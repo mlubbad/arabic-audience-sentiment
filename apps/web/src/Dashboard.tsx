@@ -4,6 +4,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import { type Filters, type Label } from "@sentiment/contracts";
 import {
+  buildExport,
   fixtureWorkspace,
   loadSnapshot,
   reviewsArePersisted,
@@ -73,6 +74,19 @@ export function Dashboard() {
       // Re-read through the same snapshot path so the corrected label, the
       // sentiment denominator and the review filter all move together.
       await client.invalidateQueries({ queryKey: ["fixture-dashboard"] });
+    },
+  });
+  const exporting = useMutation({
+    mutationFn: () => buildExport(page),
+    onSuccess: ({ csv, filename }) => {
+      const url = URL.createObjectURL(
+        new Blob([csv], { type: "text/csv;charset=utf-8" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
     },
   });
   function startReview(c: {
@@ -435,6 +449,25 @@ export function Dashboard() {
                     )}
                   </form>
                 )}
+                <div className="export">
+                  <button
+                    type="button"
+                    onClick={() => exporting.mutate()}
+                    disabled={exporting.isPending}
+                  >
+                    تصدير CSV
+                  </button>
+                  <p className="muted">
+                    يصدّر كل التعليقات المطابقة للفلاتر الحالية ({s.total}) وليس
+                    الصفحة المعروضة فقط. تُعطَّل صيغ الجداول في الملف دون تغيير
+                    النص المخزن.
+                  </p>
+                  {exporting.isError && (
+                    <p role="alert" data-testid="export-error">
+                      تعذر إنشاء ملف التصدير. حاول مرة أخرى.
+                    </p>
+                  )}
+                </div>
                 <nav className="pager" aria-label="تصفح التعليقات">
                   <button
                     type="button"

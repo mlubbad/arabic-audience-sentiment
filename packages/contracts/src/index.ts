@@ -194,15 +194,26 @@ export function effectiveLabel(
   };
 }
 
-/** Pure fixture/reference implementation. Server queries must separately enforce RLS. */
-export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
-  const f = FiltersSchema.parse(raw);
+export type LabelledComment = Comment & {
+  label: Label | null;
+  reviewed: boolean;
+};
+
+/**
+ * The single filter implementation. Views and exports both go through it, so an
+ * export can never be a differently filtered version of what was on screen.
+ */
+function filteredRows(
+  input: Comment[],
+  f: z.output<typeof FiltersSchema>,
+  activeKey: string,
+): LabelledComment[] {
   const unique = new Map(
     input
       .filter((c) => c.workspace_id === f.workspace_id)
       .map((c) => [c.id, c]),
   );
-  const rows = [...unique.values()]
+  return [...unique.values()]
     .map((c) => ({ ...c, ...effectiveLabel(c, activeKey) }))
     .filter((c) => {
       if (
@@ -247,6 +258,24 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
         .includes(f.q.trim().toLocaleLowerCase());
     })
     .sort((a, b) => a.id.localeCompare(b.id, "en"));
+}
+
+/**
+ * Every row the filters select, never a page of them. An export that silently
+ * stopped at the page size would understate the answer it claims to give.
+ */
+export function exportRows(
+  input: Comment[],
+  raw: Filters,
+  activeKey: string,
+): LabelledComment[] {
+  return filteredRows(input, FiltersSchema.parse(raw), activeKey);
+}
+
+/** Pure fixture/reference implementation. Server queries must separately enforce RLS. */
+export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
+  const f = FiltersSchema.parse(raw);
+  const rows = filteredRows(input, f, activeKey);
   const sentiments: Record<Label, number> = {
     positive: 0,
     negative: 0,
@@ -286,4 +315,84 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
         ? comments.at(-1)!.id
         : null,
   };
+}
+
+export const CSV_COLUMNS = [
+  "comment_id",
+  "video_id",
+  "video_kind",
+  "author_name",
+  "author_channel_id",
+  "text_raw",
+  "effective_label",
+  "label_source",
+  "prediction_status",
+  "analysis_key",
+  "published_at",
+  "published_time_raw",
+  "timestamp_precision",
+  "is_reply",
+  "parent_comment_id",
+  "parent_source",
+  "source",
+  "content_hash",
+] as const;
+
+// A cell a spreadsheet would evaluate on open rather than display.
+const FORMULA_START = /^[=+\-@\t\r]/;
+
+function escapeCell(value: string): string {
+  // Neutralising happens on the way out only. The stored text is evidence and
+  // is never rewritten to make a spreadsheet safe.
+  const guarded = FORMULA_START.test(value) ? `'${value}` : value;
+  return guarded !== value || /["\n\r,]/.test(guarded)
+    ? `"${guarded.replace(/"/g, '""')}"`
+    : guarded;
+}
+
+function labelSource(row: LabelledComment): string {
+  if (row.reviewed) return "human_review";
+  return row.label ? "model" : "none";
+}
+
+/**
+ * Renders already-filtered rows. Takes the output of exportRows so the file and
+ * the dashboard cannot disagree about which comments are in scope.
+ */
+export function toCsv(rows: LabelledComment[]): string {
+  const body = rows.map((r) =>
+    [
+      r.id,
+      r.video_id,
+      r.video_kind,
+      r.author_name,
+      r.author_channel_id ?? "",
+      r.text_raw,
+      r.label ?? "",
+      labelSource(r),
+      r.prediction?.status ?? "",
+      r.prediction?.analysis_key ?? "",
+      r.published_at ?? "",
+      r.published_time_raw ?? "",
+      r.timestamp_precision,
+      String(r.is_reply),
+      r.parent_comment_id ?? "",
+      r.parent_source,
+      r.source,
+      r.content_hash,
+    ]
+      .map(escapeCell)
+      .join(","),
+  );
+  // The byte order mark is what makes Excel read the file as UTF-8 rather than
+  // mangling Arabic into a legacy code page.
+  return `\uFEFF${[CSV_COLUMNS.join(","), ...body].join("\r\n")}\r\n`;
+}
+
+/**
+ * Storage object path for an export. The first segment is the workspace id
+ * because that is exactly what the private bucket policy checks.
+ */
+export function exportObjectPath(workspaceId: string, now: Date): string {
+  return `${workspaceId}/comments-${now.toISOString().slice(0, 10)}.csv`;
 }

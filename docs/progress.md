@@ -61,6 +61,10 @@ project, a real sentiment model, or any deployment.
 | Invalid-cursor recovery | fixture-tested | If the row a cursor names disappears, the page is rebuilt from page one and the user is told, instead of showing an empty or mismatched page |
 | Correction UI | fixture-tested | Per-row correction form; the corrected label overrides the model for the current text and every aggregate moves with it through the one shared snapshot |
 | Correction persistence | **blocked** | Without a Supabase project the UI keeps corrections for the browser session only, and says so on screen. The RPC call path exists but has never reached a real server |
+| CSV export | fixture-tested | One shared row selection drives the table and the export, so a file always matches the filters on screen and is never limited to the visible page |
+| Formula-injection safety | implemented | A cell a spreadsheet would evaluate is quoted and prefixed on output only; the stored text is evidence and is never rewritten |
+| Export label honesty | implemented | The file carries the effective label and whether it came from a human or the model; a stale or missing prediction exports an empty label while its status is still recorded |
+| Background export job and signed link | **blocked** | Needs Supabase Storage and a running worker. Fixture mode builds the file in the browser; the object name already carries the workspace prefix the bucket policy checks |
 | Supabase Auth account screen | implemented, not live-tested | Renders an honest "not configured" state without credentials; sign-in/sign-up paths have never contacted a real Supabase project |
 | Live Auth, Storage, PostgREST, Edge Function behaviour | **blocked** | Needs a Supabase development project URL and publishable key |
 | OAuth (M5) | not started | Table shapes and status values exist; no flow implemented |
@@ -92,10 +96,9 @@ project, a real sentiment model, or any deployment.
 
 ## Next unblocked work
 
-1. Add CSV export with formula-injection neutralisation on output while the stored raw text
-   stays unmodified.
-2. Add `usage_events` reservation inside the batch transaction so concurrent requests cannot
+1. Add `usage_events` reservation inside the batch transaction so concurrent requests cannot
    overspend a plan limit.
-3. Add the remaining dashboard filters the contract already supports — comment type, reply
+2. Add the remaining dashboard filters the contract already supports — comment type, reply
    mode, review status, video kind — now that one snapshot drives every panel.
-4. Surface the review history per comment (who, when, why) now that the log is append-only.
+3. Surface the review history per comment (who, when, why) now that the log is append-only.
+4. Add video comparison, since every panel already derives from one filtered snapshot.

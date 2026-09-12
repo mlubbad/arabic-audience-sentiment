@@ -25,12 +25,12 @@ All of the following were run after the clean install above.
 | `npm run lint` | Pass — ESLint clean; Ruff "All checks passed!" |
 | `npm run format:check` | Pass — all matched code files use Prettier style |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
-| `npm test` | Pass — 16 tests, 2 files |
+| `npm test` | Pass — 24 tests, 3 files |
 | `npm run test:db` | Pass — 10 tests |
 | `npm run worker:test` | Pass — 23 tests, 4 files |
 | `npm run build` | Pass — 146 modules; `index.js` 478.09 kB (151.76 kB gzip), `index.css` 6.29 kB |
-| `npm run check:secrets` | Pass — 61 source files plus built assets |
-| `npm run test:e2e` | Pass — 9 tests, Chromium |
+| `npm run check:secrets` | Pass — 62 source files plus built assets |
+| `npm run test:e2e` | Pass — 12 tests, Chromium |
 | `npm run worker:collect -- --source fixture …` | Pass — status `succeeded`, 2 unique comments, coverage declared as source traversal only |
 
 `npm run check` runs everything except `test:e2e` in one command, and passed end to end.
@@ -41,7 +41,7 @@ work.
 
 ## What each test actually proves
 
-### Contract and snapshot tests (`npm test`, 16)
+### Contract and snapshot tests (`npm test`, 24)
 
 - scopes to one workspace before counting, and excludes stale and unanalysed rows from the
   sentiment denominator
@@ -63,6 +63,17 @@ work.
 - the `review_status` filter sees the correction through the same snapshot
 - a correction against changed text is refused as `stale_comment_text`; an unknown comment,
   another workspace's comment, an empty reason and an unknown label are all refused
+- an export contains exactly the rows the dashboard counted, ignoring the page size, and
+  matches the dashboard total under video, search, sentiment and review-status filters
+- an export never contains another workspace's rows
+- the file records the effective label and its source: `model`, `human_review`, or `none` for
+  a stale or missing prediction, whose `prediction_status` is still preserved
+- every cell a spreadsheet would evaluate — leading `=`, `+`, `-`, `@`, tab or carriage
+  return — is quoted and prefixed, and the input objects are byte-identical afterwards, so
+  neutralising happens on output only
+- quotes, commas and embedded newlines are escaped so the record count stays honest
+- the file begins with a byte order mark, and the object name begins with the workspace id
+  that the private bucket policy checks
 - `authorize()` checks identity and current membership independently — a valid token for the
   wrong workspace, and a valid member with the wrong role, are both rejected
 
@@ -106,7 +117,7 @@ work.
   only, and a re-run does not duplicate rows; `--source youtube-api` without a key fails
   instead of producing a successful empty run
 
-### Browser tests (`npm run test:e2e`, 9)
+### Browser tests (`npm run test:e2e`, 12)
 
 - the shell renders `dir="rtl"`, labels itself as synthetic data, filters to a real subset,
   shows a genuine empty state, and resets correctly
@@ -129,6 +140,11 @@ work.
   without changing the comment total
 - a correction written against text that changed meanwhile is refused with a plain-language
   conflict message, and nothing is recorded
+- a real download with five of six rows on screen yields six data rows, a BOM and the expected
+  header; narrowing the filter narrows the file to two rows
+- the exported row carries the corrected label and `human_review`, not the superseded prediction
+- a comment whose text is a spreadsheet formula renders literally on screen and is quoted and
+  prefixed in the downloaded file
 
 ## Not verified — do not represent these as working
 
@@ -140,6 +156,8 @@ work.
 | Database behaviour beyond SQL/RLS | PGlite runs the real SQL and RLS but is not Supabase. The test file creates minimal stand-in `auth`/`storage` objects |
 | Sentiment model quality | No model downloaded, no inference run, no benchmark. No accuracy figure is claimed anywhere |
 | Correction persistence | The `submit_comment_review` RPC is tested in embedded PostgreSQL, but the browser has never called it. In fixture mode corrections are session-only and the UI says so |
+| Export delivery | The file is built in the browser. No background export job, no Supabase Storage upload, and no short-lived signed link has been exercised. Only the object-name convention is tested |
+| Spreadsheet behaviour | Neutralisation is verified as bytes in the file. No real spreadsheet application was opened to confirm how it renders them |
 | Legacy import and the handoff's topic-count discrepancies | Source CSV and amendment file missing; no reconciliation performed |
 | CI | `.github/workflows/ci.yml` exists but has never executed — no Git remote and no commit yet |
 | Deployment | Nothing deployed; no URL exists, private or otherwise |

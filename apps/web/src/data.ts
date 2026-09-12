@@ -2,7 +2,10 @@ import {
   CommentReviewInputSchema,
   FixtureSchema,
   applyReview,
+  exportObjectPath,
+  exportRows,
   snapshot,
+  toCsv,
   type Comment,
   type CommentReviewInput,
   type Filters,
@@ -74,4 +77,27 @@ export async function submitReview(raw: CommentReviewInput) {
     new Date().toISOString(),
   );
   sessionReviews.push({ input, at: new Date().toISOString() });
+}
+
+/**
+ * Builds the export from the filters currently on screen, through the same
+ * shared row selection the dashboard uses. In fixture mode the file is produced
+ * in the browser; a real export is a background job writing to the private
+ * bucket, which is why the name already carries the workspace prefix the
+ * storage policy checks.
+ */
+export async function buildExport(filters: Filters) {
+  const fixture = await readFixture();
+  const rows = exportRows(
+    withSessionReviews(fixture.comments),
+    filters,
+    fixture.active_analysis_key,
+  );
+  return {
+    rows: rows.length,
+    filename: exportObjectPath(filters.workspace_id, new Date())
+      .split("/")
+      .pop()!,
+    csv: toCsv(rows),
+  };
 }

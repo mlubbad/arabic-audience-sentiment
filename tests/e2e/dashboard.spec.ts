@@ -262,3 +262,78 @@ test("refuses a correction written against text that changed meanwhile", async (
     "مراجعة بشرية",
   );
 });
+
+async function downloadCsv(page: import("@playwright/test").Page) {
+  const wait = page.waitForEvent("download");
+  await page.getByRole("button", { name: "تصدير CSV" }).click();
+  const download = await wait;
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  return {
+    name: download.suggestedFilename(),
+    text: Buffer.concat(chunks).toString("utf8"),
+  };
+}
+
+test("exports every filtered comment, not just the visible page", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  // Shrink the page so a page-limited export would be obviously wrong.
+  await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
+  await expect(page.locator("tbody tr")).toHaveCount(5);
+
+  const all = await downloadCsv(page);
+  expect(all.name).toMatch(/^comments-\d{4}-\d{2}-\d{2}\.csv$/);
+  expect(all.text.startsWith("\uFEFF")).toBe(true);
+  const header = all.text.replace(/^\uFEFF/, "").split("\r\n")[0];
+  expect(header.split(",")[0]).toBe("comment_id");
+  // Six data rows for six filtered comments, despite five being on screen.
+  expect(all.text.trim().split("\r\n")).toHaveLength(7);
+
+  // A narrower filter must produce a narrower file, through the same rules.
+  await page.getByLabel("الفيديو").selectOption("video-2");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("2");
+  const filtered = await downloadCsv(page);
+  expect(filtered.text.trim().split("\r\n")).toHaveLength(3);
+});
+
+test("exports the corrected label rather than the superseded prediction", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const row = page.locator("tbody tr").first();
+  await row.getByRole("button", { name: "تصحيح" }).click();
+  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(page.locator("tbody tr").first()).toContainText("مراجعة بشرية");
+
+  const { text } = await downloadCsv(page);
+  const line = text.split("\r\n").find((l) => l.startsWith("fixture-1,"))!;
+  expect(line).toContain(",negative,human_review,");
+});
+
+test("neutralises spreadsheet formulas in the file but not on screen", async ({
+  page,
+}) => {
+  const attack = '=HYPERLINK("http://attacker.example","اضغط")';
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    fixture.comments[0].text_raw = attack;
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/");
+  // The dashboard shows the real stored text, escaped as text by React.
+  await expect(page.locator("tbody tr").first()).toContainText(attack);
+
+  const { text } = await downloadCsv(page);
+  const line = text.split("\r\n").find((l) => l.startsWith("fixture-1,"))!;
+  // A spreadsheet sees a quoted string beginning with an apostrophe, so it
+  // displays the text instead of evaluating it.
+  expect(line).toContain(`"'${attack.replace(/"/g, '""')}"`);
+  expect(line).not.toContain(`,${attack.slice(0, 5)}`);
+});
