@@ -1,0 +1,49 @@
+{
+  "name": "arabic-audience-sentiment",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/web",
+    "packages/contracts"
+  ],
+  "engines": {
+    "node": ">=22.14.0 <23",
+    "npm": ">=10 <11"
+  },
+  "packageManager": "npm@10.9.2",
+  "scripts": {
+    "dev": "npm run dev -w @sentiment/web",
+    "build": "npm run build -w @sentiment/web",
+    "lint": "eslint . && npm run worker:lint",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write 'apps/web/src/**/*.{ts,tsx,css}' 'apps/web/vite.config.ts' 'packages/contracts/src/*.ts' 'supabase/functions/**/*.ts' 'supabase/tests/*.ts' 'tests/e2e/*.ts' 'scripts/*.mjs' '*.{json,js,ts}'",
+    "format:check": "prettier --check 'apps/web/src/**/*.{ts,tsx,css}' 'apps/web/vite.config.ts' 'packages/contracts/src/*.ts' 'supabase/functions/**/*.ts' 'supabase/tests/*.ts' 'tests/e2e/*.ts' 'scripts/*.mjs' '*.{json,js,ts}'",
+    "test": "vitest run --exclude \"supabase/tests/**\"",
+    "test:db": "vitest run supabase/tests",
+    "test:e2e": "playwright test",
+    "worker:test": "uv --directory workers/python --cache-dir ../../.cache/uv run --frozen pytest",
+    "worker:lint": "uv --directory workers/python --cache-dir ../../.cache/uv run --frozen ruff check .",
+    "worker:collect": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m collectors.cli",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "setup": "npm ci --cache .cache/npm && uv --directory workers/python --cache-dir ../../.cache/uv sync --frozen && playwright install chromium",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run test:db && npm run worker:test && npm run build && npm run check:secrets"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.13.10",
+    "@types/react": "19.0.10",
+    "@types/react-dom": "19.0.4",
+    "@vitejs/plugin-react": "4.7.0",
+    "eslint": "9.39.5",
+    "globals": "16.5.0",
+    "prettier": "3.6.2",
+    "supabase": "2.117.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.48.1",
+    "vite": "6.4.3",
+    "vitest": "5.0.0"
+  }
+}

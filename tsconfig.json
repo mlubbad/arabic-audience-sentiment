@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "apps/web/src",
+    "apps/web/vite.config.ts",
+    "packages/contracts/src",
+    "supabase/functions",
+    "supabase/tests",
+    "tests",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
+}

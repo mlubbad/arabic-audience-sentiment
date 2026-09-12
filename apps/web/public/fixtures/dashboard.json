@@ -1,0 +1,232 @@
+{
+  "mode": "sanitized_fixture",
+  "revision": "fixture-dataset-v1",
+  "active_analysis_key": "fixture-v1",
+  "comments": [
+    {
+      "id": "fixture-1",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-0",
+      "author_name": "مؤلف اصطناعي 1",
+      "text_raw": "المحتوى واضح ومفيد",
+      "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
+      "published_at": "2026-09-01T09:00:00Z",
+      "published_time_raw": "2026-09-01T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": false,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored synthetic test data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": {
+        "status": "succeeded",
+        "label": "positive",
+        "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 1,
+          "negative": 0,
+          "neutral": 0,
+          "mixed": 0
+        }
+      },
+      "reviews": []
+    },
+    {
+      "id": "fixture-2",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-1",
+      "author_name": "مؤلف اصطناعي 2",
+      "text_raw": "أتمنى تحسين الصوت",
+      "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
+      "published_at": "2026-09-02T09:00:00Z",
+      "published_time_raw": "2026-09-02T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": true,
+      "parent_comment_id": "fixture-1",
+      "parent_source": "api",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored synthetic test data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": {
+        "status": "succeeded",
+        "label": "negative",
+        "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 0,
+          "negative": 1,
+          "neutral": 0,
+          "mixed": 0
+        }
+      },
+      "reviews": []
+    },
+    {
+      "id": "fixture-3",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-2",
+      "author_name": "مؤلف اصطناعي 3",
+      "text_raw": "معلومة عن موعد الحلقة",
+      "content_hash": "caccab19907a993a2eae2d88e4aa69035b9c05b3efffb53b44463206db23ac31",
+      "published_at": "2026-09-03T09:00:00Z",
+      "published_time_raw": "2026-09-03T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": false,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored synthetic test data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": {
+        "status": "succeeded",
+        "label": "neutral",
+        "content_hash": "caccab19907a993a2eae2d88e4aa69035b9c05b3efffb53b44463206db23ac31",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 0,
+          "negative": 0,
+          "neutral": 1,
+          "mixed": 0
+        }
+      },
+      "reviews": []
+    },
+    {
+      "id": "fixture-4",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-3",
+      "author_name": "مؤلف اصطناعي 4",
+      "text_raw": "الفكرة جيدة لكن الشرح طويل",
+      "content_hash": "ccf076ad06fa200caf79e70d5393b1c4a59717b634d74fb50258f2e230d8ef23",
+      "published_at": "2026-09-04T09:00:00Z",
+      "published_time_raw": "2026-09-04T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": true,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored synthetic test data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": {
+        "status": "succeeded",
+        "label": "mixed",
+        "content_hash": "ccf076ad06fa200caf79e70d5393b1c4a59717b634d74fb50258f2e230d8ef23",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 0,
+          "negative": 0,
+          "neutral": 0,
+          "mixed": 1
+        }
+      },
+      "reviews": []
+    },
+    {
+      "id": "fixture-5",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-2",
+      "video_kind": "video",
+      "author_channel_id": null,
+      "author_name": "مؤلف اصطناعي 5",
+      "text_raw": "تعليق لم يُحلل بعد",
+      "content_hash": "13d0095bd720a8a43beaed9a09a299131748d5ea434249841de4fe471e38b6af",
+      "published_at": null,
+      "published_time_raw": null,
+      "timestamp_precision": "unknown",
+      "is_reply": false,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored synthetic test data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": null,
+      "reviews": []
+    },
+    {
+      "id": "fixture-6",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-2",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-5",
+      "author_name": "مؤلف اصطناعي 6",
+      "text_raw": "هذا النص تغير بعد التحليل",
+      "content_hash": "24b63a9c284e1c4a3a29de0be794d78ba2071124d9f226b93d1b3d60bbc0ae0d",
+      "published_at": "2026-09-06T09:00:00Z",
+      "published_time_raw": "2026-09-06T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": false,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored synthetic test data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": {
+        "status": "succeeded",
+        "label": "positive",
+        "content_hash": "old-text-hash",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 1,
+          "negative": 0,
+          "neutral": 0,
+          "mixed": 0
+        }
+      },
+      "reviews": []
+    }
+  ]
+}
