@@ -1,12 +1,41 @@
-import { FixtureSchema, snapshot, type Filters } from "@sentiment/contracts";
+import {
+  CommentReviewInputSchema,
+  FixtureSchema,
+  applyReview,
+  snapshot,
+  type Comment,
+  type CommentReviewInput,
+  type Filters,
+} from "@sentiment/contracts";
+import { supabase } from "./supabase";
 export const fixtureWorkspace = "00000000-0000-4000-8000-000000000001";
 
-export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
+/**
+ * Fixture mode has no server, so corrections are kept for this browser session
+ * only and are never sent anywhere. They go through the same shared applyReview
+ * rules that the server RPC mirrors, so the dashboard recomputes identically.
+ */
+const sessionReviews: { input: CommentReviewInput; at: string }[] = [];
+export const reviewsArePersisted = supabase !== null;
+
+function withSessionReviews(comments: Comment[]): Comment[] {
+  return sessionReviews.reduce(
+    (acc, r) => applyReview(acc, r.input, r.at),
+    comments,
+  );
+}
+
+async function readFixture(signal?: AbortSignal) {
   const response = await fetch("/fixtures/dashboard.json", { signal });
   if (!response.ok) throw new Error("fixture_unavailable");
-  const fixture = FixtureSchema.parse(await response.json());
+  return FixtureSchema.parse(await response.json());
+}
+
+export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
+  const fixture = await readFixture(signal);
+  const comments = withSessionReviews(fixture.comments);
   const build = (f: Filters, cursor_reset: boolean) => ({
-    ...snapshot(fixture.comments, f, fixture.active_analysis_key),
+    ...snapshot(comments, f, fixture.active_analysis_key),
     revision: fixture.revision,
     cursor_reset,
   });
@@ -19,4 +48,30 @@ export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
     // than showing an empty page or a page from a different result set.
     return build({ ...filters, cursor: undefined }, true);
   }
+}
+
+export async function submitReview(raw: CommentReviewInput) {
+  const input = CommentReviewInputSchema.parse(raw);
+  if (supabase) {
+    // The RPC re-checks role, tenancy and the content hash server-side; this
+    // call is a request, not the authority on whether it is allowed.
+    const { error } = await supabase.rpc("submit_comment_review", {
+      w: input.workspace_id,
+      c: input.comment_id,
+      seen_hash: input.content_hash,
+      verdict: input.label,
+      why: input.reason,
+    });
+    if (error) throw new Error(error.message);
+    return;
+  }
+  // Validate against the current fixture so a verdict on changed text is
+  // rejected here too, instead of failing later during a reload.
+  const fixture = await readFixture();
+  applyReview(
+    withSessionReviews(fixture.comments),
+    input,
+    new Date().toISOString(),
+  );
+  sessionReviews.push({ input, at: new Date().toISOString() });
 }

@@ -169,6 +169,19 @@ small {
   margin: 0;
   color: #485e70;
 }
+.review {
+  border-inline-start: 4px solid #244c67;
+}
+.review h3 {
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.review blockquote {
+  margin: 0 0 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: #f4f6f8;
+  border-radius: 6px;
+}
 .updating {
   padding: 0.5rem 1rem;
   border-inline-start: 4px solid #687c8e;

@@ -172,3 +172,93 @@ test("recovers to page one when the row a cursor points at disappears", async ({
     page.getByRole("button", { name: "الصفحة السابقة" }),
   ).toBeDisabled();
 });
+
+test("a human correction overrides the model and moves every aggregate together", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  const distribution = page
+    .getByRole("listitem")
+    .filter({ hasText: "إيجابي:" });
+  await expect(distribution).toHaveText("إيجابي: 1 (25٪)");
+
+  // Row one is the model's single positive comment.
+  const row = page.locator("tbody tr").first();
+  await expect(row).toContainText("إيجابي");
+  await row.getByRole("button", { name: "تصحيح" }).click();
+
+  await expect(page.getByTestId("review-text")).toContainText(
+    "المحتوى واضح ومفيد",
+  );
+  // Fixture mode must say plainly that nothing is persisted.
+  await expect(page.getByTestId("review-scope")).toContainText(
+    "لا يُرسل إلى أي خادم",
+  );
+
+  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ من النموذج");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+
+  // The corrected label replaces the prediction and is marked as human.
+  await expect(page.locator("tbody tr").first()).toContainText("سلبي");
+  await expect(page.locator("tbody tr").first()).toContainText("مراجعة بشرية");
+  // The denominator is unchanged, but the buckets moved with the verdict.
+  await expect(distribution).toHaveText("إيجابي: 0 (0٪)");
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "سلبي:" }),
+  ).toHaveText("سلبي: 2 (50٪)");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(page.getByText("المقام: 4 تعليقًا")).toBeVisible();
+});
+
+test("correcting an unanalysed comment adds it to the sentiment denominator", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByText("المقام: 4 تعليقًا")).toBeVisible();
+
+  // This row has no usable prediction, so it is outside the denominator.
+  const row = page
+    .locator("tbody tr")
+    .filter({ hasText: "تعليق لم يُحلل بعد" });
+  await expect(row).toContainText("غير محلل / قديم");
+  await row.getByRole("button", { name: "تصحيح" }).click();
+  await page.getByLabel("التصنيف الصحيح").selectOption("mixed");
+  await page.getByLabel("سبب التصحيح").fill("مراجعة يدوية");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+
+  await expect(page.getByText("المقام: 5 تعليقًا")).toBeVisible();
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "مختلط:" }),
+  ).toHaveText("مختلط: 2 (40٪)");
+  // Still six comments; only the analysed share changed.
+  await expect(page.getByTestId("total")).toHaveText("6");
+});
+
+test("refuses a correction written against text that changed meanwhile", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const row = page.locator("tbody tr").first();
+  await row.getByRole("button", { name: "تصحيح" }).click();
+  await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
+
+  // The comment is edited after the reviewer read it, so the verdict now belongs
+  // to a version of the text that no longer exists.
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    fixture.comments[0].text_raw = "نص مُعدَّل بعد فتح شاشة التصحيح";
+    fixture.comments[0].content_hash = "hash-after-the-edit";
+    await route.fulfill({ json: fixture });
+  });
+
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(page.getByTestId("review-error")).toContainText(
+    "تغيّر نص التعليق",
+  );
+  // Nothing was recorded, so the model's label still stands.
+  await expect(page.locator("tbody tr").first()).not.toContainText(
+    "مراجعة بشرية",
+  );
+});

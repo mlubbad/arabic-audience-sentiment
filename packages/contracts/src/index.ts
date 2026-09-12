@@ -124,6 +124,47 @@ export const ErrorSchema = z.object({
   request_id: z.string().uuid(),
   retryable: z.boolean(),
 });
+export const CommentReviewInputSchema = z
+  .object({
+    workspace_id: z.string().uuid(),
+    comment_id: z.string().min(1),
+    // The hash of the text the reviewer actually read. Optimistic concurrency:
+    // a verdict is only valid for the version it was formed against.
+    content_hash: z.string().min(1),
+    label: LabelSchema,
+    reason: z.string().trim().min(1).max(500),
+  })
+  .strict();
+export type CommentReviewInput = z.infer<typeof CommentReviewInputSchema>;
+
+/**
+ * Appends a human correction. Pure and non-mutating, so a rejected correction
+ * cannot leave a half-applied list behind. The server RPC enforces the same
+ * rules; this is the shared reference implementation, not a substitute for it.
+ */
+export function applyReview(
+  comments: Comment[],
+  raw: CommentReviewInput,
+  now: string,
+): Comment[] {
+  const input = CommentReviewInputSchema.parse(raw);
+  const target = comments.find(
+    (c) => c.id === input.comment_id && c.workspace_id === input.workspace_id,
+  );
+  if (!target) throw new Error("invalid_comment");
+  if (target.content_hash !== input.content_hash)
+    throw new Error("stale_comment_text");
+  const review = {
+    label: input.label,
+    content_hash: input.content_hash,
+    created_at: now,
+    origin: "human" as const,
+  };
+  return comments.map((c) =>
+    c === target ? { ...c, reviews: [...c.reviews, review] } : c,
+  );
+}
+
 export const FixtureSchema = z.object({
   mode: z.literal("sanitized_fixture"),
   revision: z.string(),

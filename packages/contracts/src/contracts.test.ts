@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CommentReviewInputSchema,
   FiltersSchema,
   PredictionSchema,
+  applyReview,
+  effectiveLabel,
   snapshot,
   type Comment,
 } from "./index";
@@ -227,5 +230,108 @@ describe("dashboard contract", () => {
         "fixture-v1",
       ),
     ).toThrow("invalid_cursor");
+  });
+});
+
+describe("human corrections", () => {
+  const review = {
+    workspace_id: workspace,
+    comment_id: "1",
+    content_hash: "current",
+    label: "negative" as const,
+    reason: "تصنيف خاطئ",
+  };
+  const at = "2026-09-05T00:00:00Z";
+
+  it("appends rather than replacing, and the newest current review wins", () => {
+    const once = applyReview(rows, review, at);
+    const twice = applyReview(
+      once,
+      { ...review, label: "mixed" },
+      "2026-09-06T00:00:00Z",
+    );
+    const target = twice.find((c) => c.id === "1")!;
+    expect(target.reviews).toHaveLength(2);
+    expect(target.reviews.map((r) => r.label)).toEqual(["negative", "mixed"]);
+    expect(effectiveLabel(target, "fixture-v1")).toEqual({
+      label: "mixed",
+      reviewed: true,
+    });
+    // The input array is untouched, so a failed round trip cannot half-apply.
+    expect(rows.find((c) => c.id === "1")!.reviews).toHaveLength(0);
+  });
+
+  it("moves the comment between buckets without changing the total", () => {
+    const before = snapshot(rows, { workspace_id: workspace }, "fixture-v1");
+    const after = snapshot(
+      applyReview(rows, review, at),
+      { workspace_id: workspace },
+      "fixture-v1",
+    );
+    expect(after.total).toBe(before.total);
+    expect(before.sentiments).toEqual({
+      positive: 1,
+      negative: 0,
+      neutral: 0,
+      mixed: 1,
+    });
+    expect(after.sentiments).toEqual({
+      positive: 0,
+      negative: 1,
+      neutral: 0,
+      mixed: 1,
+    });
+    expect(after.analysed).toBe(before.analysed);
+  });
+
+  it("makes a previously unanalysed comment count once it is reviewed", () => {
+    const after = snapshot(
+      applyReview(rows, { ...review, comment_id: "4" }, at),
+      { workspace_id: workspace },
+      "fixture-v1",
+    );
+    expect(after.analysed).toBe(3);
+    expect(after.unanalysed).toBe(1);
+    expect(after.sentiments.negative).toBe(1);
+  });
+
+  it("is visible to the review_status filter through the same snapshot", () => {
+    const reviewed = applyReview(rows, review, at);
+    expect(
+      snapshot(
+        reviewed,
+        { workspace_id: workspace, review_status: "reviewed" },
+        "fixture-v1",
+      ).total,
+    ).toBe(1);
+    expect(
+      snapshot(
+        reviewed,
+        { workspace_id: workspace, review_status: "unreviewed" },
+        "fixture-v1",
+      ).total,
+    ).toBe(3);
+  });
+
+  it("refuses a verdict written against text that has since changed", () => {
+    expect(() =>
+      applyReview(rows, { ...review, content_hash: "old" }, at),
+    ).toThrow("stale_comment_text");
+  });
+
+  it("refuses an unknown comment, another workspace, and an empty reason", () => {
+    expect(() =>
+      applyReview(rows, { ...review, comment_id: "404" }, at),
+    ).toThrow("invalid_comment");
+    // Row 5 exists but belongs to another workspace.
+    expect(() => applyReview(rows, { ...review, comment_id: "5" }, at)).toThrow(
+      "invalid_comment",
+    );
+    expect(
+      CommentReviewInputSchema.safeParse({ ...review, reason: "   " }).success,
+    ).toBe(false);
+    expect(
+      CommentReviewInputSchema.safeParse({ ...review, label: "angry" }).success,
+    ).toBe(false);
   });
 });

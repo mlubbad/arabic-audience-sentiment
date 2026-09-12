@@ -159,6 +159,36 @@ declare ch uuid; begin
 end $$;
 create function public.register_channel(w uuid,c uuid,external text) returns uuid language sql security invoker set search_path='' as $$select private.register_channel_impl(w,c,external)$$;
 
+-- Human corrections are append-only and are written only through this RPC, so the
+-- reviewer identity and the 'human' provenance come from the session rather than
+-- from the caller. A legacy amendment is imported separately and stays
+-- 'legacy_unverified'; a tenant cannot award that provenance to its own verdict.
+create function private.submit_comment_review_impl(w uuid,c uuid,seen_hash text,verdict text,why text) returns uuid
+language plpgsql security definer set search_path='' as $$
+declare r uuid; current_hash text; begin
+ if not private.has_role(w,array['workspace_owner','analyst']) then raise exception 'forbidden' using errcode='42501'; end if;
+ if verdict not in ('positive','negative','neutral','mixed') then raise exception 'invalid_label' using errcode='22023'; end if;
+ if why is null or length(trim(why)) not between 1 and 500 then raise exception 'invalid_reason' using errcode='22023'; end if;
+ select content_hash into current_hash from public.comments where workspace_id=w and id=c;
+ if current_hash is null then raise exception 'invalid_comment' using errcode='23503'; end if;
+ -- Optimistic concurrency on the text the reviewer actually read. If the comment
+ -- was edited since, the verdict belongs to text that no longer exists.
+ if current_hash is distinct from seen_hash then raise exception 'stale_comment_text' using errcode='40001'; end if;
+ insert into public.comment_reviews(workspace_id,comment_id,content_hash,label,reviewer_id,reason,origin)
+ values(w,c,current_hash,verdict,(select auth.uid()),trim(why),'human') returning id into r;
+ return r;
+end $$;
+create function public.submit_comment_review(w uuid,c uuid,seen_hash text,verdict text,why text) returns uuid
+language sql security invoker set search_path='' as $$select private.submit_comment_review_impl(w,c,seen_hash,verdict,why)$$;
+
+-- Append-only is enforced in the database, not only by withheld grants, so that a
+-- privileged role cannot quietly rewrite a review history either.
+create function private.reject_review_mutation() returns trigger
+language plpgsql set search_path='' as $$
+begin raise exception 'comment_reviews_is_append_only' using errcode='0A000'; end $$;
+create trigger comment_reviews_append_only before update or delete on public.comment_reviews
+ for each row execute function private.reject_review_mutation();
+
 -- Every Auth user gets one personal workspace, so no signed-in user is left without a tenant.
 -- Runs as definer because the inserting session is GoTrue, not the new user.
 create function private.bootstrap_personal_workspace() returns trigger
@@ -201,9 +231,9 @@ begin
 end $$;
 
 revoke all on all functions in schema private from public,anon,authenticated;
-grant execute on function private.has_role(uuid,text[]),private.create_workspace_impl(text),private.enqueue_sync_impl(uuid,uuid,text),private.register_channel_impl(uuid,uuid,text) to authenticated;
-revoke all on function public.create_workspace(text),public.enqueue_sync(uuid,uuid,text),public.register_channel(uuid,uuid,text) from public,anon;
-grant execute on function public.create_workspace(text),public.enqueue_sync(uuid,uuid,text),public.register_channel(uuid,uuid,text) to authenticated;
+grant execute on function private.has_role(uuid,text[]),private.create_workspace_impl(text),private.enqueue_sync_impl(uuid,uuid,text),private.register_channel_impl(uuid,uuid,text),private.submit_comment_review_impl(uuid,uuid,text,text,text) to authenticated;
+revoke all on function public.create_workspace(text),public.enqueue_sync(uuid,uuid,text),public.register_channel(uuid,uuid,text),public.submit_comment_review(uuid,uuid,text,text,text) from public,anon;
+grant execute on function public.create_workspace(text),public.enqueue_sync(uuid,uuid,text),public.register_channel(uuid,uuid,text),public.submit_comment_review(uuid,uuid,text,text,text) to authenticated;
 grant usage on schema private to service_role;
 grant all on all tables in schema private to service_role;
 grant all on all tables in schema public to service_role;

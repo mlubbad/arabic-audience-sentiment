@@ -54,6 +54,16 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
       "insert into storage.objects(bucket_id,name) values ('exports',$1),('exports',$2)",
       [`${A}/report.csv`, `${B}/report.csv`],
     );
+    await db.query(
+      "insert into videos(id,workspace_id,channel_id,external_video_id,title) values ($1,$1,$1,'vidA','A video'),($2,$2,$2,'vidB','B video')",
+      [A, B],
+    );
+    await db.query(
+      `insert into comments(id,workspace_id,video_id,external_comment_id,text_raw,text_plain,content_hash,timestamp_precision,source)
+       values ($1,$1,$1,'cA','نص أ','نص أ','hash-a','second','sanitized_fixture'),
+              ($2,$2,$2,'cB','نص ب','نص ب','hash-b','second','sanitized_fixture')`,
+      [A, B],
+    );
   });
   afterAll(async () => {
     await db?.close();
@@ -186,6 +196,117 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
         ])
       ).rows[0],
     ).toEqual({ status: "public_unverified" });
+  });
+  it("takes human corrections only through the role-checked RPC and appends them", async () => {
+    await user(viewer);
+    await expect(
+      db.query("select submit_comment_review($1,$2,$3,$4,$5)", [
+        A,
+        A,
+        "hash-a",
+        "negative",
+        "سبب",
+      ]),
+    ).rejects.toThrow();
+
+    await user(ownerA);
+    // Another tenant's comment is not reviewable even with a valid role here.
+    await expect(
+      db.query("select submit_comment_review($1,$2,$3,$4,$5)", [
+        B,
+        B,
+        "hash-b",
+        "negative",
+        "سبب",
+      ]),
+    ).rejects.toThrow();
+    // An empty reason is not a correction.
+    await expect(
+      db.query("select submit_comment_review($1,$2,$3,$4,$5)", [
+        A,
+        A,
+        "hash-a",
+        "negative",
+        "   ",
+      ]),
+    ).rejects.toThrow();
+    // Optimistic concurrency: a verdict on text that has since changed is a
+    // conflict, not a silent write against the new text.
+    await expect(
+      db.query("select submit_comment_review($1,$2,$3,$4,$5)", [
+        A,
+        A,
+        "hash-from-older-text",
+        "negative",
+        "سبب",
+      ]),
+    ).rejects.toThrow(/stale_comment_text/);
+
+    const first = await db.query<{ id: string }>(
+      "select submit_comment_review($1,$2,$3,$4,$5) as id",
+      [A, A, "hash-a", "negative", "تصنيف خاطئ"],
+    );
+    expect(first.rows[0].id).toBeTruthy();
+    // A change of mind appends; it never rewrites the earlier verdict.
+    await db.query("select submit_comment_review($1,$2,$3,$4,$5)", [
+      A,
+      A,
+      "hash-a",
+      "mixed",
+      "إعادة نظر",
+    ]);
+    const log = await db.query<{
+      label: string;
+      reviewer_id: string;
+      origin: string;
+      content_hash: string;
+    }>(
+      "select label,reviewer_id,origin,content_hash from comment_reviews where comment_id=$1 order by created_at",
+      [A],
+    );
+    expect(log.rows.map((r) => r.label)).toEqual(["negative", "mixed"]);
+    // The reviewer and provenance come from the session, never from the caller.
+    expect(
+      log.rows.every(
+        (r) =>
+          r.reviewer_id === ownerA &&
+          r.origin === "human" &&
+          r.content_hash === "hash-a",
+      ),
+    ).toBe(true);
+  });
+  it("keeps the review log append-only and unforgeable", async () => {
+    await user(ownerA);
+    // No direct insert, so reviewer_id cannot be forged and a tenant cannot
+    // claim the weaker "legacy_unverified" provenance for its own verdict.
+    await expect(
+      db.query(
+        "insert into comment_reviews(workspace_id,comment_id,content_hash,label,reviewer_id,reason,origin) values ($1,$1,'hash-a','positive',$2,'x','legacy_unverified')",
+        [A, viewer],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      db.query(
+        "update comment_reviews set label='positive' where workspace_id=$1",
+        [A],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      db.query("delete from comment_reviews where workspace_id=$1", [A]),
+    ).rejects.toThrow();
+    // The tenant still reads its own log, and only its own.
+    const mine = await db.query<{ n: number }>(
+      "select count(*)::int as n from comment_reviews",
+    );
+    expect(mine.rows[0].n).toBe(2);
+    // History is immutable even for a role that bypasses RLS.
+    await admin();
+    await expect(
+      db.query("update comment_reviews set label='positive'"),
+    ).rejects.toThrow(/append_only/);
+    await expect(db.query("delete from comment_reviews")).rejects.toThrow(
+      /append_only/,
+    );
   });
   it("fences leases and commits batch/checkpoint idempotently", async () => {
     await admin();

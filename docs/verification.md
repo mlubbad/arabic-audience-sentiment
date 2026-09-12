@@ -25,12 +25,12 @@ All of the following were run after the clean install above.
 | `npm run lint` | Pass — ESLint clean; Ruff "All checks passed!" |
 | `npm run format:check` | Pass — all matched code files use Prettier style |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
-| `npm test` | Pass — 10 tests, 2 files |
-| `npm run test:db` | Pass — 8 tests |
+| `npm test` | Pass — 16 tests, 2 files |
+| `npm run test:db` | Pass — 10 tests |
 | `npm run worker:test` | Pass — 23 tests, 4 files |
 | `npm run build` | Pass — 146 modules; `index.js` 478.09 kB (151.76 kB gzip), `index.css` 6.29 kB |
 | `npm run check:secrets` | Pass — 61 source files plus built assets |
-| `npm run test:e2e` | Pass — 6 tests, Chromium |
+| `npm run test:e2e` | Pass — 9 tests, Chromium |
 | `npm run worker:collect -- --source fixture …` | Pass — status `succeeded`, 2 unique comments, coverage declared as source traversal only |
 
 `npm run check` runs everything except `test:e2e` in one command, and passed end to end.
@@ -41,7 +41,7 @@ work.
 
 ## What each test actually proves
 
-### Contract and snapshot tests (`npm test`, 10)
+### Contract and snapshot tests (`npm test`, 16)
 
 - scopes to one workspace before counting, and excludes stale and unanalysed rows from the
   sentiment denominator
@@ -56,10 +56,17 @@ work.
   once and reporting the same total on every page
 - rejects a cursor that the current filters no longer contain, rather than silently returning
   the first page
+- a correction appends instead of replacing, leaves the input array untouched, and the newest
+  correction matching the current text wins
+- a correction moves the comment between sentiment buckets without changing the total, and
+  brings a previously unanalysed comment into the denominator
+- the `review_status` filter sees the correction through the same snapshot
+- a correction against changed text is refused as `stale_comment_text`; an unknown comment,
+  another workspace's comment, an empty reason and an unknown label are all refused
 - `authorize()` checks identity and current membership independently — a valid token for the
   wrong workspace, and a valid member with the wrong role, are both rejected
 
-### Direct SQL tenant-isolation tests (`npm run test:db`, 8)
+### Direct SQL tenant-isolation tests (`npm run test:db`, 10)
 
 - a member of workspace A cannot read, update, or list storage objects belonging to B
 - a viewer cannot promote their own role or insert into a workspace; an owner cannot move a
@@ -71,6 +78,12 @@ work.
 - `enqueue_sync` enforces role and tenant and returns the same job for a repeated key
 - every Auth user is bootstrapped with a personal workspace; `register_channel` enforces
   role, client tenancy, and channel-id format, and creates channels as `public_unverified`
+- `submit_comment_review` refuses a viewer, another tenant's comment, a blank reason, and a
+  verdict whose content hash no longer matches; a second correction appends, and reviewer id
+  and `human` provenance are taken from the session rather than the caller
+- the review log cannot be written directly, so reviewer id cannot be forged and a tenant
+  cannot claim `legacy_unverified` for its own verdict; UPDATE and DELETE are rejected even
+  for a role that bypasses RLS
 - `claim_job` hands the same job to exactly one caller; an expired lease cannot commit; a
   repeated batch key is idempotent and a conflicting payload for that key is rejected
 
@@ -93,7 +106,7 @@ work.
   only, and a re-run does not duplicate rows; `--source youtube-api` without a key fails
   instead of producing a successful empty run
 
-### Browser tests (`npm run test:e2e`, 6)
+### Browser tests (`npm run test:e2e`, 9)
 
 - the shell renders `dir="rtl"`, labels itself as synthetic data, filters to a real subset,
   shows a genuine empty state, and resets correctly
@@ -110,6 +123,12 @@ work.
   being cancelled — verified by probe before the assertion was trusted
 - when the dataset shrinks so the cursor names a missing row, the view rebuilds from page one,
   says so, and re-disables "previous"
+- a human correction replaces the model label for that row, marks it as human-reviewed, and
+  moves the sentiment buckets while the total and denominator stay correct
+- correcting a comment that had no usable prediction adds it to the denominator (4 → 5)
+  without changing the comment total
+- a correction written against text that changed meanwhile is refused with a plain-language
+  conflict message, and nothing is recorded
 
 ## Not verified — do not represent these as working
 
@@ -120,6 +139,7 @@ work.
 | Deployed Supabase | No project URL or key. GoTrue, PostgREST, Storage HTTP, and Edge Function deployment are untested |
 | Database behaviour beyond SQL/RLS | PGlite runs the real SQL and RLS but is not Supabase. The test file creates minimal stand-in `auth`/`storage` objects |
 | Sentiment model quality | No model downloaded, no inference run, no benchmark. No accuracy figure is claimed anywhere |
+| Correction persistence | The `submit_comment_review` RPC is tested in embedded PostgreSQL, but the browser has never called it. In fixture mode corrections are session-only and the UI says so |
 | Legacy import and the handoff's topic-count discrepancies | Source CSV and amendment file missing; no reconciliation performed |
 | CI | `.github/workflows/ci.yml` exists but has never executed — no Git remote and no commit yet |
 | Deployment | Nothing deployed; no URL exists, private or otherwise |

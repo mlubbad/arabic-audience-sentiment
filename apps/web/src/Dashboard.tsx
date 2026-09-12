@@ -1,9 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import { type Filters, type Label } from "@sentiment/contracts";
-import { fixtureWorkspace, loadSnapshot } from "./data";
+import {
+  fixtureWorkspace,
+  loadSnapshot,
+  reviewsArePersisted,
+  submitReview,
+} from "./data";
 import { labels, displayDate } from "./i18n";
 ChartJS.register(ArcElement, Tooltip, Legend);
 const defaults: Filters = { workspace_id: fixtureWorkspace };
@@ -43,6 +48,48 @@ export function Dashboard() {
   function goTo(next: string[]) {
     setCursorNotice(false);
     setCursors(next);
+  }
+  const client = useQueryClient();
+  const [reviewing, setReviewing] = useState<{
+    id: string;
+    hash: string;
+    text: string;
+    label: Label | null;
+  } | null>(null);
+  const [verdict, setVerdict] = useState<Label>("neutral");
+  const [reason, setReason] = useState("");
+  const review = useMutation({
+    mutationFn: () =>
+      submitReview({
+        workspace_id: filters.workspace_id,
+        comment_id: reviewing!.id,
+        content_hash: reviewing!.hash,
+        label: verdict,
+        reason,
+      }),
+    onSuccess: async () => {
+      setReviewing(null);
+      setReason("");
+      // Re-read through the same snapshot path so the corrected label, the
+      // sentiment denominator and the review filter all move together.
+      await client.invalidateQueries({ queryKey: ["fixture-dashboard"] });
+    },
+  });
+  function startReview(c: {
+    id: string;
+    content_hash: string;
+    text_raw: string;
+    label: Label | null;
+  }) {
+    review.reset();
+    setReason("");
+    setVerdict(c.label ?? "neutral");
+    setReviewing({
+      id: c.id,
+      hash: c.content_hash,
+      text: c.text_raw,
+      label: c.label,
+    });
   }
   function apply(e: FormEvent) {
     e.preventDefault();
@@ -288,6 +335,7 @@ export function Dashboard() {
                         <th>التعليق</th>
                         <th>المشاعر</th>
                         <th>التاريخ</th>
+                        <th>التصحيح</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -300,13 +348,93 @@ export function Dashboard() {
                           <td>{c.text_raw}</td>
                           <td>
                             {c.label ? labels[c.label] : "غير محلل / قديم"}
+                            {c.reviewed && <small>مراجعة بشرية</small>}
                           </td>
                           <td>{displayDate(c.published_at)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => startReview(c)}
+                              aria-label={`تصحيح تصنيف تعليق ${c.author_name}`}
+                            >
+                              تصحيح
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                {reviewing && (
+                  <form
+                    className="review"
+                    aria-label="تصحيح التصنيف"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      review.mutate();
+                    }}
+                  >
+                    <h3>تصحيح تصنيف تعليق</h3>
+                    <blockquote data-testid="review-text">
+                      {reviewing.text}
+                    </blockquote>
+                    <p className="muted">
+                      التصنيف الحالي:{" "}
+                      {reviewing.label ? labels[reviewing.label] : "غير محلل"}.
+                      التصحيح البشري يلغي تنبؤ النموذج لهذا النص، ويسقط تلقائيًا
+                      إذا تغيّر نص التعليق لاحقًا.
+                    </p>
+                    <label>
+                      التصنيف الصحيح
+                      <select
+                        value={verdict}
+                        onChange={(e) => setVerdict(e.target.value as Label)}
+                      >
+                        {Object.entries(labels).map(([key, text]) => (
+                          <option key={key} value={key}>
+                            {text}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      سبب التصحيح
+                      <input
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        maxLength={500}
+                        required
+                      />
+                    </label>
+                    {review.isError && (
+                      <p role="alert" data-testid="review-error">
+                        {review.error.message === "stale_comment_text"
+                          ? "تغيّر نص التعليق بعد فتح هذه الشاشة. أعد قراءته ثم صحّح التصنيف."
+                          : "تعذر حفظ التصحيح. حاول مرة أخرى."}
+                      </p>
+                    )}
+                    <div>
+                      <button type="submit" disabled={review.isPending}>
+                        حفظ التصحيح
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          review.reset();
+                          setReviewing(null);
+                        }}
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                    {!reviewsArePersisted && (
+                      <p className="muted" data-testid="review-scope">
+                        وضع البيانات الاصطناعية: يُحفظ التصحيح في هذه الجلسة فقط
+                        ولا يُرسل إلى أي خادم.
+                      </p>
+                    )}
+                  </form>
+                )}
                 <nav className="pager" aria-label="تصفح التعليقات">
                   <button
                     type="button"

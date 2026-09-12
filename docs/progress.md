@@ -46,7 +46,10 @@ project, a real sentiment model, or any deployment.
 | RLS on every exposed table | implemented | Membership resolved from `auth.uid()` through a non-exposed `private.has_role`, never from user metadata |
 | Lease tokens hidden from tenants | implemented | Column-level `SELECT` grant on `jobs` omits `lease_token` |
 | Privilege escalation blocked | implemented | No grant lets a member change their own role, move a row between workspaces, or set a channel to `connected` |
-| Role-checked RPCs | implemented | `create_workspace`, `enqueue_sync` (idempotent by `dedupe_key`), `register_channel` |
+| Role-checked RPCs | implemented | `create_workspace`, `enqueue_sync` (idempotent by `dedupe_key`), `register_channel`, `submit_comment_review` |
+| Human corrections | implemented | Verdict, reviewer and reason written only through the RPC; reviewer id and `human` provenance come from the session, so a tenant cannot forge either or claim `legacy_unverified` |
+| Optimistic concurrency on text | implemented | A correction carries the hash of the text the reviewer read; if the comment changed since, the write is a conflict rather than a silent verdict on new text |
+| Append-only review log | implemented | A trigger rejects UPDATE and DELETE on `comment_reviews` even for a role that bypasses RLS |
 | Personal workspace bootstrap | implemented | Definer trigger on `auth.users`, so no signed-in user is left without a tenant |
 | Worker job primitives | implemented | `claim_job` (`FOR UPDATE SKIP LOCKED`), `heartbeat`, `commit_checkpoint`; expired lease cannot write; repeated batch key is idempotent and a conflicting payload is rejected |
 | Private storage | implemented | Non-public `imports`/`exports` buckets, paths prefixed by workspace UUID, role-gated upload |
@@ -56,6 +59,8 @@ project, a real sentiment model, or any deployment.
 | Stale-response safety | fixture-tested | Results are keyed by filter, so a late response for abandoned filters cannot repaint a newer screen — proven with a held request that was released and completed |
 | Refresh vs. load states | fixture-tested | Full loading state only before there is data; afterwards the current screen stays put behind a refresh indicator |
 | Invalid-cursor recovery | fixture-tested | If the row a cursor names disappears, the page is rebuilt from page one and the user is told, instead of showing an empty or mismatched page |
+| Correction UI | fixture-tested | Per-row correction form; the corrected label overrides the model for the current text and every aggregate moves with it through the one shared snapshot |
+| Correction persistence | **blocked** | Without a Supabase project the UI keeps corrections for the browser session only, and says so on screen. The RPC call path exists but has never reached a real server |
 | Supabase Auth account screen | implemented, not live-tested | Renders an honest "not configured" state without credentials; sign-in/sign-up paths have never contacted a real Supabase project |
 | Live Auth, Storage, PostgREST, Edge Function behaviour | **blocked** | Needs a Supabase development project URL and publishable key |
 | OAuth (M5) | not started | Table shapes and status values exist; no flow implemented |
@@ -87,11 +92,10 @@ project, a real sentiment model, or any deployment.
 
 ## Next unblocked work
 
-1. Add the human-correction write path (`comment_reviews`) with optimistic concurrency on
-   `content_hash`, plus its RLS tests.
-2. Add CSV export with formula-injection neutralisation on output while the stored raw text
+1. Add CSV export with formula-injection neutralisation on output while the stored raw text
    stays unmodified.
-3. Add `usage_events` reservation inside the batch transaction so concurrent requests cannot
+2. Add `usage_events` reservation inside the batch transaction so concurrent requests cannot
    overspend a plan limit.
-4. Add the remaining dashboard filters the contract already supports — comment type, reply
+3. Add the remaining dashboard filters the contract already supports — comment type, reply
    mode, review status, video kind — now that one snapshot drives every panel.
+4. Surface the review history per comment (who, when, why) now that the log is append-only.
