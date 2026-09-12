@@ -52,6 +52,10 @@ project, a real sentiment model, or any deployment.
 | Private storage | implemented | Non-public `imports`/`exports` buckets, paths prefixed by workspace UUID, role-gated upload |
 | Server authorization helper | implemented | `authorize()` verifies identity and *current* membership separately; dependency-injected for credential-free tests |
 | Arabic RTL shell | fixture-tested | Real `fetch`, genuine loading/error/retry/empty states, filters driving every panel from one snapshot |
+| Cursor pagination | fixture-tested | Prev/next over a cursor stack with a page-size control; aggregates describe the filtered set, not the page; a cursor is dropped whenever filters or page size change |
+| Stale-response safety | fixture-tested | Results are keyed by filter, so a late response for abandoned filters cannot repaint a newer screen — proven with a held request that was released and completed |
+| Refresh vs. load states | fixture-tested | Full loading state only before there is data; afterwards the current screen stays put behind a refresh indicator |
+| Invalid-cursor recovery | fixture-tested | If the row a cursor names disappears, the page is rebuilt from page one and the user is told, instead of showing an empty or mismatched page |
 | Supabase Auth account screen | implemented, not live-tested | Renders an honest "not configured" state without credentials; sign-in/sign-up paths have never contacted a real Supabase project |
 | Live Auth, Storage, PostgREST, Edge Function behaviour | **blocked** | Needs a Supabase development project URL and publishable key |
 | OAuth (M5) | not started | Table shapes and status values exist; no flow implemented |
@@ -83,11 +87,11 @@ project, a real sentiment model, or any deployment.
 
 ## Next unblocked work
 
-1. Wire `comments_page` cursor pagination in the UI to the contract's `next_cursor` and test
-   that a stale filter response cannot overwrite a newer one.
-2. Add the human-correction write path (`comment_reviews`) with optimistic concurrency on
+1. Add the human-correction write path (`comment_reviews`) with optimistic concurrency on
    `content_hash`, plus its RLS tests.
-3. Add CSV export with formula-injection neutralisation on output while the stored raw text
+2. Add CSV export with formula-injection neutralisation on output while the stored raw text
    stays unmodified.
-4. Add `usage_events` reservation inside the batch transaction so concurrent requests cannot
+3. Add `usage_events` reservation inside the batch transaction so concurrent requests cannot
    overspend a plan limit.
+4. Add the remaining dashboard filters the contract already supports — comment type, reply
+   mode, review status, video kind — now that one snapshot drives every panel.

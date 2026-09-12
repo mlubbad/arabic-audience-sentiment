@@ -157,6 +157,24 @@ small {
 .muted {
   color: #485e70;
 }
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.pager p {
+  margin: 0;
+  color: #485e70;
+}
+.updating {
+  padding: 0.5rem 1rem;
+  border-inline-start: 4px solid #687c8e;
+  background: #fff;
+  color: #485e70;
+}
 .loading,
 .empty {
   padding: 2rem;
@@ -173,6 +191,11 @@ small {
   z-index: 1;
 }
 @media (max-width: 650px) {
+  .pager {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
   .metrics {
     grid-template-columns: 1fr 1fr;
   }

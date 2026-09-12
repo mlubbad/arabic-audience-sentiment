@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
@@ -15,10 +15,35 @@ export function Dashboard() {
   const [from, setFrom] = useState(""),
     [to, setTo] = useState(""),
     [formError, setFormError] = useState("");
+  // cursors[i] opens page i + 2, so the stack length is the current page index.
+  // Applying, resetting or resizing clears it, because a cursor is only valid
+  // for the filtered set it was produced from.
+  const [cursors, setCursors] = useState<string[]>([]);
+  const [limit, setLimit] = useState(25);
+  const page = { ...filters, limit, cursor: cursors.at(-1) };
   const result = useQuery({
-    queryKey: ["fixture-dashboard", filters],
-    queryFn: ({ signal }) => loadSnapshot(filters, signal),
+    queryKey: ["fixture-dashboard", page],
+    queryFn: ({ signal }) => loadSnapshot(page, signal),
+    // Keep the current screen while the next one loads: the spec asks for a full
+    // loading state only before there is anything to show, and a refresh
+    // indicator afterwards. React Query still keys results by filter, so a late
+    // response lands in its own cache entry and never repaints a newer screen.
+    placeholderData: (previous) => previous,
   });
+  // Sticky, because recovery re-requests page one and that response no longer
+  // carries the reset flag. The user should still be told why the page moved.
+  const [cursorNotice, setCursorNotice] = useState(false);
+  const resetCursor = result.data?.cursor_reset === true && cursors.length > 0;
+  useEffect(() => {
+    // The data layer already fell back to page one; bring the stack with it.
+    if (!resetCursor) return;
+    setCursors([]);
+    setCursorNotice(true);
+  }, [resetCursor]);
+  function goTo(next: string[]) {
+    setCursorNotice(false);
+    setCursors(next);
+  }
   function apply(e: FormEvent) {
     e.preventDefault();
     if (from && to && from >= to) {
@@ -26,6 +51,8 @@ export function Dashboard() {
       return;
     }
     setFormError("");
+    setCursorNotice(false);
+    setCursors([]);
     setFilters({
       ...defaults,
       q: query,
@@ -42,6 +69,9 @@ export function Dashboard() {
     setFrom("");
     setTo("");
     setFormError("");
+    setCursorNotice(false);
+    setCursors([]);
+    setLimit(25);
     setFilters(defaults);
   }
   const s = result.data;
@@ -102,6 +132,22 @@ export function Dashboard() {
             onChange={(e) => setTo(e.target.value)}
           />
         </label>
+        <label>
+          عدد التعليقات في الصفحة
+          <select
+            value={limit}
+            onChange={(e) => {
+              goTo([]);
+              setLimit(Number(e.target.value));
+            }}
+          >
+            {[5, 10, 25, 50].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
         <div>
           <button type="submit">تطبيق الفلاتر</button>
           <button type="button" onClick={reset}>
@@ -115,9 +161,14 @@ export function Dashboard() {
       </p>
       {formError && <p role="alert">{formError}</p>}
       {result.isPending && (
-        <div role="status" className="loading">
+        <div role="status" data-testid="loading" className="loading">
           جارٍ تحميل التعليقات…
         </div>
+      )}
+      {!result.isPending && result.isFetching && (
+        <p role="status" data-testid="updating" className="updating">
+          جارٍ تحديث النتائج…
+        </p>
       )}
       {result.isError && (
         <div role="alert" className="notice">
@@ -220,6 +271,15 @@ export function Dashboard() {
               </section>
               <section>
                 <h2>التعليقات</h2>
+                {cursorNotice && (
+                  <p
+                    role="status"
+                    data-testid="cursor-notice"
+                    className="muted"
+                  >
+                    تغيّرت النتائج فأُعيد العرض من الصفحة الأولى.
+                  </p>
+                )}
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -247,15 +307,28 @@ export function Dashboard() {
                     </tbody>
                   </table>
                 </div>
-                {s.next_cursor && (
+                <nav className="pager" aria-label="تصفح التعليقات">
                   <button
+                    type="button"
+                    disabled={cursors.length === 0 || result.isFetching}
+                    onClick={() => goTo(cursors.slice(0, -1))}
+                  >
+                    الصفحة السابقة
+                  </button>
+                  <p data-testid="page-state" aria-live="polite">
+                    الصفحة {cursors.length + 1} — عرض {s.comments.length} من{" "}
+                    {s.total} تعليقًا ضمن الفلاتر
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!s.next_cursor || result.isFetching}
                     onClick={() =>
-                      setFilters({ ...filters, cursor: s.next_cursor! })
+                      s.next_cursor && goTo([...cursors, s.next_cursor])
                     }
                   >
                     الصفحة التالية
                   </button>
-                )}
+                </nav>
               </section>
             </>
           )}

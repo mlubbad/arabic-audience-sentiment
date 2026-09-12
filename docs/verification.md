@@ -25,12 +25,12 @@ All of the following were run after the clean install above.
 | `npm run lint` | Pass — ESLint clean; Ruff "All checks passed!" |
 | `npm run format:check` | Pass — all matched code files use Prettier style |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
-| `npm test` | Pass — 8 tests, 2 files |
+| `npm test` | Pass — 10 tests, 2 files |
 | `npm run test:db` | Pass — 8 tests |
 | `npm run worker:test` | Pass — 23 tests, 4 files |
 | `npm run build` | Pass — 146 modules; `index.js` 478.09 kB (151.76 kB gzip), `index.css` 6.29 kB |
 | `npm run check:secrets` | Pass — 61 source files plus built assets |
-| `npm run test:e2e` | Pass — 3 tests, Chromium |
+| `npm run test:e2e` | Pass — 6 tests, Chromium |
 | `npm run worker:collect -- --source fixture …` | Pass — status `succeeded`, 2 unique comments, coverage declared as source traversal only |
 
 `npm run check` runs everything except `test:e2e` in one command, and passed end to end.
@@ -41,7 +41,7 @@ work.
 
 ## What each test actually proves
 
-### Contract and snapshot tests (`npm test`, 8)
+### Contract and snapshot tests (`npm test`, 10)
 
 - scopes to one workspace before counting, and excludes stale and unanalysed rows from the
   sentiment denominator
@@ -52,6 +52,10 @@ work.
 - keeps aggregates stable across pages
 - rejects reversed date ranges, oversized page sizes, and a "succeeded" prediction with no label
 - refuses to treat legacy amendments as human truth or a failed model result as Neutral
+- walks every page with `limit: 1` until `next_cursor` is null, visiting each row exactly
+  once and reporting the same total on every page
+- rejects a cursor that the current filters no longer contain, rather than silently returning
+  the first page
 - `authorize()` checks identity and current membership independently — a valid token for the
   wrong workspace, and a valid member with the wrong role, are both rejected
 
@@ -89,7 +93,7 @@ work.
   only, and a re-run does not duplicate rows; `--source youtube-api` without a key fails
   instead of producing a successful empty run
 
-### Browser tests (`npm run test:e2e`, 3)
+### Browser tests (`npm run test:e2e`, 6)
 
 - the shell renders `dir="rtl"`, labels itself as synthetic data, filters to a real subset,
   shows a genuine empty state, and resets correctly
@@ -99,6 +103,13 @@ work.
   assumed
 - at 390×844 the page does not scroll horizontally, and the account screen states honestly
   that Supabase is not configured
+- cursor pagination walks page 1 → 2 → back to 1 with no repeated row, leaves every aggregate
+  unchanged, disables each arrow at the ends, and returns to page one when a filter changes
+- a slow response for abandoned filters does not overwrite a newer screen. The held request
+  was released and its `continue()` resolved, so it genuinely completed in flight rather than
+  being cancelled — verified by probe before the assertion was trusted
+- when the dataset shrinks so the cursor names a missing row, the view rebuilds from page one,
+  says so, and re-disables "previous"
 
 ## Not verified — do not represent these as working
 

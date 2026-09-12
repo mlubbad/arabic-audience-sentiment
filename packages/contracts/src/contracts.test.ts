@@ -189,4 +189,43 @@ describe("dashboard contract", () => {
       snapshot([r], { workspace_id: workspace }, "fixture-v1").analysed,
     ).toBe(0);
   });
+  it("walks every page exactly once and ends with a null cursor", () => {
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    let guard = 0;
+    for (;;) {
+      const page = snapshot(
+        rows,
+        { workspace_id: workspace, limit: 1, cursor },
+        "fixture-v1",
+      );
+      expect(page.total).toBe(4);
+      seen.push(...page.comments.map((c) => c.id));
+      cursor = page.next_cursor ?? undefined;
+      if (!cursor) break;
+      if (++guard > 10) throw new Error("cursor walk did not terminate");
+    }
+    expect(seen).toEqual([...new Set(seen)]);
+    expect(seen).toHaveLength(4);
+  });
+  it("rejects a cursor that the current filters no longer contain", () => {
+    const first = snapshot(
+      rows,
+      { workspace_id: workspace, limit: 1 },
+      "fixture-v1",
+    );
+    // The same cursor under a narrower filter points at a row that is gone.
+    expect(() =>
+      snapshot(
+        rows,
+        {
+          workspace_id: workspace,
+          limit: 1,
+          cursor: first.next_cursor!,
+          sentiments: ["mixed"],
+        },
+        "fixture-v1",
+      ),
+    ).toThrow("invalid_cursor");
+  });
 });
