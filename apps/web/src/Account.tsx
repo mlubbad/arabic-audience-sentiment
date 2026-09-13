@@ -1,6 +1,11 @@
 import { useState, useEffect, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import {
+  authErrorMessage,
+  authSuccessMessage,
+  type AuthAction,
+} from "./authMessages";
 export function Account() {
   const [session, setSession] = useState<Session | null>(null),
     [pending, setPending] = useState(!!supabase),
@@ -67,19 +72,19 @@ export function Account() {
     setPending(true);
     setMessage("");
     try {
-      const action = (e.nativeEvent as SubmitEvent).submitter?.getAttribute(
-        "value",
-      );
-      const { error } =
+      const action: AuthAction =
+        (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") ===
+        "signup"
+          ? "signup"
+          : "signin";
+      const { data, error } =
         action === "signup"
           ? await client.auth.signUp({ email, password })
           : await client.auth.signInWithPassword({ email, password });
       setMessage(
         error
-          ? "تعذر إتمام الطلب. تحقق من البيانات وإعدادات الحساب."
-          : action === "signup"
-            ? "تحقق من بريدك لتأكيد الحساب."
-            : "تم تسجيل الدخول.",
+          ? authErrorMessage(error)
+          : authSuccessMessage(action, !!data.session),
       );
     } catch {
       setMessage("تعذر الاتصال بالخدمة. حاول مجدداً.");
