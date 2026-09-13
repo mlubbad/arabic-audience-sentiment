@@ -851,3 +851,48 @@ rather than the two drifting apart.
 Four of the five queued schema requests are now done. Only per-video aggregates remain, and
 that one genuinely wants the live read path first, since one snapshot call per video does not
 scale to a channel with 194 of them.
+
+## Per-video aggregates in the snapshot (done, 2026-09-13)
+
+Fifth and last of the queued schema requests.
+
+**Correcting my own earlier hedge.** I twice reported that this one "wants the live read path
+first" because one snapshot call per video would not scale to a channel with 194 of them.
+That was true of the *implementation* I had written in the app, not of the contract.
+`snapshot()` already walks the filtered rows once to build the overall aggregates; extending
+that walk to accumulate per-video figures is the same O(n) pass and maps directly onto a SQL
+`GROUP BY video_id`. There was never a reason to wait.
+
+`snapshot().videos` now returns `{id, total, analysed, replies, sentiments}` per video,
+sorted busiest first with ties broken by id so the order does not wobble. The app no longer
+runs a snapshot per video: `data.ts` went from N+1 snapshot calls to one, and now only
+decides how many videos to display and when to say it truncated.
+
+Each video counts on its own denominator, the same way the whole set does: a comment with no
+usable label is inside `total` and outside `analysed`. The contract test asserts the
+per-video figures reconcile with the overall ones — `sum(total) === total` and
+`sum(analysed) === analysed` — which is the property that would have caught a
+double-count or a dropped row.
+
+The two existing comparison browser tests passed **unchanged**, which is the regression
+evidence that matters: the panel's data source changed shape underneath it and the rendered
+numbers did not move.
+
+### Still outstanding, and deliberately not faked
+
+Video **titles** are still absent from the contract, so the comparison labels by identifier
+through a fixture-local lookup. Titles cannot come from `CommentSchema` without denormalising
+a title onto every comment, and `snapshot()` only receives comments. The right shape is a
+video catalogue passed alongside, which changes the signature — a separate change, and one
+worth doing when the live read lands rather than guessing at it now.
+
+### Commands and results
+
+- `npm run check` — pass (57 unit across 8 files, 18 SQL, 23 worker, guard 5/5, build, secrets)
+- `npm run test:e2e` — 45 passed in 23.6s, on `E2E_PORT=5199`
+- `node scripts/check-ownership.mjs platform` — pass
+
+Two contract tests were confirmed failing before the change.
+
+All five queued schema requests are now complete. M4's screen elements are done, and this
+lane has no unblocked work left that does not need either I1 or the live read path.

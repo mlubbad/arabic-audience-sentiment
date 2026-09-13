@@ -4,6 +4,14 @@ import { FiltersSchema, type Filters } from "./filters";
 import { effectiveLabel, type Comment } from "./comments";
 import { type Label } from "./primitives";
 
+export type VideoAggregate = {
+  id: string;
+  total: number;
+  analysed: number;
+  replies: number;
+  sentiments: Record<Label, number>;
+};
+
 export type LabelledComment = Comment & {
   label: Label | null;
   reviewed: boolean;
@@ -106,11 +114,32 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     neutral: 0,
     mixed: 0,
   };
-  const videos = new Map<string, number>(),
+  // Per-video figures accumulate in the same pass as the overall ones, which is
+  // what a server would do with a single GROUP BY. Computing them by re-running
+  // the whole snapshot once per video would not survive a channel with 194.
+  const videos = new Map<string, VideoAggregate>(),
     timeline = new Map<string, number>();
   for (const c of rows) {
     if (c.label) sentiments[c.label]++;
-    videos.set(c.video_id, (videos.get(c.video_id) ?? 0) + 1);
+    let video = videos.get(c.video_id);
+    if (!video) {
+      video = {
+        id: c.video_id,
+        total: 0,
+        analysed: 0,
+        replies: 0,
+        sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      };
+      videos.set(c.video_id, video);
+    }
+    video.total++;
+    if (c.is_reply) video.replies++;
+    // Each video counts on its own denominator: a comment with no usable label
+    // is inside total and outside analysed, exactly as for the whole set.
+    if (c.label) {
+      video.analysed++;
+      video.sentiments[c.label]++;
+    }
     const day = c.published_at
       ? new Date(c.published_at).toISOString().slice(0, 10)
       : "unknown";
@@ -147,7 +176,10 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     unique_authors: new Set(
       rows.flatMap((c) => (c.author_channel_id ? [c.author_channel_id] : [])),
     ).size,
-    videos: [...videos].map(([id, total]) => ({ id, total })),
+    // Busiest first, ties broken by id so the order does not wobble.
+    videos: [...videos.values()].sort(
+      (a, b) => b.total - a.total || a.id.localeCompare(b.id, "en"),
+    ),
     timeline: [...timeline].map(([date, total]) => ({ date, total })),
     comments,
     next_cursor:

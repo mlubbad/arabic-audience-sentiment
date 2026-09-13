@@ -515,4 +515,68 @@ describe("human corrections", () => {
       }).success,
     ).toBe(true);
   });
+  it("aggregates each video in the same pass, on its own denominator", () => {
+    const across: Comment[] = [
+      { ...base, id: "v1a", video_id: "v1", prediction: pred("positive") },
+      { ...base, id: "v1b", video_id: "v1", prediction: predNeg() },
+      {
+        ...base,
+        id: "v1c",
+        video_id: "v1",
+        is_reply: true,
+        prediction: pred("positive"),
+      },
+      { ...base, id: "v2a", video_id: "v2", prediction: pred("positive") },
+      // No usable prediction: counted, but outside its video's denominator.
+      { ...base, id: "v2b", video_id: "v2" },
+      {
+        ...base,
+        id: "v3a",
+        video_id: "v3",
+        prediction: pred("positive", "old"),
+      },
+    ];
+    const s = snapshot(across, { workspace_id: workspace }, "fixture-v1");
+
+    // Busiest first, ties broken by id so the order is deterministic.
+    expect(s.videos.map((v) => v.id)).toEqual(["v1", "v2", "v3"]);
+
+    const v1 = s.videos.find((v) => v.id === "v1")!;
+    expect(v1).toMatchObject({ total: 3, analysed: 3, replies: 1 });
+    expect(v1.sentiments).toEqual({
+      positive: 2,
+      negative: 1,
+      neutral: 0,
+      mixed: 0,
+    });
+
+    // v2 is 1 of 2 analysed, so its share is 100% while the whole set is 4 of 6.
+    const v2 = s.videos.find((v) => v.id === "v2")!;
+    expect(v2).toMatchObject({ total: 2, analysed: 1, replies: 0 });
+    expect(v2.sentiments.positive).toBe(1);
+    expect(s.analysed).toBe(4);
+
+    // A video whose only prediction is stale has nothing to divide by.
+    expect(s.videos.find((v) => v.id === "v3")).toMatchObject({
+      total: 1,
+      analysed: 0,
+    });
+
+    // Per-video totals reconcile with the overall total.
+    expect(s.videos.reduce((n, v) => n + v.total, 0)).toBe(s.total);
+    expect(s.videos.reduce((n, v) => n + v.analysed, 0)).toBe(s.analysed);
+  });
+
+  it("drops a video entirely when the filters exclude all of its comments", () => {
+    const across: Comment[] = [
+      { ...base, id: "f1", video_id: "v1", is_reply: true },
+      { ...base, id: "f2", video_id: "v2" },
+    ];
+    const replies = snapshot(
+      across,
+      { workspace_id: workspace, replies: "replies" },
+      "fixture-v1",
+    );
+    expect(replies.videos.map((v) => v.id)).toEqual(["v1"]);
+  });
 });

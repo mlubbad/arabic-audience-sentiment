@@ -69,34 +69,13 @@ async function readFixture(signal?: AbortSignal) {
 export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
   const fixture = await readFixture(signal);
   const comments = withSessionReviews(fixture.comments);
-  // Per-video figures come from the same shared snapshot, run once per video
-  // with that video pinned. Filter semantics are then identical by
-  // construction rather than by a second implementation agreeing with the
-  // first. The cursor is dropped because it names a row in the unpinned set.
-  const compare = (f: Filters, videos: { id: string; total: number }[]) =>
-    videos
-      .slice()
-      .sort((a, b) => b.total - a.total || a.id.localeCompare(b.id, "en"))
-      .slice(0, COMPARISON_LIMIT)
-      .map((v) => {
-        const per = snapshot(
-          comments,
-          { ...f, video_ids: [v.id], cursor: undefined, limit: 1 },
-          fixture.active_analysis_key,
-        );
-        return {
-          id: v.id,
-          total: per.total,
-          analysed: per.analysed,
-          sentiments: per.sentiments,
-          replies: per.replies,
-        };
-      });
   const build = (f: Filters, cursor_reset: boolean) => {
     const base = snapshot(comments, f, fixture.active_analysis_key);
     return {
       ...base,
-      comparison: compare(f, base.videos),
+      // The snapshot already aggregates every video; the app only decides how
+      // many to show and says when it has truncated.
+      comparison: base.videos.slice(0, COMPARISON_LIMIT),
       comparison_truncated: base.videos.length > COMPARISON_LIMIT,
       revision: fixture.revision,
       // Plan state travels with the snapshot, so the limit on screen always
