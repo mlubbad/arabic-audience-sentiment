@@ -1,5 +1,21 @@
 # Verification
 
+## 2026-09-13 — Marketing landing and route integration
+
+Node 22.14.0; load average sampled at 3.13 / 3.30 / 3.25. Code reviewed against `cffb9fa` plus the landing working-tree changes. Concurrent Python/OAuth commits are outside this increment.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npm run check` after final code changes | Pass: lint, formatting, typecheck, 107 unit tests, 98 SQL tests, 91 worker tests, build and secret scan |
+| `E2E_PORT=5322 npm run test:e2e` after route integration and lazy loading | 47 passed (45 existing dashboard cases + 2 landing cases), 50.7s |
+| `E2E_PORT=5322 npm run test:e2e -- tests/e2e/landing.spec.ts` after final illustrative-chart/copy changes | 2 passed, 5.9s; includes chart/comment filter agreement, FAQ, audience tabs, account and dashboard navigation, reload, mobile menu, keyboard skip link, image loading, and 320/390/768/1440px overflow checks |
+| Visual inspection | Chromium screenshots at 1440px desktop and 390px mobile; inspected hero, Arabic hierarchy and full-page section layout |
+| Build output | Landing entry JS 272.93 kB (86.85 kB gzip); Dashboard, Account and Supabase emitted as separate deferred chunks |
+
+The first full browser run had one failed landing test: an exact text locator included the decorative FAQ `+` and could not match. It was corrected to target the semantic summary element. The other 46 tests passed on that run; all 47 passed on the rerun. No application failure was hidden by increasing a timeout.
+
+Evidence is local/fixture-backed. No live YouTube, model, account session, or remote deployment was validated by this landing work. `.htaccess` protection was preserved; `noindex` metadata was added. Asset/reference provenance is in `docs/landing.md`.
+
 Run 2026-09-13 on macOS 24.6.0, Node 22.14.0, npm 10.9.2, Python 3.12.10, uv 0.11.11,
 load average 2.80.
 
@@ -397,10 +413,22 @@ signup and creates the workspace named مساحة العمل الشخصية; an 
 their own workspaces through PostgREST and sees only those; and `create_workspace` succeeds
 as that member. None of this could run in PGlite, which has no GoTrue.
 
-**Still unverified:** a member being refused another tenant's workspace while authenticated
-(anonymous refusal is verified, member-vs-member is not), the live dashboard read returning
-real rows, and the worker gateway over HTTP. The Edge Functions are not deployed, and that
-still needs the service-role key.
+**Member-vs-member isolation, verified live 2026-09-13.** With the service-role key, a second
+tenant was created through the Auth admin API and signed in. Against the deployed project,
+over HTTP, as a real authenticated user:
+
+| Probe | Result |
+| --- | --- |
+| Does the bootstrap trigger fire for a second user | Yes — their own personal workspace |
+| Can B list A's workspaces | `[]` |
+| Can B read A's dashboard by asking for it directly | **403, SQLSTATE 42501 `forbidden`** |
+
+That is the property the whole tenancy model exists for, and it is now proven against a real
+PostgREST with two real users rather than inferred from PGlite. It was tested by asking
+directly, not by checking that a control was hidden.
+
+**Still unverified:** the live dashboard read returning real comment rows (no channel has been
+collected), and the worker gateway over HTTP. No Edge Function is deployed.
 
 ## A filename bug the first real push found
 

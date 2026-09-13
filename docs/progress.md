@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-09-13 — Arabic marketing landing implemented
+
+The requested reference-inspired landing is now the `/` route, with working links to `/dashboard` and `/account`, mobile navigation, an authored sentiment example whose chart and comments filter together, audience tabs, and FAQ. Arabic typography is self-hosted; existing dashboard/account code loads on demand. Desktop/mobile visual review and browser navigation checks passed locally. The marketing example remains illustrative and the page discloses the incomplete live setup. No public publication or remote deployment was performed in this increment. See `docs/landing.md` and the dated verification entry for details.
+
 Updated 2026-09-13. Status words are used strictly:
 **implemented** = code exists and its tests pass; **fixture-tested** = verified only against
 sanitized synthetic data; **blocked** = cannot proceed without a named missing input.
@@ -34,7 +38,9 @@ CI has never executed: there is no remote.
 Composite tenant keys, RLS resolved from `auth.uid()` through a non-exposed helper, lease
 tokens withheld from the tenant projection, role-checked RPCs, personal workspace bootstrap,
 private storage scoped by workspace UUID, append-only review log, usage metering with
-reservation, plan limits. Isolation is tested through direct SQL, not hidden UI controls.
+reservation, plan limits. Isolation is tested through direct SQL, not hidden UI controls — and as of 2026-09-13 also
+against the deployed project over HTTP with two real users: a second tenant cannot list the
+first's workspaces and is refused `forbidden` when asking for their dashboard directly.
 
 ## M3 — ingestion and analysis (server path complete)
 

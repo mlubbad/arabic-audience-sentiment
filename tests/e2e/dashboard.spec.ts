@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 test("Arabic fixture shell filters consistent totals and supports an empty state", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByTestId("total")).toHaveText("6");
   // The source strip, driven by the data mode rather than written by hand.
@@ -44,7 +44,7 @@ test("shows actual pending fetch then safe error with working retry", async ({
     }
     await route.fulfill({ status: 503, body: "unavailable" });
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("loading")).toBeVisible();
   release();
   await expect(page.getByRole("alert")).toContainText("تعذر تحميل");
@@ -57,7 +57,7 @@ test("mobile shell fits viewport and exposes honest live-configuration state", a
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
   expect(
     await page.evaluate(
@@ -71,7 +71,7 @@ test("mobile shell fits viewport and exposes honest live-configuration state", a
 test("paginates with cursors without changing totals or repeating rows", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
   const rows = () =>
     page.locator('[data-testid="comments-table"] tbody tr td:nth-child(2)');
@@ -117,7 +117,7 @@ test("paginates with cursors without changing totals or repeating rows", async (
 test("a slow response for old filters cannot overwrite newer filters", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
 
   let release!: () => void;
@@ -155,7 +155,7 @@ test("a slow response for old filters cannot overwrite newer filters", async ({
 test("recovers to page one when the row a cursor points at disappears", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
@@ -188,7 +188,7 @@ test("recovers to page one when the row a cursor points at disappears", async ({
 test("a human correction overrides the model and moves every aggregate together", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
   const distribution = page
     .getByRole("listitem")
@@ -231,7 +231,7 @@ test("a human correction overrides the model and moves every aggregate together"
 test("correcting an unanalysed comment adds it to the sentiment denominator", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByText("المقام: 4 تعليقًا")).toBeVisible();
 
   // This row has no usable prediction, so it is outside the denominator.
@@ -255,7 +255,7 @@ test("correcting an unanalysed comment adds it to the sentiment denominator", as
 test("refuses a correction written against text that changed meanwhile", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const row = page.locator('[data-testid="comments-table"] tbody tr').first();
   await row.getByRole("button", { name: "تصحيح" }).click();
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
@@ -295,7 +295,7 @@ async function downloadCsv(page: import("@playwright/test").Page) {
 test("exports every filtered comment, not just the visible page", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
   // Shrink the page so a page-limited export would be obviously wrong.
   await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
@@ -322,7 +322,7 @@ test("exports every filtered comment, not just the visible page", async ({
 test("exports the corrected label rather than the superseded prediction", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const row = page.locator('[data-testid="comments-table"] tbody tr').first();
   await row.getByRole("button", { name: "تصحيح" }).click();
   await page.getByLabel("التصنيف الصحيح").selectOption("negative");
@@ -346,7 +346,7 @@ test("neutralises spreadsheet formulas in the file but not on screen", async ({
     fixture.comments[0].text_raw = attack;
     await route.fulfill({ json: fixture });
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   // The dashboard shows the real stored text, escaped as text by React.
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr').first(),
@@ -363,7 +363,7 @@ test("neutralises spreadsheet formulas in the file but not on screen", async ({
 test("shows the plan limit while there is still room to act", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const analysis = page.getByTestId("budget-comment_analysis");
   // 74 of 100 is past the 70% notice threshold but not yet critical.
   await expect(analysis).toContainText("74 من 100 — يتبقى 26");
@@ -390,7 +390,7 @@ test("escalates to a spent state instead of only warning", async ({ page }) => {
     };
     await route.fulfill({ json: fixture });
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   const analysis = page.getByTestId("budget-comment_analysis");
   await expect(analysis.locator("small")).toHaveAttribute(
     "data-state",
@@ -409,7 +409,7 @@ test("distinguishes no activated plan from no allowance left", async ({
     fixture.plan = null;
     await route.fulfill({ json: fixture });
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("plan-none")).toContainText(
     "لا توجد خطة مفعّلة",
   );
@@ -431,7 +431,7 @@ async function applyFilter(
 }
 
 test("separates replies from top-level comments", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
   await applyFilter(page, "نوع المشاركة", "comments");
   await expect(page.getByTestId("total")).toHaveText("4");
@@ -442,7 +442,7 @@ test("separates replies from top-level comments", async ({ page }) => {
 });
 
 test("separates known from unknown publication dates", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("unknown-dates")).toHaveText("1");
   // Assert the rendered sentence, not just the number: a test that only reads
   // the span passed while the surrounding text rendered literal escape
@@ -464,7 +464,7 @@ test("separates known from unknown publication dates", async ({ page }) => {
 test("a date range and an explicit unknown-date selection cannot contradict", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.getByLabel("التاريخ").selectOption("unknown");
   // Ranges apply to known dates only, so they are disabled rather than silently
   // producing an empty screen.
@@ -475,7 +475,7 @@ test("a date range and an explicit unknown-date selection cannot contradict", as
 });
 
 test("filters by video kind", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await applyFilter(page, "نوع الفيديو", "video");
   await expect(page.getByTestId("total")).toHaveText("4");
   await applyFilter(page, "نوع الفيديو", "short");
@@ -485,7 +485,7 @@ test("filters by video kind", async ({ page }) => {
 test("filters by comment type using the types actually present", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   // The list is derived from the data, not hard-coded per channel.
   await expect(page.getByLabel("نوع التعليق").locator("option")).toHaveText([
     "كل الأنواع",
@@ -514,7 +514,7 @@ test("filters by comment type using the types actually present", async ({
 test("filters by review status and resets every control together", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await applyFilter(page, "حالة المراجعة", "reviewed");
   await expect(page.getByTestId("total")).toHaveText("0");
 
@@ -548,7 +548,7 @@ test("filters by review status and resets every control together", async ({
 });
 
 test("the export follows the new filters too", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await applyFilter(page, "نوع المشاركة", "replies");
   await expect(page.getByTestId("total")).toHaveText("2");
   const { text } = await downloadCsv(page);
@@ -569,7 +569,7 @@ async function openReview(
 test("shows no history for a comment that has never been reviewed", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await openReview(page, "المحتوى واضح ومفيد");
   await expect(page.getByTestId("review-history")).toContainText(
     "لا توجد مراجعات سابقة",
@@ -579,7 +579,7 @@ test("shows no history for a comment that has never been reviewed", async ({
 test("says a correction no longer applies once the text changed", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   // This row carries a human verdict made against text that was later edited.
   const row = page
     .locator('[data-testid="comments-table"] tbody tr')
@@ -601,7 +601,7 @@ test("says a correction no longer applies once the text changed", async ({
 test("marks a legacy amendment as unverified rather than a human review", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const row = page
     .locator('[data-testid="comments-table"] tbody tr')
     .filter({ hasText: "موعد الحلقة" });
@@ -624,7 +624,7 @@ test("marks a legacy amendment as unverified rather than a human review", async 
 test("keeps every verdict and marks which one is in force", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await openReview(page, "المحتوى واضح ومفيد");
   await page.getByLabel("التصنيف الصحيح").selectOption("negative");
   await page.getByLabel("سبب التصحيح").fill("أول تصحيح");
@@ -659,7 +659,7 @@ test("keeps every verdict and marks which one is in force", async ({
 });
 
 test("compares videos using each video's own denominator", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const one = page.getByTestId("compare-video-1");
   const two = page.getByTestId("compare-video-2");
   await expect(one).toContainText("4");
@@ -690,7 +690,7 @@ test("compares videos using each video's own denominator", async ({ page }) => {
 test("the comparison follows the same filters as everything else", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("compare-video-2")).toBeVisible();
   // video-2 has no replies, so it leaves the comparison entirely.
   await applyFilter(page, "نوع المشاركة", "replies");
@@ -702,7 +702,7 @@ test("the comparison follows the same filters as everything else", async ({
 test("does not present comment-scoped figures as lifetime video metrics", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("comparison-scope")).toContainText(
     "ضمن الفلاتر الحالية",
   );
@@ -719,7 +719,7 @@ async function withSync(page: import("@playwright/test").Page, sync: unknown) {
 test("states plainly that nothing has synced and no worker is connected", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -750,7 +750,7 @@ test("shows queued work with no worker as stalled, not as a healthy last run", a
       coverage: { videos_seen: 5, comments_collected: 900, complete: true },
     },
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -775,7 +775,7 @@ test("does not present a partial collection as a completed one", async ({
       coverage: { videos_seen: 5, comments_collected: 120, complete: false },
     },
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -794,7 +794,7 @@ test("reads a malformed sync block as unknown rather than healthy", async ({
   page,
 }) => {
   await withSync(page, { worker: "yes please", queued_jobs: "many" });
-  await page.goto("/");
+  await page.goto("/dashboard");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -808,7 +808,7 @@ test("reads a malformed sync block as unknown rather than healthy", async ({
 test("the skip link is the first stop and reaches the content", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await page.keyboard.press("Tab");
   const skip = page.getByRole("link", { name: "انتقل إلى المحتوى" });
   await expect(skip).toBeFocused();
@@ -822,7 +822,7 @@ test("the skip link is the first stop and reaches the content", async ({
 test("every filter is reachable and operable from the keyboard alone", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
   // Drive the participation filter without touching the mouse.
   await page.getByLabel("نوع المشاركة").focus();
@@ -836,7 +836,7 @@ test("every filter is reachable and operable from the keyboard alone", async ({
 test("opening a correction moves focus into it and gives it back on cancel", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const trigger = page
     .locator('[data-testid="comments-table"] tbody tr')
     .first()
@@ -851,7 +851,7 @@ test("opening a correction moves focus into it and gives it back on cancel", asy
 test("focus returns to the row after a correction is saved", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const trigger = page
     .locator('[data-testid="comments-table"] tbody tr')
     .first()
@@ -867,7 +867,7 @@ test("focus returns to the row after a correction is saved", async ({
 });
 
 test("no figure is carried by colour alone", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   // The chart duplicates the list beside it, so it is kept out of the
   // accessibility tree rather than announced as an unlabelled canvas.
   await expect(page.locator(".chart")).toHaveAttribute("aria-hidden", "true");
@@ -887,7 +887,7 @@ test("no figure is carried by colour alone", async ({ page }) => {
 test("both tables expose their column headers to assistive technology", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const unscoped = await page.evaluate(
     () =>
       [...document.querySelectorAll("table th")].filter(
@@ -915,7 +915,7 @@ test("a sync failure reads as a sentence, not as a raw code", async ({
       coverage: { videos_seen: 1, comments_collected: 0, complete: false },
     },
   });
-  await page.goto("/");
+  await page.goto("/dashboard");
   const detail = page.getByTestId("sync-error");
   // The explanation leads; the identifier is supporting detail for support.
   await expect(detail).toContainText("رفض المصدر الوصول");
@@ -923,7 +923,7 @@ test("a sync failure reads as a sentence, not as a raw code", async ({
 });
 
 test("the history says who reviewed and why", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await openReview(page, "المحتوى واضح ومفيد");
   await page.getByLabel("التصنيف الصحيح").selectOption("negative");
   await page.getByLabel("سبب التصحيح").fill("النموذج قرأ السخرية حرفيًا");
@@ -947,7 +947,7 @@ test("the history says who reviewed and why", async ({ page }) => {
 test("an imported amendment shows no reviewer and states no reason", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await openReview(page, "موعد الحلقة");
   const entry = page
     .getByTestId("review-history")
@@ -965,7 +965,7 @@ test("an imported amendment shows no reviewer and states no reason", async ({
 test("ranks engaged negatives and keeps unknown engagement out of the ranking", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   // Only one negative to begin with, so the list is short but real.
   await expect(page.getByTestId("engaged-fixture-2")).toContainText("48");
   await expect(page.getByTestId("engaged-unranked")).toHaveCount(0);
@@ -996,7 +996,7 @@ test("ranks engaged negatives and keeps unknown engagement out of the ranking", 
 test("the engagement panel follows the filters and says so when empty", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   await expect(page.getByTestId("engaged-fixture-2")).toBeVisible();
   // The only negative lives on video-1, so filtering to video-2 empties it.
   await applyFilter(page, "الفيديو", "video-2");
@@ -1009,7 +1009,7 @@ test("the engagement panel follows the filters and says so when empty", async ({
 test("the export carries engagement, with unknown left empty not zero", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/dashboard");
   const { text } = await downloadCsv(page);
   const header = text
     .replace(/^\uFEFF/, "")

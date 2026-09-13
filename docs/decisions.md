@@ -1,5 +1,7 @@
 # Implementation decisions
 
+2026-09-13 — Arabic marketing landing: the user's supplied screenshot/archive is a visual reference. `/` now serves the landing and the dashboard moves to `/dashboard`, with existing browser tests retaining their dashboard coverage at that route. Scoped landing styles protect the application shell; on-demand dashboard/account imports reduce the marketing entry bundle. Product copy discloses illustrative data and incomplete live setup; no customer endorsements, measured accuracy, paid plan, or lead collection is invented. Reference/font provenance and private-preview limitations are in `docs/landing.md`.
+
 2026-09-12 — The supplied handoff plus the latest M0–M2 request are the approved design and scope. Work runs inline on `codex/m0-foundations` in the supplied empty workspace.
 
 - Use npm workspaces and the resolved React/Vite/Chart.js/Tailwind/TanStack Query/Router/Zod stack. Node 22.14.0 supports the pinned Vite 6 release. Python 3.12.10 and uv lock the lightweight worker foundation. PyTorch/model downloads wait for the real inference milestone; no invented revision or unused heavyweight dependency is installed.
@@ -194,4 +196,3 @@ service authorization follow from this setup.
   been sent to Google.
 - **A verifier is validated where it is created, not where it is used.** By the exchange it has
   already been used, and a weak one cannot be un-sent.
-
