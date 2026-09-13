@@ -163,3 +163,132 @@ I will not speculate a Python-side client, and I will not implement a competing 
 Independent in-lane work continues meanwhile: the remaining dashboard filters that
 `FiltersSchema` already supports (comment type, reply mode, review status, video kind),
 which need no new shared contract.
+
+## Patch request for the integrator (2026-09-13)
+
+Read-only review of the integration worktree after Codex stopped at its usage limit.
+Nothing is committed there: `codex/coordination-integration` is still at `59b9205`, with
+`scripts/check-ownership.test.mjs` modified and `scripts/playwright-isolation.test.mjs`
+untracked. `npm run check` is green at HEAD; only the working tree is red. Both new tests
+are correct and both implementations are missing.
+
+I did not edit any of these files. Every command below was run in the platform worktree
+against a copy of the same setup, so the patch is verified rather than proposed.
+
+### Patch 1 — `scripts/check-ownership.mjs`: make the contracts rule real
+
+`violations()` still allows only `apps/web/`, `supabase/`, `tests/e2e/`, so the agreed rule
+is not in force and the platform lane is still blocked from `packages/contracts`. Confirmed
+by running `node --test scripts/check-ownership.test.mjs` in the integration worktree:
+**3 pass, 1 fail**, the failure being the new contracts test.
+
+Minimal change that turns it green — add one prefix to the allow list:
+
+```js
+    return !["apps/web/", "supabase/", "tests/e2e/", "packages/contracts/src/"].some(
+      (prefix) => file.startsWith(prefix),
+    );
+```
+
+`packages/contracts/package.json` and `packages/contracts/protocols/**` are then denied
+automatically, because neither lives under `src/`. No explicit deny entry is required for
+the test as written.
+
+Recommended hardening, and an open question. The allow list lets the platform lane change
+anything under `src/`. If a worker-facing TypeScript type ever lands there, one lane could
+change a cross-language contract unilaterally, which is the thing the split exists to
+prevent. Either keep worker-facing schema out of `src/` entirely, or add a defensive deny:
+
+```js
+    if (file.startsWith("packages/contracts/src/protocols/")) return true;
+```
+
+Please decide where the TypeScript side of the I1 worker batch contract will live. I have
+not created it anywhere.
+
+### Patch 2 — `playwright.config.ts`: fail closed, and avoid a trap
+
+`E2E_PORT` is currently read by nothing: `grep -rn E2E_PORT` finds only the test that sets
+it. Replace the config body with:
+
+```ts
+// Each lane drives its own dev server. Never adopt one that is already listening:
+// a server left running by another worktree serves that lane's code, and the suite
+// would pass against the wrong build.
+const port = Number(process.env.E2E_PORT ?? 5173);
+const origin = `http://127.0.0.1:${port}`;
+
+export default defineConfig({
+  testDir: "tests/e2e",
+  use: { baseURL: origin, viewport: { width: 1280, height: 800 } },
+  webServer: {
+    // Single npm layer on purpose, and --strictPort so an occupied port exits
+    // rather than silently moving to another one.
+    command: `npm run dev -w @sentiment/web -- --port ${port} --strictPort`,
+    url: origin,
+    reuseExistingServer: false,
+  },
+  reporter: "list",
+});
+```
+
+**The trap, measured.** The natural form `npm run dev -- --port ${port}` does not work.
+The root `dev` script is itself `npm run dev -w @sentiment/web`, so npm consumes `--port`
+as its own flag instead of forwarding it to Vite. I ran it: the server came up on **5173**
+while 5199 stayed closed. A patch written that way looks correct, changes nothing, and
+leaves the false-pass risk in place while appearing fixed. The single-layer form
+`npm run dev -w @sentiment/web -- --port 5199 --strictPort` served **5199** and left 5173
+closed.
+
+**Fail-closed confirmed.** With a foreign socket holding the port, that command exits `1`
+and prints `Error: Port 5197 is already in use`. Codex's assertion
+`/already used|already in use|EADDRINUSE/` matches that output, so its test should pass
+against this patch unchanged.
+
+Note that `apps/web/vite.config.ts` pins `port: 5173, strictPort: true` and is
+platform-owned. The CLI override makes this patch integrator-only; editing the Vite config
+instead would have crossed lanes for no reason.
+
+### Patch 3 — give the isolation test its own script
+
+`scripts/playwright-isolation.test.mjs` is wired to nothing. `test:coordination` runs only
+`check-ownership.test.mjs`, so the isolation test would never run.
+
+```json
+"test:isolation": "node --test scripts/playwright-isolation.test.mjs"
+```
+
+Please do **not** add it to `test:coordination`, and therefore not to `npm run check`. It
+spawns a full browser run, so it would put a browser suite inside the unit-test step and
+contend with the separate `npm run test:e2e` CI step. A separate CI step after `test:e2e`,
+or on demand, is the right home.
+
+### Patch 4 — raise the isolation test timeout
+
+`{ timeout: 60000 }` will flake exactly when it matters. Measured on this laptop on
+2026-09-12: at load average 17.25, `npm run check` took 12m27s for 31.8s of user CPU. A
+60-second budget for spawning a dev server plus a browser fails whenever the machine is
+busy, which is precisely when two agents are working. Suggest `{ timeout: 600000 }` with a
+comment pointing at that measurement.
+
+### Patch 5 — a fresh clone silently loses the guard
+
+`core.hooksPath` is set to `.githooks` in both worktrees and the hook is executable, so it
+is active here. But it is local git config: it is not committed and `npm run setup` does not
+set it, so a fresh clone or a CI runner gets no pre-commit ownership guard. Suggest
+appending to `setup`:
+
+```
+&& git config core.hooksPath .githooks
+```
+
+### What I verified, and what I did not
+
+Ran: `node --test scripts/check-ownership.test.mjs` in the integration worktree (read-only,
+pure Node, no ports); the two port-forwarding forms; and the occupied-port fail-closed case.
+
+Did not run `scripts/playwright-isolation.test.mjs` itself — it spawns a browser suite and
+would leave artifacts in another agent's worktree. Its behaviour is inferred from the three
+measurements above rather than observed end to end. Worth one real run once Patch 2 lands.
+
+No stray dev servers were left behind; port 5173 was released after each check.
