@@ -184,18 +184,26 @@ describe("csv export", () => {
 });
 
 describe("a comment whose text was removed under the retention rule", () => {
-  const purged = {
-    ...base,
-    id: "purged-1",
-    text_raw: null,
-    author_name: null,
-    content_purged_at: "2026-10-15T00:00:00Z",
-  };
+  // Built through exportRows rather than hand-assembled, so the row carries the
+  // same effective label the dashboard computed and the two cannot diverge.
+  const purged = exportRows(
+    [
+      {
+        ...base,
+        id: "purged-1",
+        text_raw: null,
+        author_name: null,
+        content_purged_at: "2026-10-15T00:00:00Z",
+      },
+    ],
+    { workspace_id: base.workspace_id },
+    "fixture-v1",
+  );
 
   it("says the text was removed rather than leaving a blank cell", () => {
     // A blank reads as a comment with no text. This one had text and no longer
     // does — a different fact, and the one an auditor asks about.
-    const rows = toCsv([purged]).split("\r\n");
+    const rows = toCsv(purged).split("\r\n");
     const cells = rows[1].split(",");
     const header = rows[0].split(",");
     const text = cells[header.indexOf("text_raw")];
@@ -206,6 +214,6 @@ describe("a comment whose text was removed under the retention rule", () => {
   it("still carries the comment, so the export and the totals agree", () => {
     // The row is not dropped: it counted in every figure on the dashboard, and
     // an export that quietly omitted it would not reconcile with them.
-    expect(toCsv([purged]).trim().split("\r\n")).toHaveLength(2);
+    expect(toCsv(purged).trim().split("\r\n")).toHaveLength(2);
   });
 });
