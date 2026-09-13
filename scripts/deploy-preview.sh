@@ -46,10 +46,14 @@ done
 # Space separated, because the case pattern below matches on spaces. A
 # newline-separated list matches nothing and deletes the build that was just
 # uploaded — which is exactly what happened the first time this ran.
-keep=" $(find . -type f -name 'index-*' | sed 's|^\./assets/||' | tr '\n' ' ') "
+# Every hashed asset, not just index-*. The build is code-split now, so the
+# chunks are named after their entry point — matching index-* alone left a
+# Dashboard-*.js and an Account-*.js behind on each deploy.
+keep=" $(find ./assets -type f 2>/dev/null | sed 's|^\./assets/||' | tr '\n' ' ') "
 for remote in $(curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
   -u "$PREVIEW_FTP_USER:$PREVIEW_FTP_PASSWORD" "ftp://$PREVIEW_FTP_HOST/assets/" \
-  --connect-timeout 25 --max-time 120 | awk '{print $NF}' | grep '^index-' || true); do
+  --connect-timeout 25 --max-time 120 | awk '{print $NF}' \
+  | grep -vE '^\.\.?$' || true); do
   case "$keep" in
     *" $remote "*) ;;
     *)

@@ -417,11 +417,15 @@ export function Dashboard() {
                           datasets: [
                             {
                               data: Object.values(s.sentiments),
+                              // The brand's plotting scale, read from the
+                              // stylesheet so the chart and the page cannot
+                              // drift apart. Labels accompany every slice;
+                              // colour is never the only carrier.
                               backgroundColor: [
-                                "#237a57",
-                                "#bc4040",
-                                "#697786",
-                                "#ad792b",
+                                "#2ebd85",
+                                "#ff6c77",
+                                "#8e8aa6",
+                                "#f0c419",
                               ],
                               borderWidth: 2,
                             },

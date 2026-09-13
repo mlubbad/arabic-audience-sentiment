@@ -1,0 +1,87 @@
+/* =====================================================================
+   Design tokens, taken from the project's own brand book by way of
+   dashboard.sky-develop.net's colors_and_type.css.
+   Source of truth: Personal Branding.pdf (Hayel Hossam, ©2025).
+
+   Values are the brand's, not invented here. What is deliberate is the
+   subset: the dashboard needs surfaces, text, spacing and a sentiment
+   palette, and does not need the display scale or the mesh gradients
+   that belong to a marketing page.
+
+   Sentiment colours are kept apart from the indigo used for chrome, so
+   a figure never reads as "brand" and a button never reads as "positive".
+   Every figure still carries a text label; colour is never the only
+   carrier, which the browser suite asserts.
+   ===================================================================== */
+
+:root {
+  /* -------- brand ------------------------------------------------- */
+  --ml-indigo: #3b27ba;
+  --ml-indigo-900: #1c1264;
+  --ml-indigo-800: #271885;
+  --ml-indigo-500: #6b59e8;
+  --ml-indigo-300: #b5aaf2;
+  --ml-indigo-100: #e6e1fb;
+  --ml-indigo-50: #f4f2fe;
+  --ml-cyan: #3ce9f9;
+  --ml-yellow: #fde676;
+  --ml-rose: #ff6c77;
+
+  /* -------- surfaces ---------------------------------------------- */
+  --bg-page: #fafafb;
+  --bg-card: #ffffff;
+  --bg-muted: #f3f2f8;
+  --border-1: #e6e3f0;
+  --border-2: #d1cde3;
+
+  /* -------- text -------------------------------------------------- */
+  --text-1: #14113a;
+  --text-2: #4a4668;
+  --text-3: #6f6b8c;
+  --link: var(--ml-indigo);
+
+  /* -------- semantic. Separate from the accent, on purpose -------- */
+  --color-success: #2ebd85;
+  --color-warning: #b8860b;
+  --color-danger: #d94550;
+  /* The donut's own scale. Rose and green at full strength read as
+     alert and confirmation; these are the plotting versions. */
+  --sentiment-positive: #2ebd85;
+  --sentiment-negative: #ff6c77;
+  --sentiment-neutral: #8e8aa6;
+  --sentiment-mixed: #f0c419;
+
+  /* -------- spacing ----------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* -------- depth ------------------------------------------------- */
+  --radius-1: 8px;
+  --radius-2: 12px;
+  --radius-3: 18px;
+  --shadow-1: 0 1px 2px rgba(14, 10, 46, 0.04);
+  --shadow-2: 0 4px 14px rgba(14, 10, 46, 0.08);
+
+  /* -------- type -------------------------------------------------- */
+  /* Readex Pro carries Arabic and Latin in one family, which is why the
+     brand uses it and why an Arabic-first interface needs it: a fallback
+     stack that switches family between scripts makes a mixed line ragged. */
+  --font-body:
+    "Readex Pro", "IBM Plex Sans Arabic", system-ui, -apple-system, sans-serif;
+  /* Parkinsans is the brand's Latin display companion. Not loaded: this
+     interface is Arabic throughout and Readex Pro covers its Latin, so a
+     second family would be weight for a moment that does not occur here. */
+  --font-latin: "Readex Pro", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-h1: clamp(26px, 3.2vw, 38px);
+  --fs-h2: clamp(20px, 2.2vw, 26px);
+  --fs-h3: 18px;
+  --fs-body: 16px;
+  --fs-small: 14px;
+  --fs-micro: 12.5px;
+}

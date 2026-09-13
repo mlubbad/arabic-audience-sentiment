@@ -1,8 +1,9 @@
 @import "tailwindcss";
+@import "./brand.css";
 :root {
-  font-family: Tahoma, Arial, sans-serif;
-  color: #172433;
-  background: #f4f6f8;
+  font-family: var(--font-body);
+  color: var(--text-1);
+  background: var(--bg-page);
   line-height: 1.7;
   font-synthesis: none;
 }
@@ -13,8 +14,8 @@ body {
   margin: 0;
 }
 header {
-  background: #fff;
-  border-bottom: 1px solid #ccd4db;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-1);
   padding: 1rem max(1rem, calc((100% - 1120px) / 2));
   display: flex;
   align-items: center;
@@ -31,7 +32,7 @@ nav {
   flex-wrap: wrap;
 }
 a {
-  color: #164c77;
+  color: var(--link);
   text-decoration: underline;
 }
 main {
@@ -63,12 +64,12 @@ article,
 .empty,
 form {
   padding: 1rem;
-  border: 1px solid #c7d0d9;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
   background: white;
 }
 .notice {
-  border-inline-start: 4px solid #687c8e;
+  border-inline-start: 4px solid var(--text-3);
 }
 .filters {
   display: flex;
@@ -83,7 +84,7 @@ label {
 input,
 select {
   display: block;
-  border: 1px solid #8392a0;
+  border: 1px solid var(--text-3);
   border-radius: 4px;
   background: white;
   padding: 0.55rem;
@@ -91,10 +92,10 @@ select {
   min-height: 44px;
 }
 button {
-  border: 1px solid #456479;
+  border: 1px solid var(--text-2);
   border-radius: 5px;
   padding: 0.5rem 0.9rem;
-  background: #244c67;
+  background: var(--ml-indigo);
   color: white;
   margin: 0.35rem;
   min-height: 44px;
@@ -105,7 +106,7 @@ button:disabled {
   cursor: wait;
 }
 :focus-visible {
-  outline: 3px solid #bd6a0b;
+  outline: 3px solid var(--color-warning);
   outline-offset: 3px;
 }
 .metrics {
@@ -145,17 +146,17 @@ table {
 th,
 td {
   padding: 0.8rem;
-  border-bottom: 1px solid #d3dbe2;
+  border-bottom: 1px solid var(--border-1);
   text-align: start;
 }
 th {
-  background: #e8eef2;
+  background: var(--bg-muted);
 }
 small {
   display: block;
 }
 .muted {
-  color: #485e70;
+  color: var(--text-2);
 }
 .pager {
   display: flex;
@@ -167,7 +168,7 @@ small {
 }
 .pager p {
   margin: 0;
-  color: #485e70;
+  color: var(--text-2);
 }
 .budgets {
   list-style: none;
@@ -179,21 +180,21 @@ small {
   display: grid;
   gap: 0.25rem;
   padding: 0.8rem;
-  border: 1px solid #c7d0d9;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
-  background: #fff;
+  background: var(--bg-card);
 }
 .budgets progress {
   width: 100%;
   height: 0.7rem;
 }
 .budgets small[data-state="warning"] {
-  color: #8a5a00;
+  color: var(--color-warning);
   font-weight: 700;
 }
 .budgets small[data-state="critical"],
 .budgets small[data-state="exhausted"] {
-  color: #9a2b2b;
+  color: var(--color-danger);
   font-weight: 700;
 }
 .export {
@@ -208,7 +209,7 @@ small {
   flex: 1 1 18rem;
 }
 .review {
-  border-inline-start: 4px solid #244c67;
+  border-inline-start: 4px solid var(--ml-indigo);
 }
 .review h3 {
   font-weight: 700;
@@ -219,13 +220,13 @@ small {
   margin: 0.8rem 0 0.4rem;
 }
 [data-severity="warning"] strong {
-  color: #8a5a00;
+  color: var(--color-warning);
 }
 [data-severity="critical"] strong {
-  color: #9a2b2b;
+  color: var(--color-danger);
 }
 [data-severity="ok"] strong {
-  color: #1d6047;
+  color: var(--color-success);
 }
 .engaged {
   padding-inline-start: 1.5rem;
@@ -253,37 +254,37 @@ small {
   gap: 0.6rem;
   flex-wrap: wrap;
   padding: 0.5rem 0.7rem;
-  border: 1px solid #d3dbe2;
+  border: 1px solid var(--border-1);
   border-radius: 6px;
-  background: #f8fafb;
+  background: var(--bg-card);
 }
 .history small {
-  color: #485e70;
+  color: var(--text-2);
 }
 .history small[data-state="in_force"] {
-  color: #1d6047;
+  color: var(--color-success);
   font-weight: 700;
 }
 .history small[data-state="superseded_by_edit"] {
-  color: #8a5a00;
+  color: var(--color-warning);
   font-weight: 700;
 }
 .review blockquote {
   margin: 0 0 0.5rem;
   padding: 0.6rem 0.8rem;
-  background: #f4f6f8;
+  background: var(--bg-page);
   border-radius: 6px;
 }
 .updating {
   padding: 0.5rem 1rem;
-  border-inline-start: 4px solid #687c8e;
-  background: #fff;
-  color: #485e70;
+  border-inline-start: 4px solid var(--text-3);
+  background: var(--bg-card);
+  color: var(--text-2);
 }
 .loading,
 .empty {
   padding: 2rem;
-  background: #fff;
+  background: var(--bg-card);
 }
 .skip {
   position: absolute;

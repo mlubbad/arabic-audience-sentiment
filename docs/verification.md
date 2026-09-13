@@ -604,6 +604,31 @@ clients. The isolation it exists to check was unaffected — a second client app
 the product changed. It now asserts the property, that A's client is visible and B's is not,
 which is what it meant all along.
 
+## A browser test that had been racing all along
+
+Applying the brand added a stylesheet link, and one test failed — deterministically, twice in
+a row, so not flakiness. The cause was not the stylesheet.
+
+The test holds the fixture request to observe the pending state, but StrictMode mounts twice
+and it held only the *first* request; the second returned 503 immediately and settled the
+query. Whether the loading indicator was ever observable came down to whether the assertion
+arrived before that. It had been passing on scheduling for months, and a render-blocking
+stylesheet delaying `goto` was enough to lose the race.
+
+Every failing request is now held until released, so the pending state is a fact rather than a
+window. The test also runs in 863ms instead of timing out at 5s.
+
+Then the fonts were moved off Google and self-hosted, which removes the delay that exposed
+this, the third-party request on every page load, and one more thing that can be unreachable.
+
+## An asset cleanup that stopped covering the assets
+
+The deploy removes superseded hashed files, and matched `index-*`. Code-splitting renamed the
+chunks after their entry points, so `Dashboard-*.js` and `Account-*.js` accumulated silently —
+two orphans were on the server before this was noticed. It now matches every file under
+`assets/`, verified by a redeploy that removed exactly the two stale chunks and kept the five
+current ones.
+
 ## Notes on running the suites
 
 The browser suite is timing-sensitive. During this work the host reached load average 17 and

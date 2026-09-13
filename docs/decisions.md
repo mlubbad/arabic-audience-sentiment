@@ -196,3 +196,18 @@ service authorization follow from this setup.
   been sent to Google.
 - **A verifier is validated where it is created, not where it is used.** By the exchange it has
   already been used, and a weak one cannot be un-sent.
+- **The brand's own tokens, a deliberate subset of them.** Colours, spacing, shadows and the
+  type scale come from the project's brand book by way of `dashboard.sky-develop.net`. What is
+  chosen here is the subset: a dashboard needs surfaces, text and a sentiment palette, not the
+  display scale or the mesh gradients that belong to a marketing page.
+- **Sentiment colour is separate from the accent.** Indigo is chrome; green, rose, grey and
+  amber plot the four labels. Sharing them would make a figure read as "brand" and a button
+  read as "positive". Every figure still carries a text label — colour is never the only
+  carrier, and the browser suite asserts it.
+- **Fonts are self-hosted.** Readex Pro carries Arabic and Latin in one design, which is why
+  an Arabic-first interface needs it: a fallback stack that changes family mid-sentence makes a
+  mixed line ragged. Served from our own origin rather than Google, because a render-blocking
+  third-party stylesheet delayed first paint enough to break a browser test, it hands a
+  visitor's IP to a third party on every load, and it is one more thing that can be
+  unreachable. Only the Arabic and Latin subsets are shipped, at four weights.
+

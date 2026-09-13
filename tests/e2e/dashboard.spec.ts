@@ -28,20 +28,19 @@ test("shows actual pending fetch then safe error with working retry", async ({
   page,
 }) => {
   // StrictMode mounts the tree twice, so the initial load issues more than one
-  // request. Gate on a flag rather than a request index, and hold only the first
-  // request so the pending state is observable rather than raced past.
+  // request. Hold *every* failing request until released, not just the first:
+  // holding one and letting the next fail immediately made the query settle
+  // while the assertion was still on its way, so whether the pending state was
+  // ever observable came down to scheduling. It passed for months and then
+  // failed the moment a render-blocking stylesheet made goto return later.
   let release!: () => void;
   const pending = new Promise<void>((r) => {
     release = r;
   });
   let failing = true;
-  let held = false;
   await page.route("**/fixtures/dashboard.json", async (route) => {
     if (!failing) return route.continue();
-    if (!held) {
-      held = true;
-      await pending;
-    }
+    await pending;
     await route.fulfill({ status: 503, body: "unavailable" });
   });
   await page.goto("/dashboard");
