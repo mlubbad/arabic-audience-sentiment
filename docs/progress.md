@@ -112,3 +112,11 @@ project, a real sentiment model, or any deployment.
 3. Add video comparison, since every panel already derives from one filtered snapshot.
 4. Re-run the browser suite on an unloaded machine and confirm 12/12, then prove concurrent
    overspend against a real PostgreSQL with two connections.
+
+## Parallel coordination — 2026-09-13
+
+A separate integration worktree was created from `5e9094f`, including the latest usage UI.
+Two implementation lanes are allocated in `docs/coordination/tasks.md`: Codex owns Python;
+Claude owns UI/database work. Shared contracts/tooling/docs have a single integrator owner.
+The original checkout is preserved. Claude's migration acknowledgement is still pending;
+this setup does not claim the external Claude session has read or accepted the new protocol.

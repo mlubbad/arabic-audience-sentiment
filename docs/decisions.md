@@ -79,3 +79,11 @@ References checked: [Supabase RLS](https://supabase.com/docs/guides/database/pos
 - The fixture carries a plan block so the panel is exercisable without a server. It is synthetic
   like the rest of the fixture and does not describe any real workspace's consumption.
 
+
+2026-09-13 — Parallel development uses three sibling Git worktrees: Codex/Python,
+Claude/platform, and a single integration lane. The original checkout is preserved during
+Claude's transition. Shared TypeScript contracts, Node dependency changes and central
+milestone records have one owner (integrator). Lane reports avoid concurrent edits to shared
+progress documents. Ownership guards run before commits in the new worktrees. See
+`docs/coordination/README.md` and `tasks.md`. No changes to application architecture or paid
+service authorization follow from this setup.

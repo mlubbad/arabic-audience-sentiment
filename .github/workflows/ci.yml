@@ -18,6 +18,7 @@ jobs:
       - run: npm ci
       - run: uv --directory workers/python sync --frozen
       - run: npx playwright install --with-deps chromium
+      # Includes the dependency-free ownership guard regression tests.
       - run: npm run check
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4

@@ -196,3 +196,17 @@ work.
 | CI | `.github/workflows/ci.yml` exists but has never executed — no Git remote and no commit yet |
 | Deployment | Nothing deployed; no URL exists, private or otherwise |
 | Final dashboard styling | Original dashboard HTML, ZIP, and brand assets not supplied |
+
+## Coordination baseline — 2026-09-13
+
+Verified in `/Users/mlubbad/Documents/Codex/SentimentAnalysis-worktrees/integration`,
+based on product commit `5e9094f`. Each worktree uses separate dependency directories.
+
+- `npm ci --cache /Users/mlubbad/Documents/Codex/SentimentAnalysis/.cache/npm`: passed;
+  237 packages installed, 0 audit vulnerabilities reported.
+- `uv --directory workers/python --cache-dir /Users/mlubbad/Documents/Codex/SentimentAnalysis/.cache/uv sync --frozen`: passed, Python 3.12.10.
+- Ownership regression tests first failed on missing implementation, then passed 3/3.
+- `npm run check`: passed lint, formatting, typecheck, 3 coordination tests, 27 application
+  unit tests, 18 SQL tests, 23 Python tests, build and secret-pattern scan.
+- This verifies the coordination baseline. It does not change the earlier live-service
+  limitations or establish that production ingestion/metering is complete.

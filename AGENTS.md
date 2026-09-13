@@ -24,3 +24,9 @@ credentials are missing. Distinguish mocked, fixture-tested, and live-tested flo
 Update docs/progress.md, docs/decisions.md, and docs/verification.md after milestones.
 Use the repository's actual lint/build/test commands and report real results.
 Do not stop at planning or leave clickable controls without working behavior.
+
+Parallel work: read docs/coordination/README.md and docs/coordination/tasks.md before
+editing. Work only in your assigned worktree and owned paths. The integrator owns
+shared contracts, root tooling and central milestone documents. Write your own
+lane report instead of editing shared progress files. Run the ownership guard
+before handing off a commit. Never alter another agent's branch or working files.
