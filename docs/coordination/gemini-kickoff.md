@@ -32,6 +32,26 @@ git status --short
 `pwd` must end in `/worktrees/schema` and the branch must be `codex/agent-c-schema`.
 If either is wrong, stop and say so rather than continuing.
 
+### Start here — paste these five, in order
+
+```
+cd /Users/mlubbad/Documents/Codex/SentimentAnalysis-worktrees/schema
+export PATH="$HOME/.nvm/versions/node/v22.14.0/bin:$PATH"
+git branch --show-current                      # must print codex/agent-c-schema
+git merge --no-edit codex/coordination-integration   # pick up other lanes' shared changes
+npm run test:db                                # must print 18 passed before you change anything
+```
+
+If any of those five does not do what it says, stop and report it rather than continuing.
+
+**Pre-flight already done for you (2026-09-13).** Before you were handed this lane, the whole
+loop was walked through once end to end: a second migration file plus its test was created,
+`npm run test:db` applied both in filename order and passed, `npm run typecheck` passed, the
+ownership guard accepted `supabase/**` and refused a file outside it, and the pre-commit hook
+was confirmed wired to your branch. The probe files were then deleted. So the pattern in
+section 5 is known to work — if it fails for you, something you changed is the cause, not the
+setup.
+
 ---
 
 ## 2. Environment — read this, it will bite you otherwise
