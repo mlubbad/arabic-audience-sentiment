@@ -103,6 +103,11 @@ export const BatchPredictionSchema = z
     model_id: z.string().min(1),
     revision: z.string().min(1),
     preprocessing_version: z.string().min(1),
+    // The inference settings this verdict was produced under. Section 9 makes
+    // the fingerprint model, revision, preprocessing *and* settings; the
+    // column and its unique index already named this, and nothing wrote it. An
+    // adapter with no settings sends {}, which is a statement, not an absence.
+    parameters: z.record(z.unknown()),
   })
   .strict()
   .refine(

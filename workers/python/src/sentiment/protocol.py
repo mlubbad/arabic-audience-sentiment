@@ -24,5 +24,8 @@ class SentimentAdapter(Protocol):
     model_id: str
     revision: str
     label_mapping: dict[int, Label]
+    # Settings that change the output. An adapter with none declares {}, which
+    # is a statement rather than an absence.
+    parameters: dict[str, object]
 
     def predict(self, texts: list[str]) -> list[Prediction]: ...

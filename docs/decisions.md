@@ -160,4 +160,15 @@ service authorization follow from this setup.
 - **A comment's content hash is computed in one place.** Predictions join to comments on it, so
   a prediction hashed over different text is stored and then never becomes the effective label
   — a comment that is analysed but shows no verdict, with nothing failing anywhere.
+- **Settings are part of what identifies an analysis.** Section 9 makes the fingerprint model,
+  revision, preprocessing *and* settings. They are stored on the run and folded into
+  `analysis_key`, because a prediction is unique on that key: without them, re-analysing a
+  comment under different settings collides with the earlier verdict and the new one is
+  dropped. An adapter with no settings declares `{}`, which is a statement rather than an
+  absence.
+- **Spent OAuth states are pruned; states in flight never are.** Retention was never load
+  bearing for security — consume requires a row that is unconsumed and unexpired — so the
+  window exists for operational diagnosis and is short. The operation is committed without a
+  schedule, because a schedule needs a deployed project and inventing one here would be a
+  configuration nobody runs.
 

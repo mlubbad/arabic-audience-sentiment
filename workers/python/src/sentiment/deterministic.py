@@ -24,6 +24,7 @@ class DeterministicTestAnalyzer:
     model_id = TEST_CARD.model_id
     revision = TEST_CARD.revision
     label_mapping = TEST_CARD.label_mapping
+    parameters = TEST_CARD.parameters
 
     def predict(self, texts: list[str]) -> list[Prediction]:
         out = []

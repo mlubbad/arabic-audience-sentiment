@@ -262,4 +262,59 @@ describe("youtube connection", () => {
       db.query("select public.oauth_disconnect($1,$1)", [A]),
     ).rejects.toThrow();
   });
+
+  it("prunes spent states without touching a connection in flight", async () => {
+    // The table is single-use and was never cleaned, so every attempt ever
+    // made stayed on disk: who started linking which client, and when.
+    await db.exec("reset role");
+    await db.exec("delete from private.oauth_states");
+    await db.query(
+      `insert into private.oauth_states(state_hash,user_id,workspace_id,client_id,expires_at,consumed_at) values
+        ('old-consumed',$1,$2,$2,now()-interval '30 days',now()-interval '30 days'),
+        ('old-expired',$1,$2,$2,now()-interval '30 days',null),
+        ('recent-consumed',$1,$2,$2,now()-interval '1 hour',now()-interval '1 hour'),
+        ('in-flight',$1,$2,$2,now()+interval '5 minutes',null)`,
+      [ownerA, A],
+    );
+    const removed = await db.query<{ prune_oauth_states: number }>(
+      "select private.prune_oauth_states()",
+    );
+    expect(removed.rows[0].prune_oauth_states).toBe(2);
+    const left = await db.query<{ state_hash: string }>(
+      "select state_hash from private.oauth_states order by state_hash",
+    );
+    // The in-flight state survives, and so does anything inside the window.
+    expect(left.rows.map((r) => r.state_hash)).toEqual([
+      "in-flight",
+      "recent-consumed",
+    ]);
+  });
+
+  it("still refuses a replay once the state it consumed has been pruned", async () => {
+    // Deleting a consumed state must not reopen it. Consume requires the row
+    // to exist, be unconsumed and be unexpired, so an absent row and a
+    // consumed row refuse identically.
+    await db.exec("reset role");
+    await db.exec("delete from private.oauth_states");
+    await db.query(
+      `insert into private.oauth_states(state_hash,user_id,workspace_id,client_id,expires_at,consumed_at)
+       values ('spent',$1,$2,$2,now()-interval '30 days',now()-interval '30 days')`,
+      [ownerA, A],
+    );
+    await db.query("select private.prune_oauth_states()");
+    await expect(
+      db.query("select * from private.oauth_consume_state('spent')"),
+    ).rejects.toThrow(/invalid_state/);
+  });
+
+  it("is service-only: a tenant cannot prune the state table", async () => {
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      ownerA,
+    ]);
+    await db.exec("set role authenticated");
+    await expect(
+      db.query("select private.prune_oauth_states()"),
+    ).rejects.toThrow();
+    await db.exec("reset role");
+  });
 });

@@ -37,6 +37,7 @@ const prediction = (id: string, over: Record<string, unknown> = {}) => ({
   model_id: "m",
   revision: "rev",
   preprocessing_version: "v1",
+  parameters: { max_length: 256 },
   ...over,
 });
 const payload = (over: Record<string, unknown> = {}) => ({
@@ -309,6 +310,56 @@ describe("atomic batch ingestion", () => {
         "select count(*)::int as n from usage_events where event_key='analysis:youtube:ghost'",
       ),
     ).toBe(0);
+  });
+
+  it("keeps two analyses of one comment apart when only their settings differ", async () => {
+    // analysis_runs.parameters was in the identity index and nothing wrote it,
+    // so every run looked identically configured. With settings stored, a
+    // re-analysis under different settings is a second run and a second
+    // verdict; without them it found the first run and filed under it.
+    const runsBefore = await scalar(
+      "select count(*)::int as n from analysis_runs",
+    );
+    await commit(
+      payload({
+        comments: [comment("c1")],
+        predictions: [
+          prediction("c1", {
+            parameters: { max_length: 512 },
+            analysis_key: "m@rev+v1+longer",
+          }),
+        ],
+      }),
+      "settings",
+      "5".repeat(64),
+    );
+    expect(await scalar("select count(*)::int as n from analysis_runs")).toBe(
+      runsBefore + 1,
+    );
+    const stored = await db.query<{ parameters: string }>(
+      "select parameters::text as parameters from analysis_runs order by parameters::text",
+    );
+    expect(stored.rows.map((r) => JSON.parse(r.parameters))).toEqual([
+      { max_length: 256 },
+      { max_length: 512 },
+    ]);
+    // Both verdicts survive against the same comment, each pointing at the run
+    // it was actually produced by. Counting rows is not enough: without the
+    // parameters in the join a verdict matches every run sharing the model and
+    // revision, so it lands under whichever one the planner reached first.
+    const linked = await db.query<{ analysis_key: string; parameters: string }>(
+      `select p.analysis_key, r.parameters::text as parameters
+       from sentiment_predictions p
+       join comments c on c.id=p.comment_id
+       join analysis_runs r on r.id=p.analysis_run_id
+       where c.external_comment_id='c1' order by p.analysis_key`,
+    );
+    expect(
+      linked.rows.map((r) => [r.analysis_key, JSON.parse(r.parameters)]),
+    ).toEqual([
+      ["m@rev+v1", { max_length: 256 }],
+      ["m@rev+v1+longer", { max_length: 512 }],
+    ]);
   });
 
   it("refuses the same comment twice in one batch as a malformed batch", async () => {

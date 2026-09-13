@@ -65,7 +65,7 @@ never be sent to a live RPC, and the UI says so on screen.
 
 | Item | Status | Notes |
 | --- | --- | --- |
-| State lifecycle | implemented | Hash-only storage, bound to user/workspace/client, 10 minutes, single use |
+| State lifecycle | implemented | Hash-only storage, bound to user/workspace/client, 10 minutes, single use. Spent states are prunable; no schedule until there is a project to attach one to |
 | Callback cannot be redirected | implemented | Consume returns the binding rather than accepting one; there is no workspace argument to forge |
 | Channel ownership | implemented | Connected claim is globally exclusive; a public_unverified row is upgraded in place so pilot data carries over |
 | Revocation | implemented | Moves to reconnect_required and cancels dependent jobs; never falls back to scraping |

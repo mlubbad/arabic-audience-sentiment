@@ -30,6 +30,7 @@ const prediction = (id: string, over = {}) => ({
   model_id: "m",
   revision: "abc123",
   preprocessing_version: "v1",
+  parameters: { max_length: 256 },
   ...over,
 });
 const payload = (over = {}) => ({

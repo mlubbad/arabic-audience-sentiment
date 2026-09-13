@@ -15,8 +15,8 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm run test:coordination` | Pass — 5 ownership-guard tests |
 | `npm test` | Pass — **77 tests, 10 files** |
-| `npm run test:db` | Pass — **55 tests, 6 files** |
-| `npm run worker:test` | Pass — **58 tests, 9 files** |
+| `npm run test:db` | Pass — **59 tests, 6 files** |
+| `npm run worker:test` | Pass — **60 tests, 9 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
 | `npm run test:e2e` | Pass — 45 tests, Chromium |
@@ -52,6 +52,11 @@ reverted and the suite returned to green.
 | Accept an adapter returning fewer verdicts than rows | 1 |
 | Let a failed analysis finish the run as succeeded | 1 |
 | Commit an empty prediction list, as before the wiring | 1 |
+| Go back to never writing analysis parameters | 2 |
+| Drop parameters from the prediction-to-run join | 1 |
+| Fingerprint an analysis without its settings | 1 |
+| Prune a connection that is still in flight | 1 |
+| Leave the prune job executable by tenants | 1 |
 
 ## What the suites prove
 
@@ -189,6 +194,33 @@ an adapter returning fewer verdicts than rows is refused rather than zipped (whi
 leave later rows silently unanalysed), and a batch whose analysis fails keeps its collected
 rows but can no longer finish `succeeded` — an exhausted source that was not fully labelled
 is `partial`.
+
+## Two recorded gaps, closed
+
+**`analysis_runs.parameters` was never written.** The column existed with a `'{}'` default and
+the run-identity index named it, so every run looked identically configured whether or not it
+was. The worker had settings to report all along — a model card carries `max_length` — and
+dropped them on the way. An unwritten column inside a unique index is worse than an absent
+one: the index claims the identity accounts for settings, so a reader trusts a distinction
+that is not being made. Settings now travel on each prediction, are stored on the run, and are
+part of `analysis_key`, because a prediction is unique on that key and two analyses of one
+comment differing only in their settings would otherwise collide with the second silently
+discarded.
+
+The prediction-to-run join now matches on parameters too. The first version of that test
+counted rows and passed under the mutation that removed the join condition — the count was
+right and the *linkage* was not, so a verdict could be filed under the wrong run. The test
+now asserts which run each verdict points at, and the mutation fails it.
+
+**`private.oauth_states` was never pruned.** Every connection attempt left a row permanently:
+who began linking which client, and when. Nothing read them again. `private.prune_oauth_states`
+removes consumed and expired states outside a retention window and never touches an unconsumed
+state that has not expired, because that is a connection in flight. Security never depended on
+retention — consume already requires the row to be unconsumed and unexpired, so a pruned row
+and a consumed row refuse a replay identically, which is asserted rather than assumed.
+
+No schedule is attached. Scheduling belongs to a deployed project, which does not exist; what
+is committed is the operation.
 
 ## Notes on running the suites
 

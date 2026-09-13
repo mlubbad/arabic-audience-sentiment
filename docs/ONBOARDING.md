@@ -77,8 +77,8 @@ Chromium. `uv` must be installed separately.
 | --- | --- | --- |
 | `npm run check` | lint, format, typecheck, unit, SQL, worker, build, secret scan | green |
 | `npm test` | contracts + web unit (10 files) | 77 passed |
-| `npm run test:db` | real SQL + real RLS in PGlite | 55 passed |
-| `npm run worker:test` | Python worker via uv/pytest | 58 passed |
+| `npm run test:db` | real SQL + real RLS in PGlite | 59 passed |
+| `npm run worker:test` | Python worker via uv/pytest | 60 passed |
 | `node scripts/check-ownership.mjs <lane>` | lane guard | 5/5 |
 | `npm run test:e2e` | Playwright against a dev server it starts itself | 45 passed |
 
@@ -169,7 +169,7 @@ packages/contracts/src/    Zod schemas + the shared snapshot. The barrel
   jobs.ts                  CommitBatchSchema, usageEventKey — the worker contract
 apps/web/src/              React 19 + Vite + Chart.js dashboard (Arabic, RTL)
   data.ts                  the single place that decides fixture vs live
-supabase/migrations/       9 files, applied in filename order, never edited
+supabase/migrations/       11 files, applied in filename order, never edited
 supabase/functions/        _shared/worker-gateway.ts — a pure handler with an
                            injected WorkerDb, so it is testable without a runtime
 supabase/tests/            6 PGlite suites; end_to_end.test.ts is the seam test

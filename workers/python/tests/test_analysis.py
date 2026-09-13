@@ -57,7 +57,10 @@ def test_the_record_carries_the_fingerprint_the_server_identifies_a_run_by():
     assert record["model_id"] == ANALYZER.model_id
     assert record["revision"] == ANALYZER.revision
     assert record["preprocessing_version"] == PREPROCESSING_VERSION
-    assert record["analysis_key"] == f"{ANALYZER.model_id}@{ANALYZER.revision}+{PREPROCESSING_VERSION}"
+    assert record["parameters"] == {"max_length": 256}
+    assert record["analysis_key"].startswith(
+        f"{ANALYZER.model_id}@{ANALYZER.revision}+{PREPROCESSING_VERSION}+"
+    )
 
 
 def test_an_adapter_that_returns_the_wrong_number_of_verdicts_is_refused():
@@ -130,3 +133,31 @@ class _Collector:
 
     def batches(self, video_id, checkpoint):
         yield from self.batches_out
+
+
+def test_settings_are_part_of_what_identifies_an_analysis():
+    # A prediction is unique on analysis_key, so two analyses of the same
+    # comment differing only in their settings must not collide: the second
+    # would be silently discarded and the difference never stored.
+    from sentiment.registry import ModelCard
+
+    base = ModelCard("m", "abc123", {0: "positive"}, PREPROCESSING_VERSION, max_length=256)
+    longer = ModelCard("m", "abc123", {0: "positive"}, PREPROCESSING_VERSION, max_length=512)
+    assert base.parameters != longer.parameters
+    assert base.analysis_key != longer.analysis_key
+    # The readable part is unchanged; only the settings digest differs.
+    assert base.analysis_key.rsplit("+", 1)[0] == longer.analysis_key.rsplit("+", 1)[0]
+
+
+def test_an_adapter_declaring_no_settings_reports_an_empty_dict():
+    # {} is a statement — "no settings" — and is what the server stores. It is
+    # not a missing value standing in for unknown ones.
+    class Bare:
+        model_id, revision = "m", "r"
+
+        def predict(self, texts):
+            return [Prediction("succeeded", "positive", {"positive": 1.0}, "m", "r")]
+
+    [record] = analyse(Bare(), [comment("c1", "أ")])
+    assert record["parameters"] == {}
+

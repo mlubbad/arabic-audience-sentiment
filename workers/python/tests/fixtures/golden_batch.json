@@ -1,6 +1,6 @@
 {
   "envelope": {
-    "batch_key": "ba960f82081925baa5e04b088cc25975",
+    "batch_key": "9150e03c976e3937541f5f4daca7e128",
     "job_id": "20000000-0000-4000-8000-000000000001",
     "lease_token": "30000000-0000-4000-8000-000000000001",
     "payload": {
@@ -53,7 +53,7 @@
       "outcome": "exhausted",
       "predictions": [
         {
-          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1",
+          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1+a272ec5cfcf7",
           "class_scores": {
             "mixed": 0.0,
             "negative": 0.0,
@@ -64,17 +64,23 @@
           "external_comment_id": "cmt-1",
           "label": "positive",
           "model_id": "deterministic-test-analyzer",
+          "parameters": {
+            "max_length": 256
+          },
           "preprocessing_version": "strip-html-normalize-space-v1",
           "revision": "not-a-model-v1",
           "status": "succeeded"
         },
         {
-          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1",
+          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1+a272ec5cfcf7",
           "class_scores": {},
           "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
           "external_comment_id": "cmt-2",
           "label": null,
           "model_id": "deterministic-test-analyzer",
+          "parameters": {
+            "max_length": 256
+          },
           "preprocessing_version": "strip-html-normalize-space-v1",
           "revision": "not-a-model-v1",
           "status": "unsupported"
@@ -82,7 +88,7 @@
       ],
       "video_title": "حلقة تجريبية"
     },
-    "payload_hash": "ba960f82081925baa5e04b088cc25975f484faee11376af73a137409c7abbd7a"
+    "payload_hash": "9150e03c976e3937541f5f4daca7e128634e3614413278a66ade03630829ed33"
   },
-  "payload_hash": "ba960f82081925baa5e04b088cc25975f484faee11376af73a137409c7abbd7a"
+  "payload_hash": "9150e03c976e3937541f5f4daca7e128634e3614413278a66ade03630829ed33"
 }

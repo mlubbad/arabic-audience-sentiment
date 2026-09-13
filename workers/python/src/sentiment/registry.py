@@ -1,9 +1,17 @@
 """Pinned model registry. Label mappings are declared, never inferred from order."""
+import hashlib
+import json
 from dataclasses import dataclass, field
 
 from .protocol import Label
 
 LABELS: tuple[Label, ...] = ("positive", "negative", "neutral", "mixed")
+
+
+def parameters_digest(parameters: dict[str, object]) -> str:
+    """Stable short digest of a settings dict, insensitive to key order."""
+    canonical = json.dumps(parameters, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()[:12]
 
 
 @dataclass(frozen=True)
@@ -32,9 +40,27 @@ class ModelCard:
         return "mixed" in self.label_mapping.values()
 
     @property
+    def parameters(self) -> dict[str, object]:
+        """The inference settings that change what the model outputs.
+
+        Declared rather than implied: the server stores these as part of what
+        identifies an analysis run, and a setting left out of here is a
+        difference the server cannot see.
+        """
+        return {"max_length": self.max_length}
+
+    @property
     def analysis_key(self) -> str:
-        """Fingerprint of model+revision+preprocessing; not a run id."""
-        return f"{self.model_id}@{self.revision}+{self.preprocessing_version}"
+        """Fingerprint of model+revision+preprocessing+settings; not a run id.
+
+        Settings belong in it because a prediction is unique on this key: two
+        analyses of the same comment differing only in their settings would
+        otherwise collide and the second would be silently discarded.
+        """
+        return (
+            f"{self.model_id}@{self.revision}"
+            f"+{self.preprocessing_version}+{parameters_digest(self.parameters)}"
+        )
 
 
 # Candidates recorded in the handoff. Revisions are deliberately absent until a real
