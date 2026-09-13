@@ -1,0 +1,69 @@
+{
+  "payload": {
+    "external_video_id": "abcdefghijk",
+    "video_title": "حلقة تجريبية",
+    "checkpoint": {
+      "page": 1
+    },
+    "outcome": "exhausted",
+    "comments": [
+      {
+        "external_comment_id": "cmt-1",
+        "external_parent_id": null,
+        "is_reply": false,
+        "parent_source": "unknown",
+        "author_channel_id": "UCauthor1",
+        "author_name": "مؤلف ١",
+        "text_raw": "المحتوى واضح ومفيد",
+        "text_plain": "المحتوى واضح ومفيد",
+        "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
+        "published_time_raw": "2026-09-01T09:00:00Z",
+        "published_at": "2026-09-01T09:00:00Z",
+        "timestamp_precision": "second",
+        "likes_raw": "12",
+        "likes_value": 12,
+        "source": "youtube_data_api_public",
+        "field_provenance": {
+          "source": "api"
+        }
+      },
+      {
+        "external_comment_id": "cmt-2",
+        "external_parent_id": "cmt-1",
+        "is_reply": true,
+        "parent_source": "api",
+        "author_channel_id": "UCauthor2",
+        "author_name": "مؤلف ٢",
+        "text_raw": "أتمنى تحسين الصوت",
+        "text_plain": "أتمنى تحسين الصوت",
+        "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
+        "published_time_raw": "2026-09-02T09:00:00Z",
+        "published_at": "2026-09-02T09:00:00Z",
+        "timestamp_precision": "second",
+        "likes_raw": null,
+        "likes_value": null,
+        "source": "youtube_data_api_public",
+        "field_provenance": {
+          "source": "api"
+        }
+      }
+    ],
+    "predictions": [
+      {
+        "external_comment_id": "cmt-1",
+        "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
+        "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1",
+        "status": "succeeded",
+        "label": "negative",
+        "class_scores": {
+          "negative": 1.0,
+          "positive": 0.0
+        },
+        "model_id": "deterministic-test-analyzer",
+        "revision": "not-a-model-v1",
+        "preprocessing_version": "strip-html-normalize-space-v1"
+      }
+    ]
+  },
+  "payload_hash": "1e3a58c30add01a6f9d3a84cc8c7c5aeaef77ce6a6d4785c16ce73ec4f3e3c91"
+}

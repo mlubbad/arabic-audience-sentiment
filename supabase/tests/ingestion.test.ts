@@ -216,9 +216,12 @@ describe("atomic batch ingestion", () => {
     );
   });
 
-  it("records an exhausted batch as succeeded and a blocked one as blocked", async () => {
+  it("records progress without ending the job, whatever the batch outcome", async () => {
+    // The outcome travels with the receipt, but only worker_finish makes a job
+    // terminal. Otherwise a worker that died after its last batch would be
+    // silently marked complete, which section 10 forbids.
     await commit(
-      payload({ outcome: "blocked", comments: [], predictions: [] }),
+      payload({ outcome: "exhausted", comments: [], predictions: [] }),
       "b6",
       "1".repeat(64),
     );
@@ -229,7 +232,14 @@ describe("atomic batch ingestion", () => {
           [JOB],
         )
       ).rows[0].status,
-    ).toBe("blocked");
+    ).toBe("running");
+    expect(
+      (
+        await db.query<{ outcome: string }>(
+          "select outcome from private.job_batches where batch_key='b6'",
+        )
+      ).rows[0].outcome,
+    ).toBe("exhausted");
   });
 
   it("is service-only: a tenant cannot call it", async () => {

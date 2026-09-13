@@ -67,6 +67,24 @@ def _comment(c: RawComment) -> dict[str, Any]:
     }
 
 
+def _canonicalise(value: Any) -> Any:
+    """Render numbers the way JSON does, so both languages agree.
+
+    Python writes an integral float as 1.0 and JavaScript writes 1. Hashing the
+    raw form makes the same payload produce two different digests, which turns a
+    legitimate replay into a batch_conflict on the server.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, dict):
+        return {k: _canonicalise(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_canonicalise(v) for v in value]
+    return value
+
+
 def build_batch(
     video_id: str,
     video_title: str | None,
@@ -85,7 +103,9 @@ def build_batch(
     }
     # Canonical form: the same content must hash identically however the dict
     # was built, or a legitimate replay would look like a conflicting payload.
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    canonical = json.dumps(
+        _canonicalise(payload), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
     return payload, hashlib.sha256(canonical.encode()).hexdigest()
 
 

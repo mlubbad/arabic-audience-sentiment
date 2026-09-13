@@ -45,6 +45,22 @@ const STATUS: Record<string, number> = {
   invalid_outcome: 400,
 };
 
+/**
+ * Resolve a refusal to our own vocabulary.
+ *
+ * A stand-in throws `{ code: "lease_lost" }`, but a real Postgres driver puts
+ * SQLSTATE in `code` and the label in the message, because every raise in the
+ * schema names its refusal explicitly. SQLSTATE alone is ambiguous — forbidden
+ * and an unknown credential are both 42501 — so the message is what
+ * distinguishes them.
+ */
+function refusalCode(error: unknown): string | undefined {
+  const e = error as { code?: string; message?: string };
+  if (e?.code && e.code in STATUS) return e.code;
+  if (e?.message && e.message in STATUS) return e.message;
+  return undefined;
+}
+
 const json = (code: number, body: unknown) =>
   new Response(JSON.stringify(body), {
     status: code,
@@ -140,8 +156,8 @@ export async function handleWorkerRequest(
     }
     return json(404, { code: "not_found" });
   } catch (error) {
-    const code = (error as { code?: string }).code;
-    if (code && code in STATUS) return refuse(code);
+    const code = refusalCode(error);
+    if (code) return refuse(code);
     // Anything unrecognised is reported without its message: a driver error can
     // carry the connection string, and a credential with it.
     return json(500, { code: "control_plane_error" });
