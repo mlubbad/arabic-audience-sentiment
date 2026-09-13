@@ -1018,3 +1018,53 @@ says how many of the rankable negatives it is showing. Contract test added.
 
 Findings 1, 2 and 3 are in the schema and worker lanes, not this one, and the integrator is
 absent. They are written above as ready-to-apply changes rather than applied.
+
+## All three audit findings fixed (2026-09-13)
+
+Applied on the user's instruction. Each was verified by mutation as well as by passing.
+
+**1. `private.plan_limit` no longer reachable by tenants.** Revoked in a new migration; it is
+only called from inside other definer functions, which run as the owner, so nothing else
+changed. The regression test is an **invariant, not a list**: every `security definer`
+function in `private` that `authenticated` may execute must call `private.has_role`, with two
+exemptions stated in the test itself — `has_role` *is* the check, and `create_workspace_impl`
+is self-scoped through `auth.uid()`. A future function added without a check fails this test.
+
+**2. The claim response is normalised in the handler.** It now returns
+`{job_id, lease_token, checkpoint}` rather than the raw `public.jobs` row. Fixing it on the
+server rather than teaching the client to read `id` keeps the wire contract from being
+"whatever columns that table happens to have", and drops columns the worker has no use for.
+The seam test asserts the exact key set, so a mock can no longer drift from the server.
+
+**3. Server-backed resume now exists.** `server/runner.run_once` claims a job, unwraps the
+stored `{"cursor": …}` into the bare string the collector issued, heartbeats **before** each
+commit so a long batch cannot let the lease lapse under the write that follows, and finishes
+explicitly. A generator that ends without saying it exhausted the source finishes `partial`,
+because silence is not completion. A lost lease propagates without declaring anything, since
+the job belongs to whoever holds it now. Seven tests over a synthetic transport.
+
+### Mutations
+
+| Mutation | Caught by |
+| --- | --- |
+| Re-grant `plan_limit` to `authenticated` | the permission invariant |
+| Return the raw jobs row from claim | the seam test's key assertion |
+| Pass the checkpoint object through unwrapped | the resume test |
+
+One of those mutations nearly shipped: the migration was untracked, so `git checkout --` could
+not revert it and reported a pathspec error rather than restoring. The re-granted privilege
+was still in the file. Caught by re-reading the file rather than trusting the restore.
+
+### Results
+
+`npm run check` — 75 contract, 52 SQL, 48 worker, guard 5/5, build, secrets. Browser 45.
+
+### Still blocked, by specific operation
+
+- `channels.list(mine=true)` and the OAuth code exchange — needs Google client credentials and
+  a registered redirect URI.
+- An HTTP round trip to a deployed Edge Function — needs a Supabase project. The handler and
+  the SQL now agree in-process; what is untested is the network hop and the Deno runtime.
+- Legacy import of the 4,899 recorded comments — needs the original CSV and the amendment file.
+- Any accuracy figure — needs the notebooks and ~600 human-labelled comments.
+

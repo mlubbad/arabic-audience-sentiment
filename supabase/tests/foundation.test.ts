@@ -636,4 +636,31 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
     // Null means "the operator has not activated a plan", not "no allowance left".
     expect(summary.rows[0].summary).toBeNull();
   });
+  it("exposes no definer function to a tenant without a role check inside it", async () => {
+    await admin();
+    // The invariant, rather than a list that goes stale: anything in the
+    // private schema a signed-in user can execute runs with the owner's rights,
+    // so it must decide for itself whether that user is entitled.
+    const exposed = await db.query<{ proname: string; src: string }>(`
+      select p.proname, p.prosrc as src
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'private' and p.prosecdef
+        and has_function_privilege('authenticated', p.oid, 'EXECUTE')`);
+    // Two are authorised without calling has_role, for reasons stated here so
+    // the exemption is deliberate rather than an oversight: has_role *is* the
+    // membership check, and create_workspace_impl is self-scoped — it refuses an
+    // anonymous caller and creates a workspace owned by that caller alone.
+    const authorisedWithoutHasRole = ["has_role", "create_workspace_impl"];
+    const unchecked = exposed.rows
+      .filter(
+        (f) =>
+          !f.src.includes("has_role") &&
+          !authorisedWithoutHasRole.includes(f.proname),
+      )
+      .map((f) => f.proname);
+    expect(unchecked).toEqual([]);
+    // And the specific leak this was written for: plan limits are not readable
+    // by passing somebody else's workspace id.
+    expect(exposed.rows.some((f) => f.proname === "plan_limit")).toBe(false);
+  });
 });

@@ -108,9 +108,17 @@ export async function handleWorkerRequest(
   const path = new URL(request.url).pathname.replace(/\/+$/, "");
   try {
     if (path.endsWith("/worker/claim")) {
-      const job = await db.claim(credential);
+      const claimed = await db.claim(credential);
       // No work is not a failure, and 204 keeps that unambiguous.
-      return job ? json(200, job) : new Response(null, { status: 204 });
+      if (!claimed) return new Response(null, { status: 204 });
+      // Normalised on purpose. The data layer returns a jobs row whose key is
+      // `id`, but the wire contract should not be whatever columns that table
+      // happens to have, and the worker has no use for the rest of them.
+      return json(200, {
+        job_id: claimed.id,
+        lease_token: claimed.lease_token,
+        checkpoint: claimed.checkpoint ?? null,
+      });
     }
 
     // Route first: an unknown path is 404 whatever the body looks like, so a

@@ -160,20 +160,31 @@ describe("worker to database, through the real handler", () => {
   it("runs claim, heartbeat, commit and finish through the handler into the database", async () => {
     const claimed = await post("/worker/claim", {});
     expect(claimed.status).toBe(200);
-    const lease = (await claimed.json()) as { id: string; lease_token: string };
+    const lease = (await claimed.json()) as {
+      job_id: string;
+      lease_token: string;
+      checkpoint: unknown;
+    };
+    // The exact keys the Python client reads. A jobs row keyed `id` would make
+    // every later call raise KeyError, which no mock-based test would catch.
+    expect(Object.keys(lease).sort()).toEqual([
+      "checkpoint",
+      "job_id",
+      "lease_token",
+    ]);
     expect(lease.lease_token).toBeTruthy();
 
     expect(
       (
         await post("/worker/heartbeat", {
-          job_id: lease.id,
+          job_id: lease.job_id,
           lease_token: lease.lease_token,
         })
       ).status,
     ).toBe(200);
 
     const committed = await post("/worker/commit-batch", {
-      job_id: lease.id,
+      job_id: lease.job_id,
       lease_token: lease.lease_token,
       batch_key: golden.payload_hash.slice(0, 32),
       payload_hash: golden.payload_hash,
@@ -199,7 +210,7 @@ describe("worker to database, through the real handler", () => {
     ).toBeNull();
 
     const finished = await post("/worker/finish", {
-      job_id: lease.id,
+      job_id: lease.job_id,
       lease_token: lease.lease_token,
       outcome: "succeeded",
     });
@@ -208,7 +219,7 @@ describe("worker to database, through the real handler", () => {
       (
         await db.query<{ status: string }>(
           "select status from jobs where id=$1",
-          [lease.id],
+          [lease.job_id],
         )
       ).rows[0].status,
     ).toBe("succeeded");
