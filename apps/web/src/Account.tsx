@@ -6,6 +6,7 @@ import {
   authSuccessMessage,
   type AuthAction,
 } from "./authMessages";
+import { beginConnect } from "./connect";
 export function Account() {
   const [session, setSession] = useState<Session | null>(null),
     [pending, setPending] = useState(!!supabase),
@@ -16,6 +17,14 @@ export function Account() {
   const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>(
     [],
   );
+  // A workspace cannot be connected without the client it owns, so the two are
+  // read together rather than the button discovering the gap on click.
+  const [clients, setClients] = useState<
+    { id: string; workspace_id: string }[]
+  >([]);
+  const [channels, setChannels] = useState<
+    { workspace_id: string; status: string; external_channel_id: string }[]
+  >([]);
   useEffect(() => {
     if (!supabase) return;
     let active = true;
@@ -40,15 +49,19 @@ export function Account() {
       return;
     }
     let active = true;
-    void supabase
-      .from("workspaces")
-      .select("id,name")
-      .then(({ data, error }) => {
-        if (active) {
-          if (error) setMessage("تعذر تحميل مساحات العمل");
-          else setWorkspaces(data ?? []);
-        }
-      });
+    void Promise.all([
+      supabase.from("workspaces").select("id,name"),
+      supabase.from("clients").select("id,workspace_id"),
+      supabase
+        .from("connection_status")
+        .select("workspace_id,status,external_channel_id"),
+    ]).then(([w, c, ch]) => {
+      if (!active) return;
+      if (w.error) setMessage("تعذر تحميل مساحات العمل");
+      else setWorkspaces(w.data ?? []);
+      setClients(c.data ?? []);
+      setChannels(ch.data ?? []);
+    });
     return () => {
       active = false;
     };
@@ -122,7 +135,8 @@ export function Account() {
     <>
       <h1>الحساب ومساحات العمل</h1>
       <p>
-        تسجيل حساب المنتج مستقل عن ربط يوتيوب. الربط غير متاح في هذا الإصدار.
+        حسابك في الخدمة مستقل عن قناتك. ربط القناة خطوة منفصلة تمنح الأداة إذن
+        قراءة تعليقاتك، ويمكن سحبها في أي وقت.
       </p>
       {pending && <p role="status">جارٍ تنفيذ الطلب…</p>}
       {message && <p role="status">{message}</p>}
@@ -172,10 +186,48 @@ export function Account() {
           {workspaces.length === 0 ? (
             <p>لا توجد مساحة عمل متاحة</p>
           ) : (
-            <ul>
-              {workspaces.map((w) => (
-                <li key={w.id}>{w.name}</li>
-              ))}
+            <ul className="workspace-list">
+              {workspaces.map((w) => {
+                const client = clients.find((c) => c.workspace_id === w.id);
+                const channel = channels.find((c) => c.workspace_id === w.id);
+                return (
+                  <li key={w.id}>
+                    <strong>{w.name}</strong>
+                    {channel ? (
+                      <span data-testid={`channel-${w.id}`}>
+                        {channel.status === "connected"
+                          ? `قناة مرتبطة: ${channel.external_channel_id}`
+                          : `القناة تحتاج إعادة ربط (${channel.status})`}
+                      </span>
+                    ) : (
+                      <span>لا توجد قناة مرتبطة بعد</span>
+                    )}
+                    {/* Shown only when it can actually work: without a client
+                        the server would refuse, and a button that always fails
+                        is worse than no button. */}
+                    {client && channel?.status !== "connected" && (
+                      <button
+                        type="button"
+                        disabled={pending}
+                        data-testid={`connect-${w.id}`}
+                        onClick={() => {
+                          setPending(true);
+                          setMessage("");
+                          void beginConnect(w.id, client.id).then((out) => {
+                            setPending(false);
+                            if (out.kind === "error") setMessage(out.message);
+                            // Google's consent screen is a full navigation, not
+                            // a popup: a popup here is blocked as often as not.
+                            else window.location.assign(out.url);
+                          });
+                        }}
+                      >
+                        ربط قناة يوتيوب
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
           <form onSubmit={createWorkspace}>

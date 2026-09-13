@@ -87,7 +87,8 @@ deployed project**, so PostgREST between the two is untested.
 | PKCE and the authorization URL | implemented | S256 checked against the RFC 7636 worked example; verifier stored server-side only, state stored as a hash, state written before the redirect is issued |
 | Code exchange, channels.list, token sealing, refresh | implemented, **never run live** | Pure handler with injected transport. The channel comes from `channels.list(mine=true)`, the verifier from the stored state, tokens are AES-GCM sealed with a fresh nonce per grant |
 | Deployed callback route | implemented | `/functions/v1/oauth-callback` renders an Arabic result page; refusals carry a code and no detail |
-| A real consent round trip | **blocked** | The registered redirect URI points at the local dev server. Pointing it at the deployed function and walking Google's consent screen is a browser step |
+| Connect button in the product | implemented | Shown only where it can work — a workspace with a client and no connected channel — because a button that always fails is worse than none |
+| A real consent round trip | **needs a person** | Everything up to Google's sign-in page is verified live. Approving is a human step |
 
 ## M6 — private pilot (front end deployed, journey incomplete)
 

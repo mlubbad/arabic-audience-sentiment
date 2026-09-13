@@ -450,8 +450,26 @@ Putting `private` on the API instead would have published every internal functio
 holding any key. None of the wrappers takes a workspace, which is asserted against
 `pg_get_function_arguments` rather than trusted.
 
-**Still unverified:** a real OAuth consent round trip (no code has been exchanged), and the
-live dashboard read returning real comment rows, since no channel has been collected.
+**The connect flow is verified up to the human click.** Against the deployed project, as a
+freshly created account behaving exactly as a new user would:
+
+| Step | Result |
+| --- | --- |
+| Sign up, then read the workspace and client the account was given | One of each |
+| `POST /functions/v1/oauth-start` with that session | 200, a Google authorization URL |
+| Parameters | `response_type=code`, `code_challenge_method=S256`, `access_type=offline`, `prompt=consent`, the deployed callback as `redirect_uri`, the youtube.readonly scope |
+| Is the verifier in the URL | **No** — 43-char state and challenge only |
+| Fetching that URL from Google | **200, redirected to Google's own sign-in** |
+
+The last row is the one worth having. Google did not answer `redirect_uri_mismatch`,
+`invalid_client` or `access_blocked`; it echoed `app_domain=https://ykqugctewsqvevhyqtbi.supabase.co`
+and asked the visitor to sign in. The configuration is validated by Google itself, without a
+human clicking anything.
+
+**Still unverified:** the exchange and everything after it — a code, a token, a channel
+identity, a sealed row. That needs a person to sign in to Google and approve, which is the one
+step that cannot be automated from here. And the live dashboard read returning real comment
+rows, since no channel has been collected.
 
 ## A filename bug the first real push found
 
