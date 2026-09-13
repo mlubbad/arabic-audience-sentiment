@@ -576,4 +576,64 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
       db.query("update plans set analysis_units=999 where key='test-small'"),
     ).rejects.toThrow();
   });
+  it("reports the meter to every member of its own workspace only", async () => {
+    // A viewer may see the plan state; it is a read, not a control.
+    await user(viewer);
+    const mine = await db.query<{ summary: Record<string, unknown> }>(
+      "select public.usage_summary($1) as summary",
+      [A],
+    );
+    expect(mine.rows[0].summary).toMatchObject({
+      plan_key: "test-small",
+      status: "active",
+    });
+    const budgets = (
+      mine.rows[0].summary as {
+        budgets: {
+          event_type: string;
+          used: number;
+          allowance: number;
+          remaining: number;
+        }[];
+      }
+    ).budgets;
+    expect(budgets).toEqual([
+      {
+        event_type: "comment_analysis",
+        used: 2,
+        allowance: 5,
+        remaining: 3,
+      },
+      {
+        event_type: "historical_backfill",
+        used: 0,
+        allowance: 2,
+        remaining: 2,
+      },
+    ]);
+
+    // Another tenant's plan is not readable, and neither is an anonymous one.
+    await user(ownerB);
+    await expect(
+      db.query("select public.usage_summary($1)", [A]),
+    ).rejects.toThrow();
+    await admin();
+    await db.query("select set_config('request.jwt.claim.sub','',false)");
+    await db.exec("set role authenticated");
+    await expect(
+      db.query("select public.usage_summary($1)", [A]),
+    ).rejects.toThrow();
+  });
+  it("says plainly when no plan has been activated", async () => {
+    await user(ownerA);
+    const fresh = await db.query<{ id: string }>(
+      "select public.create_workspace('بلا خطة') as id",
+    );
+    const summary = await db.query<{ summary: unknown }>(
+      "select public.usage_summary($1) as summary",
+      [fresh.rows[0].id],
+    );
+    // Null means "the operator has not activated a plan", not "no allowance left".
+    expect(summary.rows[0].summary).toBeNull();
+  });
 });

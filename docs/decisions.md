@@ -63,3 +63,19 @@ References checked: [Supabase RLS](https://supabase.com/docs/guides/database/pos
 - Metering is service-only. No `authenticated` grant exists on `reserve_usage`, `confirm_usage`
   or `release_usage`, so a tenant cannot meter itself or forge a reservation.
 
+2026-09-13 — surfacing plan usage.
+
+- `usage_summary` is readable by every member including a viewer: it is a read, not a control,
+  and someone watching a dashboard should be able to see why a sync stopped. It returns null
+  when no subscription exists, and the UI states that no plan has been activated rather than
+  implying the allowance ran out. Those are different situations and must not look alike.
+- `reserve_usage` and `usage_summary` both count a period's spend through one `used_units`
+  helper, so the number that blocks a batch and the number shown on screen cannot drift apart.
+- The 70% and 85% alert thresholds the specification defines for the storage budget are applied
+  to plan usage as well, so a limit becomes visible while there is still room to act instead of
+  only when a batch is refused. A zero allowance reads as exhausted rather than dividing by zero.
+- `BudgetSchema` refuses a summary whose `remaining` does not follow from `used` and `allowance`.
+  A miscounting server should fail loudly rather than render a confident but wrong progress bar.
+- The fixture carries a plan block so the panel is exercisable without a server. It is synthetic
+  like the rest of the fixture and does not describe any real workspace's consumption.
+

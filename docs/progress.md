@@ -72,7 +72,9 @@ project, a real sentiment model, or any deployment.
 | Metered batch commit | implemented | Rows, checkpoint and meter move in one transaction; a batch that cannot be paid for in full is refused rather than half-committed |
 | Reserve / confirm / release | implemented | Only an unconfirmed reservation is given back; a confirmed charge cannot be un-billed by a later failure |
 | Concurrent overspend under real parallelism | **blocked** | The row lock is the mechanism, but embedded PostgreSQL runs a single connection, so two genuinely simultaneous transactions cannot be staged. Needs a real PostgreSQL with two connections |
-| Quota visibility in the UI | not started | The meter has no read RPC and the dashboard does not show remaining allowance yet |
+| Quota visibility | implemented | `usage_summary` is readable by every member of its own workspace and by no one else; it returns null when no plan has been activated |
+| One count, two readers | implemented | The reservation and the summary both count a period through one `used_units` helper, so the number that blocks a batch is the number on screen |
+| Early warning | fixture-tested | 70% and 85% thresholds surface a limit while there is still room to act; a spent allowance and an unactivated plan are shown as distinct states |
 | Supabase Auth account screen | implemented, not live-tested | Renders an honest "not configured" state without credentials; sign-in/sign-up paths have never contacted a real Supabase project |
 | Live Auth, Storage, PostgREST, Edge Function behaviour | **blocked** | Needs a Supabase development project URL and publishable key |
 | OAuth (M5) | not started | Table shapes and status values exist; no flow implemented |
@@ -104,11 +106,9 @@ project, a real sentiment model, or any deployment.
 
 ## Next unblocked work
 
-1. Add a role-checked `usage_summary` read and surface remaining allowance in the dashboard,
-   so a limit is visible before it is hit rather than only when a batch is refused.
-2. Add the remaining dashboard filters the contract already supports — comment type, reply
+1. Add the remaining dashboard filters the contract already supports — comment type, reply
    mode, review status, video kind — now that one snapshot drives every panel.
-3. Surface the review history per comment (who, when, why) now that the log is append-only.
-4. Add video comparison, since every panel already derives from one filtered snapshot.
-5. Re-run the browser suite on an unloaded machine and confirm 12/12, then prove concurrent
+2. Surface the review history per comment (who, when, why) now that the log is append-only.
+3. Add video comparison, since every panel already derives from one filtered snapshot.
+4. Re-run the browser suite on an unloaded machine and confirm 12/12, then prove concurrent
    overspend against a real PostgreSQL with two connections.

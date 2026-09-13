@@ -217,6 +217,26 @@ end $$;
 create function public.submit_comment_review(w uuid,c uuid,seen_hash text,verdict text,why text) returns uuid
 language sql security invoker set search_path='' as $$select private.submit_comment_review_impl(w,c,seen_hash,verdict,why)$$;
 
+-- Read-only plan state for any member, so a limit is visible before it is hit
+-- rather than only when a batch is refused. Null means the operator has not
+-- activated a plan, which is different from having no allowance left.
+create function private.usage_summary_impl(w uuid) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare sub record; begin
+ if not private.has_role(w) then raise exception 'forbidden' using errcode='42501'; end if;
+ select s.plan_key,s.status,s.period_start,s.period_end,pl.analysis_units,pl.backfill_units into sub
+ from public.subscriptions s join public.plans pl on pl.key=s.plan_key where s.workspace_id=w;
+ if not found then return null; end if;
+ return jsonb_build_object(
+ 'plan_key',sub.plan_key,'status',sub.status,
+ 'period_start',to_jsonb(sub.period_start),'period_end',to_jsonb(sub.period_end),
+ 'budgets',jsonb_build_array(
+ private.budget_entry('comment_analysis',sub.analysis_units,private.used_units(w,'comment_analysis',sub.period_start)),
+ private.budget_entry('historical_backfill',sub.backfill_units,private.used_units(w,'historical_backfill',sub.period_start))));
+end $$;
+create function public.usage_summary(w uuid) returns jsonb
+language sql security invoker set search_path='' as $$select private.usage_summary_impl(w)$$;
+
 -- Append-only is enforced in the database, not only by withheld grants, so that a
 -- privileged role cannot quietly rewrite a review history either.
 create function private.reject_review_mutation() returns trigger
@@ -249,6 +269,18 @@ begin
 end $$;
 -- Metering primitives. Service-only: no authenticated grant is issued, so a
 -- tenant can neither meter itself nor forge a reservation.
+-- Counts a period's spend once, so the reservation and the summary can never
+-- disagree about how much of an allowance is gone.
+create function private.used_units(w uuid,kind text,since timestamptz) returns int
+language sql stable security definer set search_path='' as $$
+ select coalesce(sum(u.units),0)::int from public.usage_events u
+ where u.workspace_id=w and u.event_type=kind and u.period_start=since;
+$$;
+create function private.budget_entry(kind text,allowance int,used int) returns jsonb
+language sql immutable set search_path='' as $$
+ select jsonb_build_object('event_type',kind,'allowance',allowance,'used',used,
+ 'remaining',greatest(allowance-used,0));
+$$;
 create function private.reserve_usage(w uuid,kind text,keys text[]) returns text[]
 language plpgsql security invoker set search_path='' as $$
 declare sub record; allowance int; used int; covered text[]; fresh text[]; begin
@@ -267,8 +299,7 @@ declare sub record; allowance int; used int; covered text[]; fresh text[]; begin
  -- once, not once per period and not once per retry.
  select coalesce(array_agg(u.event_key),'{}') into covered
  from public.usage_events u where u.workspace_id=w and u.event_key=any(keys);
- select coalesce(sum(u.units),0) into used from public.usage_events u
- where u.workspace_id=w and u.event_type=kind and u.period_start=sub.period_start;
+ used := private.used_units(w,kind,sub.period_start);
  select coalesce(array_agg(distinct k),'{}') into fresh from unnest(keys) as k where not (k=any(covered));
  -- Grant what the remaining allowance holds; the caller decides whether a
  -- partial grant is usable or whether the whole batch should be refused.
@@ -322,9 +353,9 @@ begin
 end $$;
 
 revoke all on all functions in schema private from public,anon,authenticated;
-grant execute on function private.has_role(uuid,text[]),private.create_workspace_impl(text),private.enqueue_sync_impl(uuid,uuid,text),private.register_channel_impl(uuid,uuid,text),private.submit_comment_review_impl(uuid,uuid,text,text,text) to authenticated;
-revoke all on function public.create_workspace(text),public.enqueue_sync(uuid,uuid,text),public.register_channel(uuid,uuid,text),public.submit_comment_review(uuid,uuid,text,text,text) from public,anon;
-grant execute on function public.create_workspace(text),public.enqueue_sync(uuid,uuid,text),public.register_channel(uuid,uuid,text),public.submit_comment_review(uuid,uuid,text,text,text) to authenticated;
+grant execute on function private.has_role(uuid,text[]),private.create_workspace_impl(text),private.enqueue_sync_impl(uuid,uuid,text),private.register_channel_impl(uuid,uuid,text),private.submit_comment_review_impl(uuid,uuid,text,text,text),private.usage_summary_impl(uuid) to authenticated;
+revoke all on function public.create_workspace(text),public.enqueue_sync(uuid,uuid,text),public.register_channel(uuid,uuid,text),public.submit_comment_review(uuid,uuid,text,text,text),public.usage_summary(uuid) from public,anon;
+grant execute on function public.create_workspace(text),public.enqueue_sync(uuid,uuid,text),public.register_channel(uuid,uuid,text),public.submit_comment_review(uuid,uuid,text,text,text),public.usage_summary(uuid) to authenticated;
 grant usage on schema private to service_role;
 grant all on all tables in schema private to service_role;
 grant all on all tables in schema public to service_role;

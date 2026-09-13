@@ -40,6 +40,9 @@ export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
   const build = (f: Filters, cursor_reset: boolean) => ({
     ...snapshot(comments, f, fixture.active_analysis_key),
     revision: fixture.revision,
+    // Plan state travels with the snapshot, so the limit on screen always
+    // belongs to the same read as the numbers beside it.
+    plan: fixture.plan,
     cursor_reset,
   });
   try {

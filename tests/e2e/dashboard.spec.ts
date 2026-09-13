@@ -337,3 +337,62 @@ test("neutralises spreadsheet formulas in the file but not on screen", async ({
   expect(line).toContain(`"'${attack.replace(/"/g, '""')}"`);
   expect(line).not.toContain(`,${attack.slice(0, 5)}`);
 });
+
+test("shows the plan limit while there is still room to act", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const analysis = page.getByTestId("budget-comment_analysis");
+  // 74 of 100 is past the 70% notice threshold but not yet critical.
+  await expect(analysis).toContainText("74 من 100 — يتبقى 26");
+  await expect(analysis).toContainText("74٪");
+  await expect(analysis.locator("small")).toHaveAttribute(
+    "data-state",
+    "warning",
+  );
+  await expect(analysis).toContainText("اقترب الاستهلاك من الحد");
+  // The backfill budget is separate and healthy.
+  const backfill = page.getByTestId("budget-historical_backfill");
+  await expect(backfill.locator("small")).toHaveAttribute("data-state", "ok");
+  await expect(page.getByTestId("plan-none")).toHaveCount(0);
+});
+
+test("escalates to a spent state instead of only warning", async ({ page }) => {
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    fixture.plan.budgets[0] = {
+      event_type: "comment_analysis",
+      used: 100,
+      allowance: 100,
+      remaining: 0,
+    };
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/");
+  const analysis = page.getByTestId("budget-comment_analysis");
+  await expect(analysis.locator("small")).toHaveAttribute(
+    "data-state",
+    "exhausted",
+  );
+  await expect(analysis).toContainText("نفد الحد");
+  // A spent allowance must not be presented as a failure of the data.
+  await expect(page.getByTestId("total")).toHaveText("6");
+});
+
+test("distinguishes no activated plan from no allowance left", async ({
+  page,
+}) => {
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    fixture.plan = null;
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/");
+  await expect(page.getByTestId("plan-none")).toContainText(
+    "لا توجد خطة مفعّلة",
+  );
+  await expect(page.getByTestId("plan-none")).toContainText(
+    "لا يعني ذلك نفاد الحد",
+  );
+  await expect(page.getByTestId("budget-comment_analysis")).toHaveCount(0);
+});

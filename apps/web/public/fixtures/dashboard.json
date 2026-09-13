@@ -2,6 +2,26 @@
   "mode": "sanitized_fixture",
   "revision": "fixture-dataset-v1",
   "active_analysis_key": "fixture-v1",
+  "plan": {
+    "plan_key": "pilot-fixture",
+    "status": "active",
+    "period_start": "2026-09-01T00:00:00Z",
+    "period_end": "2026-10-01T00:00:00Z",
+    "budgets": [
+      {
+        "event_type": "comment_analysis",
+        "used": 74,
+        "allowance": 100,
+        "remaining": 26
+      },
+      {
+        "event_type": "historical_backfill",
+        "used": 0,
+        "allowance": 500,
+        "remaining": 500
+      }
+    ]
+  },
   "comments": [
     {
       "id": "fixture-1",

@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
-import { type Filters, type Label } from "@sentiment/contracts";
+import { budgetState, type Filters, type Label } from "@sentiment/contracts";
 import {
   buildExport,
   fixtureWorkspace,
@@ -10,7 +10,7 @@ import {
   reviewsArePersisted,
   submitReview,
 } from "./data";
-import { labels, displayDate } from "./i18n";
+import { labels, budgetNames, budgetMessages, displayDate } from "./i18n";
 ChartJS.register(ArcElement, Tooltip, Legend);
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export function Dashboard() {
@@ -493,6 +493,46 @@ export function Dashboard() {
               </section>
             </>
           )}
+          <section aria-labelledby="plan-heading" data-testid="plan-panel">
+            <h2 id="plan-heading">حدود الخطة</h2>
+            {s.plan === null ? (
+              <p data-testid="plan-none">
+                لا توجد خطة مفعّلة لمساحة العمل هذه. يفعّل المشغّل الخطة يدويًا
+                في هذه المرحلة، ولا يعني ذلك نفاد الحد.
+              </p>
+            ) : (
+              <>
+                <p className="muted">
+                  الخطة {s.plan.plan_key} — الفترة من{" "}
+                  {displayDate(s.plan.period_start)} حتى{" "}
+                  {displayDate(s.plan.period_end)} بتوقيت UTC.
+                </p>
+                <ul className="budgets">
+                  {s.plan.budgets.map((b) => {
+                    const state = budgetState(b);
+                    const share = b.allowance
+                      ? Math.min(Math.round((b.used / b.allowance) * 100), 100)
+                      : 100;
+                    return (
+                      <li
+                        key={b.event_type}
+                        data-testid={`budget-${b.event_type}`}
+                      >
+                        <strong>{budgetNames[b.event_type]}</strong>
+                        <span>
+                          {b.used} من {b.allowance} — يتبقى {b.remaining}
+                        </span>
+                        <progress max={b.allowance || 1} value={b.used} />
+                        <small data-state={state}>
+                          {share}٪ — {budgetMessages[state]}
+                        </small>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+          </section>
           <section className="notice">
             <h2>حالة الاتصال والجمع</h2>
             <p>
