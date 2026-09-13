@@ -143,3 +143,94 @@ def test_a_lost_lease_stops_the_run_rather_than_finishing_it():
         run_once(plane, Collector(Batch([comment("c1")], None, "exhausted")), "abcdefghijk")
     # The job belongs to whoever holds the lease now; this worker declares nothing.
     assert "finish" not in rec.calls
+
+
+def test_the_collector_is_built_from_the_token_the_server_granted():
+    # The worker never holds the sealing key or the refresh token. It is handed
+    # an access token with the job and builds its collector around that.
+    rec = Recorder()
+    rec.checkpoint = None
+    seen = {}
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        rec.calls.append(path)
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j1", "lease_token": "t1", "checkpoint": None,
+                "access_token": "ya29.granted",
+            })
+        body = json.loads(request.content)
+        if path == "commit-batch":
+            rec.committed.append(body["payload"])
+        if path == "finish":
+            rec.finished = body["outcome"]
+        return httpx.Response(200, json={})
+
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+
+    def build(token):
+        seen["token"] = token
+        return Collector(Batch([comment("c1")], None, "exhausted")), "abcdefghijk"
+
+    assert run_once(plane, None, "abcdefghijk", build_collector=build) is True
+    assert seen["token"] == "ya29.granted"
+    assert rec.finished == "succeeded"
+
+
+def test_a_job_whose_channel_is_not_connected_is_blocked_not_failed():
+    # Nothing is broken: nobody has authorised that channel yet. Reporting it as
+    # a failure would put it in the retry path, where it would fail forever.
+    rec = Recorder()
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        rec.calls.append(path)
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j1", "lease_token": "t1", "checkpoint": None,
+                "access_token": None,
+            })
+        if path == "finish":
+            rec.finished = json.loads(request.content)["outcome"]
+            rec.error_code = json.loads(request.content)["error_code"]
+        return httpx.Response(200, json={})
+
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    called = []
+    assert run_once(plane, None, "abcdefghijk",
+                    build_collector=lambda t: (called.append(t), None)) is True
+    assert rec.finished == "blocked"
+    assert rec.error_code == "channel_not_connected"
+    # And the collector is never built, so nothing reaches YouTube without a token.
+    assert called == []
+    assert "commit-batch" not in rec.calls
+
+
+def test_a_channel_with_no_video_to_collect_is_blocked_not_failed():
+    # An empty channel, or one whose uploads cannot be listed, is a fact about
+    # the channel. Failing would retry it forever against nothing.
+    rec = Recorder()
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        rec.calls.append(path)
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j1", "lease_token": "t1", "checkpoint": None,
+                "access_token": "ya29.granted",
+            })
+        if path == "finish":
+            body = json.loads(request.content)
+            rec.finished, rec.error_code = body["outcome"], body["error_code"]
+        return httpx.Response(200, json={})
+
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    assert run_once(plane, None, "abcdefghijk",
+                    build_collector=lambda t: (None, None)) is True
+    assert rec.finished == "blocked"
+    assert rec.error_code == "no_video_to_collect"
+    assert "commit-batch" not in rec.calls

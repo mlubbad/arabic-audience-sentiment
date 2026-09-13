@@ -12,6 +12,21 @@
  */
 export interface WorkerDb {
   claim(credentialHash: string): Promise<Record<string, unknown> | null>;
+  /**
+   * The channel credential for a claimed job, opened and renewed if needed.
+   *
+   * The worker holds neither the sealing key nor the refresh token, and asks
+   * for neither: it receives an access token that expires within the hour. A
+   * worker that is compromised loses an hour of read access to one channel,
+   * not the ability to renew it indefinitely.
+   *
+   * Null when the channel has no usable grant — which is a fact about the
+   * channel, not a failure to retry.
+   */
+  accessTokenFor?(
+    credentialHash: string,
+    jobId: string,
+  ): Promise<string | null>;
   heartbeat(
     credentialHash: string,
     jobId: string,
@@ -115,10 +130,18 @@ export async function handleWorkerRequest(
       // Normalised on purpose. The data layer returns a jobs row whose key is
       // `id`, but the wire contract should not be whatever columns that table
       // happens to have, and the worker has no use for the rest of them.
+      // Fetched here rather than by the worker, because reaching the sealed
+      // grant needs the service role and the worker has neither that nor the
+      // key. A channel with no usable grant still returns the job: the worker
+      // can report it as blocked, which is more useful than a silent refusal.
+      const accessToken = db.accessTokenFor
+        ? await db.accessTokenFor(credential, String(claimed.id))
+        : null;
       return json(200, {
         job_id: claimed.id,
         lease_token: claimed.lease_token,
         checkpoint: claimed.checkpoint ?? null,
+        access_token: accessToken,
       });
     }
 

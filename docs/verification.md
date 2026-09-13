@@ -32,7 +32,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run check:functions` | Pass — `deno check` on the three Edge Function entry points |
 | `npm test` | Pass — **83 tests, 10 files** |
 | `npm run test:db` | Pass — **103 tests, 11 files** |
-| `npm run worker:test` | Pass — **91 tests, 11 files** |
+| `npm run worker:test` | Pass — **94 tests, 11 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
 | `npm run test:e2e` | Pass — **47 tests, Chromium** (45 dashboard, 2 landing) |
@@ -710,6 +710,33 @@ reformatted between writing and editing it. One of them deployed unchanged and c
 round trips diagnosing a platform that was behaving correctly; one shipped the 500 above.
 Every edit now asserts its anchor and its result, and the arity class is caught by a compiler
 rather than by a person.
+
+## A channel connected, and the first collection attempted
+
+The operator connected a real channel — `UCRskvg-PG1BWLLhW-cm6_yA` — through Google's consent
+screen. The whole round trip worked: state consumed once, code exchanged, identity read from
+`channels.list(mine=true)`, tokens sealed, channel attached with status `connected`.
+
+Collection then ran against it and was **blocked**, which is the correct outcome rather than a
+failure: `commentThreads.list` answered 403 `insufficientPermissions`.
+
+That is a scope problem, and it was only findable live. `youtube.readonly` is enough to read a
+channel's identity and its uploads — both worked — and is refused for reading its comments.
+Comment access sits behind `youtube.force-ssl`, which is **broader than this product needs**:
+it permits writing and deleting comments, and nothing here calls a write endpoint. Google
+offers no narrower grant, so the wider scope is requested and the fact is recorded rather than
+buried.
+
+Finding it at all required a change. The collector reported `source_access_denied` with no
+reason, which told the operator only that something was refused. It now carries Google's own
+name for the refusal — an enum, not prose, so it holds no request detail and no credential —
+and the blocked job reads `source_access_denied:insufficientPermissions`. A blocked job with
+no reason is a dead end for whoever has to act on it.
+
+**What is verified:** a worker authenticating with a scoped credential, claiming a job over
+HTTP from the deployed gateway, receiving a short-lived access token it never had the means to
+mint, using it against the live YouTube API, and reporting a refusal honestly. **What is not:**
+a single real comment in the database. The count is zero, and the reason is above.
 
 ## Notes on running the suites
 

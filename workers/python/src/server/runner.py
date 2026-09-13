@@ -33,6 +33,7 @@ def run_once(
     video_id: str,
     video_title: str | None = None,
     analyzer=None,
+    build_collector=None,
 ) -> bool:
     """Claim one job and carry it to an explicit end. False means no work.
 
@@ -43,6 +44,23 @@ def run_once(
     lease = control.claim()
     if lease is None:
         return False
+
+    # The server hands down a short-lived access token for the claimed job's
+    # channel. A job whose channel nobody has connected arrives without one:
+    # that is blocked, not failed — nothing is wrong, there is simply nothing to
+    # collect with until somebody authorises it.
+    if build_collector is not None:
+        token = lease.get("access_token")
+        if not token:
+            control.finish(lease, "blocked", "channel_not_connected")
+            return True
+        # The callback returns both, because which video to collect can only
+        # be answered with the token: the channel's uploads are not public
+        # knowledge to the worker until it has one.
+        collector, video_id = build_collector(token)
+        if collector is None:
+            control.finish(lease, "blocked", "no_video_to_collect")
+            return True
 
     outcome = "partial"
     # An analysis failure never stops the run and never ends it as a success:

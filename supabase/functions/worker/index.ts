@@ -7,6 +7,12 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 import { handleWorkerRequest } from "../_shared/worker-gateway.ts";
+import {
+  importSealingKey,
+  openTokens,
+  refreshAccessToken,
+  RevokedError,
+} from "../_shared/oauth-callback.ts";
 
 const env = (name: string) => Deno.env.get(name) ?? "";
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
@@ -21,8 +27,78 @@ const failed = (error: unknown): never => {
   );
 };
 
+/**
+ * Opens the channel grant for a claimed job and returns a usable access token.
+ *
+ * Renewed here rather than by the worker, and written back, so the next claim
+ * does not renew again. A grant Google has revoked marks the channel for
+ * reconnection instead of being retried: nothing on the worker's side can fix
+ * a withdrawn authorisation, and retrying it would collect nothing while the
+ * channel looked connected.
+ */
+async function accessTokenFor(
+  credentialHash: string,
+  jobId: string,
+): Promise<string | null> {
+  const { data, error } = await db.rpc("svc_worker_channel_grant", {
+    credential_hash: credentialHash,
+    j: jobId,
+  });
+  // No grant is a fact about the channel, not a failure to retry.
+  if (error || !data?.length) return null;
+
+  const grant = data[0] as { connection_id: string; encrypted_tokens: string };
+  const key = await importSealingKey(env("TOKEN_ENCRYPTION_KEY"));
+  // bytea arrives from PostgREST as a \x-prefixed hex literal.
+  const hex = grant.encrypted_tokens.replace(/^\\x/, "");
+  const sealed = new Uint8Array(
+    hex.match(/../g)?.map((b) => parseInt(b, 16)) ?? [],
+  );
+  const tokens = (await openTokens(key, sealed)) as {
+    access_token: string;
+    refresh_token: string;
+    expires_at: string;
+  };
+
+  // A minute of margin: a token that expires mid-collection costs a whole run.
+  if (Date.parse(tokens.expires_at) - Date.now() > 60_000)
+    return tokens.access_token;
+
+  try {
+    const renewed = await refreshAccessToken(
+      tokens.refresh_token,
+      {
+        client_id: env("GOOGLE_CLIENT_ID"),
+        client_secret: env("GOOGLE_CLIENT_SECRET"),
+        redirect_uri: env("GOOGLE_REDIRECT_URI"),
+        token_uri: "https://oauth2.googleapis.com/token",
+        key_version: env("TOKEN_ENCRYPTION_KEY_VERSION") || "k1",
+      },
+      (u, init) => fetch(u, init),
+    );
+    const { sealTokens } = await import("../_shared/oauth-callback.ts");
+    const resealed = await sealTokens(key, renewed);
+    await db.rpc("svc_worker_store_grant", {
+      credential_hash: credentialHash,
+      connection: grant.connection_id,
+      tokens:
+        "\\x" +
+        [...resealed].map((b) => b.toString(16).padStart(2, "0")).join(""),
+    });
+    return renewed.access_token;
+  } catch (e) {
+    if (e instanceof RevokedError)
+      await db.rpc("svc_worker_mark_revoked", {
+        credential_hash: credentialHash,
+        j: jobId,
+      });
+    return null;
+  }
+}
+
 Deno.serve((request) =>
   handleWorkerRequest(request, {
+    accessTokenFor,
     claim: async (hash) => {
       const { data, error } = await db.rpc("svc_worker_claim", {
         credential_hash: hash,

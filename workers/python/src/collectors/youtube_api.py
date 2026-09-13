@@ -49,7 +49,15 @@ class YouTubeAPI:
                 raise CollectionError("comments_disabled", "explicitly_disabled")
             if reason in ("quotaExceeded", "rateLimitExceeded", "userRateLimitExceeded"):
                 raise CollectionError("quota_exceeded", "blocked", retryable=True)
-            raise CollectionError("source_access_denied", "blocked")
+            # Google's own reason travels with the refusal. It is an enum, not
+            # prose: it carries no request detail and no credential, and it is
+            # the difference between a job that says "blocked" and one that says
+            # which permission is missing. A blocked job with no reason is a
+            # dead end for whoever has to act on it.
+            raise CollectionError(
+                f"source_access_denied:{reason}" if reason else "source_access_denied",
+                "blocked",
+            )
         if response.status_code >= 500:
             raise CollectionError("source_unavailable", retryable=True)
         if response.status_code != 200:

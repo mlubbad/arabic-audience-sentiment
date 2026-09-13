@@ -169,6 +169,11 @@ describe("worker to database, through the real handler", () => {
     // The exact keys the Python client reads. A jobs row keyed `id` would make
     // every later call raise KeyError, which no mock-based test would catch.
     expect(Object.keys(lease).sort()).toEqual([
+      // access_token joined the claim so the worker can reach the channel
+      // without holding the sealing key. Pinned here because the Python client
+      // reads these exact keys, and a rename would raise KeyError at the first
+      // call after the claim — which no mock-based test would catch.
+      "access_token",
       "checkpoint",
       "job_id",
       "lease_token",

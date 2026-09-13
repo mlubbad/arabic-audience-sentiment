@@ -105,13 +105,16 @@ def test_quota_is_distinguished_from_being_refused():
     assert caught.value.code == "quota_exceeded"
     assert caught.value.retryable is True
 
+    # An unhandled refusal carries Google's own name for it, so a blocked job
+    # says which permission is missing rather than only that one is.
     plain = _responding(403, {"error": {"errors": [{"reason": "forbidden"}]}})
     with pytest.raises(CollectionError) as caught:
         list(YouTubeAPI("key", plain).batches("abcdefghijk", None))
-    assert caught.value.code == "source_access_denied"
+    assert caught.value.code == "source_access_denied:forbidden"
 
 
 def test_a_refusal_with_no_reason_is_still_handled():
+    # And a refusal with no reason at all still has to be handled.
     client = _responding(403, {"nothing": "useful"})
     with pytest.raises(CollectionError) as caught:
         list(YouTubeAPI("key", client).batches("abcdefghijk", None))

@@ -23,7 +23,12 @@ export function Account() {
     { id: string; workspace_id: string }[]
   >([]);
   const [channels, setChannels] = useState<
-    { workspace_id: string; status: string; external_channel_id: string }[]
+    {
+      workspace_id: string;
+      channel_id: string;
+      status: string;
+      external_channel_id: string;
+    }[]
   >([]);
   useEffect(() => {
     if (!supabase) return;
@@ -54,7 +59,7 @@ export function Account() {
       supabase.from("clients").select("id,workspace_id"),
       supabase
         .from("connection_status")
-        .select("workspace_id,status,external_channel_id"),
+        .select("workspace_id,channel_id,status,external_channel_id"),
     ]).then(([w, c, ch]) => {
       if (!active) return;
       if (w.error) setMessage("تعذر تحميل مساحات العمل");
@@ -188,7 +193,9 @@ export function Account() {
           ) : (
             <ul className="workspace-list">
               {workspaces.map((w) => {
-                const client = clients.find((c) => c.workspace_id === w.id);
+                const workspaceClient = clients.find(
+                  (c) => c.workspace_id === w.id,
+                );
                 const channel = channels.find((c) => c.workspace_id === w.id);
                 return (
                   <li key={w.id}>
@@ -205,7 +212,38 @@ export function Account() {
                     {/* Shown only when it can actually work: without a client
                         the server would refuse, and a button that always fails
                         is worse than no button. */}
-                    {client && channel?.status !== "connected" && (
+                    {/* Connected: the next thing to do is collect. enqueue_sync
+                        creates the job; a worker picks it up. Both halves are
+                        said plainly below, because a queued job with no worker
+                        looks identical to nothing happening. */}
+                    {channel?.status === "connected" && (
+                      <button
+                        type="button"
+                        disabled={pending}
+                        data-testid={`sync-${w.id}`}
+                        onClick={() => {
+                          setPending(true);
+                          setMessage("");
+                          void client
+                            .rpc("enqueue_sync", {
+                              w: w.id,
+                              c: channel.channel_id,
+                              k: `manual-${Date.now()}`,
+                            })
+                            .then(({ error }) => {
+                              setPending(false);
+                              setMessage(
+                                error
+                                  ? "تعذر إنشاء مهمة المزامنة."
+                                  : "أُضيفت مهمة المزامنة إلى الطابور. لن تبدأ حتى يعمل عامل الجمع.",
+                              );
+                            });
+                        }}
+                      >
+                        طلب مزامنة
+                      </button>
+                    )}
+                    {workspaceClient && channel?.status !== "connected" && (
                       <button
                         type="button"
                         disabled={pending}
@@ -213,13 +251,15 @@ export function Account() {
                         onClick={() => {
                           setPending(true);
                           setMessage("");
-                          void beginConnect(w.id, client.id).then((out) => {
-                            setPending(false);
-                            if (out.kind === "error") setMessage(out.message);
-                            // Google's consent screen is a full navigation, not
-                            // a popup: a popup here is blocked as often as not.
-                            else window.location.assign(out.url);
-                          });
+                          void beginConnect(w.id, workspaceClient.id).then(
+                            (out) => {
+                              setPending(false);
+                              if (out.kind === "error") setMessage(out.message);
+                              // Google's consent screen is a full navigation, not
+                              // a popup: a popup here is blocked as often as not.
+                              else window.location.assign(out.url);
+                            },
+                          );
                         }}
                       >
                         ربط قناة يوتيوب
