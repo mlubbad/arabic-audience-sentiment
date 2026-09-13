@@ -3,7 +3,7 @@
  * change here breaks the other side rather than merely inconveniencing it.
  */
 import { z } from "zod";
-import { timestamp } from "./primitives";
+import { LabelSchema, timestamp } from "./primitives";
 
 export const JobSchema = z.object({
   id: z.string().uuid(),
@@ -41,3 +41,128 @@ export const ErrorSchema = z.object({
   request_id: z.string().uuid(),
   retryable: z.boolean(),
 });
+
+/* ------------------------------------------------------------------ *
+ * I1 — the worker to server batch contract.
+ *
+ * The worker addresses rows by their platform identifier; the server owns
+ * every internal id, so the two sides cannot drift apart over surrogate keys.
+ * The workspace is derived server-side from the job and the worker credential
+ * and is deliberately absent from the payload: a workspace field here would be
+ * a privilege-escalation vector.
+ * ------------------------------------------------------------------ */
+
+export const OutcomeSchema = z.enum([
+  "partial",
+  "exhausted",
+  "blocked",
+  "failed",
+]);
+
+export const BatchCommentSchema = z
+  .object({
+    external_comment_id: z.string().min(1).max(200),
+    external_parent_id: z.string().min(1).max(200).nullable(),
+    is_reply: z.boolean(),
+    parent_source: z.enum(["api", "extractor", "inferred_id", "unknown"]),
+    author_channel_id: z.string().nullable(),
+    author_name: z.string(),
+    text_raw: z.string(),
+    text_plain: z.string(),
+    content_hash: z.string().min(1),
+    published_time_raw: z.string().nullable(),
+    published_at: timestamp.nullable(),
+    timestamp_precision: z.enum([
+      "second",
+      "minute",
+      "day",
+      "approximate",
+      "unknown",
+    ]),
+    likes_raw: z.string().nullable(),
+    likes_value: z.number().int().nonnegative().nullable(),
+    source: z.string().min(1),
+    field_provenance: z.record(z.unknown()),
+  })
+  .strict()
+  .refine(
+    (c) => c.is_reply || c.external_parent_id === null,
+    "a top-level comment cannot name a parent",
+  );
+
+export const BatchPredictionSchema = z
+  .object({
+    external_comment_id: z.string().min(1).max(200),
+    // Which text this verdict is about. A prediction for older text is stored
+    // but is not the effective label, so the hash travels with it.
+    content_hash: z.string().min(1),
+    analysis_key: z.string().min(1),
+    status: z.enum(["succeeded", "skipped", "failed", "unsupported"]),
+    label: LabelSchema.nullable(),
+    class_scores: z.record(LabelSchema, z.number().min(0).max(1)),
+    model_id: z.string().min(1),
+    revision: z.string().min(1),
+    preprocessing_version: z.string().min(1),
+  })
+  .strict()
+  .refine(
+    (p) => (p.status === "succeeded") === (p.label !== null),
+    "only a successful prediction carries a label",
+  )
+  .refine(
+    (p) => p.status !== "succeeded" || Object.keys(p.class_scores).length > 0,
+    "a successful prediction must record the class scores it was based on",
+  );
+
+export const CommitBatchSchema = z
+  .object({
+    job_id: z.string().uuid(),
+    // A batch covers one video. The job names the channel; the server resolves
+    // the video under it, so the worker never sends a server id.
+    external_video_id: z.string().min(1).max(64),
+    // Null when the source did not give one; the server falls back to the id
+    // rather than inventing a title.
+    video_title: z.string().nullable(),
+    // Fencing token. Never logged, never echoed back.
+    lease_token: z.string().uuid(),
+    batch_key: z.string().min(1).max(200),
+    // Fingerprint of the whole payload. batch_key alone is not enough: the same
+    // key carrying different rows must be a conflict, not a silent overwrite.
+    payload_hash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "expected a sha256 hex digest"),
+    checkpoint: z.record(z.unknown()),
+    outcome: OutcomeSchema,
+    comments: z.array(BatchCommentSchema).max(500),
+    predictions: z.array(BatchPredictionSchema).max(500),
+  })
+  .strict()
+  .refine((b) => {
+    const ids = new Set(b.comments.map((c) => c.external_comment_id));
+    // A prediction for a row the worker never delivered would be analysis of
+    // something the server cannot show, so the whole batch is refused.
+    return b.predictions.every((p) => ids.has(p.external_comment_id));
+  }, "every prediction must belong to a comment in the same batch")
+  .refine(
+    (b) =>
+      new Set(b.comments.map((c) => c.external_comment_id)).size ===
+      b.comments.length,
+    "a batch cannot carry the same comment twice",
+  );
+
+export type CommitBatch = z.infer<typeof CommitBatchSchema>;
+export type BatchComment = z.infer<typeof BatchCommentSchema>;
+export type BatchPrediction = z.infer<typeof BatchPredictionSchema>;
+
+/**
+ * The billable event key for one analysed comment.
+ *
+ * Keyed on the comment alone, not on its text. One unique comment costs one
+ * unit in a workspace once and for all: a retry, a reimport, a likes refresh
+ * and a re-analysis after an edit are all free. Including the content hash
+ * would bill every edit, which can surprise a customer for work they did not
+ * ask for. This is the pricing decision recorded in the lane report.
+ */
+export function usageEventKey(platform: string, externalCommentId: string) {
+  return `analysis:${platform}:${externalCommentId}`;
+}
