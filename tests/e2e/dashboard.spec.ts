@@ -506,3 +506,98 @@ test("the export follows the new filters too", async ({ page }) => {
   const { text } = await downloadCsv(page);
   expect(text.trim().split("\r\n")).toHaveLength(3);
 });
+
+async function openReview(
+  page: import("@playwright/test").Page,
+  rowText: string,
+) {
+  await page
+    .locator("tbody tr")
+    .filter({ hasText: rowText })
+    .getByRole("button", { name: "تصحيح" })
+    .click();
+}
+
+test("shows no history for a comment that has never been reviewed", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await openReview(page, "المحتوى واضح ومفيد");
+  await expect(page.getByTestId("review-history")).toContainText(
+    "لا توجد مراجعات سابقة",
+  );
+});
+
+test("says a correction no longer applies once the text changed", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // This row carries a human verdict made against text that was later edited.
+  const row = page.locator("tbody tr").filter({ hasText: "هذا النص تغير" });
+  await expect(row).toContainText("غير محلل / قديم");
+  await expect(row).not.toContainText("مراجعة بشرية");
+
+  await openReview(page, "هذا النص تغير");
+  const entries = page.getByTestId("review-history").getByRole("listitem");
+  await expect(entries).toHaveCount(1);
+  await expect(entries.first()).toContainText("إيجابي");
+  await expect(entries.first().locator("small")).toHaveAttribute(
+    "data-state",
+    "superseded_by_edit",
+  );
+  await expect(entries.first()).toContainText("لا تنطبق بعد تغيّر النص");
+});
+
+test("marks a legacy amendment as unverified rather than a human review", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const row = page.locator("tbody tr").filter({ hasText: "موعد الحلقة" });
+  // It must not be counted as a human review, and the model label still stands.
+  await expect(row).toContainText("محايد");
+  await expect(row).not.toContainText("مراجعة بشرية");
+
+  await openReview(page, "موعد الحلقة");
+  const entry = page
+    .getByTestId("review-history")
+    .getByRole("listitem")
+    .first();
+  await expect(entry.locator("small")).toHaveAttribute(
+    "data-state",
+    "legacy_unverified",
+  );
+  await expect(entry).toContainText("تعديل موروث");
+});
+
+test("keeps every verdict and marks which one is in force", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await openReview(page, "المحتوى واضح ومفيد");
+  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await page.getByLabel("سبب التصحيح").fill("أول تصحيح");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(page.locator("tbody tr").first()).toContainText("مراجعة بشرية");
+
+  await openReview(page, "المحتوى واضح ومفيد");
+  await page.getByLabel("التصنيف الصحيح").selectOption("mixed");
+  await page.getByLabel("سبب التصحيح").fill("إعادة نظر");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(page.locator("tbody tr").first()).toContainText("مختلط");
+
+  await openReview(page, "المحتوى واضح ومفيد");
+  const entries = page.getByTestId("review-history").getByRole("listitem");
+  // Append-only: the first verdict is kept, not overwritten.
+  await expect(entries).toHaveCount(2);
+  // Newest first, and only one is in force.
+  await expect(entries.nth(0)).toContainText("مختلط");
+  await expect(entries.nth(0).locator("small")).toHaveAttribute(
+    "data-state",
+    "in_force",
+  );
+  await expect(entries.nth(1)).toContainText("سلبي");
+  await expect(entries.nth(1).locator("small")).toHaveAttribute(
+    "data-state",
+    "superseded_by_review",
+  );
+});

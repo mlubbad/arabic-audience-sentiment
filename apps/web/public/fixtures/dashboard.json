@@ -141,7 +141,14 @@
           "mixed": 0
         }
       },
-      "reviews": []
+      "reviews": [
+        {
+          "label": "negative",
+          "content_hash": "caccab19907a993a2eae2d88e4aa69035b9c05b3efffb53b44463206db23ac31",
+          "created_at": "2026-09-05T08:00:00Z",
+          "origin": "legacy_unverified"
+        }
+      ]
     },
     {
       "id": "fixture-4",
@@ -246,7 +253,14 @@
           "mixed": 0
         }
       },
-      "reviews": []
+      "reviews": [
+        {
+          "label": "positive",
+          "content_hash": "hash-before-the-edit",
+          "created_at": "2026-09-07T10:00:00Z",
+          "origin": "human"
+        }
+      ]
     }
   ]
 }

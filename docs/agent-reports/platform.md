@@ -345,3 +345,58 @@ assertion changed. Without this the two new filters had no distinguishable data 
 
 Seven new browser tests were confirmed failing against the missing controls before the
 controls were written.
+
+## Review history per comment (done, 2026-09-13)
+
+Each comment's verdicts are now listed in the correction panel, newest first, with what each
+one is doing now. `reviewHistory()` uses the same precedence rule as `effectiveLabel` — the
+newest human verdict whose hash matches the current text wins — so the panel and the number
+in the table can never disagree.
+
+Four states, because "not counted" has four different meanings and collapsing them would be
+the dishonesty this is meant to remove:
+
+| State | Meaning |
+| --- | --- |
+| `in_force` | This is the verdict the dashboard is using |
+| `superseded_by_review` | A later human verdict replaced it; it is kept, not overwritten |
+| `superseded_by_edit` | Made against text that was edited afterwards; needs re-auditing |
+| `legacy_unverified` | An imported legacy amendment, never human-reviewed truth |
+
+`effectiveLabel` silently discards the last three. A reviewer previously had no way to see
+that their correction had stopped counting, which matters most for `superseded_by_edit`:
+the comment reverts to the model label with nothing on screen explaining why.
+
+A unit test covers the case worth being careful about — a newer *stale* verdict must not
+hide an older applicable one, and must not be promoted itself.
+
+### Blocked: "who" and "why"
+
+The task called for who, when and why. **When** and **whether it still applies** are done.
+**Who** and **why** are not, and I did not fake them: `ReviewSchema` carries only
+`label`, `content_hash`, `created_at`, `origin`. The SQL table already stores `reviewer_id`
+and `reason`, so the data exists — the shared contract does not expose it, and
+`packages/contracts` is still integrator-owned on my branch because Patch 1 has not landed.
+I verified this rather than assuming: `violations('platform', ['packages/contracts/src/index.ts'])`
+is still non-empty.
+
+**Shared-contract request:** add `reviewer_id: string` and `reason: string` to
+`ReviewSchema`. Note `ReviewSchema` is not `.strict()`, so Zod strips unknown keys — the
+fields cannot be carried through the fixture as a workaround, which is why this is a real
+block rather than a preference. Once it lands I will show the reviewer and the stated reason
+against each entry; the panel already has the row for them.
+
+### Fixture change
+
+`fixture-3` gained a `legacy_unverified` amendment and `fixture-6` a human verdict against
+pre-edit text. Neither is counted by `effectiveLabel`, so every existing count is unchanged:
+total 6, analysed 4, reviewed 0 before any correction. Confirmed by the 22 pre-existing
+browser tests passing untouched. Without them the two most important states had no data.
+
+### Commands and results
+
+- `npm run check` — pass (36 unit across 6 files, 18 SQL, 23 worker, build, secret scan)
+- `npm run test:e2e` — 26 passed in 18.0s, load average 1.99, on port 5199
+- `node scripts/check-ownership.mjs platform` — pass
+
+Four new browser tests and five new unit tests were confirmed failing before the code existed.

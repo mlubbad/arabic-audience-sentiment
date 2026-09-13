@@ -28,3 +28,9 @@ export const budgetMessages: Record<string, string> = {
   exhausted:
     "نفد الحد؛ لن تُحلَّل دفعات جديدة حتى تُرفع الخطة أو تبدأ فترة جديدة",
 };
+export const reviewStateMessages: Record<string, string> = {
+  in_force: "سارية: هذه هي النتيجة المعتمدة حاليًا",
+  superseded_by_review: "حلّت محلها مراجعة أحدث",
+  superseded_by_edit: "لا تنطبق بعد تغيّر النص؛ تحتاج إعادة تدقيق",
+  legacy_unverified: "تعديل موروث غير موثق؛ لا يُحتسب مراجعة بشرية",
+};

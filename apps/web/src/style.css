@@ -214,6 +214,38 @@ small {
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
+.review h4 {
+  font-weight: 700;
+  margin: 0.8rem 0 0.4rem;
+}
+.history {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.6rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.history li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #d3dbe2;
+  border-radius: 6px;
+  background: #f8fafb;
+}
+.history small {
+  color: #485e70;
+}
+.history small[data-state="in_force"] {
+  color: #1d6047;
+  font-weight: 700;
+}
+.history small[data-state="superseded_by_edit"] {
+  color: #8a5a00;
+  font-weight: 700;
+}
 .review blockquote {
   margin: 0 0 0.5rem;
   padding: 0.6rem 0.8rem;

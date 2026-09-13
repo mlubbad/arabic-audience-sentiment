@@ -2,7 +2,12 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
-import { budgetState, type Filters, type Label } from "@sentiment/contracts";
+import {
+  budgetState,
+  type Filters,
+  type Label,
+  type LabelledComment,
+} from "@sentiment/contracts";
 import {
   buildExport,
   fixtureWorkspace,
@@ -10,7 +15,14 @@ import {
   reviewsArePersisted,
   submitReview,
 } from "./data";
-import { labels, budgetNames, budgetMessages, displayDate } from "./i18n";
+import {
+  labels,
+  budgetNames,
+  budgetMessages,
+  reviewStateMessages,
+  displayDate,
+} from "./i18n";
+import { reviewHistory } from "./reviewHistory";
 ChartJS.register(ArcElement, Tooltip, Legend);
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export function Dashboard() {
@@ -58,12 +70,7 @@ export function Dashboard() {
     setCursors(next);
   }
   const client = useQueryClient();
-  const [reviewing, setReviewing] = useState<{
-    id: string;
-    hash: string;
-    text: string;
-    label: Label | null;
-  } | null>(null);
+  const [reviewing, setReviewing] = useState<LabelledComment | null>(null);
   const [verdict, setVerdict] = useState<Label>("neutral");
   const [reason, setReason] = useState("");
   const review = useMutation({
@@ -71,7 +78,7 @@ export function Dashboard() {
       submitReview({
         workspace_id: filters.workspace_id,
         comment_id: reviewing!.id,
-        content_hash: reviewing!.hash,
+        content_hash: reviewing!.content_hash,
         label: verdict,
         reason,
       }),
@@ -96,21 +103,11 @@ export function Dashboard() {
       URL.revokeObjectURL(url);
     },
   });
-  function startReview(c: {
-    id: string;
-    content_hash: string;
-    text_raw: string;
-    label: Label | null;
-  }) {
+  function startReview(c: LabelledComment) {
     review.reset();
     setReason("");
     setVerdict(c.label ?? "neutral");
-    setReviewing({
-      id: c.id,
-      hash: c.content_hash,
-      text: c.text_raw,
-      label: c.label,
-    });
+    setReviewing(c);
   }
   function apply(e: FormEvent) {
     e.preventDefault();
@@ -504,7 +501,7 @@ export function Dashboard() {
                   >
                     <h3>تصحيح تصنيف تعليق</h3>
                     <blockquote data-testid="review-text">
-                      {reviewing.text}
+                      {reviewing.text_raw}
                     </blockquote>
                     <p className="muted">
                       التصنيف الحالي:{" "}
@@ -512,6 +509,28 @@ export function Dashboard() {
                       التصحيح البشري يلغي تنبؤ النموذج لهذا النص، ويسقط تلقائيًا
                       إذا تغيّر نص التعليق لاحقًا.
                     </p>
+                    <div data-testid="review-history">
+                      <h4>سجل المراجعات</h4>
+                      {reviewing.reviews.length === 0 ? (
+                        <p className="muted">
+                          لا توجد مراجعات سابقة لهذا التعليق.
+                        </p>
+                      ) : (
+                        <ol className="history">
+                          {reviewHistory(reviewing).map(
+                            ({ review: r, state }, i) => (
+                              <li key={`${r.created_at}-${i}`}>
+                                <strong>{labels[r.label]}</strong>
+                                <span>{displayDate(r.created_at)}</span>
+                                <small data-state={state}>
+                                  {reviewStateMessages[state]}
+                                </small>
+                              </li>
+                            ),
+                          )}
+                        </ol>
+                      )}
+                    </div>
                     <label>
                       التصنيف الصحيح
                       <select
