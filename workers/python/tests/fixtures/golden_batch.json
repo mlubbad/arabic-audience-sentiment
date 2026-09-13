@@ -1,69 +1,75 @@
 {
-  "payload": {
-    "external_video_id": "abcdefghijk",
-    "video_title": "حلقة تجريبية",
-    "checkpoint": {
-      "page": 1
-    },
-    "outcome": "exhausted",
-    "comments": [
-      {
-        "external_comment_id": "cmt-1",
-        "external_parent_id": null,
-        "is_reply": false,
-        "parent_source": "unknown",
-        "author_channel_id": "UCauthor1",
-        "author_name": "مؤلف ١",
-        "text_raw": "المحتوى واضح ومفيد",
-        "text_plain": "المحتوى واضح ومفيد",
-        "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
-        "published_time_raw": "2026-09-01T09:00:00Z",
-        "published_at": "2026-09-01T09:00:00Z",
-        "timestamp_precision": "second",
-        "likes_raw": "12",
-        "likes_value": 12,
-        "source": "youtube_data_api_public",
-        "field_provenance": {
-          "source": "api"
-        }
+  "envelope": {
+    "batch_key": "8dae1d87bae835bdd55f289cdd6e559e",
+    "job_id": "20000000-0000-4000-8000-000000000001",
+    "lease_token": "30000000-0000-4000-8000-000000000001",
+    "payload": {
+      "checkpoint": {
+        "cursor": "page-2-token"
       },
-      {
-        "external_comment_id": "cmt-2",
-        "external_parent_id": "cmt-1",
-        "is_reply": true,
-        "parent_source": "api",
-        "author_channel_id": "UCauthor2",
-        "author_name": "مؤلف ٢",
-        "text_raw": "أتمنى تحسين الصوت",
-        "text_plain": "أتمنى تحسين الصوت",
-        "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
-        "published_time_raw": "2026-09-02T09:00:00Z",
-        "published_at": "2026-09-02T09:00:00Z",
-        "timestamp_precision": "second",
-        "likes_raw": null,
-        "likes_value": null,
-        "source": "youtube_data_api_public",
-        "field_provenance": {
-          "source": "api"
-        }
-      }
-    ],
-    "predictions": [
-      {
-        "external_comment_id": "cmt-1",
-        "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
-        "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1",
-        "status": "succeeded",
-        "label": "negative",
-        "class_scores": {
-          "negative": 1.0,
-          "positive": 0.0
+      "comments": [
+        {
+          "author_channel_id": "UCauthor1",
+          "author_name": "مؤلف ١",
+          "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
+          "external_comment_id": "cmt-1",
+          "external_parent_id": null,
+          "field_provenance": {
+            "source": "api"
+          },
+          "is_reply": false,
+          "likes_raw": "12",
+          "likes_value": 12,
+          "parent_source": "unknown",
+          "published_at": "2026-09-01T09:00:00Z",
+          "published_time_raw": "2026-09-01T09:00:00Z",
+          "source": "youtube_data_api_public",
+          "text_plain": "المحتوى واضح ومفيد",
+          "text_raw": "المحتوى واضح ومفيد",
+          "timestamp_precision": "second"
         },
-        "model_id": "deterministic-test-analyzer",
-        "revision": "not-a-model-v1",
-        "preprocessing_version": "strip-html-normalize-space-v1"
-      }
-    ]
+        {
+          "author_channel_id": "UCauthor2",
+          "author_name": "مؤلف ٢",
+          "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
+          "external_comment_id": "cmt-2",
+          "external_parent_id": "cmt-1",
+          "field_provenance": {
+            "source": "api"
+          },
+          "is_reply": true,
+          "likes_raw": null,
+          "likes_value": null,
+          "parent_source": "api",
+          "published_at": "2026-09-02T09:00:00Z",
+          "published_time_raw": "2026-09-02T09:00:00Z",
+          "source": "youtube_data_api_public",
+          "text_plain": "أتمنى تحسين الصوت",
+          "text_raw": "أتمنى تحسين الصوت",
+          "timestamp_precision": "second"
+        }
+      ],
+      "external_video_id": "abcdefghijk",
+      "outcome": "exhausted",
+      "predictions": [
+        {
+          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1",
+          "class_scores": {
+            "negative": 1.0,
+            "positive": 0.0
+          },
+          "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
+          "external_comment_id": "cmt-1",
+          "label": "negative",
+          "model_id": "deterministic-test-analyzer",
+          "preprocessing_version": "strip-html-normalize-space-v1",
+          "revision": "not-a-model-v1",
+          "status": "succeeded"
+        }
+      ],
+      "video_title": "حلقة تجريبية"
+    },
+    "payload_hash": "8dae1d87bae835bdd55f289cdd6e559eca84fa1b48f8b7b5f87b28a09a099e21"
   },
-  "payload_hash": "1e3a58c30add01a6f9d3a84cc8c7c5aeaef77ce6a6d4785c16ce73ec4f3e3c91"
+  "payload_hash": "8dae1d87bae835bdd55f289cdd6e559eca84fa1b48f8b7b5f87b28a09a099e21"
 }

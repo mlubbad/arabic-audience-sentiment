@@ -94,8 +94,12 @@ Needs a Supabase project and Sites access. Nothing is deployed.
 - Concurrent overspend is not provable here: PGlite runs a single connection, so two
   simultaneous transactions cannot be staged. The row lock is the mechanism; what the tests
   prove is that no *sequence* of calls exceeds an allowance.
-- The edge handler and the SQL have never spoken to each other. Each is tested against a
-  stand-in for the other, which is not the same as the two agreeing.
+- The edge handler and the SQL now meet in `end_to_end.test.ts`, over a request body captured
+  from the real Python client. What remains untested is an actual network hop and a deployed
+  Edge Function runtime.
+- The handler does not validate the body against the shared contract. The shapes now match, so
+  this is a deployment question — the contracts package imports Zod and the function has no
+  import map — not a correctness gap: every rule the contract states is enforced in SQL.
 - Video titles are absent from the contract, so the comparison labels by identifier.
 - The dashboard is a neutral functional shell. Final styling waits on the original assets.
 

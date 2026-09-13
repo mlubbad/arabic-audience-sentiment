@@ -5,7 +5,8 @@ people after a long gap. It is an entry point, not a summary: everything here is
 either a pointer, a trap that has already cost someone time, or a rule you cannot
 infer by reading the code.
 
-Written at `c1a0c43` on `codex/coordination-integration`.
+Written on `codex/coordination-integration`. The counts below are from the latest
+full run; `docs/verification.md` is the authoritative record of what was run when.
 
 Read `AGENTS.md` first. It is short and it is binding.
 
@@ -72,12 +73,12 @@ Chromium. `uv` must be installed separately.
 
 ### The command set
 
-| Command | Covers | At `c1a0c43` |
+| Command | Covers | Latest run |
 | --- | --- | --- |
 | `npm run check` | lint, format, typecheck, unit, SQL, worker, build, secret scan | green |
-| `npm test` | contracts + web unit (10 files) | 75 passed |
-| `npm run test:db` | real SQL + real RLS in PGlite | 53 passed |
-| `npm run worker:test` | Python worker via uv/pytest | 48 passed |
+| `npm test` | contracts + web unit (10 files) | 77 passed |
+| `npm run test:db` | real SQL + real RLS in PGlite | 55 passed |
+| `npm run worker:test` | Python worker via uv/pytest | 49 passed |
 | `node scripts/check-ownership.mjs <lane>` | lane guard | 5/5 |
 | `npm run test:e2e` | Playwright against a dev server it starts itself | 45 passed |
 
@@ -126,6 +127,15 @@ unknown engagement figure never silently sorts as the least engaged.
 `failed`. An empty result is not a successful empty dataset. A generator that
 ends without exhausting the source finishes `partial`.
 
+**A malformed batch is refused whole, never filtered.** Quietly dropping the rows
+that do not fit is how a worker defect became a customer charge: predictions for
+comments absent from the batch were metered, then discarded by the join. If the
+sender built it wrong, tell the sender.
+
+**A rule that meters must be enforced where the metering happens.** Validation
+can live in as many layers as are useful, but the layer that spends the
+customer's allowance has to be one of them.
+
 **Commit is progress, not completion.** `commit_batch` records a checkpoint; it
 does not set a terminal status. `worker_finish` does. Migration
 `20260913180000` exists because they once disagreed.
@@ -159,7 +169,7 @@ packages/contracts/src/    Zod schemas + the shared snapshot. The barrel
   jobs.ts                  CommitBatchSchema, usageEventKey — the worker contract
 apps/web/src/              React 19 + Vite + Chart.js dashboard (Arabic, RTL)
   data.ts                  the single place that decides fixture vs live
-supabase/migrations/       8 files, applied in filename order, never edited
+supabase/migrations/       9 files, applied in filename order, never edited
 supabase/functions/        _shared/worker-gateway.ts — a pure handler with an
                            injected WorkerDb, so it is testable without a runtime
 supabase/tests/            6 PGlite suites; end_to_end.test.ts is the seam test

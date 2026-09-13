@@ -17,7 +17,10 @@ const ownerA = "10000000-0000-4000-8000-000000000001";
 const CREDENTIAL = "worker-bearer-token-for-workspace-a";
 const golden = JSON.parse(
   readFileSync("workers/python/tests/fixtures/golden_batch.json", "utf8"),
-) as { payload: Record<string, unknown>; payload_hash: string };
+) as {
+  envelope: Record<string, unknown> & { payload: Record<string, unknown> };
+  payload_hash: string;
+};
 
 let db: PGlite;
 
@@ -141,19 +144,17 @@ describe("worker to database, through the real handler", () => {
     // If the two languages canonicalise differently, a correct replay reads as
     // a conflicting payload. Nothing else in the suite would catch that.
     const here = createHash("sha256")
-      .update(canonical(golden.payload))
+      .update(canonical(golden.envelope.payload))
       .digest("hex");
     expect(here).toBe(golden.payload_hash);
   });
 
-  it("accepts the Python payload against the shared contract", () => {
-    const parsed = CommitBatchSchema.safeParse({
-      job_id: "20000000-0000-4000-8000-000000000001",
-      lease_token: "30000000-0000-4000-8000-000000000001",
-      batch_key: golden.payload_hash.slice(0, 32),
-      payload_hash: golden.payload_hash,
-      ...golden.payload,
-    });
+  it("accepts the request body the Python client posts, unmodified", () => {
+    // Parsed exactly as captured. This test used to rebuild the envelope around
+    // the payload before parsing, which is how the contract went on describing
+    // a flat object nothing sends: the reshaping was doing the adapting, so the
+    // mismatch could never fail a test.
+    const parsed = CommitBatchSchema.safeParse(golden.envelope);
     expect(parsed.success).toBe(true);
   });
 
@@ -183,12 +184,12 @@ describe("worker to database, through the real handler", () => {
       ).status,
     ).toBe(200);
 
+    // The client's own body, with only the two values a live lease decides
+    // substituted. batch_key, payload_hash and payload are the client's.
     const committed = await post("/worker/commit-batch", {
+      ...golden.envelope,
       job_id: lease.job_id,
       lease_token: lease.lease_token,
-      batch_key: golden.payload_hash.slice(0, 32),
-      payload_hash: golden.payload_hash,
-      payload: golden.payload,
     });
     expect(committed.status).toBe(200);
 

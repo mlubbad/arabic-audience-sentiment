@@ -114,23 +114,24 @@ export const BatchPredictionSchema = z
     "a successful prediction must record the class scores it was based on",
   );
 
-export const CommitBatchSchema = z
+/**
+ * What travels as `payload`, and what the payload hash is computed over.
+ *
+ * Kept separate from the envelope on purpose. The two are hashed and routed
+ * differently: the envelope names the job and the lease so the server can
+ * authorise the call, and the payload is the content whose digest makes a
+ * replay recognisable. Folding them into one object — which this contract used
+ * to do — produced a schema that described neither, so nothing could be
+ * validated against it.
+ */
+export const BatchPayloadSchema = z
   .object({
-    job_id: z.string().uuid(),
     // A batch covers one video. The job names the channel; the server resolves
     // the video under it, so the worker never sends a server id.
     external_video_id: z.string().min(1).max(64),
     // Null when the source did not give one; the server falls back to the id
     // rather than inventing a title.
     video_title: z.string().nullable(),
-    // Fencing token. Never logged, never echoed back.
-    lease_token: z.string().uuid(),
-    batch_key: z.string().min(1).max(200),
-    // Fingerprint of the whole payload. batch_key alone is not enough: the same
-    // key carrying different rows must be a conflict, not a silent overwrite.
-    payload_hash: z
-      .string()
-      .regex(/^[0-9a-f]{64}$/, "expected a sha256 hex digest"),
     checkpoint: z.record(z.unknown()),
     outcome: OutcomeSchema,
     comments: z.array(BatchCommentSchema).max(500),
@@ -140,7 +141,9 @@ export const CommitBatchSchema = z
   .refine((b) => {
     const ids = new Set(b.comments.map((c) => c.external_comment_id));
     // A prediction for a row the worker never delivered would be analysis of
-    // something the server cannot show, so the whole batch is refused.
+    // something the server cannot show, so the whole batch is refused. The
+    // database enforces this too, and must: the handler cannot reach a schema
+    // the worker is free to ignore, and metering happens server-side.
     return b.predictions.every((p) => ids.has(p.external_comment_id));
   }, "every prediction must belong to a comment in the same batch")
   .refine(
@@ -150,7 +153,31 @@ export const CommitBatchSchema = z
     "a batch cannot carry the same comment twice",
   );
 
+/**
+ * The commit-batch request exactly as it goes over the wire.
+ *
+ * This is the message `ControlPlane.commit_batch` posts — envelope around
+ * payload, not one flat object. The golden fixture records a real one and the
+ * seam test parses it here without reshaping, which is the only way this schema
+ * can keep describing what is actually sent.
+ */
+export const CommitBatchSchema = z
+  .object({
+    job_id: z.string().uuid(),
+    // Fencing token. Never logged, never echoed back.
+    lease_token: z.string().uuid(),
+    batch_key: z.string().min(1).max(200),
+    // Fingerprint of the whole payload. batch_key alone is not enough: the same
+    // key carrying different rows must be a conflict, not a silent overwrite.
+    payload_hash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/, "expected a sha256 hex digest"),
+    payload: BatchPayloadSchema,
+  })
+  .strict();
+
 export type CommitBatch = z.infer<typeof CommitBatchSchema>;
+export type BatchPayload = z.infer<typeof BatchPayloadSchema>;
 export type BatchComment = z.infer<typeof BatchCommentSchema>;
 export type BatchPrediction = z.infer<typeof BatchPredictionSchema>;
 

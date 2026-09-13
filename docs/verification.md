@@ -14,9 +14,9 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm run test:coordination` | Pass — 5 ownership-guard tests |
-| `npm test` | Pass — **74 tests, 10 files** |
-| `npm run test:db` | Pass — **51 tests, 6 files** |
-| `npm run worker:test` | Pass — **41 tests, 6 files** |
+| `npm test` | Pass — **77 tests, 10 files** |
+| `npm run test:db` | Pass — **55 tests, 6 files** |
+| `npm run worker:test` | Pass — **49 tests, 8 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
 | `npm run test:e2e` | Pass — 45 tests, Chromium |
@@ -45,6 +45,9 @@ reverted and the suite returned to green.
 | Drop the import path scoping | 1 |
 | Remove the lease-duration guard | 1 |
 | Neutralise the retry backoff | 1 |
+| Accept a prediction for a comment absent from the batch | 1 |
+| Accept the same comment twice in one batch | 1 |
+| Flatten the golden fixture back to the pre-split shape | 3 |
 
 ## What the suites prove
 
@@ -119,6 +122,42 @@ being tested against a stand-in for the other:
    `lease_lost`. Section 10 makes finish the explicit final result and forbids an automatic
    success, so the commit is now progress only: if a worker dies after its last batch the job
    stays running and its lease lapses, which is a retry rather than a silent completion.
+
+## What the contract-shape pass found
+
+Two more defects, both of the same kind as the three above: a rule that existed only on the
+side free to ignore it.
+
+4. **A batch could be charged for analyses it never stored.** `reserve_usage` meters from the
+   prediction list; the prediction insert then joins those rows to `comments`, and a
+   prediction naming a comment the batch never delivered found no match and was dropped —
+   after the charge. Probed directly: one comment and two predictions in, one prediction
+   stored, **two** `usage_events` written, the second keyed
+   `analysis:youtube:c-ghost` for a comment that does not exist. The call returned success.
+   The I1 contract has forbidden this since it was written; nothing server-side applied it.
+   `commit_batch` now refuses such a batch whole, before any write, so a malformed batch
+   costs no rows, no receipt and no units.
+
+5. **The shared contract described a message nothing sends.** `CommitBatchSchema` was one flat
+   object holding the envelope fields and the payload fields together. The client posts
+   `{job_id, lease_token, batch_key, payload_hash, payload}` — envelope around payload. The
+   seam test had been spreading the payload into the envelope fields before parsing, so the
+   reshaping in the test was doing the adapting and the mismatch could never fail. This is
+   why the edge handler "does not parse against the contract": it could not. The schema is
+   now split into `BatchPayloadSchema` and `CommitBatchSchema`, and the golden fixture holds
+   the request body captured from the real client rather than a payload the TypeScript side
+   re-wrapped by hand. Flattening that fixture back to the old shape now fails three tests;
+   before the split, the flat shape was the only one that parsed.
+
+   The same change exposed a smaller falsehood in the fixture: its checkpoint was
+   `{"page": 1}`, a shape `ControlPlane.commit_batch` never produces. The real one is
+   `{"cursor": …}`, which is also what the runner resumes from.
+
+The handler still does not validate the body against the contract. That is now a deployment
+question rather than a shape mismatch — the contracts package imports Zod, and the edge
+function has no `deno.json` or import map, so module resolution cannot be verified without a
+project. It is not a correctness gap: every rule the contract states is enforced in SQL,
+which is the layer that meters and the only one a worker cannot bypass.
 
 ## Notes on running the suites
 

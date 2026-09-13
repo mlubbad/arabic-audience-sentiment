@@ -134,3 +134,19 @@ service authorization follow from this setup.
   quote a connection string, and a credential with it.
 - **The audit trail answers to owners only** and is append-only in the database, with short
   bounded fields so a comment body cannot be parked in it.
+- **A contract describes the wire, or it describes nothing.** `CommitBatchSchema` was one flat
+  object while the client posts an envelope wrapping a payload, and the seam test reshaped the
+  payload before parsing — so the test's adapter was the only thing making the two agree, and
+  the handler could not have validated against the schema even in principle. The schema is now
+  `CommitBatchSchema` (envelope) over `BatchPayloadSchema` (content), and the golden fixture is
+  the request body captured from the real client rather than one assembled by the side reading
+  it. A fixture built by the consumer proves the consumer agrees with itself.
+- **A rule that meters must be enforced where the metering happens.** The prediction/comment
+  rule lived only in Zod, which the worker is free not to run and the handler never reached.
+  The consequence was not a dropped row but a charge for one. Validation may live in as many
+  layers as are useful, but the layer that spends the customer's allowance has to be one of
+  them.
+- **A malformed batch is refused whole, never filtered.** Silently discarding the rows that do
+  not fit is what turned a worker defect into a customer charge. A batch whose predictions do
+  not describe its own comments is a bug in the sender, and the sender should be told.
+

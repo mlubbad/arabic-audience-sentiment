@@ -1,15 +1,25 @@
 """Guards the fixture the TypeScript side consumes.
 
-If the client's payload shape or its canonical hashing changes, this fails here
-rather than silently letting the two languages disagree about what a batch is.
+The fixture is the exact request body ControlPlane.commit_batch posts, captured
+from the real client through a mock transport. It used to hold only the payload,
+and the TypeScript seam test rebuilt the envelope around it by hand — so both
+sides reimplemented the envelope and neither checked the other's version of it.
+Recording what is actually sent is the only form of this fixture that can catch
+a drift in the envelope.
 """
 import json
 from pathlib import Path
 
-from collectors.protocol import RawComment
-from server.gateway import build_batch
+import httpx
+
+from collectors.protocol import Batch, RawComment
+from server.gateway import ControlPlane
 
 GOLDEN = Path(__file__).parent / "fixtures" / "golden_batch.json"
+LEASE = {
+    "job_id": "20000000-0000-4000-8000-000000000001",
+    "lease_token": "30000000-0000-4000-8000-000000000001",
+}
 
 
 def rebuild():
@@ -26,25 +36,45 @@ def rebuild():
                    likes_raw=None, likes_value=None, source="youtube_data_api_public",
                    field_provenance={"source": "api"}),
     ]
+    captured: dict = {}
+
+    def handler(request):
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json={"replayed": False})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="https://control.invalid")
     golden = json.loads(GOLDEN.read_text())
-    return build_batch(
-        "abcdefghijk", "حلقة تجريبية", {"page": 1}, "exhausted",
-        comments, golden["payload"]["predictions"],
+    ControlPlane("https://control.invalid", "worker-credential-value", client).commit_batch(
+        LEASE, "abcdefghijk", "حلقة تجريبية",
+        Batch(comments=comments, checkpoint="page-2-token", outcome="exhausted"),
+        golden["envelope"]["payload"]["predictions"],
     )
+    return captured
 
 
-def test_the_client_still_produces_the_fixture_typescript_reads():
-    payload, digest = rebuild()
+def test_the_client_still_posts_the_envelope_typescript_reads():
     golden = json.loads(GOLDEN.read_text())
-    assert payload == golden["payload"]
-    # The digest is the contract between the two languages: a replay is only
-    # recognised as identical if both sides canonicalise the same way.
-    assert digest == golden["payload_hash"]
+    assert rebuild() == golden["envelope"]
+
+
+def test_the_envelope_is_the_shape_the_wire_contract_describes():
+    envelope = json.loads(GOLDEN.read_text())["envelope"]
+    # Envelope around payload, never one flat object: the contract says so and
+    # this is where that claim is checked against a real request body.
+    assert set(envelope) == {"job_id", "lease_token", "batch_key", "payload_hash", "payload"}
+    assert set(envelope["payload"]) == {
+        "external_video_id", "video_title", "checkpoint", "outcome", "comments", "predictions",
+    }
+    # No workspace anywhere: the server derives the tenant from the credential.
+    assert "workspace_id" not in envelope and "workspace_id" not in envelope["payload"]
+    # The key is a prefix of the digest, so a reused key with different rows
+    # cannot look like a replay.
+    assert envelope["payload_hash"].startswith(envelope["batch_key"])
 
 
 def test_the_fixture_exercises_the_cases_worth_carrying_across():
-    golden = json.loads(GOLDEN.read_text())["payload"]
-    rows = golden["comments"]
+    payload = json.loads(GOLDEN.read_text())["envelope"]["payload"]
+    rows = payload["comments"]
     # A reply with a parent, and a top-level row without one.
     assert [r["is_reply"] for r in rows] == [False, True]
     assert rows[1]["external_parent_id"] == "cmt-1"
@@ -53,4 +83,7 @@ def test_the_fixture_exercises_the_cases_worth_carrying_across():
     # Arabic survives the round trip unescaped.
     assert "المحتوى" in rows[0]["text_raw"]
     # The prediction names the exact text it judged.
-    assert golden["predictions"][0]["content_hash"] == rows[0]["content_hash"]
+    assert payload["predictions"][0]["content_hash"] == rows[0]["content_hash"]
+    # The checkpoint is the shape the client really sends and the runner really
+    # resumes from. The old fixture carried {"page": 1}, which nothing produces.
+    assert payload["checkpoint"] == {"cursor": "page-2-token"}

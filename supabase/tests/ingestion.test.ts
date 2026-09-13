@@ -284,4 +284,44 @@ describe("atomic batch ingestion", () => {
       ),
     ).rejects.toThrow(/batch_too_large/);
   });
+  it("refuses a prediction whose comment is not in the batch, and bills nothing for it", async () => {
+    // The contract already forbids this ("every prediction must belong to a
+    // comment in the same batch") but nothing server-side applied that rule.
+    // The join simply found no comment and dropped the row — after
+    // reserve_usage had already charged for it. The customer paid for an
+    // analysis the server can never show.
+    const before = await scalar("select count(*)::int as n from usage_events");
+    await expect(
+      commit(
+        payload({
+          comments: [comment("c1")],
+          predictions: [prediction("c1"), prediction("ghost")],
+        }),
+        "orphan",
+        "7".repeat(64),
+      ),
+    ).rejects.toThrow(/invalid_batch/);
+    expect(await scalar("select count(*)::int as n from usage_events")).toBe(
+      before,
+    );
+    expect(
+      await scalar(
+        "select count(*)::int as n from usage_events where event_key='analysis:youtube:ghost'",
+      ),
+    ).toBe(0);
+  });
+
+  it("refuses the same comment twice in one batch as a malformed batch", async () => {
+    // ON CONFLICT DO UPDATE already refuses to touch a row twice, so this was
+    // never a data risk — but it surfaced as a raw 21000 the handler reports as
+    // an unrecognised 500. The worker retries a 500 and gives up on a 400, and
+    // a batch it built wrong will be wrong every time.
+    await expect(
+      commit(
+        payload({ comments: [comment("c1"), comment("c1")], predictions: [] }),
+        "dupe",
+        "6".repeat(64),
+      ),
+    ).rejects.toThrow(/invalid_batch/);
+  });
 });

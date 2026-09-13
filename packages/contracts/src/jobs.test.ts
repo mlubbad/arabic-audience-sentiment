@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CommitBatchSchema, usageEventKey } from "./index";
+import { BatchPayloadSchema, CommitBatchSchema, usageEventKey } from "./index";
 
 const comment = (id: string, over = {}) => ({
   external_comment_id: id,
@@ -32,18 +32,22 @@ const prediction = (id: string, over = {}) => ({
   preprocessing_version: "v1",
   ...over,
 });
-const batch = (over = {}) => ({
-  job_id: "20000000-0000-4000-8000-000000000001",
+const payload = (over = {}) => ({
   external_video_id: "abcdefghijk",
   video_title: "حلقة تجريبية",
-  lease_token: "30000000-0000-4000-8000-000000000001",
-  batch_key: "batch-1",
-  payload_hash: "a".repeat(64),
   checkpoint: { page: 2 },
   outcome: "partial" as const,
   comments: [comment("c1")],
   predictions: [prediction("c1")],
   ...over,
+});
+// The envelope as it goes over the wire: payload nested, not spread.
+const batch = (over = {}) => ({
+  job_id: "20000000-0000-4000-8000-000000000001",
+  lease_token: "30000000-0000-4000-8000-000000000001",
+  batch_key: "batch-1",
+  payload_hash: "a".repeat(64),
+  payload: payload(over),
 });
 
 describe("worker batch contract", () => {
@@ -63,21 +67,47 @@ describe("worker batch contract", () => {
     ).toBe(false);
   });
 
+  it("describes the envelope the client actually posts, not a flat batch", () => {
+    // This schema used to be one flat object holding both the envelope fields
+    // and the payload fields. Nothing ever sent that: the client posts
+    // {job_id, lease_token, batch_key, payload_hash, payload}. The seam test
+    // reshaped the payload to make it parse, so the mismatch stayed invisible
+    // and the handler could not validate against the contract at all.
+    const flat = {
+      job_id: "20000000-0000-4000-8000-000000000001",
+      lease_token: "30000000-0000-4000-8000-000000000001",
+      batch_key: "batch-1",
+      payload_hash: "a".repeat(64),
+      ...payload(),
+    };
+    expect(CommitBatchSchema.safeParse(flat).success).toBe(false);
+    expect(CommitBatchSchema.safeParse(batch()).success).toBe(true);
+  });
+
+  it("carries no workspace in the payload either", () => {
+    // The envelope test covers the outer object; a forged field one level down
+    // would be just as much of an escalation vector.
+    expect(
+      BatchPayloadSchema.safeParse({
+        ...payload(),
+        workspace_id: "00000000-0000-4000-8000-000000000002",
+      }).success,
+    ).toBe(false);
+  });
+
   it("refuses a prediction for a comment the batch never delivered", () => {
     expect(
-      CommitBatchSchema.safeParse({
-        ...batch(),
-        predictions: [prediction("not-in-batch")],
-      }).success,
+      BatchPayloadSchema.safeParse(
+        payload({ predictions: [prediction("not-in-batch")] }),
+      ).success,
     ).toBe(false);
   });
 
   it("refuses the same comment twice in one batch", () => {
     expect(
-      CommitBatchSchema.safeParse({
-        ...batch(),
-        comments: [comment("c1"), comment("c1")],
-      }).success,
+      BatchPayloadSchema.safeParse(
+        payload({ comments: [comment("c1"), comment("c1")] }),
+      ).success,
     ).toBe(false);
   });
 
@@ -88,36 +118,37 @@ describe("worker batch contract", () => {
       { class_scores: {} },
     ]) {
       expect(
-        CommitBatchSchema.safeParse({
-          ...batch(),
-          predictions: [prediction("c1", bad)],
-        }).success,
+        BatchPayloadSchema.safeParse(
+          payload({ predictions: [prediction("c1", bad)] }),
+        ).success,
       ).toBe(false);
     }
     // A skipped row legitimately has no label and no scores.
     expect(
-      CommitBatchSchema.safeParse({
-        ...batch(),
-        predictions: [
-          prediction("c1", {
-            status: "skipped",
-            label: null,
-            class_scores: {},
-          }),
-        ],
-      }).success,
+      BatchPayloadSchema.safeParse(
+        payload({
+          predictions: [
+            prediction("c1", {
+              status: "skipped",
+              label: null,
+              class_scores: {},
+            }),
+          ],
+        }),
+      ).success,
     ).toBe(true);
   });
 
   it("refuses a top-level comment that names a parent", () => {
     expect(
-      CommitBatchSchema.safeParse({
-        ...batch(),
-        comments: [
-          comment("c1", { is_reply: false, external_parent_id: "p1" }),
-        ],
-        predictions: [],
-      }).success,
+      BatchPayloadSchema.safeParse(
+        payload({
+          comments: [
+            comment("c1", { is_reply: false, external_parent_id: "p1" }),
+          ],
+          predictions: [],
+        }),
+      ).success,
     ).toBe(false);
   });
 
@@ -127,11 +158,8 @@ describe("worker batch contract", () => {
     ).toBe(false);
     const many = Array.from({ length: 501 }, (_, i) => comment(`c${i}`));
     expect(
-      CommitBatchSchema.safeParse({
-        ...batch(),
-        comments: many,
-        predictions: [],
-      }).success,
+      BatchPayloadSchema.safeParse(payload({ comments: many, predictions: [] }))
+        .success,
     ).toBe(false);
   });
 
@@ -149,10 +177,10 @@ describe("worker batch contract", () => {
 
   it("names the video it covers, and tolerates an unknown title", () => {
     expect(
-      CommitBatchSchema.safeParse({ ...batch(), video_title: null }).success,
+      BatchPayloadSchema.safeParse(payload({ video_title: null })).success,
     ).toBe(true);
-    const withoutVideo: Record<string, unknown> = { ...batch() };
+    const withoutVideo: Record<string, unknown> = { ...payload() };
     delete withoutVideo.external_video_id;
-    expect(CommitBatchSchema.safeParse(withoutVideo).success).toBe(false);
+    expect(BatchPayloadSchema.safeParse(withoutVideo).success).toBe(false);
   });
 });
