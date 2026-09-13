@@ -14,7 +14,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — **83 tests, 10 files** |
-| `npm run test:db` | Pass — **74 tests, 8 files** |
+| `npm run test:db` | Pass — **80 tests, 9 files** |
 | `npm run worker:test` | Pass — **85 tests, 11 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
@@ -65,6 +65,10 @@ reverted and the suite returned to green.
 | Skip classes the model never predicts | 1 |
 | Count an unclear gold row as a model error | 1 |
 | Use the normal approximation for the interval | 1 |
+| Purge the text but leave the author | 1 |
+| Let a purge take the prediction with it | 2 |
+| Stop a refresh clearing the purge marker | 3 |
+| Ignore the retention window and purge everything | 1 |
 | Trust the server's answer without parsing it | 1 |
 | Show the model's answer in the labelling sheet | 1 |
 | Stop neutralising spreadsheet formulas in the sheet | 1 |
@@ -455,6 +459,40 @@ The scorer exits non-zero below the gate (macro F1 ≥ 0.75), so it can sit in a
 
 **No model has been scored.** Nothing has been downloaded and no figure is claimed. What
 exists is the instrument.
+
+## Comment text now has a deadline; the analysis of it does not
+
+YouTube's developer terms require API data refreshed or deleted within 30 days, while derived
+results may be kept. The schema had no way to express that difference: every comment ever
+collected would have sat in the table indefinitely. That is a compliance problem, and a
+personal-data problem for commenters who never agreed to anything.
+
+Done now because it is cheap now — three nullable columns and a function. After a workspace
+holds real comments it is a migration over customer data with a deletion deadline attached.
+
+`private.purge_comment_text(retain interval default '30 days')` removes the text and the
+author from comments not seen inside the window, and keeps the row, its content hash, its
+dates, and the sentiment prediction about it. So every aggregate still computes and a purged
+comment still counts — only its text is gone.
+
+Refresh is the other half of the rule and does not depend on a writer remembering it: a
+trigger clears the purge marker on any write that brings text back, so a re-collected comment
+is simply no longer purged. A check constraint keeps the marker and the text from
+disagreeing.
+
+Two judgements worth naming. `likes_value` is kept and `likes_raw` is not: the verbatim string
+the source displayed is content, the parsed number is a metric feeding an aggregate. And a
+write that sets both text and marker is *corrected* rather than refused — refusing would fail
+a legitimate re-collection of any row older than thirty days, which is the ordinary case.
+
+Downstream, absence is not emptiness. Search never matches a purged row rather than matching
+it loosely; the export writes that the text was removed and carries the purge date, instead of
+a blank cell that would read as a comment nobody wrote; and the dashboard renders a marker.
+The live read returns `content_purged_at` and a null author rather than coercing it to an
+empty string, which would read as an anonymous commenter.
+
+No schedule is attached, for the same reason as the OAuth state prune: scheduling belongs to a
+deployed project. What is committed is the operation.
 
 ## Notes on running the suites
 

@@ -68,3 +68,22 @@ export const syncErrorMessages: Record<string, string> = {
   repeated_page_token: "تكرّر مؤشر الصفحة، فأُوقف الجمع لتفادي حلقة لا تنتهي",
   retry_exhausted: "استُنفدت المحاولات المسموح بها",
 };
+
+/**
+ * What to show where a comment's text used to be.
+ *
+ * Absent is not empty. The comment existed, was analysed, and still counts in
+ * every figure on the page — only its text is gone, removed under the retention
+ * rule the platform's terms require. Rendering a blank would read as a comment
+ * nobody wrote.
+ */
+export const PURGED_TEXT = "[حُذف النص بعد انتهاء مدة الاحتفاظ]";
+export const PURGED_AUTHOR = "[غير محتفظ به]";
+
+export function commentText(c: {
+  text_raw: string | null;
+  content_purged_at: string | null;
+}): string {
+  if (c.text_raw !== null) return c.text_raw;
+  return c.content_purged_at ? PURGED_TEXT : "";
+}

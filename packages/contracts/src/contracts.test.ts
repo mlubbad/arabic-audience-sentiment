@@ -32,6 +32,7 @@ const base = {
   source: "sanitized_fixture" as const,
   field_provenance: {},
   comment_type: null,
+  content_purged_at: null,
   reviews: [],
   prediction: null,
 };
@@ -601,5 +602,43 @@ describe("human corrections", () => {
     );
     expect(few.most_engaged_negative).toHaveLength(3);
     expect(few.negative_ranked).toBe(3);
+  });
+});
+
+describe("searching a corpus that contains purged comments", () => {
+  const purged = {
+    ...base,
+    id: "p1",
+    text_raw: null,
+    author_name: null,
+    content_purged_at: "2026-10-15T00:00:00Z",
+  };
+
+  it("never matches a purged row on text, and never crashes on one", () => {
+    // Coercing a missing text to "" would make it match loosely and read as a
+    // result. There is nothing there to search; it must simply not match.
+    const withPurged = [...rows, purged];
+    const hit = snapshot(
+      withPurged,
+      { workspace_id: base.workspace_id, q: "تعليق" },
+      "fixture-v1",
+    );
+    expect(hit.comments.some((c) => c.id === "p1")).toBe(false);
+    expect(hit.comments.length).toBeGreaterThan(0);
+  });
+
+  it("still counts a purged comment in the totals it belongs to", () => {
+    // Its text is gone; the fact that it existed and was analysed is not.
+    const before = snapshot(
+      rows,
+      { workspace_id: base.workspace_id },
+      "fixture-v1",
+    );
+    const after = snapshot(
+      [...rows, purged],
+      { workspace_id: base.workspace_id },
+      "fixture-v1",
+    );
+    expect(after.total).toBe(before.total + 1);
   });
 });

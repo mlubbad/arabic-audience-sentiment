@@ -44,8 +44,14 @@ export const CommentSchema = z
     video_id: z.string(),
     video_kind: z.enum(["video", "short", "stream"]),
     author_channel_id: z.string().nullable(),
-    author_name: z.string(),
-    text_raw: z.string(),
+    // Null once the retention purge has run. The author is personal data
+    // belonging to someone who is not the customer, so it does not outlive the
+    // text it came with.
+    author_name: z.string().nullable(),
+    // Null once the retention purge has run. Absent is not empty: the comment
+    // existed and was analysed, and only its text is gone. Anything rendering
+    // this must say which of the two it is.
+    text_raw: z.string().nullable(),
     content_hash: z.string().min(1),
     // What the source displayed, e.g. "1.2K", kept verbatim. Null when the
     // source showed nothing.
@@ -75,6 +81,8 @@ export const CommentSchema = z
     ]),
     field_provenance: z.record(z.unknown()),
     comment_type: z.string().nullable(),
+    // When the text was removed under the retention rule; null while retained.
+    content_purged_at: timestamp.nullable().default(null),
     prediction: PredictionSchema.nullable(),
     reviews: z.array(ReviewSchema),
   })

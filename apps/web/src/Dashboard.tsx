@@ -24,6 +24,8 @@ import {
   syncMessages,
   syncErrorMessages,
   displayDate,
+  commentText,
+  PURGED_AUTHOR,
 } from "./i18n";
 import { reviewHistory } from "./reviewHistory";
 import { syncHealth } from "./syncHealth";
@@ -520,7 +522,7 @@ export function Dashboard() {
                     {s.most_engaged_negative.map((c) => (
                       <li key={c.id} data-testid={`engaged-${c.id}`}>
                         <strong>{c.likes_raw ?? c.likes_value}</strong> إعجابًا
-                        — {c.text_raw}
+                        — {commentText(c)}
                         {c.reviewed && <small>مراجعة بشرية</small>}
                       </li>
                     ))}
@@ -565,10 +567,10 @@ export function Dashboard() {
                       {s.comments.map((c) => (
                         <tr key={c.id}>
                           <td>
-                            {c.author_name}
+                            {c.author_name ?? PURGED_AUTHOR}
                             {c.is_reply && <small>رد</small>}
                           </td>
-                          <td>{c.text_raw}</td>
+                          <td>{commentText(c)}</td>
                           <td>
                             {c.label ? labels[c.label] : "غير محلل / قديم"}
                             {c.reviewed && <small>مراجعة بشرية</small>}
@@ -601,7 +603,7 @@ export function Dashboard() {
                   >
                     <h3>تصحيح تصنيف تعليق</h3>
                     <blockquote data-testid="review-text">
-                      {reviewing.text_raw}
+                      {commentText(reviewing)}
                     </blockquote>
                     <p className="muted">
                       التصنيف الحالي:{" "}

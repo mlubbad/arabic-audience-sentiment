@@ -71,7 +71,10 @@ function filteredRows(
         (f.review_status === "unreviewed" && c.reviewed)
       )
         return false;
-      return `${c.text_raw} ${c.author_name} ${c.author_channel_id ?? ""}`
+      // A purged row has nothing to search. Coercing null to "" would make it
+      // match every empty-ish query and none of the real ones, which reads as
+      // a result rather than as an absence.
+      return `${c.text_raw ?? ""} ${c.author_name ?? ""} ${c.author_channel_id ?? ""}`
         .toLocaleLowerCase()
         .includes(f.q.trim().toLocaleLowerCase());
     })

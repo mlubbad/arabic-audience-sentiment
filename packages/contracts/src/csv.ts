@@ -8,6 +8,7 @@ export const CSV_COLUMNS = [
   "author_name",
   "author_channel_id",
   "text_raw",
+  "content_purged_at",
   "effective_label",
   "label_source",
   "prediction_status",
@@ -51,9 +52,13 @@ export function toCsv(rows: LabelledComment[]): string {
       r.id,
       r.video_id,
       r.video_kind,
-      r.author_name,
+      r.author_name ?? "",
       r.author_channel_id ?? "",
-      r.text_raw,
+      // An empty cell would read as a comment with no text. This one had text
+      // and no longer does, which is a different fact and belongs in the file.
+      r.text_raw ??
+        (r.content_purged_at ? "[نص محذوف بموجب مدة الاحتفاظ]" : ""),
+      r.content_purged_at ?? "",
       r.label ?? "",
       labelSource(r),
       r.prediction?.status ?? "",

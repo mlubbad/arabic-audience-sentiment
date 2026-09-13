@@ -103,6 +103,14 @@ worker endpoint. None of those exist yet, so there is no complete creator journe
 | Model selection and any accuracy claim | The two model notebooks and ~600 independently human-labelled comments. The sampler, the blind labelling sheets and the protocol are built (`docs/labelling-guide.md`, `npm run label:draw`); what is missing is the human labelling itself and the notebooks |
 | Private pilot deployment | Sites access with a verified private mode |
 
+## Retention
+
+Comment text and author are removable after 30 days by `private.purge_comment_text`, keeping
+the row and its analysis so aggregates still compute. Required by YouTube's developer terms
+and by any sensible reading of PDPL/GDPR, since a comment is personal data belonging to the
+commenter and not to the customer. No schedule is attached yet; a deletion path driven by a
+tenant request is still to build.
+
 ## Known limitations
 
 - Database evidence is PGlite. It runs the real SQL and real RLS but **is not** GoTrue,

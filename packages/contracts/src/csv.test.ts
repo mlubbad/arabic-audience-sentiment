@@ -30,6 +30,7 @@ const base = {
   source: "sanitized_fixture" as const,
   field_provenance: {},
   comment_type: null,
+  content_purged_at: null,
   reviews: [],
   prediction: null,
 };
@@ -179,5 +180,32 @@ describe("csv export", () => {
     // The policy reads split_part(name,'/',1), so the workspace must lead.
     expect(path.split("/")[0]).toBe(workspace);
     expect(path).toBe(`${workspace}/comments-2026-09-12.csv`);
+  });
+});
+
+describe("a comment whose text was removed under the retention rule", () => {
+  const purged = {
+    ...base,
+    id: "purged-1",
+    text_raw: null,
+    author_name: null,
+    content_purged_at: "2026-10-15T00:00:00Z",
+  };
+
+  it("says the text was removed rather than leaving a blank cell", () => {
+    // A blank reads as a comment with no text. This one had text and no longer
+    // does — a different fact, and the one an auditor asks about.
+    const rows = toCsv([purged]).split("\r\n");
+    const cells = rows[1].split(",");
+    const header = rows[0].split(",");
+    const text = cells[header.indexOf("text_raw")];
+    expect(text).toContain("محذوف");
+    expect(cells[header.indexOf("content_purged_at")]).toContain("2026-10-15");
+  });
+
+  it("still carries the comment, so the export and the totals agree", () => {
+    // The row is not dropped: it counted in every figure on the dashboard, and
+    // an export that quietly omitted it would not reconcile with them.
+    expect(toCsv([purged]).trim().split("\r\n")).toHaveLength(2);
   });
 });
