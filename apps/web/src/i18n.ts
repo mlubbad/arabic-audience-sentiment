@@ -56,3 +56,15 @@ export const syncMessages: Record<string, string> = {
   never_run_no_worker: "لم تُنفذ أي مزامنة، ولا يوجد عامل متصل",
   no_data: "لا تتوفر بيانات عن حالة المزامنة",
 };
+/** Known collector failures in plain Arabic. The raw code stays visible as
+ *  supporting detail, so support can act on it without the user decoding it. */
+export const syncErrorMessages: Record<string, string> = {
+  source_access_denied: "رفض المصدر الوصول، غالبًا بسبب الحصة أو الصلاحيات",
+  source_unavailable: "المصدر غير متاح مؤقتًا",
+  source_http_error: "رد المصدر بخطأ غير متوقع",
+  invalid_response: "وصل رد غير صالح من المصدر",
+  network_failure: "تعذّر الاتصال بالمصدر",
+  source_ended_without_completion: "انتهى المصدر قبل اكتمال الجمع",
+  repeated_page_token: "تكرّر مؤشر الصفحة، فأُوقف الجمع لتفادي حلقة لا تنتهي",
+  retry_exhausted: "استُنفدت المحاولات المسموح بها",
+};

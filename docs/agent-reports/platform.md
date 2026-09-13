@@ -563,3 +563,51 @@ trip, which is the bottleneck measured earlier at 3 of 5 feature commits.
 M4's screen elements are complete except item 5: filters, pagination, corrections with
 history, CSV export, plan limits, video comparison and sync health are all implemented and
 tested. P2 and P3 remain blocked on I1. No further unblocked M4 work remains in this lane.
+
+## Accessibility and keyboard pass (done, 2026-09-13)
+
+Audited against §11: RTL, charts not carried by colour alone, reduced motion, keyboard
+access, and no continuation tokens or stack traces shown to the user.
+
+### Already correct before this pass
+
+`prefers-reduced-motion` is honoured, Chart.js animation is off, `:focus-visible` outlines
+exist, `lang="ar"` and `dir="rtl"` are set, and the skip link works. Verified rather than
+assumed: a DOM audit found **0 of 25** form controls, buttons, meters or canvases without an
+accessible name or a deliberate `aria-hidden`; **12 headings with no skipped levels**; no
+positive `tabindex`; and no focusable element inside an `aria-hidden` subtree, which would be
+reachable by Tab but invisible to a screen reader.
+
+Contrast against white, measured: critical `#9a2b2b` 7.62:1, ok `#1d6047` 7.46:1, muted
+`#485e70` 6.75:1, body 15.71:1, warning `#8a5a00` 5.93:1. All clear WCAG AA; all but the
+warning colour clear AAA.
+
+### Fixed
+
+| Defect | Why it mattered |
+| --- | --- |
+| Opening a correction left focus on the trigger | The panel renders below the table, so a keyboard user was dropped behind it. Focus now moves into the form, and returns to the exact row button on both cancel and save |
+| `<th>` had no `scope` | Neither table exposed its column headers, so cells were read without their meaning |
+| The comments table had no accessible name | Two tables on one page were indistinguishable |
+| The doughnut was an unlabelled canvas in the tree | It duplicates the list beside it, so it is now `aria-hidden` rather than announced as nothing useful |
+| Plan meters were unlabelled `<progress>` elements | Same reasoning; the numbers are text beside the bar |
+| A sync failure showed only `source_access_denied` | A raw identifier is close to the stack-trace leak §11 forbids. A plain sentence now leads and the code follows in parentheses for support |
+
+### A test that was weaker than it looked
+
+The skip-link test asserted `toBeFocused()` only. A skip link parked at `top: -100px` that
+never comes back on screen would have passed it. It now also asserts `toBeInViewport()`.
+
+Worth recording how that surfaced: a JS probe reported the link still at `-100px` while
+focused, which looked like a real bug. It was not — `document.activeElement` was correct but
+`:focus` did not match, because the browser pane was not the focused window. The CSS was
+fine. Checking again under a real keyboard press rather than trusting the first reading
+avoided "fixing" working code; the genuine defect was the missing assertion.
+
+### Commands and results
+
+- `npm run check` — pass (45 unit across 7 files, 18 SQL, 23 worker, build, secret scan)
+- `npm run test:e2e` — 40 passed in 27.8s, on port 5199
+- `node scripts/check-ownership.mjs platform` — pass
+
+Seven browser tests added; six were confirmed failing before the fixes.

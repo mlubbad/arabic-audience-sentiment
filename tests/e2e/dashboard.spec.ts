@@ -783,3 +783,120 @@ test("reads a malformed sync block as unknown rather than healthy", async ({
   // The rest of the dashboard still works; sync health is not load-bearing.
   await expect(page.getByTestId("total")).toHaveText("6");
 });
+
+test("the skip link is the first stop and reaches the content", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: "انتقل إلى المحتوى" });
+  await expect(skip).toBeFocused();
+  // A skip link that stays parked off-screen while focused helps nobody who can
+  // see the page, so assert it actually arrives on screen.
+  await expect(skip).toBeInViewport();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("main#content")).toBeVisible();
+});
+
+test("every filter is reachable and operable from the keyboard alone", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  // Drive the participation filter without touching the mouse.
+  await page.getByLabel("نوع المشاركة").focus();
+  await expect(page.getByLabel("نوع المشاركة")).toBeFocused();
+  await page.getByLabel("نوع المشاركة").selectOption("replies");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("total")).toHaveText("2");
+});
+
+test("opening a correction moves focus into it and gives it back on cancel", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const trigger = page
+    .locator('[data-testid="comments-table"] tbody tr')
+    .first()
+    .getByRole("button", { name: "تصحيح" });
+  await trigger.click();
+  // A panel that appears below the fold is useless if focus stays behind it.
+  await expect(page.getByRole("form", { name: "تصحيح التصنيف" })).toBeFocused();
+  await page.getByRole("button", { name: "إلغاء" }).click();
+  await expect(trigger).toBeFocused();
+});
+
+test("focus returns to the row after a correction is saved", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const trigger = page
+    .locator('[data-testid="comments-table"] tbody tr')
+    .first()
+    .getByRole("button", { name: "تصحيح" });
+  await trigger.click();
+  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).toContainText("مراجعة بشرية");
+  await expect(trigger).toBeFocused();
+});
+
+test("no figure is carried by colour alone", async ({ page }) => {
+  await page.goto("/");
+  // The chart duplicates the list beside it, so it is kept out of the
+  // accessibility tree rather than announced as an unlabelled canvas.
+  await expect(page.locator(".chart")).toHaveAttribute("aria-hidden", "true");
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "إيجابي:" }),
+  ).toHaveText("إيجابي: 1 (25٪)");
+  // Same for the plan meters: the numbers are text beside the bar.
+  await expect(page.locator("progress").first()).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
+  await expect(page.getByTestId("budget-comment_analysis")).toContainText(
+    "74 من 100 — يتبقى 26",
+  );
+});
+
+test("both tables expose their column headers to assistive technology", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const unscoped = await page.evaluate(
+    () =>
+      [...document.querySelectorAll("table th")].filter(
+        (th) => th.getAttribute("scope") !== "col",
+      ).length,
+  );
+  expect(unscoped).toBe(0);
+  await expect(
+    page.getByRole("table", { name: "التعليقات ضمن الفلاتر" }),
+  ).toBeVisible();
+});
+
+test("a sync failure reads as a sentence, not as a raw code", async ({
+  page,
+}) => {
+  await withSync(page, {
+    worker: { connected: true, last_heartbeat_at: "2026-09-13T11:59:00Z" },
+    queued_jobs: 0,
+    last_run: {
+      started_at: "2026-09-13T11:00:00Z",
+      ended_at: "2026-09-13T11:30:00Z",
+      status: "blocked",
+      source: "youtube_data_api_public",
+      error_code: "source_access_denied",
+      coverage: { videos_seen: 1, comments_collected: 0, complete: false },
+    },
+  });
+  await page.goto("/");
+  const detail = page.getByTestId("sync-error");
+  // The explanation leads; the identifier is supporting detail for support.
+  await expect(detail).toContainText("رفض المصدر الوصول");
+  await expect(detail).toContainText("source_access_denied");
+});

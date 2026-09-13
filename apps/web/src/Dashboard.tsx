@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
@@ -22,6 +22,7 @@ import {
   reviewStateMessages,
   videoLabel,
   syncMessages,
+  syncErrorMessages,
   displayDate,
 } from "./i18n";
 import { reviewHistory } from "./reviewHistory";
@@ -75,6 +76,16 @@ export function Dashboard() {
   const client = useQueryClient();
   const [reviewing, setReviewing] = useState<LabelledComment | null>(null);
   const [verdict, setVerdict] = useState<Label>("neutral");
+  const reviewFormRef = useRef<HTMLFormElement | null>(null);
+  const reviewTriggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (reviewing) reviewFormRef.current?.focus();
+  }, [reviewing]);
+  function closeReview() {
+    setReviewing(null);
+    // Hand focus back to the row the reviewer came from.
+    reviewTriggerRef.current?.focus();
+  }
   const [reason, setReason] = useState("");
   const review = useMutation({
     mutationFn: () =>
@@ -86,7 +97,7 @@ export function Dashboard() {
         reason,
       }),
     onSuccess: async () => {
-      setReviewing(null);
+      closeReview();
       setReason("");
       // Re-read through the same snapshot path so the corrected label, the
       // sentiment denominator and the review filter all move together.
@@ -106,7 +117,8 @@ export function Dashboard() {
       URL.revokeObjectURL(url);
     },
   });
-  function startReview(c: LabelledComment) {
+  function startReview(c: LabelledComment, trigger: HTMLButtonElement) {
+    reviewTriggerRef.current = trigger;
     review.reset();
     setReason("");
     setVerdict(c.label ?? "neutral");
@@ -382,7 +394,7 @@ export function Dashboard() {
                     مستقلة.
                   </p>
                   {s.analysed > 0 && (
-                    <div className="chart">
+                    <div className="chart" aria-hidden="true">
                       <Doughnut
                         data={{
                           labels: Object.values(labels),
@@ -453,14 +465,14 @@ export function Dashboard() {
                   </p>
                 )}
                 <div className="table-wrap">
-                  <table>
+                  <table aria-label="مقارنة الفيديوهات ضمن الفلاتر">
                     <thead>
                       <tr>
-                        <th>الفيديو</th>
-                        <th>التعليقات</th>
-                        <th>الردود</th>
-                        <th>المحللة</th>
-                        <th>التوزيع</th>
+                        <th scope="col">الفيديو</th>
+                        <th scope="col">التعليقات</th>
+                        <th scope="col">الردود</th>
+                        <th scope="col">المحللة</th>
+                        <th scope="col">التوزيع</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -502,14 +514,14 @@ export function Dashboard() {
                   </p>
                 )}
                 <div className="table-wrap">
-                  <table>
+                  <table aria-label="التعليقات ضمن الفلاتر">
                     <thead>
                       <tr>
-                        <th>المؤلف</th>
-                        <th>التعليق</th>
-                        <th>المشاعر</th>
-                        <th>التاريخ</th>
-                        <th>التصحيح</th>
+                        <th scope="col">المؤلف</th>
+                        <th scope="col">التعليق</th>
+                        <th scope="col">المشاعر</th>
+                        <th scope="col">التاريخ</th>
+                        <th scope="col">التصحيح</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -528,7 +540,7 @@ export function Dashboard() {
                           <td>
                             <button
                               type="button"
-                              onClick={() => startReview(c)}
+                              onClick={(e) => startReview(c, e.currentTarget)}
                               aria-label={`تصحيح تصنيف تعليق ${c.author_name}`}
                             >
                               تصحيح
@@ -542,6 +554,8 @@ export function Dashboard() {
                 {reviewing && (
                   <form
                     className="review"
+                    ref={reviewFormRef}
+                    tabIndex={-1}
                     aria-label="تصحيح التصنيف"
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -618,7 +632,7 @@ export function Dashboard() {
                         type="button"
                         onClick={() => {
                           review.reset();
-                          setReviewing(null);
+                          closeReview();
                         }}
                       >
                         إلغاء
@@ -705,7 +719,11 @@ export function Dashboard() {
                         <span>
                           {b.used} من {b.allowance} — يتبقى {b.remaining}
                         </span>
-                        <progress max={b.allowance || 1} value={b.used} />
+                        <progress
+                          max={b.allowance || 1}
+                          value={b.used}
+                          aria-hidden="true"
+                        />
                         <small data-state={state}>
                           {share}٪ — {budgetMessages[state]}
                         </small>
@@ -731,7 +749,9 @@ export function Dashboard() {
                 </p>
                 {health.errorCode && (
                   <p data-testid="sync-error">
-                    رمز الخطأ: <code>{health.errorCode}</code>
+                    {syncErrorMessages[health.errorCode] ??
+                      "تعذّرت المزامنة لسبب غير مصنَّف"}{" "}
+                    (<code>{health.errorCode}</code>)
                   </p>
                 )}
                 {health.queued > 0 && (
