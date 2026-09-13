@@ -13,6 +13,7 @@ import {
   fixtureWorkspace,
   loadSnapshot,
   reviewsArePersisted,
+  dataMode,
   submitReview,
 } from "./data";
 import {
@@ -28,6 +29,7 @@ import {
   PURGED_AUTHOR,
 } from "./i18n";
 import { reviewHistory } from "./reviewHistory";
+import { describeSource } from "./dataSource";
 import { syncHealth } from "./syncHealth";
 ChartJS.register(ArcElement, Tooltip, Legend);
 const defaults: Filters = { workspace_id: fixtureWorkspace };
@@ -176,19 +178,31 @@ export function Dashboard() {
     setFilters(defaults);
   }
   const s = result.data;
+  // Every sentence in the header comes from the values that decide behaviour,
+  // so the label and the truth cannot drift apart.
+  const source = describeSource({
+    mode: dataMode,
+    workspaceId: filters.workspace_id,
+    persisted: reviewsArePersisted,
+    sync: s?.sync ?? null,
+    total: s?.total ?? null,
+    now: new Date(),
+  });
   return (
     <>
       <h1>لوحة مشاعر الجمهور</h1>
-      <aside className="notice">
-        <strong>بيانات اصطناعية للاختبار فقط</strong>
-        <p>
-          لا توجد قناة متصلة أو نتائج نموذج حي. هذا هيكل وظيفي مؤقت بانتظار
-          ملفات التصميم الأصلية.
-        </p>
-        <p data-testid="data-mode">
-          تسجيل الدخول لا يغيّر مصدر هذه البيانات. حتى مع ضبط حساب Supabase،
-          تبقى هذه الشاشة على بيانات الاختبار ولا تُرسل تصحيحاتها إلى أي خادم.
-        </p>
+      <aside
+        className={source.tone === "warning" ? "notice" : "notice source-live"}
+        data-testid="source"
+        data-mode={source.mode}
+      >
+        <strong>{source.badge}</strong>
+        <p data-testid="source-scope">{source.scope}</p>
+        <p data-testid="source-coverage">{source.coverage}</p>
+        <p data-testid="data-mode">{source.persistence}</p>
+        {source.freshness && (
+          <p data-testid="source-freshness">{source.freshness}</p>
+        )}
       </aside>
       <form onSubmit={apply} className="filters">
         <label>

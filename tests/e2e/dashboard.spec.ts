@@ -5,7 +5,14 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByTestId("total")).toHaveText("6");
-  await expect(page.getByText("بيانات اصطناعية للاختبار فقط")).toBeVisible();
+  // The source strip, driven by the data mode rather than written by hand.
+  const source = page.getByTestId("source");
+  await expect(source).toHaveAttribute("data-mode", "sanitized_fixture");
+  await expect(source).toContainText("بيانات اصطناعية");
+  // Fixture mode must say plainly that a correction goes nowhere.
+  await expect(page.getByTestId("data-mode")).toContainText("لا تُرسل");
+  // And it must not claim a collection that never happened.
+  await expect(source).toContainText("لا يمثل أي جمهور حقيقي");
   await page
     .getByLabel("البحث في التعليقات والمؤلفين")
     .fill("غير موجود نهائياً");
