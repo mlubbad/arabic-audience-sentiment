@@ -87,3 +87,50 @@ milestone records have one owner (integrator). Lane reports avoid concurrent edi
 progress documents. Ownership guards run before commits in the new worktrees. See
 `docs/coordination/README.md` and `tasks.md`. No changes to application architecture or paid
 service authorization follow from this setup.
+
+2026-09-13 (M3 and M5 server work) — decisions taken while implementing, with reasons.
+
+- **The billable unit is the comment, not its text.** `usageEventKey` is
+  `analysis:{platform}:{external_comment_id}` with no content hash, so a retry, a reimport, a
+  likes refresh and a re-analysis after an edit are all free. Including the hash would bill a
+  customer for edits they did not ask for. This was recorded as an open pricing question and
+  is now decided; it is reversible by changing one function and adding a migration.
+- **Replay is keyed on the batch key plus a payload fingerprint.** The earlier
+  `commit_checkpoint` compared only the checkpoint, so a reused key carrying different rows
+  would have been accepted as an update. It is now a conflict. The Python client hashes the
+  payload canonically, because a digest that varied with dictionary order would make a
+  legitimate replay look like a conflicting payload and turn a retry into a failure.
+- **A prediction for a comment not in its batch fails the whole batch**, rather than being
+  stored, because it is analysis of something the server cannot show. A successful prediction
+  must carry its class scores, since the specification requires keeping all class
+  probabilities.
+- **Nothing that crosses a trust boundary accepts a workspace.** The OAuth callback, the
+  worker gateway, the batch payload and the edge handler all derive the tenant from something
+  the caller cannot choose — stored state, or a credential. This is deliberately structural
+  rather than a validation step: there is no field to forge, so the check cannot be forgotten
+  later.
+- **A worker holds a scoped credential, never the service role**, and that credential names
+  exactly one workspace. Claim, heartbeat, commit and finish take no workspace argument.
+- **The connected claim on a channel is globally exclusive**, enforced by a partial unique
+  index. A second workspace keeps its `public_unverified` row, because collecting public data
+  needs no authorisation, but can never become the authorised holder. A channel already being
+  collected publicly is upgraded in place so pilot data gathered before the creator authorised
+  carries over instead of being orphaned.
+- **An idempotent replay is answered before the rate limit is consulted.** Returning the same
+  job for the same key is not a new request, and refusing it would punish a correctly
+  retrying client.
+- **`sync.ts` is application schema, not worker protocol.** It is a read projection over sync
+  runs and the job queue, so changing it cannot break the worker. `jobs.ts` and the barrel
+  stay coordinated because a unilateral change there would.
+- **Aggregates belong in the shared snapshot, not the app.** `comment_types` and the
+  per-video figures were computed in the browser, which only worked because fixture mode
+  reads every row; a live paginated read could not have offered the same control, and the two
+  modes would have diverged. The per-video figures accumulate in the pass that already walks
+  the rows, which is what a `GROUP BY` does, so there was never a scaling reason to defer it.
+- **Unknown is never zero.** An unparsed like count stays null and its comment is excluded
+  from the engagement ranking rather than sorted last; an export writes it empty. Sorting
+  unknown as zero would present an unmeasured row as measured-and-lowest.
+- **Errors crossing a boundary carry a code and no message.** A driver or transport error can
+  quote a connection string, and a credential with it.
+- **The audit trail answers to owners only** and is append-only in the database, with short
+  bounded fields so a comment body cannot be parked in it.

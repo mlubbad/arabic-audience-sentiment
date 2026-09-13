@@ -1,122 +1,110 @@
 # Progress
 
-Updated 2026-09-12. Status words are used strictly:
+Updated 2026-09-13. Status words are used strictly:
 **implemented** = code exists and its tests pass; **fixture-tested** = verified only against
 sanitized synthetic data; **blocked** = cannot proceed without a named missing input.
-No item below has been validated against live YouTube, Google OAuth, a deployed Supabase
-project, a real sentiment model, or any deployment.
+
+**Nothing here has run against live YouTube, Google OAuth, a deployed Supabase project, a
+real sentiment model, or any deployment.** Every "implemented" below means verified in
+embedded PostgreSQL, in Node, or in a browser against fixtures. The list of what that
+excludes is at the end of `verification.md` and is the honest limit of this work.
 
 ## M0 — scaffold and reproducibility (complete)
 
-| Item | Status | Evidence |
-| --- | --- | --- |
-| Git workspace with `.gitignore` | implemented | Branch `codex/m0-foundations`; ignores `.env*` (except the example), raw data dirs, archives, notebooks, caches, build output |
-| Monorepo layout | implemented | `apps/web`, `packages/contracts`, `supabase/{migrations,functions,tests}`, `workers/python`, `docs` |
-| Pinned manifests and lockfiles | implemented | `package-lock.json`, `workers/python/uv.lock`; `save-exact` and `engine-strict` in `.npmrc` |
-| `.env.example`, placeholders only | implemented | Every variable from the handoff's environment contract, all empty |
-| `CLAUDE.md` pointing to AGENTS.md and the handoff | implemented | Present at repository root |
-| `docs/decisions.md`, `progress.md`, `verification.md` | implemented | This file plus its two siblings |
-| Documented build/lint/typecheck/test/worker commands | implemented | `package.json` scripts, described in `README.md` |
-| CI restricted to credential-free checks | implemented | `.github/workflows/ci.yml`; never executed here — no CI run exists yet |
-| Clean install verified | implemented | `node_modules` and `.venv` deleted and rebuilt from lockfiles; see verification |
+Monorepo, pinned manifests and both lockfiles, placeholder-only `.env.example`, documented
+commands, CI restricted to credential-free checks, clean install verified from lockfiles.
+CI has never executed: there is no remote.
 
 ## M1 — collection primitives (unblocked parts implemented)
 
 | Item | Status | Notes |
 | --- | --- | --- |
-| Collector adapter protocol | implemented | `Collector`, `Batch`, `RawComment`, six-value `Outcome`; exhaustion means source traversal ended, never "all comments exist" |
-| YouTube Data API adapter | fixture-tested | Explicit reply pagination; tested against synthetic `httpx.MockTransport` responses only. **Never run against live YouTube.** |
-| Durable local spool | implemented | SQLite with `BEGIN IMMEDIATE`, lease tokens, heartbeat fencing, bounded attempts, exponential backoff |
-| Resume without duplication | implemented | Rows plus checkpoint commit in one transaction; a rolled-back batch leaves no rows and no checkpoint |
-| Failure is never success | implemented | 403/429 → `blocked`, 5xx → retryable `failed`, malformed JSON → `invalid_response`; none become `succeeded` |
-| Text-version history | implemented | `versions` table keyed by content hash; an edited comment keeps its prior version |
-| Collection smoke command | fixture-tested | `npm run worker:collect`; manifest states coverage is source traversal only |
-| Sentiment adapter interface | implemented | `SentimentAdapter` protocol, `Prediction` invariants, pinned-revision `ModelCard` registry, preprocessing |
-| Deterministic test analyzer | implemented | Clearly named `deterministic-test-analyzer`; **not a model** and must never be shown as a prediction |
-| Catalog import and legacy importer | **blocked** | Needs the source ZIP, the original comments CSV, and the classification amendment file |
-| Real channel discovery | **blocked** | Needs a YouTube Data API key or an authorized `yt-dlp` run; no live call has been made |
-| Model inference and benchmark | **blocked** | Needs the model notebooks and ~600 human-labelled comments. No accuracy figure is claimed |
+| Collector protocol | implemented | "Exhausted" means the source stopped returning rows, never that everything was retrieved |
+| YouTube Data API adapter | fixture-tested | Explicit reply pagination, tested against synthetic HTTP only. **Never run against live YouTube** |
+| Durable local spool | implemented | Lease fencing, heartbeats, bounded retries, rows and checkpoint in one transaction |
+| Queue semantics | implemented | Lease bounds, batch limits, exponential backoff, both routes to a terminal job |
+| Failure is never success | implemented | 403/429 → blocked, 5xx → retryable failure, malformed JSON → invalid response |
+| Sentiment interfaces | implemented | Pinned-revision registry, preprocessing, a deterministic test analyzer that is **not a model** |
+| Catalogue import, live discovery, model inference | **blocked** | Needs the ZIP, the CSVs, an API key, the notebooks |
 
-## M2 — secure SaaS foundation (unblocked parts implemented)
+## M2 — secure SaaS foundation (complete)
+
+Composite tenant keys, RLS resolved from `auth.uid()` through a non-exposed helper, lease
+tokens withheld from the tenant projection, role-checked RPCs, personal workspace bootstrap,
+private storage scoped by workspace UUID, append-only review log, usage metering with
+reservation, plan limits. Isolation is tested through direct SQL, not hidden UI controls.
+
+## M3 — ingestion and analysis (server path complete)
 
 | Item | Status | Notes |
 | --- | --- | --- |
-| Initial migration | implemented | `supabase/migrations/20260912185902_foundation.sql` |
-| Composite tenant keys | implemented | `(workspace_id, id)` uniqueness and composite foreign keys; a cross-workspace child insert fails even for a privileged role |
-| RLS on every exposed table | implemented | Membership resolved from `auth.uid()` through a non-exposed `private.has_role`, never from user metadata |
-| Lease tokens hidden from tenants | implemented | Column-level `SELECT` grant on `jobs` omits `lease_token` |
-| Privilege escalation blocked | implemented | No grant lets a member change their own role, move a row between workspaces, or set a channel to `connected` |
-| Role-checked RPCs | implemented | `create_workspace`, `enqueue_sync` (idempotent by `dedupe_key`), `register_channel`, `submit_comment_review` |
-| Human corrections | implemented | Verdict, reviewer and reason written only through the RPC; reviewer id and `human` provenance come from the session, so a tenant cannot forge either or claim `legacy_unverified` |
-| Optimistic concurrency on text | implemented | A correction carries the hash of the text the reviewer read; if the comment changed since, the write is a conflict rather than a silent verdict on new text |
-| Append-only review log | implemented | A trigger rejects UPDATE and DELETE on `comment_reviews` even for a role that bypasses RLS |
-| Personal workspace bootstrap | implemented | Definer trigger on `auth.users`, so no signed-in user is left without a tenant |
-| Worker job primitives | implemented | `claim_job` (`FOR UPDATE SKIP LOCKED`), `heartbeat`, `commit_checkpoint`; expired lease cannot write; repeated batch key is idempotent and a conflicting payload is rejected |
-| Private storage | implemented | Non-public `imports`/`exports` buckets, paths prefixed by workspace UUID, role-gated upload |
-| Server authorization helper | implemented | `authorize()` verifies identity and *current* membership separately; dependency-injected for credential-free tests |
-| Arabic RTL shell | fixture-tested | Real `fetch`, genuine loading/error/retry/empty states, filters driving every panel from one snapshot |
-| Cursor pagination | fixture-tested | Prev/next over a cursor stack with a page-size control; aggregates describe the filtered set, not the page; a cursor is dropped whenever filters or page size change |
-| Stale-response safety | fixture-tested | Results are keyed by filter, so a late response for abandoned filters cannot repaint a newer screen — proven with a held request that was released and completed |
-| Refresh vs. load states | fixture-tested | Full loading state only before there is data; afterwards the current screen stays put behind a refresh indicator |
-| Invalid-cursor recovery | fixture-tested | If the row a cursor names disappears, the page is rebuilt from page one and the user is told, instead of showing an empty or mismatched page |
-| Correction UI | fixture-tested | Per-row correction form; the corrected label overrides the model for the current text and every aggregate moves with it through the one shared snapshot |
-| Correction persistence | **blocked** | Without a Supabase project the UI keeps corrections for the browser session only, and says so on screen. The RPC call path exists but has never reached a real server |
-| CSV export | fixture-tested | One shared row selection drives the table and the export, so a file always matches the filters on screen and is never limited to the visible page |
-| Formula-injection safety | implemented | A cell a spreadsheet would evaluate is quoted and prefixed on output only; the stored text is evidence and is never rewritten |
-| Export label honesty | implemented | The file carries the effective label and whether it came from a human or the model; a stale or missing prediction exports an empty label while its status is still recorded |
-| Background export job and signed link | **blocked** | Needs Supabase Storage and a running worker. Fixture mode builds the file in the browser; the object name already carries the workspace prefix the bucket policy checks |
-| Plans and subscriptions | implemented | Operator-managed `plans` with no tenant grant; a UTC billing period that does not move with a display timezone; `provider = 'mock'` rejected outright |
-| Usage reservation | implemented | `reserve_usage` locks the subscription row, grants only what the allowance still holds, and returns the covered keys |
-| No double charge | implemented | `(workspace_id, event_key)` makes retries, reimports and replayed batches free; a unique comment costs one unit in a workspace once |
-| Separate backfill budget | implemented | `historical_backfill` draws on its own allowance, so it neither blocks nor consumes the monthly analysis budget |
-| Metered batch commit | implemented | Rows, checkpoint and meter move in one transaction; a batch that cannot be paid for in full is refused rather than half-committed |
-| Reserve / confirm / release | implemented | Only an unconfirmed reservation is given back; a confirmed charge cannot be un-billed by a later failure |
-| Concurrent overspend under real parallelism | **blocked** | The row lock is the mechanism, but embedded PostgreSQL runs a single connection, so two genuinely simultaneous transactions cannot be staged. Needs a real PostgreSQL with two connections |
-| Quota visibility | implemented | `usage_summary` is readable by every member of its own workspace and by no one else; it returns null when no plan has been activated |
-| One count, two readers | implemented | The reservation and the summary both count a period through one `used_units` helper, so the number that blocks a batch is the number on screen |
-| Early warning | fixture-tested | 70% and 85% thresholds surface a limit while there is still room to act; a spent allowance and an unactivated plan are shown as distinct states |
-| Supabase Auth account screen | implemented, not live-tested | Renders an honest "not configured" state without credentials; sign-in/sign-up paths have never contacted a real Supabase project |
-| Live Auth, Storage, PostgREST, Edge Function behaviour | **blocked** | Needs a Supabase development project URL and publishable key |
-| OAuth (M5) | not started | Table shapes and status values exist; no flow implemented |
+| Worker batch contract (I1) | implemented | Rows addressed by platform id; **no workspace field exists** in the payload |
+| Atomic ingestion (P2) | implemented | Rows, predictions, checkpoint and meter in one transaction; a batch that cannot be paid for in full is refused whole |
+| Replay safety | implemented | `batch_key` plus payload fingerprint: identical replay is a no-op, a reused key with different rows is a conflict |
+| Metering | implemented | One unit per unique comment, ever. Retries, reimports, likes refreshes and re-analysis after an edit are free |
+| Worker gateway (P3) | implemented | Scoped credential, never the service role; the tenant comes from the credential |
+| Worker lifecycle | implemented | Explicit terminal result; nothing promotes a job to succeeded on its own |
+| Python control-plane client | implemented | Canonical payload hashing; only an exhausted source maps to succeeded |
+| Edge handler | implemented, **not deployed** | Pure handler with an injected data layer. **Has never served a real request** |
+| Legacy import and reconciliation | **blocked** | Needs the original CSVs and the amendment file |
+| Real model inference | **blocked** | Needs the notebooks and ~600 human-labelled comments. No accuracy figure is claimed |
 
-## Known limitations
+## M4 — dashboard (complete, fixture-backed)
 
-- Database evidence comes from PGlite, which runs the real SQL and real RLS but **is not**
-  GoTrue, PostgREST, Storage HTTP, or a deployed Supabase project. The test file creates
-  minimal stand-in `auth`/`storage` objects. Full Supabase integration is a separate gate.
-- `channels` is unique per workspace, so two tenants may currently register the same public
-  channel id. This is deliberate for pre-OAuth public collection; ownership is proven at M5
-  by the channel identity returned from an authorized connection, not by a claimed URL.
-- The dashboard is a neutral functional shell. Final styling waits on the original dashboard
-  HTML, the ZIP, and the brand assets. Nothing here reproduces the reference design.
-- The legacy topic-count discrepancies in the handoff are not yet reproducible: the source
-  rows are missing, so no reconciliation report exists.
+One filter contract drives every panel and the export. Cursor pagination with stale-response
+safety, human corrections with verdict history, CSV export with formula-injection
+neutralisation, plan limits with early warning, video comparison on per-video denominators,
+sync health classified into ten states, engagement ranking that never lets likes weight
+sentiment. Arabic RTL throughout, keyboard-navigable, no figure carried by colour alone.
+
+Fixture mode is isolated from configured Auth: a correction made against fixture rows can
+never be sent to a live RPC, and the UI says so on screen.
+
+## M5 — OAuth (server half implemented)
+
+| Item | Status | Notes |
+| --- | --- | --- |
+| State lifecycle | implemented | Hash-only storage, bound to user/workspace/client, 10 minutes, single use |
+| Callback cannot be redirected | implemented | Consume returns the binding rather than accepting one; there is no workspace argument to forge |
+| Channel ownership | implemented | Connected claim is globally exclusive; a public_unverified row is upgraded in place so pilot data carries over |
+| Revocation | implemented | Moves to reconnect_required and cancels dependent jobs; never falls back to scraping |
+| Authorization URL, code exchange, PKCE, channels.list, redirect page | **blocked** | Needs Google credentials |
+
+## M6 — private pilot (not started)
+
+Needs a Supabase project and Sites access. Nothing is deployed.
 
 ## Exact missing input per blocked task
 
 | Blocked task | Exact input required |
 | --- | --- |
-| Legacy import and reconciliation report | Original comments CSV/data files, plus the classification amendment file |
-| Catalog verification (35 + 157 + 2 = 194) | `SpecTech-YouTube-MVP-Package.zip` with its manifest and JSONL catalog |
+| Legacy import and the handoff's topic-count reconciliation | Original comments CSV/data files, plus the classification amendment file |
+| Catalogue verification (35 + 157 + 2 = 194) | `SpecTech-YouTube-MVP-Package.zip` with its manifest and JSONL catalog |
 | Final dashboard styling | Standalone dashboard HTML, the dashboard ZIP, and the brand assets |
-| Live public collection | A YouTube Data API key placed server-side (never in `VITE_*`) |
-| Live Auth, Storage and Edge Functions | Supabase development project URL and publishable key, plus service-role key held server-side |
-| OAuth connection | Google OAuth web client id/secret, registered redirect URI, and test-user authorization |
-| Model selection and any accuracy claim | The two model notebooks and ~600 independently human-labelled comments including Mixed |
+| Live public collection | A YouTube Data API key placed server-side |
+| Live Auth, Storage, Edge Functions, and proving the edge handler and SQL agree over HTTP | Supabase development project URL and keys |
+| OAuth exchange and live connection | Google OAuth client id/secret, registered redirect URI, test-user authorization |
+| Model selection and any accuracy claim | The two model notebooks and ~600 independently human-labelled comments |
+| Private pilot deployment | Sites access with a verified private mode |
 
-## Next unblocked work
+## Known limitations
 
-1. Add the remaining dashboard filters the contract already supports — comment type, reply
-   mode, review status, video kind — now that one snapshot drives every panel.
-2. Surface the review history per comment (who, when, why) now that the log is append-only.
-3. Add video comparison, since every panel already derives from one filtered snapshot.
-4. Re-run the browser suite on an unloaded machine and confirm 12/12, then prove concurrent
-   overspend against a real PostgreSQL with two connections.
+- Database evidence is PGlite. It runs the real SQL and real RLS but **is not** GoTrue,
+  PostgREST, Storage HTTP, or a deployed project.
+- Concurrent overspend is not provable here: PGlite runs a single connection, so two
+  simultaneous transactions cannot be staged. The row lock is the mechanism; what the tests
+  prove is that no *sequence* of calls exceeds an allowance.
+- The edge handler and the SQL have never spoken to each other. Each is tested against a
+  stand-in for the other, which is not the same as the two agreeing.
+- Video titles are absent from the contract, so the comparison labels by identifier.
+- The dashboard is a neutral functional shell. Final styling waits on the original assets.
 
-## Parallel coordination — 2026-09-13
+## Coordination
 
-A separate integration worktree was created from `5e9094f`, including the latest usage UI.
-Two implementation lanes are allocated in `docs/coordination/tasks.md`: Codex owns Python;
-Claude owns UI/database work. Shared contracts/tooling/docs have a single integrator owner.
-The original checkout is preserved. Claude's migration acknowledgement is still pending;
-this setup does not claim the external Claude session has read or accepted the new protocol.
+Four lanes with an ownership guard and a pre-commit hook: worker, platform, schema,
+integration. The guard is not decorative — it refused three commits during this work and each
+time the change belonged in another lane.
+
+The worker and schema lanes have no commits. Work assigned to them was taken on directly
+after the user reassigned it; where it crossed a lane, it was committed on integration so
+those lanes can rejoin by merging rather than by reconciling a rewritten branch.
