@@ -15,7 +15,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — **83 tests, 10 files** |
 | `npm run test:db` | Pass — **74 tests, 8 files** |
-| `npm run worker:test` | Pass — **74 tests, 10 files** |
+| `npm run worker:test` | Pass — **85 tests, 11 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
 | `npm run test:e2e` | Pass — 45 tests, Chromium |
@@ -61,6 +61,10 @@ reverted and the suite returned to green.
 | Leave the platform parent id unresolved | 1 |
 | Let a configured project alone flip the data source | 4 |
 | Let the browser suite inherit the machine's .env.local | 1 |
+| Report accuracy as the headline instead of macro F1 | 1 |
+| Skip classes the model never predicts | 1 |
+| Count an unclear gold row as a model error | 1 |
+| Use the normal approximation for the interval | 1 |
 | Trust the server's answer without parsing it | 1 |
 | Show the model's answer in the labelling sheet | 1 |
 | Stop neutralising spreadsheet formulas in the sheet | 1 |
@@ -413,6 +417,44 @@ removing the override reproduces exactly the original 1-of-45 failure on exactly
 
 The configured half of that branch is not covered here. It is exercised by the deployed
 preview, where a real signup succeeded, and by the `authMessages` unit tests.
+
+## Scoring a model, and the ways a score flatters
+
+The evaluation set exists to answer one question, and the obvious way to answer it is
+wrong. A model can reach 0.80 accuracy on a corpus that is mostly praise while never once
+identifying a negative comment — and negative is what a customer pays to find. The
+candidate model this project started from reports that exact shape: accuracy 0.80, macro
+F1 0.65.
+
+`labelling/score.py` therefore reports **macro F1** as the headline and treats accuracy as
+context. Four decisions in it are each a way the number could have flattered a broken
+model, and each is mutation-checked:
+
+- a class the model **never predicts** scores zero and still counts in the average, rather
+  than dropping out of it — which is precisely how a model that cannot find negatives
+  produces a respectable mean;
+- a class **nobody labelled** does not have a zero invented for it, which is the mirror
+  error;
+- `unclear` gold rows are **coverage, not error** — a human who could not tell is not
+  evidence about the model;
+- rows with no prediction are **reported, not skipped**, because a model measured only on
+  the rows it managed is measured on the part it found easy.
+
+The interval is Wilson, not the textbook normal approximation. That mutation initially
+**survived**, because the test only checked 20/20 and 0/20, where both methods agree. The
+approximation breaks *near* the edge — at 19/20 it returns an upper bound of about 1.045 —
+and a rare class lands exactly there. The test now checks 19/20 and 1/20, and the mutation
+fails.
+
+Cohen's kappa returns **undefined** rather than a number when every rater used a single
+category. The statistic is 0/0 there: reporting 1.0 would read as "perfect agreement, trust
+these labels" and 0.0 as "no better than chance", and neither is true. A test and the
+implementation disagreed about this, and both were wrong.
+
+The scorer exits non-zero below the gate (macro F1 ≥ 0.75), so it can sit in a pipeline.
+
+**No model has been scored.** Nothing has been downloaded and no figure is claimed. What
+exists is the instrument.
 
 ## Notes on running the suites
 

@@ -78,7 +78,7 @@ Chromium. `uv` must be installed separately.
 | `npm run check` | lint, format, typecheck, unit, SQL, worker, build, secret scan | green |
 | `npm test` | contracts + web unit (10 files) | 83 passed |
 | `npm run test:db` | real SQL + real RLS in PGlite | 73 passed |
-| `npm run worker:test` | Python worker via uv/pytest | 74 passed |
+| `npm run worker:test` | Python worker via uv/pytest | 85 passed |
 | `npm run test:e2e` | Playwright against a dev server it starts itself | 45 passed |
 
 `npm run check` does **not** include `test:e2e`. Run that separately; it starts its own dev

@@ -25,6 +25,7 @@
     "worker:test": "uv --directory workers/python --cache-dir ../../.cache/uv run --frozen pytest",
     "worker:lint": "uv --directory workers/python --cache-dir ../../.cache/uv run --frozen ruff check .",
     "label:draw": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m labelling.cli",
+    "label:score": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m labelling.score_cli",
     "worker:collect": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m collectors.cli",
     "deploy:preview": "sh scripts/deploy-preview.sh",
     "check:secrets": "node scripts/check-secrets.mjs",

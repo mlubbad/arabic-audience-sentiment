@@ -97,22 +97,53 @@ definitions are the problem, not the labellers — stop, fix the guide, and rela
 **An agreement figure is not optional**: without it there is no way to separate model
 error from label noise, and every accuracy claim inherits that ambiguity.
 
+## Scoring: macro F1, not accuracy
+
+```bash
+npm run label:score -- --gold round-1/estimate-sheet.csv \
+  --predictions round-1/model-a.csv --key round-1/key.csv --gate 0.75
+```
+
+**The headline is macro F1. Accuracy never decides this**, and the difference is the whole
+point of the exercise.
+
+A model can reach 0.80 accuracy on a corpus that is mostly praise while never once
+identifying a negative comment. Accuracy calls that a good model. Macro F1 does not,
+because every class weighs the same however rare it is — and negative is precisely what a
+customer pays to find. The candidate model this project started from reports exactly that
+shape: accuracy 0.80, macro F1 0.65.
+
+The scorer therefore:
+
+- averages over **every class the gold set contains**, including one the model never
+  predicts, which scores zero rather than vanishing from the average;
+- excludes `unclear` and unanalysable rows from the ratio and reports them as **coverage**,
+  because a human who could not tell is not evidence about the model;
+- reports rows it could not score rather than quietly scoring the rest — a model that fails
+  on a third of the set and is measured on the remainder is being measured on the part it
+  found easy;
+- gives a Wilson interval, which stays inside 0 and 1 where the textbook approximation
+  does not, and a rare class lands exactly there.
+
+It exits non-zero below the gate, so it can sit in a pipeline and mean something.
+
 ## Using the result honestly
 
-- Choose between the two candidate models on the **booster** set and any development
-  slice. Then report the **estimate** set figure once, for the chosen model. Selecting a
-  model on the same data you report is how a number ends up unreproducible.
-- At n = 400 the 95% interval is roughly ±5 percentage points; at n = 600, ±4. Report
-  the interval, not just the point.
+- **The gate is macro F1 ≥ 0.75 on the estimate set.** Below it, fine-tune before building
+  anything on top; above it, proceed and keep the set frozen for every later version.
+- Choose between candidate models on the **booster** set and any development slice. Then
+  report the **estimate** figure once, for the chosen model. Selecting a model on the same
+  data you report is how a number ends up unreproducible.
+- At n = 400 the 95% interval is roughly ±5 percentage points; at n = 600, ±4. Report the
+  interval, not just the point.
 - Per-class figures from the estimate set alone will be wide for `mixed`. Say so rather
   than quoting a precise-looking number from a handful of rows.
-- `unclear` rows and rows excluded as unanalysable are **coverage**, not accuracy. Report
-  them separately; folding them into either the numerator or the denominator misstates
-  what the model can do.
 - The sheets are drawn over *unique* texts: identical duplicates collapse, and `key.csv`
-  records how many collapsed into each row. The default figure is therefore accuracy over
+  records how many collapsed into each row. The default figure is therefore computed over
   unique comment texts. Weight by `duplicates` if the question is instead about the raw
   comment stream.
+- Without a second labeller, kappa is unmeasured and every figure inherits that ambiguity.
+  The scorer says so in its output rather than staying silent.
 
 ## Redrawing a round
 
