@@ -80,9 +80,15 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
   });
   it("allows own reads and denies foreign reads, updates, and exports", async () => {
     await user(ownerA);
-    expect((await db.query("select id from clients")).rows).toEqual([
-      { id: A },
-    ]);
+    // The property, not a row count: A's own client is visible and B's is not.
+    // Asserting an exact list made this fail the moment every workspace started
+    // getting a client of its own, which was a change to the product and not to
+    // the isolation this test exists to check.
+    const visible = (
+      await db.query<{ id: string }>("select id from clients")
+    ).rows.map((r) => r.id);
+    expect(visible).toContain(A);
+    expect(visible).not.toContain(B);
     expect(
       (
         await db.query(

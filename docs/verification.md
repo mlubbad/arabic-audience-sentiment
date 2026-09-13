@@ -30,7 +30,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — **83 tests, 10 files** |
-| `npm run test:db` | Pass — **100 tests, 11 files** |
+| `npm run test:db` | Pass — **103 tests, 11 files** |
 | `npm run worker:test` | Pass — **91 tests, 11 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
@@ -578,6 +578,31 @@ overflow at 320, 390, 768 and 1440.
 200 with credentials, and both SPA routes fall back correctly.
 
 One thing to fix later: the hero image is 1.5MB, which is most of the page weight.
+
+## Nobody could have connected a channel
+
+`oauth_start` and `register_channel` both require a client belonging to the workspace, and
+nothing in the product ever inserted into `public.clients` — not `create_workspace`, not the
+personal-workspace trigger, not any RPC. A user could sign up, receive a workspace, and reach
+a wall with no way past it. The connect step had been unreachable since the schema was
+written, and it only surfaced when the live project was queried and came back with no clients
+and no channels at all.
+
+Every workspace now gets a client when it is created, named after it. For a single creator the
+distinction never surfaces — their workspace is their client. For an agency it is the seam
+that lets one workspace hold several brands, which is why the column exists.
+
+**The backfill is verified live, not in the suite.** The suite applies every migration to a
+fresh database before inserting anything, so it structurally cannot construct a workspace
+older than the rule; a mutation removing the backfill from the migration fails nothing, and
+the test that exists covers the statement's logic rather than its presence. What was checked
+instead is the real thing: after applying to the live project, the three workspaces created
+before this each have a client.
+
+A foundation RLS test failed on this change because it asserted an exact list of visible
+clients. The isolation it exists to check was unaffected — a second client appeared because
+the product changed. It now asserts the property, that A's client is visible and B's is not,
+which is what it meant all along.
 
 ## Notes on running the suites
 

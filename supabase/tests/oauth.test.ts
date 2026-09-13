@@ -448,4 +448,85 @@ describe("youtube connection", () => {
     expect(args.rows.length).toBeGreaterThan(0);
     for (const row of args.rows) expect(row.args).not.toContain("workspace");
   });
+
+  it("gives every workspace a client, so connecting is reachable at all", async () => {
+    // oauth_start and register_channel both require a client that belongs to
+    // the workspace, and nothing used to create one. A user could sign up, get
+    // a workspace, and reach a wall with no way past it.
+    await admin();
+    await db.query("insert into auth.users(id) values ($1)", [
+      "10000000-0000-4000-8000-0000000000ff",
+    ]);
+    const w = await db.query<{ id: string }>(
+      "select id from workspaces where created_by=$1",
+      ["10000000-0000-4000-8000-0000000000ff"],
+    );
+    // The trigger made a personal workspace; it must also have made a client.
+    expect(w.rows).toHaveLength(1);
+    const clients = await db.query<{ n: number }>(
+      "select count(*)::int as n from clients where workspace_id=$1",
+      [w.rows[0].id],
+    );
+    expect(clients.rows[0].n).toBe(1);
+  });
+
+  it("lets a fresh account actually begin a connection", async () => {
+    // The end-to-end shape of the fix: sign up, take the workspace and the
+    // client the account was given, and oauth_start accepts them.
+    await admin();
+    const owner = "10000000-0000-4000-8000-0000000000fe";
+    await db.query("insert into auth.users(id) values ($1)", [owner]);
+    const row = await db.query<{ w: string; c: string }>(
+      `select w.id as w, c.id as c from workspaces w
+       join clients c on c.workspace_id = w.id where w.created_by = $1`,
+      [owner],
+    );
+    await user(owner);
+    await expect(
+      db.query("select public.oauth_start($1,$2,$3,$4)", [
+        row.rows[0].w,
+        row.rows[0].c,
+        h("h-journey"),
+        VERIFIER,
+      ]),
+    ).resolves.toBeTruthy();
+    await admin();
+  });
+
+  it("the backfill statement gives a clientless workspace a client", async () => {
+    // This covers the statement's logic, and deliberately not its presence in
+    // the migration: the suite runs every migration against a fresh database
+    // before inserting anything, so it cannot construct a workspace older than
+    // the rule. Removing the backfill from the migration does not fail this.
+    //
+    // That the backfill actually ran is verified against the live project
+    // instead, where the three workspaces created before it now each have a
+    // client. See docs/verification.md.
+    await admin();
+    const w = await db.query<{ id: string }>(
+      "insert into workspaces(name,created_by) values ('قديمة',$1) returning id",
+      [ownerA],
+    );
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select count(*)::int as n from clients where workspace_id=$1",
+          [w.rows[0].id],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+
+    await db.exec(`insert into public.clients(workspace_id,name)
+      select w.id, w.name from public.workspaces w
+      where not exists (select 1 from public.clients c where c.workspace_id = w.id)`);
+
+    expect(
+      (
+        await db.query<{ name: string }>(
+          "select name from clients where workspace_id=$1",
+          [w.rows[0].id],
+        )
+      ).rows[0].name,
+    ).toBe("قديمة");
+  });
 });
