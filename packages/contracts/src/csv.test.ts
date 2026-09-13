@@ -19,6 +19,8 @@ const base = {
   author_name: "كاتب تجريبي",
   text_raw: "تعليق تجريبي",
   content_hash: "current",
+  likes_raw: "0",
+  likes_value: 0,
   published_at: "2026-09-01T00:00:00Z",
   published_time_raw: "2026-09-01T00:00:00Z",
   timestamp_precision: "second" as const,

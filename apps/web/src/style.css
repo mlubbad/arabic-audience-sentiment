@@ -227,6 +227,11 @@ small {
 [data-severity="ok"] strong {
   color: #1d6047;
 }
+.engaged {
+  padding-inline-start: 1.5rem;
+  display: grid;
+  gap: 0.4rem;
+}
 .share {
   list-style: none;
   padding: 0;

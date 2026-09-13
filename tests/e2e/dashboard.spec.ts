@@ -417,7 +417,9 @@ async function applyFilter(
   label: string,
   value: string,
 ) {
-  await page.getByLabel(label).selectOption(value);
+  // Exact: several filter labels are substrings of others, so a loose match
+  // silently resolves to more than one control.
+  await page.getByLabel(label, { exact: true }).selectOption(value);
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
 }
 
@@ -951,4 +953,68 @@ test("an imported amendment shows no reviewer and states no reason", async ({
     "data-state",
     "legacy_unverified",
   );
+});
+
+test("ranks engaged negatives and keeps unknown engagement out of the ranking", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // Only one negative to begin with, so the list is short but real.
+  await expect(page.getByTestId("engaged-fixture-2")).toContainText("48");
+  await expect(page.getByTestId("engaged-unranked")).toHaveCount(0);
+
+  // Correct a liked positive to negative: it must join the ranking below the
+  // more engaged one, ranked on the effective label rather than the model's.
+  await openReview(page, "المحتوى واضح ومفيد");
+  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  const ranked = page.getByTestId("engaged-panel").getByRole("listitem");
+  await expect(ranked).toHaveCount(2);
+  await expect(ranked.nth(0)).toContainText("48");
+  await expect(ranked.nth(1)).toContainText("12");
+
+  // Now correct the comment whose like count is unknown. It is negative, so it
+  // counts as excluded, but it must not be ranked as though it had zero likes.
+  await openReview(page, "تعليق لم يُحلل بعد");
+  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await page.getByLabel("سبب التصحيح").fill("مراجعة يدوية");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(ranked).toHaveCount(2);
+  await expect(page.getByTestId("engaged-unranked")).toContainText(
+    "عدد غير معروف ليس صفرًا",
+  );
+});
+
+test("the engagement panel follows the filters and says so when empty", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("engaged-fixture-2")).toBeVisible();
+  // The only negative lives on video-1, so filtering to video-2 empties it.
+  await applyFilter(page, "الفيديو", "video-2");
+  await expect(page.getByTestId("engaged-empty")).toBeVisible();
+  await expect(page.getByTestId("engaged-panel")).toContainText(
+    "الإعجابات لا تُرجِّح التصنيف",
+  );
+});
+
+test("the export carries engagement, with unknown left empty not zero", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const { text } = await downloadCsv(page);
+  const header = text
+    .replace(/^\uFEFF/, "")
+    .split("\r\n")[0]
+    .split(",");
+  expect(header.slice(-2)).toEqual(["likes_raw", "likes_value"]);
+  const row = (id: string) =>
+    text
+      .split("\r\n")
+      .find((l) => l.startsWith(`${id},`))!
+      .split(",");
+  expect(row("fixture-2").slice(-2)).toEqual(["48", "48"]);
+  // Unknown engagement exports as empty, never as a zero somebody could sum.
+  expect(row("fixture-5").slice(-2)).toEqual(["", ""]);
 });

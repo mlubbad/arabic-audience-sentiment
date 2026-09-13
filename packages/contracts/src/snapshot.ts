@@ -83,6 +83,9 @@ export function exportRows(
 }
 
 /** Pure fixture/reference implementation. Server queries must separately enforce RLS. */
+/** How many engaged negatives the dashboard shows. */
+const ENGAGEMENT_LIMIT = 5;
+
 export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   const f = FiltersSchema.parse(raw);
   const rows = filteredRows(input, f, activeKey);
@@ -117,9 +120,24 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   const cursorIndex = f.cursor ? rows.findIndex((c) => c.id === f.cursor) : -1;
   if (f.cursor && cursorIndex < 0) throw new Error("invalid_cursor");
   const comments = rows.slice(cursorIndex + 1, cursorIndex + 1 + f.limit);
+  // Negatives the audience engaged with most. Ranked on the effective label, so
+  // a human correction counts here too. A row with unknown engagement is left
+  // out rather than sorted as zero, and the exclusion is reported instead of
+  // being hidden.
+  const negatives = rows.filter((c) => c.label === "negative");
+  const most_engaged_negative = negatives
+    .filter((c) => c.likes_value !== null)
+    .sort(
+      (a, b) =>
+        (b.likes_value ?? 0) - (a.likes_value ?? 0) ||
+        a.id.localeCompare(b.id, "en"),
+    )
+    .slice(0, ENGAGEMENT_LIMIT);
   return {
     mode: "sanitized_fixture" as const,
     comment_types,
+    most_engaged_negative,
+    negative_unranked: negatives.filter((c) => c.likes_value === null).length,
     total: rows.length,
     analysed,
     unanalysed: rows.length - analysed,

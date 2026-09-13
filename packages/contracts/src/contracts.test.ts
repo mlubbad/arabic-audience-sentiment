@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CommentSchema,
   CommentReviewInputSchema,
   ReviewSchema,
   FiltersSchema,
@@ -20,6 +21,8 @@ const base = {
   author_name: "كاتب تجريبي",
   text_raw: "تعليق تجريبي",
   content_hash: "current",
+  likes_raw: "0",
+  likes_value: 0,
   published_at: "2026-09-01T00:00:00Z",
   published_time_raw: "2026-09-01T00:00:00Z",
   timestamp_precision: "second" as const,
@@ -32,6 +35,7 @@ const base = {
   reviews: [],
   prediction: null,
 };
+const predNeg = () => ({ ...pred("positive"), label: "negative" as const });
 const pred = (label: "positive" | "mixed", hash = "current") => ({
   status: "succeeded" as const,
   label,
@@ -418,5 +422,97 @@ describe("human corrections", () => {
     );
     expect(oneVideo.total).toBe(1);
     expect(oneVideo.comment_types).toEqual(["اقتراح", "سؤال"]);
+  });
+  it("ranks the most engaged negatives without letting likes touch the label", () => {
+    const liked: Comment[] = [
+      { ...base, id: "e1", likes_value: 500, prediction: pred("positive") },
+      { ...base, id: "e2", likes_value: 90, prediction: predNeg() },
+      { ...base, id: "e3", likes_value: 400, prediction: predNeg() },
+      {
+        ...base,
+        id: "e4",
+        likes_value: null,
+        likes_raw: null,
+        prediction: predNeg(),
+      },
+    ];
+    const s = snapshot(liked, { workspace_id: workspace }, "fixture-v1");
+    // Highest engagement first, and the heavily liked positive stays out.
+    expect(s.most_engaged_negative.map((c) => c.id)).toEqual(["e3", "e2"]);
+    // Unknown engagement is not zero engagement, so it is not ranked last —
+    // it is not ranked at all, and the exclusion is reported.
+    expect(s.negative_unranked).toBe(1);
+
+    // Likes must never weight sentiment: a creator's heart is not a vote.
+    const unliked = liked.map((c) => ({
+      ...c,
+      likes_value: null,
+      likes_raw: null,
+    }));
+    const without = snapshot(
+      unliked,
+      { workspace_id: workspace },
+      "fixture-v1",
+    );
+    expect(without.sentiments).toEqual(s.sentiments);
+    expect(without.analysed).toBe(s.analysed);
+    expect(without.most_engaged_negative).toHaveLength(0);
+    expect(without.negative_unranked).toBe(3);
+  });
+
+  it("ranks by the effective label, and follows the filters", () => {
+    const liked: Comment[] = [
+      {
+        ...base,
+        id: "e5",
+        likes_value: 10,
+        prediction: pred("positive"),
+        reviews: [
+          {
+            label: "negative" as const,
+            content_hash: "current",
+            created_at: "2026-09-05T00:00:00Z",
+            origin: "human" as const,
+            reviewer_id: "reviewer-1",
+            reason: "تصنيف خاطئ",
+          },
+        ],
+      },
+      {
+        ...base,
+        id: "e6",
+        likes_value: 99,
+        video_id: "v2",
+        prediction: predNeg(),
+      },
+    ];
+    const all = snapshot(liked, { workspace_id: workspace }, "fixture-v1");
+    // A corrected comment is negative for ranking too, not only in the table.
+    expect(all.most_engaged_negative.map((c) => c.id)).toEqual(["e6", "e5"]);
+    const oneVideo = snapshot(
+      liked,
+      { workspace_id: workspace, video_ids: ["v1"] },
+      "fixture-v1",
+    );
+    expect(oneVideo.most_engaged_negative.map((c) => c.id)).toEqual(["e5"]);
+  });
+
+  it("refuses a negative like count", () => {
+    expect(
+      CommentSchema.safeParse({ ...base, id: "x", likes_value: -1 }).success,
+    ).toBe(false);
+    expect(
+      CommentSchema.safeParse({ ...base, id: "x", likes_value: 1.5 }).success,
+    ).toBe(false);
+    // Unknown engagement is legitimate; a scraped "1.2K" that could not be
+    // parsed keeps its raw form with no invented number.
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "x",
+        likes_raw: "1.2K",
+        likes_value: null,
+      }).success,
+    ).toBe(true);
   });
 });

@@ -502,6 +502,37 @@ export function Dashboard() {
                   </table>
                 </div>
               </section>
+              <section
+                aria-labelledby="engaged-heading"
+                data-testid="engaged-panel"
+              >
+                <h2 id="engaged-heading">أكثر التعليقات السلبية تفاعلًا</h2>
+                <p className="muted">
+                  ترتيب حسب الإعجابات ضمن الفلاتر الحالية. الإعجابات لا تُرجِّح
+                  التصنيف، وقلب صاحب القناة ليس مشاعر إيجابية.
+                </p>
+                {s.most_engaged_negative.length === 0 ? (
+                  <p data-testid="engaged-empty">
+                    لا توجد تعليقات سلبية بإعجابات معروفة ضمن الفلاتر.
+                  </p>
+                ) : (
+                  <ol className="engaged">
+                    {s.most_engaged_negative.map((c) => (
+                      <li key={c.id} data-testid={`engaged-${c.id}`}>
+                        <strong>{c.likes_raw ?? c.likes_value}</strong> إعجابًا
+                        — {c.text_raw}
+                        {c.reviewed && <small>مراجعة بشرية</small>}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {s.negative_unranked > 0 && (
+                  <p className="muted" data-testid="engaged-unranked">
+                    {s.negative_unranked} تعليقًا سلبيًا بلا عدد إعجابات معروف،
+                    فلم تدخل الترتيب. عدد غير معروف ليس صفرًا.
+                  </p>
+                )}
+              </section>
               <section data-testid="comments-table">
                 <h2>التعليقات</h2>
                 {cursorNotice && (

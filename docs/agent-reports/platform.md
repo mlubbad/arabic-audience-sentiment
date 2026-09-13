@@ -754,3 +754,55 @@ Nulls are dropped and another workspace's types never appear.
 - `node scripts/check-ownership.mjs platform` — pass
 
 One contract test was confirmed failing before the move.
+
+## Engagement on CommentSchema, and most-engaged negatives (done, 2026-09-13)
+
+Third schema change in this lane, and the last M4 screen element.
+
+`CommentSchema` now carries `likes_raw` and `likes_value`, matching the SQL table and the
+Python `RawComment`. **Unknown is not zero.** A scraped "1.2K" that could not be parsed keeps
+its raw form with `likes_value: null` rather than becoming a number we invented, and the
+schema rejects a negative or fractional count.
+
+`snapshot()` returns `most_engaged_negative` and `negative_unranked`, so the live read path
+gets the same ranking rather than the app inventing one. Two rules from section 11 are
+encoded rather than assumed:
+
+- **Likes never weight sentiment.** A test runs the same rows with and without engagement
+  and asserts `sentiments` and `analysed` are identical. The panel says so on screen: a
+  creator's heart is not positive sentiment.
+- **A negative with unknown engagement is excluded from the ranking, not sorted as zero**,
+  and the exclusion is reported: "عدد غير معروف ليس صفرًا". Sorting unknown as zero would
+  quietly rank it last as though it had been measured.
+
+Ranking uses the **effective** label, so a human correction promotes a comment into the
+panel. The browser test proves that by correcting a liked positive to negative and watching
+it appear below the more engaged one, then correcting the row whose likes are unknown and
+watching the count stay at two.
+
+The CSV gained `likes_raw` and `likes_value` as the last two columns, so existing column
+positions are unaffected. Unknown exports as empty, never as a zero somebody could sum.
+
+### Two defects found on the way
+
+- The generic `applyFilter` browser helper used a loose label match, which resolved to four
+  elements once the comparison table added `aria-label`s containing the word for video. It is
+  now exact, which also hardens every other caller.
+- A literal U+FEFF was written into the spec file instead of the escape sequence, the same
+  way it happened once before. Lint caught it again.
+
+### Commands and results
+
+- `npm run check` — pass (51 unit across 7 files, 18 SQL, 23 worker, guard 5/5, build, secrets)
+- `npm run test:e2e` — 45 passed, run with `E2E_PORT=5199`
+- `node scripts/check-ownership.mjs platform` — pass
+
+Three contract tests and three browser tests were confirmed failing first.
+
+### Note on port 5173
+
+A dev server was started in the **original checkout** at 12:23:28, the second one today. Not
+started by this lane. Patch 2 did its job: the suite refused to adopt it rather than testing
+the wrong build, and `E2E_PORT=5199` let this lane keep working while it runs. Worth checking
+whether another agent was pointed at `/Users/mlubbad/Documents/Codex/SentimentAnalysis`
+instead of its own worktree.

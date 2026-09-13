@@ -47,6 +47,13 @@ export const CommentSchema = z
     author_name: z.string(),
     text_raw: z.string(),
     content_hash: z.string().min(1),
+    // What the source displayed, e.g. "1.2K", kept verbatim. Null when the
+    // source showed nothing.
+    likes_raw: z.string().nullable(),
+    // The parsed count. Null means unknown, which is not the same as zero: a
+    // scraped "1.2K" that could not be parsed must not become a number we made
+    // up. Likes never weight sentiment (spec 11).
+    likes_value: z.number().int().nonnegative().nullable(),
     published_at: timestamp.nullable(),
     published_time_raw: z.string().nullable(),
     timestamp_precision: z.enum([
