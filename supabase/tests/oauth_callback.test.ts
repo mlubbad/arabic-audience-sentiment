@@ -12,6 +12,7 @@ import {
   handleCallback,
   importSealingKey,
   openTokens,
+  refreshAccessToken,
   sealTokens,
   type CallbackConfig,
   type CallbackDb,
@@ -244,5 +245,58 @@ describe("the pieces on their own", () => {
     await expect(fetchOwnChannel("t", http)).rejects.toThrow(
       "channel_lookup_failed",
     );
+  });
+});
+
+describe("renewing an access token", () => {
+  const http = (status: number, body: unknown) =>
+    vi.fn(async () => new Response(JSON.stringify(body), { status }));
+
+  it("keeps the refresh token Google does not send back", async () => {
+    // Google omits refresh_token on a renewal. Writing the response straight
+    // over the stored grant erases the only means of renewing again, and the
+    // connection works for an hour and is then unrecoverable.
+    const result = await refreshAccessToken(
+      "1//original",
+      config,
+      http(200, { access_token: "ya29.new", expires_in: 3599 }),
+    );
+    expect(result.access_token).toBe("ya29.new");
+    expect(result.refresh_token).toBe("1//original");
+    expect(Date.parse(result.expires_at)).toBeGreaterThan(Date.now());
+  });
+
+  it("takes a rotated refresh token when one is sent", async () => {
+    const result = await refreshAccessToken(
+      "1//original",
+      config,
+      http(200, {
+        access_token: "a",
+        refresh_token: "1//rotated",
+        expires_in: 60,
+      }),
+    );
+    expect(result.refresh_token).toBe("1//rotated");
+  });
+
+  it("treats a revoked grant as over, not as something to retry", async () => {
+    // invalid_grant means the user withdrew access or the token lapsed from
+    // disuse. Retrying forever would collect nothing while looking connected.
+    await expect(
+      refreshAccessToken(
+        "1//dead",
+        config,
+        http(400, { error: "invalid_grant" }),
+      ),
+    ).rejects.toThrow("connection_revoked");
+    await expect(
+      refreshAccessToken("1//x", config, http(500, { error: "backend" })),
+    ).rejects.toThrow("token_refresh_failed");
+  });
+
+  it("never returns a renewal without a token in it", async () => {
+    await expect(
+      refreshAccessToken("1//x", config, http(200, { expires_in: 3599 })),
+    ).rejects.toThrow("token_refresh_failed");
   });
 });

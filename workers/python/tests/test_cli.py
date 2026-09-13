@@ -25,15 +25,18 @@ def test_fixture_run_writes_manifest_and_is_idempotent_on_rerun(tmp_path, monkey
     assert json.loads((tmp_path / "manifest.json").read_text())["unique_comments_in_workspace"] == 2
 
 
-def test_api_source_without_a_key_fails_instead_of_reporting_empty_success(tmp_path, monkeypatch):
+def test_api_source_without_a_credential_fails_instead_of_reporting_empty_success(tmp_path, monkeypatch):
+    # Either an API key or an OAuth token will do; with neither there is nothing
+    # to ask, and an empty output file would read as a channel with no comments.
     monkeypatch.delenv("YOUTUBE_API_KEY", raising=False)
+    monkeypatch.delenv("YOUTUBE_ACCESS_TOKEN", raising=False)
     argv = ["collect", "--source", "youtube-api", "--workspace", "w",
             "--video", "abcdefghijk", "--output", str(tmp_path)]
     monkeypatch.setattr("sys.argv", argv)
     try:
         main()
     except ValueError as exc:
-        assert "missing_api_key" in str(exc)
+        assert "need_exactly_one_credential" in str(exc)
     else:
-        raise AssertionError("a missing key must not produce a successful empty run")
+        raise AssertionError("a missing credential must not produce a successful empty run")
     assert not (tmp_path / "manifest.json").exists()

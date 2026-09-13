@@ -29,7 +29,8 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     with httpx.Client() as client, Store(args.output / "spool.sqlite") as store:
-        adapter = FixtureCollector() if args.source == "fixture" else YouTubeAPI(os.environ.get("YOUTUBE_API_KEY", ""), client)
+        adapter = FixtureCollector() if args.source == "fixture" else YouTubeAPI(os.environ.get("YOUTUBE_API_KEY") or None, client,
+                                     access_token=os.environ.get("YOUTUBE_ACCESS_TOKEN") or None)
         store.enqueue(args.workspace, args.video)
         collect(store, args.workspace, adapter)
         summary = {"source": adapter.source, "adapter_revision": adapter.revision,

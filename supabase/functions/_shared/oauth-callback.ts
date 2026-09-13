@@ -217,3 +217,68 @@ export async function handleCallback(input: {
   });
   return { channelId, workspaceId: binding.workspace_id };
 }
+
+/**
+ * Renews an access token from the stored refresh token.
+ *
+ * Two things about Google's response are easy to get wrong and expensive.
+ *
+ * It does not return a refresh token on a renewal. Writing the response
+ * straight back over the stored grant would erase the only means of renewing it
+ * again, and the connection would work for an hour and then be unrecoverable.
+ *
+ * `invalid_grant` means the user revoked access, or the token expired from
+ * disuse. That is not a transient failure to retry: the connection is over, and
+ * it must be marked so the channel asks to be reconnected instead of silently
+ * collecting nothing.
+ */
+export class RevokedError extends ConnectError {
+  constructor() {
+    super("connection_revoked");
+  }
+}
+
+export async function refreshAccessToken(
+  refreshToken: string,
+  config: CallbackConfig,
+  http: Http,
+): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+}> {
+  const response = await http(config.token_uri, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: config.client_id,
+      client_secret: config.client_secret,
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }).toString(),
+  });
+  const body = (await response.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  if (!response.ok) {
+    if (body.error === "invalid_grant") throw new RevokedError();
+    throw new ConnectError("token_refresh_failed");
+  }
+  const access = body.access_token;
+  if (typeof access !== "string" || !access)
+    throw new ConnectError("token_refresh_failed");
+  return {
+    access_token: access,
+    // Kept, not replaced. Google omits it here, and taking the response at face
+    // value would drop the only way to renew again.
+    refresh_token:
+      typeof body.refresh_token === "string" && body.refresh_token
+        ? body.refresh_token
+        : refreshToken,
+    expires_at: new Date(
+      Date.now() +
+        (typeof body.expires_in === "number" ? body.expires_in : 3600) * 1000,
+    ).toISOString(),
+  };
+}

@@ -21,7 +21,8 @@ CI has never executed: there is no remote.
 | Item | Status | Notes |
 | --- | --- | --- |
 | Collector protocol | implemented | "Exhausted" means the source stopped returning rows, never that everything was retrieved |
-| YouTube Data API adapter | fixture-tested | Explicit reply pagination, tested against synthetic HTTP only. **Never run against live YouTube** |
+| YouTube Data API adapter | fixture-tested | Explicit reply pagination, tested against synthetic HTTP only. **Never run against live YouTube.** Authenticates with an API key *or* an OAuth access token; the token path needs no API key and reads a connected channel directly |
+| Refusals told apart | implemented | Comments disabled is the video's answer (`explicitly_disabled`), quota comes back tomorrow (retryable), an expired token asks to be renewed, and a refusal is none of those |
 | Durable local spool | implemented | Lease fencing, heartbeats, bounded retries, rows and checkpoint in one transaction |
 | Queue semantics | implemented | Lease bounds, batch limits, exponential backoff, both routes to a terminal job |
 | Failure is never success | implemented | 403/429 → blocked, 5xx → retryable failure, malformed JSON → invalid response |
@@ -78,7 +79,8 @@ deployed project**, so PostgREST between the two is untested.
 | Channel ownership | implemented | Connected claim is globally exclusive; a public_unverified row is upgraded in place so pilot data carries over |
 | Revocation | implemented | Moves to reconnect_required and cancels dependent jobs; never falls back to scraping |
 | PKCE and the authorization URL | implemented | S256 checked against the RFC 7636 worked example; verifier stored server-side only, state stored as a hash, state written before the redirect is issued |
-| Code exchange, channels.list, redirect page, token encryption | **blocked** | Needs a Google client id and secret and a registered redirect URI. No authorization URL has been opened and no code exchanged |
+| Code exchange, channels.list, token sealing, refresh | implemented, **never run live** | Pure handler with injected transport. The channel comes from `channels.list(mine=true)`, the verifier from the stored state, tokens are AES-GCM sealed with a fresh nonce per grant |
+| Redirect page and a deployed callback route | **blocked** | Needs a deployed Edge Function. No authorization URL has been opened and no code exchanged |
 
 ## M6 — private pilot (front end deployed, journey incomplete)
 

@@ -14,8 +14,8 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — **83 tests, 10 files** |
-| `npm run test:db` | Pass — **80 tests, 9 files** |
-| `npm run worker:test` | Pass — **85 tests, 11 files** |
+| `npm run test:db` | Pass — **98 tests, 11 files** |
+| `npm run worker:test` | Pass — **91 tests, 11 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
 | `npm run test:e2e` | Pass — 45 tests, Chromium |
@@ -55,6 +55,15 @@ reverted and the suite returned to green.
 | Drop parameters from the prediction-to-run join | 1 |
 | Fingerprint an analysis without its settings | 1 |
 | Prune a connection that is still in flight | 1 |
+| Reuse one nonce for every sealed grant | 1 |
+| Accept a grant with no refresh token | 1 |
+| Return Google's error body as the reason | 2 |
+| Trust the first channel when an account has several | 1 |
+| Overwrite the stored refresh token on renewal | 1 |
+| Retry a revoked grant instead of ending it | 1 |
+| Treat an expired token as a blocked channel | 1 |
+| File comments-disabled as an access refusal | 1 |
+| Send the API key alongside the bearer token | 1 |
 | Leave the prune job executable by tenants | 1 |
 | Show a verdict about text the comment no longer has | 1 |
 | Turn unknown engagement into zero on the live read | 1 |

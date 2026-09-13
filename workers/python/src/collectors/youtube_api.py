@@ -1,4 +1,10 @@
-"""Public API adapter. Tested with synthetic HTTP responses; no live collection claim."""
+"""YouTube Data API adapter. Tested with synthetic HTTP responses; never run live.
+
+Authenticates either with an API key, for public data, or with an OAuth access
+token, for a channel its owner has connected. The token path is the product
+path: it needs no API key at all, and it reaches a connected channel's comments
+directly.
+"""
 import json
 import re
 from collections.abc import Iterator
@@ -10,18 +16,39 @@ class YouTubeAPI:
     source = "youtube_data_api_public"
     revision = "api-v3-adapter-v1"
 
-    def __init__(self, api_key: str, client: httpx.Client):
-        if not api_key:
-            raise ValueError("missing_api_key")
-        self.key, self.client = api_key, client
+    def __init__(self, api_key: str | None, client: httpx.Client, access_token: str | None = None):
+        # Exactly one. Sending both would let a stale key silently answer for a
+        # revoked token, and the row would record the wrong provenance.
+        if bool(api_key) == bool(access_token):
+            raise ValueError("need_exactly_one_credential")
+        self.key, self.token, self.client = api_key, access_token, client
+        # The provenance travels with every row, so a comment read on the
+        # owner's authority is never filed as public data.
+        self.source = "youtube_oauth" if access_token else "youtube_data_api_public"
 
     def _get(self, resource, params):
+        headers = {"authorization": f"Bearer {self.token}"} if self.token else {}
+        query = params if self.token else {**params, "key": self.key}
         try:
             response = self.client.get(f"https://www.googleapis.com/youtube/v3/{resource}",
-                                       params={**params, "key": self.key}, timeout=20, follow_redirects=False)
+                                       params=query, headers=headers,
+                                       timeout=20, follow_redirects=False)
         except httpx.HTTPError:
             raise CollectionError("network_failure", retryable=True) from None
+        # An expired access token is not a refusal; it is a credential that
+        # needs renewing. Reported as retryable so the caller refreshes rather
+        # than marking the channel blocked and stopping collection for good.
+        if response.status_code == 401:
+            raise CollectionError("credential_expired", "failed", retryable=True)
         if response.status_code in (403, 429):
+            reason = self._reason(response)
+            # Comments turned off on a video is a property of the video, and a
+            # legitimate answer. Filing it as "access denied" would read as a
+            # problem with our credentials and hide the real ones.
+            if reason == "commentsDisabled":
+                raise CollectionError("comments_disabled", "explicitly_disabled")
+            if reason in ("quotaExceeded", "rateLimitExceeded", "userRateLimitExceeded"):
+                raise CollectionError("quota_exceeded", "blocked", retryable=True)
             raise CollectionError("source_access_denied", "blocked")
         if response.status_code >= 500:
             raise CollectionError("source_unavailable", retryable=True)
@@ -34,6 +61,15 @@ class YouTubeAPI:
             return data
         except ValueError:
             raise CollectionError("invalid_response") from None
+
+    @staticmethod
+    def _reason(response) -> str:
+        """Google's own name for the refusal, or "" when it did not give one."""
+        try:
+            errors = response.json()["error"]["errors"]
+            return errors[0].get("reason", "") if errors else ""
+        except (ValueError, KeyError, TypeError, IndexError):
+            return ""
 
     def _comment(self, item, video, parent=None):
         try:
