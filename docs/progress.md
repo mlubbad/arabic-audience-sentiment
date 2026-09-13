@@ -93,7 +93,7 @@ Needs a Supabase project and Sites access. Nothing is deployed.
 | Live public collection | A YouTube Data API key placed server-side |
 | Live Auth, Storage, Edge Functions, and proving the edge handler and SQL agree over HTTP | Supabase development project URL and keys |
 | OAuth code exchange and live connection | Google OAuth client id/secret, registered redirect URI, test-user authorization. PKCE and the authorization URL are implemented and need none of these |
-| Model selection and any accuracy claim | The two model notebooks and ~600 independently human-labelled comments |
+| Model selection and any accuracy claim | The two model notebooks and ~600 independently human-labelled comments. The sampler, the blind labelling sheets and the protocol are built (`docs/labelling-guide.md`, `npm run label:draw`); what is missing is the human labelling itself and the notebooks |
 | Private pilot deployment | Sites access with a verified private mode |
 
 ## Known limitations

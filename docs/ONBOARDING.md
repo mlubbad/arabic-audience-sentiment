@@ -78,7 +78,7 @@ Chromium. `uv` must be installed separately.
 | `npm run check` | lint, format, typecheck, unit, SQL, worker, build, secret scan | green |
 | `npm test` | contracts + web unit (10 files) | 83 passed |
 | `npm run test:db` | real SQL + real RLS in PGlite | 73 passed |
-| `npm run worker:test` | Python worker via uv/pytest | 60 passed |
+| `npm run worker:test` | Python worker via uv/pytest | 74 passed |
 | `npm run test:e2e` | Playwright against a dev server it starts itself | 45 passed |
 
 `npm run check` does **not** include `test:e2e`. Run that separately; it starts its own dev
@@ -175,7 +175,8 @@ supabase/functions/        _shared/worker-gateway.ts and oauth-start.ts — pure
                            deployed project
 supabase/tests/            6 PGlite suites; end_to_end.test.ts is the seam test
 workers/python/src/        collectors/ (sources), sentiment/ (adapters, no model),
-                           server/ (control plane, analysis wiring)
+                           server/ (control plane, analysis wiring),
+                           labelling/ (evaluation-set sampler and sheets)
 workers/python/tests/fixtures/golden_batch.json
                            produced by the real Python client, consumed by the TS
                            seam test. Regenerate it, do not hand-edit it

@@ -15,7 +15,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — **83 tests, 10 files** |
 | `npm run test:db` | Pass — **73 tests, 8 files** |
-| `npm run worker:test` | Pass — **60 tests, 9 files** |
+| `npm run worker:test` | Pass — **74 tests, 10 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
 | `npm run test:e2e` | Pass — 45 tests, Chromium |
@@ -61,6 +61,11 @@ reverted and the suite returned to green.
 | Leave the platform parent id unresolved | 1 |
 | Let a configured project alone flip the data source | 4 |
 | Trust the server's answer without parsing it | 1 |
+| Show the model's answer in the labelling sheet | 1 |
+| Stop neutralising spreadsheet formulas in the sheet | 1 |
+| Drop unanalysable rows without counting them | 1 |
+| Let the booster reuse estimate rows | 1 |
+| Sample uniformly instead of proportionally by video | 1 |
 | Send the verifier instead of its challenge | 1 |
 | Store the OAuth state raw instead of hashed | 1 |
 | Allow an http redirect URI | 1 |
@@ -301,6 +306,38 @@ differ was added beside it.
 **Not written, and genuinely blocked:** the token exchange, `channels.list(mine=true)`, the
 redirect page, and token encryption at rest. These need a Google client id and secret and a
 registered redirect URI. No authorization URL has been opened and no code has been exchanged.
+
+## The human evaluation set
+
+No accuracy figure can exist without one, so the sampler and the sheets are built even
+though the labelling itself is blocked on the corpus and on people.
+
+Two samples, drawn for two jobs and deliberately not pooled. The **estimate** set is a
+proportionally stratified random sample whose selection does not depend on what any comment
+says — the only one an accuracy figure may come from. The **booster** set over-selects
+comments carrying an Arabic contrastive marker (لكن، بس، رغم، مع ذلك), because Mixed lives
+behind those and a uniform draw from a corpus of mostly short praise contains almost none of
+it. Selecting on content and then measuring accuracy over the result reports the sample and
+not the corpus, so the key file records which set every row came from and the two are
+disjoint by construction.
+
+The sheet is blind: no model prediction, no existing label, no author, no like count, no
+video. A labeller who can see the model's answer is no longer an independent measurement of
+it. Replies carry the text they answer, because "لا أوافق" is not sentiment about anything
+until you know what it answers.
+
+Exclusions are counted rather than dropped, duplicate texts collapse but keep their
+multiplicity so the estimate can be reweighted to the raw comment stream, and a round that
+comes out smaller than requested reports the shortfall — a quietly smaller round changes the
+confidence interval without anyone noticing. Every round is reproducible from its seed.
+
+The sheet is written with a BOM and CRLF so Excel opens Arabic as Arabic, and cells are
+neutralised against spreadsheet formula injection using the same rule as the dashboard
+export — these files are opened in Excel by people who are not developers.
+
+`docs/labelling-guide.md` carries the label definitions, the Arabic edge cases, the
+independence and adjudication protocol, and the rule that agreement must be reported: without
+a kappa there is no way to separate model error from label noise.
 
 ## Notes on running the suites
 
