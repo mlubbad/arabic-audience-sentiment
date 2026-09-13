@@ -1068,3 +1068,44 @@ was still in the file. Caught by re-reading the file rather than trusting the re
 - Legacy import of the 4,899 recorded comments — needs the original CSV and the amendment file.
 - Any accuracy figure — needs the notebooks and ~600 human-labelled comments.
 
+
+## Review pass over today's SQL (2026-09-13)
+
+Read adversarially rather than re-run: the tests were already green, so anything found here
+was something the tests did not think to ask.
+
+### Fixed
+
+**A batch was unbounded in the database.** The 500-row cap lived in the Zod schema and the
+Python client, but the edge handler does not parse against the contract, so the database was
+the only server-side guard — and it had none. A probe committed 501 comments successfully.
+Any worker, or any handler bug, could have put an arbitrary number of rows into one
+transaction. The cap is now checked before any write, so an oversized batch costs nothing,
+and `batch_too_large` maps to 400.
+
+**Analysis run identity omitted its parameters.** Section 9 makes the fingerprint model,
+revision, preprocessing *and* settings, but the unique index keyed only the first three, so
+two runs differing only in inference parameters would have collapsed into one row and lost
+the distinction. Corrected before it could be wrong: nothing sets `parameters` yet.
+
+**The predictions join ignored platform.** `comments` is unique on
+`(workspace_id, platform, external_comment_id)` but the join matched on workspace and external
+id alone. Latent rather than live, since `platform` is constrained to `youtube` today, but it
+would have produced duplicate prediction rows the moment a second platform existed.
+
+### Recorded, not fixed
+
+- **Nothing sets `analysis_runs.parameters`.** The batch contract does not carry them, so
+  inference settings — batch size, max length, truncation — are never persisted. Section 9
+  requires keeping them. *Shared-contract request:* add `parameters` to `BatchPredictionSchema`
+  and pass it through `commit_batch`.
+- **`private.oauth_states` is never pruned.** Consumed and expired rows accumulate. Not a
+  security fault — single use is enforced — but it needs a cleanup job before a pilot.
+- **The edge handler does not validate against `CommitBatchSchema`.** The contract is enforced
+  at the two ends and not at the boundary between them. The database now bounds size, but
+  shape is still only checked by the client that sends it.
+
+### Results
+
+`npm run check` — 75 contract, 53 SQL, 48 worker, guard 5/5. Browser 45.
+The batch bound was verified by mutation; removing it fails exactly the test written for it.

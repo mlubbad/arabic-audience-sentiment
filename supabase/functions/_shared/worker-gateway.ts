@@ -42,6 +42,7 @@ const STATUS: Record<string, number> = {
   batch_conflict: 409,
   quota_exceeded: 429,
   invalid_batch: 400,
+  batch_too_large: 400,
   invalid_outcome: 400,
 };
 

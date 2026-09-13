@@ -258,4 +258,30 @@ describe("atomic batch ingestion", () => {
     ).rejects.toThrow();
     await db.exec("reset role");
   });
+  it("bounds a batch in the database, not only in the client", async () => {
+    // The 500-row cap lives in the Zod schema and the Python client, but the
+    // handler does not parse against the contract, so the database is the only
+    // server-side guard. An unbounded batch is one transaction holding an
+    // arbitrary number of rows.
+    const many = Array.from({ length: 501 }, (_, i) => comment(`big-${i}`));
+    await expect(
+      commit(
+        payload({ comments: many, predictions: [] }),
+        "too-big",
+        "9".repeat(64),
+      ),
+    ).rejects.toThrow(/batch_too_large/);
+    expect(await scalar("select count(*)::int as n from comments")).toBe(2);
+
+    const predictions = Array.from({ length: 501 }, (_, i) =>
+      prediction(`big-${i}`),
+    );
+    await expect(
+      commit(
+        payload({ comments: [comment("c1")], predictions }),
+        "too-many-preds",
+        "8".repeat(64),
+      ),
+    ).rejects.toThrow(/batch_too_large/);
+  });
 });
