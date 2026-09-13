@@ -57,9 +57,23 @@ async function readFixture(signal?: AbortSignal) {
 export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
   const fixture = await readFixture(signal);
   const comments = withSessionReviews(fixture.comments);
+  // Offered filter values come from the data, so a channel's own vocabulary
+  // drives the control instead of a hard-coded per-customer list. Derived from
+  // every row in the workspace, not the filtered page, so a type that is
+  // currently filtered out can still be selected.
+  const comment_types = [
+    ...new Set(
+      comments
+        .filter(
+          (c) => c.workspace_id === filters.workspace_id && c.comment_type,
+        )
+        .map((c) => c.comment_type as string),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "ar"));
   const build = (f: Filters, cursor_reset: boolean) => ({
     ...snapshot(comments, f, fixture.active_analysis_key),
     revision: fixture.revision,
+    comment_types,
     // Plan state travels with the snapshot, so the limit on screen always
     // belongs to the same read as the numbers beside it.
     plan: fixture.plan,

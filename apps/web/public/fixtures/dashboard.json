@@ -84,7 +84,7 @@
       "field_provenance": {
         "origin": "authored synthetic test data; not real commenters"
       },
-      "comment_type": null,
+      "comment_type": "اقتراح",
       "prediction": {
         "status": "succeeded",
         "label": "negative",
@@ -124,7 +124,7 @@
       "field_provenance": {
         "origin": "authored synthetic test data; not real commenters"
       },
-      "comment_type": null,
+      "comment_type": "سؤال",
       "prediction": {
         "status": "succeeded",
         "label": "neutral",
@@ -189,7 +189,7 @@
       "client_id": "fixture-client",
       "channel_id": "fixture-channel",
       "video_id": "video-2",
-      "video_kind": "video",
+      "video_kind": "short",
       "author_channel_id": null,
       "author_name": "مؤلف اصطناعي 5",
       "text_raw": "تعليق لم يُحلل بعد",
@@ -214,7 +214,7 @@
       "client_id": "fixture-client",
       "channel_id": "fixture-channel",
       "video_id": "video-2",
-      "video_kind": "video",
+      "video_kind": "short",
       "author_channel_id": "fixture-author-5",
       "author_name": "مؤلف اصطناعي 6",
       "text_raw": "هذا النص تغير بعد التحليل",

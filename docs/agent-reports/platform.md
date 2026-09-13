@@ -292,3 +292,56 @@ would leave artifacts in another agent's worktree. Its behaviour is inferred fro
 measurements above rather than observed end to end. Worth one real run once Patch 2 lands.
 
 No stray dev servers were left behind; port 5173 was released after each check.
+
+## Remaining dashboard filters (done, 2026-09-13)
+
+`FiltersSchema` already supported these and `snapshot()` already implemented them; only the
+controls were missing. Now exposed: video kind, participation (comment vs reply), comment
+type, review status, and known/unknown publication date. Every panel still derives from the
+one snapshot, so aggregates, the comment table and the CSV export all move together — the
+export test asserts a replies-only filter produces a two-row file.
+
+Two decisions worth recording.
+
+**Comment types are derived from the data, not hard-coded.** The options come from the
+distinct `comment_type` values present in the workspace, computed over every row rather than
+the current page so a type that is filtered out can still be selected. The specification is
+explicit that one channel's vocabulary must not be generalised to other customers, so a
+fixed list would have been wrong. This is currently computed in `apps/web/src/data.ts`
+because the fixture is read whole. **Shared-contract request:** when the live dashboard read
+lands, `snapshot()` needs a `comment_types` aggregate, otherwise the live path cannot offer
+the same control and the two modes diverge — the exact failure P1 fixed.
+
+**A date range and "no known date" cannot contradict.** Selecting undated rows disables the
+range inputs and the range is not sent, rather than silently returning an empty screen.
+
+### Accessibility defect found and fixed
+
+A `<label>` wrapping a `<select>` takes its accessible name from all descendant text, which
+includes every `<option>`. A screen reader announced the video filter as
+"الفيديو كل الفيديوهات فيديو اصطناعي ١ فيديو اصطناعي ٢" — the entire option list as the
+field name. Found because `getByLabel("الفيديو", { exact: true })` matched nothing. Every
+select in the dashboard now carries an explicit `aria-label`, so each control has a real
+name. This was a pre-existing defect, not one introduced here.
+
+Related: adding the label "نوع الفيديو" silently broke four passing tests, because
+Playwright's `getByLabel` is a substring match and "نوع الفيديو" contains "الفيديو". Those
+selectors are now exact.
+
+### Fixture change
+
+`fixture-5` and `fixture-6` became `short`, and two rows gained a `comment_type`. No row was
+added or removed: the total stays 6 and the per-video counts stay 4 and 2, so no existing
+assertion changed. Without this the two new filters had no distinguishable data to act on.
+
+### Commands and results, run in this worktree
+
+- `npm run check` — pass (lint, format, typecheck, coordination, 31 unit, 18 SQL, 23 worker,
+  build, secret scan)
+- `npm run test:e2e` — 22 passed in 16.9s, load average 1.79. Run on port 5199 via
+  `npm run dev -w @sentiment/web -- --port 5199 --strictPort`; port 5173 was never occupied
+  by this lane and no server was left running.
+- `node scripts/check-ownership.mjs platform` — pass
+
+Seven new browser tests were confirmed failing against the missing controls before the
+controls were written.

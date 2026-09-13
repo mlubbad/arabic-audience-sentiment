@@ -13,7 +13,7 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
   await expect(page.getByText("لا توجد تعليقات مطابقة")).toBeVisible();
   await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("6");
-  await page.getByLabel("الفيديو").selectOption("video-2");
+  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
 });
@@ -100,7 +100,7 @@ test("paginates with cursors without changing totals or repeating rows", async (
   // A new filter must start at page one rather than reusing a stale cursor.
   await page.getByRole("button", { name: "الصفحة التالية" }).click();
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 2");
-  await page.getByLabel("الفيديو").selectOption("video-1");
+  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-1");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("4");
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 1");
@@ -127,14 +127,14 @@ test("a slow response for old filters cannot overwrite newer filters", async ({
 
   // Filter A is slow: one video, 4 rows.
   holdNext = true;
-  await page.getByLabel("الفيديو").selectOption("video-1");
+  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-1");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   // The previous screen stays put behind a refresh indicator instead of blanking.
   await expect(page.getByTestId("updating")).toBeVisible();
   await expect(page.getByTestId("total")).toHaveText("6");
 
   // Filter B is applied before A returns, and answers immediately: 2 rows.
-  await page.getByLabel("الفيديو").selectOption("video-2");
+  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
 
@@ -294,7 +294,7 @@ test("exports every filtered comment, not just the visible page", async ({
   expect(all.text.trim().split("\r\n")).toHaveLength(7);
 
   // A narrower filter must produce a narrower file, through the same rules.
-  await page.getByLabel("الفيديو").selectOption("video-2");
+  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
   const filtered = await downloadCsv(page);
@@ -395,4 +395,114 @@ test("distinguishes no activated plan from no allowance left", async ({
     "لا يعني ذلك نفاد الحد",
   );
   await expect(page.getByTestId("budget-comment_analysis")).toHaveCount(0);
+});
+
+async function applyFilter(
+  page: import("@playwright/test").Page,
+  label: string,
+  value: string,
+) {
+  await page.getByLabel(label).selectOption(value);
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+}
+
+test("separates replies from top-level comments", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await applyFilter(page, "نوع المشاركة", "comments");
+  await expect(page.getByTestId("total")).toHaveText("4");
+  await expect(page.getByTestId("replies-count")).toHaveText("0");
+  await applyFilter(page, "نوع المشاركة", "replies");
+  await expect(page.getByTestId("total")).toHaveText("2");
+  await expect(page.getByTestId("replies-count")).toHaveText("2");
+});
+
+test("separates known from unknown publication dates", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("unknown-dates")).toHaveText("1");
+  await applyFilter(page, "التاريخ", "known");
+  await expect(page.getByTestId("total")).toHaveText("5");
+  await expect(page.getByTestId("unknown-dates")).toHaveText("0");
+  await applyFilter(page, "التاريخ", "unknown");
+  await expect(page.getByTestId("total")).toHaveText("1");
+  // A comment with no date is still a comment, not a defect.
+  await expect(page.locator("tbody tr")).toContainText("تعليق لم يُحلل بعد");
+});
+
+test("a date range and an explicit unknown-date selection cannot contradict", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("التاريخ").selectOption("unknown");
+  // Ranges apply to known dates only, so they are disabled rather than silently
+  // producing an empty screen.
+  await expect(page.getByLabel("من تاريخ")).toBeDisabled();
+  await expect(page.getByLabel("إلى تاريخ (غير شامل)")).toBeDisabled();
+  await page.getByLabel("التاريخ").selectOption("all");
+  await expect(page.getByLabel("من تاريخ")).toBeEnabled();
+});
+
+test("filters by video kind", async ({ page }) => {
+  await page.goto("/");
+  await applyFilter(page, "نوع الفيديو", "video");
+  await expect(page.getByTestId("total")).toHaveText("4");
+  await applyFilter(page, "نوع الفيديو", "short");
+  await expect(page.getByTestId("total")).toHaveText("2");
+});
+
+test("filters by comment type using the types actually present", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // The list is derived from the data, not hard-coded per channel.
+  await expect(page.getByLabel("نوع التعليق").locator("option")).toHaveText([
+    "كل الأنواع",
+    "اقتراح",
+    "سؤال",
+  ]);
+  await applyFilter(page, "نوع التعليق", "سؤال");
+  await expect(page.getByTestId("total")).toHaveText("1");
+  await expect(page.locator("tbody tr")).toContainText("معلومة عن موعد الحلقة");
+});
+
+test("filters by review status and resets every control together", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await applyFilter(page, "حالة المراجعة", "reviewed");
+  await expect(page.getByTestId("total")).toHaveText("0");
+
+  await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
+  const row = page.locator("tbody tr").first();
+  await row.getByRole("button", { name: "تصحيح" }).click();
+  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(page.locator("tbody tr").first()).toContainText("مراجعة بشرية");
+
+  await applyFilter(page, "حالة المراجعة", "reviewed");
+  await expect(page.getByTestId("total")).toHaveText("1");
+  await applyFilter(page, "حالة المراجعة", "unreviewed");
+  await expect(page.getByTestId("total")).toHaveText("5");
+
+  // Reset must clear every control, not only the ones with visible values.
+  await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("6");
+  for (const [label, value] of [
+    ["نوع المشاركة", "all"],
+    ["التاريخ", "all"],
+    ["نوع الفيديو", ""],
+    ["نوع التعليق", ""],
+    ["حالة المراجعة", "all"],
+  ] as const) {
+    await expect(page.getByLabel(label)).toHaveValue(value);
+  }
+});
+
+test("the export follows the new filters too", async ({ page }) => {
+  await page.goto("/");
+  await applyFilter(page, "نوع المشاركة", "replies");
+  await expect(page.getByTestId("total")).toHaveText("2");
+  const { text } = await downloadCsv(page);
+  expect(text.trim().split("\r\n")).toHaveLength(3);
 });

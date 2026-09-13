@@ -21,6 +21,13 @@ export function Dashboard() {
   const [from, setFrom] = useState(""),
     [to, setTo] = useState(""),
     [formError, setFormError] = useState("");
+  const [replies, setReplies] = useState<"all" | "comments" | "replies">("all");
+  const [dateMode, setDateMode] = useState<"all" | "known" | "unknown">("all");
+  const [videoKind, setVideoKind] = useState("");
+  const [commentType, setCommentType] = useState("");
+  const [reviewStatus, setReviewStatus] = useState<
+    "all" | "reviewed" | "unreviewed"
+  >("all");
   // cursors[i] opens page i + 2, so the stack length is the current page index.
   // Applying, resetting or resizing clears it, because a cursor is only valid
   // for the filtered set it was produced from.
@@ -107,20 +114,34 @@ export function Dashboard() {
   }
   function apply(e: FormEvent) {
     e.preventDefault();
-    if (from && to && from >= to) {
+    if (dateMode !== "unknown" && from && to && from >= to) {
       setFormError("يجب أن يسبق تاريخ البداية تاريخ النهاية");
       return;
     }
     setFormError("");
     setCursorNotice(false);
     setCursors([]);
+    // A range describes known dates, so it is not sent when the user has asked
+    // for the rows that have no date at all.
+    const ranged = dateMode !== "unknown";
     setFilters({
       ...defaults,
       q: query,
       video_ids: video ? [video] : [],
+      video_kind: (videoKind || undefined) as Filters["video_kind"],
       sentiments: sentiment ? [sentiment as Label] : [],
-      from: from ? new Date(from + "T00:00:00+03:00").toISOString() : undefined,
-      to: to ? new Date(to + "T00:00:00+03:00").toISOString() : undefined,
+      replies,
+      date_mode: dateMode,
+      comment_type: commentType || undefined,
+      review_status: reviewStatus,
+      from:
+        ranged && from
+          ? new Date(from + "T00:00:00+03:00").toISOString()
+          : undefined,
+      to:
+        ranged && to
+          ? new Date(to + "T00:00:00+03:00").toISOString()
+          : undefined,
     });
   }
   function reset() {
@@ -130,6 +151,11 @@ export function Dashboard() {
     setFrom("");
     setTo("");
     setFormError("");
+    setReplies("all");
+    setDateMode("all");
+    setVideoKind("");
+    setCommentType("");
+    setReviewStatus("all");
     setCursorNotice(false);
     setCursors([]);
     setLimit(25);
@@ -161,7 +187,11 @@ export function Dashboard() {
         </label>
         <label>
           الفيديو
-          <select value={video} onChange={(e) => setVideo(e.target.value)}>
+          <select
+            aria-label="الفيديو"
+            value={video}
+            onChange={(e) => setVideo(e.target.value)}
+          >
             <option value="">كل الفيديوهات</option>
             <option value="video-1">فيديو اصطناعي ١</option>
             <option value="video-2">فيديو اصطناعي ٢</option>
@@ -170,6 +200,7 @@ export function Dashboard() {
         <label>
           المشاعر
           <select
+            aria-label="المشاعر"
             value={sentiment}
             onChange={(e) => setSentiment(e.target.value)}
           >
@@ -182,10 +213,83 @@ export function Dashboard() {
           </select>
         </label>
         <label>
+          نوع الفيديو
+          <select
+            aria-label="نوع الفيديو"
+            value={videoKind}
+            onChange={(e) => setVideoKind(e.target.value)}
+          >
+            <option value="">كل الأنواع</option>
+            <option value="video">فيديو</option>
+            <option value="short">شورت</option>
+            <option value="stream">بث</option>
+          </select>
+        </label>
+        <label>
+          نوع المشاركة
+          <select
+            aria-label="نوع المشاركة"
+            value={replies}
+            onChange={(e) =>
+              setReplies(e.target.value as "all" | "comments" | "replies")
+            }
+          >
+            <option value="all">تعليقات وردود</option>
+            <option value="comments">تعليقات أصلية فقط</option>
+            <option value="replies">ردود فقط</option>
+          </select>
+        </label>
+        <label>
+          نوع التعليق
+          <select
+            aria-label="نوع التعليق"
+            value={commentType}
+            onChange={(e) => setCommentType(e.target.value)}
+          >
+            <option value="">كل الأنواع</option>
+            {(result.data?.comment_types ?? []).map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          حالة المراجعة
+          <select
+            aria-label="حالة المراجعة"
+            value={reviewStatus}
+            onChange={(e) =>
+              setReviewStatus(
+                e.target.value as "all" | "reviewed" | "unreviewed",
+              )
+            }
+          >
+            <option value="all">الكل</option>
+            <option value="reviewed">مراجَعة بشريًا</option>
+            <option value="unreviewed">دون مراجعة</option>
+          </select>
+        </label>
+        <label>
+          التاريخ
+          <select
+            aria-label="التاريخ"
+            value={dateMode}
+            onChange={(e) =>
+              setDateMode(e.target.value as "all" | "known" | "unknown")
+            }
+          >
+            <option value="all">كل التواريخ</option>
+            <option value="known">التواريخ المعروفة</option>
+            <option value="unknown">بلا تاريخ معروف</option>
+          </select>
+        </label>
+        <label>
           من تاريخ
           <input
             type="date"
             value={from}
+            disabled={dateMode === "unknown"}
             onChange={(e) => setFrom(e.target.value)}
           />
         </label>
@@ -194,12 +298,14 @@ export function Dashboard() {
           <input
             type="date"
             value={to}
+            disabled={dateMode === "unknown"}
             onChange={(e) => setTo(e.target.value)}
           />
         </label>
         <label>
           عدد التعليقات في الصفحة
           <select
+            aria-label="عدد التعليقات في الصفحة"
             value={limit}
             onChange={(e) => {
               goTo([]);
@@ -258,7 +364,7 @@ export function Dashboard() {
             </article>
             <article>
               <h2>الردود</h2>
-              <strong>{s.replies}</strong>
+              <strong data-testid="replies-count">{s.replies}</strong>
             </article>
           </section>
           {s.total === 0 ? (
@@ -331,7 +437,11 @@ export function Dashboard() {
                     ))}
                   </ul>
                   <p>معرّفات المؤلفين المتاحة: {s.unique_authors}</p>
-                  <p>تعليقات بلا تاريخ: {s.unknown_dates}</p>
+                  <p>
+                    \n تعليقات بلا تاريخ: \n{" "}
+                    <span data-testid="unknown-dates">{s.unknown_dates}</span>
+                    \n{" "}
+                  </p>
                 </article>
               </section>
               <section>
@@ -405,6 +515,7 @@ export function Dashboard() {
                     <label>
                       التصنيف الصحيح
                       <select
+                        aria-label="التصنيف الصحيح"
                         value={verdict}
                         onChange={(e) => setVerdict(e.target.value as Label)}
                       >
