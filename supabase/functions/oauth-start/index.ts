@@ -7,15 +7,22 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
 import { beginAuthorization } from "../_shared/oauth-start.ts";
+import { corsHeaders, parseOrigins, preflight } from "../_shared/cors.ts";
 
 const env = (name: string) => Deno.env.get(name) ?? "";
-const json = (code: number, body: unknown) =>
-  new Response(JSON.stringify(body), {
-    status: code,
-    headers: { "content-type": "application/json" },
-  });
-
+const allowed = parseOrigins(Deno.env.get("ALLOWED_ORIGINS"));
 Deno.serve(async (request) => {
+  // The browser asks before it sends. Answering this is the difference between
+  // a working button and a network error with nothing behind it.
+  const pre = preflight(request, allowed);
+  if (pre) return pre;
+
+  const json = (code: number, body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status: code,
+      headers: { "content-type": "application/json", ...corsHeaders(request) },
+    });
+
   if (request.method !== "POST")
     return json(405, { code: "method_not_allowed" });
   const auth = request.headers.get("authorization");
