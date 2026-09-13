@@ -164,7 +164,10 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     )
     .slice(0, ENGAGEMENT_LIMIT);
   return {
-    mode: "sanitized_fixture" as const,
+    // No mode here. This aggregates rows and cannot know where they came from;
+    // asserting "sanitized_fixture" was a claim about provenance made by the
+    // one function with no access to it, and it stayed true only because there
+    // was no live read. The data layer owns that answer.
     comment_types,
     most_engaged_negative,
     // How many could be ranked, so a shown five is never mistaken for all five.

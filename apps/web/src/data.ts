@@ -1,6 +1,7 @@
 import {
   CommentReviewInputSchema,
   FixtureSchema,
+  LiveSnapshotSchema,
   applyReview,
   exportObjectPath,
   exportRows,
@@ -10,6 +11,7 @@ import {
   type CommentReviewInput,
   type Filters,
 } from "@sentiment/contracts";
+import { supabase } from "./supabase";
 /**
  * Who a fixture-mode correction is attributed to. Deliberately not a UUID and
  * clearly synthetic: there is no authenticated user in fixture mode, and
@@ -29,23 +31,19 @@ export type DataMode = "sanitized_fixture" | "live";
 /**
  * What the dashboard is actually serving, decided in one place.
  *
- * There is no live comment read path yet, so this is fixture and nothing can
- * change it. Configuring Supabase enables product Auth and workspace
- * management on the account screen; it does not turn fixture rows into live
- * data. In particular it must never redirect a correction made against a
- * fixture row at a live RPC, which would address a fixture id and a fixture
- * workspace to a real server and then report success.
+ * Two conditions, both required. A configured Supabase project enables product
+ * Auth and workspace management; on its own it must never turn fixture rows
+ * into live data, because a correction made against a fixture id and a fixture
+ * workspace would then be addressed to a real server and reported as saved.
+ * Going live is therefore an explicit choice as well as a configured one.
  *
- * The live path arrives together with a live dashboard read, as one change, so
- * the read and write paths can never disagree about which mode they are in.
+ * The read and the write branch on this same value, so they cannot disagree
+ * about which mode they are in.
  */
-export const dataMode: DataMode = "sanitized_fixture";
+const liveRequested = import.meta.env.VITE_DASHBOARD_SOURCE === "live";
+export const dataMode: DataMode =
+  supabase && liveRequested ? "live" : "sanitized_fixture";
 
-/**
- * Corrections are persisted only when the data itself is live. Derived from the
- * data mode rather than from whether Auth happens to be configured, so the UI
- * cannot claim a correction was saved while it is editing fixture rows.
- */
 export const reviewsArePersisted = dataMode !== "sanitized_fixture";
 
 // Fixture corrections are kept for this browser session only and are never sent
@@ -66,22 +64,48 @@ async function readFixture(signal?: AbortSignal) {
   return FixtureSchema.parse(await response.json());
 }
 
-export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
+/**
+ * The live read. Parsed with the schema that shares its field definitions with
+ * the fixture, so a server that answers with a different shape is refused here
+ * rather than rendered as a half-populated dashboard.
+ */
+async function readLive(workspace: string) {
+  const { data, error } = await supabase!.rpc("dashboard_snapshot", {
+    w: workspace,
+  });
+  // The reason is not surfaced: a PostgREST error can carry the request URL.
+  if (error) throw new Error("live_unavailable");
+  return LiveSnapshotSchema.parse(data);
+}
+
+/**
+ * One source, chosen once. Session corrections belong to fixture mode alone —
+ * in live mode the server holds the review log, and replaying local edits over
+ * it would show a correction that no longer exists on the server as if it did.
+ */
+async function readSource(workspace: string, signal?: AbortSignal) {
+  if (dataMode === "live") return readLive(workspace);
   const fixture = await readFixture(signal);
-  const comments = withSessionReviews(fixture.comments);
+  return { ...fixture, comments: withSessionReviews(fixture.comments) };
+}
+
+export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
+  const source = await readSource(filters.workspace_id, signal);
+  const comments = source.comments;
   const build = (f: Filters, cursor_reset: boolean) => {
-    const base = snapshot(comments, f, fixture.active_analysis_key);
+    const base = snapshot(comments, f, source.active_analysis_key);
     return {
       ...base,
       // The snapshot already aggregates every video; the app only decides how
       // many to show and says when it has truncated.
       comparison: base.videos.slice(0, COMPARISON_LIMIT),
       comparison_truncated: base.videos.length > COMPARISON_LIMIT,
-      revision: fixture.revision,
+      mode: dataMode,
+      revision: source.revision,
       // Plan state travels with the snapshot, so the limit on screen always
       // belongs to the same read as the numbers beside it.
-      plan: fixture.plan,
-      sync: fixture.sync,
+      plan: source.plan,
+      sync: source.sync,
       cursor_reset,
     };
   };
@@ -98,9 +122,22 @@ export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
 
 export async function submitReview(raw: CommentReviewInput) {
   const input = CommentReviewInputSchema.parse(raw);
-  // No live branch here on purpose. While the dashboard serves fixtures, a
-  // correction belongs to the fixture it was made against, whatever Auth is
-  // configured. Adding a server call keyed on Auth is the defect this prevents.
+  if (dataMode === "live") {
+    // Addressed to the same source the rows came from. The server takes the
+    // reviewer and the human provenance from the session and re-checks the
+    // hash, so this sends a verdict and never an identity.
+    const { error } = await supabase!.rpc("submit_comment_review", {
+      w: input.workspace_id,
+      c: input.comment_id,
+      seen_hash: input.content_hash,
+      verdict: input.label,
+      why: input.reason,
+    });
+    if (error) throw new Error("review_rejected");
+    return;
+  }
+  // A correction belongs to the fixture it was made against. Keyed on the data
+  // mode, never on whether Auth happens to be configured.
   const fixture = await readFixture();
   // Validate against the current fixture so a verdict on changed text is
   // rejected here too, instead of failing later during a reload.
@@ -121,12 +158,8 @@ export async function submitReview(raw: CommentReviewInput) {
  * storage policy checks.
  */
 export async function buildExport(filters: Filters) {
-  const fixture = await readFixture();
-  const rows = exportRows(
-    withSessionReviews(fixture.comments),
-    filters,
-    fixture.active_analysis_key,
-  );
+  const source = await readSource(filters.workspace_id);
+  const rows = exportRows(source.comments, filters, source.active_analysis_key);
   return {
     rows: rows.length,
     filename: exportObjectPath(filters.workspace_id, new Date())

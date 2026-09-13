@@ -13,8 +13,8 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run lint` | Pass — ESLint clean; Ruff "All checks passed!" |
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
-| `npm test` | Pass — **77 tests, 10 files** |
-| `npm run test:db` | Pass — **59 tests, 6 files** |
+| `npm test` | Pass — **83 tests, 10 files** |
+| `npm run test:db` | Pass — **64 tests, 7 files** |
 | `npm run worker:test` | Pass — **60 tests, 9 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
@@ -56,6 +56,11 @@ reverted and the suite returned to green.
 | Fingerprint an analysis without its settings | 1 |
 | Prune a connection that is still in flight | 1 |
 | Leave the prune job executable by tenants | 1 |
+| Show a verdict about text the comment no longer has | 1 |
+| Turn unknown engagement into zero on the live read | 1 |
+| Leave the platform parent id unresolved | 1 |
+| Let a configured project alone flip the data source | 4 |
+| Trust the server's answer without parsing it | 1 |
 
 ## What the suites prove
 
@@ -220,6 +225,44 @@ and a consumed row refuse a replay identically, which is asserted rather than as
 
 No schedule is attached. Scheduling belongs to a deployed project, which does not exist; what
 is committed is the operation.
+
+## The live dashboard read
+
+The dashboard had no live path at all. `data.ts` pinned the mode to
+`sanitized_fixture` with nothing able to change it, so the filters, the aggregates, the
+export and the corrections all ran over a JSON file.
+
+`public.dashboard_snapshot(w)` assembles the same object the fixture is, from the tables
+under RLS, and `LiveSnapshotSchema` shares its field definitions with `FixtureSchema` — the
+two modes cannot drift into producing different shapes from equivalent rows. The SQL test
+parses the result with that shared schema and then runs the shared `snapshot()` over it, so
+the aggregation path is literally the same one fixture mode uses.
+
+Verified against real migrations and real RLS: the shape parses, an unparseable like count
+stays null, a reply names its parent by internal id, a prediction whose comment has since
+been edited is not returned as the effective label, another tenant's workspace id is refused
+rather than answered with an empty snapshot, and an anonymous caller is refused.
+
+**One mutation survived, and is recorded rather than hidden.** Removing the `has_role` check
+from `dashboard_snapshot_impl` does not fail any test, because `private.usage_summary_impl`
+independently raises `forbidden` for a non-member and is called on every read. The suite
+therefore proves tenant isolation but does not prove that particular line. The check is kept
+— a read should authorise at its own entry point rather than depend on which sub-call raises
+first — but the claim made for it here is only what the tests support.
+
+On the client, live is two conditions and not one: a configured Supabase project **and** an
+explicit `VITE_DASHBOARD_SOURCE=live`. A configured project alone must never turn fixture
+rows into live data, because a correction against a fixture id and a fixture workspace would
+then be addressed to a real server and reported as saved. Making the mode depend on
+configuration alone fails four tests, which is the intended result.
+
+`snapshot()` no longer returns `mode: "sanitized_fixture"`. It aggregates rows and cannot
+know where they came from; the claim was dead code that stayed true only because no live read
+existed.
+
+**Not verified:** no HTTP request has been made to a deployed project. The SQL is exercised in
+PGlite and the client is exercised against a mocked `rpc`, so what is untested is PostgREST
+between them — argument marshalling, the JSON it returns, and Auth.
 
 ## Notes on running the suites
 

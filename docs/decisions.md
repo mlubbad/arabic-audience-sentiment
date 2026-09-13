@@ -171,4 +171,17 @@ service authorization follow from this setup.
   window exists for operational diagnosis and is short. The operation is committed without a
   schedule, because a schedule needs a deployed project and inventing one here would be a
   configuration nobody runs.
+- **Going live takes a configured project and an explicit request.** A configured Supabase
+  project enables Auth and workspace management; on its own it must never turn fixture rows
+  into live data, or a correction against a fixture id would be addressed to a real server and
+  reported as saved. The read and the write branch on the same data mode, so they cannot
+  disagree about which one they are in.
+- **The live read returns the whole workspace, and says so.** That is the same whole-set read
+  the fixture does, which is what lets one `snapshot()` compute identical aggregates in both
+  modes. It is right for pilot-scale data and needs server-side filtering before a workspace
+  holds substantially more. It is deliberately not capped: a silent subset would report
+  partial data as if it were the whole set.
+- **`snapshot()` makes no claim about provenance.** It aggregates rows and cannot know where
+  they came from. Returning `mode: "sanitized_fixture"` was a claim made by the one function
+  with no access to the answer, and it stayed true only because no live read existed.
 

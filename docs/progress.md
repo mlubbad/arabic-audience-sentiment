@@ -50,7 +50,7 @@ reservation, plan limits. Isolation is tested through direct SQL, not hidden UI 
 | Analysis in the server path | implemented, fixture-tested | `run_once` labels each batch before committing, so rows and verdicts land in one transaction. Verified end to end with the **deterministic test analyzer, which is not a model** |
 | Real model inference | **blocked** | Needs the notebooks and ~600 human-labelled comments. No accuracy figure is claimed |
 
-## M4 — dashboard (complete, fixture-backed)
+## M4 — dashboard (complete; live read implemented, never served over HTTP)
 
 One filter contract drives every panel and the export. Cursor pagination with stale-response
 safety, human corrections with verdict history, CSV export with formula-injection
@@ -59,7 +59,14 @@ sync health classified into ten states, engagement ranking that never lets likes
 sentiment. Arabic RTL throughout, keyboard-navigable, no figure carried by colour alone.
 
 Fixture mode is isolated from configured Auth: a correction made against fixture rows can
-never be sent to a live RPC, and the UI says so on screen.
+never be sent to a live RPC, and the UI says so on screen. Live mode requires a configured
+project **and** an explicit `VITE_DASHBOARD_SOURCE=live`, so configuration alone cannot flip
+the data source.
+
+`public.dashboard_snapshot` assembles the same object the fixture is, and the read and write
+paths branch on one data mode so they cannot disagree about which they are in. Verified
+against real SQL and RLS, and against a mocked client; **no HTTP request has been made to a
+deployed project**, so PostgREST between the two is untested.
 
 ## M5 — OAuth (server half implemented)
 
