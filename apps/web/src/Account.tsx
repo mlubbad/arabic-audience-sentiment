@@ -232,10 +232,14 @@ export function Account() {
                             })
                             .then(({ error }) => {
                               setPending(false);
+                              // Deliberately not "أُضيفت": the server answers a
+                              // repeat request with the job already waiting, so
+                              // claiming a new one was added would be a lie on
+                              // every click after the first.
                               setMessage(
                                 error
-                                  ? "تعذر إنشاء مهمة المزامنة."
-                                  : "أُضيفت مهمة المزامنة إلى الطابور. لن تبدأ حتى يعمل عامل الجمع.",
+                                  ? "تعذر تسجيل طلب المزامنة."
+                                  : "طلب المزامنة قائم. لكل قناة طلب واحد في كل مرة، ولن يبدأ حتى يعمل عامل الجمع — التفاصيل في صفحة «حالة المزامنة».",
                               );
                             });
                         }}

@@ -237,16 +237,87 @@ describe("scoped worker gateway and plan limits", () => {
       ownerB,
     ]);
     await db.exec("set role authenticated");
-    await db.query("select public.enqueue_sync($1,$1,$2)", [B, "sync-1"]);
-    // A different key, so this is a genuinely new request rather than a replay.
-    await expect(
-      db.query("select public.enqueue_sync($1,$1,$2)", [B, "sync-2"]),
-    ).rejects.toThrow(/sync_too_soon/);
+    // Workspace B already has the collect job the claim tests seeded, and it is
+    // still queued — so this request is answered with that one rather than
+    // making a second. That is the rule under test, seen from the other side.
+    const queued = await db.query(
+      "select public.enqueue_sync($1,$1,$2) as id",
+      [B, "sync-1"],
+    );
+    // Make that outstanding job recent, so the rate limit would also have
+    // something to complain about. "Already queued" must win: refusing with
+    // sync_too_soon would be a wrong answer to a reasonable question, and the
+    // operator would go looking for a limit that is not the reason.
+    await db.exec("reset role");
+    const queuedId = (queued.rows[0] as { id: string }).id;
+    await db.query("update jobs set created_at=now() where id=$1", [queuedId]);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      ownerB,
+    ]);
+    await db.exec("set role authenticated");
+    // A different key, so by the key's own definition this is a new request.
+    // It is still answered with the job already waiting: a channel has one
+    // collection outstanding, and asking twice does not make two.
+    const again = await db.query("select public.enqueue_sync($1,$1,$2) as id", [
+      B,
+      "sync-2",
+    ]);
+    expect(again.rows).toEqual(queued.rows);
     // The same key still returns the same job: idempotency is not rate limiting.
     await expect(
       db.query("select public.enqueue_sync($1,$1,$2)", [B, "sync-1"]),
     ).resolves.toBeTruthy();
+
+    // With nothing outstanding, the rate limit is what remains, and it still
+    // refuses. Finishing the job is what makes a new request possible at all.
     await db.exec("reset role");
+    // Finished, and finished recently: the rate limit measures age, so a job
+    // aged two hours by the setup above would not trip it and the assertion
+    // below would prove nothing.
+    await db.query(
+      "update jobs set status='succeeded', created_at=now() where id=$1",
+      [queuedId],
+    );
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      ownerB,
+    ]);
+    await db.exec("set role authenticated");
+    await expect(
+      db.query("select public.enqueue_sync($1,$1,$2)", [B, "sync-3"]),
+    ).rejects.toThrow(/sync_too_soon/);
+    await db.exec("reset role");
+  });
+
+  it("refuses a second outstanding collection even inserted directly", async () => {
+    // The function returns the existing job, but a caller who reaches the
+    // table without going through it must be refused too — otherwise the rule
+    // lives in a code path rather than in the data.
+    await db.exec("reset role");
+    await db.query(
+      "update jobs set status='cancelled' where workspace_id=$1 and type='collect'",
+      [B],
+    );
+    await db.query(
+      "insert into jobs(workspace_id,channel_id,type,dedupe_key) values($1,$1,'collect','direct-1')",
+      [B],
+    );
+    await expect(
+      db.query(
+        "insert into jobs(workspace_id,channel_id,type,dedupe_key) values($1,$1,'collect','direct-2')",
+        [B],
+      ),
+    ).rejects.toThrow(/jobs_one_outstanding_collect/);
+    // A finished one is not outstanding, so the next request is allowed.
+    await db.query(
+      "update jobs set status='succeeded' where workspace_id=$1 and dedupe_key='direct-1'",
+      [B],
+    );
+    await expect(
+      db.query(
+        "insert into jobs(workspace_id,channel_id,type,dedupe_key) values($1,$1,'collect','direct-3')",
+        [B],
+      ),
+    ).resolves.toBeTruthy();
   });
 
   it("keeps the credential table away from tenants entirely", async () => {

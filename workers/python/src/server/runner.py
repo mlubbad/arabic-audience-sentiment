@@ -59,7 +59,12 @@ def run_once(
         # knowledge to the worker until it has one.
         collector, video_id = build_collector(token)
         if collector is None:
-            control.finish(lease, "blocked", "no_video_to_collect")
+            # The builder may say *why* it found nothing. "No video to collect"
+            # is true both of a channel whose uploads have comments switched
+            # off and of one that is simply quiet, and the operator has to do
+            # different things about those two.
+            reason = getattr(build_collector, "reason", None)
+            control.finish(lease, "blocked", reason or "no_video_to_collect")
             return True
 
     outcome = "partial"

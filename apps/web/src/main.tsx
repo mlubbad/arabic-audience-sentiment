@@ -10,6 +10,7 @@ const Dashboard = lazy(() =>
 const Connected = lazy(() =>
   import("./Connected").then((m) => ({ default: m.Connected })),
 );
+const Sync = lazy(() => import("./Sync").then((m) => ({ default: m.Sync })));
 const Account = lazy(() =>
   import("./Account").then((m) => ({ default: m.Account })),
 );
@@ -28,6 +29,7 @@ function AppLayout() {
           <NavLink to="/">الرئيسية</NavLink>
           <NavLink to="/dashboard">لوحة الاختبار</NavLink>
           <NavLink to="/account">الحساب ومساحات العمل</NavLink>
+          <NavLink to="/sync">حالة المزامنة</NavLink>
         </nav>
       </header>
       <main id="content">
@@ -47,6 +49,7 @@ createRoot(document.getElementById("root")!).render(
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/sync" element={<Sync />} />
             <Route path="/connected" element={<Connected />} />
             <Route path="*" element={<p>الصفحة غير موجودة</p>} />
           </Route>

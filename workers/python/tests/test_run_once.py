@@ -234,3 +234,38 @@ def test_a_channel_with_no_video_to_collect_is_blocked_not_failed():
     assert rec.finished == "blocked"
     assert rec.error_code == "no_video_to_collect"
     assert "commit-batch" not in rec.calls
+
+
+def test_the_builder_can_say_why_it_found_nothing():
+    """A blocked job records the real reason when one is available.
+
+    "no_video_to_collect" is true of a channel whose uploads all have comments
+    switched off and of one whose uploads simply have no comments yet, and the
+    operator has to do different things about those. The generic code stays as
+    the fallback for a builder that offers nothing.
+    """
+    rec = Recorder()
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        rec.calls.append(path)
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j1", "lease_token": "t1", "checkpoint": None,
+                "access_token": "ya29.granted",
+            })
+        if path == "finish":
+            body = json.loads(request.content)
+            rec.finished, rec.error_code = body["outcome"], body["error_code"]
+        return httpx.Response(200, json={})
+
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+
+    def build(token):
+        build.reason = "no_upload_has_comments:12_checked_0_disabled"
+        return None, None
+
+    assert run_once(plane, None, "abcdefghijk", build_collector=build) is True
+    assert rec.finished == "blocked"
+    assert rec.error_code == "no_upload_has_comments:12_checked_0_disabled"
