@@ -320,6 +320,74 @@ describe("scoped worker gateway and plan limits", () => {
     ).resolves.toBeTruthy();
   });
 
+  it("records a run for a job that finished having found nothing", async () => {
+    // public.sync_runs is what the operations page reads. Nothing wrote it, so
+    // four successful collections still produced "no sync has run". A job that
+    // ended blocked did run — it is the run that found nothing — and the panel
+    // has to be able to tell that apart from never having tried.
+    await db.exec("reset role");
+    await db.query(
+      "insert into jobs(workspace_id,channel_id,type,dedupe_key) values ($1,$1,'collect','run-record-1')",
+      [A],
+    );
+    const claimed = await claim(CRED_A);
+    const { id, lease_token } = claimed.rows[0];
+    await db.query("select private.worker_finish($1,$2,$3,$4,$5)", [
+      CRED_A,
+      id,
+      lease_token,
+      "blocked",
+      "comments_disabled",
+    ]);
+    const run = await db.query<{
+      status: string;
+      error_code: string | null;
+      ended_at: string | null;
+      mode: string;
+    }>(
+      "select status, error_code, ended_at, mode from sync_runs where job_id=$1",
+      [id],
+    );
+    expect(run.rows).toHaveLength(1);
+    expect(run.rows[0].status).toBe("blocked");
+    // The reason travels with the record, or the run says only that it failed.
+    expect(run.rows[0].error_code).toBe("comments_disabled");
+    expect(run.rows[0].ended_at).not.toBeNull();
+    expect(run.rows[0].mode).toBe("collect");
+  });
+
+  it("does not leave a cancelled job's run open for ever", async () => {
+    // sync_runs did not admit 'cancelled' while jobs did, so closing one was
+    // impossible and the row would have stayed 'running' indefinitely — a
+    // worker that looks permanently busy.
+    await db.exec("reset role");
+    await db.query(
+      "update jobs set status='cancelled' where workspace_id=$1 and type='collect' and status in ('queued','running')",
+      [A],
+    );
+    await db.query(
+      "insert into jobs(workspace_id,channel_id,type,dedupe_key) values ($1,$1,'collect','run-record-2')",
+      [A],
+    );
+    const claimed = await claim(CRED_A);
+    const { id, lease_token } = claimed.rows[0];
+    await expect(
+      db.query("select private.worker_finish($1,$2,$3,$4,$5)", [
+        CRED_A,
+        id,
+        lease_token,
+        "cancelled",
+        "superseded",
+      ]),
+    ).resolves.toBeTruthy();
+    const run = await db.query<{ status: string; ended_at: string | null }>(
+      "select status, ended_at from sync_runs where job_id=$1",
+      [id],
+    );
+    expect(run.rows[0].status).toBe("cancelled");
+    expect(run.rows[0].ended_at).not.toBeNull();
+  });
+
   it("keeps the credential table away from tenants entirely", async () => {
     await db.exec("reset role");
     await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
