@@ -1,0 +1,38 @@
+# Apache configuration for the private preview deployment.
+#
+# Kept in public/ so every build carries it. Writing it straight into dist/
+# meant the next build silently dropped it — and with it the password on a
+# deployment whose whole premise is that it is not published openly.
+#
+# The password itself is not here. It lives in .htpasswd_app one level above
+# the document root, which is why that file cannot be served.
+AuthType Basic
+AuthName "Sentiment MVP - private preview"
+AuthUserFile /home/u92286/domains/app.sky-develop.net/.htpasswd_app
+Require valid-user
+
+# Single-page app: an unknown path is the router's business, not the
+# filesystem's. Without this, refreshing on /account is a 404.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  RewriteRule . /index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  # The bundle carries a content hash in its name, so it can be cached hard.
+  # index.html must not be, or a deploy stays invisible until a cache expires.
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\.(html|json)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set X-Robots-Tag "noindex, nofollow"
+</IfModule>
