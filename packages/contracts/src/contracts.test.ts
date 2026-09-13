@@ -579,4 +579,27 @@ describe("human corrections", () => {
     );
     expect(replies.videos.map((v) => v.id)).toEqual(["v1"]);
   });
+  it("says how many engaged negatives it ranked, not just the ones it shows", () => {
+    const many: Comment[] = Array.from({ length: 8 }, (_, i) => ({
+      ...base,
+      id: `n${i}`,
+      likes_value: 100 - i,
+      prediction: predNeg(),
+    }));
+    const s = snapshot(many, { workspace_id: workspace }, "fixture-v1");
+    // Only the busiest few are listed, but the total is reported so five of
+    // forty cannot be mistaken for all of them.
+    expect(s.most_engaged_negative).toHaveLength(5);
+    expect(s.negative_ranked).toBe(8);
+    expect(s.most_engaged_negative[0].id).toBe("n0");
+
+    // Below the limit the two agree, so no truncation is implied.
+    const few = snapshot(
+      many.slice(0, 3),
+      { workspace_id: workspace },
+      "fixture-v1",
+    );
+    expect(few.most_engaged_negative).toHaveLength(3);
+    expect(few.negative_ranked).toBe(3);
+  });
 });

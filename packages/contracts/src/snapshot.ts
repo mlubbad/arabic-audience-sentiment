@@ -154,8 +154,9 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   // out rather than sorted as zero, and the exclusion is reported instead of
   // being hidden.
   const negatives = rows.filter((c) => c.label === "negative");
-  const most_engaged_negative = negatives
-    .filter((c) => c.likes_value !== null)
+  const rankable = negatives.filter((c) => c.likes_value !== null);
+  const most_engaged_negative = rankable
+    .slice()
     .sort(
       (a, b) =>
         (b.likes_value ?? 0) - (a.likes_value ?? 0) ||
@@ -166,7 +167,9 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     mode: "sanitized_fixture" as const,
     comment_types,
     most_engaged_negative,
-    negative_unranked: negatives.filter((c) => c.likes_value === null).length,
+    // How many could be ranked, so a shown five is never mistaken for all five.
+    negative_ranked: rankable.length,
+    negative_unranked: negatives.length - rankable.length,
     total: rows.length,
     analysed,
     unanalysed: rows.length - analysed,

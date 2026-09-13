@@ -954,3 +954,67 @@ left, but it is not the state it left, and it should not have to discover that b
 
 Nothing else of the integrator's was modified. `docs/coordination/tasks.md` and
 `docs/agent-reports/integration.md` are untouched, which was verified, not assumed.
+
+## Audit against the current commit (2026-09-13)
+
+**No comprehensive review document exists in this repository.** `find` over the whole tree
+returns only `reviewHistory.ts`, which is a dashboard feature. Rather than invent findings to
+match a document I cannot read, I audited the five named areas directly. If the review exists
+outside the repo, its findings should be re-checked against this list.
+
+### Confirmed defects
+
+**1. Cross-tenant leak: `private.plan_limit` (schema lane).** It is `security definer`,
+executable by `authenticated`, and contains **no role check**, unlike every other definer
+function. An enumeration of `has_function_privilege('authenticated', …)` over the `private`
+schema shows it is the only one without one. Any signed-in user can read any workspace's plan
+limits by passing that workspace's id.
+
+*Fix, ready to apply:* it is only ever called from inside other definer functions, which run
+as their owner, so revoking is safe.
+
+```sql
+revoke all on function private.plan_limit(uuid,text) from public, anon, authenticated;
+```
+
+Add a regression test asserting the only definer functions executable by `authenticated` are
+those that call `private.has_role` first.
+
+**2. The Python client cannot read a real claim (worker lane).** It reads
+`lease["job_id"]`, but `private.worker_claim` returns `setof public.jobs`, whose key column is
+**`id`**. A real claim followed by a heartbeat raises `KeyError: 'job_id'`. The client's tests
+pass because the mock returns `{"job_id": …}` — a stand-in that does not match the server.
+This is the same class of defect as the SQLSTATE mapping found by the seam test, and it means
+**the worker has never successfully completed a lifecycle against the real control plane**.
+
+*Fix:* read `lease["id"]`, or have the handler normalise the claim response to `job_id`.
+Whichever is chosen, the golden-fixture approach should be extended to the claim response so a
+mock cannot drift from the server again.
+
+**3. No server-backed resume exists (worker lane).** `grep -rn ControlPlane workers/python/src`
+finds no caller: `collect()` drives the local SQLite spool only, and nothing ties a collector
+to the control plane. The server stores a checkpoint as `{"cursor": "…"}` while the collector
+expects the bare string, so even the shape needs unwrapping. **A worker cannot currently
+resume from the server after an interruption**, which is the M1 durability guarantee.
+
+*Fix:* a `run_once(control, collector)` that claims, unwraps the checkpoint, heartbeats and
+commits each batch, and finishes explicitly — testable end to end with `httpx.MockTransport`.
+
+### Checked and clean
+
+- **Worker contract compatibility.** The three definitions of a batch comment — the Zod
+  schema, the Python builder and the SQL `jsonb_to_recordset` column list — were diffed
+  field by field. All sixteen agree, in both directions. Nothing is silently dropped.
+- **Dashboard consistency.** Every panel derives from the one snapshot; the export matches
+  the filters on screen; `comment_types` is workspace-scoped on purpose.
+
+### Fixed in this lane
+
+The video comparison declared truncation while the engagement panel silently sliced to five,
+so five of forty read as all five. `snapshot()` now returns `negative_ranked` and the panel
+says how many of the rankable negatives it is showing. Contract test added.
+
+### Lane note
+
+Findings 1, 2 and 3 are in the schema and worker lanes, not this one, and the integrator is
+absent. They are written above as ready-to-apply changes rather than applied.

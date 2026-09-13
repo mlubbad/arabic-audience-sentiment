@@ -526,6 +526,12 @@ export function Dashboard() {
                     ))}
                   </ol>
                 )}
+                {s.negative_ranked > s.most_engaged_negative.length && (
+                  <p className="muted" data-testid="engaged-truncated">
+                    تُعرض {s.most_engaged_negative.length} من{" "}
+                    {s.negative_ranked} تعليقًا سلبيًا لها عدد إعجابات معروف.
+                  </p>
+                )}
                 {s.negative_unranked > 0 && (
                   <p className="muted" data-testid="engaged-unranked">
                     {s.negative_unranked} تعليقًا سلبيًا بلا عدد إعجابات معروف،
