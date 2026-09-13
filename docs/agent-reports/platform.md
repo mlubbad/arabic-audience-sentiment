@@ -511,3 +511,55 @@ logic is presentation and should stay in the app.
 Nine unit tests and four browser tests were confirmed failing before the code existed. One
 unit expectation was wrong on the first run — a 49.5-hour gap rounds to 50, not 49 — and the
 test was rewritten to use an exact 48-hour gap rather than depending on rounding.
+
+## Most-engaged negative comments: blocked, not attempted (2026-09-13)
+
+`likes_raw` and `likes_value` exist in the SQL `comments` table and in the Python
+`RawComment`, but **not** in `CommentSchema`. `grep likes packages/contracts/src/index.ts`
+returns nothing, and the fixture has zero occurrences.
+
+`CommentSchema` is `.strict()`, so this fails louder than the `sync` case. Verified by probe
+rather than assumed:
+
+```
+FixtureSchema.safeParse(fixtureWithLikes)
+-> success: false
+-> unrecognized_keys ["likes_value", "likes_raw"] at comments[0]
+```
+
+A stripped key would have been survivable; a strict schema **throws**, so putting likes in
+the fixture would take the entire dashboard to its error state. I did not build a parallel
+engagement path outside the contract to get around it — that is the shape of defect P1 existed
+to fix.
+
+Note for whoever implements it: §11 says likes are not a default weight for sentiment and a
+creator's heart is not positive sentiment. Ranking by engagement must not feed the label.
+
+## Consolidated contract requests — one change unblocks the rest
+
+Five requests have accumulated. **Landing Patch 1 alone resolves four of them**, because it
+gives this lane `packages/contracts/src/**` and I can then make schema changes 2–5 myself
+without another round trip. It is the highest-leverage item by a wide margin.
+
+| # | Change | Unblocks | Owner after Patch 1 |
+| --- | --- | --- | --- |
+| 1 | Guard allows platform to edit `packages/contracts/src/**` (patch already written above) | items 2–5 | integrator |
+| 2 | `ReviewSchema` + `reviewer_id: string`, `reason: string` | "who / why" in review history | platform |
+| 3 | `snapshot()` returns a `comment_types` aggregate | live comment-type filter | platform |
+| 4 | Per-video aggregate on the snapshot, plus a `videos` projection carrying title and kind | video comparison at channel scale; real video names | platform |
+| 5 | `CommentSchema` + `likes_raw: string \| null`, `likes_value: number \| null`, and a CSV column | most-engaged negative comments | platform |
+| 6 | `SyncRunSchema` + `sync` on `FixtureSchema` (shape proposed in `apps/web/src/syncHealth.ts`) | sync panel on live data | platform |
+
+Item 4 is the only one with a cross-language dimension, since per-video aggregates are
+computed server-side; the rest are application schema. None of them touch the worker↔server
+protocol, so none should need to wait on I1.
+
+If the integrator prefers to keep all of `packages/contracts` coordinated, these six can be
+landed by the integrator directly instead — but then each future schema change costs a round
+trip, which is the bottleneck measured earlier at 3 of 5 feature commits.
+
+### Current lane status
+
+M4's screen elements are complete except item 5: filters, pagination, corrections with
+history, CSV export, plan limits, video comparison and sync health are all implemented and
+tested. P2 and P3 remain blocked on I1. No further unblocked M4 work remains in this lane.
