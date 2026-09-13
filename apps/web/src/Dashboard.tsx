@@ -16,7 +16,6 @@ import { Bar, Doughnut, Line } from "react-chartjs-2";
 import "./report.css";
 import { byHour, byWeek, byWeekday, commenters } from "./analytics";
 import {
-  budgetState,
   type Filters,
   type Label,
   type LabelledComment,
@@ -35,19 +34,14 @@ import { useSession, useWorkspaces } from "./session";
 import { workspaceState, readableWorkspace } from "./workspace";
 import {
   labels,
-  budgetNames,
-  budgetMessages,
   reviewStateMessages,
   videoLabel,
-  syncMessages,
-  syncErrorMessages,
   displayDate,
   commentText,
   PURGED_AUTHOR,
 } from "./i18n";
 import { reviewHistory } from "./reviewHistory";
 import { describeSource } from "./dataSource";
-import { syncHealth } from "./syncHealth";
 ChartJS.register(
   ArcElement,
   BarElement,
@@ -1436,94 +1430,12 @@ function DashboardBody({
               </section>
             </>
           )}
-          <section aria-labelledby="plan-heading" data-testid="plan-panel">
-            <h2 id="plan-heading">حدود الخطة</h2>
-            {s.plan === null ? (
-              <p data-testid="plan-none">
-                لا توجد خطة مفعّلة لمساحة العمل هذه. يفعّل المشغّل الخطة يدويًا
-                في هذه المرحلة، ولا يعني ذلك نفاد الحد.
-              </p>
-            ) : (
-              <>
-                <p className="muted">
-                  الخطة {s.plan.plan_key} — الفترة من{" "}
-                  {displayDate(s.plan.period_start)} حتى{" "}
-                  {displayDate(s.plan.period_end)} بتوقيت UTC.
-                </p>
-                <ul className="budgets">
-                  {s.plan.budgets.map((b) => {
-                    const state = budgetState(b);
-                    const share = b.allowance
-                      ? Math.min(Math.round((b.used / b.allowance) * 100), 100)
-                      : 100;
-                    return (
-                      <li
-                        key={b.event_type}
-                        data-testid={`budget-${b.event_type}`}
-                      >
-                        <strong>{budgetNames[b.event_type]}</strong>
-                        <span>
-                          {b.used} من {b.allowance} — يتبقى {b.remaining}
-                        </span>
-                        <progress
-                          max={b.allowance || 1}
-                          value={b.used}
-                          aria-hidden="true"
-                        />
-                        <small data-state={state}>
-                          {share}٪ — {budgetMessages[state]}
-                        </small>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            )}
-          </section>
-          {(() => {
-            const health = syncHealth(s.sync, new Date());
-            const run = s.sync?.last_run ?? null;
-            return (
-              <section
-                className="notice"
-                aria-labelledby="sync-heading"
-                data-testid="sync-panel"
-              >
-                <h2 id="sync-heading">صحة المزامنة</h2>
-                <p data-testid="sync-state" data-severity={health.severity}>
-                  <strong>{syncMessages[health.key]}</strong>
-                </p>
-                {health.errorCode && (
-                  <p data-testid="sync-error">
-                    {syncErrorMessages[health.errorCode] ??
-                      "تعذّرت المزامنة لسبب غير مصنَّف"}{" "}
-                    (<code>{health.errorCode}</code>)
-                  </p>
-                )}
-                {health.queued > 0 && (
-                  <p data-testid="sync-queued">مهام منتظرة: {health.queued}</p>
-                )}
-                <p data-testid="sync-worker">
-                  العامل:{" "}
-                  {s.sync?.worker.connected
-                    ? `متصل، آخر نبضة ${displayDate(s.sync.worker.last_heartbeat_at)}`
-                    : "غير متصل. لا يعمل جهاز مطوّر مغلق على مدار الساعة، ولا تُحدَّث البيانات حتى يعود."}
-                </p>
-                {run ? (
-                  <p data-testid="sync-last-run">
-                    آخر تشغيل: {displayDate(run.started_at)} — المصدر{" "}
-                    {run.source} — فيديوهات {run.coverage.videos_seen}، تعليقات{" "}
-                    {run.coverage.comments_collected}.{" "}
-                    {run.coverage.complete
-                      ? "اكتمل اجتياز المصدر."
-                      : "لم يُثبت اجتياز المصدر بالكامل."}
-                  </p>
-                ) : (
-                  <p data-testid="sync-last-run">لا يوجد تشغيل سابق مسجَّل.</p>
-                )}
-              </section>
-            );
-          })()}
+          {/* Plan limits and worker health used to sit here, under the
+              charts. They answer a different question for a different reader —
+              and "no sync has run" qualifies every figure above it, so placing
+              it below meant the caveat arrived after the numbers had been
+              believed. Both now live on /sync, and what stays on this page is
+              the provenance strip at the top, which precedes what it limits. */}
         </>
       )}
     </div>

@@ -397,7 +397,7 @@ test("neutralises spreadsheet formulas in the file but not on screen", async ({
 test("shows the plan limit while there is still room to act", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
+  await page.goto("/sync");
   const analysis = page.getByTestId("budget-comment_analysis");
   // 74 of 100 is past the 70% notice threshold but not yet critical.
   await expect(analysis).toContainText("74 من 100 — يتبقى 26");
@@ -424,14 +424,17 @@ test("escalates to a spent state instead of only warning", async ({ page }) => {
     };
     await route.fulfill({ json: fixture });
   });
-  await page.goto("/dashboard");
+  await page.goto("/sync");
   const analysis = page.getByTestId("budget-comment_analysis");
   await expect(analysis.locator("small")).toHaveAttribute(
     "data-state",
     "exhausted",
   );
   await expect(analysis).toContainText("نفد الحد");
-  // A spent allowance must not be presented as a failure of the data.
+  // A spent allowance must not be presented as a failure of the data. The
+  // budget lives on the operations page now, so the claim is checked where the
+  // data is — the property is unchanged, only the two halves sit apart.
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
 });
 
@@ -443,7 +446,7 @@ test("distinguishes no activated plan from no allowance left", async ({
     fixture.plan = null;
     await route.fulfill({ json: fixture });
   });
-  await page.goto("/dashboard");
+  await page.goto("/sync");
   await expect(page.getByTestId("plan-none")).toContainText(
     "لا توجد خطة مفعّلة",
   );
@@ -753,7 +756,7 @@ async function withSync(page: import("@playwright/test").Page, sync: unknown) {
 test("states plainly that nothing has synced and no worker is connected", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
+  await page.goto("/sync");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -784,7 +787,7 @@ test("shows queued work with no worker as stalled, not as a healthy last run", a
       coverage: { videos_seen: 5, comments_collected: 900, complete: true },
     },
   });
-  await page.goto("/dashboard");
+  await page.goto("/sync");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -809,7 +812,7 @@ test("does not present a partial collection as a completed one", async ({
       coverage: { videos_seen: 5, comments_collected: 120, complete: false },
     },
   });
-  await page.goto("/dashboard");
+  await page.goto("/sync");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -828,14 +831,15 @@ test("reads a malformed sync block as unknown rather than healthy", async ({
   page,
 }) => {
   await withSync(page, { worker: "yes please", queued_jobs: "many" });
-  await page.goto("/dashboard");
+  await page.goto("/sync");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
     "unknown",
   );
   await expect(panel).toContainText("لا تتوفر بيانات عن حالة المزامنة");
-  // The rest of the dashboard still works; sync health is not load-bearing.
+  // The dashboard still works; sync health is not load-bearing for it.
+  await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
 });
 
@@ -911,7 +915,9 @@ test("no figure is carried by colour alone", async ({ page }) => {
   await expect(
     page.getByRole("listitem").filter({ hasText: "إيجابي:" }),
   ).toHaveText("إيجابي: 1 (25٪)");
-  // Same for the plan meters: the numbers are text beside the bar.
+  // Same for the plan meters: the numbers are text beside the bar. They moved
+  // to the operations page, and the rule follows them.
+  await page.goto("/sync");
   await expect(page.locator("progress").first()).toHaveAttribute(
     "aria-hidden",
     "true",
@@ -952,7 +958,7 @@ test("a sync failure reads as a sentence, not as a raw code", async ({
       coverage: { videos_seen: 1, comments_collected: 0, complete: false },
     },
   });
-  await page.goto("/dashboard");
+  await page.goto("/sync");
   const detail = page.getByTestId("sync-error");
   // The explanation leads; the identifier is supporting detail for support.
   await expect(detail).toContainText("رفض المصدر الوصول");
