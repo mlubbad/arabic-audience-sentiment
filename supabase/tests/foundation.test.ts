@@ -66,7 +66,7 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
     );
     // A deliberately tiny plan, so allowance behaviour is visible in a few calls.
     await db.query(
-      "insert into plans(key,analysis_units,backfill_units) values ('test-small',5,2)",
+      "insert into plans(key,analysis_units,backfill_units,channels_limit) values ('test-small',5,2,10)",
     );
     await db.query(
       `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
