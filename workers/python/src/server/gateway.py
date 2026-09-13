@@ -183,8 +183,15 @@ class ControlPlane:
         video_title: str | None,
         batch: Batch,
         predictions: Iterable[dict[str, Any]] = (),
+        progress: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
-        checkpoint = {"cursor": batch.checkpoint} if batch.checkpoint else {}
+        # A channel-wide collection spans many videos, so the checkpoint has to
+        # say which one is in hand and which are already finished. Without that
+        # a resumed job restarts the channel from the top and re-reads
+        # everything it had already read.
+        checkpoint: dict[str, Any] = dict(progress or {})
+        if batch.checkpoint:
+            checkpoint["cursor"] = batch.checkpoint
         payload, digest = build_batch(
             video_id, video_title, checkpoint, batch.outcome, batch.comments, predictions
         )

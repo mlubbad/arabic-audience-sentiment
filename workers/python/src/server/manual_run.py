@@ -20,7 +20,7 @@ from collectors.youtube_api import YouTubeAPI
 from sentiment.deterministic import DeterministicTestAnalyzer
 
 from .gateway import ControlPlane
-from .runner import run_once
+from .runner import run_backfill, run_once
 
 UPLOADS = "https://www.googleapis.com/youtube/v3/channels"
 ITEMS = "https://www.googleapis.com/youtube/v3/playlistItems"
@@ -56,14 +56,27 @@ def survey_uploads(token: str, client: httpx.Client, consider: int = 25) -> dict
         return {**empty, "reason": "no_channel_for_credential"}
     playlist = items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
-    videos = client.get(
-        ITEMS,
-        params={"part": "snippet", "playlistId": playlist, "maxResults": consider},
-        headers=auth, timeout=30,
-    )
-    if videos.status_code != 200:
-        return {**empty, "reason": f"uploads_lookup_failed:{videos.status_code}"}
-    entries = videos.json().get("items") or []
+    entries = []
+    page = None
+    # Paged rather than capped: a backfill is asking about the whole channel,
+    # and stopping at the first page would silently define "the channel" as its
+    # newest 50 uploads.
+    while len(entries) < consider:
+        params = {
+            "part": "snippet",
+            "playlistId": playlist,
+            "maxResults": min(50, consider - len(entries)),
+        }
+        if page:
+            params["pageToken"] = page
+        videos = client.get(ITEMS, params=params, headers=auth, timeout=30)
+        if videos.status_code != 200:
+            return {**empty, "reason": f"uploads_lookup_failed:{videos.status_code}"}
+        body = videos.json()
+        entries.extend(body.get("items") or [])
+        page = body.get("nextPageToken")
+        if not page:
+            break
     if not entries:
         return {**empty, "reason": "channel_has_no_uploads"}
 
@@ -71,16 +84,22 @@ def survey_uploads(token: str, client: httpx.Client, consider: int = 25) -> dict
         e["snippet"]["resourceId"]["videoId"]: e["snippet"].get("title") or ""
         for e in entries
     }
-    stats = client.get(
-        STATS,
-        params={"part": "statistics", "id": ",".join(titles)},
-        headers=auth, timeout=30,
-    )
-    if stats.status_code != 200:
-        return {**empty, "reason": f"statistics_lookup_failed:{stats.status_code}"}
+    ids = list(titles)
+    stat_items = []
+    # videos.list accepts at most 50 ids per call, so a long channel is asked
+    # about in chunks rather than in one request that silently returns fewer.
+    for start in range(0, len(ids), 50):
+        stats = client.get(
+            STATS,
+            params={"part": "statistics", "id": ",".join(ids[start:start + 50])},
+            headers=auth, timeout=30,
+        )
+        if stats.status_code != 200:
+            return {**empty, "reason": f"statistics_lookup_failed:{stats.status_code}"}
+        stat_items.extend(stats.json().get("items") or [])
 
     candidates = []
-    for item in stats.json().get("items") or []:
+    for item in stat_items:
         raw = item.get("statistics", {}).get("commentCount")
         candidates.append({
             "video_id": item["id"],
@@ -107,6 +126,13 @@ def main() -> None:
     # Off by default, and the test analyzer is never the default when it is on:
     # it performs no language understanding, and labelling a real channel with
     # it would put figures on screen that mean nothing about that audience.
+    # A backfill walks the whole channel as one resumable job. Off by default:
+    # it can spend a large share of the day's quota, and that should be asked
+    # for rather than happen because someone ran the collector.
+    p.add_argument("--backfill", action="store_true",
+                   help="walk every upload that has comments, resuming from the checkpoint")
+    p.add_argument("--videos", type=int, default=25,
+                   help="how many recent uploads to consider (backfill only)")
     p.add_argument("--model", default="none",
                    choices=["none", "camelbert-da", "deterministic-test"],
                    help="camelbert-da runs the pinned Arabic classifier; "
@@ -141,18 +167,35 @@ def main() -> None:
         build.video_title = report["chosen"]["title"] or None
         return YouTubeAPI(None, client, access_token=token), report["chosen"]["video_id"]
 
-    worked = run_once(
-        control,
-        None,
-        "",
-        video_title=None,
-        analyzer=analyzer,
-        build_collector=build,
-    )
+    if args.backfill:
+        def plan(token: str):
+            report = survey_uploads(token, client, consider=args.videos)
+            survey.update(report)
+            # Only videos that have something to read. A video with no comments
+            # costs a request and returns nothing, and a channel of those would
+            # spend the quota discovering it one at a time.
+            wanted = [c for c in report["candidates"] if (c["comments"] or 0) > 0]
+            if not wanted:
+                plan.reason = report["reason"]
+                return None, []
+            chosen["videos"] = len(wanted)
+            return YouTubeAPI(None, client, access_token=token), wanted
+
+        worked = run_backfill(control, plan, analyzer=analyzer)
+    else:
+        worked = run_once(
+            control,
+            None,
+            "",
+            video_title=None,
+            analyzer=analyzer,
+            build_collector=build,
+        )
     print(json.dumps(
         {"claimed": worked, "video": chosen or None,
          "why": survey.get("reason", "not_reached"),
          "candidates": survey.get("candidates", []),
+         "mode": "backfill" if args.backfill else "one_video",
          "analysed_with": args.model if analyzer is not None else None,
          "analysis_key": getattr(analyzer, "model_id", None)
          and f"{analyzer.model_id}@{analyzer.revision}"},
