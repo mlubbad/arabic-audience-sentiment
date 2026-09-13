@@ -105,6 +105,31 @@ describe("the first successful analysis becomes the channel's active one", () =>
     await db?.close();
   });
 
+  it("lets the worker's role meter usage, which nothing could do before", async () => {
+    // private.reserve_usage is security invoker and calls private.used_units.
+    // The foundation revokes every private function and grants a named list
+    // back to service_role; reserve_usage was on it and used_units was not, so
+    // the first batch of real predictions died on "permission denied for
+    // function used_units" and reached the worker as a bare 500.
+    await db.exec("reset role");
+    await db.query(
+      "insert into plans(key,analysis_units,backfill_units) values ('t',100,0) on conflict do nothing",
+    );
+    await db.query(
+      `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
+       values ($1,'t','active',now()-interval '1 day',now()+interval '29 days')
+       on conflict (workspace_id) do nothing`,
+      [W],
+    );
+    await db.exec("set role service_role");
+    const reserved = await db.query<{ reserve_usage: string[] }>(
+      "select private.reserve_usage($1,'comment_analysis',array['k1']) as reserve_usage",
+      [W],
+    );
+    expect(reserved.rows[0].reserve_usage).toEqual(["k1"]);
+    await db.exec("reset role");
+  });
+
   it("starts with no analysis, which is why every comment read as unanalysed", async () => {
     expect(await activeKey()).toBeNull();
   });

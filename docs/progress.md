@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-09-14 — Dashboard identity and source-truth repair
+
+The dashboard now waits for the signed-in user's own workspace list before reading comments. Changing account or workspace remounts the report, clearing an open correction and its filters; the query key includes the user and workspace, and placeholder rows are reused only inside that same identity. An unavailable workspace list no longer causes a silent switch to the fixture. The creator can switch between accessible workspaces after choosing one, and the source strip displays its name. The video selector uses the videos in the workspace's source data, including titles where available, rather than two fixture ids. The report introduction does not display a zero while loading or claim topic analysis. A browser test with a local fake Auth/API origin proves that delayed B data and sign-out do not display A's comments; an authenticated walkthrough against the deployed Supabase project remains outstanding. The review-history refresh race found by the full browser suite was corrected so the correction form closes after the new snapshot arrives.
+
 ## 2026-09-14 — Marketing landing copy and asset correction
 
 The landing's supplied third-party hero PNG was removed from tracked source and replaced with an original generated illustration. Its primary indigo accent now matches the product brand token. The landing copy reflects the witnessed private OAuth connection and 65 real comments collected for a pilot channel, while explicitly stating that live dashboard integration and real-model validation remain in progress. These are copy/asset changes, not a claim that the current deployed page or signed-in dashboard has passed a live browser walkthrough. The current private deployment still needs the corrected asset after the concurrently edited dashboard settles. See `docs/landing.md` and the current verification entry.

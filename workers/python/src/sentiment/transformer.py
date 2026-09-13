@@ -24,6 +24,7 @@ testable without downloading half a gigabyte of weights, and `torch` and
 `transformers` stay at the edge in `load_pinned`.
 """
 import math
+import os
 
 from .preprocess import PREPROCESSING_VERSION, is_analysable, to_plain_text
 from .protocol import Label, Prediction
@@ -143,6 +144,14 @@ def load_pinned(card: ModelCard = CAMELBERT_DA_SENTIMENT) -> LogitsAdapter:
     """
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+    # Shared hosting caps how many processes and threads an account may have,
+    # and torch's OpenMP pool sizes itself from the machine's core count — 18
+    # here — which fails outright with "Thread creation failed" before a single
+    # comment is read. One thread by default; an operator with room can raise
+    # it. Thread count does not change the output, so it is not part of the
+    # analysis key: two runs at different widths are the same analysis.
+    torch.set_num_threads(int(os.environ.get("SENTIMENT_TORCH_THREADS", "1")))
 
     tokenizer = AutoTokenizer.from_pretrained(card.model_id, revision=card.revision)
     model = AutoModelForSequenceClassification.from_pretrained(

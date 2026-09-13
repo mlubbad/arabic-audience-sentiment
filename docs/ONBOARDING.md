@@ -80,10 +80,11 @@ Chromium. `uv` must be installed separately.
 | Command | Covers | Latest run |
 | --- | --- | --- |
 | `npm run check` | lint, format, typecheck, unit, SQL, worker, build, secret scan | green |
-| `npm test` | contracts + web unit (10 files) | 83 passed |
-| `npm run test:db` | real SQL + real RLS in PGlite | 73 passed |
-| `npm run worker:test` | Python worker via uv/pytest | 85 passed |
-| `npm run test:e2e` | Playwright against a dev server it starts itself | 45 passed |
+| `npm test` | contracts + web unit | 140 passed on 2026-09-14 |
+| `npm run test:db` | real SQL + real RLS in PGlite | 116 passed on 2026-09-14 |
+| `npm run worker:test` | Python worker via uv/pytest | 108 passed on 2026-09-14 |
+| `npm run test:e2e` | Playwright against a dev server it starts itself | 48 passed on 2026-09-14 |
+| `npm run test:e2e:live` | Signed-in workspace switch and sign-out in a browser against local fake Auth/API responses | 1 passed on 2026-09-14; no real account used |
 
 `npm run check` does **not** include `test:e2e`. Run that separately; it starts its own dev
 server and refuses to adopt one that is already listening — see the port trap below.
@@ -175,7 +176,7 @@ packages/contracts/src/    Zod schemas + the shared snapshot. The barrel
 apps/web/src/              React 19 + Vite + Chart.js dashboard (Arabic, RTL)
   data.ts                  the single place that decides fixture vs live; live
                            needs a configured project AND VITE_DASHBOARD_SOURCE=live
-supabase/migrations/       13 files, applied in filename order, never edited
+supabase/migrations/       Timestamped files, applied in filename order, never edited
 supabase/functions/        _shared/worker-gateway.ts and oauth-start.ts — pure
                            handlers with injected dependencies, testable with no
                            deployed project

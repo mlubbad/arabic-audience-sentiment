@@ -68,13 +68,15 @@ function freshnessSentence(sync: SyncState | null, now: Date): string {
 export function describeSource(input: {
   mode: DataMode;
   workspaceId: string;
+  workspaceName?: string | null;
   persisted: boolean;
   sync: SyncState | null;
   /** Null while the snapshot has not been read. Not zero — see below. */
   total: number | null;
   now: Date;
 }): SourceDescription {
-  const { mode, workspaceId, persisted, sync, total, now } = input;
+  const { mode, workspaceId, workspaceName, persisted, sync, total, now } =
+    input;
   // The strip is shown beside the title from the first paint, before any data
   // has arrived. "Not read yet" and "read, and empty" are different answers, and
   // rendering a zero here would give the second when the first is true.
@@ -99,7 +101,7 @@ export function describeSource(input: {
   return {
     mode,
     badge: "بيانات مباشرة",
-    scope: `مساحة العمل ${workspaceId}`,
+    scope: workspaceName?.trim() || `مساحة العمل ${workspaceId}`,
     coverage: unread ? "جارٍ قراءة البيانات." : coverageSentence(sync),
     persistence: persisted
       ? "التصحيحات تُحفظ في سجل المراجعة ولا يمكن تعديلها بعد الحفظ."

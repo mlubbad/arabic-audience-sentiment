@@ -156,12 +156,33 @@ export function Dashboard() {
   // A new identity remounts the whole report, including any open review dialog.
   // No comment or pending correction from a previous tenant survives the switch.
   return (
-    <DashboardBody
-      key={`${userId}:${mode}:${workspaceId}`}
-      userId={userId}
-      mode={mode}
-      workspaceId={workspaceId}
-    />
+    <>
+      {place.kind === "ready" && place.options.length > 1 && (
+        <div className="notice">
+          <label>
+            مساحة العمل
+            <select
+              aria-label="تغيير مساحة العمل"
+              value={place.id}
+              onChange={(e) => setChosen(e.target.value)}
+            >
+              {place.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+      <DashboardBody
+        key={`${userId}:${mode}:${workspaceId}`}
+        userId={userId}
+        mode={mode}
+        workspaceId={workspaceId}
+        workspaceName={place.kind === "ready" ? place.name : null}
+      />
+    </>
   );
 }
 
@@ -169,10 +190,12 @@ function DashboardBody({
   userId,
   mode,
   workspaceId,
+  workspaceName,
 }: {
   userId: string;
   mode: DataMode;
   workspaceId: string;
+  workspaceName: string | null;
 }) {
   const [filters, setFilters] = useState<Filters>(defaults),
     [query, setQuery] = useState(""),
@@ -371,6 +394,7 @@ function DashboardBody({
   const source = describeSource({
     mode,
     workspaceId,
+    workspaceName,
     persisted: reviewsArePersisted(mode),
     sync: s?.sync ?? null,
     total: s?.total ?? null,

@@ -33,6 +33,26 @@ class ControlPlaneError(Exception):
         self.code, self.retryable = code, retryable
 
 
+def _refusal_code(data: object, status: int) -> str:
+    """The server's own code, or something better than silence.
+
+    A refusal used to collapse to the bare string "control_plane_error"
+    whenever the body did not carry `code` — which told an operator nothing at
+    all about a batch the server had just rejected. The full message is still
+    not repeated: a PostgREST error can contain the request URL, and that URL
+    carries the key. So this takes a short token-shaped value only, and
+    otherwise falls back to naming the status.
+    """
+    if isinstance(data, dict):
+        for key in ("code", "error", "error_code"):
+            value = data.get(key)
+            # A code is a token. A sentence is a message, and messages are the
+            # things that carry URLs.
+            if isinstance(value, str) and value and len(value) <= 64 and " " not in value:
+                return value
+    return f"control_plane_error:{status}"
+
+
 class LeaseLost(ControlPlaneError):
     def __init__(self):
         super().__init__("lease_lost", retryable=False)
@@ -142,7 +162,7 @@ class ControlPlane:
         except ValueError:
             raise ControlPlaneError("invalid_response", retryable=False) from None
         if response.status_code >= 400:
-            code = data.get("code", "control_plane_error") if isinstance(data, dict) else "control_plane_error"
+            code = _refusal_code(data, response.status_code)
             if code == "lease_lost":
                 raise LeaseLost()
             # 5xx may be transient; a refusal at 4xx is a decision, not a blip.

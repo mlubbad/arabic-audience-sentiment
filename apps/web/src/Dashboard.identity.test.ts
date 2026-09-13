@@ -10,6 +10,12 @@ const shared = vi.hoisted(() => ({
   user: "user-b",
   workspaces: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "مساحة ب" }],
   workspacesLoading: false,
+  forcedPlace: null as null | {
+    kind: "ready";
+    id: string;
+    name: string;
+    options: { id: string; name: string }[];
+  },
   previous: null as unknown,
   previousKey: [] as unknown[],
 }));
@@ -25,6 +31,14 @@ vi.mock("./session", () => ({
     failed: false,
   }),
 }));
+vi.mock("./workspace", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./workspace")>();
+  return {
+    ...real,
+    workspaceState: (input: Parameters<typeof real.workspaceState>[0]) =>
+      shared.forcedPlace ?? real.workspaceState(input),
+  };
+});
 vi.mock("./data", () => ({
   configuredMode: "live",
   fixtureWorkspace: "00000000-0000-4000-8000-000000000001",
@@ -99,6 +113,7 @@ describe("dashboard identity boundary", () => {
     shared.user = "user-b";
     shared.workspaces = [{ id: B, name: "مساحة ب" }];
     shared.workspacesLoading = false;
+    shared.forcedPlace = null;
     shared.previous = previousData;
     shared.previousKey = ["dashboard", "live", { workspace_id: A }];
   });
@@ -122,5 +137,24 @@ describe("dashboard identity boundary", () => {
     const html = renderToStaticMarkup(createElement(Dashboard));
     expect(html).toContain("جارٍ تحميل مساحات العمل");
     expect(html).not.toContain("بيانات اصطناعية");
+  });
+
+  it("keeps workspace switching available after a creator chooses one", () => {
+    shared.previous = null;
+    shared.forcedPlace = {
+      kind: "ready",
+      id: B,
+      name: "مساحة ب",
+      options: [
+        { id: A, name: "مساحة أ" },
+        { id: B, name: "مساحة ب" },
+      ],
+    };
+    const html = renderToStaticMarkup(createElement(Dashboard));
+    expect(html).toContain('aria-label="تغيير مساحة العمل"');
+    expect(html).toContain("مساحة أ");
+    expect(html).toContain("مساحة ب");
+    expect(html).toContain('data-testid="source-scope">مساحة ب');
+    expect(html).not.toContain(`data-testid="source-scope">مساحة العمل ${B}`);
   });
 });

@@ -59,6 +59,13 @@ const STATUS: Record<string, number> = {
   invalid_batch: 400,
   batch_too_large: 400,
   invalid_outcome: 400,
+  // A workspace with no plan, or one outside its period, is a decision about
+  // entitlement — not a fault in this service. These were missing from the
+  // map, so metering refused a batch of real predictions and the worker was
+  // told "control_plane_error": an operator reading that would go looking for
+  // a broken function instead of an unconfigured workspace.
+  no_active_plan: 402,
+  plan_inactive: 402,
 };
 
 /**
@@ -190,8 +197,17 @@ export async function handleWorkerRequest(
   } catch (error) {
     const code = refusalCode(error);
     if (code) return refuse(code);
-    // Anything unrecognised is reported without its message: a driver error can
-    // carry the connection string, and a credential with it.
-    return json(500, { code: "control_plane_error" });
+    // The message is still withheld — a driver error can carry the connection
+    // string, and a credential with it. The SQLSTATE is not the message: five
+    // characters that name the class of failure and can hold no secret. It was
+    // being discarded along with the message, which left an operator with a
+    // rejected batch and the word "error", and no way to tell a constraint
+    // violation from a missing function.
+    const sqlstate = (error as { code?: string } | null)?.code;
+    const named =
+      typeof sqlstate === "string" && /^[0-9A-Z]{5}$/.test(sqlstate)
+        ? `control_plane_error:${sqlstate}`
+        : "control_plane_error";
+    return json(500, { code: named });
   }
 }

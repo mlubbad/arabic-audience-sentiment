@@ -1,5 +1,25 @@
 # Verification
 
+## 2026-09-14 — Dashboard identity, video choices, and honest introduction
+
+On `0ea0ca0` plus the shared working-tree changes (Claude Code was editing the new report and model path concurrently), Node 22.14.0:
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run apps/web/src/Dashboard.identity.test.ts --reporter=dot` before the identity fix | 2 failed initially: a previous tenant's comment rendered under the next workspace and after sign-out. After adding the pending-workspace case, 3 failed; the new case showed the fixture path while a signed-in workspace list was still loading |
+| `npx vitest run apps/web/src/session.test.ts --reporter=dot` before the workspace-loading fix | 1 failed: a signed-in user was initially reported as having finished loading before the workspace request began |
+| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'actual pending fetch\|video filter offers'` before the copy/video fixes | Both failed: the hero reported zero while a request was held, and the selector lacked the unfamiliar video id supplied by the test fixture |
+| `npx vitest run apps/web/src/session.test.ts apps/web/src/Dashboard.identity.test.ts --reporter=dot` after the fix | 4 passed |
+| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'Arabic fixture shell filters\|actual pending fetch\|video filter offers'` after the fix | 3 passed |
+| `npm run check` | Passed: lint, format, typecheck, Edge Function check, 140 unit tests, 116 SQL tests, 108 worker tests, build, and secret scan |
+| `E2E_PORT=5332 npm run test:e2e` initial full run | 47 passed, 1 failed: review history was reopened before the invalidated snapshot had refreshed |
+| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'history says who reviewed'` after keeping the correction form open until refresh | 1 passed |
+| `E2E_PORT=5332 npm run test:e2e` final full run | 48 passed (52.5s) |
+| `npx vitest run apps/web/src/Dashboard.identity.test.ts apps/web/src/dataSource.test.ts --reporter=dot` after retaining the workspace selector and showing its name | 12 passed; the new selector/name assertion was observed failing before implementation |
+| `npm run test:e2e:live` | 1 passed (3.8s): fake local Auth/PostgREST responses, A then delayed B, then sign-out; A's text was absent during B loading and after sign-out |
+
+The identity test renders the real Dashboard component with a controlled previous query result, so it asserts the user-visible absence of another tenant's text. The dynamic-video and loading tests run the actual Vite UI against sanitized fixtures. The separate live-mode browser test signs in through a local fake API and delays the second workspace's response; it exercises the actual UI and query lifecycle without external credentials. It is **mocked integration**, not proof against a deployed Supabase project. Model inference against real comments and the corrected private deploy also remain unproven by these checks.
+
 ## 2026-09-14 — Landing asset and current-state copy
 
 At `0ea0ca0` plus the landing working-tree changes, with concurrent uncommitted live-dashboard work outside this increment:
