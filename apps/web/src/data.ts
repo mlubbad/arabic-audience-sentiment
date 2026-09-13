@@ -10,16 +10,36 @@ import {
   type CommentReviewInput,
   type Filters,
 } from "@sentiment/contracts";
-import { supabase } from "./supabase";
 export const fixtureWorkspace = "00000000-0000-4000-8000-000000000001";
 
+export type DataMode = "sanitized_fixture" | "live";
+
 /**
- * Fixture mode has no server, so corrections are kept for this browser session
- * only and are never sent anywhere. They go through the same shared applyReview
- * rules that the server RPC mirrors, so the dashboard recomputes identically.
+ * What the dashboard is actually serving, decided in one place.
+ *
+ * There is no live comment read path yet, so this is fixture and nothing can
+ * change it. Configuring Supabase enables product Auth and workspace
+ * management on the account screen; it does not turn fixture rows into live
+ * data. In particular it must never redirect a correction made against a
+ * fixture row at a live RPC, which would address a fixture id and a fixture
+ * workspace to a real server and then report success.
+ *
+ * The live path arrives together with a live dashboard read, as one change, so
+ * the read and write paths can never disagree about which mode they are in.
  */
+export const dataMode: DataMode = "sanitized_fixture";
+
+/**
+ * Corrections are persisted only when the data itself is live. Derived from the
+ * data mode rather than from whether Auth happens to be configured, so the UI
+ * cannot claim a correction was saved while it is editing fixture rows.
+ */
+export const reviewsArePersisted = dataMode !== "sanitized_fixture";
+
+// Fixture corrections are kept for this browser session only and are never sent
+// anywhere. They go through the same shared applyReview rules the server RPC
+// mirrors, so the dashboard recomputes identically either way.
 const sessionReviews: { input: CommentReviewInput; at: string }[] = [];
-export const reviewsArePersisted = supabase !== null;
 
 function withSessionReviews(comments: Comment[]): Comment[] {
   return sessionReviews.reduce(
@@ -58,22 +78,12 @@ export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
 
 export async function submitReview(raw: CommentReviewInput) {
   const input = CommentReviewInputSchema.parse(raw);
-  if (supabase) {
-    // The RPC re-checks role, tenancy and the content hash server-side; this
-    // call is a request, not the authority on whether it is allowed.
-    const { error } = await supabase.rpc("submit_comment_review", {
-      w: input.workspace_id,
-      c: input.comment_id,
-      seen_hash: input.content_hash,
-      verdict: input.label,
-      why: input.reason,
-    });
-    if (error) throw new Error(error.message);
-    return;
-  }
+  // No live branch here on purpose. While the dashboard serves fixtures, a
+  // correction belongs to the fixture it was made against, whatever Auth is
+  // configured. Adding a server call keyed on Auth is the defect this prevents.
+  const fixture = await readFixture();
   // Validate against the current fixture so a verdict on changed text is
   // rejected here too, instead of failing later during a reload.
-  const fixture = await readFixture();
   applyReview(
     withSessionReviews(fixture.comments),
     input,
