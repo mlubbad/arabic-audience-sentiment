@@ -20,7 +20,10 @@ Deno.serve(async (request) => {
   const json = (code: number, body: unknown) =>
     new Response(JSON.stringify(body), {
       status: code,
-      headers: { "content-type": "application/json", ...corsHeaders(request) },
+      headers: {
+        "content-type": "application/json",
+        ...corsHeaders(request, allowed),
+      },
     });
 
   if (request.method !== "POST")

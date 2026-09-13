@@ -29,6 +29,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run lint` | Pass — ESLint clean; Ruff "All checks passed!" |
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
+| `npm run check:functions` | Pass — `deno check` on the three Edge Function entry points |
 | `npm test` | Pass — **83 tests, 10 files** |
 | `npm run test:db` | Pass — **103 tests, 11 files** |
 | `npm run worker:test` | Pass — **91 tests, 11 files** |
@@ -678,6 +679,37 @@ generic.
 The outcome travels from the function to the app as a **code, never a message**: a code is an
 enum the app translates, while a message could carry a Google error body, and those quote the
 request back.
+
+## The entry points had no typechecker, and it cost a production 500
+
+`tsconfig.json` excludes `supabase/functions/*/index.ts` because the Node compiler knows
+nothing of `npm:` specifiers or the `Deno` global. The reasoning was that Deno checks them at
+deploy. It does not: `supabase functions deploy` bundles without typechecking, so the
+exclusion left them checked by nothing at all.
+
+What shipped through that gap was a one-argument call to a two-argument function. `corsHeaders`
+had gained an `allowed` parameter; one call site kept the old shape, `allowed` was `undefined`,
+`.includes` threw, and every POST to `oauth-start` returned 500 with no CORS headers — which
+the browser reports as `TypeError: Failed to fetch`, indistinguishable from the CORS problem
+that had just been fixed. The preflight kept working, because that call site *had* been
+updated, which made it look like a CORS fault rather than a crash.
+
+`npm run check:functions` runs `deno check` over the three entry points and is part of
+`npm run check`. Verified by reintroducing the exact bug: `TS2554: Expected 2 arguments, but
+got 1`, exit 1.
+
+Diagnosed in a real browser rather than by reasoning. `curl` could not reproduce any of it,
+and the decisive measurement was that `/auth/v1/health` answered from the page while every
+`/functions/v1/` call threw — which separated "cannot reach Supabase" from "this function is
+broken".
+
+## Three unasserted edits, and what they cost
+
+Three string replacements in this session silently matched nothing, because the file had been
+reformatted between writing and editing it. One of them deployed unchanged and cost three
+round trips diagnosing a platform that was behaving correctly; one shipped the 500 above.
+Every edit now asserts its anchor and its result, and the arity class is caught by a compiler
+rather than by a person.
 
 ## Notes on running the suites
 

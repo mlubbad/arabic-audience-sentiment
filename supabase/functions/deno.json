@@ -1,0 +1,4 @@
+{
+  "//": "Deno's view of the Edge Functions, for `npm run check:functions` only. The deploy bundler resolves npm: specifiers itself and does not read this file. tsconfig.json excludes these entry points because the Node compiler knows nothing of npm: specifiers or the Deno global — which is how a call with the wrong number of arguments once shipped a 500 to production.",
+  "nodeModulesDir": "auto"
+}
