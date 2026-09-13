@@ -686,3 +686,100 @@ test("does not present comment-scoped figures as lifetime video metrics", async 
     "ضمن الفلاتر الحالية",
   );
 });
+
+async function withSync(page: import("@playwright/test").Page, sync: unknown) {
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    fixture.sync = sync;
+    await route.fulfill({ json: fixture });
+  });
+}
+
+test("states plainly that nothing has synced and no worker is connected", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const panel = page.getByTestId("sync-panel");
+  await expect(panel.getByTestId("sync-state")).toHaveAttribute(
+    "data-severity",
+    "critical",
+  );
+  await expect(panel).toContainText("لم تُنفذ أي مزامنة، ولا يوجد عامل متصل");
+  // The reason a developer machine is not a scheduler must be said, not implied.
+  await expect(panel.getByTestId("sync-worker")).toContainText(
+    "لا يعمل جهاز مطوّر مغلق على مدار الساعة",
+  );
+  await expect(panel.getByTestId("sync-last-run")).toContainText(
+    "لا يوجد تشغيل سابق",
+  );
+});
+
+test("shows queued work with no worker as stalled, not as a healthy last run", async ({
+  page,
+}) => {
+  await withSync(page, {
+    worker: { connected: false, last_heartbeat_at: "2026-09-12T09:00:00Z" },
+    queued_jobs: 3,
+    last_run: {
+      started_at: "2026-09-13T11:00:00Z",
+      ended_at: "2026-09-13T11:30:00Z",
+      status: "succeeded",
+      source: "youtube_data_api_public",
+      error_code: null,
+      coverage: { videos_seen: 5, comments_collected: 900, complete: true },
+    },
+  });
+  await page.goto("/");
+  const panel = page.getByTestId("sync-panel");
+  await expect(panel.getByTestId("sync-state")).toHaveAttribute(
+    "data-severity",
+    "critical",
+  );
+  await expect(panel).toContainText("مهام منتظرة ولا يوجد عامل متصل");
+  await expect(panel.getByTestId("sync-queued")).toContainText("3");
+});
+
+test("does not present a partial collection as a completed one", async ({
+  page,
+}) => {
+  await withSync(page, {
+    worker: { connected: true, last_heartbeat_at: "2026-09-13T11:59:00Z" },
+    queued_jobs: 0,
+    last_run: {
+      started_at: "2026-09-13T11:00:00Z",
+      ended_at: "2026-09-13T11:30:00Z",
+      status: "partial",
+      source: "youtube_data_api_public",
+      error_code: "source_ended_without_completion",
+      coverage: { videos_seen: 5, comments_collected: 120, complete: false },
+    },
+  });
+  await page.goto("/");
+  const panel = page.getByTestId("sync-panel");
+  await expect(panel.getByTestId("sync-state")).toHaveAttribute(
+    "data-severity",
+    "warning",
+  );
+  await expect(panel).toContainText("التغطية جزئية وليست اكتمالًا");
+  await expect(panel.getByTestId("sync-error")).toContainText(
+    "source_ended_without_completion",
+  );
+  await expect(panel.getByTestId("sync-last-run")).toContainText(
+    "لم يُثبت اجتياز المصدر بالكامل",
+  );
+});
+
+test("reads a malformed sync block as unknown rather than healthy", async ({
+  page,
+}) => {
+  await withSync(page, { worker: "yes please", queued_jobs: "many" });
+  await page.goto("/");
+  const panel = page.getByTestId("sync-panel");
+  await expect(panel.getByTestId("sync-state")).toHaveAttribute(
+    "data-severity",
+    "unknown",
+  );
+  await expect(panel).toContainText("لا تتوفر بيانات عن حالة المزامنة");
+  // The rest of the dashboard still works; sync health is not load-bearing.
+  await expect(page.getByTestId("total")).toHaveText("6");
+});

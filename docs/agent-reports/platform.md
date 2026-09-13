@@ -458,3 +458,56 @@ contract, so the comparison labels by identifier through a fixture-local lookup.
 read path this needs either a per-video aggregate on `dashboard_snapshot` or a `videos`
 projection carrying title and kind — one snapshot call per video will not scale to a channel
 with 194 of them. Recorded here rather than worked around.
+
+## Sync health panel (done, 2026-09-13)
+
+The panel classifies rather than summarises, because the specification is explicit that a
+worker on a closed laptop does not give round-the-clock updates and that a collection which
+stopped early is partial or failed but never a successful empty dataset. "Succeeded" alone is
+therefore not enough to call a channel current.
+
+| State | Severity | Why it is separate |
+| --- | --- | --- |
+| `stalled` | critical | Queued work with no worker. Checked **first**, so a healthy previous run cannot hide that nothing is progressing |
+| `never_run_no_worker` / `never_run` | critical / warning | Nothing has run; whether anyone could is a different problem |
+| `failed` / `blocked` | critical | Shown with the error code, not a generic failure |
+| `partial` | warning | Stopped before the end; never rendered as completion |
+| `incomplete_coverage` | warning | The source stopped returning rows, which is not proof everything was retrieved. Outranks recency |
+| `stale` | warning | Completed, but more than 24h ago |
+| `running` / `healthy` | ok | In progress with no outcome guessed, or complete and recent |
+| `no_data` | unknown | Absent or malformed input reads as unknown, never as healthy |
+
+The worker line states *why* a developer machine is not a scheduler rather than implying it.
+
+In fixture mode the panel shows "no sync has run and no worker is connected". That is not a
+placeholder: it is the true state, and it is what the acceptance criteria ask to be visible.
+
+### Defensive parsing
+
+`readSyncState()` validates the block and returns null on anything unexpected, so a
+malformed payload reads as `unknown` rather than falling through to healthy. A browser test
+feeds it `{worker: "yes please", queued_jobs: "many"}` and asserts both the unknown state and
+that the rest of the dashboard still works — sync health is not load-bearing.
+
+### Contract note
+
+The shared contract has no `sync_runs` schema and `FixtureSchema` is not strict, so it
+silently strips a `sync` key. The block is therefore read from the raw payload alongside
+`FixtureSchema.parse`, and validated by a local presentation model in
+`apps/web/src/syncHealth.ts`. I could not add `zod` to `apps/web` for this because the
+package manifest is outside my lane; the validation is hand-rolled instead of pulling in an
+undeclared dependency.
+
+**Shared-contract request:** canonicalise this shape as `SyncRunSchema` plus a `sync` field on
+`FixtureSchema`. The local type in `syncHealth.ts` is the proposed shape; the classification
+logic is presentation and should stay in the app.
+
+### Commands and results
+
+- `npm run check` — pass (45 unit across 7 files, 18 SQL, 23 worker, build, secret scan)
+- `npm run test:e2e` — 33 passed in 19.3s, on port 5199
+- `node scripts/check-ownership.mjs platform` — pass
+
+Nine unit tests and four browser tests were confirmed failing before the code existed. One
+unit expectation was wrong on the first run — a 49.5-hour gap rounds to 50, not 49 — and the
+test was rewritten to use an exact 48-hour gap rather than depending on rounding.

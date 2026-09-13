@@ -21,9 +21,11 @@ import {
   budgetMessages,
   reviewStateMessages,
   videoLabel,
+  syncMessages,
   displayDate,
 } from "./i18n";
 import { reviewHistory } from "./reviewHistory";
+import { syncHealth } from "./syncHealth";
 ChartJS.register(ArcElement, Tooltip, Legend);
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export function Dashboard() {
@@ -714,13 +716,48 @@ export function Dashboard() {
               </>
             )}
           </section>
-          <section className="notice">
-            <h2>حالة الاتصال والجمع</h2>
-            <p>
-              لا يوجد عامل متصل. لم تُنفذ مزامنة حية. مصدر هذه الشاشة: ملفات
-              اختبار محلية.
-            </p>
-          </section>
+          {(() => {
+            const health = syncHealth(s.sync, new Date());
+            const run = s.sync?.last_run ?? null;
+            return (
+              <section
+                className="notice"
+                aria-labelledby="sync-heading"
+                data-testid="sync-panel"
+              >
+                <h2 id="sync-heading">صحة المزامنة</h2>
+                <p data-testid="sync-state" data-severity={health.severity}>
+                  <strong>{syncMessages[health.key]}</strong>
+                </p>
+                {health.errorCode && (
+                  <p data-testid="sync-error">
+                    رمز الخطأ: <code>{health.errorCode}</code>
+                  </p>
+                )}
+                {health.queued > 0 && (
+                  <p data-testid="sync-queued">مهام منتظرة: {health.queued}</p>
+                )}
+                <p data-testid="sync-worker">
+                  العامل:{" "}
+                  {s.sync?.worker.connected
+                    ? `متصل، آخر نبضة ${displayDate(s.sync.worker.last_heartbeat_at)}`
+                    : "غير متصل. لا يعمل جهاز مطوّر مغلق على مدار الساعة، ولا تُحدَّث البيانات حتى يعود."}
+                </p>
+                {run ? (
+                  <p data-testid="sync-last-run">
+                    آخر تشغيل: {displayDate(run.started_at)} — المصدر{" "}
+                    {run.source} — فيديوهات {run.coverage.videos_seen}، تعليقات{" "}
+                    {run.coverage.comments_collected}.{" "}
+                    {run.coverage.complete
+                      ? "اكتمل اجتياز المصدر."
+                      : "لم يُثبت اجتياز المصدر بالكامل."}
+                  </p>
+                ) : (
+                  <p data-testid="sync-last-run">لا يوجد تشغيل سابق مسجَّل.</p>
+                )}
+              </section>
+            );
+          })()}
         </>
       )}
     </>

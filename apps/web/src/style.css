@@ -218,6 +218,15 @@ small {
   font-weight: 700;
   margin: 0.8rem 0 0.4rem;
 }
+[data-severity="warning"] strong {
+  color: #8a5a00;
+}
+[data-severity="critical"] strong {
+  color: #9a2b2b;
+}
+[data-severity="ok"] strong {
+  color: #1d6047;
+}
 .share {
   list-style: none;
   padding: 0;

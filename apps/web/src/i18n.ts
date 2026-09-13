@@ -42,3 +42,17 @@ const fixtureVideoNames: Record<string, string> = {
 export function videoLabel(id: string) {
   return fixtureVideoNames[id] ?? id;
 }
+export const syncMessages: Record<string, string> = {
+  healthy: "آخر مزامنة اكتملت حديثًا",
+  running: "مزامنة قيد التنفيذ الآن؛ النتيجة غير معروفة بعد",
+  stale: "مضى وقت طويل على آخر مزامنة؛ قد تكون البيانات قديمة",
+  partial: "آخر مزامنة توقفت قبل نهايتها؛ التغطية جزئية وليست اكتمالًا",
+  incomplete_coverage:
+    "انتهى المصدر دون إثبات التغطية الكاملة؛ لا يعني ذلك جمع كل التعليقات",
+  failed: "فشلت آخر مزامنة",
+  blocked: "تعذّر الوصول إلى المصدر في آخر مزامنة",
+  stalled: "توجد مهام منتظرة ولا يوجد عامل متصل لتنفيذها",
+  never_run: "لم تُنفذ أي مزامنة بعد",
+  never_run_no_worker: "لم تُنفذ أي مزامنة، ولا يوجد عامل متصل",
+  no_data: "لا تتوفر بيانات عن حالة المزامنة",
+};

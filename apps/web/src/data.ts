@@ -10,6 +10,8 @@ import {
   type CommentReviewInput,
   type Filters,
 } from "@sentiment/contracts";
+import { readSyncState } from "./syncHealth";
+
 export const fixtureWorkspace = "00000000-0000-4000-8000-000000000001";
 
 // A channel can have hundreds of videos; comparing all of them is neither
@@ -55,7 +57,10 @@ function withSessionReviews(comments: Comment[]): Comment[] {
 async function readFixture(signal?: AbortSignal) {
   const response = await fetch("/fixtures/dashboard.json", { signal });
   if (!response.ok) throw new Error("fixture_unavailable");
-  return FixtureSchema.parse(await response.json());
+  const raw = await response.json();
+  // FixtureSchema is not strict, so it strips keys it does not model. The sync
+  // block is read from the raw payload until the shared contract carries it.
+  return { ...FixtureSchema.parse(raw), sync: readSyncState(raw?.sync) };
 }
 
 export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
@@ -108,6 +113,7 @@ export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
       // Plan state travels with the snapshot, so the limit on screen always
       // belongs to the same read as the numbers beside it.
       plan: fixture.plan,
+      sync: fixture.sync,
       cursor_reset,
     };
   };
