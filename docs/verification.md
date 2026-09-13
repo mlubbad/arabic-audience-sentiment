@@ -371,12 +371,18 @@ holding the publishable key, because that is the boundary a stranger actually re
 This retires one specific caveat: the grants and the schema separation hold in a deployed
 Supabase and not only in an embedded Postgres. It does **not** retire the others.
 
-**Still unverified, and named:** every authenticated path. Creating a test user needs either
-the service-role key (admin create) or a real mailbox — GoTrue rejects reserved test domains,
-and guessing at domains to get past that would risk mailing a live address. So the
-personal-workspace bootstrap trigger, a member reading their own workspace, a member being
-refused another's, the live dashboard read returning real rows, and the worker gateway over
-HTTP are all still untested against the deployed project. The Edge Functions are not deployed.
+**Authenticated paths, partly verified 2026-09-13** by the operator signing up on the deployed
+preview with a real mailbox — which is how this got tested at all, since GoTrue rejects
+reserved test domains and guessing at domains to get past that would risk mailing a live
+address. Confirmed live: the `bootstrap_personal_workspace` trigger fires on a real GoTrue
+signup and creates the workspace named مساحة العمل الشخصية; an authenticated member reads
+their own workspaces through PostgREST and sees only those; and `create_workspace` succeeds
+as that member. None of this could run in PGlite, which has no GoTrue.
+
+**Still unverified:** a member being refused another tenant's workspace while authenticated
+(anonymous refusal is verified, member-vs-member is not), the live dashboard read returning
+real rows, and the worker gateway over HTTP. The Edge Functions are not deployed, and that
+still needs the service-role key.
 
 ## A filename bug the first real push found
 

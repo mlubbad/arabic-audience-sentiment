@@ -8,7 +8,7 @@
 # the document root, which is why that file cannot be served.
 AuthType Basic
 AuthName "Sentiment MVP - private preview"
-AuthUserFile /home/u92286/domains/app.sky-develop.net/.htpasswd_app
+AuthUserFile /home/u101542/domains/app.sky-develop.net/.htpasswd_app
 Require valid-user
 
 # Single-page app: an unknown path is the router's business, not the
