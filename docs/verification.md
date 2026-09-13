@@ -647,6 +647,38 @@ two orphans were on the server before this was noticed. It now matches every fil
 `assets/`, verified by a redeploy that removed exactly the two stale chunks and kept the five
 current ones.
 
+## A real consent round trip, and the three defects it found
+
+The operator connected a channel through Google's consent screen. It got further than anything
+before it: the state was consumed, the code was exchanged for tokens, and it failed at
+`channels.list`. Three separate defects, none of which any test here could have found.
+
+**CORS.** The button failed with a bare network error because the function sent no
+access-control headers and answered `OPTIONS` with 405, so the browser refused to send at all.
+Every curl check had passed, because curl does not enforce CORS. That is the whole lesson:
+*verified with curl* was not *works in a browser*, and only a browser was going to find it. An
+allowlist now, not `*` — these functions are reached with a user's token in a header, so a
+permissive origin would let any page start a connection with a token it had obtained. An unset
+allowlist permits nobody, which is the direction that fails safely.
+
+**The result page could not be served.** Supabase rewrites a function's content-type to
+`text/plain` with `nosniff` and will not serve HTML from its own domain, so the Arabic page
+arrived as mojibake. The bytes were valid UTF-8 throughout; the header was the problem, and it
+was not ours to set. The callback now redirects to `/connected` in the app, which is better
+regardless: the person ends up inside the product rather than stranded on a `supabase.co` URL.
+
+**`channel_lookup_failed` said nothing.** The refusal is almost certainly that YouTube Data
+API v3 is not enabled in the Google Cloud project — consent and API access are separate, and
+granting one does not switch on the other. The lookup now reads Google's machine-readable
+reason, which is an enum carrying no request detail and no credential, and maps
+`accessNotConfigured` to a sentence naming the one thing in the way, with a link to the page
+that fixes it. Quota and missing scope are told apart from it, and anything unrecognised stays
+generic.
+
+The outcome travels from the function to the app as a **code, never a message**: a code is an
+enum the app translates, while a message could carry a Google error body, and those quote the
+request back.
+
 ## Notes on running the suites
 
 The browser suite is timing-sensitive. During this work the host reached load average 17 and

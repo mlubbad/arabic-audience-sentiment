@@ -151,6 +151,18 @@ export async function exchangeCode(
   };
 }
 
+/** Google's machine-readable reason for a refusal, or "" when it gave none. */
+async function refusalReason(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as {
+      error?: { status?: string; errors?: { reason?: string }[] };
+    };
+    return body.error?.errors?.[0]?.reason ?? body.error?.status ?? "";
+  } catch {
+    return "";
+  }
+}
+
 /** Whose channel this is, according to Google rather than according to the caller. */
 export async function fetchOwnChannel(
   accessToken: string,
@@ -160,7 +172,20 @@ export async function fetchOwnChannel(
     method: "GET",
     headers: { authorization: `Bearer ${accessToken}` },
   });
-  if (!response.ok) throw new ConnectError("channel_lookup_failed");
+  if (!response.ok) {
+    // Google's own name for the refusal, which is an enum rather than prose:
+    // it carries no request detail and no credential, and it is the difference
+    // between "something failed" and "the YouTube Data API is switched off in
+    // your Google Cloud project". Anything unrecognised stays generic.
+    const reason = await refusalReason(response);
+    if (reason === "accessNotConfigured" || reason === "SERVICE_DISABLED")
+      throw new ConnectError("youtube_api_not_enabled");
+    if (reason === "quotaExceeded")
+      throw new ConnectError("youtube_quota_exceeded");
+    if (reason === "forbidden" || reason === "insufficientPermissions")
+      throw new ConnectError("youtube_scope_missing");
+    throw new ConnectError("channel_lookup_failed");
+  }
   const body = (await response.json()) as { items?: { id?: unknown }[] };
   const items = body.items ?? [];
   // No channel is a real answer: a Google account without a YouTube channel

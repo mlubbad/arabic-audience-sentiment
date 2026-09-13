@@ -7,6 +7,9 @@ import { Landing } from "./Landing";
 const Dashboard = lazy(() =>
   import("./Dashboard").then((m) => ({ default: m.Dashboard })),
 );
+const Connected = lazy(() =>
+  import("./Connected").then((m) => ({ default: m.Connected })),
+);
 const Account = lazy(() =>
   import("./Account").then((m) => ({ default: m.Account })),
 );
@@ -44,6 +47,7 @@ createRoot(document.getElementById("root")!).render(
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/connected" element={<Connected />} />
             <Route path="*" element={<p>الصفحة غير موجودة</p>} />
           </Route>
         </Routes>
