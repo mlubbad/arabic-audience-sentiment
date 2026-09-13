@@ -73,6 +73,40 @@ create table public.jobs (
  foreign key(workspace_id,channel_id) references public.channels(workspace_id,id)
 );
 create index jobs_claim on public.jobs(status,not_before);
+-- Plans are operator-managed. No tenant grant is issued on this table, so a
+-- workspace cannot raise its own limits.
+create table public.plans (
+ key text primary key,
+ analysis_units integer not null check(analysis_units>=0),
+ backfill_units integer not null default 0 check(backfill_units>=0),
+ channels_limit integer not null default 1 check(channels_limit>=0),
+ members_limit integer not null default 1 check(members_limit>=0)
+);
+insert into public.plans(key,analysis_units,backfill_units,channels_limit,members_limit)
+ values ('pilot',5000,20000,3,5);
+create table public.subscriptions (
+ workspace_id uuid primary key references public.workspaces(id),
+ plan_key text not null references public.plans(key),
+ status text not null default 'active' check(status in ('active','paused','cancelled')),
+ -- The billing period is declared in UTC and does not move with a display timezone.
+ period_start timestamptz not null, period_end timestamptz not null,
+ provider text, provider_ref text,
+ check(period_end>period_start),
+ -- payment_provider is null during the pilot, and mock billing never reaches a real plan.
+ check(provider is null or provider<>'mock')
+);
+create table public.usage_events (
+ workspace_id uuid not null references public.workspaces(id),
+ period_start timestamptz not null, event_key text not null,
+ event_type text not null check(event_type in ('comment_analysis','historical_backfill')),
+ units integer not null default 1 check(units>0),
+ state text not null default 'reserved' check(state in ('reserved','charged')),
+ created_at timestamptz not null default now(),
+ -- One unit per unique event key per workspace, so a retry, a reimport or a
+ -- likes-only refresh can never be charged a second time.
+ primary key(workspace_id,event_key)
+);
+create index usage_events_period on public.usage_events(workspace_id,event_type,period_start);
 create table private.job_batches (
  job_id uuid not null references public.jobs(id),batch_key text not null,checkpoint jsonb not null,primary key(job_id,batch_key)
 );
@@ -99,7 +133,7 @@ grant usage on schema private to authenticated;
 grant execute on function private.has_role(uuid,text[]) to authenticated;
 
 do $$ declare t text; begin
- foreach t in array array['workspaces','memberships','clients','channels','videos','comments','analysis_runs','sentiment_predictions','comment_reviews','jobs'] loop
+ foreach t in array array['workspaces','memberships','clients','channels','videos','comments','analysis_runs','sentiment_predictions','comment_reviews','jobs','subscriptions','usage_events'] loop
  execute format('alter table public.%I enable row level security',t);
  execute format('revoke all on public.%I from anon,authenticated',t);
  if t <> 'jobs' then execute format('grant select on public.%I to authenticated',t); end if;
@@ -112,6 +146,8 @@ grant insert(workspace_id,name),update(name) on public.clients to authenticated;
 create policy clients_insert on public.clients for insert to authenticated with check(private.has_role(workspace_id,array['workspace_owner']));
 create policy clients_update on public.clients for update to authenticated using(private.has_role(workspace_id,array['workspace_owner'])) with check(private.has_role(workspace_id,array['workspace_owner']));
 -- Private tables also deny browser access; only trusted server operations can access them.
+alter table public.plans enable row level security;
+revoke all on public.plans from anon,authenticated;
 alter table private.oauth_connections enable row level security;
 alter table private.oauth_states enable row level security;
 alter table private.job_batches enable row level security;
@@ -211,15 +247,70 @@ begin
  and (q.status='queued' or (q.status='running' and q.lease_expires_at<=now()))
  order by q.not_before,q.id for update skip locked limit 1) returning j.*;
 end $$;
-create function private.commit_checkpoint(j uuid,t uuid,p jsonb,b text) returns void
+-- Metering primitives. Service-only: no authenticated grant is issued, so a
+-- tenant can neither meter itself nor forge a reservation.
+create function private.reserve_usage(w uuid,kind text,keys text[]) returns text[]
 language plpgsql security invoker set search_path='' as $$
-declare old jsonb; begin
- perform 1 from public.jobs where id=j and lease_token=t and status='running' and lease_expires_at>now() for update;
+declare sub record; allowance int; used int; covered text[]; fresh text[]; begin
+ if kind not in ('comment_analysis','historical_backfill') then raise exception 'invalid_event_type' using errcode='22023'; end if;
+ if coalesce(array_length(keys,1),0) > 500 then raise exception 'batch_too_large' using errcode='22023'; end if;
+ -- Locking the subscription serialises reservations for this workspace, so two
+ -- callers cannot both read the same remaining allowance and both spend it.
+ select s.status,s.period_start,s.period_end,pl.analysis_units,pl.backfill_units into sub
+ from public.subscriptions s join public.plans pl on pl.key=s.plan_key
+ where s.workspace_id=w for update of s;
+ if not found then raise exception 'no_active_plan' using errcode='42501'; end if;
+ if sub.status<>'active' or now()<sub.period_start or now()>=sub.period_end then
+ raise exception 'plan_inactive' using errcode='42501'; end if;
+ allowance := case kind when 'comment_analysis' then sub.analysis_units else sub.backfill_units end;
+ -- Already metered at any time in this workspace: a unique comment is charged
+ -- once, not once per period and not once per retry.
+ select coalesce(array_agg(u.event_key),'{}') into covered
+ from public.usage_events u where u.workspace_id=w and u.event_key=any(keys);
+ select coalesce(sum(u.units),0) into used from public.usage_events u
+ where u.workspace_id=w and u.event_type=kind and u.period_start=sub.period_start;
+ select coalesce(array_agg(distinct k),'{}') into fresh from unnest(keys) as k where not (k=any(covered));
+ -- Grant what the remaining allowance holds; the caller decides whether a
+ -- partial grant is usable or whether the whole batch should be refused.
+ fresh := fresh[1:greatest(allowance-used,0)];
+ insert into public.usage_events(workspace_id,period_start,event_key,event_type)
+ select w,sub.period_start,k,kind from unnest(fresh) as k;
+ return covered||fresh;
+end $$;
+create function private.confirm_usage(w uuid,keys text[]) returns int
+language plpgsql security invoker set search_path='' as $$
+declare n int; begin
+ update public.usage_events set state='charged'
+ where workspace_id=w and event_key=any(keys) and state='reserved';
+ get diagnostics n = row_count; return n;
+end $$;
+create function private.release_usage(w uuid,keys text[]) returns int
+language plpgsql security invoker set search_path='' as $$
+declare n int; begin
+ -- A confirmed charge is history. Only an unused reservation is given back.
+ delete from public.usage_events where workspace_id=w and event_key=any(keys) and state='reserved';
+ get diagnostics n = row_count; return n;
+end $$;
+
+create function private.commit_checkpoint(j uuid,t uuid,p jsonb,b text,usage_keys text[] default '{}') returns void
+language plpgsql security invoker set search_path='' as $$
+declare old jsonb; w uuid; covered text[]; wanted int; begin
+ select workspace_id into w from public.jobs
+ where id=j and lease_token=t and status='running' and lease_expires_at>now() for update;
  if not found then raise exception 'lease_lost' using errcode='40001'; end if;
  if jsonb_typeof(p)<>'object' or b is null or length(b) not between 1 and 200 then raise exception 'invalid_batch'; end if;
  select checkpoint into old from private.job_batches where job_id=j and batch_key=b;
  if found then
+ -- A replay of a committed batch is already paid for; it must not meter again.
  if old<>p then raise exception 'batch_conflict'; end if; return;
+ end if;
+ wanted := coalesce(array_length(usage_keys,1),0);
+ if wanted > 0 then
+ covered := private.reserve_usage(w,'comment_analysis',usage_keys);
+ -- Rows, checkpoint and meter move together. A batch that cannot be paid for
+ -- in full is refused outright rather than committed half-metered.
+ if coalesce(array_length(covered,1),0) <> wanted then
+ raise exception 'quota_exceeded' using errcode='53400'; end if;
  end if;
  insert into private.job_batches values(j,b,p);
  update public.jobs set checkpoint=p where id=j;
@@ -237,7 +328,7 @@ grant execute on function public.create_workspace(text),public.enqueue_sync(uuid
 grant usage on schema private to service_role;
 grant all on all tables in schema private to service_role;
 grant all on all tables in schema public to service_role;
-grant execute on function private.claim_job(uuid),private.commit_checkpoint(uuid,uuid,jsonb,text),private.heartbeat(uuid,uuid) to service_role;
+grant execute on function private.claim_job(uuid),private.commit_checkpoint(uuid,uuid,jsonb,text,text[]),private.heartbeat(uuid,uuid),private.reserve_usage(uuid,text,text[]),private.confirm_usage(uuid,text[]),private.release_usage(uuid,text[]) to service_role;
 
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values
  ('imports','imports',false,10485760,array['text/csv','application/json','application/x-ndjson']),

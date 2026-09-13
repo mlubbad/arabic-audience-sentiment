@@ -65,6 +65,14 @@ project, a real sentiment model, or any deployment.
 | Formula-injection safety | implemented | A cell a spreadsheet would evaluate is quoted and prefixed on output only; the stored text is evidence and is never rewritten |
 | Export label honesty | implemented | The file carries the effective label and whether it came from a human or the model; a stale or missing prediction exports an empty label while its status is still recorded |
 | Background export job and signed link | **blocked** | Needs Supabase Storage and a running worker. Fixture mode builds the file in the browser; the object name already carries the workspace prefix the bucket policy checks |
+| Plans and subscriptions | implemented | Operator-managed `plans` with no tenant grant; a UTC billing period that does not move with a display timezone; `provider = 'mock'` rejected outright |
+| Usage reservation | implemented | `reserve_usage` locks the subscription row, grants only what the allowance still holds, and returns the covered keys |
+| No double charge | implemented | `(workspace_id, event_key)` makes retries, reimports and replayed batches free; a unique comment costs one unit in a workspace once |
+| Separate backfill budget | implemented | `historical_backfill` draws on its own allowance, so it neither blocks nor consumes the monthly analysis budget |
+| Metered batch commit | implemented | Rows, checkpoint and meter move in one transaction; a batch that cannot be paid for in full is refused rather than half-committed |
+| Reserve / confirm / release | implemented | Only an unconfirmed reservation is given back; a confirmed charge cannot be un-billed by a later failure |
+| Concurrent overspend under real parallelism | **blocked** | The row lock is the mechanism, but embedded PostgreSQL runs a single connection, so two genuinely simultaneous transactions cannot be staged. Needs a real PostgreSQL with two connections |
+| Quota visibility in the UI | not started | The meter has no read RPC and the dashboard does not show remaining allowance yet |
 | Supabase Auth account screen | implemented, not live-tested | Renders an honest "not configured" state without credentials; sign-in/sign-up paths have never contacted a real Supabase project |
 | Live Auth, Storage, PostgREST, Edge Function behaviour | **blocked** | Needs a Supabase development project URL and publishable key |
 | OAuth (M5) | not started | Table shapes and status values exist; no flow implemented |
@@ -96,9 +104,11 @@ project, a real sentiment model, or any deployment.
 
 ## Next unblocked work
 
-1. Add `usage_events` reservation inside the batch transaction so concurrent requests cannot
-   overspend a plan limit.
+1. Add a role-checked `usage_summary` read and surface remaining allowance in the dashboard,
+   so a limit is visible before it is hit rather than only when a batch is refused.
 2. Add the remaining dashboard filters the contract already supports — comment type, reply
    mode, review status, video kind — now that one snapshot drives every panel.
 3. Surface the review history per comment (who, when, why) now that the log is append-only.
 4. Add video comparison, since every panel already derives from one filtered snapshot.
+5. Re-run the browser suite on an unloaded machine and confirm 12/12, then prove concurrent
+   overspend against a real PostgreSQL with two connections.

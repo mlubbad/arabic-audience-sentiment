@@ -38,3 +38,28 @@ References checked: [Supabase RLS](https://supabase.com/docs/guides/database/pos
   page, not assumed — so an index-based handler let the second request succeed and silently
   tested nothing.
 
+2026-09-13 — metering and plan limits.
+
+- Plans live in an operator-managed `plans` table with no tenant grant, so a workspace cannot
+  raise its own limits. A subscription carries the plan key and a UTC period; the period is
+  declared in UTC and does not move when a workspace changes its display timezone.
+- `usage_events` is keyed by `(workspace_id, event_key)`, which is what makes a retry, a
+  reimport, or a likes-only refresh free. One unique comment costs one unit in a workspace
+  once, not once per period, so the key is checked across all periods rather than within one.
+- `historical_backfill` draws on its own allowance. An exhausted analysis quota must not block
+  a backfill, and a backfill must not silently consume the monthly analysis budget.
+- `reserve_usage` locks the subscription row before reading the remaining allowance. That lock
+  is the mechanism that stops two concurrent callers both seeing the same headroom and both
+  spending it. Reservation is deliberately partial: it grants what the allowance still holds
+  and returns the covered keys, leaving the caller to decide whether a partial grant is usable.
+- `commit_checkpoint` is all-or-nothing by contrast. Rows, checkpoint and meter move in one
+  transaction, and a batch that cannot be paid for in full is refused rather than committed
+  half-metered. A replayed batch key returns before metering, so it is never charged twice.
+- A reservation is released only while it is still `reserved`. A confirmed charge is history
+  and `release_usage` will not remove it, so a failure late in a batch cannot un-bill work
+  that already succeeded.
+- The subscription table rejects `provider = 'mock'`, so a mock billing mode cannot be attached
+  to a real plan row outside a test harness.
+- Metering is service-only. No `authenticated` grant exists on `reserve_usage`, `confirm_usage`
+  or `release_usage`, so a tenant cannot meter itself or forge a reservation.
+

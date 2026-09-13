@@ -26,7 +26,7 @@ All of the following were run after the clean install above.
 | `npm run format:check` | Pass — all matched code files use Prettier style |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — 24 tests, 3 files |
-| `npm run test:db` | Pass — 10 tests |
+| `npm run test:db` | Pass — 16 tests |
 | `npm run worker:test` | Pass — 23 tests, 4 files |
 | `npm run build` | Pass — 146 modules; `index.js` 478.09 kB (151.76 kB gzip), `index.css` 6.29 kB |
 | `npm run check:secrets` | Pass — 62 source files plus built assets |
@@ -34,6 +34,13 @@ All of the following were run after the clean install above.
 | `npm run worker:collect -- --source fixture …` | Pass — status `succeeded`, 2 unique comments, coverage declared as source traversal only |
 
 `npm run check` runs everything except `test:e2e` in one command, and passed end to end.
+
+The browser suite is timing-sensitive. During this run the host reached a load average of
+17 and the suite failed intermittently — a different test each time, at 0-4% CPU, with
+`npm run check` taking 12.5 minutes for 32 seconds of work. Once load fell the same code
+passed 12/12 in 11.6 seconds at 111% CPU. Only SQL and database tests changed in that round,
+neither of which the browser suite loads. Treat a browser failure on a loaded machine as
+unproven rather than as evidence either way, and re-run before believing it.
 
 `format:check` deliberately excludes Markdown: `docs/input-inventory.md` records the SHA-256
 of the two supplied specification files, and both hashes were re-verified unchanged after this
@@ -77,7 +84,7 @@ work.
 - `authorize()` checks identity and current membership independently — a valid token for the
   wrong workspace, and a valid member with the wrong role, are both rejected
 
-### Direct SQL tenant-isolation tests (`npm run test:db`, 10)
+### Direct SQL tenant-isolation tests (`npm run test:db`, 16)
 
 - a member of workspace A cannot read, update, or list storage objects belonging to B
 - a viewer cannot promote their own role or insert into a workspace; an owner cannot move a
@@ -95,6 +102,19 @@ work.
 - the review log cannot be written directly, so reviewer id cannot be forged and a tenant
   cannot claim `legacy_unverified` for its own verdict; UPDATE and DELETE are rejected even
   for a role that bypasses RLS
+- a unique comment is metered once: a repeated reservation of the same keys covers them again
+  but adds no units
+- five keys requested against three remaining units yields a partial grant of three, and the
+  next request grants nothing; the period total stops exactly at the allowance
+- `historical_backfill` still grants after the analysis allowance is exhausted, and stops at
+  its own separate budget
+- metering is refused when the plan is paused, and when now() falls outside the billing period
+- `commit_checkpoint` writes rows, checkpoint and meter together: a replayed batch key charges
+  nothing more, and a batch larger than the remaining allowance is refused with
+  `quota_exceeded`, leaving the usage count, the checkpoint and the batch receipt untouched
+- `release_usage` returns only the unconfirmed reservation and leaves a confirmed charge intact
+- a tenant reads its own meter but cannot insert, update or delete a usage row, cannot call
+  `reserve_usage`, and cannot raise its own plan limits
 - `claim_job` hands the same job to exactly one caller; an expired lease cannot commit; a
   repeated batch key is idempotent and a conflicting payload for that key is rejected
 
@@ -155,6 +175,7 @@ work.
 | Deployed Supabase | No project URL or key. GoTrue, PostgREST, Storage HTTP, and Edge Function deployment are untested |
 | Database behaviour beyond SQL/RLS | PGlite runs the real SQL and RLS but is not Supabase. The test file creates minimal stand-in `auth`/`storage` objects |
 | Sentiment model quality | No model downloaded, no inference run, no benchmark. No accuracy figure is claimed anywhere |
+| Concurrent overspend | The subscription row lock is the mechanism, but PGlite runs a single connection, so two genuinely simultaneous transactions cannot be staged. What is proven is the accounting invariant: no sequence of calls exceeds the allowance. The race itself needs a real PostgreSQL with two connections |
 | Correction persistence | The `submit_comment_review` RPC is tested in embedded PostgreSQL, but the browser has never called it. In fixture mode corrections are session-only and the UI says so |
 | Export delivery | The file is built in the browser. No background export job, no Supabase Storage upload, and no short-lived signed link has been exercised. Only the object-name convention is tested |
 | Spreadsheet behaviour | Neutralisation is verified as bytes in the file. No real spreadsheet application was opened to confirm how it renders them |

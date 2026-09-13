@@ -64,6 +64,16 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
               ($2,$2,$2,'cB','نص ب','نص ب','hash-b','second','sanitized_fixture')`,
       [A, B],
     );
+    // A deliberately tiny plan, so allowance behaviour is visible in a few calls.
+    await db.query(
+      "insert into plans(key,analysis_units,backfill_units) values ('test-small',5,2)",
+    );
+    await db.query(
+      `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
+       values ($1,'test-small','active',now()-interval '1 day',now()+interval '29 days'),
+              ($2,'test-small','active',now()-interval '1 day',now()+interval '29 days')`,
+      [A, B],
+    );
   });
   afterAll(async () => {
     await db?.close();
@@ -354,6 +364,216 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
         "{}",
         "batch-2",
       ]),
+    ).rejects.toThrow();
+  });
+  it("meters the first analysis of a comment and never charges it twice", async () => {
+    await admin();
+    const reserve = (keys: string[], kind = "comment_analysis") =>
+      db.query<{ covered: string[] }>(
+        "select private.reserve_usage($1,$2,$3) as covered",
+        [B, kind, keys],
+      );
+    expect((await reserve(["b-c1", "b-c2"])).rows[0].covered.sort()).toEqual([
+      "b-c1",
+      "b-c2",
+    ]);
+    // A retry of the same batch is covered again but costs nothing more.
+    expect((await reserve(["b-c1", "b-c2"])).rows[0].covered.sort()).toEqual([
+      "b-c1",
+      "b-c2",
+    ]);
+    const used = await db.query<{ n: number }>(
+      "select coalesce(sum(units),0)::int as n from usage_events where workspace_id=$1 and event_type='comment_analysis'",
+      [B],
+    );
+    expect(used.rows[0].n).toBe(2);
+  });
+  it("grants only what the allowance still holds, and never past it", async () => {
+    await admin();
+    const reserve = (keys: string[], kind = "comment_analysis") =>
+      db.query<{ covered: string[] }>(
+        "select private.reserve_usage($1,$2,$3) as covered",
+        [B, kind, keys],
+      );
+    // Five requested, three left: a partial grant rather than an overspend.
+    expect(
+      (await reserve(["b-c3", "b-c4", "b-c5", "b-c6", "b-c7"])).rows[0].covered,
+    ).toHaveLength(3);
+    expect((await reserve(["b-c8"])).rows[0].covered).toEqual([]);
+    const used = await db.query<{ n: number }>(
+      "select coalesce(sum(units),0)::int as n from usage_events where workspace_id=$1 and event_type='comment_analysis'",
+      [B],
+    );
+    expect(used.rows[0].n).toBe(5);
+    // Backfill draws on its own budget, so an exhausted analysis quota does not
+    // block it and it cannot borrow from analysis either.
+    expect(
+      (await reserve(["b-h1", "b-h2"], "historical_backfill")).rows[0].covered,
+    ).toHaveLength(2);
+    expect(
+      (await reserve(["b-h3"], "historical_backfill")).rows[0].covered,
+    ).toEqual([]);
+  });
+  it("refuses to meter without an active plan inside its period", async () => {
+    await admin();
+    await expect(
+      db.query("select private.reserve_usage($1,'comment_analysis',$2)", [
+        A,
+        ["x"],
+      ]),
+    ).resolves.toBeTruthy();
+    await db.query(
+      "update subscriptions set status='paused' where workspace_id=$1",
+      [A],
+    );
+    await expect(
+      db.query("select private.reserve_usage($1,'comment_analysis',$2)", [
+        A,
+        ["y"],
+      ]),
+    ).rejects.toThrow(/plan_inactive/);
+    await db.query(
+      "update subscriptions set status='active', period_end=now()-interval '1 hour' where workspace_id=$1",
+      [A],
+    );
+    await expect(
+      db.query("select private.reserve_usage($1,'comment_analysis',$2)", [
+        A,
+        ["y"],
+      ]),
+    ).rejects.toThrow(/plan_inactive/);
+    await db.query(
+      "update subscriptions set period_end=now()+interval '29 days' where workspace_id=$1",
+      [A],
+    );
+    await db.query("delete from usage_events where workspace_id=$1", [A]);
+  });
+  it("commits rows, checkpoint and usage in one transaction or not at all", async () => {
+    await admin();
+    const job = "20000000-0000-4000-8000-000000000001";
+    const token = "30000000-0000-4000-8000-000000000001";
+    await db.query(
+      `insert into jobs(id,workspace_id,channel_id,type,dedupe_key,status,lease_token,lease_expires_at)
+       values ($1,$2,$2,'analyse','usage-batch','running',$3,now()+interval '5 minutes')`,
+      [job, A, token],
+    );
+    await db.query("select private.commit_checkpoint($1,$2,$3,$4,$5)", [
+      job,
+      token,
+      '{"page":1}',
+      "batch-usage-1",
+      ["a-c1", "a-c2", "a-c3"],
+    ]);
+    const afterFirst = await db.query<{ n: number }>(
+      "select count(*)::int as n from usage_events where workspace_id=$1",
+      [A],
+    );
+    expect(afterFirst.rows[0].n).toBe(3);
+
+    // Replaying the batch must not charge a second time.
+    await db.query("select private.commit_checkpoint($1,$2,$3,$4,$5)", [
+      job,
+      token,
+      '{"page":1}',
+      "batch-usage-1",
+      ["a-c1", "a-c2", "a-c3"],
+    ]);
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select count(*)::int as n from usage_events where workspace_id=$1",
+          [A],
+        )
+      ).rows[0].n,
+    ).toBe(3);
+
+    // Two units left, four requested: the whole batch is refused rather than
+    // half-committed, so rows, checkpoint and meter stay consistent.
+    await expect(
+      db.query("select private.commit_checkpoint($1,$2,$3,$4,$5)", [
+        job,
+        token,
+        '{"page":2}',
+        "batch-usage-2",
+        ["a-c4", "a-c5", "a-c6", "a-c7"],
+      ]),
+    ).rejects.toThrow(/quota_exceeded/);
+    const after = await db.query<{
+      n: number;
+      checkpoint: string;
+      batches: number;
+    }>(
+      `select (select count(*) from usage_events where workspace_id=$1)::int as n,
+              (select checkpoint::text from jobs where id=$2) as checkpoint,
+              (select count(*) from private.job_batches where job_id=$2)::int as batches`,
+      [A, job],
+    );
+    expect(after.rows[0].n).toBe(3);
+    expect(JSON.parse(after.rows[0].checkpoint)).toEqual({ page: 1 });
+    expect(after.rows[0].batches).toBe(1);
+  });
+  it("releases only what was never confirmed", async () => {
+    await admin();
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select private.confirm_usage($1,$2) as n",
+          [A, ["a-c1"]],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    // A confirmed charge is history; only the unused reservation is given back.
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select private.release_usage($1,$2) as n",
+          [A, ["a-c1", "a-c2"]],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    const left = await db.query<{ event_key: string; state: string }>(
+      "select event_key,state from usage_events where workspace_id=$1 order by event_key",
+      [A],
+    );
+    expect(left.rows).toEqual([
+      { event_key: "a-c1", state: "charged" },
+      { event_key: "a-c3", state: "reserved" },
+    ]);
+  });
+  it("keeps the meter readable by its tenant and writable by no tenant", async () => {
+    await user(ownerA);
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select count(*)::int as n from usage_events",
+        )
+      ).rows[0].n,
+    ).toBe(2);
+    await expect(
+      db.query(
+        "insert into usage_events(workspace_id,period_start,event_key,event_type) values ($1,now(),'free','comment_analysis')",
+        [A],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      db.query(
+        "update usage_events set state='reserved' where workspace_id=$1",
+        [A],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      db.query("delete from usage_events where workspace_id=$1", [A]),
+    ).rejects.toThrow();
+    // Metering is a server primitive; a tenant cannot call it at all.
+    await expect(
+      db.query("select private.reserve_usage($1,'comment_analysis',$2)", [
+        A,
+        ["forged"],
+      ]),
+    ).rejects.toThrow();
+    // A plan is operator-managed, so a tenant cannot raise its own limits.
+    await expect(
+      db.query("update plans set analysis_units=999 where key='test-small'"),
     ).rejects.toThrow();
   });
 });
