@@ -415,4 +415,37 @@ describe("youtube connection", () => {
       db.query("select private.oauth_consume_state($1)", [h("h-pkce")]),
     ).rejects.toThrow(/invalid_state/);
   });
+
+  it("publishes exactly the entry points the functions need, to service_role only", async () => {
+    // PostgREST exposes public only, so the Edge Functions had no route to any
+    // private primitive. These wrappers open six of them and nothing else — the
+    // alternative, putting `private` on the API, would publish every internal
+    // function to anyone holding any key.
+    await user(ownerA);
+    for (const call of [
+      "select * from public.svc_oauth_consume_state('x')",
+      "select public.svc_worker_claim('x')",
+      "select public.svc_worker_heartbeat('x',$1,$1)",
+      "select public.svc_worker_finish('x',$1,$1,'succeeded',null)",
+    ])
+      await expect(
+        db.query(call, call.includes("$1") ? [A] : []),
+      ).rejects.toThrow(/permission denied|forbidden/);
+    await admin();
+  });
+
+  it("keeps the workspace out of every service entry point", async () => {
+    // The tenant comes from the worker's hashed credential or from the consumed
+    // state. If one of these took a workspace, the whole derivation would be
+    // decorative — so the signatures are asserted, not trusted.
+    await admin();
+    const args = await db.query<{ name: string; args: string }>(
+      `select p.proname as name, pg_get_function_arguments(p.oid) as args
+       from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+       where n.nspname='public' and p.proname like 'svc_worker%'
+       order by p.proname`,
+    );
+    expect(args.rows.length).toBeGreaterThan(0);
+    for (const row of args.rows) expect(row.args).not.toContain("workspace");
+  });
 });

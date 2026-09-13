@@ -53,7 +53,7 @@ first's workspaces and is refused `forbidden` when asking for their dashboard di
 | Worker gateway (P3) | implemented | Scoped credential, never the service role; the tenant comes from the credential |
 | Worker lifecycle | implemented | Explicit terminal result; nothing promotes a job to succeeded on its own |
 | Python control-plane client | implemented | Canonical payload hashing; only an exhausted source maps to succeeded |
-| Edge handler | implemented, **not deployed** | Pure handler with an injected data layer. **Has never served a real request.** Deploying it needs the service-role key |
+| Edge handler | **deployed and answering** | `worker`, `oauth-start` and `oauth-callback` are live on the project. The gateway refuses an unknown credential *from the database*, over HTTP, which is the seam that was untested all along |
 | Legacy import and reconciliation | **blocked** | Needs the original CSVs and the amendment file |
 | Analysis in the server path | implemented, fixture-tested | `run_once` labels each batch before committing, so rows and verdicts land in one transaction. Verified end to end with the **deterministic test analyzer, which is not a model** |
 | Real model inference | **blocked** | Needs the notebooks and ~600 human-labelled comments. No accuracy figure is claimed |
@@ -86,7 +86,8 @@ deployed project**, so PostgREST between the two is untested.
 | Revocation | implemented | Moves to reconnect_required and cancels dependent jobs; never falls back to scraping |
 | PKCE and the authorization URL | implemented | S256 checked against the RFC 7636 worked example; verifier stored server-side only, state stored as a hash, state written before the redirect is issued |
 | Code exchange, channels.list, token sealing, refresh | implemented, **never run live** | Pure handler with injected transport. The channel comes from `channels.list(mine=true)`, the verifier from the stored state, tokens are AES-GCM sealed with a fresh nonce per grant |
-| Redirect page and a deployed callback route | **blocked** | Needs a deployed Edge Function. No authorization URL has been opened and no code exchanged |
+| Deployed callback route | implemented | `/functions/v1/oauth-callback` renders an Arabic result page; refusals carry a code and no detail |
+| A real consent round trip | **blocked** | The registered redirect URI points at the local dev server. Pointing it at the deployed function and walking Google's consent screen is a browser step |
 
 ## M6 — private pilot (front end deployed, journey incomplete)
 

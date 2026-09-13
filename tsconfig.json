@@ -13,6 +13,15 @@
     "esModuleInterop": true,
     "types": ["node", "vite/client"]
   },
+  // The Deno entry points under supabase/functions/*/index.ts are deliberately
+  // excluded: they use npm: specifiers and the Deno global, which this compiler
+  // has no knowledge of. They are typechecked by Deno at deploy time, which is
+  // the compiler that matches their runtime.
+  //
+  // The _shared handlers stay in. They are pure, they are what the tests drive,
+  // and they are where the logic worth checking lives — the entry points are
+  // wiring.
+  "exclude": ["supabase/functions/*/index.ts"],
   "include": [
     "apps/web/src",
     "apps/web/vite.config.ts",

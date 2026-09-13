@@ -30,7 +30,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — **83 tests, 10 files** |
-| `npm run test:db` | Pass — **98 tests, 11 files** |
+| `npm run test:db` | Pass — **100 tests, 11 files** |
 | `npm run worker:test` | Pass — **91 tests, 11 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
@@ -427,8 +427,31 @@ That is the property the whole tenancy model exists for, and it is now proven ag
 PostgREST with two real users rather than inferred from PGlite. It was tested by asking
 directly, not by checking that a control was hidden.
 
-**Still unverified:** the live dashboard read returning real comment rows (no channel has been
-collected), and the worker gateway over HTTP. No Edge Function is deployed.
+**The handler and the SQL have now spoken over a real network hop.** Three Edge Functions are
+deployed — `worker`, `oauth-start`, `oauth-callback` — and answered from the live project:
+
+| Request | Result |
+| --- | --- |
+| `POST /worker/worker/claim`, no credential | 401 `invalid_worker_credential` |
+| Same, with a credential never issued | 401, **the same shape** — nothing distinguishes them |
+| `POST /worker/worker/typo` | 404 `not_found`, not a malformed-request error |
+| `GET` on a POST-only route | 405 |
+| `POST /oauth-start` with no session | 401 `unauthenticated` |
+| `GET /oauth-callback` with no code | an Arabic page, 400, no stack trace |
+
+The second row is the one that matters: that request reached the database. The handler split
+the bearer, hashed it, called `svc_worker_claim` through PostgREST, and SQL refused it. Until
+today each side was only ever tested against a stand-in for the other.
+
+PostgREST exposes `public` only, so the functions had no route to any `private` primitive —
+the handlers were complete and unreachable. Six `svc_*` wrappers now publish exactly what the
+functions call, revoked from anon and authenticated and granted to `service_role` alone.
+Putting `private` on the API instead would have published every internal function to anyone
+holding any key. None of the wrappers takes a workspace, which is asserted against
+`pg_get_function_arguments` rather than trusted.
+
+**Still unverified:** a real OAuth consent round trip (no code has been exchanged), and the
+live dashboard read returning real comment rows, since no channel has been collected.
 
 ## A filename bug the first real push found
 
