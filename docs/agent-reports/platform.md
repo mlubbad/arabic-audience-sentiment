@@ -896,3 +896,32 @@ Two contract tests were confirmed failing before the change.
 
 All five queued schema requests are now complete. M4's screen elements are done, and this
 lane has no unblocked work left that does not need either I1 or the live read path.
+
+## Worker test hardening (2026-09-13) — cross-lane, flagged
+
+Done on the user's explicit request. `workers/python/**` belongs to the worker lane and this
+lane's guard refused the commit, so it was committed on integration (`f6ecf43`). The worker
+lane should merge integration rather than have this pushed at its branch.
+
+**Collision risk, stated plainly.** W1–W3 are assigned to the worker lane and it has not
+started them. To reduce overlap the work was scoped to the local spool's *queue arithmetic* —
+lease bounds, batch limits, backoff, terminal states, runner control flow — and deliberately
+avoids collector transport and model identity, which are W2 and W1. W3 covers collector
+robustness and rollback tests; the one area that could still overlap is invalid-continuation
+recovery, which was left alone for that reason. The file is new
+(`tests/test_queue_semantics.py`) so it cannot conflict with edits to existing worker tests.
+
+Worker tests went 23 → 33. Paths that previously had none: lease durations outside their
+bounds, an oversized batch, a retryable failure and its exponential backoff, both routes to a
+terminal job, an unavailable source reading as blocked rather than empty-successful, and the
+runner's behaviour with no work, with a lost lease, and with an unplanned exception.
+
+**Two tests corrected my assumptions rather than the code.** A job that exhausts its retries
+keeps the last real cause (`network_failure`) rather than being overwritten with
+`retry_exhausted` — the more useful record, since the status already says it stopped.
+`retry_exhausted` marks a different case: a worker that died mid-run and never reported. That
+path now has its own test.
+
+**Verified by mutation, not by passing.** Removing the lease-duration guard and neutralising
+the backoff each break exactly one test, and the suite returns to green once restored. A new
+test that cannot fail is not coverage.
