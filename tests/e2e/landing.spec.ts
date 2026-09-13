@@ -30,9 +30,11 @@ test("landing demo filters illustrative comments and connects to the real dashbo
     .locator("summary")
     .filter({ hasText: "هل يمكنني ربط قناتي الآن؟" })
     .click();
-  await expect(page.locator("details[open]")).toContainText("ما زال ضمن تجهيز");
+  await expect(page.locator("details[open]")).toContainText(
+    "جُمعت تعليقات حقيقية",
+  );
   await page
-    .getByRole("link", { name: "استكشف اللوحة التجريبية", exact: false })
+    .getByRole("link", { name: "استكشف اللوحة", exact: false })
     .first()
     .click();
   await expect(page).toHaveURL(/\/dashboard$/);
@@ -72,6 +74,6 @@ test("mobile landing has working navigation, keyboard access, and no page overfl
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await expect(page.locator(".lp-hero-art img")).toHaveJSProperty(
     "naturalWidth",
-    1920,
+    1536,
   );
 });

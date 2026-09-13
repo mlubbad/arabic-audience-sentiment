@@ -41,10 +41,39 @@ export type DataMode = "sanitized_fixture" | "live";
  * about which mode they are in.
  */
 const liveRequested = import.meta.env.VITE_DASHBOARD_SOURCE === "live";
-export const dataMode: DataMode =
+/**
+ * The furthest this build is allowed to go. Configuration alone never makes a
+ * read live — it only permits it.
+ */
+export const configuredMode: DataMode =
   supabase && liveRequested ? "live" : "sanitized_fixture";
 
-export const reviewsArePersisted = dataMode !== "sanitized_fixture";
+/**
+ * The mode one particular render is in.
+ *
+ * Previously a module constant, which forced the whole deployment to be either
+ * a demo or a product: a signed-out visitor on a live build had nothing to
+ * look at, and a signed-in owner on a demo build could never see their own
+ * channel. Both audiences exist at the same URL, so the answer depends on who
+ * is asking and cannot be decided at build time.
+ *
+ * Every caller now passes the mode it resolved, so a read and the correction
+ * written against it are answered by the same source — the property the module
+ * constant was protecting, kept without the constant.
+ */
+export function resolveMode(input: {
+  signedIn: boolean;
+  /** A workspace the caller is entitled to read, already resolved. */
+  workspace: string | null;
+}): DataMode {
+  if (configuredMode !== "live") return "sanitized_fixture";
+  // Both required. Signed in with no workspace has nothing live to show, and a
+  // workspace id without a session is a claim rather than an entitlement.
+  return input.signedIn && input.workspace ? "live" : "sanitized_fixture";
+}
+
+export const reviewsArePersisted = (mode: DataMode) =>
+  mode !== "sanitized_fixture";
 
 // Fixture corrections are kept for this browser session only and are never sent
 // anywhere. They go through the same shared applyReview rules the server RPC
@@ -83,14 +112,22 @@ async function readLive(workspace: string) {
  * in live mode the server holds the review log, and replaying local edits over
  * it would show a correction that no longer exists on the server as if it did.
  */
-async function readSource(workspace: string, signal?: AbortSignal) {
-  if (dataMode === "live") return readLive(workspace);
+async function readSource(
+  mode: DataMode,
+  workspace: string,
+  signal?: AbortSignal,
+) {
+  if (mode === "live") return readLive(workspace);
   const fixture = await readFixture(signal);
   return { ...fixture, comments: withSessionReviews(fixture.comments) };
 }
 
-export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
-  const source = await readSource(filters.workspace_id, signal);
+export async function loadSnapshot(
+  mode: DataMode,
+  filters: Filters,
+  signal: AbortSignal,
+) {
+  const source = await readSource(mode, filters.workspace_id, signal);
   const comments = source.comments;
   const build = (f: Filters, cursor_reset: boolean) => {
     const base = snapshot(comments, f, source.active_analysis_key);
@@ -100,7 +137,7 @@ export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
       // many to show and says when it has truncated.
       comparison: base.videos.slice(0, COMPARISON_LIMIT),
       comparison_truncated: base.videos.length > COMPARISON_LIMIT,
-      mode: dataMode,
+      mode,
       revision: source.revision,
       // Plan state travels with the snapshot, so the limit on screen always
       // belongs to the same read as the numbers beside it.
@@ -120,9 +157,9 @@ export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
   }
 }
 
-export async function submitReview(raw: CommentReviewInput) {
+export async function submitReview(mode: DataMode, raw: CommentReviewInput) {
   const input = CommentReviewInputSchema.parse(raw);
-  if (dataMode === "live") {
+  if (mode === "live") {
     // Addressed to the same source the rows came from. The server takes the
     // reviewer and the human provenance from the session and re-checks the
     // hash, so this sends a verdict and never an identity.
@@ -157,8 +194,8 @@ export async function submitReview(raw: CommentReviewInput) {
  * bucket, which is why the name already carries the workspace prefix the
  * storage policy checks.
  */
-export async function buildExport(filters: Filters) {
-  const source = await readSource(filters.workspace_id);
+export async function buildExport(mode: DataMode, filters: Filters) {
+  const source = await readSource(mode, filters.workspace_id);
   const rows = exportRows(source.comments, filters, source.active_analysis_key);
   return {
     rows: rows.length,

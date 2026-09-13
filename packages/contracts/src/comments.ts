@@ -42,6 +42,10 @@ export const CommentSchema = z
     client_id: z.string(),
     channel_id: z.string(),
     video_id: z.string(),
+    // The video's own title. Null only for a row whose video is unknown; the
+    // dashboard fell back to printing the raw id because this was never
+    // carried, which reads as a database key where a person expects a name.
+    video_title: z.string().nullable().default(null),
     video_kind: z.enum(["video", "short", "stream"]),
     author_channel_id: z.string().nullable(),
     // Null once the retention purge has run. The author is personal data

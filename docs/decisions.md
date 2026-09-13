@@ -1,5 +1,7 @@
 # Implementation decisions
 
+2026-09-14 — Replace the supplied marketing-reference hero with an original generated illustration before treating the landing as a product asset. The reference archive informs composition only; it does not establish redistribution rights. Use the project's documented indigo token for landing actions. Marketing copy distinguishes the fixture example on the landing from the pilot channel's collected real comments and does not imply that live model analysis or authenticated dashboard reading has been validated.
+
 2026-09-13 — Arabic marketing landing: the user's supplied screenshot/archive is a visual reference. `/` now serves the landing and the dashboard moves to `/dashboard`, with existing browser tests retaining their dashboard coverage at that route. Scoped landing styles protect the application shell; on-demand dashboard/account imports reduce the marketing entry bundle. Product copy discloses illustrative data and incomplete live setup; no customer endorsements, measured accuracy, paid plan, or lead collection is invented. Reference/font provenance and private-preview limitations are in `docs/landing.md`.
 
 2026-09-12 — The supplied handoff plus the latest M0–M2 request are the approved design and scope. Work runs inline on `codex/m0-foundations` in the supplied empty workspace.
@@ -210,4 +212,3 @@ service authorization follow from this setup.
   third-party stylesheet delayed first paint enough to break a browser test, it hands a
   visitor's IP to a third party on every load, and it is one more thing that can be
   unreachable. Only the Arabic and Latin subsets are shipped, at four weights.
-

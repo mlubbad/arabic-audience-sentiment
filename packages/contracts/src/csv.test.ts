@@ -14,6 +14,7 @@ const base = {
   client_id: "client",
   channel_id: "channel",
   video_id: "v1",
+  video_title: "حلقة تجريبية",
   video_kind: "video" as const,
   author_channel_id: "author",
   author_name: "كاتب تجريبي",

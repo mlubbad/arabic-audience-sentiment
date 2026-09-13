@@ -5,8 +5,10 @@ people after a long gap. It is an entry point, not a summary: everything here is
 either a pointer, a trap that has already cost someone time, or a rule you cannot
 infer by reading the code.
 
-The counts below are from the latest full run; `docs/verification.md` is the
-authoritative record of what was run when.
+Some counts and milestone descriptions below were written before the 2026-09-14
+live OAuth and collection run. `docs/verification.md` is the authoritative
+record of what was run when; its dated entries take precedence over older
+paragraphs in this onboarding note.
 
 Read `AGENTS.md` first. It is short and it is binding.
 
@@ -41,10 +43,12 @@ Shared contract           packages/contracts/src/snapshot.ts
 Dashboard                 apps/web/src/
 ```
 
-The dashboard is **fixture-backed today**. `apps/web/src/data.ts` decides the mode
-in one place and there is no live comment read path; configuring Supabase enables
-Auth and workspace management, it does not turn fixture rows into live data. That
-is deliberate — read the comment at the top of `data.ts` before changing it.
+The dashboard has a sanitized fixture for visitors and a live read path for a
+signed-in creator whose accessible workspace has loaded. `apps/web/src/data.ts`
+decides the mode; the component suppresses results while workspace ownership is
+being resolved and remounts on identity changes. A deployed authenticated
+browser walkthrough of the new live dashboard is still required. Read the
+comment at the top of `data.ts` before changing the source selection.
 
 ---
 
@@ -146,10 +150,12 @@ extend the baseline — several branches depend on it.
 mutation: break the implementation deliberately and confirm the test goes red.
 `docs/verification.md` carries a 14-row mutation table. Follow it for new work.
 
-**Distinguish mocked, fixture-tested and live-tested.** Never write that
-something works live. Nothing in this repo has been validated live —
-`docs/verification.md` §"Not verified" is the authoritative list and it must stay
-accurate.
+**Distinguish mocked, fixture-tested and live-tested.** A private OAuth round
+trip and a collection of 65 real comments for one pilot channel were reported
+and verified by the development session on 2026-09-14. This does not establish
+that the new authenticated dashboard or real sentiment model has passed a live
+browser walkthrough. Read the dated evidence in `docs/verification.md` before
+describing either path as validated.
 
 **Boundaries are where the defects are.** The three defects the cross-language
 seam test found all had passing unit tests on both sides: Python's `1.0` against
@@ -220,15 +226,18 @@ What still holds, and is not enforced by anything:
 
 ## 8. What is not real
 
-No model has been downloaded and no accuracy figure is claimed anywhere — do not
-produce one. No YouTube or Google credential is configured for collection.
+No model accuracy figure has been adopted. A pinned Arabic classifier adapter
+is under development; its presence in source is not evidence of live inference
+or measured accuracy. Google OAuth and an OAuth-backed collector have been used
+for the private pilot channel; do not expose or copy their credentials.
 
-What *is* real, as of 2026-09-13: a Supabase development project holds the schema;
-the built front end is deployed at `app.sky-develop.net` behind a password, serving
-fixtures; and Auth works, verified by a real signup. What is still not real: any
-live comment data, any deployed worker or Edge Function, and the whole YouTube path.
-`docs/verification.md` is the authoritative split — read it before describing this
-system to anyone.
+What *is* real, as of 2026-09-14: a Supabase development project holds the
+schema; the built front end is deployed privately; Auth and OAuth were exercised;
+and 65 genuine comments reached the database through an OAuth-backed manual
+worker run. The worker is not yet a persistent scheduled service. The corrected
+landing asset and the new signed-in dashboard need a fresh private deploy and
+authenticated browser verification. `docs/verification.md` records the evidence
+and its limits.
 
 Blocked items are blocked by a **named operation and a named missing input**, not
 by a whole milestone: `channels.list(mine=true)` plus the OAuth code exchange

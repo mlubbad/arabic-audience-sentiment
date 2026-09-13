@@ -37,7 +37,7 @@ describe("fixture and live modes stay separate", () => {
       await loadModule();
     // Fixture rows carry fixture ids and a fixture workspace. No live server
     // would accept them, so the correction must never be addressed to one.
-    await submitReview({
+    await submitReview("sanitized_fixture", {
       workspace_id: fixtureWorkspace,
       comment_id: target.id,
       content_hash: target.content_hash,
@@ -46,12 +46,12 @@ describe("fixture and live modes stay separate", () => {
     });
     expect(rpc).not.toHaveBeenCalled();
     // The UI must keep telling the truth about persistence.
-    expect(reviewsArePersisted).toBe(false);
+    expect(reviewsArePersisted("sanitized_fixture")).toBe(false);
   });
 
   it("keeps the correction in the session view rather than claiming a server wrote it", async () => {
     const { submitReview, loadSnapshot, fixtureWorkspace } = await loadModule();
-    await submitReview({
+    await submitReview("sanitized_fixture", {
       workspace_id: fixtureWorkspace,
       comment_id: target.id,
       content_hash: target.content_hash,
@@ -59,6 +59,7 @@ describe("fixture and live modes stay separate", () => {
       reason: "تصنيف خاطئ",
     });
     const view = await loadSnapshot(
+      "sanitized_fixture",
       { workspace_id: fixtureWorkspace },
       new AbortController().signal,
     );
@@ -71,7 +72,7 @@ describe("fixture and live modes stay separate", () => {
   it("still refuses a verdict on text that changed, without falling back to the server", async () => {
     const { submitReview, fixtureWorkspace } = await loadModule();
     await expect(
-      submitReview({
+      submitReview("sanitized_fixture", {
         workspace_id: fixtureWorkspace,
         comment_id: target.id,
         content_hash: "hash-of-older-text",
@@ -82,9 +83,23 @@ describe("fixture and live modes stay separate", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("reports the data mode it is actually serving", async () => {
-    const { dataMode } = await loadModule();
-    expect(dataMode).toBe("sanitized_fixture");
+  it("reports the furthest mode this build is allowed to serve", async () => {
+    const { configuredMode } = await loadModule();
+    expect(configuredMode).toBe("sanitized_fixture");
+  });
+
+  it("cannot be talked into a live read by a session on a demo build", async () => {
+    // Configuration is the ceiling. A signed-in user with a real workspace id
+    // still gets the fixture here, because this build has no live source to
+    // read and addressing one would be a request to a server that was never
+    // configured.
+    const { resolveMode } = await loadModule();
+    expect(
+      resolveMode({
+        signedIn: true,
+        workspace: "9f1f0f38-0000-4000-8000-000000000001",
+      }),
+    ).toBe("sanitized_fixture");
   });
 });
 
@@ -101,9 +116,10 @@ describe("the live path reads and writes against the same source", () => {
 
   it("reads the snapshot from the server and not from the fixture file", async () => {
     rpc.mockResolvedValueOnce({ data: live(), error: null });
-    const { loadSnapshot, dataMode } = await loadModule();
-    expect(dataMode).toBe("live");
+    const { loadSnapshot, configuredMode } = await loadModule();
+    expect(configuredMode).toBe("live");
     const view = await loadSnapshot(
+      "live",
       { workspace_id: "00000000-0000-4000-8000-000000000001" },
       new AbortController().signal,
     );
@@ -120,7 +136,7 @@ describe("the live path reads and writes against the same source", () => {
   it("sends a correction to the server, carrying a verdict and no identity", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: null });
     const { submitReview } = await loadModule();
-    await submitReview({
+    await submitReview("live", {
       workspace_id: "00000000-0000-4000-8000-000000000001",
       comment_id: "aaaaaaaa-0000-4000-8000-000000000001",
       content_hash: "h1",
@@ -151,6 +167,7 @@ describe("the live path reads and writes against the same source", () => {
     const { loadSnapshot } = await loadModule();
     await expect(
       loadSnapshot(
+        "live",
         { workspace_id: "00000000-0000-4000-8000-000000000001" },
         new AbortController().signal,
       ),
@@ -172,6 +189,7 @@ describe("the live path reads and writes against the same source", () => {
     const { loadSnapshot } = await loadModule();
     await expect(
       loadSnapshot(
+        "live",
         { workspace_id: "00000000-0000-4000-8000-000000000001" },
         new AbortController().signal,
       ),
@@ -188,14 +206,32 @@ describe("the live path reads and writes against the same source", () => {
     const { loadSnapshot } = await loadModule();
     await expect(
       loadSnapshot(
+        "live",
         { workspace_id: "00000000-0000-4000-8000-000000000001" },
         new AbortController().signal,
       ),
     ).rejects.toThrow("live_unavailable");
   });
 
+  it("goes live only with a session and a workspace, never with one of them", async () => {
+    const { resolveMode } = await loadModule();
+    const workspace = "9f1f0f38-0000-4000-8000-000000000001";
+    expect(resolveMode({ signedIn: true, workspace })).toBe("live");
+    // A workspace id with no session is a claim, not an entitlement: the id
+    // could have come from a URL, a stale render or another tenant.
+    expect(resolveMode({ signedIn: false, workspace })).toBe(
+      "sanitized_fixture",
+    );
+    // And a session with nothing resolved has no live rows to show. Falling
+    // back to the fixture workspace under a live mode would read the demo id
+    // from the real server.
+    expect(resolveMode({ signedIn: true, workspace: null })).toBe(
+      "sanitized_fixture",
+    );
+  });
+
   it("says corrections are persisted, because now they are", async () => {
     const { reviewsArePersisted } = await loadModule();
-    expect(reviewsArePersisted).toBe(true);
+    expect(reviewsArePersisted("live")).toBe(true);
   });
 });

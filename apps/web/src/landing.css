@@ -13,7 +13,7 @@
   font-display: swap;
 }
 .landing {
-  --lp-purple: #6654ec;
+  --lp-purple: #3b27ba;
   --lp-ink: #22203a;
   --lp-dark: #25223f;
   color: var(--lp-ink);
@@ -233,7 +233,7 @@
     transform 0.2s;
 }
 .landing .lp-button:hover {
-  background: #5040ca;
+  background: #271885;
   transform: translateY(-2px);
 }
 .lp-text-link {
@@ -262,6 +262,12 @@
   display: block;
   position: relative;
   z-index: 1;
+  mix-blend-mode: multiply;
+  mask-image: radial-gradient(
+    ellipse 80% 72% at 50% 54%,
+    #000 53%,
+    transparent 100%
+  );
 }
 .lp-art-halo {
   position: absolute;

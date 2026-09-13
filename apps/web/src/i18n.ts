@@ -38,9 +38,16 @@ const fixtureVideoNames: Record<string, string> = {
   "video-1": "فيديو اصطناعي ١",
   "video-2": "فيديو اصطناعي ٢",
 };
-/** Falls back to the identifier rather than guessing a name. */
-export function videoLabel(id: string) {
-  return fixtureVideoNames[id] ?? id;
+/**
+ * The video's real title where the row carried one.
+ *
+ * The fixture names are a fallback for fixture ids alone. They used to be the
+ * only source, which meant a live dashboard printed a UUID for every real
+ * video — and the id is still what is shown when no title came through, since
+ * a wrong name is worse than an honest identifier.
+ */
+export function videoLabel(id: string, title?: string | null) {
+  return title ?? fixtureVideoNames[id] ?? id;
 }
 export const syncMessages: Record<string, string> = {
   healthy: "آخر مزامنة اكتملت حديثًا",

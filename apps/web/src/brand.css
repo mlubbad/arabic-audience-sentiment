@@ -84,4 +84,61 @@
   --fs-body: 16px;
   --fs-small: 14px;
   --fs-micro: 12.5px;
+
+  /* -------------------------------------------------------------------
+     The rest of the brand book, added when the dashboard was rebuilt to
+     the reference layout at dashboard.sky-develop.net. Same source, same
+     values — the earlier subset simply had not needed them.
+     ------------------------------------------------------------------- */
+  --ml-rose-300: #ffa8af;
+  --ml-rose-100: #ffdee1;
+  --ml-yellow-100: #fef3c5;
+  --fg-1: #0e0a2e;
+  --fg-2: #3f3a5c;
+  --fg-3: #6e6a85;
+  --fg-on-brand: #fde676;
+
+  --ml-grad-warm-cool: linear-gradient(
+    135deg,
+    #ff6c77 0%,
+    #ff9080 12%,
+    #c97ccb 26%,
+    #7e66e5 42%,
+    #3b27ba 60%,
+    #271885 85%,
+    #1c1264 100%
+  );
+  --ml-grad-warm-cool-h: linear-gradient(
+    90deg,
+    #ff6c77 0%,
+    #ff9080 12%,
+    #c97ccb 26%,
+    #7e66e5 42%,
+    #3b27ba 60%,
+    #271885 85%,
+    #1c1264 100%
+  );
+  --ml-grad-soft: linear-gradient(
+    135deg,
+    #ffedee 0%,
+    #f0e3f8 25%,
+    #ddd6f8 55%,
+    #b5aaf2 100%
+  );
+
+  --r-xs: 4px;
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-2xl: 40px;
+  --r-pill: 999px;
+
+  --shadow-3:
+    0 12px 32px rgba(14, 10, 46, 0.12), 0 4px 10px rgba(14, 10, 46, 0.05);
+  --shadow-glow-indigo: 0 16px 48px -8px rgba(59, 39, 186, 0.45);
+  --shadow-glow-rose: 0 16px 48px -8px rgba(255, 108, 119, 0.45);
+
+  --space-8: 64px;
+  --space-9: 96px;
 }

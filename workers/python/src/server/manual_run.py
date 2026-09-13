@@ -104,14 +104,25 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--base", default=os.environ.get("WORKER_API_BASE_URL", ""))
     p.add_argument("--credential", default=os.environ.get("WORKER_CREDENTIAL", ""))
-    # Off by default. The deterministic analyzer is not a model, and labelling a
-    # real channel's comments with it would put figures on screen that mean
-    # nothing about that audience.
-    p.add_argument("--analyse", action="store_true",
-                   help="label with the deterministic test analyzer (NOT a model)")
+    # Off by default, and the test analyzer is never the default when it is on:
+    # it performs no language understanding, and labelling a real channel with
+    # it would put figures on screen that mean nothing about that audience.
+    p.add_argument("--model", default="none",
+                   choices=["none", "camelbert-da", "deterministic-test"],
+                   help="camelbert-da runs the pinned Arabic classifier; "
+                        "deterministic-test is a fixture double, NOT a model")
     args = p.parse_args()
     if not args.base or not args.credential:
         raise SystemExit("need WORKER_API_BASE_URL and WORKER_CREDENTIAL")
+
+    analyzer = None
+    if args.model == "camelbert-da":
+        # Imported here so the collection-only path never needs torch.
+        from sentiment.transformer import load_pinned
+
+        analyzer = load_pinned()
+    elif args.model == "deterministic-test":
+        analyzer = DeterministicTestAnalyzer()
 
     client = httpx.Client()
     control = ControlPlane(args.base, args.credential, client)
@@ -134,14 +145,16 @@ def main() -> None:
         None,
         "",
         video_title=None,
-        analyzer=DeterministicTestAnalyzer() if args.analyse else None,
+        analyzer=analyzer,
         build_collector=build,
     )
     print(json.dumps(
         {"claimed": worked, "video": chosen or None,
          "why": survey.get("reason", "not_reached"),
          "candidates": survey.get("candidates", []),
-         "analysed": bool(args.analyse)},
+         "analysed_with": args.model if analyzer is not None else None,
+         "analysis_key": getattr(analyzer, "model_id", None)
+         and f"{analyzer.model_id}@{analyzer.revision}"},
         ensure_ascii=False, indent=2))
 
 

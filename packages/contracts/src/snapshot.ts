@@ -6,6 +6,8 @@ import { type Label } from "./primitives";
 
 export type VideoAggregate = {
   id: string;
+  /** Null when no row carried one; never replaced with the id. */
+  title: string | null;
   total: number;
   analysed: number;
   replies: number;
@@ -111,6 +113,19 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
         .map((c) => c.comment_type as string),
     ),
   ].sort((a, b) => a.localeCompare(b, "ar"));
+  // The videos the filter control may offer, on the same principle as the
+  // comment types above: scoped to the workspace and to nothing else. Taking
+  // them from the filtered result instead would leave the chosen video as the
+  // only option the moment it was chosen, with no way back to the others.
+  const video_options = [
+    ...new Map(
+      input
+        .filter((c) => c.workspace_id === f.workspace_id)
+        .map((c) => [c.video_id, c.video_title] as const),
+    ),
+  ]
+    .map(([id, title]) => ({ id, title }))
+    .sort((a, b) => (a.title ?? a.id).localeCompare(b.title ?? b.id, "ar"));
   const sentiments: Record<Label, number> = {
     positive: 0,
     negative: 0,
@@ -128,6 +143,7 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     if (!video) {
       video = {
         id: c.video_id,
+        title: c.video_title,
         total: 0,
         analysed: 0,
         replies: 0,
@@ -135,6 +151,7 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
       };
       videos.set(c.video_id, video);
     }
+    video.title ??= c.video_title;
     video.total++;
     if (c.is_reply) video.replies++;
     // Each video counts on its own denominator: a comment with no usable label
@@ -172,6 +189,7 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     // one function with no access to it, and it stayed true only because there
     // was no live read. The data layer owns that answer.
     comment_types,
+    video_options,
     most_engaged_negative,
     // How many could be ranked, so a shown five is never mistaken for all five.
     negative_ranked: rankable.length,
@@ -190,6 +208,12 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
       (a, b) => b.total - a.total || a.id.localeCompare(b.id, "en"),
     ),
     timeline: [...timeline].map(([date, total]) => ({ date, total })),
+    // Every row the filters admit, not just the page on screen. The panels
+    // that chart behaviour — hour of day, day of week, who is talking — are
+    // asking about the whole filtered set, and paging is a reading aid that
+    // must not change the answer. Same array, no copy: the export and the
+    // charts are looking at the identical rows by construction.
+    filtered: rows,
     comments,
     next_cursor:
       cursorIndex + 1 + comments.length < rows.length

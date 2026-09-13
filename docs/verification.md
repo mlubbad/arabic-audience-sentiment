@@ -1,5 +1,20 @@
 # Verification
 
+## 2026-09-14 — Landing asset and current-state copy
+
+At `0ea0ca0` plus the landing working-tree changes, with concurrent uncommitted live-dashboard work outside this increment:
+
+| Command / observation | Actual result |
+| --- | --- |
+| `E2E_PORT=5322 npm run test:e2e -- tests/e2e/landing.spec.ts` | 2 passed (5.5s), including working links, FAQ, mobile navigation, accessibility and image loading |
+| `npx prettier --check apps/web/src/Landing.tsx apps/web/src/landing.css tests/e2e/landing.spec.ts` | Passed after formatting the landing test |
+| `npx eslint apps/web/src/Landing.tsx tests/e2e/landing.spec.ts` | Passed |
+| `npm run build` | Passed, 171 modules transformed, 2.65s |
+| Chromium screenshots at 1440px and 390px | Full page visually inspected; original bright glass chart sits in the hero without clipping |
+| `shasum -a 256 apps/web/public/landing/audience-growth-original.png` | `5f800bc3d9fb7e2004c5de245653021f123f2a4cedbf29f7aee8e6ca5f22cdbe` |
+
+Formatting checks initially found wrapping issues in the landing test and then the illustration mask rule; both were corrected before the final passing checks. This increment did not re-run the full repository suite or redeploy the site, because the signed-in dashboard is being edited concurrently. The 65 live comments and tenant boundary were verified by the other development session, as described in the user-supplied handoff; this landing verification did not independently exercise its live OAuth, worker, model or authenticated dashboard path.
+
 ## 2026-09-13 — Marketing landing and route integration
 
 Node 22.14.0; load average sampled at 3.13 / 3.30 / 3.25. Code reviewed against `cffb9fa` plus the landing working-tree changes. Concurrent Python/OAuth commits are outside this increment.

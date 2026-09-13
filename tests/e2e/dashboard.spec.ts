@@ -5,6 +5,7 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
   await page.goto("/dashboard");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(page.locator(".rp-hero")).not.toContainText("موضوعات");
   // The source strip, driven by the data mode rather than written by hand.
   const source = page.getByTestId("source");
   await expect(source).toHaveAttribute("data-mode", "sanitized_fixture");
@@ -17,7 +18,9 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
     .getByLabel("البحث في التعليقات والمؤلفين")
     .fill("غير موجود نهائياً");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
-  await expect(page.getByText("لا توجد تعليقات مطابقة")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "لا توجد تعليقات مطابقة" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("6");
   await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
@@ -45,12 +48,44 @@ test("shows actual pending fetch then safe error with working retry", async ({
   });
   await page.goto("/dashboard");
   await expect(page.getByTestId("loading")).toBeVisible();
+  await expect(page.locator(".rp-hero")).not.toContainText("قراءة 0 تعليقًا");
+  await expect(page.locator(".rp-hero")).not.toContainText("موضوعات");
   release();
   await expect(page.getByRole("alert")).toContainText("تعذر تحميل");
   await expect(page.getByTestId("total")).toHaveCount(0);
   failing = false;
   await page.getByRole("button", { name: "إعادة المحاولة" }).click();
   await expect(page.getByTestId("total")).toHaveText("6");
+});
+
+test("video filter offers the videos in the current dataset, including unfamiliar ids", async ({
+  page,
+}) => {
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const response = await route.fetch();
+    const fixture = await response.json();
+    fixture.comments = fixture.comments.map(
+      (comment: { video_id: string }) => ({
+        ...comment,
+        video_id:
+          comment.video_id === "video-2"
+            ? "new-channel-video"
+            : comment.video_id,
+      }),
+    );
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  const select = page.getByLabel("الفيديو", { exact: true });
+  await expect(select.locator('option[value="new-channel-video"]')).toHaveCount(
+    1,
+  );
+  await expect(select.locator('option[value="video-2"]')).toHaveCount(0);
+  await select.selectOption("new-channel-video");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("2");
+  await expect(select.locator('option[value="video-1"]')).toHaveCount(1);
 });
 test("mobile shell fits viewport and exposes honest live-configuration state", async ({
   page,
@@ -869,7 +904,10 @@ test("no figure is carried by colour alone", async ({ page }) => {
   await page.goto("/dashboard");
   // The chart duplicates the list beside it, so it is kept out of the
   // accessibility tree rather than announced as an unlabelled canvas.
-  await expect(page.locator(".chart")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator(".rp-chart-donut")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
   await expect(
     page.getByRole("listitem").filter({ hasText: "إيجابي:" }),
   ).toHaveText("إيجابي: 1 (25٪)");
@@ -927,6 +965,9 @@ test("the history says who reviewed and why", async ({ page }) => {
   await page.getByLabel("التصنيف الصحيح").selectOption("negative");
   await page.getByLabel("سبب التصحيح").fill("النموذج قرأ السخرية حرفيًا");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(page.getByRole("form", { name: "تصحيح التصنيف" })).toHaveCount(
+    0,
+  );
 
   await openReview(page, "المحتوى واضح ومفيد");
   const entry = page

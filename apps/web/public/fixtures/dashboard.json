@@ -71,7 +71,8 @@
           "mixed": 0
         }
       },
-      "reviews": []
+      "reviews": [],
+      "video_title": "فيديو اصطناعي ١"
     },
     {
       "id": "fixture-2",
@@ -113,7 +114,8 @@
           "mixed": 0
         }
       },
-      "reviews": []
+      "reviews": [],
+      "video_title": "فيديو اصطناعي ١"
     },
     {
       "id": "fixture-3",
@@ -164,7 +166,8 @@
           "reviewer_id": null,
           "reason": null
         }
-      ]
+      ],
+      "video_title": "فيديو اصطناعي ١"
     },
     {
       "id": "fixture-4",
@@ -206,7 +209,8 @@
           "mixed": 1
         }
       },
-      "reviews": []
+      "reviews": [],
+      "video_title": "فيديو اصطناعي ١"
     },
     {
       "id": "fixture-5",
@@ -233,7 +237,8 @@
       },
       "comment_type": null,
       "prediction": null,
-      "reviews": []
+      "reviews": [],
+      "video_title": "فيديو اصطناعي ٢"
     },
     {
       "id": "fixture-6",
@@ -284,7 +289,8 @@
           "reviewer_id": "fixture-reviewer-1",
           "reason": "مراجعة سابقة على النص قبل تعديله"
         }
-      ]
+      ],
+      "video_title": "فيديو اصطناعي ٢"
     }
   ]
 }

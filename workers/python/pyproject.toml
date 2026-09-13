@@ -7,6 +7,19 @@ dependencies = ["httpx==0.28.1"]
 
 [dependency-groups]
 dev = ["pytest==8.3.5", "ruff==0.11.13"]
+# Real inference. Kept out of the default install on purpose: these pull half a
+# gigabyte of weights machinery, the test suite drives the adapter through an
+# injected callable and needs none of it, and a collection-only worker should
+# not carry a model runtime it never loads.
+# torch is pinned per-platform: 2.2.2 is the last release with an x86_64 macOS
+# wheel, which is what this project is developed on, while Linux workers take
+# the current one. Pinning the old build everywhere would ship a dated runtime
+# to production to suit one laptop.
+inference = [
+  "transformers==4.57.1",
+  "torch==2.2.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+  "torch==2.9.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

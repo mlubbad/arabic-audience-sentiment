@@ -1,7 +1,20 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-import { Doughnut } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Filler,
+  Legend,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip,
+} from "chart.js";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
+import "./report.css";
+import { byHour, byWeek, byWeekday, commenters } from "./analytics";
 import {
   budgetState,
   type Filters,
@@ -10,12 +23,16 @@ import {
 } from "@sentiment/contracts";
 import {
   buildExport,
+  type DataMode,
   fixtureWorkspace,
   loadSnapshot,
   reviewsArePersisted,
-  dataMode,
+  configuredMode,
+  resolveMode,
   submitReview,
 } from "./data";
+import { useSession, useWorkspaces } from "./session";
+import { workspaceState, readableWorkspace } from "./workspace";
 import {
   labels,
   budgetNames,
@@ -31,9 +48,132 @@ import {
 import { reviewHistory } from "./reviewHistory";
 import { describeSource } from "./dataSource";
 import { syncHealth } from "./syncHealth";
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Filler,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  Legend,
+);
+
+/** Numerals pinned: "ar" renders different digits per browser ICU build. */
+const n = (v: number) => v.toLocaleString("en-US");
+
+/* Chart defaults shared by the three timing panels, so they read as one
+   family rather than three charts that happen to sit together. */
+const axisText = "#6e6a85";
+const gridLine = "#e6e3f0";
+const barOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: axisText }, grid: { display: false } },
+    y: {
+      beginAtZero: true,
+      ticks: { color: axisText, precision: 0 },
+      grid: { color: gridLine },
+    },
+  },
+} as const;
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export function Dashboard() {
+  // Who is asking decides what this page is. A signed-in owner reads their own
+  // channel; everyone else gets the sanitized demo at the same URL, clearly
+  // labelled as one. Neither audience is served by a build-time flag.
+  const { session, loading: sessionLoading } = useSession();
+  const {
+    workspaces,
+    loading: workspacesLoading,
+    failed: workspacesFailed,
+  } = useWorkspaces(session);
+  const [chosen, setChosen] = useState<string | null>(null);
+  if (sessionLoading)
+    return (
+      <div role="status" className="loading">
+        جارٍ تحديد حسابك…
+      </div>
+    );
+  const place = workspaceState({
+    mode: configuredMode,
+    fixtureWorkspace,
+    signedIn: !!session,
+    workspaces,
+    selectedId: chosen,
+  });
+  if (configuredMode === "live" && session) {
+    if (workspacesLoading)
+      return (
+        <div role="status" className="loading">
+          جارٍ تحميل مساحات العمل…
+        </div>
+      );
+    if (workspacesFailed)
+      return (
+        <div role="alert" className="notice">
+          تعذّرت قراءة مساحات عملك. حدّث الصفحة لإعادة المحاولة.
+        </div>
+      );
+    if (place.kind === "no_workspaces")
+      return (
+        <div className="notice">
+          <h1>لا توجد مساحة عمل لهذا الحساب بعد.</h1>
+          <a href="/account">أنشئ مساحة عمل من صفحة الحساب</a>
+        </div>
+      );
+    if (place.kind === "choose")
+      return (
+        <div className="notice" data-testid="ws-choose">
+          <h1>اختر مساحة العمل التي تريد قراءة بياناتها</h1>
+          <label>
+            مساحة العمل
+            <select
+              value={chosen ?? ""}
+              onChange={(e) => setChosen(e.target.value || null)}
+            >
+              <option value="">— اختر —</option>
+              {place.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      );
+  }
+  const live = readableWorkspace(place);
+  const mode = resolveMode({ signedIn: !!session, workspace: live });
+  // In fixture mode the id is the fixture's, never a real one left over from a
+  // previous render: a correction addressed to the wrong pair is exactly what
+  // the old build-time constant existed to prevent.
+  const workspaceId = mode === "live" && live ? live : fixtureWorkspace;
+  const userId = session?.user.id ?? "visitor";
+  // A new identity remounts the whole report, including any open review dialog.
+  // No comment or pending correction from a previous tenant survives the switch.
+  return (
+    <DashboardBody
+      key={`${userId}:${mode}:${workspaceId}`}
+      userId={userId}
+      mode={mode}
+      workspaceId={workspaceId}
+    />
+  );
+}
+
+function DashboardBody({
+  userId,
+  mode,
+  workspaceId,
+}: {
+  userId: string;
+  mode: DataMode;
+  workspaceId: string;
+}) {
   const [filters, setFilters] = useState<Filters>(defaults),
     [query, setQuery] = useState(""),
     [video, setVideo] = useState(""),
@@ -53,15 +193,31 @@ export function Dashboard() {
   // for the filtered set it was produced from.
   const [cursors, setCursors] = useState<string[]>([]);
   const [limit, setLimit] = useState(25);
-  const page = { ...filters, limit, cursor: cursors.at(-1) };
+  const page = {
+    ...filters,
+    workspace_id: workspaceId,
+    limit,
+    cursor: cursors.at(-1),
+  };
   const result = useQuery({
-    queryKey: ["fixture-dashboard", page],
-    queryFn: ({ signal }) => loadSnapshot(page, signal),
+    // The mode is part of the key: the same filters mean different rows in
+    // each, and a cached demo page must never be served as somebody's channel.
+    queryKey: ["dashboard", userId, mode, page],
+    queryFn: ({ signal }) => loadSnapshot(mode, page, signal),
     // Keep the current screen while the next one loads: the spec asks for a full
     // loading state only before there is anything to show, and a refresh
     // indicator afterwards. React Query still keys results by filter, so a late
     // response lands in its own cache entry and never repaints a newer screen.
-    placeholderData: (previous) => previous,
+    placeholderData: (previous, previousQuery) => {
+      const oldKey = previousQuery?.queryKey;
+      if (!Array.isArray(oldKey)) return undefined;
+      const oldPage = oldKey[3] as Filters | undefined;
+      return oldKey[1] === userId &&
+        oldKey[2] === mode &&
+        oldPage?.workspace_id === workspaceId
+        ? previous
+        : undefined;
+    },
   });
   // Sticky, because recovery re-requests page one and that response no longer
   // carries the reset flag. The user should still be told why the page moved.
@@ -93,23 +249,25 @@ export function Dashboard() {
   const [reason, setReason] = useState("");
   const review = useMutation({
     mutationFn: () =>
-      submitReview({
-        workspace_id: filters.workspace_id,
+      submitReview(mode, {
+        workspace_id: workspaceId,
         comment_id: reviewing!.id,
         content_hash: reviewing!.content_hash,
         label: verdict,
         reason,
       }),
     onSuccess: async () => {
+      // Re-read through the same snapshot path so the corrected label, the
+      // sentiment denominator and the review filter all move together. Keep
+      // the form open until the refreshed read is ready: closing it first
+      // allowed an immediate reopen to show the old review history.
+      await client.invalidateQueries({ queryKey: ["dashboard"] });
       closeReview();
       setReason("");
-      // Re-read through the same snapshot path so the corrected label, the
-      // sentiment denominator and the review filter all move together.
-      await client.invalidateQueries({ queryKey: ["fixture-dashboard"] });
     },
   });
   const exporting = useMutation({
-    mutationFn: () => buildExport(page),
+    mutationFn: () => buildExport(mode, page),
     onSuccess: ({ csv, filename }) => {
       const url = URL.createObjectURL(
         new Blob([csv], { type: "text/csv;charset=utf-8" }),
@@ -178,19 +336,90 @@ export function Dashboard() {
     setFilters(defaults);
   }
   const s = result.data;
+  // Aggregations for the charts, over every row the filters admit rather than
+  // the page on screen. Memoised on the filtered array itself: it is a new
+  // array only when the read or the filters actually changed.
+  const rows = s?.filtered ?? [];
+  const hours = useMemo(() => byHour(rows), [rows]);
+  const weekdays = useMemo(() => byWeekday(rows), [rows]);
+  const weeks = useMemo(() => byWeek(rows), [rows]);
+  const [peopleBy, setPeopleBy] = useState<"comments" | "likes">("comments");
+  const people = useMemo(() => commenters(rows, peopleBy), [rows, peopleBy]);
+  const [cardTab, setCardTab] = useState<"liked" | "recent" | "critical">(
+    "liked",
+  );
+  const cards = useMemo(() => {
+    const list = [...rows];
+    if (cardTab === "critical")
+      return list
+        .filter((c) => c.label === "negative")
+        .sort((a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1))
+        .slice(0, 12);
+    if (cardTab === "recent")
+      return list
+        .filter((c) => c.published_at)
+        .sort((a, b) => (a.published_at! < b.published_at! ? 1 : -1))
+        .slice(0, 12);
+    // Unknown like counts sort last rather than as zero, so a comment whose
+    // count could not be read is never presented as the least liked.
+    return list
+      .sort((a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1))
+      .slice(0, 12);
+  }, [rows, cardTab]);
   // Every sentence in the header comes from the values that decide behaviour,
   // so the label and the truth cannot drift apart.
   const source = describeSource({
-    mode: dataMode,
-    workspaceId: filters.workspace_id,
-    persisted: reviewsArePersisted,
+    mode,
+    workspaceId,
+    persisted: reviewsArePersisted(mode),
     sync: s?.sync ?? null,
     total: s?.total ?? null,
     now: new Date(),
   });
+  const span = s?.timeline ?? [];
+  const range =
+    span.length > 0
+      ? `${span[0].date} — ${span[span.length - 1].date}`
+      : "لا توجد تواريخ معروفة";
   return (
-    <>
-      <h1>لوحة مشاعر الجمهور</h1>
+    <div className="rp-page">
+      <header className="rp-hero">
+        <p className="rp-eyebrow">تقرير تحليلي · قناة يوتيوب</p>
+        <h1>ماذا يقول جمهورك — وأين يقوله؟</h1>
+        {/* Before the read returns there is no count, and `?? 0` would have
+            printed "قراءة 0 تعليقًا" over a page that is still loading —
+            unknown rendered as a measurement of none. The banner says what it
+            is doing instead, and the figures appear when they exist. */}
+        {s ? (
+          <>
+            <p>
+              قراءة {n(s.total)} تعليقًا عبر {s.videos.length} فيديو، مع من
+              قالها ومتى. كل رقم أدناه محسوب من الصفوف المحفوظة — لا تقدير ولا
+              استقراء.
+            </p>
+            <div className="rp-pills">
+              <span className="rp-pill">{range}</span>
+              <span className="rp-pill">{n(s.total)} تعليقًا</span>
+              <span className="rp-pill">
+                {n(s.unique_authors)} معلّقًا معروفًا
+              </span>
+            </div>
+          </>
+        ) : (
+          <p>جارٍ قراءة التعليقات المحفوظة…</p>
+        )}
+      </header>
+      <nav className="rp-nav" aria-label="أقسام التقرير">
+        <div className="rp-nav-links">
+          <a href="#rp-summary">الملخص</a>
+          <a href="#rp-videos">الفيديوهات</a>
+          <a href="#rp-voice">صوت الجمهور</a>
+          <a href="#rp-timing">التوقيت</a>
+          <a href="#rp-people">المعلّقون</a>
+          <a href="#rp-comments">التعليقات</a>
+        </div>
+        <span className="rp-scope">{source.scope}</span>
+      </nav>
       <aside
         className={source.tone === "warning" ? "notice" : "notice source-live"}
         data-testid="source"
@@ -221,8 +450,15 @@ export function Dashboard() {
             onChange={(e) => setVideo(e.target.value)}
           >
             <option value="">كل الفيديوهات</option>
-            <option value="video-1">فيديو اصطناعي ١</option>
-            <option value="video-2">فيديو اصطناعي ٢</option>
+            {/* Built from the videos actually in the current read. These were
+                hard-coded to the two fixture ids, so a live account was
+                offered a choice between two videos it does not have and none
+                of the ones it does. */}
+            {(s?.video_options ?? []).map((v) => (
+              <option key={v.id} value={v.id}>
+                {videoLabel(v.id, v.title)}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -377,23 +613,96 @@ export function Dashboard() {
       )}
       {s && (
         <>
-          <section className="metrics" aria-label="المؤشرات">
-            <article>
-              <h2>التعليقات والردود</h2>
-              <strong data-testid="total">{s.total}</strong>
-            </article>
-            <article>
-              <h2>المحللة</h2>
-              <strong>{s.analysed}</strong>
-            </article>
-            <article>
-              <h2>غير المحللة أو القديمة</h2>
-              <strong>{s.unanalysed}</strong>
-            </article>
-            <article>
-              <h2>الردود</h2>
-              <strong data-testid="replies-count">{s.replies}</strong>
-            </article>
+          <section className="rp-section" id="rp-summary">
+            <header>
+              <h2>الملخص</h2>
+              <p className="rp-sub">
+                الأرقام أدناه تتبع الفلاتر المطبَّقة أعلاه.
+              </p>
+            </header>
+            <div className="rp-grid rp-grid-5" aria-label="المؤشرات">
+              <article className="rp-card rp-metric">
+                <span className="rp-metric-label">التعليقات والردود</span>
+                <strong className="rp-metric-value" data-testid="total">
+                  {n(s.total)}
+                </strong>
+                <span className="rp-metric-note">كل ما تطابق مع الفلاتر.</span>
+              </article>
+              <article className="rp-card rp-metric">
+                <span className="rp-metric-label">المحلَّلة</span>
+                <strong className="rp-metric-value">{n(s.analysed)}</strong>
+                <span className="rp-metric-note">
+                  تحمل تصنيفًا صالحًا للتحليل الحالي.
+                </span>
+              </article>
+              <article className="rp-card rp-metric">
+                <span className="rp-metric-label">
+                  غير المحلَّلة أو القديمة
+                </span>
+                <strong className="rp-metric-value">{n(s.unanalysed)}</strong>
+                <span className="rp-metric-note">
+                  محفوظة، ولا تدخل في نسب المشاعر.
+                </span>
+              </article>
+              <article className="rp-card rp-metric">
+                <span className="rp-metric-label">الردود</span>
+                <strong className="rp-metric-value" data-testid="replies-count">
+                  {n(s.replies)}
+                </strong>
+                <span className="rp-metric-note">
+                  ردود على تعليقات، لا تعليقات أصلية.
+                </span>
+              </article>
+              <article className="rp-card rp-metric">
+                <span className="rp-metric-label">معلّقون معروفون</span>
+                <strong className="rp-metric-value">
+                  {n(s.unique_authors)}
+                </strong>
+                <span className="rp-metric-note">
+                  {/* Counted by channel id. Rows whose author was purged are
+                      not countable as people and are excluded rather than
+                      guessed at. */}
+                  محسوبون بمعرّف القناة، لا بالاسم المعروض.
+                </span>
+              </article>
+            </div>
+            <div
+              className="rp-grid rp-grid-4"
+              style={{ marginTop: "var(--space-4)" }}
+            >
+              <article className="rp-insight">
+                <p className="rp-insight-tag">استنتاج ١</p>
+                <p>
+                  {s.total > 0
+                    ? `حُلِّل ${Math.round((s.analysed / s.total) * 100)}٪ من التعليقات المطابقة. الباقي محفوظ بلا تصنيف، ولا يدخل في أي نسبة مشاعر.`
+                    : "لا توجد تعليقات مطابقة، فلا نسبة تحليل يمكن ذكرها."}
+                </p>
+              </article>
+              <article className="rp-insight">
+                <p className="rp-insight-tag">استنتاج ٢</p>
+                <p>
+                  {s.total > 0
+                    ? `${Math.round((s.replies / s.total) * 100)}٪ منها ردود — أي حوار بين المشاهدين أنفسهم لا خطاب موجَّه إلى القناة.`
+                    : "لا بيانات كافية لقياس نسبة الردود."}
+                </p>
+              </article>
+              <article className="rp-insight">
+                <p className="rp-insight-tag">استنتاج ٣</p>
+                <p>
+                  {s.videos.length > 0
+                    ? `أنشط فيديو جمع ${n(s.videos[0].total)} تعليقًا من أصل ${n(s.total)} — أي ${Math.round((s.videos[0].total / s.total) * 100)}٪ من الحديث كله.`
+                    : "لا فيديو ضمن الفلاتر الحالية."}
+                </p>
+              </article>
+              <article className="rp-insight">
+                <p className="rp-insight-tag">استنتاج ٤</p>
+                <p>
+                  {s.unknown_dates > 0
+                    ? `${n(s.unknown_dates)} تعليقًا بلا تاريخ معروف. لا تظهر في رسوم التوقيت، ولم تُوضع في خانة افتراضية.`
+                    : "كل التعليقات المطابقة تحمل تاريخًا معروفًا."}
+                </p>
+              </article>
+            </div>
           </section>
           {s.total === 0 ? (
             <section className="empty">
@@ -402,78 +711,359 @@ export function Dashboard() {
             </section>
           ) : (
             <>
-              <section className="split">
-                <article>
-                  <h2>توزيع المشاعر</h2>
-                  <p>
-                    المقام: {s.analysed} تعليقًا ذا تصنيف صالح. المشاعر المختلطة
-                    مستقلة.
+              <section className="rp-section" id="rp-videos">
+                <header>
+                  <h2>الفيديوهات</h2>
+                  <p className="rp-sub">
+                    اضغط أي فيديو لتصفية اللوحة كاملة عليه. الأرقام مشتقة من
+                    التعليقات المحفوظة، لا من مؤشرات يوتيوب للفيديو.
                   </p>
-                  {s.analysed > 0 && (
-                    <div className="chart" aria-hidden="true">
-                      <Doughnut
+                </header>
+                <ul className="rp-videos">
+                  {s.videos.map((v) => {
+                    const known =
+                      v.sentiments.positive +
+                      v.sentiments.negative +
+                      v.sentiments.neutral +
+                      v.sentiments.mixed;
+                    const pct = (x: number) =>
+                      v.total ? (x / v.total) * 100 : 0;
+                    return (
+                      <li key={v.id}>
+                        <button
+                          type="button"
+                          className="rp-video"
+                          aria-pressed={video === v.id}
+                          data-testid={`rp-video-${v.id}`}
+                          onClick={() => {
+                            // Selecting a video is a filter change like any
+                            // other, so it goes through the same apply path
+                            // and resets paging rather than leaving a cursor
+                            // pointing into the previous result set.
+                            const next = video === v.id ? "" : v.id;
+                            setVideo(next);
+                            goTo([]);
+                            setFilters((f) => ({
+                              ...f,
+                              video_id: next || undefined,
+                            }));
+                          }}
+                        >
+                          <span>
+                            <span className="rp-video-title">
+                              {videoLabel(v.id, v.title)}
+                            </span>
+                            <span className="rp-video-meta">
+                              <span>{n(v.total)} تعليقًا</span>
+                              <span>{n(v.replies)} ردًّا</span>
+                              <span>{n(v.analysed)} محلَّلًا</span>
+                            </span>
+                            <span className="rp-bar" aria-hidden="true">
+                              <span
+                                className="pos"
+                                style={{
+                                  width: `${pct(v.sentiments.positive)}%`,
+                                }}
+                              />
+                              <span
+                                className="neg"
+                                style={{
+                                  width: `${pct(v.sentiments.negative)}%`,
+                                }}
+                              />
+                              <span
+                                className="neu"
+                                style={{
+                                  width: `${pct(v.sentiments.neutral)}%`,
+                                }}
+                              />
+                              <span
+                                className="mix"
+                                style={{ width: `${pct(v.sentiments.mixed)}%` }}
+                              />
+                              {/* The unanalysed remainder is drawn, not
+                                  omitted: a bar that fills to 100% from four
+                                  labels would claim every comment was read. */}
+                              <span
+                                className="un"
+                                style={{ width: `${pct(v.total - known)}%` }}
+                              />
+                            </span>
+                          </span>
+                          <span className="rp-video-figure">
+                            <strong>{n(v.total)}</strong>
+                            <span>تعليقًا</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+              <section className="rp-section" id="rp-voice">
+                <header>
+                  <h2>صوت الجمهور</h2>
+                  <p className="rp-sub">
+                    المقام: {n(s.analysed)} تعليقًا ذا تصنيف صالح — لا العدد
+                    الكلي. المشاعر المختلطة فئة مستقلة، لا وسط بين طرفين.
+                  </p>
+                </header>
+                <div className="rp-grid rp-grid-2">
+                  <article className="rp-card">
+                    <h3>المشاعر</h3>
+                    {s.analysed > 0 ? (
+                      <>
+                        <div className="rp-chart-donut" aria-hidden="true">
+                          <Doughnut
+                            data={{
+                              labels: Object.values(labels),
+                              datasets: [
+                                {
+                                  data: Object.values(s.sentiments),
+                                  // The brand's plotting scale. Labels
+                                  // accompany every slice; colour is never the
+                                  // only carrier.
+                                  backgroundColor: [
+                                    "#2ebd85",
+                                    "#ff6c77",
+                                    "#8e8aa6",
+                                    "#f0c419",
+                                  ],
+                                  borderWidth: 2,
+                                },
+                              ],
+                            }}
+                            options={{
+                              animation: false,
+                              maintainAspectRatio: false,
+                              cutout: "62%",
+                              plugins: { legend: { display: false } },
+                            }}
+                          />
+                        </div>
+                        <ul className="rp-legend">
+                          {Object.entries(s.sentiments).map(([key, v]) => (
+                            <li key={key}>
+                              <span>
+                                <span
+                                  className="rp-swatch"
+                                  style={{
+                                    background: `var(--sentiment-${key})`,
+                                  }}
+                                  aria-hidden="true"
+                                />
+                                {labels[key as Label]}: {n(v)} (
+                                {s.analysed
+                                  ? Math.round((v / s.analysed) * 100)
+                                  : 0}
+                                ٪)
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <p className="rp-missing">
+                        <strong>لا يوجد تصنيف بعد</strong>
+                        التعليقات محفوظة ولم يُشغَّل عليها نموذج تصنيف، فلا توجد
+                        نسبة مشاعر تُعرض. هذا غياب تحليل، لا حياد جمهور.
+                      </p>
+                    )}
+                  </article>
+                  <article className="rp-card">
+                    <h3>الموضوعات</h3>
+                    {/* The reference groups comments into themes with a
+                        language model. We have not built that layer, and
+                        clustering by keyword would produce topic names nobody
+                        chose and a chart that looks like analysis. */}
+                    <p className="rp-missing">
+                      <strong>غير متاح بعد</strong>
+                      تصنيف التعليقات إلى موضوعات يحتاج طبقة نموذج لغوي لم تُبنَ
+                      بعد. لن يُعرض هنا رسم مشتق من كلمات مفتاحية ويُقدَّم كأنه
+                      تحليل موضوعي.
+                    </p>
+                  </article>
+                </div>
+                <div
+                  className="rp-grid rp-grid-3"
+                  style={{ marginTop: "var(--space-4)" }}
+                >
+                  <article className="rp-deep">
+                    <strong>{n(s.sentiments.positive)}</strong>
+                    <p>تعليقًا إيجابيًا ضمن المحلَّل.</p>
+                  </article>
+                  <article className="rp-deep">
+                    <strong>{n(s.sentiments.negative)}</strong>
+                    <p>
+                      تعليقًا سلبيًا — وهي التي تستحق قراءة نصّها لا نسبتها.
+                    </p>
+                  </article>
+                  <article className="rp-deep">
+                    <strong>{n(s.unanalysed)}</strong>
+                    <p>بلا تصنيف بعد، ولا تدخل في أي نسبة أعلاه.</p>
+                  </article>
+                </div>
+              </section>
+              <section className="rp-section" id="rp-timing">
+                <header>
+                  <h2>توقيت التفاعل</h2>
+                  <p className="rp-sub">
+                    متى يصل التعليق. تعليق بتوقيت تقريبي («منذ ٣ أشهر») لا يمكن
+                    وضعه في ساعة، فيُستبعد ويُذكر عدده بدل أن يُسنَد إلى منتصف
+                    الليل.
+                  </p>
+                </header>
+                <article className="rp-card">
+                  <h3>التعليقات أسبوعيًا</h3>
+                  <div className="rp-chart rp-chart-tall" aria-hidden="true">
+                    <Line
+                      data={{
+                        labels: weeks.buckets.map((b) => b.label),
+                        datasets: [
+                          {
+                            data: weeks.buckets.map((b) => b.count),
+                            borderColor: "#3b27ba",
+                            backgroundColor: "rgba(59,39,186,0.10)",
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 0,
+                          },
+                        ],
+                      }}
+                      options={{ ...barOptions, animation: false }}
+                    />
+                  </div>
+                  <p className="rp-metric-note">
+                    {weeks.unplaceable > 0
+                      ? `${n(weeks.unplaceable)} تعليقًا بلا تاريخ صالح لم يدخل هذا الرسم.`
+                      : "كل التعليقات المطابقة دخلت هذا الرسم."}
+                  </p>
+                </article>
+                <div
+                  className="rp-grid rp-grid-2"
+                  style={{ marginTop: "var(--space-4)" }}
+                >
+                  <article className="rp-card">
+                    <h3>حسب ساعة اليوم</h3>
+                    <div className="rp-chart" aria-hidden="true">
+                      <Bar
                         data={{
-                          labels: Object.values(labels),
+                          labels: hours.buckets.map((b) => b.label),
                           datasets: [
                             {
-                              data: Object.values(s.sentiments),
-                              // The brand's plotting scale, read from the
-                              // stylesheet so the chart and the page cannot
-                              // drift apart. Labels accompany every slice;
-                              // colour is never the only carrier.
-                              backgroundColor: [
-                                "#2ebd85",
-                                "#ff6c77",
-                                "#8e8aa6",
-                                "#f0c419",
-                              ],
-                              borderWidth: 2,
+                              data: hours.buckets.map((b) => b.count),
+                              backgroundColor: "#6b59e8",
+                              borderRadius: 4,
                             },
                           ],
                         }}
-                        options={{
-                          animation: false,
-                          maintainAspectRatio: false,
-                          plugins: { legend: { display: false } },
-                        }}
+                        options={{ ...barOptions, animation: false }}
                       />
                     </div>
-                  )}
-                  <ul>
-                    {Object.entries(s.sentiments).map(([key, n]) => (
-                      <li key={key}>
-                        {labels[key as Label]}: {n} (
-                        {s.analysed ? Math.round((n / s.analysed) * 100) : 0}٪)
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-                <article>
-                  <h2>الفيديوهات ضمن الفلاتر</h2>
-                  <ul>
-                    {s.videos.map((v) => (
-                      <li key={v.id}>
-                        {videoLabel(v.id)}: {v.total}
-                      </li>
-                    ))}
-                  </ul>
-                  <h2>التواريخ المتاحة</h2>
-                  <ul>
-                    {s.timeline.map((t) => (
-                      <li key={t.date}>
-                        {t.date === "unknown" ? "غير معروف" : t.date}: {t.total}
-                      </li>
-                    ))}
-                  </ul>
-                  <p>معرّفات المؤلفين المتاحة: {s.unique_authors}</p>
-                  <p>
-                    تعليقات بلا تاريخ:{" "}
-                    <span data-testid="unknown-dates">{s.unknown_dates}</span>
+                    <p className="rp-metric-note" data-testid="hours-excluded">
+                      {hours.unplaceable > 0
+                        ? `${n(hours.unplaceable)} تعليقًا بتوقيت أخشن من الساعة، مستبعَد من هذا الرسم.`
+                        : "كل التعليقات المطابقة قابلة للوضع في ساعة."}
+                    </p>
+                  </article>
+                  <article className="rp-card">
+                    <h3>حسب يوم الأسبوع</h3>
+                    <div className="rp-chart" aria-hidden="true">
+                      <Bar
+                        data={{
+                          labels: weekdays.buckets.map((b) => b.label),
+                          datasets: [
+                            {
+                              data: weekdays.buckets.map((b) => b.count),
+                              backgroundColor: "#ff9080",
+                              borderRadius: 4,
+                            },
+                          ],
+                        }}
+                        options={{ ...barOptions, animation: false }}
+                      />
+                    </div>
+                    <p className="rp-metric-note">اليوم بتوقيت متصفحك.</p>
+                    <p className="rp-metric-note">
+                      تعليقات بلا تاريخ:{" "}
+                      <span data-testid="unknown-dates">{s.unknown_dates}</span>
+                    </p>
+                  </article>
+                </div>
+              </section>
+              <section className="rp-section" id="rp-people">
+                <header>
+                  <h2>المعلّقون</h2>
+                  <p className="rp-sub">
+                    من يتحدّث، ومن يجد صدى. الهوية بمعرّف القناة لا بالاسم
+                    المعروض: شخصان قد يتشابه اسمهما، ودمجهما يخترع معلّقًا لا
+                    وجود له.
                   </p>
+                </header>
+                <article className="rp-card">
+                  <div className="rp-tabs" style={{ marginBottom: "16px" }}>
+                    <button
+                      type="button"
+                      className="rp-tab"
+                      aria-pressed={peopleBy === "comments"}
+                      onClick={() => setPeopleBy("comments")}
+                    >
+                      الأكثر نشاطًا
+                    </button>
+                    <button
+                      type="button"
+                      className="rp-tab"
+                      aria-pressed={peopleBy === "likes"}
+                      onClick={() => setPeopleBy("likes")}
+                    >
+                      الأكثر تأثيرًا
+                    </button>
+                  </div>
+                  {people.ranked.length === 0 ? (
+                    <p className="rp-missing">
+                      <strong>لا يوجد معلّق يمكن عدّه</strong>
+                      لا تحمل الصفوف المطابقة اسم كاتب — إمّا لعدم وجود تعليقات،
+                      أو لأن الأسماء حُذفت تحت قاعدة الاحتفاظ.
+                    </p>
+                  ) : (
+                    <ol className="rp-people">
+                      {people.ranked.slice(0, 20).map((c, i) => (
+                        <li
+                          key={c.key}
+                          className="rp-person"
+                          data-testid={`rp-person-${i}`}
+                        >
+                          <span className="rp-rank">{i + 1}</span>
+                          <span className="rp-person-name">{c.name}</span>
+                          <span className="rp-person-n">
+                            {n(c.comments)} تعليقًا
+                          </span>
+                          <span className="rp-person-likes">
+                            {/* Unknown stays unknown: a source that showed no
+                                count is not a source that showed zero. */}
+                            {c.likes === null
+                              ? "إعجابات غير معروفة"
+                              : `${n(c.likes)} إعجابًا`}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {people.anonymous > 0 && (
+                    <p className="rp-metric-note" data-testid="rp-anonymous">
+                      {n(people.anonymous)} تعليقًا كاتبها محذوف تحت قاعدة
+                      الاحتفاظ. لم يُدمج في معلّق واحد، ولا يظهر في الترتيب.
+                    </p>
+                  )}
                 </article>
               </section>
-              <section aria-labelledby="comparison-heading">
-                <h2 id="comparison-heading">مقارنة الفيديوهات</h2>
+              <section
+                className="rp-section"
+                aria-labelledby="comparison-heading"
+              >
+                <header>
+                  <h2 id="comparison-heading">مقارنة الفيديوهات</h2>
+                </header>
                 <p className="muted" data-testid="comparison-scope">
                   أرقام مشتقة من التعليقات ضمن الفلاتر الحالية فقط. ليست مؤشرات
                   الفيديو الكلية: لتلك نطاق وتاريخ رصد مستقلان.
@@ -498,7 +1088,7 @@ export function Dashboard() {
                     <tbody>
                       {s.comparison.map((v) => (
                         <tr key={v.id} data-testid={`compare-${v.id}`}>
-                          <td>{videoLabel(v.id)}</td>
+                          <td>{videoLabel(v.id, v.title)}</td>
                           <td>{v.total}</td>
                           <td>{v.replies}</td>
                           <td>{v.analysed}</td>
@@ -523,10 +1113,13 @@ export function Dashboard() {
                 </div>
               </section>
               <section
+                className="rp-section"
                 aria-labelledby="engaged-heading"
                 data-testid="engaged-panel"
               >
-                <h2 id="engaged-heading">أكثر التعليقات السلبية تفاعلًا</h2>
+                <header>
+                  <h2 id="engaged-heading">أكثر التعليقات السلبية تفاعلًا</h2>
+                </header>
                 <p className="muted">
                   ترتيب حسب الإعجابات ضمن الفلاتر الحالية. الإعجابات لا تُرجِّح
                   التصنيف، وقلب صاحب القناة ليس مشاعر إيجابية.
@@ -559,8 +1152,74 @@ export function Dashboard() {
                   </p>
                 )}
               </section>
-              <section data-testid="comments-table">
-                <h2>التعليقات</h2>
+              <section
+                className="rp-section"
+                id="rp-comments"
+                data-testid="comments-table"
+              >
+                <header>
+                  <h2>التعليقات</h2>
+                  <p className="rp-sub">
+                    اضغط أي بطاقة لقراءة التعليق كاملًا، والجدول تحتها هو مكان
+                    التصحيح والتصدير والتنقّل بين الصفحات.
+                  </p>
+                </header>
+                <div className="rp-tabs" style={{ marginBottom: "16px" }}>
+                  <button
+                    type="button"
+                    className="rp-tab"
+                    aria-pressed={cardTab === "liked"}
+                    onClick={() => setCardTab("liked")}
+                  >
+                    الأكثر إعجابًا
+                  </button>
+                  <button
+                    type="button"
+                    className="rp-tab"
+                    aria-pressed={cardTab === "recent"}
+                    onClick={() => setCardTab("recent")}
+                  >
+                    الأحدث
+                  </button>
+                  <button
+                    type="button"
+                    className="rp-tab"
+                    aria-pressed={cardTab === "critical"}
+                    onClick={() => setCardTab("critical")}
+                  >
+                    النقدية
+                  </button>
+                </div>
+                <ul className="rp-comments" data-testid="rp-cards">
+                  {cards.map((c) => (
+                    <li key={c.id} className="rp-comment">
+                      <div className="rp-comment-head">
+                        <span className="rp-comment-who">
+                          {/* A purged author is named as purged, not left
+                              blank and not replaced with a plausible name. */}
+                          {c.author_name ?? PURGED_AUTHOR}
+                        </span>
+                        <span
+                          className="rp-chip"
+                          data-label={c.label ?? "none"}
+                        >
+                          {c.label ? labels[c.label] : "بلا تصنيف"}
+                        </span>
+                      </div>
+                      <p className="rp-comment-text">{commentText(c)}</p>
+                      <div className="rp-comment-foot">
+                        <span>{displayDate(c.published_at)}</span>
+                        <span>
+                          {/* Unknown likes are said to be unknown. Rendering a
+                              zero here would be a number we invented. */}
+                          {c.likes_value === null
+                            ? "إعجابات غير معروفة"
+                            : `${n(c.likes_value)} إعجابًا`}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
                 {cursorNotice && (
                   <p
                     role="status"
@@ -701,7 +1360,7 @@ export function Dashboard() {
                         إلغاء
                       </button>
                     </div>
-                    {!reviewsArePersisted && (
+                    {!reviewsArePersisted(mode) && (
                       <p className="muted" data-testid="review-scope">
                         وضع البيانات الاصطناعية: يُحفظ التصحيح في هذه الجلسة فقط
                         ولا يُرسل إلى أي خادم.
@@ -843,6 +1502,6 @@ export function Dashboard() {
           })()}
         </>
       )}
-    </>
+    </div>
   );
 }

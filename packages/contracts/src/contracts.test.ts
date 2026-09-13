@@ -16,6 +16,7 @@ const base = {
   client_id: "client",
   channel_id: "channel",
   video_id: "v1",
+  video_title: "حلقة تجريبية",
   video_kind: "video" as const,
   author_channel_id: "author",
   author_name: "كاتب تجريبي",
@@ -423,6 +424,46 @@ describe("human corrections", () => {
     );
     expect(oneVideo.total).toBe(1);
     expect(oneVideo.comment_types).toEqual(["اقتراح", "سؤال"]);
+  });
+  it("offers every video the workspace has, whichever one is selected", () => {
+    const rows: Comment[] = [
+      { ...base, id: "o1", video_id: "v1", video_title: "الحلقة الأولى" },
+      { ...base, id: "o2", video_id: "v2", video_title: "الحلقة الثانية" },
+      // No title carried: the id stands in rather than a made-up name.
+      { ...base, id: "o3", video_id: "v3", video_title: null },
+      {
+        ...base,
+        id: "o4",
+        video_id: "v9",
+        video_title: "قناة أخرى",
+        workspace_id: "00000000-0000-4000-8000-000000000002",
+      },
+    ];
+    const all = snapshot(rows, { workspace_id: workspace }, "fixture-v1");
+    expect(all.video_options.map((v) => v.id)).toEqual(["v1", "v2", "v3"]);
+    expect(all.video_options[0].title).toBe("الحلقة الأولى");
+    expect(all.video_options.find((v) => v.id === "v3")!.title).toBeNull();
+
+    // The bug this guards: choosing a video left it as the only option in the
+    // control, so there was no way back to the others without a full reset.
+    const one = snapshot(
+      rows,
+      { workspace_id: workspace, video_ids: ["v1"] },
+      "fixture-v1",
+    );
+    expect(one.total).toBe(1);
+    expect(one.videos.map((v) => v.id)).toEqual(["v1"]);
+    expect(one.video_options.map((v) => v.id)).toEqual(["v1", "v2", "v3"]);
+  });
+  it("names a video by its own title in the per-video figures", () => {
+    const rows: Comment[] = [
+      { ...base, id: "n1", video_id: "v1", video_title: null },
+      { ...base, id: "n2", video_id: "v1", video_title: "الحلقة الأولى" },
+    ];
+    const s = snapshot(rows, { workspace_id: workspace }, "fixture-v1");
+    // A later row supplies what the first lacked, rather than the aggregate
+    // being stuck with the null it happened to see first.
+    expect(s.videos[0].title).toBe("الحلقة الأولى");
   });
   it("ranks the most engaged negatives without letting likes touch the label", () => {
     const liked: Comment[] = [

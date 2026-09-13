@@ -133,14 +133,14 @@ export function Landing() {
             </p>
             <div className="lp-actions">
               <Link className="lp-button" to="/dashboard">
-                استكشف اللوحة التجريبية <span aria-hidden="true">←</span>
+                استكشف اللوحة <span aria-hidden="true">←</span>
               </Link>
               <a className="lp-text-link" href="#experience">
                 شاهد كيف تعمل <span aria-hidden="true">↙</span>
               </a>
             </div>
             <p className="lp-caption">
-              جرّب الواجهة ببيانات توضيحية، دون ربط قناتك.
+              المثال المعروض هنا توضيحي؛ بيانات قناتك تتطلب تسجيل الدخول والربط.
             </p>
           </div>
           <div
@@ -149,9 +149,9 @@ export function Landing() {
           >
             <div className="lp-art-halo" />
             <img
-              src="/landing/audience-growth.png"
-              width="1920"
-              height="1331"
+              src="/landing/audience-growth-original.png"
+              width="1536"
+              height="1024"
               alt=""
               fetchPriority="high"
             />
@@ -453,11 +453,11 @@ export function Landing() {
             {[
               [
                 "هل البيانات في التجربة من قناة حقيقية؟",
-                "لا. اللوحة التجريبية تستخدم بيانات اصطناعية معلّمة بوضوح. يمكنك تجربة الفلاتر والمراجعة والتصدير دون ربط قناة أو مشاركة تعليقات حقيقية.",
+                "المثال التفاعلي في هذه الصفحة يستخدم تعليقات اصطناعية معلّمة بوضوح. حُفظت تعليقات قناة اختبار حقيقية في الخدمة، ويجري توصيلها باللوحة الحية لصاحب مساحة العمل.",
               ],
               [
                 "هل يمكنني ربط قناتي الآن؟",
-                "ربط حساب يوتيوب والجمع والتحليل الحي ما زال ضمن تجهيز النسخة الأولية. فتح حساب في الخدمة مستقل عن ربط يوتيوب، ولا يحوّل بيانات التجربة إلى بيانات قناتك.",
+                "ربط يوتيوب متاح ضمن التجربة الخاصة للحسابات المخوّلة، وقد جُمعت تعليقات حقيقية لقناة اختبار. تتطلب المزامنة تشغيل العامل، وما زال تحليل المشاعر بالنموذج الحي والتحقق من اللوحة الحية قيد الإكمال.",
               ],
               [
                 "هل تحليل المشاعر دقيق دائمًا؟",
@@ -489,10 +489,10 @@ export function Landing() {
           </h2>
           <p>خذ جولة في تجربة عربية تجعل التعليقات أقرب إلى الفهم.</p>
           <Link className="lp-button" to="/dashboard">
-            استكشف اللوحة التجريبية <span aria-hidden="true">←</span>
+            استكشف اللوحة <span aria-hidden="true">←</span>
           </Link>
           <span className="lp-caption">
-            بيانات توضيحية · لا يلزم ربط يوتيوب
+            المثال هنا توضيحي · ربط القناة للحسابات المخوّلة
           </span>
         </section>
       </main>
@@ -504,7 +504,7 @@ export function Landing() {
           <p>رؤية أوضح لما وراء تعليقات يوتيوب.</p>
         </div>
         <nav aria-label="روابط التذييل">
-          <Link to="/dashboard">اللوحة التجريبية</Link>
+          <Link to="/dashboard">اللوحة</Link>
           <Link to="/account">الحساب</Link>
           <a href="#questions">أسئلة شائعة</a>
         </nav>
