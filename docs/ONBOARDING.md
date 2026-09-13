@@ -5,8 +5,8 @@ people after a long gap. It is an entry point, not a summary: everything here is
 either a pointer, a trap that has already cost someone time, or a rule you cannot
 infer by reading the code.
 
-Written on `codex/coordination-integration`. The counts below are from the latest
-full run; `docs/verification.md` is the authoritative record of what was run when.
+The counts below are from the latest full run; `docs/verification.md` is the
+authoritative record of what was run when.
 
 Read `AGENTS.md` first. It is short and it is binding.
 
@@ -79,11 +79,10 @@ Chromium. `uv` must be installed separately.
 | `npm test` | contracts + web unit (10 files) | 77 passed |
 | `npm run test:db` | real SQL + real RLS in PGlite | 59 passed |
 | `npm run worker:test` | Python worker via uv/pytest | 60 passed |
-| `node scripts/check-ownership.mjs <lane>` | lane guard | 5/5 |
 | `npm run test:e2e` | Playwright against a dev server it starts itself | 45 passed |
 
-`npm run check` does **not** include `test:e2e`. Run that separately, and only one
-lane at a time — see the port trap below.
+`npm run check` does **not** include `test:e2e`. Run that separately; it starts its own dev
+server and refuses to adopt one that is already listening — see the port trap below.
 
 `npm run test:db` needs no Docker. It runs the real migrations and the real RLS
 policies inside PGlite, an embedded Postgres. What that buys and what it does not
@@ -100,7 +99,7 @@ hypothetical.
 | Trap | What you see | What is true |
 | --- | --- | --- |
 | `npm run dev -- --port X` | The flag is silently ignored and Vite serves 5173 | The root `dev` script is itself an `npm run`, so npm eats the flag. `playwright.config.ts` goes one layer down on purpose: `npm run dev -w @sentiment/web -- --port X --strictPort` |
-| Two lanes running the browser suite | It passes, or fails, against the wrong build | `reuseExistingServer: false` and `--strictPort` exist for this. Set `E2E_PORT` per lane, and check the other lane's report before starting |
+| A dev server already listening on the port | The suite passes, or fails, against the wrong build | `reuseExistingServer: false` and `--strictPort` exist for this. Stop your own stray `vite`, or set `E2E_PORT` to a free port |
 | `getByLabel("...")` in a test | Matches more elements than you expect | It is a substring match. A `<label>` wrapping a `<select>` also takes its accessible name from **all option text**, so `{ exact: true }` can match nothing. Every select carries an explicit `aria-label` for this reason — that was a real a11y defect, not a test workaround |
 | e2e failing differently on each run | Looks like a flaky regression | Check the host load average. At 17.25 this suite took 12m27s for 32s of work and failed a different test each run. Diagnose contention before diagnosing code |
 | `git checkout -- <file>` to undo an experiment | Reports a pathspec error and does nothing | It fails on an **untracked** file. A deliberately introduced mutation nearly shipped this way. Re-read the file after restoring it; do not trust the restore |
@@ -178,7 +177,7 @@ workers/python/src/        collectors/ (sources), sentiment/ (adapters, no model
 workers/python/tests/fixtures/golden_batch.json
                            produced by the real Python client, consumed by the TS
                            seam test. Regenerate it, do not hand-edit it
-scripts/                   check-ownership.mjs, check-secrets.mjs, and their tests
+scripts/                   check-secrets.mjs, and the Playwright isolation test
 ```
 
 ---
@@ -199,36 +198,22 @@ scripts/                   check-ownership.mjs, check-secrets.mjs, and their tes
 
 ## 7. Before you commit
 
-Four lanes, four worktrees, four branches:
+One writer, one branch: `main`, in this checkout. There are no worktrees and no ownership
+guard; both belonged to a multi-agent protocol that closed on 2026-09-13, recorded in
+`docs/coordination/README.md`.
 
-| Lane | Branch | Writes |
-| --- | --- | --- |
-| worker | `codex/agent-a-worker` | `workers/python/**` |
-| platform | `codex/agent-b-platform` | `apps/web/**` (not its manifest), `tests/e2e/**`, `packages/contracts/src/**` except the coordinated files |
-| schema | `codex/agent-c-schema` | `supabase/**` |
-| integration | `codex/coordination-integration` | shared contracts, root tooling, shared docs, merges |
+What still holds, and is not enforced by anything:
 
-`packages/contracts/src/index.ts` and `src/jobs.ts` are **coordinated** — the
-barrel and the worker-facing contract are where two lanes meet, so neither lane
-changes them unilaterally. Request the change in your lane report; the integrator
-commits it first and both lanes merge that commit.
-
-Run the guard before handing off:
-
-```bash
-node scripts/check-ownership.mjs platform
-```
-
-`.githooks/pre-commit` runs it automatically and picks the lane from the branch.
-It examines committed changes since the integration merge base, staged and
-unstaged changes, and untracked files. It refused three commits during this work
-and was right all three times. It is a review guard, not a security boundary — do
-not relax ownership to make it pass.
-
-Start every task with `pwd`, `git branch --show-current`, `git status --short`.
-Never touch another lane's branch or working files.
-
----
+- **Migrations are immutable once applied.** Add a new timestamped file. Never edit one
+  that has shipped — the test suite replays all of them in filename order.
+- **`packages/contracts/src/jobs.ts` is the worker-facing surface.** A change there is a
+  change to what the Python client and the database both agree a batch is, so it travels
+  with its fixture and its SQL. `sync.ts` next to it is application schema and is free to
+  change; the split is deliberate.
+- **Run `npm run check` before committing**, and `npm run test:e2e` when you touched the
+  dashboard. Nothing runs them for you.
+- **Say what you actually ran.** `docs/verification.md` is the record, and its value is
+  entirely in it being true.
 
 ## 8. What is not real
 

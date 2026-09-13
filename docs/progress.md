@@ -106,10 +106,9 @@ Needs a Supabase project and Sites access. Nothing is deployed.
 
 ## Coordination
 
-Four lanes with an ownership guard and a pre-commit hook: worker, platform, schema,
-integration. The guard is not decorative — it refused three commits during this work and each
-time the change belonged in another lane.
-
-The worker and schema lanes have no commits. Work assigned to them was taken on directly
-after the user reassigned it; where it crossed a lane, it was committed on integration so
-those lanes can rejoin by merging rather than by reconciling a rewritten branch.
+A four-lane worktree protocol ran on 2026-09-13 and is closed. The worker and schema lanes
+never produced a commit; the work assigned to them was taken on directly and committed on
+integration. Everything is now on one branch, `main`, in the original checkout — every commit
+the lane branches held is an ancestor of it, so nothing was lost. The guard and its hook are
+removed. `docs/coordination/README.md` records what the protocol was, the three commits it
+correctly refused, and why it ended.

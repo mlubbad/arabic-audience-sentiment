@@ -13,7 +13,6 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run lint` | Pass — ESLint clean; Ruff "All checks passed!" |
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
-| `npm run test:coordination` | Pass — 5 ownership-guard tests |
 | `npm test` | Pass — **77 tests, 10 files** |
 | `npm run test:db` | Pass — **59 tests, 6 files** |
 | `npm run worker:test` | Pass — **60 tests, 9 files** |

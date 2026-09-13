@@ -25,8 +25,8 @@ Update docs/progress.md, docs/decisions.md, and docs/verification.md after miles
 Use the repository's actual lint/build/test commands and report real results.
 Do not stop at planning or leave clickable controls without working behavior.
 
-Parallel work: read docs/coordination/README.md and docs/coordination/tasks.md before
-editing. Work only in your assigned worktree and owned paths. The integrator owns
-shared contracts, root tooling and central milestone documents. Write your own
-lane report instead of editing shared progress files. Run the ownership guard
-before handing off a commit. Never alter another agent's branch or working files.
+One writer, one branch: `main` in this checkout. The multi-agent worktree protocol ran
+on 2026-09-13 and is closed; docs/coordination/README.md records what it was and why it
+ended. Read docs/ONBOARDING.md before starting. Migrations are immutable once applied —
+add a new timestamped file. Keep changes reviewable: small coherent commits carrying the
+commands and results that back them.
