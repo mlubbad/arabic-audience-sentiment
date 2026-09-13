@@ -31,6 +31,24 @@ shared host — and there are several, including a live WordPress install on the
 the data connection. That is acceptable only because everything shipped here is public by
 design. Never send anything else over it.
 
+## Superseded assets, and two traps in removing them
+
+The bundle is content-hashed, so every deploy writes a new filename and the previous one is
+left behind — about 740KB each time. The deploy script now removes any `index-*` on the server
+that the current build did not produce.
+
+**Do not use the panel's file manager for this.** `CMD_API_FILE_MANAGER` answers a delete with
+`error=0&text=Users+Deleted` and removes nothing: it reads the request as a user deletion. It
+reports success either way, which is worse than failing. FTP `DELE` returns 250 and actually
+deletes.
+
+**The keep-list is space separated on purpose.** The first version built it with newlines and
+compared with a `case` pattern matching on spaces, so nothing matched and the deploy deleted
+the build it had just uploaded. The site kept answering 200 because Cloudflare was serving the
+immutable-cached copy while the origin files were gone — a failure that would have surfaced
+hours later, to a user, as a blank page. Verify a deploy against the origin with
+`--resolve app.sky-develop.net:80:91.204.209.217`, not through the CDN.
+
 ## It is private, and stays private across deploys
 
 The whole site is behind HTTP basic auth. `.htpasswd_app` lives one level above the document

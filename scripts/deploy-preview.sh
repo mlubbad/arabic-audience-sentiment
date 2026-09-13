@@ -35,3 +35,30 @@ find . -type f | sed 's|^\./||' | while read -r f; do
     -w '%{http_code}  %{size_upload} bytes\n' \
     --connect-timeout 25 --max-time 300
 done
+
+# Remove the previous build's hashed assets, which nothing references any more.
+# Uploading alone would leave a ~740KB orphan behind on every deploy.
+#
+# DELE over FTP, not the panel's file manager: CMD_API_FILE_MANAGER answers a
+# delete with "error=0&text=Users Deleted" and removes nothing, because it is
+# reading the request as a user deletion. It reports success either way, which
+# is worse than failing.
+# Space separated, because the case pattern below matches on spaces. A
+# newline-separated list matches nothing and deletes the build that was just
+# uploaded — which is exactly what happened the first time this ran.
+keep=" $(find . -type f -name 'index-*' | sed 's|^\./assets/||' | tr '\n' ' ') "
+for remote in $(curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
+  -u "$PREVIEW_FTP_USER:$PREVIEW_FTP_PASSWORD" "ftp://$PREVIEW_FTP_HOST/assets/" \
+  --connect-timeout 25 --max-time 120 | awk '{print $NF}' | grep '^index-' || true); do
+  case "$keep" in
+    *" $remote "*) ;;
+    *)
+      printf '%-44s ' "removing $remote"
+      curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
+        -u "$PREVIEW_FTP_USER:$PREVIEW_FTP_PASSWORD" "ftp://$PREVIEW_FTP_HOST/" \
+        -Q "-DELE assets/$remote" -o /dev/null -w 'gone\n' \
+        --connect-timeout 25 --max-time 120
+      ;;
+  esac
+done
+
