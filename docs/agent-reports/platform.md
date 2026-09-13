@@ -7,3 +7,8 @@ Next task: P1 fixture/live separation.
 Newer original-checkout commits to preserve: Claude must list them here before integration if any.
 Shared contract request: P2 batch contract to be proposed for I1.
 Verification: setup pending; existing work is not claimed to be integrated automatically.
+
+Setup verified 2026-09-13: isolated Node/Python environments installed from frozen locks;
+no Node audit vulnerabilities reported. Ownership guard passes a clean lane and the
+pre-commit hook rejects an out-of-lane synthetic file without changing HEAD. P1 remains
+assigned to Claude, awaiting its acknowledgement. No active Claude process has been moved.
