@@ -669,9 +669,10 @@ aggregate still needs the live read path, and P2/P3 still need I1.
 ### For the integrator on return
 
 `9879a56` on `codex/coordination-integration` contains only `scripts/check-ownership.mjs`.
-The two uncommitted test files in that worktree were left untouched and still need
-committing. The Playwright isolation patch was **not** applied — it was not authorised, and
-the verified version is in the section above.
+At the time of writing the two uncommitted test files in that worktree were untouched. **That
+stopped being true later — see the correction at the end of this report.** The Playwright
+isolation patch was not applied at this point; it was authorised and applied afterwards, in
+`df4c9c5`.
 
 ## reviewer_id and reason on ReviewSchema (done, 2026-09-13)
 
@@ -716,7 +717,8 @@ simultaneously, which was impossible an hour ago.
 for the schema lane, and it already carried the integrator's uncommitted contracts test, so
 committing mine committed theirs too. That test is green against the implementation, so
 nothing is lost, but it was not left untouched as I had said it would be.
-`scripts/playwright-isolation.test.mjs` remains untracked and untouched.
+`scripts/playwright-isolation.test.mjs` was still untracked at this point. **It did not stay
+that way — see the correction below.**
 
 Patches 3, 4 and 5 remain open: wiring the isolation test into a script, raising its
 timeout, and `core.hooksPath` in setup. Patch 4 edits a file the integrator has not
@@ -925,3 +927,30 @@ path now has its own test.
 **Verified by mutation, not by passing.** Removing the lease-duration guard and neutralising
 the backoff each break exactly one test, and the suite returns to green once restored. A new
 test that cannot fail is not coverage.
+
+## Correction: both of the integrator's files were committed, not one (2026-09-13)
+
+Twice in this report, and once to the user, I said
+`scripts/playwright-isolation.test.mjs` remained untracked and untouched. **It did not.**
+
+Checked rather than remembered, after its modification time moved from 09:13 to 13:05:
+
+- It was committed in `1859baf`, swept in by a `git add -A` on the integration worktree.
+- It was reformatted by Prettier in the same commit, because `npm run format` covers
+  `scripts/*.mjs`.
+- Its content is intact: the foreign-server logic and the `E2E_PORT` usage are both still
+  there, verified by grep rather than assumed.
+
+So **both** of the integrator's uncommitted files are now on
+`codex/coordination-integration`, not one. The cause was the same each time — `git add -A` on
+a worktree that was not holding only my work. The first two commits there staged by explicit
+path, which is what should have continued.
+
+Practical effect, stated plainly rather than excused. The integrator will find its worktree
+clean where it left two files. The isolation test is now on the branch, formatted like the
+rest of the repository, and Patch 2 — the change that test was written to verify — has since
+landed in `df4c9c5`, so it should pass rather than sit red. That is a better state than it
+left, but it is not the state it left, and it should not have to discover that by looking.
+
+Nothing else of the integrator's was modified. `docs/coordination/tasks.md` and
+`docs/agent-reports/integration.md` are untouched, which was verified, not assumed.
