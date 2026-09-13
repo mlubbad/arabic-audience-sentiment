@@ -184,4 +184,14 @@ service authorization follow from this setup.
 - **`snapshot()` makes no claim about provenance.** It aggregates rows and cannot know where
   they came from. Returning `mode: "sanitized_fixture"` was a claim made by the one function
   with no access to the answer, and it stayed true only because no live read existed.
+- **The state is stored hashed; the verifier is stored raw.** They are different kinds of
+  secret. The state travels back through the browser, so a readable copy in the database would
+  be enough to forge a callback. The verifier never leaves the server and the exchange requires
+  it, so storing it is what the protocol asks for. Both live in a table with no tenant grants,
+  single use, ten minutes, and pruned.
+- **The state is recorded before the redirect is issued.** A callback for a state that was
+  never written is refused, so the write must not be able to fail after the user has already
+  been sent to Google.
+- **A verifier is validated where it is created, not where it is used.** By the exchange it has
+  already been used, and a weak one cannot be un-sent.
 

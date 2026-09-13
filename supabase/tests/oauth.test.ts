@@ -2,6 +2,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+// RFC 7636 appendix B: 43 unreserved characters.
+const VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 const A = "00000000-0000-4000-8000-000000000001";
 const B = "00000000-0000-4000-8000-000000000002";
 const ownerA = "10000000-0000-4000-8000-000000000001";
@@ -67,15 +69,27 @@ describe("youtube connection", () => {
   it("only an owner may begin a connection, and only in their own workspace", async () => {
     await user(viewer);
     await expect(
-      db.query("select public.oauth_start($1,$1,$2)", [A, h("h-viewer")]),
+      db.query("select public.oauth_start($1,$1,$2,$3)", [
+        A,
+        h("h-viewer"),
+        VERIFIER,
+      ]),
     ).rejects.toThrow();
     await user(ownerB);
     await expect(
-      db.query("select public.oauth_start($1,$1,$2)", [A, h("h-b")]),
+      db.query("select public.oauth_start($1,$1,$2,$3)", [
+        A,
+        h("h-b"),
+        VERIFIER,
+      ]),
     ).rejects.toThrow();
     await user(ownerA);
     await expect(
-      db.query("select public.oauth_start($1,$1,$2)", [A, h("h-ok")]),
+      db.query("select public.oauth_start($1,$1,$2,$3)", [
+        A,
+        h("h-ok"),
+        VERIFIER,
+      ]),
     ).resolves.toBeTruthy();
   });
 
@@ -104,7 +118,11 @@ describe("youtube connection", () => {
     ).rejects.toThrow(/invalid_state/);
 
     await user(ownerA);
-    await db.query("select public.oauth_start($1,$1,$2)", [A, h("h-expired")]);
+    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+      A,
+      h("h-expired"),
+      VERIFIER,
+    ]);
     await admin();
     await db.query(
       "update private.oauth_states set expires_at=now()-interval '1 second' where state_hash=$1",
@@ -127,7 +145,11 @@ describe("youtube connection", () => {
 
   it("takes the workspace from the stored state, never from the caller", async () => {
     await user(ownerA);
-    await db.query("select public.oauth_start($1,$1,$2)", [A, h("h-attach")]);
+    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+      A,
+      h("h-attach"),
+      VERIFIER,
+    ]);
     await admin();
     // attach is given a state and a channel id only. There is no workspace
     // argument to forge, which is why the callback cannot be pointed at B.
@@ -148,7 +170,11 @@ describe("youtube connection", () => {
       [B, "UC" + "b".repeat(22)],
     );
     await user(ownerB);
-    await db.query("select public.oauth_start($1,$1,$2)", [B, h("h-upgrade")]);
+    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+      B,
+      h("h-upgrade"),
+      VERIFIER,
+    ]);
     await admin();
     const attached = await attach(h("h-upgrade"), "UC" + "b".repeat(22));
     // The same row is upgraded, not duplicated, so the collected data carries over.
@@ -172,7 +198,11 @@ describe("youtube connection", () => {
       [B, CHANNEL],
     );
     await user(ownerB);
-    await db.query("select public.oauth_start($1,$1,$2)", [B, h("h-seize")]);
+    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+      B,
+      h("h-seize"),
+      VERIFIER,
+    ]);
     await admin();
     // But it can never become the authorised holder while A is connected.
     await expect(attach(h("h-seize"))).rejects.toThrow(
@@ -316,5 +346,73 @@ describe("youtube connection", () => {
       db.query("select private.prune_oauth_states()"),
     ).rejects.toThrow();
     await db.exec("reset role");
+  });
+
+  it("refuses a verifier that is too short or outside the unreserved set", async () => {
+    // RFC 7636 4.1. Checked at start because the exchange cannot check it
+    // later: by then a weak verifier has already been used.
+    await user(ownerA);
+    for (const bad of [
+      "short",
+      "a".repeat(42),
+      "a".repeat(129),
+      `${"a".repeat(42)}+`,
+      `${"a".repeat(42)}/`,
+      `${"a".repeat(42)} `,
+    ]) {
+      await expect(
+        db.query("select public.oauth_start($1,$1,$2,$3)", [
+          A,
+          h(`h-bad-${bad.length}${bad.slice(-1)}`),
+          bad,
+        ]),
+      ).rejects.toThrow(/invalid_verifier/);
+    }
+    // The boundary lengths themselves are valid.
+    await expect(
+      db.query("select public.oauth_start($1,$1,$2,$3)", [
+        A,
+        h("h-min"),
+        "a".repeat(43),
+      ]),
+    ).resolves.toBeTruthy();
+    await expect(
+      db.query("select public.oauth_start($1,$1,$2,$3)", [
+        A,
+        h("h-max"),
+        `${"a".repeat(124)}._~-`,
+      ]),
+    ).resolves.toBeTruthy();
+  });
+
+  it("hands the verifier to the exchange once, and never to a tenant", async () => {
+    await user(ownerA);
+    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+      A,
+      h("h-pkce"),
+      VERIFIER,
+    ]);
+    // A tenant cannot read it back: the state table has no grants at all, and
+    // consume is service-only.
+    await expect(
+      db.query(
+        "select code_verifier from private.oauth_states where state_hash=$1",
+        [h("h-pkce")],
+      ),
+    ).rejects.toThrow();
+    await expect(
+      db.query("select private.oauth_consume_state($1)", [h("h-pkce")]),
+    ).rejects.toThrow();
+
+    await admin();
+    const consumed = await db.query<{ code_verifier: string }>(
+      "select code_verifier from private.oauth_consume_state($1)",
+      [h("h-pkce")],
+    );
+    expect(consumed.rows[0].code_verifier).toBe(VERIFIER);
+    // Single use still holds, so a stolen code cannot be exchanged twice.
+    await expect(
+      db.query("select private.oauth_consume_state($1)", [h("h-pkce")]),
+    ).rejects.toThrow(/invalid_state/);
   });
 });

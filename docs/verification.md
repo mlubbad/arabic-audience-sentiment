@@ -14,7 +14,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — **83 tests, 10 files** |
-| `npm run test:db` | Pass — **64 tests, 7 files** |
+| `npm run test:db` | Pass — **73 tests, 8 files** |
 | `npm run worker:test` | Pass — **60 tests, 9 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
@@ -61,6 +61,10 @@ reverted and the suite returned to green.
 | Leave the platform parent id unresolved | 1 |
 | Let a configured project alone flip the data source | 4 |
 | Trust the server's answer without parsing it | 1 |
+| Send the verifier instead of its challenge | 1 |
+| Store the OAuth state raw instead of hashed | 1 |
+| Allow an http redirect URI | 1 |
+| Drop the verifier charset and length check | 1 |
 
 ## What the suites prove
 
@@ -263,6 +267,40 @@ existed.
 **Not verified:** no HTTP request has been made to a deployed project. The SQL is exercised in
 PGlite and the client is exercised against a mocked `rpc`, so what is untested is PostgREST
 between them — argument marshalling, the JSON it returns, and Auth.
+
+## PKCE and the authorization redirect
+
+Recorded as blocked on Google credentials, and most of it was not: only the code exchange and
+`channels.list` need them. Everything up to the redirect needs none to be correct.
+
+`supabase/functions/_shared/oauth-start.ts` generates the verifier and the state, records the
+state's hash with the verifier, and builds the Google authorization URL. Pure, with injected
+config, randomness and data layer, so it runs without a deployed project.
+
+Checked against the RFC's own worked example: the S256 challenge for the verifier in RFC 7636
+appendix B is asserted to equal the value the RFC prints. A drift there would be rejected by
+Google as `invalid_grant`, which does not say what is wrong.
+
+The verifier is stored raw while the state is stored only as a hash, and the asymmetry is the
+point: the state travels back through the browser, so a readable copy in the database would be
+enough to forge a callback, whereas the verifier never leaves the server and the protocol
+requires it at the exchange. It lives in `private.oauth_states`, which has no tenant grants, is
+single use, expires in ten minutes and is pruned. A tenant cannot read it and cannot call
+consume; both are asserted.
+
+The state is written before the URL is handed out, so a callback can never arrive for a state
+we failed to record. `oauth_start` refuses a verifier outside RFC 7636's length and character
+rules, because the exchange cannot check that later — by then a weak verifier has been used.
+
+**A test caught a real property while being written.** The first random stub returned the same
+bytes on both calls, which made the verifier and the state identical and put the verifier in
+the URL. No CSPRNG does that, so the stub was wrong rather than the code — but the assertion
+that the verifier never appears in the URL is kept, and an explicit check that the two values
+differ was added beside it.
+
+**Not written, and genuinely blocked:** the token exchange, `channels.list(mine=true)`, the
+redirect page, and token encryption at rest. These need a Google client id and secret and a
+registered redirect URI. No authorization URL has been opened and no code has been exchanged.
 
 ## Notes on running the suites
 

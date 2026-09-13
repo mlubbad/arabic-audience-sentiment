@@ -77,7 +77,7 @@ Chromium. `uv` must be installed separately.
 | --- | --- | --- |
 | `npm run check` | lint, format, typecheck, unit, SQL, worker, build, secret scan | green |
 | `npm test` | contracts + web unit (10 files) | 83 passed |
-| `npm run test:db` | real SQL + real RLS in PGlite | 64 passed |
+| `npm run test:db` | real SQL + real RLS in PGlite | 73 passed |
 | `npm run worker:test` | Python worker via uv/pytest | 60 passed |
 | `npm run test:e2e` | Playwright against a dev server it starts itself | 45 passed |
 
@@ -169,9 +169,10 @@ packages/contracts/src/    Zod schemas + the shared snapshot. The barrel
 apps/web/src/              React 19 + Vite + Chart.js dashboard (Arabic, RTL)
   data.ts                  the single place that decides fixture vs live; live
                            needs a configured project AND VITE_DASHBOARD_SOURCE=live
-supabase/migrations/       12 files, applied in filename order, never edited
-supabase/functions/        _shared/worker-gateway.ts — a pure handler with an
-                           injected WorkerDb, so it is testable without a runtime
+supabase/migrations/       13 files, applied in filename order, never edited
+supabase/functions/        _shared/worker-gateway.ts and oauth-start.ts — pure
+                           handlers with injected dependencies, testable with no
+                           deployed project
 supabase/tests/            6 PGlite suites; end_to_end.test.ts is the seam test
 workers/python/src/        collectors/ (sources), sentiment/ (adapters, no model),
                            server/ (control plane, analysis wiring)

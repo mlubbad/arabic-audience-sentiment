@@ -76,7 +76,8 @@ deployed project**, so PostgREST between the two is untested.
 | Callback cannot be redirected | implemented | Consume returns the binding rather than accepting one; there is no workspace argument to forge |
 | Channel ownership | implemented | Connected claim is globally exclusive; a public_unverified row is upgraded in place so pilot data carries over |
 | Revocation | implemented | Moves to reconnect_required and cancels dependent jobs; never falls back to scraping |
-| Authorization URL, code exchange, PKCE, channels.list, redirect page | **blocked** | Needs Google credentials |
+| PKCE and the authorization URL | implemented | S256 checked against the RFC 7636 worked example; verifier stored server-side only, state stored as a hash, state written before the redirect is issued |
+| Code exchange, channels.list, redirect page, token encryption | **blocked** | Needs a Google client id and secret and a registered redirect URI. No authorization URL has been opened and no code exchanged |
 
 ## M6 — private pilot (not started)
 
@@ -91,7 +92,7 @@ Needs a Supabase project and Sites access. Nothing is deployed.
 | Final dashboard styling | Standalone dashboard HTML, the dashboard ZIP, and the brand assets |
 | Live public collection | A YouTube Data API key placed server-side |
 | Live Auth, Storage, Edge Functions, and proving the edge handler and SQL agree over HTTP | Supabase development project URL and keys |
-| OAuth exchange and live connection | Google OAuth client id/secret, registered redirect URI, test-user authorization |
+| OAuth code exchange and live connection | Google OAuth client id/secret, registered redirect URI, test-user authorization. PKCE and the authorization URL are implemented and need none of these |
 | Model selection and any accuracy claim | The two model notebooks and ~600 independently human-labelled comments |
 | Private pilot deployment | Sites access with a verified private mode |
 
