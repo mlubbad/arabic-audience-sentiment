@@ -63,6 +63,20 @@ export async function sha256Hex(value: string): Promise<string> {
     .join("");
 }
 
+const LOOPBACK = new Set(["127.0.0.1", "[::1]", "localhost"]);
+
+/** https anywhere, or http on the loopback interface and nowhere else. */
+export function isSafeRedirect(uri: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && LOOPBACK.has(url.hostname);
+}
+
 export async function beginAuthorization(
   workspace: string,
   client: string,
@@ -74,7 +88,13 @@ export async function beginAuthorization(
     throw new Error("oauth_not_configured");
   // Refused rather than coerced: a redirect URI that is not exactly the one
   // registered is a misconfiguration, and http would put the code on the wire.
-  if (!config.redirect_uri.startsWith("https://"))
+  //
+  // The exception is the loopback interface, which Google documents and which
+  // this project needs: a code delivered to 127.0.0.1 never traverses a
+  // network, so there is nothing on the wire to intercept. Written as an
+  // allowlist of hosts rather than a substring test, because a scheme check
+  // that accepted "http://127.0.0.1.evil.test" would be worse than no check.
+  if (!isSafeRedirect(config.redirect_uri))
     throw new Error("oauth_not_configured");
 
   // 32 bytes -> 43 base64url characters, the RFC minimum length, from a source

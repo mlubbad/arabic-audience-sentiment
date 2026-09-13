@@ -9,6 +9,7 @@ import {
   base64url,
   beginAuthorization,
   codeChallenge,
+  isSafeRedirect,
   sha256Hex,
   type OauthConfig,
   type StartDb,
@@ -141,13 +142,38 @@ describe("the authorization redirect", () => {
     expect((calls[0] as string[])[3]).not.toBe((calls[1] as string[])[3]);
   });
 
+  it("accepts http only on the loopback interface", async () => {
+    // Google documents the loopback exception and development needs it: a code
+    // delivered to 127.0.0.1 never traverses a network. Everything else on
+    // http would put the authorization code on the wire in clear.
+    for (const ok of [
+      "https://app.example/callback",
+      "http://127.0.0.1:5173/oauth/youtube/callback",
+      "http://localhost:5173/callback",
+      "http://[::1]:5173/callback",
+    ])
+      expect(isSafeRedirect(ok)).toBe(true);
+
+    for (const bad of [
+      "http://app.example/callback",
+      // A substring test for "127.0.0.1" would accept both of these.
+      "http://127.0.0.1.evil.test/callback",
+      "http://evil.test/?next=http://127.0.0.1",
+      "http://localhost.evil.test/callback",
+      "ftp://127.0.0.1/callback",
+      "not a url",
+      "",
+    ])
+      expect(isSafeRedirect(bad)).toBe(false);
+  });
+
   it("refuses to build a redirect from incomplete or insecure configuration", async () => {
     const { db, calls } = recorder();
     for (const bad of [
       { ...config, client_id: "" },
       { ...config, redirect_uri: "" },
       { ...config, scopes: [] },
-      // http would put the authorization code on the wire in clear.
+      // http off the loopback interface would put the code on the wire.
       { ...config, redirect_uri: "http://app.example/callback" },
     ]) {
       await expect(

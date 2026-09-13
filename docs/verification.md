@@ -14,7 +14,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run format:check` | Pass |
 | `npm run typecheck` | Pass — no `tsc` diagnostics |
 | `npm test` | Pass — **83 tests, 10 files** |
-| `npm run test:db` | Pass — **73 tests, 8 files** |
+| `npm run test:db` | Pass — **74 tests, 8 files** |
 | `npm run worker:test` | Pass — **74 tests, 10 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
@@ -66,6 +66,8 @@ reverted and the suite returned to green.
 | Drop unanalysable rows without counting them | 1 |
 | Let the booster reuse estimate rows | 1 |
 | Sample uniformly instead of proportionally by video | 1 |
+| Match the loopback redirect by substring instead of host | 1 |
+| Accept any http redirect URI | 2 |
 | Send the verifier instead of its challenge | 1 |
 | Store the OAuth state raw instead of hashed | 1 |
 | Allow an http redirect URI | 1 |
@@ -302,6 +304,14 @@ bytes on both calls, which made the verifier and the state identical and put the
 the URL. No CSPRNG does that, so the stub was wrong rather than the code — but the assertion
 that the verifier never appears in the URL is kept, and an explicit check that the two values
 differ was added beside it.
+
+A real OAuth client, configured on 2026-09-13, immediately found a defect in this: the
+redirect check refused anything that was not `https://`, which blocks local development
+outright. Google documents the loopback exception, and a code delivered to `127.0.0.1` never
+traverses a network, so there is nothing on the wire to intercept. The check is now an
+allowlist of hosts rather than a scheme test — written that way because a substring test for
+`127.0.0.1` would have accepted `http://127.0.0.1.evil.test`, which is worse than no check at
+all. Both of those mutations are in the table above.
 
 **Not written, and genuinely blocked:** the token exchange, `channels.list(mine=true)`, the
 redirect page, and token encryption at rest. These need a Google client id and secret and a
