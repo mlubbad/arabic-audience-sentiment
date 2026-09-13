@@ -46,7 +46,7 @@ reservation, plan limits. Isolation is tested through direct SQL, not hidden UI 
 | Worker gateway (P3) | implemented | Scoped credential, never the service role; the tenant comes from the credential |
 | Worker lifecycle | implemented | Explicit terminal result; nothing promotes a job to succeeded on its own |
 | Python control-plane client | implemented | Canonical payload hashing; only an exhausted source maps to succeeded |
-| Edge handler | implemented, **not deployed** | Pure handler with an injected data layer. **Has never served a real request** |
+| Edge handler | implemented, **not deployed** | Pure handler with an injected data layer. **Has never served a real request.** Deploying it needs the service-role key |
 | Legacy import and reconciliation | **blocked** | Needs the original CSVs and the amendment file |
 | Analysis in the server path | implemented, fixture-tested | `run_once` labels each batch before committing, so rows and verdicts land in one transaction. Verified end to end with the **deterministic test analyzer, which is not a model** |
 | Real model inference | **blocked** | Needs the notebooks and ~600 human-labelled comments. No accuracy figure is claimed |
@@ -80,9 +80,15 @@ deployed project**, so PostgREST between the two is untested.
 | PKCE and the authorization URL | implemented | S256 checked against the RFC 7636 worked example; verifier stored server-side only, state stored as a hash, state written before the redirect is issued |
 | Code exchange, channels.list, redirect page, token encryption | **blocked** | Needs a Google client id and secret and a registered redirect URI. No authorization URL has been opened and no code exchanged |
 
-## M6 — private pilot (not started)
+## M6 — private pilot (front end deployed, journey incomplete)
 
-Needs a Supabase project and Sites access. Nothing is deployed.
+The built front end is live at `app.sky-develop.net` behind HTTP basic auth, not indexed, and
+serving sanitized fixtures. `docs/deployment.md` covers it.
+
+What a pilot still needs: a live dashboard a signed-in creator can actually read, which means
+selecting their own workspace rather than the synthetic one the app starts with; a persisted
+correction and an export against that data; a second tenant proving isolation; and a deployed
+worker endpoint. None of those exist yet, so there is no complete creator journey.
 
 ## Exact missing input per blocked task
 

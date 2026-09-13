@@ -220,8 +220,15 @@ What still holds, and is not enforced by anything:
 
 ## 8. What is not real
 
-No credentials exist. Nothing is deployed. No model has been downloaded and no
-accuracy figure is claimed anywhere — do not produce one.
+No model has been downloaded and no accuracy figure is claimed anywhere — do not
+produce one. No YouTube or Google credential is configured for collection.
+
+What *is* real, as of 2026-09-13: a Supabase development project holds the schema;
+the built front end is deployed at `app.sky-develop.net` behind a password, serving
+fixtures; and Auth works, verified by a real signup. What is still not real: any
+live comment data, any deployed worker or Edge Function, and the whole YouTube path.
+`docs/verification.md` is the authoritative split — read it before describing this
+system to anyone.
 
 Blocked items are blocked by a **named operation and a named missing input**, not
 by a whole milestone: `channels.list(mine=true)` plus the OAuth code exchange

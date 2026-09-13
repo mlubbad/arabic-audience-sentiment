@@ -60,6 +60,7 @@ reverted and the suite returned to green.
 | Turn unknown engagement into zero on the live read | 1 |
 | Leave the platform parent id unresolved | 1 |
 | Let a configured project alone flip the data source | 4 |
+| Let the browser suite inherit the machine's .env.local | 1 |
 | Trust the server's answer without parsing it | 1 |
 | Show the model's answer in the labelling sheet | 1 |
 | Stop neutralising spreadsheet formulas in the sheet | 1 |
@@ -118,7 +119,7 @@ against white.
 | Sentiment model quality | No model downloaded, no inference run, no benchmark. No accuracy figure is claimed anywhere |
 | Legacy import and the topic-count discrepancies | Source CSVs and amendment file missing; no reconciliation performed |
 | CI | `.github/workflows/ci.yml` exists but has never executed — there is no remote |
-| Deployment | Nothing deployed; no URL exists, private or otherwise |
+| Deployment | The **front end only** is deployed, at `app.sky-develop.net`, behind a password and serving fixtures. No Edge Function, no worker, no live data path is deployed |
 | Spreadsheet behaviour | Formula neutralisation is verified as bytes in the file. No spreadsheet application was opened |
 | Final dashboard styling | Original dashboard HTML, ZIP and brand assets not supplied |
 
@@ -393,6 +394,25 @@ echoed those two back as raw strings.
 
 Renamed to `20260913233000` and `20260913234500` before the first push, which was the last
 moment it was possible: a filename is frozen once the migration is applied anywhere real.
+
+## A test that was a property of the laptop
+
+`npm run test:e2e` failed 1 of 45 on a machine with a Supabase project configured, and passed
+on one without. The test asserts the account screen's "Supabase is not configured" notice —
+an honest claim, but only while nothing is configured, so `apps/web/.env.local` was silently
+deciding the result.
+
+A suite that passes or fails depending on the developer's environment is worse than one that
+fails everywhere: it looks green where it is meaningless and red where it is correct, and
+neither reading is trustworthy.
+
+Vite's `envDir` now comes from `VITE_ENV_DIR`, and the browser suite points it at `tests/e2e`,
+which holds no `.env` files. The app under test is therefore configured by the suite and not
+by the machine. Verified both ways: 45/45 with a live project configured in `.env.local`, and
+removing the override reproduces exactly the original 1-of-45 failure on exactly that test.
+
+The configured half of that branch is not covered here. It is exercised by the deployed
+preview, where a real signup succeeded, and by the `authMessages` unit tests.
 
 ## Notes on running the suites
 

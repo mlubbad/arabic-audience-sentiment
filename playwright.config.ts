@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { resolve } from "node:path";
 
 // Each lane drives its own dev server. Never adopt one that is already
 // listening: a server left running by another worktree serves that lane's code,
@@ -17,6 +18,17 @@ export default defineConfig({
     command: `npm run dev -w @sentiment/web -- --port ${port} --strictPort`,
     url: origin,
     reuseExistingServer: false,
+    // The suite decides how the app is configured, rather than inheriting it.
+    // tests/e2e holds no .env files, so pointing Vite's envDir there means
+    // apps/web/.env.local is not read and these tests describe fixture mode on
+    // every machine. A developer with a live project configured used to fail
+    // one test here, which made the result a property of the laptop.
+    env: {
+      VITE_ENV_DIR: resolve("tests/e2e"),
+      VITE_SUPABASE_URL: "",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "",
+      VITE_DASHBOARD_SOURCE: "",
+    },
   },
   reporter: "list",
 });
