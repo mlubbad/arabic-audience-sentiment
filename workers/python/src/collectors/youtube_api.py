@@ -43,6 +43,7 @@ class YouTubeAPI:
                               parent_id=parent, is_reply=parent is not None,
                               parent_source="api" if parent else "unknown",
                               author_channel_id=s.get("authorChannelId", {}).get("value"),
+                              author_name=s.get("authorDisplayName", ""),
                               published_time_raw=s.get("publishedAt"), published_at=s.get("publishedAt"),
                               timestamp_precision="second" if s.get("publishedAt") else "unknown",
                               likes_value=s.get("likeCount"), source=self.source,

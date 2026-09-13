@@ -17,6 +17,7 @@ class RawComment:
     published_at: str | None = None
     timestamp_precision: str = "unknown"
     author_channel_id: str | None = None
+    author_name: str = ""
     likes_raw: str | None = None
     likes_value: int | None = None
     source: str = "sanitized_fixture"
