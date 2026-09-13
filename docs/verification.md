@@ -210,3 +210,10 @@ based on product commit `5e9094f`. Each worktree uses separate dependency direct
   unit tests, 18 SQL tests, 23 Python tests, build and secret-pattern scan.
 - This verifies the coordination baseline. It does not change the earlier live-service
   limitations or establish that production ingestion/metering is complete.
+- `npm run test:e2e`: passed 15/15 on the integration baseline (12.0 seconds).
+- Real pre-commit probes in worker and platform: both rejected a staged synthetic file
+  outside their lane, returned nonzero, and preserved HEAD. Probe files were removed and
+  unstaged; subsequent allowed lane-report commits succeeded.
+- Original checkout `core.hooksPath` remains unset. New worktrees each use `.githooks`
+  through worktree-local config. Worker and platform readiness reports were merged serially;
+  no product changes were merged as part of this coordination setup.
