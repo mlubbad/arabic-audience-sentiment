@@ -269,3 +269,37 @@ def test_the_builder_can_say_why_it_found_nothing():
     assert run_once(plane, None, "abcdefghijk", build_collector=build) is True
     assert rec.finished == "blocked"
     assert rec.error_code == "no_upload_has_comments:12_checked_0_disabled"
+
+
+def test_the_builder_carries_the_title_it_already_knows():
+    """The chosen video's name reaches the commit, not just its id.
+
+    The builder picks the video, so it is the only place the title exists. It
+    was dropped, and the server stored the platform id as the title — a correct
+    fallback for a title nobody has, and wrong when one was in hand.
+    """
+    rec = Recorder()
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        rec.calls.append(path)
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j1", "lease_token": "t1", "checkpoint": None,
+                "access_token": "ya29.granted",
+            })
+        if path == "commit-batch":
+            rec.error_code = json.loads(request.content)["payload"]["video_title"]
+        if path == "finish":
+            rec.finished = json.loads(request.content)["outcome"]
+        return httpx.Response(200, json={})
+
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+
+    def build(token):
+        build.video_title = "رسالة من أسامة بن لادن"
+        return Collector(Batch([comment("c1")], None, "exhausted")), "mFnJS2hxHrU"
+
+    assert run_once(plane, None, "", build_collector=build) is True
+    assert rec.error_code == "رسالة من أسامة بن لادن"

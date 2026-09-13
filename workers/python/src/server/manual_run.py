@@ -138,6 +138,7 @@ def main() -> None:
             build.reason = report["reason"]
             return None, None
         chosen.update(report["chosen"])
+        build.video_title = report["chosen"]["title"] or None
         return YouTubeAPI(None, client, access_token=token), report["chosen"]["video_id"]
 
     worked = run_once(

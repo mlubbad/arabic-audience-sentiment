@@ -58,6 +58,11 @@ def run_once(
         # be answered with the token: the channel's uploads are not public
         # knowledge to the worker until it has one.
         collector, video_id = build_collector(token)
+        # The builder is the only thing that knows which video it chose, so it
+        # is also the only thing that knows the title. Without this the server
+        # stored the platform id as the title — correct as a fallback, wrong
+        # when the name was in hand all along.
+        video_title = getattr(build_collector, "video_title", None) or video_title
         if collector is None:
             # The builder may say *why* it found nothing. "No video to collect"
             # is true both of a channel whose uploads have comments switched
