@@ -1,6 +1,6 @@
 {
   "envelope": {
-    "batch_key": "8dae1d87bae835bdd55f289cdd6e559e",
+    "batch_key": "ba960f82081925baa5e04b088cc25975",
     "job_id": "20000000-0000-4000-8000-000000000001",
     "lease_token": "30000000-0000-4000-8000-000000000001",
     "payload": {
@@ -11,7 +11,7 @@
         {
           "author_channel_id": "UCauthor1",
           "author_name": "مؤلف ١",
-          "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
+          "content_hash": "c680851dc7a72ce4068a2a7ea3450fef8464cbc52ca7321a204ae08230eb54c0",
           "external_comment_id": "cmt-1",
           "external_parent_id": null,
           "field_provenance": {
@@ -24,8 +24,8 @@
           "published_at": "2026-09-01T09:00:00Z",
           "published_time_raw": "2026-09-01T09:00:00Z",
           "source": "youtube_data_api_public",
-          "text_plain": "المحتوى واضح ومفيد",
-          "text_raw": "المحتوى واضح ومفيد",
+          "text_plain": "المحتوى واضح ومفيد ﹢",
+          "text_raw": "المحتوى واضح ومفيد ﹢",
           "timestamp_precision": "second"
         },
         {
@@ -55,21 +55,34 @@
         {
           "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1",
           "class_scores": {
-            "negative": 1.0,
-            "positive": 0.0
+            "mixed": 0.0,
+            "negative": 0.0,
+            "neutral": 0.0,
+            "positive": 1.0
           },
-          "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
+          "content_hash": "c680851dc7a72ce4068a2a7ea3450fef8464cbc52ca7321a204ae08230eb54c0",
           "external_comment_id": "cmt-1",
-          "label": "negative",
+          "label": "positive",
           "model_id": "deterministic-test-analyzer",
           "preprocessing_version": "strip-html-normalize-space-v1",
           "revision": "not-a-model-v1",
           "status": "succeeded"
+        },
+        {
+          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1",
+          "class_scores": {},
+          "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
+          "external_comment_id": "cmt-2",
+          "label": null,
+          "model_id": "deterministic-test-analyzer",
+          "preprocessing_version": "strip-html-normalize-space-v1",
+          "revision": "not-a-model-v1",
+          "status": "unsupported"
         }
       ],
       "video_title": "حلقة تجريبية"
     },
-    "payload_hash": "8dae1d87bae835bdd55f289cdd6e559eca84fa1b48f8b7b5f87b28a09a099e21"
+    "payload_hash": "ba960f82081925baa5e04b088cc25975f484faee11376af73a137409c7abbd7a"
   },
-  "payload_hash": "8dae1d87bae835bdd55f289cdd6e559eca84fa1b48f8b7b5f87b28a09a099e21"
+  "payload_hash": "ba960f82081925baa5e04b088cc25975f484faee11376af73a137409c7abbd7a"
 }

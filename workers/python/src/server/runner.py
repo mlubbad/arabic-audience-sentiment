@@ -7,6 +7,7 @@ picks up where it stopped rather than starting the video again.
 """
 from collectors.protocol import CollectionError
 
+from .analysis import AnalysisError, analyse
 from .gateway import ControlPlane, LeaseLost
 
 # Outcomes a worker may declare. Anything else is reported as a failure rather
@@ -31,25 +32,44 @@ def run_once(
     collector,
     video_id: str,
     video_title: str | None = None,
+    analyzer=None,
 ) -> bool:
-    """Claim one job and carry it to an explicit end. False means no work."""
+    """Claim one job and carry it to an explicit end. False means no work.
+
+    With an analyzer, each batch is labelled before it is committed, so rows and
+    the verdicts about them land in the same transaction. Without one the job is
+    collection only, which is a legitimate job type and the previous behaviour.
+    """
     lease = control.claim()
     if lease is None:
         return False
 
     outcome = "partial"
+    # An analysis failure never stops the run and never ends it as a success:
+    # the rows are real and worth keeping, but the coverage they claim is not.
+    analysis_failed = False
     try:
         for batch in collector.batches(video_id, _resume_cursor(lease)):
+            predictions: list = []
+            if analyzer is not None:
+                try:
+                    predictions = analyse(analyzer, batch.comments)
+                except AnalysisError:
+                    analysis_failed = True
             # Heartbeat before the commit, so a long batch does not let the
             # lease lapse underneath the write that follows it.
             control.heartbeat(lease)
-            control.commit_batch(lease, video_id, video_title, batch)
+            control.commit_batch(lease, video_id, video_title, batch, predictions)
             outcome = batch.outcome if batch.outcome in _DECLARABLE else "failed"
             if batch.outcome != "partial":
                 break
         else:
             # The generator ended without saying it had exhausted the source, so
             # coverage is partial. Silence is not completion.
+            outcome = "partial"
+        if analysis_failed and outcome == "exhausted":
+            # The source was read to its end but not everything in it was
+            # labelled, so this is not a complete result.
             outcome = "partial"
         control.finish(lease, outcome)
     except LeaseLost:

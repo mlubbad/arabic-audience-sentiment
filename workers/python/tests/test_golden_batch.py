@@ -13,6 +13,8 @@ from pathlib import Path
 import httpx
 
 from collectors.protocol import Batch, RawComment
+from sentiment.deterministic import DeterministicTestAnalyzer
+from server.analysis import analyse
 from server.gateway import ControlPlane
 
 GOLDEN = Path(__file__).parent / "fixtures" / "golden_batch.json"
@@ -24,7 +26,7 @@ LEASE = {
 
 def rebuild():
     comments = [
-        RawComment("cmt-1", "abcdefghijk", "المحتوى واضح ومفيد", author_name="مؤلف ١",
+        RawComment("cmt-1", "abcdefghijk", "المحتوى واضح ومفيد ﹢", author_name="مؤلف ١",
                    published_time_raw="2026-09-01T09:00:00Z", published_at="2026-09-01T09:00:00Z",
                    timestamp_precision="second", author_channel_id="UCauthor1",
                    likes_raw="12", likes_value=12, source="youtube_data_api_public",
@@ -43,11 +45,13 @@ def rebuild():
         return httpx.Response(200, json={"replayed": False})
 
     client = httpx.Client(transport=httpx.MockTransport(handler), base_url="https://control.invalid")
-    golden = json.loads(GOLDEN.read_text())
     ControlPlane("https://control.invalid", "worker-credential-value", client).commit_batch(
         LEASE, "abcdefghijk", "حلقة تجريبية",
         Batch(comments=comments, checkpoint="page-2-token", outcome="exhausted"),
-        golden["envelope"]["payload"]["predictions"],
+        # Produced by the real analyzer, not written by hand. The TypeScript
+        # seam test commits this into real SQL, so a record the analyzer builds
+        # that the contract or the database would reject fails there.
+        analyse(DeterministicTestAnalyzer(), comments),
     )
     return captured
 
@@ -82,8 +86,15 @@ def test_the_fixture_exercises_the_cases_worth_carrying_across():
     assert rows[1]["likes_value"] is None and rows[1]["likes_raw"] is None
     # Arabic survives the round trip unescaped.
     assert "المحتوى" in rows[0]["text_raw"]
-    # The prediction names the exact text it judged.
+    # One verdict per row, each naming the exact text it judged.
+    assert [p["external_comment_id"] for p in payload["predictions"]] == ["cmt-1", "cmt-2"]
     assert payload["predictions"][0]["content_hash"] == rows[0]["content_hash"]
+    assert payload["predictions"][1]["content_hash"] == rows[1]["content_hash"]
+    # A labelled row and an unanalysable one, so the fixture carries both a
+    # billable analysis and a result that is explicitly not a neutral verdict.
+    assert payload["predictions"][0]["status"] == "succeeded"
+    assert payload["predictions"][1]["status"] == "unsupported"
+    assert payload["predictions"][1]["label"] is None
     # The checkpoint is the shape the client really sends and the runner really
     # resumes from. The old fixture carried {"page": 1}, which nothing produces.
     assert payload["checkpoint"] == {"cursor": "page-2-token"}

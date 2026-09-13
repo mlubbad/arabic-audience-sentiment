@@ -149,4 +149,15 @@ service authorization follow from this setup.
 - **A malformed batch is refused whole, never filtered.** Silently discarding the rows that do
   not fit is what turned a worker defect into a customer charge. A batch whose predictions do
   not describe its own comments is a bug in the sender, and the sender should be told.
+- **An analysis failure keeps the rows and downgrades the claim.** Collected comments are real
+  work and are committed; what the run may no longer say is that it finished. An exhausted
+  source that was not fully labelled is `partial`, never `succeeded`. Discarding the rows
+  would lose collection and the checkpoint with it; reporting success would claim a coverage
+  the data does not have.
+- **An adapter returning the wrong number of verdicts is refused, not zipped.** A short list
+  silently leaves later rows unanalysed while the run reports success, and a long one names
+  comments that do not exist.
+- **A comment's content hash is computed in one place.** Predictions join to comments on it, so
+  a prediction hashed over different text is stored and then never becomes the effective label
+  — a comment that is analysed but shows no verdict, with nothing failing anywhere.
 

@@ -47,6 +47,7 @@ reservation, plan limits. Isolation is tested through direct SQL, not hidden UI 
 | Python control-plane client | implemented | Canonical payload hashing; only an exhausted source maps to succeeded |
 | Edge handler | implemented, **not deployed** | Pure handler with an injected data layer. **Has never served a real request** |
 | Legacy import and reconciliation | **blocked** | Needs the original CSVs and the amendment file |
+| Analysis in the server path | implemented, fixture-tested | `run_once` labels each batch before committing, so rows and verdicts land in one transaction. Verified end to end with the **deterministic test analyzer, which is not a model** |
 | Real model inference | **blocked** | Needs the notebooks and ~600 human-labelled comments. No accuracy figure is claimed |
 
 ## M4 — dashboard (complete, fixture-backed)

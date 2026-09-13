@@ -195,12 +195,34 @@ describe("worker to database, through the real handler", () => {
 
     // The rows the Python client described actually landed.
     expect(await scalar("select count(*)::int as n from comments")).toBe(2);
+    expect(await scalar("select count(*)::int as n from videos")).toBe(1);
+    // Both verdicts stored: the fixture's predictions are built by the real
+    // analyzer, so this is the first point at which a record it produces is
+    // checked against the contract and the database rather than against a
+    // hand-written stand-in.
     expect(
       await scalar("select count(*)::int as n from sentiment_predictions"),
-    ).toBe(1);
-    expect(await scalar("select count(*)::int as n from videos")).toBe(1);
-    // One successful analysis, so one billable unit.
+    ).toBe(2);
+    // One of the two was analysable, so exactly one billable unit. The
+    // unsupported row is recorded and costs nothing.
     expect(await scalar("select count(*)::int as n from usage_events")).toBe(1);
+    const verdicts = await db.query<{ status: string; label: string | null }>(
+      `select p.status, p.label from sentiment_predictions p
+       join comments c on c.id=p.comment_id order by c.external_comment_id`,
+    );
+    expect(verdicts.rows).toEqual([
+      { status: "succeeded", label: "positive" },
+      // Unsupported is a real result and explicitly not a neutral verdict.
+      { status: "unsupported", label: null },
+    ]);
+    // The verdict is joined to its comment by the text it judged, so a hash
+    // that drifted would store a prediction that never becomes effective.
+    expect(
+      await scalar(
+        `select count(*)::int as n from sentiment_predictions p
+         join comments c on c.id=p.comment_id and c.content_hash=p.content_hash`,
+      ),
+    ).toBe(2);
     // Unknown engagement survived as null rather than becoming zero.
     expect(
       (

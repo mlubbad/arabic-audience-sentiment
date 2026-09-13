@@ -44,6 +44,16 @@ def finish_status(outcome: str) -> str:
     return _FINISH[outcome]
 
 
+def content_hash(text: str) -> str:
+    """The identity of a stored text.
+
+    Shared with the analysis builder on purpose. A prediction whose hash does
+    not match its comment is stored but never becomes the effective label, so
+    the two must be computed in one place or they will drift apart silently.
+    """
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
 def _comment(c: RawComment) -> dict[str, Any]:
     return {
         "external_comment_id": c.id,
@@ -56,7 +66,7 @@ def _comment(c: RawComment) -> dict[str, Any]:
         "text_plain": to_plain_text(c.text),
         # Hashes the stored text only, so a likes-only refresh leaves the hash
         # alone and an existing prediction stays effective.
-        "content_hash": hashlib.sha256(c.text.encode()).hexdigest(),
+        "content_hash": content_hash(c.text),
         "published_time_raw": c.published_time_raw,
         "published_at": c.published_at,
         "timestamp_precision": c.timestamp_precision,

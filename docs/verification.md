@@ -16,7 +16,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run test:coordination` | Pass — 5 ownership-guard tests |
 | `npm test` | Pass — **77 tests, 10 files** |
 | `npm run test:db` | Pass — **55 tests, 6 files** |
-| `npm run worker:test` | Pass — **49 tests, 8 files** |
+| `npm run worker:test` | Pass — **58 tests, 9 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
 | `npm run test:e2e` | Pass — 45 tests, Chromium |
@@ -48,6 +48,10 @@ reverted and the suite returned to green.
 | Accept a prediction for a comment absent from the batch | 1 |
 | Accept the same comment twice in one batch | 1 |
 | Flatten the golden fixture back to the pre-split shape | 3 |
+| Hash a prediction over different text than its comment row | 1 |
+| Accept an adapter returning fewer verdicts than rows | 1 |
+| Let a failed analysis finish the run as succeeded | 1 |
+| Commit an empty prediction list, as before the wiring | 1 |
 
 ## What the suites prove
 
@@ -158,6 +162,33 @@ question rather than a shape mismatch — the contracts package imports Zod, and
 function has no `deno.json` or import map, so module resolution cannot be verified without a
 project. It is not a correctness gap: every rule the contract states is enforced in SQL,
 which is the layer that meters and the only one a worker cannot bypass.
+
+## Analysis reaching the server path
+
+The sentiment package existed and was tested, and nothing used it. `run_once` collected rows
+and committed them with an empty prediction list, so a configured analyzer produced no stored
+labels at all — the server path could not have produced a sentiment figure for anything.
+
+`server/analysis.py` now builds the prediction records a batch carries, and `run_once` takes
+an analyzer and labels each batch before committing it, so rows and the verdicts about them
+land in one transaction. The golden fixture's predictions are now produced by the real
+analyzer instead of being written by hand, which means the seam test commits analyzer output
+through the real handler into real SQL and checks what came back: two verdicts stored, one
+`succeeded` with a label and one `unsupported` with none, one billable unit, and every
+prediction joined to its comment on a matching `content_hash`.
+
+**The analyzer is `DeterministicTestAnalyzer`, which is not a model.** It labels by an
+explicit marker character and performs no language understanding. What is now verified is the
+wiring — that a verdict reaches the database attached to the right row and the right text, and
+that an unanalysable row is recorded as `unsupported` rather than invented as neutral. Model
+selection, download and any accuracy figure remain blocked on the notebooks and the labelled
+set, and no accuracy figure is claimed anywhere.
+
+Two behaviours are worth naming because they are the failure-becomes-success pattern:
+an adapter returning fewer verdicts than rows is refused rather than zipped (which would
+leave later rows silently unanalysed), and a batch whose analysis fails keeps its collected
+rows but can no longer finish `succeeded` — an exhausted source that was not fully labelled
+is `partial`.
 
 ## Notes on running the suites
 
