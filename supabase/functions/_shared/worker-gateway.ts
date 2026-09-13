@@ -1,0 +1,149 @@
+/**
+ * The seam between the Python worker and the SQL control plane.
+ *
+ * It authenticates a scoped worker credential and translates database
+ * refusals into the exact status codes the worker client distinguishes. It
+ * never accepts a workspace from the request: which tenant a worker may touch
+ * is derived from its credential inside the database, and nothing here can
+ * override that.
+ *
+ * Written as a pure handler with an injected data layer so it is testable
+ * without a deployed Supabase project.
+ */
+export interface WorkerDb {
+  claim(credentialHash: string): Promise<Record<string, unknown> | null>;
+  heartbeat(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+  ): Promise<void>;
+  commitBatch(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    batchKey: string,
+    payloadHash: string,
+    payload: unknown,
+  ): Promise<unknown>;
+  finish(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    outcome: string,
+    errorCode: string | null,
+  ): Promise<void>;
+}
+
+/** Refusals the worker client tells apart. Anything else is a 500 with no detail. */
+const STATUS: Record<string, number> = {
+  invalid_worker_credential: 401,
+  forbidden: 403,
+  lease_lost: 409,
+  batch_conflict: 409,
+  quota_exceeded: 429,
+  invalid_batch: 400,
+  invalid_outcome: 400,
+};
+
+const json = (code: number, body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status: code,
+    headers: { "content-type": "application/json" },
+  });
+const refuse = (code: string) => json(STATUS[code] ?? 500, { code });
+
+async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+const str = (body: Record<string, unknown>, key: string) =>
+  typeof body[key] === "string" && (body[key] as string).length > 0
+    ? (body[key] as string)
+    : null;
+
+export async function handleWorkerRequest(
+  request: Request,
+  db: WorkerDb,
+): Promise<Response> {
+  if (request.method !== "POST")
+    return json(405, { code: "method_not_allowed" });
+
+  // Checked before anything else, so an unauthenticated caller never reaches
+  // the data layer and cannot probe it for timing or error differences.
+  const bearer = /^Bearer ([^\s]+)$/.exec(
+    request.headers.get("authorization") ?? "",
+  )?.[1];
+  if (!bearer) return refuse("invalid_worker_credential");
+  const credential = await sha256Hex(bearer);
+
+  let body: Record<string, unknown> = {};
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return refuse("invalid_batch");
+  }
+
+  const path = new URL(request.url).pathname.replace(/\/+$/, "");
+  try {
+    if (path.endsWith("/worker/claim")) {
+      const job = await db.claim(credential);
+      // No work is not a failure, and 204 keeps that unambiguous.
+      return job ? json(200, job) : new Response(null, { status: 204 });
+    }
+
+    // Route first: an unknown path is 404 whatever the body looks like, so a
+    // typo is never reported as a malformed request.
+    const leased = [
+      "/worker/heartbeat",
+      "/worker/commit-batch",
+      "/worker/finish",
+    ];
+    if (!leased.some((route) => path.endsWith(route)))
+      return json(404, { code: "not_found" });
+
+    const job = str(body, "job_id");
+    const lease = str(body, "lease_token");
+    if (!job || !lease) return refuse("invalid_batch");
+
+    if (path.endsWith("/worker/heartbeat")) {
+      await db.heartbeat(credential, job, lease);
+      return json(200, {});
+    }
+    if (path.endsWith("/worker/commit-batch")) {
+      const key = str(body, "batch_key");
+      const hash = str(body, "payload_hash");
+      if (
+        !key ||
+        !hash ||
+        !/^[0-9a-f]{64}$/.test(hash) ||
+        typeof body.payload !== "object"
+      )
+        return refuse("invalid_batch");
+      // Only these five reach the database. A workspace_id in the request body
+      // is simply never read, so a worker cannot address another tenant.
+      return json(
+        200,
+        await db.commitBatch(credential, job, lease, key, hash, body.payload),
+      );
+    }
+    if (path.endsWith("/worker/finish")) {
+      const outcome = str(body, "outcome");
+      if (!outcome) return refuse("invalid_batch");
+      await db.finish(credential, job, lease, outcome, str(body, "error_code"));
+      return json(200, {});
+    }
+    return json(404, { code: "not_found" });
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code && code in STATUS) return refuse(code);
+    // Anything unrecognised is reported without its message: a driver error can
+    // carry the connection string, and a credential with it.
+    return json(500, { code: "control_plane_error" });
+  }
+}
