@@ -10,8 +10,6 @@ import {
   type CommentReviewInput,
   type Filters,
 } from "@sentiment/contracts";
-import { readSyncState } from "./syncHealth";
-
 /**
  * Who a fixture-mode correction is attributed to. Deliberately not a UUID and
  * clearly synthetic: there is no authenticated user in fixture mode, and
@@ -65,10 +63,7 @@ function withSessionReviews(comments: Comment[]): Comment[] {
 async function readFixture(signal?: AbortSignal) {
   const response = await fetch("/fixtures/dashboard.json", { signal });
   if (!response.ok) throw new Error("fixture_unavailable");
-  const raw = await response.json();
-  // FixtureSchema is not strict, so it strips keys it does not model. The sync
-  // block is read from the raw payload until the shared contract carries it.
-  return { ...FixtureSchema.parse(raw), sync: readSyncState(raw?.sync) };
+  return FixtureSchema.parse(await response.json());
 }
 
 export async function loadSnapshot(filters: Filters, signal: AbortSignal) {

@@ -6,35 +6,12 @@
  * or failed but never a successful empty dataset. So this classifies rather
  * than summarises: "succeeded" alone is not enough to call a channel current.
  *
- * The shape below is a local presentation model. The shared contract has no
- * sync_runs schema yet, so it is requested in the lane report and validated
- * here defensively instead of being assumed.
+ * The shape lives in the shared contract; what a given shape *means* is
+ * presentation and stays here.
  */
-export type RunStatus =
-  | "running"
-  | "succeeded"
-  | "partial"
-  | "failed"
-  | "blocked";
+import { type SyncState } from "@sentiment/contracts";
 
-export type SyncState = {
-  worker: { connected: boolean; last_heartbeat_at: string | null };
-  queued_jobs: number;
-  last_run: {
-    started_at: string;
-    ended_at: string | null;
-    status: RunStatus;
-    source: string;
-    error_code: string | null;
-    coverage: {
-      videos_seen: number;
-      comments_collected: number;
-      // Whether the source was traversed to its end. Never a claim that every
-      // comment that exists was retrieved.
-      complete: boolean;
-    };
-  } | null;
-};
+export type { SyncState };
 
 export type HealthKey =
   | "healthy"
@@ -106,44 +83,4 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
   if (staleHours !== null && staleHours >= STALE_AFTER_HOURS)
     return { ...base, severity: "warning", key: "stale", queued, staleHours };
   return { ...base, severity: "ok", key: "healthy", queued, staleHours };
-}
-
-/** Defensive parse: a malformed block reads as unknown, never as healthy. */
-export function readSyncState(value: unknown): SyncState | null {
-  if (!value || typeof value !== "object") return null;
-  const v = value as Record<string, unknown>;
-  const worker = v.worker as Record<string, unknown> | undefined;
-  if (!worker || typeof worker.connected !== "boolean") return null;
-  if (typeof v.queued_jobs !== "number") return null;
-  const run = v.last_run as Record<string, unknown> | null | undefined;
-  if (run === null || run === undefined)
-    return {
-      worker: {
-        connected: worker.connected,
-        last_heartbeat_at: (worker.last_heartbeat_at as string) ?? null,
-      },
-      queued_jobs: v.queued_jobs,
-      last_run: null,
-    };
-  const coverage = run.coverage as Record<string, unknown> | undefined;
-  if (typeof run.status !== "string" || !coverage) return null;
-  return {
-    worker: {
-      connected: worker.connected,
-      last_heartbeat_at: (worker.last_heartbeat_at as string) ?? null,
-    },
-    queued_jobs: v.queued_jobs,
-    last_run: {
-      started_at: run.started_at as string,
-      ended_at: (run.ended_at as string) ?? null,
-      status: run.status as RunStatus,
-      source: (run.source as string) ?? "unknown",
-      error_code: (run.error_code as string) ?? null,
-      coverage: {
-        videos_seen: Number(coverage.videos_seen ?? 0),
-        comments_collected: Number(coverage.comments_collected ?? 0),
-        complete: coverage.complete === true,
-      },
-    },
-  };
 }

@@ -806,3 +806,48 @@ started by this lane. Patch 2 did its job: the suite refused to adopt it rather 
 the wrong build, and `E2E_PORT=5199` let this lane keep working while it runs. Worth checking
 whether another agent was pointed at `/Users/mlubbad/Documents/Codex/SentimentAnalysis`
 instead of its own worktree.
+
+## sync block moved into FixtureSchema (done, 2026-09-13)
+
+Fourth schema change in this lane, and it removes a workaround rather than adding a feature.
+
+`SyncStateSchema` now lives in `packages/contracts/src/sync.ts`, and `FixtureSchema` carries
+`sync`. The raw-payload read in `readFixture` is gone — it existed only because the shared
+schema stripped keys it did not model — and the forty-line hand-rolled validator in
+`syncHealth.ts` is deleted. That file now holds only the classification, which is
+presentation and belongs there; the shape belongs in the contract.
+
+**The fail-safe is preserved, and is now declarative.** `sync: SyncStateSchema.nullable()
+.catch(null)` means a malformed block falls back to null instead of failing the whole read,
+and null is classified as `unknown` rather than healthy. Sync health must never be
+load-bearing: an unreadable status must not take the dashboard down. A contract test asserts
+a nonsense block yields `sync === null` while the comments still parse, and the existing
+browser test that feeds the panel `{worker: "yes please"}` still passes unchanged — that was
+the regression I most wanted to avoid when replacing hand-rolled validation with a schema.
+
+Two invariants are now enforced that the hand-rolled version could not express: a run marked
+`running` may not also claim to have ended, and unknown fields are rejected outright.
+
+### Placement, and a note for the schema lane
+
+`sync.ts` is platform-owned rather than in `jobs.ts`, because this is a **read projection**
+aggregated over sync runs and the job queue — not a table row, and not part of the
+worker↔server batch protocol. Changing it cannot break the worker.
+
+It does, however, have to match what the server eventually returns. **For G1:** the
+dashboard expects `last_run` to carry `started_at`, `ended_at`, `status`, `source`,
+`error_code`, and a `coverage` object of `videos_seen`, `comments_collected`, `complete`;
+plus `worker.connected`, `worker.last_heartbeat_at` and `queued_jobs` aggregated alongside.
+The `status` vocabulary is the same five values the jobs table uses. If the `sync_runs` table
+lands with different names, say so in the schema lane report and this projection will follow
+rather than the two drifting apart.
+
+### Commands and results
+
+- `npm run check` — pass (55 unit across 8 files, 18 SQL, 23 worker, guard 5/5, build, secrets)
+- `npm run test:e2e` — 45 passed in 23.3s
+- `node scripts/check-ownership.mjs platform` — pass
+
+Four of the five queued schema requests are now done. Only per-video aggregates remain, and
+that one genuinely wants the live read path first, since one snapshot call per video does not
+scale to a channel with 194 of them.
