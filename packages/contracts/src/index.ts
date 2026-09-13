@@ -13,6 +13,7 @@ export * from "./filters";
 export * from "./comments";
 export * from "./jobs";
 export * from "./usage";
+export * from "./sync";
 export * from "./fixture";
 export * from "./snapshot";
 export * from "./csv";
