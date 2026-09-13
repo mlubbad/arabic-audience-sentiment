@@ -10,6 +10,16 @@ export function expectedBranch(lane) {
   if (!Object.hasOwn(branches, lane)) throw new Error(`Unknown lane: ${lane}`);
   return branches[lane];
 }
+const coordinatedContracts = new Set([
+  "packages/contracts/src/index.ts",
+  "packages/contracts/src/jobs.ts",
+]);
+const platformOwned = [
+  "apps/web/",
+  "supabase/",
+  "tests/e2e/",
+  "packages/contracts/src/",
+];
 export function violations(lane, files) {
   expectedBranch(lane);
   return files.filter((file) => {
@@ -18,9 +28,13 @@ export function violations(lane, files) {
     if (file === `docs/agent-reports/${lane}.md`) return false;
     if (lane === "worker") return !file.startsWith("workers/python/");
     if (file === "apps/web/package.json") return true;
-    return !["apps/web/", "supabase/", "tests/e2e/"].some((prefix) =>
-      file.startsWith(prefix),
-    );
+    // Platform ships application schema alongside the features that need it, so
+    // a UI change no longer waits on a round trip. The barrel and any
+    // worker-facing contract stay coordinated, because that is where the two
+    // lanes meet and where a unilateral change would break the other one.
+    if (coordinatedContracts.has(file)) return true;
+    if (file.startsWith("packages/contracts/src/protocols/")) return true;
+    return !platformOwned.some((prefix) => file.startsWith(prefix));
   });
 }
 function git(args) {
