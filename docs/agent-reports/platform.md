@@ -611,3 +611,64 @@ avoided "fixing" working code; the genuine defect was the missing assertion.
 - `node scripts/check-ownership.mjs platform` — pass
 
 Seven browser tests added; six were confirmed failing before the fixes.
+
+## Ownership patch applied and contracts split (2026-09-13)
+
+Done on the user's explicit authorisation while the integrator was at its usage limit. Both
+changes implement the integrator's own already-written intent; neither invents policy.
+
+### Correction to my earlier patch write-up
+
+My write-up said "add one prefix to the allow list" and claimed
+`packages/contracts/package.json` and `protocols/**` would then be denied automatically.
+**That was wrong.** Reading the integrator's test properly showed it also denies
+`packages/contracts/src/index.ts` and `src/jobs.ts` to this lane. My one-line version would
+have granted this lane the barrel *and* the worker-facing contract, and would have failed the
+integrator's own test. Implemented what the test specifies instead; it now passes 4/4.
+
+### Correction to my "one change unblocks four" claim
+
+Also wrong. After landing the guard change alone, a probe showed every schema this lane needs
+still lived in `index.ts`, which stays coordinated — so the patch unblocked nothing. The rule
+anticipated a module structure that did not exist yet.
+
+### The split
+
+`index.ts` (438 lines) is now a barrel over `primitives`, `filters`, `comments`, `jobs`,
+`usage`, `fixture`, `snapshot`, `csv`. Code was moved verbatim by line range; no logic was
+rewritten.
+
+Public surface preserved exactly, verified two ways rather than assumed:
+- name-by-name diff of exported symbols before and after — **nothing missing**
+- a runtime assertion that the barrel exposes exactly the 19 expected runtime exports
+
+The one difference is `timestamp`, previously a private const, which had to become
+cross-module. It is exported from `primitives.ts` for siblings but **deliberately not
+re-exported from the barrel**, so the published surface is unchanged.
+
+### What this unblocks
+
+| File | Access | Carries |
+| --- | --- | --- |
+| `comments.ts` | platform | `ReviewSchema` reviewer/reason; `CommentSchema` likes |
+| `snapshot.ts` | platform | `comment_types`; per-video aggregates |
+| `fixture.ts` | platform | the `sync` block |
+| `csv.ts` | platform | the likes column |
+| `index.ts`, `jobs.ts` | **coordinated** | barrel and worker-facing surface |
+
+All five queued schema requests are now this lane's to make. Item 4's server-side per-video
+aggregate still needs the live read path, and P2/P3 still need I1.
+
+### Commands and results
+
+- `npm run check` — pass (45 unit across 7 files, 18 SQL, 23 worker, build, secret scan)
+- `npm run test:e2e` — 40 passed in 20.9s
+- `node --test scripts/check-ownership.test.mjs` in the integration worktree — 4 pass, 0 fail
+- `node scripts/check-ownership.mjs platform` — pass
+
+### For the integrator on return
+
+`9879a56` on `codex/coordination-integration` contains only `scripts/check-ownership.mjs`.
+The two uncommitted test files in that worktree were left untouched and still need
+committing. The Playwright isolation patch was **not** applied — it was not authorised, and
+the verified version is in the section above.
