@@ -55,6 +55,8 @@ const rows: Comment[] = [
         content_hash: "current",
         created_at: "2026-09-03T00:00:00Z",
         origin: "human" as const,
+        reviewer_id: "reviewer-1",
+        reason: "تصنيف خاطئ",
       },
     ],
   },

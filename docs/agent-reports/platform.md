@@ -672,3 +672,59 @@ aggregate still needs the live read path, and P2/P3 still need I1.
 The two uncommitted test files in that worktree were left untouched and still need
 committing. The Playwright isolation patch was **not** applied — it was not authorised, and
 the verified version is in the section above.
+
+## reviewer_id and reason on ReviewSchema (done, 2026-09-13)
+
+First schema change made in this lane after the split. `ReviewSchema` now carries
+`reviewer_id` and `reason`, both nullable, with a refinement that **a human verdict must
+state a reason** while a legacy amendment may carry neither — which is precisely why it is
+not human-reviewed truth.
+
+`applyReview` takes the reviewer as a **separate argument**, never from the payload. That
+mirrors `submit_comment_review` taking it from the session: a reviewer must not be able to
+attribute a verdict to somebody else. A test asserts `CommentReviewInputSchema` rejects a
+`reviewer_id` field outright.
+
+Fixture mode attributes corrections to `مراجع محلي (جلسة اختبار)` — deliberately not a UUID
+and obviously synthetic, because there is no authenticated user in fixture mode and
+inventing one would be the dishonesty P1 removed.
+
+TypeScript caught four incomplete review literals across three other test files when the
+schema gained required fields. All fixed rather than loosened.
+
+## Third lane created for Gemini, and Patch 2 applied (2026-09-13)
+
+On the user's explicit authorisation, in the order they asked: lane first, then Patch 2,
+then the stray server.
+
+**Schema lane.** `codex/agent-c-schema` at `worktrees/schema`, owning `supabase/**` and
+`docs/agent-reports/schema.md`. Database work **moved out of this lane** rather than being
+shared — one writer per area is the point. The pre-existing guard test asserting platform
+owns SQL was inverted so the move cannot regress silently. Lane verified usable end to end:
+Node 22.14.0, correct branch, guard passes, 18 SQL tests pass, typecheck clean.
+Tasks G1–G4 are in `docs/coordination/gemini-kickoff.md`, taken from section 7 of the
+handoff with acceptance tests spelled out. `docs/coordination/tasks.md` was left untouched;
+the integrator should fold G1–G4 in on return.
+
+**Patch 2 verified against the real failure, not a synthetic one.** With the foreign server
+still holding 5173, the suite now refuses to start:
+`Error: http://127.0.0.1:5173 is already used`. Then, with that server *still running*,
+`E2E_PORT=5199 npm run test:e2e` passed 42 — so two lanes can now run browser tests
+simultaneously, which was impossible an hour ago.
+
+**One thing to flag to the integrator.** `scripts/check-ownership.test.mjs` needed my edits
+for the schema lane, and it already carried the integrator's uncommitted contracts test, so
+committing mine committed theirs too. That test is green against the implementation, so
+nothing is lost, but it was not left untouched as I had said it would be.
+`scripts/playwright-isolation.test.mjs` remains untracked and untouched.
+
+Patches 3, 4 and 5 remain open: wiring the isolation test into a script, raising its
+timeout, and `core.hooksPath` in setup. Patch 4 edits a file the integrator has not
+committed, so it was left alone.
+
+### Commands and results
+
+- `npm run check` — pass (47 unit across 7 files, 18 SQL, 23 worker, guard 5/5, build, secrets)
+- `npm run test:e2e` — 42 passed in 22.4s on the default port, and 42 passed on 5199 while
+  5173 was occupied
+- `node scripts/check-ownership.mjs platform` — pass

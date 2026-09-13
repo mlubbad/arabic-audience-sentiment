@@ -585,9 +585,15 @@ export function Dashboard() {
                               <li key={`${r.created_at}-${i}`}>
                                 <strong>{labels[r.label]}</strong>
                                 <span>{displayDate(r.created_at)}</span>
+                                <span data-testid="review-by">
+                                  {r.reviewer_id ?? "مراجع غير معروف"}
+                                </span>
                                 <small data-state={state}>
                                   {reviewStateMessages[state]}
                                 </small>
+                                {r.reason && (
+                                  <q data-testid="review-reason">{r.reason}</q>
+                                )}
                               </li>
                             ),
                           )}

@@ -12,6 +12,14 @@ import {
 } from "@sentiment/contracts";
 import { readSyncState } from "./syncHealth";
 
+/**
+ * Who a fixture-mode correction is attributed to. Deliberately not a UUID and
+ * clearly synthetic: there is no authenticated user in fixture mode, and
+ * pretending otherwise would be the dishonesty P1 removed. The live path takes
+ * this from the session inside the RPC.
+ */
+export const fixtureReviewer = "مراجع محلي (جلسة اختبار)";
+
 export const fixtureWorkspace = "00000000-0000-4000-8000-000000000001";
 
 // A channel can have hundreds of videos; comparing all of them is neither
@@ -49,7 +57,7 @@ const sessionReviews: { input: CommentReviewInput; at: string }[] = [];
 
 function withSessionReviews(comments: Comment[]): Comment[] {
   return sessionReviews.reduce(
-    (acc, r) => applyReview(acc, r.input, r.at),
+    (acc, r) => applyReview(acc, r.input, r.at, fixtureReviewer),
     comments,
   );
 }
@@ -140,6 +148,7 @@ export async function submitReview(raw: CommentReviewInput) {
     withSessionReviews(fixture.comments),
     input,
     new Date().toISOString(),
+    fixtureReviewer,
   );
   sessionReviews.push({ input, at: new Date().toISOString() });
 }

@@ -8,12 +8,16 @@ const review = (
     content_hash: string;
     created_at: string;
     origin: "human" | "legacy_unverified";
+    reviewer_id: string | null;
+    reason: string | null;
   }> = {},
 ) => ({
   label: "negative" as const,
   content_hash: "current",
   created_at: at("01"),
   origin: "human" as const,
+  reviewer_id: "reviewer-1",
+  reason: "سبب",
   ...over,
 });
 

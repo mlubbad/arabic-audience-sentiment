@@ -900,3 +900,43 @@ test("a sync failure reads as a sentence, not as a raw code", async ({
   await expect(detail).toContainText("رفض المصدر الوصول");
   await expect(detail).toContainText("source_access_denied");
 });
+
+test("the history says who reviewed and why", async ({ page }) => {
+  await page.goto("/");
+  await openReview(page, "المحتوى واضح ومفيد");
+  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await page.getByLabel("سبب التصحيح").fill("النموذج قرأ السخرية حرفيًا");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+
+  await openReview(page, "المحتوى واضح ومفيد");
+  const entry = page
+    .getByTestId("review-history")
+    .getByRole("listitem")
+    .first();
+  await expect(entry.getByTestId("review-reason")).toContainText(
+    "النموذج قرأ السخرية حرفيًا",
+  );
+  // The reviewer is attributed from the session context, and fixture mode says
+  // plainly that the session is a local test one rather than inventing a user.
+  await expect(entry.getByTestId("review-by")).toContainText(
+    "مراجع محلي (جلسة اختبار)",
+  );
+});
+
+test("an imported amendment shows no reviewer and states no reason", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await openReview(page, "موعد الحلقة");
+  const entry = page
+    .getByTestId("review-history")
+    .getByRole("listitem")
+    .first();
+  await expect(entry.getByTestId("review-by")).toContainText("مراجع غير معروف");
+  // No reason element at all, rather than an empty quote implying one exists.
+  await expect(entry.getByTestId("review-reason")).toHaveCount(0);
+  await expect(entry.locator("small")).toHaveAttribute(
+    "data-state",
+    "legacy_unverified",
+  );
+});
