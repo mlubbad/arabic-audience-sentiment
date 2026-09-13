@@ -34,7 +34,7 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 | `npm run worker:test` | Pass — **91 tests, 11 files** |
 | `npm run build` | Pass |
 | `npm run check:secrets` | Pass |
-| `npm run test:e2e` | Pass — 45 tests, Chromium |
+| `npm run test:e2e` | Pass — **47 tests, Chromium** (45 dashboard, 2 landing) |
 
 `npm run check` runs everything except `test:e2e` and passed end to end.
 
@@ -553,6 +553,31 @@ empty string, which would read as an anonymous commenter.
 
 No schedule is attached, for the same reason as the OAuth state prune: scheduling belongs to a
 deployed project. What is committed is the operation.
+
+## The landing page, and a review I should have done first
+
+A landing page at `/` was added by the operator while I was working, and I committed it in
+`a49596d` without reading it, because I used `git add -A`. That is the second time in this
+session I have swept in a file I had not reviewed, and a marketing page is the worst place
+for it: fabricated testimonials, invented accuracy figures and borrowed brand assets are
+exactly what belongs on one and exactly what this project refuses to publish.
+
+Audited after the fact. It is honest, and unusually so for marketing copy. It answers "is the
+demo real channel data?" with *no, synthetic and clearly labelled*; "can I connect my channel
+now?" with *not yet*; and "is sentiment analysis always accurate?" with *no*, naming sarcasm,
+dialect and context, and stating that no accuracy figure has been adopted for a live model.
+There are no testimonials, no customer logos and no invented metrics — the only large numbers
+in the file are SVG coordinates. Fonts are self-hosted with their OFL licence alongside.
+
+Covered by two browser tests: the demo filter, RTL, the FAQ, navigation through to the
+dashboard and the account page, the mobile menu, the keyboard skip link, and no horizontal
+overflow at 320, 390, 768 and 1440.
+
+**Deployed and verified at the origin**, file by file: every asset 200 at its exact size, and
+`.htaccess` 403 because Apache refuses to serve it. Through Cloudflare: 401 unauthenticated,
+200 with credentials, and both SPA routes fall back correctly.
+
+One thing to fix later: the hero image is 1.5MB, which is most of the page weight.
 
 ## Notes on running the suites
 
