@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 const branches = {
   worker: "codex/agent-a-worker",
   platform: "codex/agent-b-platform",
+  schema: "codex/agent-c-schema",
   integration: "codex/coordination-integration",
 };
 export function expectedBranch(lane) {
@@ -14,12 +15,10 @@ const coordinatedContracts = new Set([
   "packages/contracts/src/index.ts",
   "packages/contracts/src/jobs.ts",
 ]);
-const platformOwned = [
-  "apps/web/",
-  "supabase/",
-  "tests/e2e/",
-  "packages/contracts/src/",
-];
+const platformOwned = ["apps/web/", "tests/e2e/", "packages/contracts/src/"];
+// Database work moved out of the platform lane when the schema lane was added:
+// one writer per area is the whole point, so it cannot be owned by both.
+const schemaOwned = ["supabase/"];
 export function violations(lane, files) {
   expectedBranch(lane);
   return files.filter((file) => {
@@ -27,6 +26,8 @@ export function violations(lane, files) {
     if (lane === "integration") return false;
     if (file === `docs/agent-reports/${lane}.md`) return false;
     if (lane === "worker") return !file.startsWith("workers/python/");
+    if (lane === "schema")
+      return !schemaOwned.some((prefix) => file.startsWith(prefix));
     if (file === "apps/web/package.json") return true;
     // Platform ships application schema alongside the features that need it, so
     // a UI change no longer waits on a round trip. The barrel and any

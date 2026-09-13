@@ -3,6 +3,7 @@ set -eu
 case "$(git branch --show-current)" in
   codex/agent-a-worker) lane=worker ;;
   codex/agent-b-platform) lane=platform ;;
+  codex/agent-c-schema) lane=schema ;;
   codex/coordination-integration) lane=integration ;;
   *) echo 'No lane assigned to this branch; ask the integrator before committing.' >&2; exit 1 ;;
 esac
