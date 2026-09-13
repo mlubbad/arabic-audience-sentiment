@@ -349,6 +349,45 @@ export — these files are opened in Excel by people who are not developers.
 independence and adjudication protocol, and the rule that agreement must be reported: without
 a kappa there is no way to separate model error from label noise.
 
+## First live run against a deployed project
+
+2026-09-13. A Supabase development project (`ykqugctewsqvevhyqtbi`, Postgres 17.6.1,
+ap-south-1) was linked and all **13 migrations applied**. Until this point the schema had
+only ever run in PGlite. It applied clean, in order, with no edits — the first evidence that
+what the tests run is what a real Postgres accepts.
+
+Tenant isolation was then probed **over real HTTP through PostgREST**, as an anonymous caller
+holding the publishable key, because that is the boundary a stranger actually reaches:
+
+| Request | Result |
+| --- | --- |
+| `GET /rest/v1/comments`, `workspaces`, `memberships` | 401, SQLSTATE 42501 |
+| `GET /rest/v1/jobs` | 401 — no grant exists at all |
+| `GET /rest/v1/connection_status` | 401 — the view is security_invoker, so it inherits the refusal |
+| `GET /rest/v1/oauth_states` | 404 — the `private` schema is not exposed by PostgREST |
+| `POST /rest/v1/rpc/dashboard_snapshot` | 401, permission denied for function |
+| `POST /rest/v1/rpc/usage_summary` | 401, permission denied for function |
+
+This retires one specific caveat: the grants and the schema separation hold in a deployed
+Supabase and not only in an embedded Postgres. It does **not** retire the others.
+
+**Still unverified, and named:** every authenticated path. Creating a test user needs either
+the service-role key (admin create) or a real mailbox — GoTrue rejects reserved test domains,
+and guessing at domains to get past that would risk mailing a live address. So the
+personal-workspace bootstrap trigger, a member reading their own workspace, a member being
+refused another's, the live dashboard read returning real rows, and the worker gateway over
+HTTP are all still untested against the deployed project. The Edge Functions are not deployed.
+
+## A filename bug the first real push found
+
+Two migrations were named `20260913240000` and `20260913250000` — hour 24 and hour 25, which
+are not times. PGlite never noticed, because the suite only sorts filenames, and the numbers
+sort correctly either way. The Supabase CLI parsed every other migration into a timestamp and
+echoed those two back as raw strings.
+
+Renamed to `20260913233000` and `20260913234500` before the first push, which was the last
+moment it was possible: a filename is frozen once the migration is applied anywhere real.
+
 ## Notes on running the suites
 
 The browser suite is timing-sensitive. During this work the host reached load average 17 and

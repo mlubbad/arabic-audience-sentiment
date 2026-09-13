@@ -4,8 +4,9 @@ Updated 2026-09-13. Status words are used strictly:
 **implemented** = code exists and its tests pass; **fixture-tested** = verified only against
 sanitized synthetic data; **blocked** = cannot proceed without a named missing input.
 
-**Nothing here has run against live YouTube, Google OAuth, a deployed Supabase project, a
-real sentiment model, or any deployment.** Every "implemented" below means verified in
+**Nothing here has run against live YouTube, Google OAuth, a real sentiment model, or any
+deployment.** As of 2026-09-13 the schema *has* been applied to a real Supabase development
+project and anonymous isolation probed over HTTP; every authenticated path remains untested. Every "implemented" below means verified in
 embedded PostgreSQL, in Node, or in a browser against fixtures. The list of what that
 excludes is at the end of `verification.md` and is the honest limit of this work.
 
@@ -91,7 +92,7 @@ Needs a Supabase project and Sites access. Nothing is deployed.
 | Catalogue verification (35 + 157 + 2 = 194) | `SpecTech-YouTube-MVP-Package.zip` with its manifest and JSONL catalog |
 | Final dashboard styling | Standalone dashboard HTML, the dashboard ZIP, and the brand assets |
 | Live public collection | A YouTube Data API key placed server-side |
-| Live Auth, Storage, Edge Functions, and proving the edge handler and SQL agree over HTTP | Supabase development project URL and keys |
+| Authenticated paths, Storage, Edge Functions, and proving the edge handler and SQL agree over HTTP | The project's service-role key. The project is linked and all 13 migrations are applied; anonymous isolation is verified over HTTP. Creating a test user needs admin access, because GoTrue rejects reserved test email domains |
 | OAuth code exchange and live connection | Google OAuth client id/secret, registered redirect URI, test-user authorization. PKCE and the authorization URL are implemented and need none of these |
 | Model selection and any accuracy claim | The two model notebooks and ~600 independently human-labelled comments. The sampler, the blind labelling sheets and the protocol are built (`docs/labelling-guide.md`, `npm run label:draw`); what is missing is the human labelling itself and the notebooks |
 | Private pilot deployment | Sites access with a verified private mode |
