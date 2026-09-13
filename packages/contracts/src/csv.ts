@@ -20,6 +20,8 @@ export const CSV_COLUMNS = [
   "parent_source",
   "source",
   "content_hash",
+  "likes_raw",
+  "likes_value",
 ] as const;
 
 // A cell a spreadsheet would evaluate on open rather than display.
@@ -64,6 +66,9 @@ export function toCsv(rows: LabelledComment[]): string {
       r.parent_source,
       r.source,
       r.content_hash,
+      r.likes_raw ?? "",
+      // Empty means unknown, never zero.
+      r.likes_value === null ? "" : String(r.likes_value),
     ]
       .map(escapeCell)
       .join(","),

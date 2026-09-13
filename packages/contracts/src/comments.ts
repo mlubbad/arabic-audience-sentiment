@@ -19,12 +19,22 @@ export const PredictionSchema = z
     (v) => (v.status === "succeeded" ? v.label !== null : v.label === null),
     "Only successful predictions have labels",
   );
-export const ReviewSchema = z.object({
-  label: LabelSchema,
-  content_hash: z.string(),
-  created_at: timestamp,
-  origin: z.enum(["human", "legacy_unverified"]),
-});
+export const ReviewSchema = z
+  .object({
+    label: LabelSchema,
+    content_hash: z.string(),
+    created_at: timestamp,
+    origin: z.enum(["human", "legacy_unverified"]),
+    // Null for an imported amendment, which has no reviewer by definition.
+    reviewer_id: z.string().min(1).nullable(),
+    reason: z.string().nullable(),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.origin !== "human" || (v.reason !== null && v.reason.trim().length > 0),
+    "a human review must state a reason",
+  );
 export const CommentSchema = z
   .object({
     id: z.string().min(1),
@@ -37,6 +47,13 @@ export const CommentSchema = z
     author_name: z.string(),
     text_raw: z.string(),
     content_hash: z.string().min(1),
+    // What the source displayed, e.g. "1.2K", kept verbatim. Null when the
+    // source showed nothing.
+    likes_raw: z.string().nullable(),
+    // The parsed count. Null means unknown, which is not the same as zero: a
+    // scraped "1.2K" that could not be parsed must not become a number we made
+    // up. Likes never weight sentiment (spec 11).
+    likes_value: z.number().int().nonnegative().nullable(),
     published_at: timestamp.nullable(),
     published_time_raw: z.string().nullable(),
     timestamp_precision: z.enum([
@@ -86,6 +103,10 @@ export function applyReview(
   comments: Comment[],
   raw: CommentReviewInput,
   now: string,
+  // Supplied by the caller's own context, never read from the payload. The RPC
+  // takes it from the session for the same reason: a reviewer must not be able
+  // to attribute a verdict to somebody else.
+  reviewerId: string | null,
 ): Comment[] {
   const input = CommentReviewInputSchema.parse(raw);
   const target = comments.find(
@@ -99,6 +120,8 @@ export function applyReview(
     content_hash: input.content_hash,
     created_at: now,
     origin: "human" as const,
+    reviewer_id: reviewerId,
+    reason: input.reason,
   };
   return comments.map((c) =>
     c === target ? { ...c, reviews: [...c.reviews, review] } : c,

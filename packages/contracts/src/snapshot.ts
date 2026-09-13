@@ -4,6 +4,14 @@ import { FiltersSchema, type Filters } from "./filters";
 import { effectiveLabel, type Comment } from "./comments";
 import { type Label } from "./primitives";
 
+export type VideoAggregate = {
+  id: string;
+  total: number;
+  analysed: number;
+  replies: number;
+  sentiments: Record<Label, number>;
+};
+
 export type LabelledComment = Comment & {
   label: Label | null;
   reviewed: boolean;
@@ -83,20 +91,55 @@ export function exportRows(
 }
 
 /** Pure fixture/reference implementation. Server queries must separately enforce RLS. */
+/** How many engaged negatives the dashboard shows. */
+const ENGAGEMENT_LIMIT = 5;
+
 export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   const f = FiltersSchema.parse(raw);
   const rows = filteredRows(input, f, activeKey);
+  // Offered filter values come from the data, so a channel's own vocabulary
+  // drives the control instead of a hard-coded per-customer list. Scoped to the
+  // workspace but deliberately not to the other filters: narrowing this with
+  // the current selection would make a filtered-out type unselectable.
+  const comment_types = [
+    ...new Set(
+      input
+        .filter((c) => c.workspace_id === f.workspace_id && c.comment_type)
+        .map((c) => c.comment_type as string),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "ar"));
   const sentiments: Record<Label, number> = {
     positive: 0,
     negative: 0,
     neutral: 0,
     mixed: 0,
   };
-  const videos = new Map<string, number>(),
+  // Per-video figures accumulate in the same pass as the overall ones, which is
+  // what a server would do with a single GROUP BY. Computing them by re-running
+  // the whole snapshot once per video would not survive a channel with 194.
+  const videos = new Map<string, VideoAggregate>(),
     timeline = new Map<string, number>();
   for (const c of rows) {
     if (c.label) sentiments[c.label]++;
-    videos.set(c.video_id, (videos.get(c.video_id) ?? 0) + 1);
+    let video = videos.get(c.video_id);
+    if (!video) {
+      video = {
+        id: c.video_id,
+        total: 0,
+        analysed: 0,
+        replies: 0,
+        sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      };
+      videos.set(c.video_id, video);
+    }
+    video.total++;
+    if (c.is_reply) video.replies++;
+    // Each video counts on its own denominator: a comment with no usable label
+    // is inside total and outside analysed, exactly as for the whole set.
+    if (c.label) {
+      video.analysed++;
+      video.sentiments[c.label]++;
+    }
     const day = c.published_at
       ? new Date(c.published_at).toISOString().slice(0, 10)
       : "unknown";
@@ -106,8 +149,24 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   const cursorIndex = f.cursor ? rows.findIndex((c) => c.id === f.cursor) : -1;
   if (f.cursor && cursorIndex < 0) throw new Error("invalid_cursor");
   const comments = rows.slice(cursorIndex + 1, cursorIndex + 1 + f.limit);
+  // Negatives the audience engaged with most. Ranked on the effective label, so
+  // a human correction counts here too. A row with unknown engagement is left
+  // out rather than sorted as zero, and the exclusion is reported instead of
+  // being hidden.
+  const negatives = rows.filter((c) => c.label === "negative");
+  const most_engaged_negative = negatives
+    .filter((c) => c.likes_value !== null)
+    .sort(
+      (a, b) =>
+        (b.likes_value ?? 0) - (a.likes_value ?? 0) ||
+        a.id.localeCompare(b.id, "en"),
+    )
+    .slice(0, ENGAGEMENT_LIMIT);
   return {
     mode: "sanitized_fixture" as const,
+    comment_types,
+    most_engaged_negative,
+    negative_unranked: negatives.filter((c) => c.likes_value === null).length,
     total: rows.length,
     analysed,
     unanalysed: rows.length - analysed,
@@ -117,7 +176,10 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     unique_authors: new Set(
       rows.flatMap((c) => (c.author_channel_id ? [c.author_channel_id] : [])),
     ).size,
-    videos: [...videos].map(([id, total]) => ({ id, total })),
+    // Busiest first, ties broken by id so the order does not wobble.
+    videos: [...videos.values()].sort(
+      (a, b) => b.total - a.total || a.id.localeCompare(b.id, "en"),
+    ),
     timeline: [...timeline].map(([date, total]) => ({ date, total })),
     comments,
     next_cursor:

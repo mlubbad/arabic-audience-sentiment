@@ -1,8 +1,13 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
-import { budgetState, type Filters, type Label } from "@sentiment/contracts";
+import {
+  budgetState,
+  type Filters,
+  type Label,
+  type LabelledComment,
+} from "@sentiment/contracts";
 import {
   buildExport,
   fixtureWorkspace,
@@ -10,7 +15,18 @@ import {
   reviewsArePersisted,
   submitReview,
 } from "./data";
-import { labels, budgetNames, budgetMessages, displayDate } from "./i18n";
+import {
+  labels,
+  budgetNames,
+  budgetMessages,
+  reviewStateMessages,
+  videoLabel,
+  syncMessages,
+  syncErrorMessages,
+  displayDate,
+} from "./i18n";
+import { reviewHistory } from "./reviewHistory";
+import { syncHealth } from "./syncHealth";
 ChartJS.register(ArcElement, Tooltip, Legend);
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export function Dashboard() {
@@ -21,6 +37,13 @@ export function Dashboard() {
   const [from, setFrom] = useState(""),
     [to, setTo] = useState(""),
     [formError, setFormError] = useState("");
+  const [replies, setReplies] = useState<"all" | "comments" | "replies">("all");
+  const [dateMode, setDateMode] = useState<"all" | "known" | "unknown">("all");
+  const [videoKind, setVideoKind] = useState("");
+  const [commentType, setCommentType] = useState("");
+  const [reviewStatus, setReviewStatus] = useState<
+    "all" | "reviewed" | "unreviewed"
+  >("all");
   // cursors[i] opens page i + 2, so the stack length is the current page index.
   // Applying, resetting or resizing clears it, because a cursor is only valid
   // for the filtered set it was produced from.
@@ -51,25 +74,30 @@ export function Dashboard() {
     setCursors(next);
   }
   const client = useQueryClient();
-  const [reviewing, setReviewing] = useState<{
-    id: string;
-    hash: string;
-    text: string;
-    label: Label | null;
-  } | null>(null);
+  const [reviewing, setReviewing] = useState<LabelledComment | null>(null);
   const [verdict, setVerdict] = useState<Label>("neutral");
+  const reviewFormRef = useRef<HTMLFormElement | null>(null);
+  const reviewTriggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (reviewing) reviewFormRef.current?.focus();
+  }, [reviewing]);
+  function closeReview() {
+    setReviewing(null);
+    // Hand focus back to the row the reviewer came from.
+    reviewTriggerRef.current?.focus();
+  }
   const [reason, setReason] = useState("");
   const review = useMutation({
     mutationFn: () =>
       submitReview({
         workspace_id: filters.workspace_id,
         comment_id: reviewing!.id,
-        content_hash: reviewing!.hash,
+        content_hash: reviewing!.content_hash,
         label: verdict,
         reason,
       }),
     onSuccess: async () => {
-      setReviewing(null);
+      closeReview();
       setReason("");
       // Re-read through the same snapshot path so the corrected label, the
       // sentiment denominator and the review filter all move together.
@@ -89,38 +117,43 @@ export function Dashboard() {
       URL.revokeObjectURL(url);
     },
   });
-  function startReview(c: {
-    id: string;
-    content_hash: string;
-    text_raw: string;
-    label: Label | null;
-  }) {
+  function startReview(c: LabelledComment, trigger: HTMLButtonElement) {
+    reviewTriggerRef.current = trigger;
     review.reset();
     setReason("");
     setVerdict(c.label ?? "neutral");
-    setReviewing({
-      id: c.id,
-      hash: c.content_hash,
-      text: c.text_raw,
-      label: c.label,
-    });
+    setReviewing(c);
   }
   function apply(e: FormEvent) {
     e.preventDefault();
-    if (from && to && from >= to) {
+    if (dateMode !== "unknown" && from && to && from >= to) {
       setFormError("يجب أن يسبق تاريخ البداية تاريخ النهاية");
       return;
     }
     setFormError("");
     setCursorNotice(false);
     setCursors([]);
+    // A range describes known dates, so it is not sent when the user has asked
+    // for the rows that have no date at all.
+    const ranged = dateMode !== "unknown";
     setFilters({
       ...defaults,
       q: query,
       video_ids: video ? [video] : [],
+      video_kind: (videoKind || undefined) as Filters["video_kind"],
       sentiments: sentiment ? [sentiment as Label] : [],
-      from: from ? new Date(from + "T00:00:00+03:00").toISOString() : undefined,
-      to: to ? new Date(to + "T00:00:00+03:00").toISOString() : undefined,
+      replies,
+      date_mode: dateMode,
+      comment_type: commentType || undefined,
+      review_status: reviewStatus,
+      from:
+        ranged && from
+          ? new Date(from + "T00:00:00+03:00").toISOString()
+          : undefined,
+      to:
+        ranged && to
+          ? new Date(to + "T00:00:00+03:00").toISOString()
+          : undefined,
     });
   }
   function reset() {
@@ -130,6 +163,11 @@ export function Dashboard() {
     setFrom("");
     setTo("");
     setFormError("");
+    setReplies("all");
+    setDateMode("all");
+    setVideoKind("");
+    setCommentType("");
+    setReviewStatus("all");
     setCursorNotice(false);
     setCursors([]);
     setLimit(25);
@@ -145,6 +183,10 @@ export function Dashboard() {
           لا توجد قناة متصلة أو نتائج نموذج حي. هذا هيكل وظيفي مؤقت بانتظار
           ملفات التصميم الأصلية.
         </p>
+        <p data-testid="data-mode">
+          تسجيل الدخول لا يغيّر مصدر هذه البيانات. حتى مع ضبط حساب Supabase،
+          تبقى هذه الشاشة على بيانات الاختبار ولا تُرسل تصحيحاتها إلى أي خادم.
+        </p>
       </aside>
       <form onSubmit={apply} className="filters">
         <label>
@@ -157,7 +199,11 @@ export function Dashboard() {
         </label>
         <label>
           الفيديو
-          <select value={video} onChange={(e) => setVideo(e.target.value)}>
+          <select
+            aria-label="الفيديو"
+            value={video}
+            onChange={(e) => setVideo(e.target.value)}
+          >
             <option value="">كل الفيديوهات</option>
             <option value="video-1">فيديو اصطناعي ١</option>
             <option value="video-2">فيديو اصطناعي ٢</option>
@@ -166,6 +212,7 @@ export function Dashboard() {
         <label>
           المشاعر
           <select
+            aria-label="المشاعر"
             value={sentiment}
             onChange={(e) => setSentiment(e.target.value)}
           >
@@ -178,10 +225,83 @@ export function Dashboard() {
           </select>
         </label>
         <label>
+          نوع الفيديو
+          <select
+            aria-label="نوع الفيديو"
+            value={videoKind}
+            onChange={(e) => setVideoKind(e.target.value)}
+          >
+            <option value="">كل الأنواع</option>
+            <option value="video">فيديو</option>
+            <option value="short">شورت</option>
+            <option value="stream">بث</option>
+          </select>
+        </label>
+        <label>
+          نوع المشاركة
+          <select
+            aria-label="نوع المشاركة"
+            value={replies}
+            onChange={(e) =>
+              setReplies(e.target.value as "all" | "comments" | "replies")
+            }
+          >
+            <option value="all">تعليقات وردود</option>
+            <option value="comments">تعليقات أصلية فقط</option>
+            <option value="replies">ردود فقط</option>
+          </select>
+        </label>
+        <label>
+          نوع التعليق
+          <select
+            aria-label="نوع التعليق"
+            value={commentType}
+            onChange={(e) => setCommentType(e.target.value)}
+          >
+            <option value="">كل الأنواع</option>
+            {(result.data?.comment_types ?? []).map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          حالة المراجعة
+          <select
+            aria-label="حالة المراجعة"
+            value={reviewStatus}
+            onChange={(e) =>
+              setReviewStatus(
+                e.target.value as "all" | "reviewed" | "unreviewed",
+              )
+            }
+          >
+            <option value="all">الكل</option>
+            <option value="reviewed">مراجَعة بشريًا</option>
+            <option value="unreviewed">دون مراجعة</option>
+          </select>
+        </label>
+        <label>
+          التاريخ
+          <select
+            aria-label="التاريخ"
+            value={dateMode}
+            onChange={(e) =>
+              setDateMode(e.target.value as "all" | "known" | "unknown")
+            }
+          >
+            <option value="all">كل التواريخ</option>
+            <option value="known">التواريخ المعروفة</option>
+            <option value="unknown">بلا تاريخ معروف</option>
+          </select>
+        </label>
+        <label>
           من تاريخ
           <input
             type="date"
             value={from}
+            disabled={dateMode === "unknown"}
             onChange={(e) => setFrom(e.target.value)}
           />
         </label>
@@ -190,12 +310,14 @@ export function Dashboard() {
           <input
             type="date"
             value={to}
+            disabled={dateMode === "unknown"}
             onChange={(e) => setTo(e.target.value)}
           />
         </label>
         <label>
           عدد التعليقات في الصفحة
           <select
+            aria-label="عدد التعليقات في الصفحة"
             value={limit}
             onChange={(e) => {
               goTo([]);
@@ -254,7 +376,7 @@ export function Dashboard() {
             </article>
             <article>
               <h2>الردود</h2>
-              <strong>{s.replies}</strong>
+              <strong data-testid="replies-count">{s.replies}</strong>
             </article>
           </section>
           {s.total === 0 ? (
@@ -272,7 +394,7 @@ export function Dashboard() {
                     مستقلة.
                   </p>
                   {s.analysed > 0 && (
-                    <div className="chart">
+                    <div className="chart" aria-hidden="true">
                       <Doughnut
                         data={{
                           labels: Object.values(labels),
@@ -311,10 +433,7 @@ export function Dashboard() {
                   <ul>
                     {s.videos.map((v) => (
                       <li key={v.id}>
-                        {v.id === "video-1"
-                          ? "فيديو اصطناعي ١"
-                          : "فيديو اصطناعي ٢"}
-                        : {v.total}
+                        {videoLabel(v.id)}: {v.total}
                       </li>
                     ))}
                   </ul>
@@ -327,10 +446,94 @@ export function Dashboard() {
                     ))}
                   </ul>
                   <p>معرّفات المؤلفين المتاحة: {s.unique_authors}</p>
-                  <p>تعليقات بلا تاريخ: {s.unknown_dates}</p>
+                  <p>
+                    تعليقات بلا تاريخ:{" "}
+                    <span data-testid="unknown-dates">{s.unknown_dates}</span>
+                  </p>
                 </article>
               </section>
-              <section>
+              <section aria-labelledby="comparison-heading">
+                <h2 id="comparison-heading">مقارنة الفيديوهات</h2>
+                <p className="muted" data-testid="comparison-scope">
+                  أرقام مشتقة من التعليقات ضمن الفلاتر الحالية فقط. ليست مؤشرات
+                  الفيديو الكلية: لتلك نطاق وتاريخ رصد مستقلان.
+                </p>
+                {s.comparison_truncated && (
+                  <p className="muted">
+                    تُقارَن الفيديوهات الأكثر تعليقًا فقط؛ بقية الفيديوهات ضمن
+                    الفلاتر غير معروضة هنا.
+                  </p>
+                )}
+                <div className="table-wrap">
+                  <table aria-label="مقارنة الفيديوهات ضمن الفلاتر">
+                    <thead>
+                      <tr>
+                        <th scope="col">الفيديو</th>
+                        <th scope="col">التعليقات</th>
+                        <th scope="col">الردود</th>
+                        <th scope="col">المحللة</th>
+                        <th scope="col">التوزيع</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {s.comparison.map((v) => (
+                        <tr key={v.id} data-testid={`compare-${v.id}`}>
+                          <td>{videoLabel(v.id)}</td>
+                          <td>{v.total}</td>
+                          <td>{v.replies}</td>
+                          <td>{v.analysed}</td>
+                          <td>
+                            {v.analysed === 0 ? (
+                              <small>لا توجد تعليقات محللة ضمن الفلاتر</small>
+                            ) : (
+                              <ul className="share">
+                                {Object.entries(v.sentiments).map(([k, n]) => (
+                                  <li key={k}>
+                                    {labels[k as Label]} {n} (
+                                    {Math.round((n / v.analysed) * 100)}٪)
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              <section
+                aria-labelledby="engaged-heading"
+                data-testid="engaged-panel"
+              >
+                <h2 id="engaged-heading">أكثر التعليقات السلبية تفاعلًا</h2>
+                <p className="muted">
+                  ترتيب حسب الإعجابات ضمن الفلاتر الحالية. الإعجابات لا تُرجِّح
+                  التصنيف، وقلب صاحب القناة ليس مشاعر إيجابية.
+                </p>
+                {s.most_engaged_negative.length === 0 ? (
+                  <p data-testid="engaged-empty">
+                    لا توجد تعليقات سلبية بإعجابات معروفة ضمن الفلاتر.
+                  </p>
+                ) : (
+                  <ol className="engaged">
+                    {s.most_engaged_negative.map((c) => (
+                      <li key={c.id} data-testid={`engaged-${c.id}`}>
+                        <strong>{c.likes_raw ?? c.likes_value}</strong> إعجابًا
+                        — {c.text_raw}
+                        {c.reviewed && <small>مراجعة بشرية</small>}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {s.negative_unranked > 0 && (
+                  <p className="muted" data-testid="engaged-unranked">
+                    {s.negative_unranked} تعليقًا سلبيًا بلا عدد إعجابات معروف،
+                    فلم تدخل الترتيب. عدد غير معروف ليس صفرًا.
+                  </p>
+                )}
+              </section>
+              <section data-testid="comments-table">
                 <h2>التعليقات</h2>
                 {cursorNotice && (
                   <p
@@ -342,14 +545,14 @@ export function Dashboard() {
                   </p>
                 )}
                 <div className="table-wrap">
-                  <table>
+                  <table aria-label="التعليقات ضمن الفلاتر">
                     <thead>
                       <tr>
-                        <th>المؤلف</th>
-                        <th>التعليق</th>
-                        <th>المشاعر</th>
-                        <th>التاريخ</th>
-                        <th>التصحيح</th>
+                        <th scope="col">المؤلف</th>
+                        <th scope="col">التعليق</th>
+                        <th scope="col">المشاعر</th>
+                        <th scope="col">التاريخ</th>
+                        <th scope="col">التصحيح</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -368,7 +571,7 @@ export function Dashboard() {
                           <td>
                             <button
                               type="button"
-                              onClick={() => startReview(c)}
+                              onClick={(e) => startReview(c, e.currentTarget)}
                               aria-label={`تصحيح تصنيف تعليق ${c.author_name}`}
                             >
                               تصحيح
@@ -382,6 +585,8 @@ export function Dashboard() {
                 {reviewing && (
                   <form
                     className="review"
+                    ref={reviewFormRef}
+                    tabIndex={-1}
                     aria-label="تصحيح التصنيف"
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -390,7 +595,7 @@ export function Dashboard() {
                   >
                     <h3>تصحيح تصنيف تعليق</h3>
                     <blockquote data-testid="review-text">
-                      {reviewing.text}
+                      {reviewing.text_raw}
                     </blockquote>
                     <p className="muted">
                       التصنيف الحالي:{" "}
@@ -398,9 +603,38 @@ export function Dashboard() {
                       التصحيح البشري يلغي تنبؤ النموذج لهذا النص، ويسقط تلقائيًا
                       إذا تغيّر نص التعليق لاحقًا.
                     </p>
+                    <div data-testid="review-history">
+                      <h4>سجل المراجعات</h4>
+                      {reviewing.reviews.length === 0 ? (
+                        <p className="muted">
+                          لا توجد مراجعات سابقة لهذا التعليق.
+                        </p>
+                      ) : (
+                        <ol className="history">
+                          {reviewHistory(reviewing).map(
+                            ({ review: r, state }, i) => (
+                              <li key={`${r.created_at}-${i}`}>
+                                <strong>{labels[r.label]}</strong>
+                                <span>{displayDate(r.created_at)}</span>
+                                <span data-testid="review-by">
+                                  {r.reviewer_id ?? "مراجع غير معروف"}
+                                </span>
+                                <small data-state={state}>
+                                  {reviewStateMessages[state]}
+                                </small>
+                                {r.reason && (
+                                  <q data-testid="review-reason">{r.reason}</q>
+                                )}
+                              </li>
+                            ),
+                          )}
+                        </ol>
+                      )}
+                    </div>
                     <label>
                       التصنيف الصحيح
                       <select
+                        aria-label="التصنيف الصحيح"
                         value={verdict}
                         onChange={(e) => setVerdict(e.target.value as Label)}
                       >
@@ -435,7 +669,7 @@ export function Dashboard() {
                         type="button"
                         onClick={() => {
                           review.reset();
-                          setReviewing(null);
+                          closeReview();
                         }}
                       >
                         إلغاء
@@ -522,7 +756,11 @@ export function Dashboard() {
                         <span>
                           {b.used} من {b.allowance} — يتبقى {b.remaining}
                         </span>
-                        <progress max={b.allowance || 1} value={b.used} />
+                        <progress
+                          max={b.allowance || 1}
+                          value={b.used}
+                          aria-hidden="true"
+                        />
                         <small data-state={state}>
                           {share}٪ — {budgetMessages[state]}
                         </small>
@@ -533,13 +771,50 @@ export function Dashboard() {
               </>
             )}
           </section>
-          <section className="notice">
-            <h2>حالة الاتصال والجمع</h2>
-            <p>
-              لا يوجد عامل متصل. لم تُنفذ مزامنة حية. مصدر هذه الشاشة: ملفات
-              اختبار محلية.
-            </p>
-          </section>
+          {(() => {
+            const health = syncHealth(s.sync, new Date());
+            const run = s.sync?.last_run ?? null;
+            return (
+              <section
+                className="notice"
+                aria-labelledby="sync-heading"
+                data-testid="sync-panel"
+              >
+                <h2 id="sync-heading">صحة المزامنة</h2>
+                <p data-testid="sync-state" data-severity={health.severity}>
+                  <strong>{syncMessages[health.key]}</strong>
+                </p>
+                {health.errorCode && (
+                  <p data-testid="sync-error">
+                    {syncErrorMessages[health.errorCode] ??
+                      "تعذّرت المزامنة لسبب غير مصنَّف"}{" "}
+                    (<code>{health.errorCode}</code>)
+                  </p>
+                )}
+                {health.queued > 0 && (
+                  <p data-testid="sync-queued">مهام منتظرة: {health.queued}</p>
+                )}
+                <p data-testid="sync-worker">
+                  العامل:{" "}
+                  {s.sync?.worker.connected
+                    ? `متصل، آخر نبضة ${displayDate(s.sync.worker.last_heartbeat_at)}`
+                    : "غير متصل. لا يعمل جهاز مطوّر مغلق على مدار الساعة، ولا تُحدَّث البيانات حتى يعود."}
+                </p>
+                {run ? (
+                  <p data-testid="sync-last-run">
+                    آخر تشغيل: {displayDate(run.started_at)} — المصدر{" "}
+                    {run.source} — فيديوهات {run.coverage.videos_seen}، تعليقات{" "}
+                    {run.coverage.comments_collected}.{" "}
+                    {run.coverage.complete
+                      ? "اكتمل اجتياز المصدر."
+                      : "لم يُثبت اجتياز المصدر بالكامل."}
+                  </p>
+                ) : (
+                  <p data-testid="sync-last-run">لا يوجد تشغيل سابق مسجَّل.</p>
+                )}
+              </section>
+            );
+          })()}
         </>
       )}
     </>

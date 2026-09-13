@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  CommentSchema,
   CommentReviewInputSchema,
+  ReviewSchema,
   FiltersSchema,
   PredictionSchema,
   applyReview,
@@ -19,6 +21,8 @@ const base = {
   author_name: "كاتب تجريبي",
   text_raw: "تعليق تجريبي",
   content_hash: "current",
+  likes_raw: "0",
+  likes_value: 0,
   published_at: "2026-09-01T00:00:00Z",
   published_time_raw: "2026-09-01T00:00:00Z",
   timestamp_precision: "second" as const,
@@ -31,6 +35,7 @@ const base = {
   reviews: [],
   prediction: null,
 };
+const predNeg = () => ({ ...pred("positive"), label: "negative" as const });
 const pred = (label: "positive" | "mixed", hash = "current") => ({
   status: "succeeded" as const,
   label,
@@ -112,6 +117,8 @@ describe("dashboard contract", () => {
           content_hash: "old",
           created_at: "2026-09-03T00:00:00Z",
           origin: "human" as const,
+          reviewer_id: "reviewer-1",
+          reason: "تصنيف خاطئ",
         },
       ],
     };
@@ -180,6 +187,8 @@ describe("dashboard contract", () => {
           content_hash: "current",
           created_at: "2026-09-03T00:00:00Z",
           origin: "legacy_unverified" as const,
+          reviewer_id: null,
+          reason: null,
         },
       ],
       prediction: {
@@ -244,11 +253,12 @@ describe("human corrections", () => {
   const at = "2026-09-05T00:00:00Z";
 
   it("appends rather than replacing, and the newest current review wins", () => {
-    const once = applyReview(rows, review, at);
+    const once = applyReview(rows, review, at, "reviewer-1");
     const twice = applyReview(
       once,
       { ...review, label: "mixed" },
       "2026-09-06T00:00:00Z",
+      "reviewer-1",
     );
     const target = twice.find((c) => c.id === "1")!;
     expect(target.reviews).toHaveLength(2);
@@ -264,7 +274,7 @@ describe("human corrections", () => {
   it("moves the comment between buckets without changing the total", () => {
     const before = snapshot(rows, { workspace_id: workspace }, "fixture-v1");
     const after = snapshot(
-      applyReview(rows, review, at),
+      applyReview(rows, review, at, "reviewer-1"),
       { workspace_id: workspace },
       "fixture-v1",
     );
@@ -286,7 +296,7 @@ describe("human corrections", () => {
 
   it("makes a previously unanalysed comment count once it is reviewed", () => {
     const after = snapshot(
-      applyReview(rows, { ...review, comment_id: "4" }, at),
+      applyReview(rows, { ...review, comment_id: "4" }, at, "reviewer-1"),
       { workspace_id: workspace },
       "fixture-v1",
     );
@@ -296,7 +306,7 @@ describe("human corrections", () => {
   });
 
   it("is visible to the review_status filter through the same snapshot", () => {
-    const reviewed = applyReview(rows, review, at);
+    const reviewed = applyReview(rows, review, at, "reviewer-1");
     expect(
       snapshot(
         reviewed,
@@ -315,23 +325,258 @@ describe("human corrections", () => {
 
   it("refuses a verdict written against text that has since changed", () => {
     expect(() =>
-      applyReview(rows, { ...review, content_hash: "old" }, at),
+      applyReview(rows, { ...review, content_hash: "old" }, at, "reviewer-1"),
     ).toThrow("stale_comment_text");
   });
 
   it("refuses an unknown comment, another workspace, and an empty reason", () => {
     expect(() =>
-      applyReview(rows, { ...review, comment_id: "404" }, at),
+      applyReview(rows, { ...review, comment_id: "404" }, at, "reviewer-1"),
     ).toThrow("invalid_comment");
     // Row 5 exists but belongs to another workspace.
-    expect(() => applyReview(rows, { ...review, comment_id: "5" }, at)).toThrow(
-      "invalid_comment",
-    );
+    expect(() =>
+      applyReview(rows, { ...review, comment_id: "5" }, at, "reviewer-1"),
+    ).toThrow("invalid_comment");
     expect(
       CommentReviewInputSchema.safeParse({ ...review, reason: "   " }).success,
     ).toBe(false);
     expect(
       CommentReviewInputSchema.safeParse({ ...review, label: "angry" }).success,
     ).toBe(false);
+  });
+  it("records who reviewed and why, taking the identity from the caller", () => {
+    const applied = applyReview(rows, review, at, "reviewer-7");
+    const entry = applied.find((c) => c.id === "1")!.reviews[0];
+    expect(entry.reviewer_id).toBe("reviewer-7");
+    expect(entry.reason).toBe("تصنيف خاطئ");
+    // The identity must not be forgeable through the payload, matching the RPC
+    // which takes it from the session rather than from the caller's fields.
+    expect(
+      CommentReviewInputSchema.safeParse({
+        ...review,
+        reviewer_id: "someone-else",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a human verdict to state a reason, but not a legacy amendment", () => {
+    const human = {
+      label: "negative" as const,
+      content_hash: "current",
+      created_at: at,
+      origin: "human" as const,
+      reviewer_id: "reviewer-7",
+      reason: "سبب",
+    };
+    expect(ReviewSchema.safeParse(human).success).toBe(true);
+    expect(ReviewSchema.safeParse({ ...human, reason: null }).success).toBe(
+      false,
+    );
+    expect(ReviewSchema.safeParse({ ...human, reason: "   " }).success).toBe(
+      false,
+    );
+    // An imported amendment has no reviewer and no stated reason, and that is
+    // exactly why it is not human-reviewed truth.
+    expect(
+      ReviewSchema.safeParse({
+        ...human,
+        origin: "legacy_unverified",
+        reviewer_id: null,
+        reason: null,
+      }).success,
+    ).toBe(true);
+  });
+  it("offers the comment types present in the workspace, not in the page", () => {
+    const typed: Comment[] = [
+      { ...base, id: "t1", comment_type: "سؤال" },
+      { ...base, id: "t2", comment_type: "اقتراح", video_id: "v2" },
+      { ...base, id: "t3", comment_type: "سؤال" },
+      { ...base, id: "t4", comment_type: null },
+      {
+        ...base,
+        id: "t5",
+        comment_type: "نوع آخر",
+        workspace_id: "00000000-0000-4000-8000-000000000002",
+      },
+    ];
+    const all = snapshot(typed, { workspace_id: workspace }, "fixture-v1");
+    // Distinct, sorted, nulls dropped, and another workspace never leaks in.
+    expect(all.comment_types).toEqual(["اقتراح", "سؤال"]);
+
+    // The list must not narrow with the filters, or a type that is currently
+    // filtered out could never be selected again.
+    const narrowed = snapshot(
+      typed,
+      { workspace_id: workspace, comment_type: "سؤال", limit: 1 },
+      "fixture-v1",
+    );
+    expect(narrowed.total).toBe(2);
+    expect(narrowed.comments).toHaveLength(1);
+    expect(narrowed.comment_types).toEqual(["اقتراح", "سؤال"]);
+
+    // Same when a video filter excludes the only comment of a type.
+    const oneVideo = snapshot(
+      typed,
+      { workspace_id: workspace, video_ids: ["v2"] },
+      "fixture-v1",
+    );
+    expect(oneVideo.total).toBe(1);
+    expect(oneVideo.comment_types).toEqual(["اقتراح", "سؤال"]);
+  });
+  it("ranks the most engaged negatives without letting likes touch the label", () => {
+    const liked: Comment[] = [
+      { ...base, id: "e1", likes_value: 500, prediction: pred("positive") },
+      { ...base, id: "e2", likes_value: 90, prediction: predNeg() },
+      { ...base, id: "e3", likes_value: 400, prediction: predNeg() },
+      {
+        ...base,
+        id: "e4",
+        likes_value: null,
+        likes_raw: null,
+        prediction: predNeg(),
+      },
+    ];
+    const s = snapshot(liked, { workspace_id: workspace }, "fixture-v1");
+    // Highest engagement first, and the heavily liked positive stays out.
+    expect(s.most_engaged_negative.map((c) => c.id)).toEqual(["e3", "e2"]);
+    // Unknown engagement is not zero engagement, so it is not ranked last —
+    // it is not ranked at all, and the exclusion is reported.
+    expect(s.negative_unranked).toBe(1);
+
+    // Likes must never weight sentiment: a creator's heart is not a vote.
+    const unliked = liked.map((c) => ({
+      ...c,
+      likes_value: null,
+      likes_raw: null,
+    }));
+    const without = snapshot(
+      unliked,
+      { workspace_id: workspace },
+      "fixture-v1",
+    );
+    expect(without.sentiments).toEqual(s.sentiments);
+    expect(without.analysed).toBe(s.analysed);
+    expect(without.most_engaged_negative).toHaveLength(0);
+    expect(without.negative_unranked).toBe(3);
+  });
+
+  it("ranks by the effective label, and follows the filters", () => {
+    const liked: Comment[] = [
+      {
+        ...base,
+        id: "e5",
+        likes_value: 10,
+        prediction: pred("positive"),
+        reviews: [
+          {
+            label: "negative" as const,
+            content_hash: "current",
+            created_at: "2026-09-05T00:00:00Z",
+            origin: "human" as const,
+            reviewer_id: "reviewer-1",
+            reason: "تصنيف خاطئ",
+          },
+        ],
+      },
+      {
+        ...base,
+        id: "e6",
+        likes_value: 99,
+        video_id: "v2",
+        prediction: predNeg(),
+      },
+    ];
+    const all = snapshot(liked, { workspace_id: workspace }, "fixture-v1");
+    // A corrected comment is negative for ranking too, not only in the table.
+    expect(all.most_engaged_negative.map((c) => c.id)).toEqual(["e6", "e5"]);
+    const oneVideo = snapshot(
+      liked,
+      { workspace_id: workspace, video_ids: ["v1"] },
+      "fixture-v1",
+    );
+    expect(oneVideo.most_engaged_negative.map((c) => c.id)).toEqual(["e5"]);
+  });
+
+  it("refuses a negative like count", () => {
+    expect(
+      CommentSchema.safeParse({ ...base, id: "x", likes_value: -1 }).success,
+    ).toBe(false);
+    expect(
+      CommentSchema.safeParse({ ...base, id: "x", likes_value: 1.5 }).success,
+    ).toBe(false);
+    // Unknown engagement is legitimate; a scraped "1.2K" that could not be
+    // parsed keeps its raw form with no invented number.
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "x",
+        likes_raw: "1.2K",
+        likes_value: null,
+      }).success,
+    ).toBe(true);
+  });
+  it("aggregates each video in the same pass, on its own denominator", () => {
+    const across: Comment[] = [
+      { ...base, id: "v1a", video_id: "v1", prediction: pred("positive") },
+      { ...base, id: "v1b", video_id: "v1", prediction: predNeg() },
+      {
+        ...base,
+        id: "v1c",
+        video_id: "v1",
+        is_reply: true,
+        prediction: pred("positive"),
+      },
+      { ...base, id: "v2a", video_id: "v2", prediction: pred("positive") },
+      // No usable prediction: counted, but outside its video's denominator.
+      { ...base, id: "v2b", video_id: "v2" },
+      {
+        ...base,
+        id: "v3a",
+        video_id: "v3",
+        prediction: pred("positive", "old"),
+      },
+    ];
+    const s = snapshot(across, { workspace_id: workspace }, "fixture-v1");
+
+    // Busiest first, ties broken by id so the order is deterministic.
+    expect(s.videos.map((v) => v.id)).toEqual(["v1", "v2", "v3"]);
+
+    const v1 = s.videos.find((v) => v.id === "v1")!;
+    expect(v1).toMatchObject({ total: 3, analysed: 3, replies: 1 });
+    expect(v1.sentiments).toEqual({
+      positive: 2,
+      negative: 1,
+      neutral: 0,
+      mixed: 0,
+    });
+
+    // v2 is 1 of 2 analysed, so its share is 100% while the whole set is 4 of 6.
+    const v2 = s.videos.find((v) => v.id === "v2")!;
+    expect(v2).toMatchObject({ total: 2, analysed: 1, replies: 0 });
+    expect(v2.sentiments.positive).toBe(1);
+    expect(s.analysed).toBe(4);
+
+    // A video whose only prediction is stale has nothing to divide by.
+    expect(s.videos.find((v) => v.id === "v3")).toMatchObject({
+      total: 1,
+      analysed: 0,
+    });
+
+    // Per-video totals reconcile with the overall total.
+    expect(s.videos.reduce((n, v) => n + v.total, 0)).toBe(s.total);
+    expect(s.videos.reduce((n, v) => n + v.analysed, 0)).toBe(s.analysed);
+  });
+
+  it("drops a video entirely when the filters exclude all of its comments", () => {
+    const across: Comment[] = [
+      { ...base, id: "f1", video_id: "v1", is_reply: true },
+      { ...base, id: "f2", video_id: "v2" },
+    ];
+    const replies = snapshot(
+      across,
+      { workspace_id: workspace, replies: "replies" },
+      "fixture-v1",
+    );
+    expect(replies.videos.map((v) => v.id)).toEqual(["v1"]);
   });
 });
