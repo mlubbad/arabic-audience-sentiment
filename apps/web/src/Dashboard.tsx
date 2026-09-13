@@ -20,6 +20,7 @@ import {
   budgetNames,
   budgetMessages,
   reviewStateMessages,
+  videoLabel,
   displayDate,
 } from "./i18n";
 import { reviewHistory } from "./reviewHistory";
@@ -418,10 +419,7 @@ export function Dashboard() {
                   <ul>
                     {s.videos.map((v) => (
                       <li key={v.id}>
-                        {v.id === "video-1"
-                          ? "فيديو اصطناعي ١"
-                          : "فيديو اصطناعي ٢"}
-                        : {v.total}
+                        {videoLabel(v.id)}: {v.total}
                       </li>
                     ))}
                   </ul>
@@ -435,13 +433,62 @@ export function Dashboard() {
                   </ul>
                   <p>معرّفات المؤلفين المتاحة: {s.unique_authors}</p>
                   <p>
-                    \n تعليقات بلا تاريخ: \n{" "}
+                    تعليقات بلا تاريخ:{" "}
                     <span data-testid="unknown-dates">{s.unknown_dates}</span>
-                    \n{" "}
                   </p>
                 </article>
               </section>
-              <section>
+              <section aria-labelledby="comparison-heading">
+                <h2 id="comparison-heading">مقارنة الفيديوهات</h2>
+                <p className="muted" data-testid="comparison-scope">
+                  أرقام مشتقة من التعليقات ضمن الفلاتر الحالية فقط. ليست مؤشرات
+                  الفيديو الكلية: لتلك نطاق وتاريخ رصد مستقلان.
+                </p>
+                {s.comparison_truncated && (
+                  <p className="muted">
+                    تُقارَن الفيديوهات الأكثر تعليقًا فقط؛ بقية الفيديوهات ضمن
+                    الفلاتر غير معروضة هنا.
+                  </p>
+                )}
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>الفيديو</th>
+                        <th>التعليقات</th>
+                        <th>الردود</th>
+                        <th>المحللة</th>
+                        <th>التوزيع</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {s.comparison.map((v) => (
+                        <tr key={v.id} data-testid={`compare-${v.id}`}>
+                          <td>{videoLabel(v.id)}</td>
+                          <td>{v.total}</td>
+                          <td>{v.replies}</td>
+                          <td>{v.analysed}</td>
+                          <td>
+                            {v.analysed === 0 ? (
+                              <small>لا توجد تعليقات محللة ضمن الفلاتر</small>
+                            ) : (
+                              <ul className="share">
+                                {Object.entries(v.sentiments).map(([k, n]) => (
+                                  <li key={k}>
+                                    {labels[k as Label]} {n} (
+                                    {Math.round((n / v.analysed) * 100)}٪)
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              <section data-testid="comments-table">
                 <h2>التعليقات</h2>
                 {cursorNotice && (
                   <p

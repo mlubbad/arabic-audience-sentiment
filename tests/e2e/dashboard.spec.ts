@@ -66,7 +66,8 @@ test("paginates with cursors without changing totals or repeating rows", async (
 }) => {
   await page.goto("/");
   await expect(page.getByTestId("total")).toHaveText("6");
-  const rows = () => page.locator("tbody tr td:nth-child(2)");
+  const rows = () =>
+    page.locator('[data-testid="comments-table"] tbody tr td:nth-child(2)');
 
   // 25 per page holds the whole fixture, so there is nothing to page through.
   await expect(
@@ -149,7 +150,9 @@ test("recovers to page one when the row a cursor points at disappears", async ({
 }) => {
   await page.goto("/");
   await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
-  await expect(page.locator("tbody tr")).toHaveCount(5);
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr'),
+  ).toHaveCount(5);
 
   // The dataset shrinks before the next page is requested, so the cursor names a
   // row that no longer exists. This is the real backend case, not a UI mistake.
@@ -166,7 +169,9 @@ test("recovers to page one when the row a cursor points at disappears", async ({
   );
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 1");
   await expect(page.getByTestId("total")).toHaveText("2");
-  await expect(page.locator("tbody tr")).toHaveCount(2);
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr'),
+  ).toHaveCount(2);
   // The stack came back with it, so "previous" is not offering a page that is gone.
   await expect(
     page.getByRole("button", { name: "الصفحة السابقة" }),
@@ -184,7 +189,7 @@ test("a human correction overrides the model and moves every aggregate together"
   await expect(distribution).toHaveText("إيجابي: 1 (25٪)");
 
   // Row one is the model's single positive comment.
-  const row = page.locator("tbody tr").first();
+  const row = page.locator('[data-testid="comments-table"] tbody tr').first();
   await expect(row).toContainText("إيجابي");
   await row.getByRole("button", { name: "تصحيح" }).click();
 
@@ -201,8 +206,12 @@ test("a human correction overrides the model and moves every aggregate together"
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
 
   // The corrected label replaces the prediction and is marked as human.
-  await expect(page.locator("tbody tr").first()).toContainText("سلبي");
-  await expect(page.locator("tbody tr").first()).toContainText("مراجعة بشرية");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).toContainText("سلبي");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).toContainText("مراجعة بشرية");
   // The denominator is unchanged, but the buckets moved with the verdict.
   await expect(distribution).toHaveText("إيجابي: 0 (0٪)");
   await expect(
@@ -220,7 +229,7 @@ test("correcting an unanalysed comment adds it to the sentiment denominator", as
 
   // This row has no usable prediction, so it is outside the denominator.
   const row = page
-    .locator("tbody tr")
+    .locator('[data-testid="comments-table"] tbody tr')
     .filter({ hasText: "تعليق لم يُحلل بعد" });
   await expect(row).toContainText("غير محلل / قديم");
   await row.getByRole("button", { name: "تصحيح" }).click();
@@ -240,7 +249,7 @@ test("refuses a correction written against text that changed meanwhile", async (
   page,
 }) => {
   await page.goto("/");
-  const row = page.locator("tbody tr").first();
+  const row = page.locator('[data-testid="comments-table"] tbody tr').first();
   await row.getByRole("button", { name: "تصحيح" }).click();
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
 
@@ -258,9 +267,9 @@ test("refuses a correction written against text that changed meanwhile", async (
     "تغيّر نص التعليق",
   );
   // Nothing was recorded, so the model's label still stands.
-  await expect(page.locator("tbody tr").first()).not.toContainText(
-    "مراجعة بشرية",
-  );
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).not.toContainText("مراجعة بشرية");
 });
 
 async function downloadCsv(page: import("@playwright/test").Page) {
@@ -283,7 +292,9 @@ test("exports every filtered comment, not just the visible page", async ({
   await expect(page.getByTestId("total")).toHaveText("6");
   // Shrink the page so a page-limited export would be obviously wrong.
   await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
-  await expect(page.locator("tbody tr")).toHaveCount(5);
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr'),
+  ).toHaveCount(5);
 
   const all = await downloadCsv(page);
   expect(all.name).toMatch(/^comments-\d{4}-\d{2}-\d{2}\.csv$/);
@@ -305,12 +316,14 @@ test("exports the corrected label rather than the superseded prediction", async 
   page,
 }) => {
   await page.goto("/");
-  const row = page.locator("tbody tr").first();
+  const row = page.locator('[data-testid="comments-table"] tbody tr').first();
   await row.getByRole("button", { name: "تصحيح" }).click();
   await page.getByLabel("التصنيف الصحيح").selectOption("negative");
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
-  await expect(page.locator("tbody tr").first()).toContainText("مراجعة بشرية");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).toContainText("مراجعة بشرية");
 
   const { text } = await downloadCsv(page);
   const line = text.split("\r\n").find((l) => l.startsWith("fixture-1,"))!;
@@ -328,7 +341,9 @@ test("neutralises spreadsheet formulas in the file but not on screen", async ({
   });
   await page.goto("/");
   // The dashboard shows the real stored text, escaped as text by React.
-  await expect(page.locator("tbody tr").first()).toContainText(attack);
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).toContainText(attack);
 
   const { text } = await downloadCsv(page);
   const line = text.split("\r\n").find((l) => l.startsWith("fixture-1,"))!;
@@ -420,13 +435,21 @@ test("separates replies from top-level comments", async ({ page }) => {
 test("separates known from unknown publication dates", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("unknown-dates")).toHaveText("1");
+  // Assert the rendered sentence, not just the number: a test that only reads
+  // the span passed while the surrounding text rendered literal escape
+  // characters on screen.
+  await expect(
+    page.getByText("تعليقات بلا تاريخ: 1", { exact: true }),
+  ).toBeVisible();
   await applyFilter(page, "التاريخ", "known");
   await expect(page.getByTestId("total")).toHaveText("5");
   await expect(page.getByTestId("unknown-dates")).toHaveText("0");
   await applyFilter(page, "التاريخ", "unknown");
   await expect(page.getByTestId("total")).toHaveText("1");
   // A comment with no date is still a comment, not a defect.
-  await expect(page.locator("tbody tr")).toContainText("تعليق لم يُحلل بعد");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr'),
+  ).toContainText("تعليق لم يُحلل بعد");
 });
 
 test("a date range and an explicit unknown-date selection cannot contradict", async ({
@@ -462,7 +485,9 @@ test("filters by comment type using the types actually present", async ({
   ]);
   await applyFilter(page, "نوع التعليق", "سؤال");
   await expect(page.getByTestId("total")).toHaveText("1");
-  await expect(page.locator("tbody tr")).toContainText("معلومة عن موعد الحلقة");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr'),
+  ).toContainText("معلومة عن موعد الحلقة");
 });
 
 test("filters by review status and resets every control together", async ({
@@ -473,12 +498,14 @@ test("filters by review status and resets every control together", async ({
   await expect(page.getByTestId("total")).toHaveText("0");
 
   await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
-  const row = page.locator("tbody tr").first();
+  const row = page.locator('[data-testid="comments-table"] tbody tr').first();
   await row.getByRole("button", { name: "تصحيح" }).click();
   await page.getByLabel("التصنيف الصحيح").selectOption("negative");
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
-  await expect(page.locator("tbody tr").first()).toContainText("مراجعة بشرية");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).toContainText("مراجعة بشرية");
 
   await applyFilter(page, "حالة المراجعة", "reviewed");
   await expect(page.getByTestId("total")).toHaveText("1");
@@ -512,7 +539,7 @@ async function openReview(
   rowText: string,
 ) {
   await page
-    .locator("tbody tr")
+    .locator('[data-testid="comments-table"] tbody tr')
     .filter({ hasText: rowText })
     .getByRole("button", { name: "تصحيح" })
     .click();
@@ -533,7 +560,9 @@ test("says a correction no longer applies once the text changed", async ({
 }) => {
   await page.goto("/");
   // This row carries a human verdict made against text that was later edited.
-  const row = page.locator("tbody tr").filter({ hasText: "هذا النص تغير" });
+  const row = page
+    .locator('[data-testid="comments-table"] tbody tr')
+    .filter({ hasText: "هذا النص تغير" });
   await expect(row).toContainText("غير محلل / قديم");
   await expect(row).not.toContainText("مراجعة بشرية");
 
@@ -552,7 +581,9 @@ test("marks a legacy amendment as unverified rather than a human review", async 
   page,
 }) => {
   await page.goto("/");
-  const row = page.locator("tbody tr").filter({ hasText: "موعد الحلقة" });
+  const row = page
+    .locator('[data-testid="comments-table"] tbody tr')
+    .filter({ hasText: "موعد الحلقة" });
   // It must not be counted as a human review, and the model label still stands.
   await expect(row).toContainText("محايد");
   await expect(row).not.toContainText("مراجعة بشرية");
@@ -577,13 +608,17 @@ test("keeps every verdict and marks which one is in force", async ({
   await page.getByLabel("التصنيف الصحيح").selectOption("negative");
   await page.getByLabel("سبب التصحيح").fill("أول تصحيح");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
-  await expect(page.locator("tbody tr").first()).toContainText("مراجعة بشرية");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).toContainText("مراجعة بشرية");
 
   await openReview(page, "المحتوى واضح ومفيد");
   await page.getByLabel("التصنيف الصحيح").selectOption("mixed");
   await page.getByLabel("سبب التصحيح").fill("إعادة نظر");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
-  await expect(page.locator("tbody tr").first()).toContainText("مختلط");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr').first(),
+  ).toContainText("مختلط");
 
   await openReview(page, "المحتوى واضح ومفيد");
   const entries = page.getByTestId("review-history").getByRole("listitem");
@@ -599,5 +634,55 @@ test("keeps every verdict and marks which one is in force", async ({
   await expect(entries.nth(1).locator("small")).toHaveAttribute(
     "data-state",
     "superseded_by_review",
+  );
+});
+
+test("compares videos using each video's own denominator", async ({ page }) => {
+  await page.goto("/");
+  const one = page.getByTestId("compare-video-1");
+  const two = page.getByTestId("compare-video-2");
+  await expect(one).toContainText("4");
+  await expect(two).toContainText("2");
+
+  // Every comment on video-2 is unanalysed, so it must say so rather than
+  // render 0% positive as though that had been measured.
+  await expect(two).toContainText("لا توجد تعليقات محللة");
+  await expect(one).toContainText("إيجابي 1 (25٪)");
+
+  // Give video-2 exactly one analysed comment, so the two videos no longer
+  // share a denominator with each other or with the whole filtered set.
+  await page
+    .locator('[data-testid="comments-table"] tbody tr')
+    .filter({ hasText: "تعليق لم يُحلل بعد" })
+    .getByRole("button", { name: "تصحيح" })
+    .click();
+  await page.getByLabel("التصنيف الصحيح").selectOption("positive");
+  await page.getByLabel("سبب التصحيح").fill("مراجعة يدوية");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+
+  // Whole set: 5 analysed, 2 positive -> 40%. video-2 alone: 1 of 1 -> 100%.
+  await expect(page.getByText("المقام: 5 تعليقًا")).toBeVisible();
+  await expect(two).toContainText("إيجابي 1 (100٪)");
+  await expect(one).toContainText("إيجابي 1 (25٪)");
+});
+
+test("the comparison follows the same filters as everything else", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("compare-video-2")).toBeVisible();
+  // video-2 has no replies, so it leaves the comparison entirely.
+  await applyFilter(page, "نوع المشاركة", "replies");
+  await expect(page.getByTestId("total")).toHaveText("2");
+  await expect(page.getByTestId("compare-video-1")).toContainText("2");
+  await expect(page.getByTestId("compare-video-2")).toHaveCount(0);
+});
+
+test("does not present comment-scoped figures as lifetime video metrics", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("comparison-scope")).toContainText(
+    "ضمن الفلاتر الحالية",
   );
 });

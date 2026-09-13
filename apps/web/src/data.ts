@@ -12,6 +12,10 @@ import {
 } from "@sentiment/contracts";
 export const fixtureWorkspace = "00000000-0000-4000-8000-000000000001";
 
+// A channel can have hundreds of videos; comparing all of them is neither
+// usable nor cheap. The busiest few are compared and the rest declared.
+const COMPARISON_LIMIT = 10;
+
 export type DataMode = "sanitized_fixture" | "live";
 
 /**
@@ -70,15 +74,43 @@ export async function loadSnapshot(filters: Filters, signal: AbortSignal) {
         .map((c) => c.comment_type as string),
     ),
   ].sort((a, b) => a.localeCompare(b, "ar"));
-  const build = (f: Filters, cursor_reset: boolean) => ({
-    ...snapshot(comments, f, fixture.active_analysis_key),
-    revision: fixture.revision,
-    comment_types,
-    // Plan state travels with the snapshot, so the limit on screen always
-    // belongs to the same read as the numbers beside it.
-    plan: fixture.plan,
-    cursor_reset,
-  });
+  // Per-video figures come from the same shared snapshot, run once per video
+  // with that video pinned. Filter semantics are then identical by
+  // construction rather than by a second implementation agreeing with the
+  // first. The cursor is dropped because it names a row in the unpinned set.
+  const compare = (f: Filters, videos: { id: string; total: number }[]) =>
+    videos
+      .slice()
+      .sort((a, b) => b.total - a.total || a.id.localeCompare(b.id, "en"))
+      .slice(0, COMPARISON_LIMIT)
+      .map((v) => {
+        const per = snapshot(
+          comments,
+          { ...f, video_ids: [v.id], cursor: undefined, limit: 1 },
+          fixture.active_analysis_key,
+        );
+        return {
+          id: v.id,
+          total: per.total,
+          analysed: per.analysed,
+          sentiments: per.sentiments,
+          replies: per.replies,
+        };
+      });
+  const build = (f: Filters, cursor_reset: boolean) => {
+    const base = snapshot(comments, f, fixture.active_analysis_key);
+    return {
+      ...base,
+      comparison: compare(f, base.videos),
+      comparison_truncated: base.videos.length > COMPARISON_LIMIT,
+      revision: fixture.revision,
+      comment_types,
+      // Plan state travels with the snapshot, so the limit on screen always
+      // belongs to the same read as the numbers beside it.
+      plan: fixture.plan,
+      cursor_reset,
+    };
+  };
   try {
     return build(filters, false);
   } catch (error) {

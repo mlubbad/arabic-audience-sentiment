@@ -34,3 +34,11 @@ export const reviewStateMessages: Record<string, string> = {
   superseded_by_edit: "لا تنطبق بعد تغيّر النص؛ تحتاج إعادة تدقيق",
   legacy_unverified: "تعديل موروث غير موثق؛ لا يُحتسب مراجعة بشرية",
 };
+const fixtureVideoNames: Record<string, string> = {
+  "video-1": "فيديو اصطناعي ١",
+  "video-2": "فيديو اصطناعي ٢",
+};
+/** Falls back to the identifier rather than guessing a name. */
+export function videoLabel(id: string) {
+  return fixtureVideoNames[id] ?? id;
+}

@@ -400,3 +400,61 @@ browser tests passing untouched. Without them the two most important states had 
 - `node scripts/check-ownership.mjs platform` — pass
 
 Four new browser tests and five new unit tests were confirmed failing before the code existed.
+
+## Video comparison (done, 2026-09-13)
+
+Per-video figures are computed by running the shared `snapshot()` once per video with that
+video pinned, rather than writing a second aggregation. Filter semantics are then identical
+**by construction** instead of by a second implementation happening to agree with the first.
+No shared-contract change was needed: `snapshot()` already accepts `video_ids`.
+
+Two correctness points.
+
+**Each video uses its own denominator.** The test proves it rather than asserting numbers
+that happen to coincide: it corrects one comment on video-2 so the whole set reads 5 analysed
+with 2 positive (40%) while video-2 alone reads 1 of 1 (100%). Sharing the global denominator
+would have shown 40% for both.
+
+**A video with nothing analysed says so.** video-2 renders "لا توجد تعليقات محللة ضمن
+الفلاتر" rather than 0% positive, which would read as a measurement that was never made —
+the same rule as a three-class model not reporting 0% Mixed.
+
+The panel also declares its scope: these are comment-derived figures under the current
+filters, explicitly not lifetime video metrics, which the specification requires to carry
+their own observation window. Comparison is capped at the ten busiest videos and says when
+it has truncated, since a channel can have hundreds.
+
+### Two defects found and fixed on the way
+
+**Literal escape characters were rendering on screen.** The undated-comments line displayed
+`\n تعليقات بلا تاريخ: 1 \n`. An earlier edit of mine had written escaped newlines into the
+JSX as text. The existing test passed because it asserted only the `<span>` holding the
+number, not the sentence around it. Found by looking at the page, not by a failing test. The
+test now asserts the rendered sentence, which would have caught it.
+
+**Every video other than `video-1` was labelled "فيديو اصطناعي ٢".** The old code was an
+inline ternary with no third branch, so a third video would have been silently mislabelled as
+the second. Replaced with a lookup that falls back to the identifier rather than guessing.
+
+### A selector fragility the new table exposed
+
+Adding a second table broke eleven passing tests that used a bare `locator("tbody tr")`.
+Three more kept passing only because the comparison table happens not to contain comment
+text. All nineteen are now scoped to `[data-testid="comments-table"]`; none of them depend on
+there being exactly one table any more.
+
+### Commands and results
+
+- `npm run check` — pass (36 unit across 6 files, 18 SQL, 23 worker, build, secret scan)
+- `npm run test:e2e` — 29 passed in 17.1s, on port 5199
+- `node scripts/check-ownership.mjs platform` — pass
+
+Three new browser tests were confirmed failing before the section existed.
+
+### Shared-contract requests arising
+
+`snapshot()` returns only `{id, total}` per video and there is no video title anywhere in the
+contract, so the comparison labels by identifier through a fixture-local lookup. For the live
+read path this needs either a per-video aggregate on `dashboard_snapshot` or a `videos`
+projection carrying title and kind — one snapshot call per video will not scale to a channel
+with 194 of them. Recorded here rather than worked around.

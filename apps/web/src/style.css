@@ -218,6 +218,14 @@ small {
   font-weight: 700;
   margin: 0.8rem 0 0.4rem;
 }
+.share {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
 .history {
   list-style: none;
   padding: 0;
