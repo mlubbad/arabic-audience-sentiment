@@ -488,6 +488,18 @@ test("filters by comment type using the types actually present", async ({
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
   ).toContainText("معلومة عن موعد الحلقة");
+  // The list must not shrink to the types left on screen, or the filter would
+  // be a one-way door: once narrowed, the other types could never be chosen.
+  await expect(page.getByLabel("نوع التعليق").locator("option")).toHaveText([
+    "كل الأنواع",
+    "اقتراح",
+    "سؤال",
+  ]);
+  await applyFilter(page, "نوع التعليق", "اقتراح");
+  await expect(page.getByTestId("total")).toHaveText("1");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr'),
+  ).toContainText("أتمنى تحسين الصوت");
 });
 
 test("filters by review status and resets every control together", async ({

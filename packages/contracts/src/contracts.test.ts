@@ -382,4 +382,41 @@ describe("human corrections", () => {
       }).success,
     ).toBe(true);
   });
+  it("offers the comment types present in the workspace, not in the page", () => {
+    const typed: Comment[] = [
+      { ...base, id: "t1", comment_type: "سؤال" },
+      { ...base, id: "t2", comment_type: "اقتراح", video_id: "v2" },
+      { ...base, id: "t3", comment_type: "سؤال" },
+      { ...base, id: "t4", comment_type: null },
+      {
+        ...base,
+        id: "t5",
+        comment_type: "نوع آخر",
+        workspace_id: "00000000-0000-4000-8000-000000000002",
+      },
+    ];
+    const all = snapshot(typed, { workspace_id: workspace }, "fixture-v1");
+    // Distinct, sorted, nulls dropped, and another workspace never leaks in.
+    expect(all.comment_types).toEqual(["اقتراح", "سؤال"]);
+
+    // The list must not narrow with the filters, or a type that is currently
+    // filtered out could never be selected again.
+    const narrowed = snapshot(
+      typed,
+      { workspace_id: workspace, comment_type: "سؤال", limit: 1 },
+      "fixture-v1",
+    );
+    expect(narrowed.total).toBe(2);
+    expect(narrowed.comments).toHaveLength(1);
+    expect(narrowed.comment_types).toEqual(["اقتراح", "سؤال"]);
+
+    // Same when a video filter excludes the only comment of a type.
+    const oneVideo = snapshot(
+      typed,
+      { workspace_id: workspace, video_ids: ["v2"] },
+      "fixture-v1",
+    );
+    expect(oneVideo.total).toBe(1);
+    expect(oneVideo.comment_types).toEqual(["اقتراح", "سؤال"]);
+  });
 });

@@ -86,6 +86,17 @@ export function exportRows(
 export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   const f = FiltersSchema.parse(raw);
   const rows = filteredRows(input, f, activeKey);
+  // Offered filter values come from the data, so a channel's own vocabulary
+  // drives the control instead of a hard-coded per-customer list. Scoped to the
+  // workspace but deliberately not to the other filters: narrowing this with
+  // the current selection would make a filtered-out type unselectable.
+  const comment_types = [
+    ...new Set(
+      input
+        .filter((c) => c.workspace_id === f.workspace_id && c.comment_type)
+        .map((c) => c.comment_type as string),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "ar"));
   const sentiments: Record<Label, number> = {
     positive: 0,
     negative: 0,
@@ -108,6 +119,7 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   const comments = rows.slice(cursorIndex + 1, cursorIndex + 1 + f.limit);
   return {
     mode: "sanitized_fixture" as const,
+    comment_types,
     total: rows.length,
     analysed,
     unanalysed: rows.length - analysed,

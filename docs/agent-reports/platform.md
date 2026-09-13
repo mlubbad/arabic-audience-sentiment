@@ -728,3 +728,29 @@ committed, so it was left alone.
 - `npm run test:e2e` — 42 passed in 22.4s on the default port, and 42 passed on 5199 while
   5173 was occupied
 - `node scripts/check-ownership.mjs platform` — pass
+
+## comment_types moved into snapshot (done, 2026-09-13)
+
+Second schema change in this lane. The available comment types were computed in
+`apps/web/src/data.ts`, which only worked because fixture mode reads every row. The live
+read path would have had no way to offer the same control, so the two modes would have
+diverged — the failure P1 existed to fix. `snapshot()` now returns `comment_types` and the
+app just renders what it is given.
+
+The property worth protecting is that the list is scoped to the **workspace, not to the
+active filters**. Narrowing it to what is on screen would make the filter a one-way door:
+once you picked a type, every other type would vanish from the list and you could not get
+back. Both halves are tested — a contract test proves the list is identical under a
+`comment_type` filter and under a video filter that excludes a type entirely, and the
+browser test now filters to one type, asserts the dropdown still offers all of them, and
+then switches to the other type to prove it is still reachable.
+
+Nulls are dropped and another workspace's types never appear.
+
+### Commands and results
+
+- `npm run check` — pass (48 unit across 7 files, 18 SQL, 23 worker, guard 5/5, build, secrets)
+- `npm run test:e2e` — 42 passed in 21.9s
+- `node scripts/check-ownership.mjs platform` — pass
+
+One contract test was confirmed failing before the move.
