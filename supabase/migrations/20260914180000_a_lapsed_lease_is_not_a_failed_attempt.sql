@@ -105,10 +105,16 @@ end $$;
 -- `worker_finish` already writes the cause into `error_code`; this keeps a copy
 -- that a subsequent claim will not overwrite, so the terminal code can name the
 -- last real failure instead of replacing it.
+--
+-- Rebuilt on the version from 20260914070000, not on the original. A
+-- `create or replace` is a whole-body rewrite: taking the function as it was
+-- first written and adding one line silently reverts every change made to it
+-- since. That is what the first draft of this migration did — it dropped the
+-- run-closing insert, and two tests in worker_gateway caught it.
 create or replace function private.worker_finish(
   token_hash text, j uuid, t uuid, outcome text, reason text) returns void
 language plpgsql security invoker set search_path='' as $$
-begin
+declare w uuid; ch uuid; begin
   perform private.worker_job(token_hash, j, t);
   if outcome not in ('succeeded','partial','failed','blocked','cancelled') then
     raise exception 'invalid_outcome' using errcode='22023'; end if;
@@ -119,7 +125,17 @@ begin
       else coalesce(reason, public.jobs.last_error) end,
     -- Releasing the lease is what makes a finished job unwritable.
     lease_token = null, lease_expires_at = null
-  where id = j;
+  where id = j
+  returning workspace_id, channel_id into w, ch;
+
+  insert into public.sync_runs(workspace_id, channel_id, job_id, mode, source,
+                               status, ended_at, error_code)
+  values (w, ch, j, 'collect', 'unknown', outcome, now(),
+          case when outcome = 'succeeded' then null else reason end)
+  on conflict (workspace_id, job_id) do update
+    set status = excluded.status,
+        ended_at = excluded.ended_at,
+        error_code = excluded.error_code;
 end $$;
 
 grant execute on function private.claim_job(uuid) to service_role;
