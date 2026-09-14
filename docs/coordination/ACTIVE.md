@@ -1,0 +1,153 @@
+# Working here alongside other agents
+
+Read this before writing anything. It is short because it is the set of things
+that have actually gone wrong in this checkout, not a policy.
+
+There is no message channel between the tools working on this repository —
+Claude Code, Antigravity and Codex cannot talk to each other. The repository is
+the channel. That is why this file exists and why it is kept current rather
+than aspirational: if it says something that is no longer true, it is worse
+than nothing.
+
+## The one that loses work
+
+**There is no git remote.** `git remote -v` is empty. Every commit exists on one
+disk, in one checkout, with no copy anywhere. As of writing that is 11 commits
+made today.
+
+So:
+
+- **Never `git checkout <path>` or `git reset --hard` on a file with
+  uncommitted changes.** Copy it somewhere first. This is not a precaution
+  against a theoretical mistake — it happened in this checkout on 2026-09-14
+  during mutation testing, destroyed about an hour of uncommitted work in
+  `Dashboard.tsx` and `report.css`, and the work had to be written again from
+  memory. Mutation testing in particular *invites* this: the natural instinct
+  after mutating a file is to check it out, and the natural instinct is wrong.
+  Back the file up, mutate, restore from the backup.
+- **Commit early.** An uncommitted change is the only kind that can vanish.
+- Ask the user before adding a remote or pushing. It is the right fix and it is
+  their decision, not ours.
+
+## Who is writing
+
+One writer at a time on `apps/web/src/**`. There is no ownership guard any
+more — `scripts/check-ownership.mjs` and its hook were removed with the old
+four-lane protocol (see `README.md` in this directory). Nothing will stop two
+agents editing the same file; only telling each other will.
+
+If you are picking up work, say so in your first commit message and note here
+what you are taking. If you find this file claiming an area that has been idle
+for a day, assume it is free.
+
+Claimed as of 2026-09-14, by message between the two live Claude sessions:
+
+| Area | Held by | Since |
+| --- | --- | --- |
+| `supabase/migrations/**` | `sentimentanalysis-91` — collection-queue reliability | 2026-09-14 |
+| `workers/python/src/server/**` | `sentimentanalysis-91` | 2026-09-14 |
+| `apps/web/src/syncHealth.ts`, `jobFeed.ts`, `Sync.tsx` | `sentimentanalysis-91` | 2026-09-14 |
+| `tests/e2e/dashboard.spec.ts` | **shared, append-only** — add your block, never rewrite another's | |
+| `apps/web/src/Dashboard.tsx`, `Account.tsx`, `Landing.tsx`, `main.tsx`, `authProviders.ts`, the CSS | `sentimentanalysis-82` | 2026-09-14 |
+| `packages/contracts/**` | `sentimentanalysis-82` | 2026-09-14 |
+| `workers/python/src/labelling/**` | free | |
+| `docs/coordination/ACTIVE.md` | `sentimentanalysis-82` maintains it; everyone reads it | |
+| `docs/progress.md`, `decisions.md`, `verification.md` | shared, append-only | |
+
+`sentimentanalysis-69` reported itself inactive with no uncommitted work.
+
+## Three invariants that no failing test will announce
+
+Both were flagged by `sentimentanalysis-69`, which wrote them. Each is enforced
+in one place rather than at every call site, which is what makes them easy to
+undo by accident — a redesign can bypass either and every existing test still
+passes, because the tests check the path that goes through them.
+
+**The channel's own comments are excluded in exactly one function.**
+`filteredRows` in `packages/contracts/src/snapshot.ts`, plus the two option-list
+builders (`comment_types`, `video_options`) that repeat the predicate. Every
+total on the dashboard is taken downstream of it. A new panel that reads
+`input` instead of the returned `filtered`/`rows` silently puts the channel's 13
+promotional replies back into that panel's denominator — nothing fails, the
+number is just wrong. `channel_own_comments` is deliberately counted from the
+*unfiltered* input and shown on screen; it should stay visible.
+
+**`measurable` is what stops the legend printing a false zero.** It is a Set
+built from `active_analysis_labels`, and it is why the legend reads
+"لا يقيسه النموذج الحالي" rather than "مختلط: 0 (0٪)". The live model has three
+classes and roughly 4% of this channel's comments are genuinely mixed, so that
+zero is not merely uninformative — it is false. Render the four labels from a
+static list and the regression comes back looking like a design detail.
+
+**The trust panel on the signed-out account page may not carry a number.**
+It currently says six Arabic classifiers were measured against a hand-labelled
+set and none passed the gate — all three parts check out against
+`docs/evaluation/model-comparison.md`, and the claim is safe *because it is a
+negative one*. The golden set has a single annotator, no second pass and no
+adjudication (model-comparison.md:23–26), which cannot make "we measured and
+none passed" less true. It can make an absolute figure false. So the moment
+anyone writes a per-class number or an accuracy into that panel, the
+single-annotator limit has to go in beside it — the set cannot establish an
+absolute accuracy. Flagged by `sentimentanalysis-69`, which built the set. Same
+shape as the two above: no test will catch it.
+
+## Things that are shared and will collide silently
+
+**Port 4173.** The Vite preview server and Playwright's `webServer` both want
+it. If a preview is already running, `npm run test:e2e` waits 60 s and then
+reports the whole suite as failed — failures that are not real and that look
+exactly like real ones. Stop your preview before running the browser suite.
+
+**The browser suite's exit code.** `npm run test:e2e | tail` reports *tail's*
+exit code, not Playwright's. A run with two failures reads as success. Redirect
+to a file and check `$?`, or check each gate separately. This also happened
+here, and a green report was nearly filed on a run that was not green.
+
+**System load.** On a loaded machine (load average above ~15) single browser
+tests take 25 s and the suite reports one or two failures, a *different* one
+each run, each passing in isolation. That is contention, not regression — but
+confirm it by running the failing test alone rather than assuming.
+
+**`npm run deploy:preview`.** Single writer, no locking. It uploads
+`apps/web/dist` over FTP and then deletes superseded hashed assets on the
+server; two concurrent runs would delete each other's files.
+
+Its failure mode is the safe one and is deliberate: `set -eu` stops the script
+on the first error, so a deploy that cannot connect uploads nothing and the
+last good build keeps serving. A non-zero exit is not a half-deployed site.
+
+**Do not read "FTP is down" as a standing fact from this file.** It has been
+intermittent: two sessions on 2026-09-14 got opposite results within the hour —
+one completed (25 files at 226, superseded assets removed, the host answering
+401 with the new bundle), the other timed out at port 21 on three consecutive
+attempts and again on a fourth check later. Test it when you need it. A
+document that says deploying is impossible will stop someone deploying when
+they can, which is the more expensive error of the two.
+
+**The live Supabase project.** Migrations and auth configuration are applied to
+a real project serving real comments. Do not enable providers, change
+`site_url`, or apply a migration without the user saying so in that turn. The
+project currently has `external_google_enabled`, `external_azure_enabled` and
+`saml_enabled` all false, and `site_url` still `http://localhost:3000` — which
+would break any OAuth redirect from the deployed host, and is the user's to
+fix.
+
+## What the tests are for
+
+Every guarantee in this product is asserted somewhere, and most of the
+assertions were written *after* a mutation proved they would catch the thing
+they claim to catch. If you change behaviour and a test fails, read the test's
+comment before changing it: it usually records a specific defect that shipped
+once.
+
+Two whole classes of bug in this codebase come from **one meaning with two
+implementations** — sentiment colours in three places, two typefaces neither of
+which knew about the other, two tables of error codes that disagreed on the
+same screen. If you are about to add a second place where something is decided,
+that is the pattern.
+
+## When you finish
+
+Append a dated entry to `docs/progress.md` and, if you verified something,
+`docs/verification.md`. Leave the tree clean. Say in your last message what is
+committed and what is only on disk.

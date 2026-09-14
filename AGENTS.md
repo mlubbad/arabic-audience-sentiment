@@ -1,5 +1,11 @@
 # Project instructions
 
+> **Before writing anything, read `docs/coordination/ACTIVE.md`.**
+> More than one agent works in this checkout — Claude Code, Antigravity, Codex —
+> and they have no channel to each other. That file is the channel: who holds
+> which paths, what collides silently, and the one mistake that permanently
+> destroys work here (there is no git remote).
+
 Read docs/Codex-Build-Handoff.md completely before implementation.
 The latest explicit user instructions take precedence over historical proposals.
 

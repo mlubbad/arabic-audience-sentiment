@@ -24,7 +24,14 @@ vi.mock("./supabase", () => ({
   },
 }));
 
-vi.stubGlobal("location", { search: "", origin: "https://example.invalid" });
+/** The component reads `window.location.search`, and a server render has no
+ *  `window` at all — so stubbing `location` alone left the signup screen
+ *  unreachable and the test silently rendered the login screen twice. */
+const atUrl = (search: string) =>
+  vi.stubGlobal("window", {
+    location: { search, origin: "https://example.invalid" },
+  });
+atUrl("");
 
 async function render() {
   vi.stubEnv("VITE_AUTH_PROVIDERS", shared.providers);
@@ -35,6 +42,7 @@ async function render() {
 beforeEach(() => {
   vi.resetModules();
   shared.providers = "";
+  atUrl("");
 });
 
 describe("the sign-in surface", () => {
@@ -76,6 +84,26 @@ describe("the sign-in surface", () => {
     // And leaves the others shut, so the UI cannot get ahead of the backend.
     expect(html).toContain('id="why-azure"');
     expect(html).toContain('id="why-sso"');
+  });
+
+  it("never puts two buttons of the same name on one screen", async () => {
+    // Flagged by a peer session working in this checkout: the live suite
+    // locates controls by role and accessible name, and Playwright's strict
+    // mode fails on two matches rather than picking one. The two-screen split
+    // creates the risk — "تسجيل الدخول" is the submit on one screen and the
+    // switch link on the other — so it is asserted rather than reasoned about.
+    const count = (html: string, name: string) =>
+      (html.match(new RegExp(`>${name}<`, "g")) ?? []).length;
+
+    const login = await render();
+    expect(count(login, "تسجيل الدخول")).toBe(1);
+    expect(count(login, "إنشاء حساب جديد")).toBe(0);
+
+    atUrl("?signup=1");
+    vi.resetModules();
+    const signup = await render();
+    expect(count(signup, "إنشاء حساب جديد")).toBe(1);
+    expect(count(signup, "تسجيل الدخول")).toBe(1);
   });
 
   it("claims nothing it cannot show", async () => {
