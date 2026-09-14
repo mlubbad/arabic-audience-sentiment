@@ -170,6 +170,27 @@ purple-is-positive and met teal-is-positive on the next screen.
 None of them failed a test. Each was found by looking for the shape. If you are
 about to add a second place where something is decided, that is the shape.
 
+**But unifying is not automatically an improvement, and this is not a rule you
+can apply without looking.** Both failure modes showed up while fixing the six:
+
+- *The merged reader said less than a reader it replaced.* Two error-code
+  tables became one, and the surviving one's entry for a bare
+  `source_access_denied` was thinner than the table's had been — it dropped the
+  half of the sentence that told the operator where to look. Caught by a
+  browser test, by luck. The rule now encoded: a merged reader may override
+  another only where it has something *more* specific to say; otherwise the
+  replaced wording stands, asserted over every key with the one deliberate
+  exception named.
+- *The discarded version was better on a dimension nobody was measuring.* The
+  landing page's sentiment palette separated better under deuteranopia than the
+  dashboard's (ΔE 23.4 against 9.6) — the dashboard's was still chosen, because
+  all four landing marks sat under 3:1 on white and a mark carries meaning at
+  3:1. "Unify on the shared source" would have concluded the opposite without
+  measuring, and would have been wrong about which set was better.
+
+So: find the shape, then measure both sides before collapsing them. The shape
+tells you there is a decision to make, not what the decision is.
+
 ## When you finish
 
 Append a dated entry to `docs/progress.md` and, if you verified something,
