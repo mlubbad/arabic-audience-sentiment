@@ -41,13 +41,25 @@ Require valid-user
   <FilesMatch "\.(js|css)$">
     Header set Cache-Control "public, max-age=31536000, immutable" \
       "expr=%{REQUEST_STATUS} == 200"
-    # The other half of the same decision, and deliberately `!= 200` rather
-    # than a range: `== 200` is known to evaluate correctly on this host,
-    # having been measured doing it, so its negation is the one refusal that
-    # cannot be silently skipped. Saying nothing here is not neutral — a
-    # response with no Cache-Control gets whatever default the CDN applies,
-    # which on 2026-09-15 was four hours on a 401.
-    Header always set Cache-Control "no-store" "expr=%{REQUEST_STATUS} != 200"
+    # The other half of the same decision. Three things about how it is
+    # written, each of them measured against this host rather than assumed,
+    # because two earlier versions of this line were skipped in silence:
+    #
+    #   * `Header set`, not `Header always set`. Unconditional `always` works
+    #     here — the security headers below arrive on a 401. `always` *with* an
+    #     `expr` does not fire at all, and a rule that never runs looks exactly
+    #     like a rule that ran and found nothing to do.
+    #   * plain `Header set` does reach the error response on this server. That
+    #     is not a quirk being exploited; it is precisely the mechanism that
+    #     put `immutable` on the 401 in the first place, pointed the other way.
+    #   * `!= 200` rather than a range, because `== 200` above is the one
+    #     comparison this host has been observed evaluating correctly, and its
+    #     negation inherits that.
+    #
+    # Saying nothing here is not neutral. A response with no Cache-Control does
+    # not go uncached; it gets whatever default the layer above applies, which
+    # on 2026-09-15 was four hours on a 401.
+    Header set Cache-Control "no-store" "expr=%{REQUEST_STATUS} != 200"
   </FilesMatch>
   <FilesMatch "\.(html|json)$">
     Header set Cache-Control "no-cache"
@@ -58,7 +70,7 @@ Require valid-user
   # `-ge`, not `>=`. Apache's `>=` compares strings, and the first version of
   # this line used it and never fired once — the 401 it was written for came
   # back carrying no Cache-Control at all.
-  Header always set Cache-Control "no-store" "expr=%{REQUEST_STATUS} -ge 400"
+  Header set Cache-Control "no-store" "expr=%{REQUEST_STATUS} -ge 400"
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "no-referrer"

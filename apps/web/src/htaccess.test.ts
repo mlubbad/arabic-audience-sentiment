@@ -56,12 +56,27 @@ describe("the preview host's cache policy", () => {
     // string form here is the point of the test, not pedantry about syntax.
     const refusals = headerDirectives.filter(
       (d) =>
-        /always\s+set\s+Cache-Control/i.test(d) &&
         /no-store/i.test(d) &&
         /expr=%\{REQUEST_STATUS\}\s*(?:-ge\s*400|!=\s*200)/.test(d),
     );
     expect(refusals.length).toBeGreaterThan(0);
     expect(source).not.toMatch(/%\{REQUEST_STATUS\}\s*>=/);
+  });
+
+  it("states its conditional rules in the form this host executes", () => {
+    // Measured, not assumed. On this server `Header always set` works for an
+    // unconditional header — the security headers arrive on a 401 — but
+    // `always` combined with `expr` never fires, and a rule that never runs is
+    // indistinguishable from one that ran and had nothing to do. Two versions
+    // of the refusal below were lost that way before anyone looked at a
+    // response header.
+    const conditional = headerDirectives.filter((d) =>
+      /expr=%\{REQUEST_STATUS\}/.test(d),
+    );
+    expect(conditional.length).toBeGreaterThan(0);
+    for (const directive of conditional) {
+      expect(directive).not.toMatch(/Header\s+always\s+set/i);
+    }
   });
 
   it("refuses to store a failure for the bundle specifically", () => {
@@ -71,7 +86,7 @@ describe("the preview host's cache policy", () => {
     // evaluating.
     const bundleRule = headerDirectives.find(
       (d) =>
-        /always\s+set\s+Cache-Control/i.test(d) &&
+        /^Header\s+set\s+Cache-Control/i.test(d) &&
         /no-store/i.test(d) &&
         /expr=%\{REQUEST_STATUS\}\s*!=\s*200/.test(d),
     );
