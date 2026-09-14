@@ -84,6 +84,12 @@ describe("a lapsed lease is a recovery", () => {
       "insert into workspaces(id,name,created_by) values ($1,'w',$2)",
       [W, OWNER],
     );
+    // The snapshot refuses a caller with no membership, and creating a
+    // workspace does not make its creator a member of it.
+    await db.query(
+      "insert into memberships(workspace_id,user_id,role) values ($1,$2,'workspace_owner') on conflict do nothing",
+      [W, OWNER],
+    );
     await db.query(
       "insert into clients(id,workspace_id,name) values ($1,$1,'c')",
       [W],
@@ -245,5 +251,75 @@ describe("a run that never committed still ran", () => {
     await lapse(id);
     await claim();
     expect(await at()).toBeGreaterThan(30);
+  });
+});
+
+describe("connected is something the worker says", () => {
+  /** As the owner, because the snapshot refuses a caller with no membership. */
+  const snapshot = async () => {
+    await db.exec("reset role");
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      OWNER,
+    ]);
+    await db.exec("set role authenticated");
+    const r = await db.query<{
+      s: {
+        sync: {
+          worker: {
+            connected: boolean;
+            busy: boolean;
+            last_heartbeat_at: string | null;
+          };
+        };
+      };
+    }>("select public.dashboard_snapshot($1) s", [W]);
+    await db.exec("reset role");
+    // The worker block lives under `sync`, not at the root.
+    return r.rows[0].s.sync;
+  };
+
+  it("reports a worker that has never asked as absent, not as null", async () => {
+    await db.exec("reset role");
+    await db.query("delete from worker_seen where workspace_id=$1", [W]);
+    const w = (await snapshot()).worker;
+    // A missing row is "no worker", not "unknown". The contract types this as
+    // a boolean and the panel branches on it.
+    expect(w.connected).toBe(false);
+    expect(w.last_heartbeat_at).toBeNull();
+  });
+
+  it("counts an idle worker as connected", async () => {
+    await db.exec("reset role");
+    await db.query("delete from jobs where workspace_id=$1", [W]);
+    // An empty queue: claim_job returns nothing at all.
+    const { rows } = await db.query("select * from private.claim_job($1)", [W]);
+    expect(rows).toHaveLength(0);
+    const w = (await snapshot()).worker;
+    // This is the whole point. A worker polling an empty queue holds no lease,
+    // and under the old rule read exactly like no worker at all — two
+    // situations calling for opposite responses, shown in one colour.
+    expect(w.connected).toBe(true);
+    expect(w.busy).toBe(false);
+    expect(w.last_heartbeat_at).not.toBeNull();
+  });
+
+  it("separates a worker that is busy from one that is merely up", async () => {
+    const id = await job();
+    await claim();
+    const w = (await snapshot()).worker;
+    expect(w.connected).toBe(true);
+    expect(w.busy).toBe(true);
+    // And once the lease lapses it is up but no longer working on anything.
+    await lapse(id);
+    expect((await snapshot()).worker.busy).toBe(false);
+  });
+
+  it("forgets a worker that stopped asking", async () => {
+    await db.exec("reset role");
+    await db.query(
+      "update worker_seen set last_seen_at = now() - interval '10 minutes' where workspace_id=$1",
+      [W],
+    );
+    expect((await snapshot()).worker.connected).toBe(false);
   });
 });

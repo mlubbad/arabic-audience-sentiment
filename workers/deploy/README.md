@@ -63,6 +63,34 @@ empty cycles, and the next tick starts a clean process — long-lived Python
 accumulates memory, and a scheduled restart is simpler than diagnosing that
 later.
 
+## When it stops working without stopping
+
+`flock -n` makes cron a no-op while a worker holds the lock. That is right while
+the worker is alive and wrong while it is stuck: a hung process holds the lock
+for as long as it hangs, and the five-minute tick restarts nothing. On
+2026-09-14 a worker held its lease, stopped heartbeating, and sat there for
+twenty-five minutes with no replacement possible.
+
+`watchdog.sh` is the missing half. It never starts a worker — it ends one that
+has stopped working and lets `run-worker.sh` start a clean replacement, which it
+then can, because the lock is free. Two things that can both start a worker is
+how you get two workers.
+
+```
+*/5 * * * * $HOME/sentiment-worker/run-worker.sh
+*/2 * * * * $HOME/sentiment-worker/watchdog.sh
+```
+
+Liveness is judged by the log's modification time, because that is the one thing
+a working worker touches continuously and a hung one does not. Process CPU time
+would miss a worker spinning in a retry loop, and the job lease would need
+database credentials this script deliberately does not hold. The default is ten
+minutes of silence — longer than the lease plus the slowest plausible batch —
+and `SILENT_SECONDS` overrides it.
+
+TERM first, so a worker mid-commit can finish: the loop installs a handler that
+completes the job in hand and leaves. KILL only for a process that ignores it.
+
 ## Watching it
 
 `~/sentiment-worker/worker.log` is timestamped and truncated when it passes
