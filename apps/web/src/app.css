@@ -33,15 +33,16 @@
   display: flex;
   justify-content: center;
   gap: 1.25rem;
-  padding: 0.35rem 1rem;
-  background: #25223f;
+  padding: 0.4rem 1rem;
+  background: #0d0a22;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 600;
   text-align: center;
 }
 .app-announcement span + span {
-  color: #d4cbff;
+  color: #c4b8ff;
 }
 .app-shell > .app-header {
   /* Level 2. Pinned, so the page passes behind it rather than under a lid. */
@@ -83,36 +84,41 @@
 .app-brand-dot {
   color: var(--ml-indigo);
 }
-.app-nav {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 0.2rem;
-  margin-inline-start: auto;
-}
-.app-nav a {
+/* The four-bar brand mark. Shared between landing and app shell. */
+.lp-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  padding: 0.45rem 0.8rem;
-  border-radius: var(--r-pill);
-  color: #514d66;
-  font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;
-  transition:
-    background 0.18s,
-    color 0.18s;
+  gap: 3px;
+  width: 29px;
+  height: 28px;
+  transform: rotate(-10deg);
+  flex-shrink: 0;
 }
-.app-nav a:hover {
-  background: #f3f0ff;
-  color: var(--ml-indigo);
+.lp-mark i {
+  background: var(--ml-indigo, #3b27ba);
+  width: 5px;
+  border-radius: 4px;
+  height: 14px;
+  display: inline-block;
+  transition: transform 0.2s ease;
 }
-.app-nav a.active {
-  background: var(--ml-indigo);
-  color: white;
+.lp-mark i:nth-child(2) {
+  height: 25px;
 }
+.lp-mark i:nth-child(3) {
+  height: 19px;
+}
+.lp-mark i:nth-child(4) {
+  height: 10px;
+  background: #ff5c67;
+}
+/* The navigation's only styling now lives with the rail. What was here was
+   the top bar's: a centred pill row, laid out with `align-items: center`.
+   Removing the bar left it behind, and it kept applying — which is why every
+   rail item sized itself to its own label and each icon landed at a different
+   distance from the edge. Nothing on screen said the rule was still there;
+   the symptom was three links that looked hand-placed. */
 /* Session state, in the slot the tagline used to hold. */
 .app-session {
   flex: 0 0 auto;
@@ -197,62 +203,134 @@
 /* A compact report masthead keeps the first useful figure near the fold. */
 .app-shell .rp-page .rp-hero {
   display: block;
+  position: relative;
+  overflow: hidden;
   min-height: 0;
-  margin: 0 0 1.25rem;
-  padding: clamp(1.5rem, 3.5vw, 2.6rem) clamp(1.5rem, 4vw, 3.2rem);
-  border-radius: var(--r-4);
-  background: linear-gradient(115deg, #292541 0%, #352b85 58%, #5442bf 100%);
-  box-shadow: 0 18px 42px -20px rgba(59, 39, 186, 0.5);
+  margin: 0 0 1.5rem;
+  padding: clamp(1.6rem, 3.5vw, 2.7rem) clamp(1.5rem, 4vw, 3rem);
+  border-radius: 20px;
+  background: linear-gradient(135deg, #131032 0%, #1c164a 45%, #271c6d 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 16px 36px -12px rgba(19, 16, 50, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.12);
 }
 .app-shell .rp-page .rp-hero::after {
   inset: 0;
   background:
     radial-gradient(
-      circle at 93% 85%,
-      rgba(255, 108, 119, 0.42),
-      transparent 26%
+      ellipse at 88% 18%,
+      rgba(253, 230, 118, 0.22),
+      transparent 40%
     ),
-    radial-gradient(circle at 1% 0%, rgba(181, 170, 242, 0.25), transparent 31%);
-  filter: none;
+    radial-gradient(
+      ellipse at 12% 82%,
+      rgba(60, 233, 249, 0.16),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 60% 50%,
+      rgba(181, 170, 242, 0.12),
+      transparent 55%
+    );
+  filter: blur(10px);
 }
 .app-shell .rp-page .rp-hero h1 {
   max-width: 28ch;
-  margin-bottom: 0.4rem;
-  font-size: clamp(1.8rem, 3.5vw, 2.9rem);
-  line-height: 1.35;
+  margin-bottom: 0.5rem;
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1.32;
+  letter-spacing: -0.015em;
+  color: #fff;
 }
 .app-shell .rp-page .rp-hero p {
-  max-width: 66ch;
-  font-size: clamp(0.88rem, 1.3vw, 1rem);
-  line-height: 1.85;
+  max-width: 68ch;
+  font-size: clamp(0.9rem, 1.25vw, 1.02rem);
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.88);
 }
 .app-shell .rp-page .rp-eyebrow {
-  margin-bottom: 0.5rem;
-  color: #ffe9a5;
-  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0.6rem;
+  color: #ffd166;
+  font-size: 0.8rem;
+  font-weight: 700;
+  /* Zero, and deliberately so: `report.css` tracks this eyebrow at 0.16em and
+     this is the rule that undoes it inside the app shell. It was set back to
+     0.03em somewhere in the restyle, which is enough to pull the joins in
+     "تقرير تحليلي" apart — `dashboard.spec.ts` asserts against exactly this. */
   letter-spacing: 0;
 }
 .app-shell .rp-pills {
-  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 1.25rem;
 }
 .app-shell .rp-pill {
-  padding: 0.28rem 0.8rem;
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: background 0.15s ease;
+}
+.app-shell .rp-pill:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.app-shell .rp-hero-split {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.9);
 }
 .app-shell .rp-nav {
-  margin-bottom: 1rem;
-  padding: 0.55rem 1rem;
-  border-radius: var(--r-3);
-  box-shadow: 0 6px 20px rgba(35, 31, 67, 0.055);
+  margin-bottom: 1.25rem;
+  padding: 0.6rem 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-1);
+  box-shadow: 0 4px 20px rgba(20, 17, 58, 0.05);
 }
 .app-shell .rp-provenance {
-  margin-bottom: 1rem;
-  padding: 0.75rem 1.1rem;
-  border-radius: var(--r-2);
-  background: #fff;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  background: #fdfbf7;
+  border: 1px solid #fae8c8;
+  border-inline-start: 4px solid #f59e0b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+.app-shell .rp-provenance.warn {
+  background: #fff8f0;
+  border-color: #fee2cb;
+  border-inline-start-color: #f97316;
+}
+.app-shell .rp-provenance strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 4px;
 }
 .app-shell .rp-provenance p {
-  line-height: 1.55;
+  line-height: 1.6;
+  font-size: 13.5px;
+  color: #78350f;
 }
 .app-shell .rp-section {
   margin-bottom: 3.4rem;
@@ -265,12 +343,25 @@
 }
 .app-shell .rp-section > header h2 {
   margin: 0 0 0.3rem;
+  font-size: clamp(1.3rem, 2.2vw, 1.65rem);
+  font-weight: 700;
+  color: var(--text-1);
 }
 .app-shell .rp-card {
-  border-radius: var(--r-3);
+  border-radius: 16px;
+  border: 1px solid rgba(226, 224, 237, 0.85);
+  box-shadow: 0 4px 20px rgba(15, 13, 35, 0.04);
 }
 .app-shell .rp-metric {
   border-top: 3px solid #ddd5ff;
+  border-radius: 14px;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.app-shell .rp-metric:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15, 13, 35, 0.07);
 }
 .app-shell .rp-metric:first-child {
   border-top-color: var(--ml-indigo);
@@ -285,9 +376,10 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: end;
-  gap: 0.85rem;
+  gap: 1rem;
   margin-bottom: 0.45rem;
-  padding: 1.1rem;
+  padding: 1.25rem;
+  border-radius: 16px;
 }
 .app-shell .rp-page form.rp-card.rp-filters[hidden] {
   display: none;
@@ -298,23 +390,76 @@
 .app-shell .rp-filters > label {
   min-width: 0;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
 }
 .app-shell .rp-filters input,
 .app-shell .rp-filters select {
   min-width: 0;
   width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-1);
+  background-color: var(--bg-card, #ffffff);
+  color: var(--fg-1);
+  font-family: inherit;
+  font-size: 14px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.app-shell .rp-filters select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236f6b8c' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 12px center;
+  padding-inline-start: 36px;
+  padding-inline-end: 12px;
+  cursor: pointer;
+}
+.app-shell .rp-filters input:focus,
+.app-shell .rp-filters select:focus,
+.app-shell .rp-filters input:focus-visible,
+.app-shell .rp-filters select:focus-visible {
+  border-color: #634ee6;
+  box-shadow: 0 0 0 3px rgba(99, 78, 230, 0.18);
+  outline: none;
 }
 .app-shell .rp-filters button {
   width: 100%;
-  min-height: 44px;
+  height: 42px;
+  min-height: 42px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 .app-shell .rp-filters button[type="submit"] {
-  background: var(--ml-indigo);
+  background: linear-gradient(135deg, #4338ca 0%, #312e81 100%);
+  border: 1px solid #312e81;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(67, 56, 202, 0.3);
+}
+.app-shell .rp-filters button[type="submit"]:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+  box-shadow: 0 4px 14px rgba(67, 56, 202, 0.4);
+  transform: translateY(-1px);
 }
 .app-shell .rp-filters button[type="button"] {
-  background: #f3f0ff;
-  border-color: #ded7fd;
+  background: #f4f2fe;
+  border: 1px solid #ded7fd;
   color: var(--ml-indigo);
+}
+.app-shell .rp-filters button[type="button"]:hover {
+  background: #ebe7fd;
+  border-color: #cbbeff;
 }
 .app-shell .rp-page .notice,
 .app-shell .rp-page .loading {
@@ -621,23 +766,9 @@
     font-size: 0.84rem;
     font-weight: 700;
   }
-  .app-nav {
-    display: none;
-    position: absolute;
-    top: calc(100% - 1px);
-    inset-inline: 0;
-    padding: 0.75rem 1rem 1rem;
-    background: white;
-    border-bottom: 1px solid var(--border-1);
-    box-shadow: 0 14px 24px rgba(35, 31, 67, 0.08);
-  }
-  .app-nav.is-open {
-    display: grid;
-  }
-  .app-nav a {
-    justify-content: flex-start;
-    border-radius: var(--r-2);
-  }
+  /* The top bar's drop-down lived here: `display: none` until `.is-open` was
+     put on the nav itself. The rail opens as a sheet and carries `.is-open`
+     on the RAIL, so this rule left the phone's menu open and empty. */
   .app-shell > .app-main {
     padding: 1.1rem 1rem 3rem;
   }
@@ -751,110 +882,222 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  padding: var(--space-5) var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-3) var(--space-4);
   /* The one dark plane in the product. It is the frame, and a frame that
      recedes lets the data be the brightest thing on screen. */
-  background: linear-gradient(180deg, #1b1740, #14112f 60%, #171338);
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(99, 78, 230, 0.16) 0%,
+      transparent 70%
+    ),
+    #100d28;
+  border-inline-end: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
   color: #fff;
 }
+/* ---- the lockup -------------------------------------------------------
+   Product name, owner, and the mark, as one object with a rule under it.
+   The rule is what makes the rail read as having parts rather than as a
+   column of things that happen to be stacked. */
 .app-rail .app-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 10px;
   color: #fff;
-  padding-inline-start: var(--space-2);
+  padding: 2px 10px var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  transition: opacity 0.18s ease;
+}
+.app-rail .app-brand:hover {
+  opacity: 0.85;
+}
+.app-rail .lp-mark i {
+  background: linear-gradient(180deg, #c4b8ff 0%, #826df8 100%);
+  box-shadow: 0 0 8px rgba(181, 170, 242, 0.35);
+}
+.app-rail .lp-mark i:nth-child(4) {
+  background: linear-gradient(180deg, #ff8f98 0%, #ff5c67 100%);
+  box-shadow: 0 0 8px rgba(255, 92, 103, 0.45);
 }
 .app-rail .app-brand span {
   display: flex;
   flex-direction: column;
-  line-height: 1.25;
+  gap: 1px;
+  line-height: 1.2;
+  min-width: 0;
 }
 .app-rail .app-brand b {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 .app-rail .app-brand small {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  font-weight: 500;
+  /* Measured, not picked: this is 11px text on the rail's dark plane, so it
+     is held to 4.5:1 there like any other text. See `rail.test.ts`. */
+  color: rgba(255, 255, 255, 0.58);
 }
+
+/* ---- the destinations -------------------------------------------------
+   Two columns, not a row of inline-flex links: the icon column is a fixed
+   width, so every mark sits on the same vertical line whatever its label is
+   and the eye has one edge to run down. */
 .app-rail .app-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  gap: 2px;
+  align-content: start;
+}
+.app-rail-caption {
+  padding: 0 12px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  /* No tracking. This label is Arabic, and Arabic letters join: tracking runs
+     after shaping, so it draws the connected forms with gaps between them and
+     the word comes apart. `dashboard.spec.ts` asserts it across the page — it
+     caught this one, which is what that test is for. */
+  color: rgba(255, 255, 255, 0.62);
 }
 .app-shell .app-rail .app-nav a {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-3);
-  padding: 11px var(--space-3);
-  border-radius: var(--r-2);
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 15px;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 14px;
   font-weight: 600;
-  background: none;
-  border: 0;
+  background: transparent;
+  transition:
+    background var(--dur-1) var(--ease-glass),
+    color var(--dur-1) var(--ease-glass);
 }
 .app-shell .app-rail .app-nav a:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
-/* The current destination, marked by fill rather than by colour alone. */
+/* The current destination. Fill carries it, and a bar on the rail's outer
+   edge repeats it in shape — colour alone is not a state. */
 .app-shell .app-rail .app-nav a.active,
 .app-shell .app-rail .app-nav a[aria-current="page"] {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(126, 105, 245, 0.2);
   color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.app-shell .app-rail .app-nav a.active::before,
+.app-shell .app-rail .app-nav a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: 9px;
+  width: 3px;
+  /* Symmetric on purpose. `border-radius: 0 3px 3px 0` is physical, and this
+     document is right-to-left, so it rounded the edge against the page and
+     squared the one against the rail — the mirror of what was drawn. */
+  border-radius: 3px;
+  background: #9584ff;
 }
 .app-nav-mark {
-  font-size: 15px;
-  opacity: 0.8;
-  width: 1.1em;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: rgba(255, 255, 255, 0.55);
+  transition: color var(--dur-1) var(--ease-glass);
+}
+.app-shell .app-rail .app-nav a:hover .app-nav-mark {
+  color: rgba(255, 255, 255, 0.85);
+}
+.app-shell .app-rail .app-nav a.active .app-nav-mark,
+.app-shell .app-rail .app-nav a[aria-current="page"] .app-nav-mark {
+  color: #c4b8ff;
 }
 .app-rail-foot {
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
 }
 .app-plan {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: var(--space-4);
-  border-radius: var(--r-3);
-  background: rgba(255, 255, 255, 0.07);
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  transition:
+    border-color 0.18s,
+    background 0.18s;
+}
+.app-plan:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
 }
 .app-plan-kicker {
-  font-size: 10.5px;
-  color: var(--ml-yellow);
+  font-size: 11px;
+  color: #ffd166;
   font-weight: 700;
+  /* Same reason. This label is only rendered to a signed-in reader, so no
+     browser test sees it — which is exactly why it is worth writing down. */
+  letter-spacing: 0;
 }
 .app-plan strong {
   font-size: 15px;
+  color: #ffffff;
 }
 .app-plan-note {
   font-size: 11.5px;
   color: rgba(255, 255, 255, 0.6);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 /* The session control sits on the dark plane now, so it takes the light ink. */
 .app-rail .app-session {
   border-inline-start: 0;
   padding-inline-start: 0;
   flex-wrap: wrap;
+  gap: 8px;
 }
 .app-rail .app-session-who {
   color: rgba(255, 255, 255, 0.7);
+  font-size: 12.5px;
   max-width: 100%;
 }
 .app-shell .app-rail .app-session button,
 .app-shell .app-rail a.app-session-in {
-  border-color: rgba(255, 255, 255, 0.28);
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.app-shell .app-rail .app-session button:hover,
+.app-shell .app-rail a.app-session-in:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
 }
 .app-shell:has(.app-rail) > .app-main {
   grid-area: main;

@@ -87,18 +87,73 @@ function SessionControl() {
   );
 }
 
+function NavIcon({ to }: { to: string }) {
+  if (to === "/dashboard") {
+    return (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="3" width="7" height="9" rx="1.5" />
+        <rect x="14" y="3" width="7" height="5" rx="1.5" />
+        <rect x="14" y="12" width="7" height="9" rx="1.5" />
+        <rect x="3" y="16" width="7" height="5" rx="1.5" />
+      </svg>
+    );
+  }
+  if (to === "/sync") {
+    return (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+        <path d="M16 21h5v-5" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 /** The product's parts, in one list.
  *  The page title, the rail and the document title all read from it, so a
  *  destination cannot exist in the navigation and nowhere else, or the
  *  reverse — which is how "مقارنة الفيديوهات" came to be a section of the
  *  report that its own index did not list. */
 const DESTINATIONS = [
-  { to: "/dashboard", label: "نظرة عامة", mark: "◴", title: "نظرة عامة" },
-  { to: "/sync", label: "التشغيل", mark: "⟳", title: "حالة المزامنة" },
+  { to: "/dashboard", label: "نظرة عامة", title: "نظرة عامة" },
+  { to: "/sync", label: "التشغيل", title: "حالة المزامنة" },
   {
     to: "/account",
     label: "المصادر والحساب",
-    mark: "⊕",
     title: "الحساب ومساحات العمل",
   },
 ] as const;
@@ -174,10 +229,14 @@ function AppLayout() {
         </Link>
 
         <nav className="app-nav" aria-label="التنقل الرئيسي">
+          {/* A heading for the group, not decoration: the rail carries three
+              kinds of thing — where you are, what your plan has left, and who
+              you are — and unlabelled they read as one undifferentiated list. */}
+          <p className="app-rail-caption">التنقّل</p>
           {DESTINATIONS.map((d) => (
             <NavLink key={d.to} to={d.to} onClick={() => setMenuOpen(false)}>
               <span className="app-nav-mark" aria-hidden="true">
-                {d.mark}
+                <NavIcon to={d.to} />
               </span>
               {d.label}
             </NavLink>
