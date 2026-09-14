@@ -51,7 +51,14 @@ run one worker over several tenants rather than one process each.
 ```
 
 Cron is a restarter, not a scheduler of work: while a worker holds the lock the
-five-minute tick is a no-op. The loop stands down by itself after a stretch of
+five-minute tick is a no-op.
+
+A jitter is worth adding so that every host does not restart on the same
+second, but keep it out of the crontab unless you know what `/bin/sh` is on
+that machine. A line like `sleep $((RANDOM \% 60)) && …` depends on `sh` being
+bash; under dash `$RANDOM` is empty, the arithmetic fails, and the worker
+silently never starts. The deployment this was built against happens to link
+`/bin/sh` to bash — which is a fact about that host, not a guarantee. The loop stands down by itself after a stretch of
 empty cycles, and the next tick starts a clean process — long-lived Python
 accumulates memory, and a scheduled restart is simpler than diagnosing that
 later.

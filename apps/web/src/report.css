@@ -653,3 +653,70 @@
   border-radius: var(--r-sm);
   border-color: var(--ml-indigo);
 }
+
+/* ---------------- forms inside the system ----------------
+   The filter bar sets the pattern; every other form on these pages follows it
+   rather than falling back to the base stylesheet's bare controls, which look
+   like a different product sitting inside this one. */
+.rp-page form.rp-card {
+  /* Flex rather than grid so the actions at the end sit on one row while every
+     field still takes the full width above them. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-4);
+  max-width: 30rem;
+}
+.rp-page form.rp-card > label {
+  flex: 1 1 100%;
+}
+.rp-page form.rp-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.rp-page form.rp-card input,
+.rp-page form.rp-card select {
+  width: 100%;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-sm);
+  padding: 0.6rem 0.7rem;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--fg-1);
+  background: var(--bg-card);
+}
+.rp-page form.rp-card input:focus-visible,
+.rp-page form.rp-card select:focus-visible {
+  border-color: var(--ml-indigo);
+}
+.rp-page form.rp-card button {
+  margin: 0;
+  border-radius: var(--r-sm);
+  border-color: var(--ml-indigo);
+}
+.rp-page form.rp-card > button {
+  flex: 0 0 auto;
+}
+
+/* The workspace list and the history list keep their own shapes but take the
+   page's surfaces, so nothing reads as a leftover from the base stylesheet. */
+.rp-page .history li {
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  gap: var(--space-2);
+}
+.rp-page .history li[data-severity="critical"] strong {
+  color: var(--color-danger);
+}
+.rp-page .history li[data-severity="warning"] strong {
+  color: var(--color-warning);
+}
+.rp-page .history li[data-severity="muted"] strong {
+  color: var(--fg-3);
+}
+.rp-page .budgets li {
+  border-radius: var(--r-md);
+}
