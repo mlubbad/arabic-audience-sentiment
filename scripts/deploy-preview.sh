@@ -36,6 +36,12 @@ find . -type f | sed 's|^\./||' | while read -r f; do
     --connect-timeout 25 --max-time 300
 done
 
+# Must match `build.assetsDir` in apps/web/vite.config.ts, which explains why
+# it is not `assets`. A stale value here is not a no-op: the sweep below would
+# list an empty or missing directory, delete nothing, and leave every previous
+# build sitting on the host.
+DIR=static
+
 # Remove the previous build's hashed assets, which nothing references any more.
 # Uploading alone would leave a ~740KB orphan behind on every deploy.
 #
@@ -49,9 +55,9 @@ done
 # Every hashed asset, not just index-*. The build is code-split now, so the
 # chunks are named after their entry point — matching index-* alone left a
 # Dashboard-*.js and an Account-*.js behind on each deploy.
-keep=" $(find ./assets -type f 2>/dev/null | sed 's|^\./assets/||' | tr '\n' ' ') "
+keep=" $(find "./$DIR" -type f 2>/dev/null | sed "s|^\./$DIR/||" | tr '\n' ' ') "
 for remote in $(curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
-  -u "$PREVIEW_FTP_USER:$PREVIEW_FTP_PASSWORD" "ftp://$PREVIEW_FTP_HOST/assets/" \
+  -u "$PREVIEW_FTP_USER:$PREVIEW_FTP_PASSWORD" "ftp://$PREVIEW_FTP_HOST/$DIR/" \
   --connect-timeout 25 --max-time 120 | awk '{print $NF}' \
   | grep -vE '^\.\.?$' || true); do
   case "$keep" in
@@ -60,7 +66,7 @@ for remote in $(curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
       printf '%-44s ' "removing $remote"
       curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
         -u "$PREVIEW_FTP_USER:$PREVIEW_FTP_PASSWORD" "ftp://$PREVIEW_FTP_HOST/" \
-        -Q "-DELE assets/$remote" -o /dev/null -w 'gone\n' \
+        -Q "-DELE $DIR/$remote" -o /dev/null -w 'gone\n' \
         --connect-timeout 25 --max-time 120
       ;;
   esac

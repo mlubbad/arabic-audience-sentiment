@@ -23,14 +23,31 @@ Require valid-user
 </IfModule>
 
 <IfModule mod_headers.c>
-  # The bundle carries a content hash in its name, so it can be cached hard.
-  # index.html must not be, or a deploy stays invisible until a cache expires.
+  # The bundle carries a content hash in its name, so it can be cached hard —
+  # but only when there is a bundle to cache. Without the status guard this
+  # rule also stamped `immutable` on the 401 challenge page, because the
+  # challenge is served *for* the requested filename and matches on it.
+  #
+  # Cloudflare then did exactly what it was told. On 2026-09-15 a single
+  # unauthenticated request to each hashed asset pinned a 401 at the edge for a
+  # year: `cf-cache-status: HIT`, served in place of the JavaScript even to a
+  # request carrying valid credentials, and immune to a revalidating
+  # `Cache-Control: no-cache`. The app loaded its index.html and then nothing.
+  # Any crawler, or any browser that asks for an asset before the password is
+  # entered, does the same thing — this did not need an operator to trigger it.
+  #
+  # `immutable` is a promise that the body will never change. An error page
+  # about a file is not that file, so it must never carry the promise.
   <FilesMatch "\.(js|css)$">
-    Header set Cache-Control "public, max-age=31536000, immutable"
+    Header set Cache-Control "public, max-age=31536000, immutable" \
+      "expr=%{REQUEST_STATUS} == 200"
   </FilesMatch>
   <FilesMatch "\.(html|json)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
+  # Belt and braces, and the half that survives a future FilesMatch someone
+  # adds without thinking about failures: nothing that went wrong is storable.
+  Header always set Cache-Control "no-store" "expr=%{REQUEST_STATUS} >= 400"
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "no-referrer"
