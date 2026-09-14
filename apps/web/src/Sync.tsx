@@ -29,14 +29,13 @@ import {
   type WorkspaceOption,
 } from "./workspace";
 import { syncHealth } from "./syncHealth";
+import { budgetMessages, budgetNames, displayDate, syncMessages } from "./i18n";
 import {
-  budgetMessages,
-  budgetNames,
-  displayDate,
-  syncErrorMessages,
-  syncMessages,
-} from "./i18n";
-import { describeJob, type JobEntry, type JobRow } from "./jobFeed";
+  describeJob,
+  explainCode,
+  type JobEntry,
+  type JobRow,
+} from "./jobFeed";
 import "./report.css";
 
 export function Sync() {
@@ -365,7 +364,7 @@ function SyncBody({
                 </p>
                 {health.errorCode && (
                   <p data-testid="sync-error">
-                    {syncErrorMessages[health.errorCode] ??
+                    {explainCode(health.errorCode) ??
                       "تعذّرت المزامنة لسبب غير مصنَّف"}{" "}
                     (<code>{health.errorCode}</code>)
                   </p>

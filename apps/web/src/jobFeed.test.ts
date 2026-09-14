@@ -131,10 +131,14 @@ describe("one table for one meaning", () => {
 
   it("explains a code the shared table knows", () => {
     // The health panel and the attempts log sat on the same screen and
-    // disagreed about this exact code: one rendered the sentence, the other
-    // called it uninterpreted. Two tables for one meaning.
-    expect(at("retry_exhausted")).toBe("استُنفدت المحاولات المسموح بها");
-    expect(at("retry_exhausted")).not.toContain("رمز غير مفسَّر");
+    // disagreed about a code: one rendered the sentence, the other called it
+    // uninterpreted. Two tables for one meaning.
+    //
+    // `retry_exhausted` was the example, and it has since earned a case of its
+    // own — so the guarantee is pinned on a code that still travels the
+    // fallback path, which is what this test is actually about.
+    expect(at("source_unavailable")).toBe("المصدر غير متاح مؤقتًا");
+    expect(at("source_unavailable")).not.toContain("رمز غير مفسَّر");
   });
 
   it("still prefers its own wording where it has some", () => {
@@ -148,5 +152,56 @@ describe("one table for one meaning", () => {
   it("still admits a code neither table knows", () => {
     // Inventing an explanation would be worse than saying there is not one.
     expect(at("something_new_from_the_server")).toContain("رمز غير مفسَّر");
+  });
+});
+
+describe("a code that carries a reason shows the reason", () => {
+  const at = (error_code: string) =>
+    describeJob(
+      {
+        id: "j",
+        status: "failed",
+        attempt: 3,
+        error_code,
+        created_at: "2026-09-14T00:00:00Z",
+      },
+      { workerConnected: false },
+    ).detail;
+
+  it("says what 'no reason recorded' actually means", () => {
+    // The old sentence — "استُنفدت المحاولات المسموح بها" — is true and
+    // useless: it describes the counter, not the situation. Nothing was
+    // retried; the job was taken from a worker that was still working, and
+    // restarting the worker is the wrong response to that.
+    //
+    // A bare code carries no cause, which *is* "no reason recorded", so the
+    // two read the same on purpose. The first draft of this test asserted they
+    // differ, which would have been a distinction with nothing behind it.
+    for (const code of [
+      "retry_exhausted",
+      "retry_exhausted:no_error_recorded",
+    ]) {
+      const detail = at(code);
+      expect(detail, code).toContain("انتُزعت من عامل كان يعمل");
+      expect(detail, code).toContain("مدّة الحيازة");
+    }
+  });
+
+  it("explains the carried cause rather than printing its code", () => {
+    // The tail is itself a code, so it gets the same treatment recursively.
+    const detail = at("retry_exhausted:quota_exceeded");
+    expect(detail).toContain("آخر سبب");
+    expect(detail).toContain("حصة يوتيوب");
+    expect(detail).not.toContain("quota_exceeded");
+  });
+
+  it("names thrashing as its own problem, with its count", () => {
+    const detail = at("lease_thrashing:20");
+    expect(detail).toContain("20");
+    expect(detail).toContain("لا شيء يقدر على إمساكها");
+  });
+
+  it("still admits a tail it cannot explain", () => {
+    expect(at("retry_exhausted:something_new")).toContain("something_new");
   });
 });

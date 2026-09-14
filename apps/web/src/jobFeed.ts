@@ -52,6 +52,20 @@ export type JobEntry = {
  * insufficientPermissions`. Splitting on the first colon keeps the specific
  * part available instead of throwing it away with a `startsWith` match.
  */
+/**
+ * One code, one sentence, for every surface that shows one.
+ *
+ * Exported because the health panel used to do its own flat lookup in
+ * `syncErrorMessages` — which is the same one-meaning-two-implementations
+ * shape that put two disagreeing tables on one screen, and it broke the moment
+ * a code carried a parameter: `retry_exhausted:no_error_recorded` is not a key
+ * in that table, so the panel fell through to "لسبب غير مصنَّف" and lost the
+ * part that mattered.
+ */
+export function explainCode(code: string): string | null {
+  return explain(code);
+}
+
 function explain(code: string): string | null {
   const [head, ...rest] = code.split(":");
   const tail = rest.join(":");
@@ -84,6 +98,21 @@ function explain(code: string): string | null {
         : `رفض يوتيوب الوصول${tail ? ` (${tail})` : ""}.`;
     case "superseded_by_existing_request":
       return "أُلغيت لأن طلبًا مطابقًا كان في الطابور بالفعل. طلب واحد لكل قناة في كل مرة.";
+    case "retry_exhausted": {
+      // The distinction the operator most needs, and the one a flat table
+      // cannot carry. "Exhausted with no reason recorded" does not mean the
+      // work failed — it means no worker ever reported anything, which is what
+      // a job taken from a worker that was still running looks like. Restarting
+      // the worker is the wrong response to it.
+      if (!tail || tail === "no_error_recorded")
+        return "بلغت الحدّ دون أن يسجّل أي عامل سببًا. هذا ليس فشلًا في الجمع: هكذا تبدو مهمّة انتُزعت من عامل كان يعمل. افحص مدّة الحيازة قبل أن تعيد تشغيل العامل.";
+      const why = explain(tail);
+      return `بلغت الحدّ المسموح. آخر سبب سجّله عامل: ${why ?? tail}`;
+    }
+    case "lease_thrashing":
+      // Not a slow job. A job nothing can hold, which is a different problem
+      // and deserves a different word.
+      return `تغيّرت يد هذه المهمة ${tail || "مرارًا"} مرّة دون أن تُنهى. ليست بطيئة؛ لا شيء يقدر على إمساكها — افحص العامل نفسه لا مدّة الحيازة.`;
     default:
       // The shared table, before giving up.
       //
