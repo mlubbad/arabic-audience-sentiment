@@ -27,8 +27,20 @@ WORKER_API_BASE_URL=https://<project>.supabase.co/functions/v1
 WORKER_CREDENTIAL=<the scoped worker credential>
 ```
 
-The credential is scoped to one workspace and is the only secret on the host.
-It is not a Supabase key and cannot read anything but its own queue.
+A credential is scoped to one workspace and is the only kind of secret on the
+host. It is not a Supabase key and cannot read anything but its own queue.
+
+To serve more than one workspace from one machine, list their credentials
+comma-separated:
+
+```
+WORKER_CREDENTIAL=<first>,<second>
+```
+
+The loop takes them in turn rather than in order, so a busy tenant cannot
+starve a quiet one, and a round counts as idle only when every credential came
+back empty. The classifier is loaded once and shared, which is the reason to
+run one worker over several tenants rather than one process each.
 
 ## Continuously
 

@@ -61,7 +61,7 @@ def build_plan(client: httpx.Client, consider: int):
 
 
 def serve(
-    control,
+    controls,
     plan,
     analyzer=None,
     idle_seconds: float = 60.0,
@@ -76,8 +76,16 @@ def serve(
     job that raises, and standing down rather than spinning — is testable
     without a control plane, a model or a clock.
     """
+    # One control plane per credential. A credential is scoped to a single
+    # workspace, so a worker holding one serves one tenant and every other
+    # tenant waits for a worker nobody started. They are taken in turn rather
+    # than in order, or the first busy tenant would starve the rest.
+    queue = list(controls) if isinstance(controls, (list, tuple)) else [controls]
     idle = 0
+    turn = 0
     while not should_stop():
+        control = queue[turn % len(queue)]
+        turn += 1
         try:
             worked = run(control, plan, analyzer=analyzer)
         except LeaseLost:
@@ -99,8 +107,12 @@ def serve(
             idle = 0
             continue
         idle += 1
-        if idle >= max_idle:
-            _log(f"idle for {idle} cycles, exiting for a clean restart")
+        # A round is only idle when every credential came back empty, so one
+        # quiet tenant never stands the worker down for the others.
+        if idle % len(queue) != 0:
+            continue
+        if idle // len(queue) >= max_idle:
+            _log(f"idle for {idle // len(queue)} rounds, exiting for a clean restart")
             return "idle"
         sleep(idle_seconds)
     return "stopped"
@@ -109,7 +121,9 @@ def serve(
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--base", default=os.environ.get("WORKER_API_BASE_URL", ""))
-    p.add_argument("--credential", default=os.environ.get("WORKER_CREDENTIAL", ""))
+    # Comma-separated: one scoped credential per workspace this worker serves.
+    p.add_argument("--credential", default=os.environ.get("WORKER_CREDENTIAL", ""),
+                   help="one or more scoped worker credentials, comma-separated")
     p.add_argument("--model", default="none",
                    choices=["none", "camelbert-da", "deterministic-test"])
     p.add_argument("--videos", type=int, default=50)
@@ -137,11 +151,12 @@ def main() -> None:
         analyzer = DeterministicTestAnalyzer()
 
     client = httpx.Client()
-    control = ControlPlane(args.base, args.credential, client)
+    credentials = [c.strip() for c in args.credential.split(",") if c.strip()]
+    controls = [ControlPlane(args.base, c, client) for c in credentials]
     plan = build_plan(client, args.videos)
-    _log(f"worker up, model={args.model}")
+    _log(f"worker up, model={args.model}, tenants={len(controls)}")
     why = serve(
-        control,
+        controls,
         plan,
         analyzer=analyzer,
         idle_seconds=args.idle_seconds,

@@ -75,3 +75,43 @@ def test_a_stop_request_ends_the_loop_between_jobs():
     # abandons a lease that the server then has to time out.
     assert why == "stopped"
     assert len(seen) == 2
+
+
+def test_every_tenant_gets_a_turn():
+    seen = []
+
+    def run(control, plan, analyzer=None):
+        seen.append(control)
+        return False
+
+    # A credential is scoped to one workspace, so a worker holding one serves
+    # one tenant. Taken in turn rather than in order, or the first busy tenant
+    # would starve the rest.
+    slept = []
+    serve(["a", "b", "c"], None, run=run, max_idle=2, sleep=slept.append)
+    assert seen[:6] == ["a", "b", "c", "a", "b", "c"]
+    # One pause per completed round, not one per credential: pausing between
+    # tenants would make a three-tenant worker three times slower to notice
+    # work than a one-tenant worker.
+    assert len(slept) == 1
+
+
+def test_one_quiet_tenant_does_not_stand_the_worker_down():
+    calls = []
+
+    def run(control, plan, analyzer=None):
+        calls.append(control)
+        # "b" always has work; "a" never does.
+        return control == "b"
+
+    stop = {"n": 0}
+
+    def should_stop():
+        stop["n"] += 1
+        return stop["n"] > 12
+
+    serve(["a", "b"], None, run=run, max_idle=1, should_stop=should_stop,
+          sleep=lambda s: None)
+    # A round is idle only when every credential came back empty. "b" keeps
+    # answering, so the loop never stands down despite max_idle of one.
+    assert calls.count("b") >= 5
