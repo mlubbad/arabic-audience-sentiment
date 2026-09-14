@@ -980,6 +980,94 @@ test("a chart that cannot be seen can still be read", async ({ page }) => {
   await expect(first.locator("tbody tr").first()).toContainText(/\d/);
 });
 
+test("an empty page says which empty it is", async ({ page }) => {
+  await page.goto("/dashboard");
+  const empty = page.getByTestId("empty-state");
+  await page
+    .getByLabel("البحث في التعليقات والمؤلفين")
+    .fill("لا يطابق هذا شيئًا");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(empty).toBeVisible();
+  // Filters excluded everything, and the workspace is not empty. Telling this
+  // reader that no collection has run would be false; telling the reader of an
+  // uncollected workspace to widen their filters is advice that cannot work,
+  // and for a new client on their first screen it was the only advice offered.
+  await expect(empty).toContainText("لا توجد تعليقات مطابقة لهذه الفلاتر");
+  await expect(empty).toContainText("6 تعليقًا محفوظًا");
+  // And the page carries the control that resolves it, under its own name —
+  // the filter bar's button already owns "إعادة ضبط الفلاتر".
+  await empty.getByRole("button", { name: "اعرض كل التعليقات" }).click();
+  await expect(page.getByTestId("total")).toHaveText("6");
+});
+
+test("a workspace with nothing collected is not told to change its filters", async ({
+  page,
+}) => {
+  // The state a new client meets on their very first screen, and the one the
+  // fixture cannot otherwise produce. It used to read "غيّر الفلاتر أو أعد
+  // ضبطها لعرض بيانات الاختبار" — advice that cannot work for a reader with no
+  // filters set, offering test data on a page reading their own channel.
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    fixture.comments = [];
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/dashboard");
+  const empty = page.getByTestId("empty-state");
+  await expect(empty).toBeVisible();
+  await expect(empty).toContainText("لم تصل تعليقات بعد");
+  await expect(empty).not.toContainText("الفلاتر أو أعد ضبطها");
+  // And it points at the two places where a collection can actually begin.
+  await expect(empty.getByRole("link", { name: /حالة الجمع/ })).toHaveAttribute(
+    "href",
+    "/sync",
+  );
+  await expect(empty.getByRole("link", { name: /اربط قناة/ })).toHaveAttribute(
+    "href",
+    "/account",
+  );
+});
+
+test("the report index lists every section and marks the one in view", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const links = page.locator(".rp-nav-links a");
+  // Wait for the sections to exist before comparing them to the index. The
+  // header test in this file spent its life asserting against a page whose
+  // data had not arrived — it counted nothing, found nothing wrong, and
+  // passed. The same trap is one line away here.
+  await expect(page.locator("#rp-comments")).toBeVisible();
+  // One list drives both the index and the page, so a section cannot exist in
+  // one and not the other. Two did: مقارنة الفيديوهات and أكثر التعليقات
+  // السلبية تفاعلًا were on the page and absent from the index enumerating it.
+  const ids = await links.evaluateAll((els) =>
+    els.map((e) => (e as HTMLAnchorElement).getAttribute("href")!.slice(1)),
+  );
+  expect(ids.length).toBeGreaterThan(0);
+  for (const id of ids) await expect(page.locator(`#${id}`)).toHaveCount(1);
+  const sections = await page
+    .locator("main section.rp-section[id]")
+    .evaluateAll((els) => els.map((e) => e.id));
+  expect(new Set(ids)).toEqual(new Set(sections));
+
+  // And the index says where the reader is.
+  await page.locator("#rp-comments").scrollIntoViewIfNeeded();
+  await expect(links.filter({ hasText: "التعليقات" }).last()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+
+  // An index to nothing is worse than no index: at zero rows every section it
+  // names is unrendered, and a link that does nothing reads as a broken page.
+  await page
+    .getByLabel("البحث في التعليقات والمؤلفين")
+    .fill("لا يطابق هذا شيئًا");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("empty-state")).toBeVisible();
+  await expect(links).toHaveCount(0);
+});
+
 test("a budget bar shows the state its sentence reports", async ({ page }) => {
   await page.goto("/sync");
   const near = page.getByTestId("budget-comment_analysis");

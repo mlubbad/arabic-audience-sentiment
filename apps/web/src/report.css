@@ -857,3 +857,82 @@
   progress::-moz-progress-bar {
   background: var(--color-danger);
 }
+
+/* The empty page is a page like any other: it says which of the two empties
+   this is, and carries the control that resolves it. */
+.rp-page .empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.rp-page .empty-actions a,
+.rp-page .empty-actions button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-2);
+  background: var(--bg-card);
+  color: var(--link);
+  font-family: inherit;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.rp-page .empty-actions a:first-child,
+.rp-page .empty-actions button:first-child {
+  background: var(--ml-indigo);
+  border-color: var(--ml-indigo);
+  color: #fff;
+}
+
+/* The action beside the diagnosis. */
+.rp-page .sync-actions {
+  margin-block: var(--space-4);
+}
+.rp-page .sync-actions button {
+  min-height: 40px;
+  padding: 0 var(--space-5);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--ml-indigo);
+  background: var(--ml-indigo);
+  color: #fff;
+  font-family: inherit;
+  font-size: var(--fs-small);
+  font-weight: 700;
+  cursor: pointer;
+}
+.rp-page .sync-actions p {
+  margin: 0;
+  font-size: var(--fs-small);
+}
+
+/* Where the reader is. The mark is weight and a rule, not colour alone. */
+.rp-nav-links a[aria-current] {
+  color: var(--ml-indigo);
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 0 var(--ml-indigo);
+}
+
+/* A row action is not the page's primary action.
+   Every <button> in the product defaults to filled indigo, so a table of 25
+   comments shipped 25 filled buttons down its last column — a wall of equal
+   shouting in which nothing is emphasised and the eye has nowhere to rest.
+   Emphasis is finite: spending it on a repeating control leaves none for the
+   one button the reader actually has to find. Scoped to table cells rather
+   than given a class, so the next table cannot forget it. */
+.rp-page td button {
+  background: var(--bg-card);
+  border-color: var(--border-2);
+  color: var(--link);
+  font-weight: 600;
+  min-height: 36px;
+  padding: 0.35rem 0.8rem;
+}
+.rp-page td button:hover:not(:disabled) {
+  border-color: var(--ml-indigo);
+  background: var(--ml-indigo-50);
+}

@@ -152,6 +152,11 @@ function SyncBody({
   // inventing one would put a plausible history on screen for a demo.
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [jobsFailed, setJobsFailed] = useState(false);
+  // The channel, read here for one reason: this page is where a reader learns
+  // that nothing has collected, and the only button that starts a collection
+  // was on the account page. Being told "لم تُنفَّذ أي مزامنة" by a screen
+  // that cannot start one leaves the reader to guess where the remedy lives.
+  const [channelId, setChannelId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [acting, setActing] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState("");
@@ -177,13 +182,51 @@ function SyncBody({
       void snapshot.refetch();
     });
   };
+  const requestSync = () => {
+    if (!supabase || !channelId) return;
+    setActing("enqueue");
+    setActionMessage("");
+    void supabase
+      .rpc("enqueue_sync", {
+        w: workspaceId,
+        c: channelId,
+        // Not a timestamp. The database holds one outstanding collection per
+        // channel and answers a repeat with the job already waiting; a key
+        // that changes on every click asks it for a new one each time.
+        k: `sync-page-${workspaceId}`,
+      })
+      .then(({ error }) => {
+        setActing(null);
+        // Never "أُضيفت": a second click is answered with the first job, and
+        // claiming a new one was queued would be false on every click but one.
+        setActionMessage(
+          error
+            ? "تعذّر تسجيل طلب المزامنة."
+            : "طلب المزامنة قائم. لكل قناة طلب واحد في كل مرة، ويبدأ حين يعمل عامل الجمع.",
+        );
+        setTick((t) => t + 1);
+        void snapshot.refetch();
+      });
+  };
   useEffect(() => {
     if (!supabase || mode !== "live") {
       setJobs(null);
+      setChannelId(null);
       return;
     }
     const db = supabase;
     let active = true;
+    void db
+      .from("connection_status")
+      .select("channel_id,status")
+      .eq("workspace_id", workspaceId)
+      .then(({ data }) => {
+        if (!active) return;
+        const connectedChannel = (data ?? []).find(
+          (c) => c.status === "connected",
+        );
+        setChannelId(connectedChannel?.channel_id ?? null);
+      });
     void db
       .from("jobs")
       .select("id,status,attempt,error_code,created_at")
@@ -288,6 +331,30 @@ function SyncBody({
                     ? `متصل، آخر نبضة ${displayDate(s.sync.worker.last_heartbeat_at)}`
                     : "غير متصل الآن. لن تُحدَّث البيانات تلقائيًا حتى يعود عامل الجمع."}
                 </p>
+                {/* The remedy, beside the diagnosis. Offered only when it can
+                    work: without a connected channel the server refuses, and a
+                    button that always fails is worse than no button — so that
+                    case says where to go instead. */}
+                {mode === "live" && (
+                  <div className="sync-actions">
+                    {channelId ? (
+                      <button
+                        type="button"
+                        data-testid="sync-request"
+                        disabled={acting === "enqueue"}
+                        onClick={requestSync}
+                      >
+                        {acting === "enqueue" ? "جارٍ الطلب…" : "طلب مزامنة"}
+                      </button>
+                    ) : (
+                      <p className="muted" data-testid="sync-no-channel">
+                        لا توجد قناة مرتبطة بمساحة العمل هذه.{" "}
+                        <a href="/account">اربط قناة من صفحة الحساب</a> ليبدأ
+                        الجمع.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {run ? (
                   <p data-testid="sync-last-run">
                     آخر تشغيل: {displayDate(run.started_at)} — المصدر{" "}

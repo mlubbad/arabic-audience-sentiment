@@ -497,6 +497,39 @@ describe("human corrections", () => {
         .channel_own_comments,
     ).toBe(1);
   });
+  it("tells an empty workspace apart from an emptied filter", () => {
+    const rows: Comment[] = [
+      { ...base, id: "a", prediction: pred("positive") },
+      { ...base, id: "b", prediction: predNeg() },
+      { ...base, id: "own", by_channel_owner: true },
+      {
+        ...base,
+        id: "elsewhere",
+        workspace_id: "00000000-0000-4000-8000-000000000002",
+      },
+    ];
+    // Filtered to nothing, but the workspace is not empty: this reader has
+    // filters to widen and should be told so.
+    const narrowed = snapshot(
+      rows,
+      { workspace_id: workspace, q: "لا يطابق شيئًا" },
+      "fixture-v1",
+    );
+    expect(narrowed.total).toBe(0);
+    expect(narrowed.workspace_total).toBe(2);
+
+    // Nothing held at all. Telling this reader to change their filters is
+    // advice that cannot work, so the page has to be able to see the
+    // difference. Neither the channel's own replies nor another workspace's
+    // rows make a workspace non-empty.
+    const empty = snapshot(
+      rows.filter((c) => c.id !== "a" && c.id !== "b"),
+      { workspace_id: workspace },
+      "fixture-v1",
+    );
+    expect(empty.total).toBe(0);
+    expect(empty.workspace_total).toBe(0);
+  });
   it("offers every video the workspace has, whichever one is selected", () => {
     const rows: Comment[] = [
       { ...base, id: "o1", video_id: "v1", video_title: "الحلقة الأولى" },

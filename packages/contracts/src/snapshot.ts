@@ -213,6 +213,20 @@ export function snapshot(
     channel_own_comments: input.filter(
       (c) => c.workspace_id === f.workspace_id && c.by_channel_owner,
     ).length,
+    // Everything held for this workspace, before any filter but the two that
+    // are not choices — the workspace itself, and the channel's own voice.
+    //
+    // This exists to tell two zeros apart. A workspace whose collection has
+    // not run yet and a filter that excluded everything both end with an empty
+    // page, and the only useful thing to say about them is opposite: one
+    // reader should widen their filters, the other has no filters to widen and
+    // needs a collection. Without this number the page can only guess, and it
+    // guessed "change your filters" at the reader who had none.
+    workspace_total: new Set(
+      input
+        .filter((c) => c.workspace_id === f.workspace_id && !c.by_channel_owner)
+        .map((c) => c.id),
+    ).size,
     most_engaged_negative,
     // How many could be ranked, so a shown five is never mistaken for all five.
     negative_ranked: rankable.length,

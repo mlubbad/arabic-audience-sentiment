@@ -126,6 +126,60 @@ function ChartFigures({
   );
 }
 
+/** The report's sections, in the order the page lays them out. One list, so a
+ *  section cannot be added to the page and forgotten in its index — which is
+ *  how "مقارنة الفيديوهات" and "أكثر التعليقات السلبية تفاعلًا" came to exist
+ *  on the page and nowhere in the navigation that claims to enumerate it. */
+const SECTIONS = [
+  { id: "rp-summary", label: "الملخص" },
+  { id: "rp-videos", label: "الفيديوهات" },
+  { id: "rp-voice", label: "صوت الجمهور" },
+  { id: "rp-timing", label: "التوقيت" },
+  { id: "rp-people", label: "المعلّقون" },
+  { id: "rp-compare", label: "المقارنة" },
+  { id: "rp-engaged", label: "الأكثر تفاعلًا" },
+  { id: "rp-comments", label: "التعليقات" },
+] as const;
+
+/**
+ * Which section the reader is in.
+ *
+ * Scroll position is the wrong question — a section can be short, or the page
+ * can be scrolled to its end with three sections in view. The observer answers
+ * the question actually being asked: of the sections currently on screen,
+ * which starts highest. `enabled` exists because the sections do not render on
+ * an empty page, and an observer watching for elements that will never appear
+ * is a subscription with no subject.
+ */
+function useActiveSection(enabled: boolean) {
+  const [active, setActive] = useState<string | null>(null);
+  useEffect(() => {
+    if (!enabled || typeof IntersectionObserver === "undefined") {
+      setActive(null);
+      return;
+    }
+    const seen = new Map<string, boolean>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id, e.isIntersecting);
+        const first = SECTIONS.find((s) => seen.get(s.id));
+        // Only move the mark when something is in view. Clearing it between
+        // two sections would make the index flicker on every scroll.
+        if (first) setActive(first.id);
+      },
+      // The header is sticky, so a section is "reached" when its top passes
+      // under it, not when it touches the viewport edge.
+      { rootMargin: "-88px 0px -55% 0px" },
+    );
+    for (const s of SECTIONS) {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [enabled]);
+  return active;
+}
+
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export function Dashboard() {
   // Who is asking decides what this page is. A signed-in owner reads their own
@@ -416,6 +470,7 @@ function DashboardBody({
     setFilters(defaults);
   }
   const s = result.data;
+  const active = useActiveSection(!!s && s.total > 0);
   // Aggregations for the charts, over every row the filters admit rather than
   // the page on screen. Memoised on the filtered array itself: it is a new
   // array only when the read or the filters actually changed.
@@ -510,15 +565,29 @@ function DashboardBody({
           <p>جارٍ قراءة التعليقات المحفوظة…</p>
         )}
       </header>
+      {/* Two sections were missing from this list and two more were being
+          offered on a page that had none: at zero rows every section below is
+          unrendered, and the nav went on linking to six of them. A control
+          that does nothing when pressed is worse than an absent one — the
+          reader concludes the page is broken rather than empty. */}
       <nav className="rp-nav" aria-label="أقسام التقرير">
-        <div className="rp-nav-links">
-          <a href="#rp-summary">الملخص</a>
-          <a href="#rp-videos">الفيديوهات</a>
-          <a href="#rp-voice">صوت الجمهور</a>
-          <a href="#rp-timing">التوقيت</a>
-          <a href="#rp-people">المعلّقون</a>
-          <a href="#rp-comments">التعليقات</a>
-        </div>
+        {s && s.total > 0 && (
+          <div className="rp-nav-links">
+            {SECTIONS.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                // Where the reader is, not only where they can go. A sticky
+                // index on a page this long that never says which of its eight
+                // sections you are in is a table of contents with the bookmark
+                // removed.
+                aria-current={active === section.id ? "true" : undefined}
+              >
+                {section.label}
+              </a>
+            ))}
+          </div>
+        )}
         <span className="rp-scope">{source.scope}</span>
       </nav>
       <aside
@@ -839,9 +908,44 @@ function DashboardBody({
             </div>
           </section>
           {s.total === 0 ? (
-            <section className="empty">
-              <h2>لا توجد تعليقات مطابقة</h2>
-              <p>غيّر الفلاتر أو أعد ضبطها لعرض بيانات الاختبار.</p>
+            /* Two different zeros, and for years one message.
+               A workspace whose collection has not run yet and a filter that
+               excluded everything both land here, and the only useful advice
+               is opposite. The page told both of them to change their filters
+               — which is the one thing a new client, on their first screen,
+               with no filters set, cannot do. It also offered to show them
+               "بيانات الاختبار" on a page reading their real channel. */
+            <section className="empty" data-testid="empty-state">
+              {s.workspace_total === 0 ? (
+                <>
+                  <h2>لم تصل تعليقات بعد</h2>
+                  <p>
+                    لا توجد تعليقات محفوظة لمساحة العمل هذه. لا علاقة للفلاتر
+                    بذلك — لم يكتمل جمعٌ بعد.
+                  </p>
+                  <div className="empty-actions">
+                    <a href="/sync">تابع حالة الجمع</a>
+                    <a href="/account">اربط قناة أو اطلب مزامنة</a>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2>لا توجد تعليقات مطابقة لهذه الفلاتر</h2>
+                  <p>
+                    {n(s.workspace_total)} تعليقًا محفوظًا في مساحة العمل، ولا
+                    واحد منها يطابق ما اخترته. وسّع الفلاتر أو أعد ضبطها.
+                  </p>
+                  <div className="empty-actions">
+                    {/* Not "إعادة ضبط الفلاتر", which is what the button in
+                        the filter bar says. Two controls with one name are one
+                        name too few — and from an empty page the useful
+                        promise is the result, not the mechanism. */}
+                    <button type="button" onClick={reset}>
+                      اعرض كل التعليقات
+                    </button>
+                  </div>
+                </>
+              )}
             </section>
           ) : (
             <>
@@ -1258,6 +1362,7 @@ function DashboardBody({
               </section>
               <section
                 className="rp-section"
+                id="rp-compare"
                 aria-labelledby="comparison-heading"
               >
                 <header>
@@ -1346,6 +1451,7 @@ function DashboardBody({
               </section>
               <section
                 className="rp-section"
+                id="rp-engaged"
                 aria-labelledby="engaged-heading"
                 data-testid="engaged-panel"
               >
