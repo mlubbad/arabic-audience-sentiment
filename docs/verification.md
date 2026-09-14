@@ -1,6 +1,28 @@
 # Verification
 
+## 2026-09-14 — Private preview deployment and live origin verification
+
+Deployed to private preview hosting (`app.sky-develop.net`, origin `91.204.209.217`) via `npm run deploy:preview`:
+
+| Probe / Request | Actual result |
+| --- | --- |
+| `GET /` without basic auth | **401 Unauthorized** (private protection strictly enforced) |
+| `GET /` with basic auth | **200 OK** |
+| `GET /index.html` | **200 OK** (803 bytes) |
+| `GET /fixtures/dashboard.json` | **200 OK** (11,283 bytes) |
+| `GET /landing/arabic-bold.ttf` | **200 OK** (229,352 bytes) |
+| `GET /robots.txt` | **200 OK** (26 bytes) |
+| `GET /dashboard` (SPA route fallback) | **200 OK** (serves `index.html`) |
+| `GET /sync` (SPA route fallback) | **200 OK** (serves `index.html`) |
+| `GET /account` (SPA route fallback) | **200 OK** (serves `index.html`) |
+| `GET /.htaccess` | **403 Forbidden** (direct configuration access prevented) |
+| `GET /assets/report-KE-usfQc.css` | **200 OK** (19,393 bytes) |
+| `GET /assets/Dashboard-MT9GcQVq.js` | **200 OK** (231,257 bytes) |
+| `GET /assets/index-BuQPClQp.js` | **200 OK** (509,440 bytes) |
+| Stale asset cleanup | 8 obsolete bundles deleted via FTP DELE (`gone`) |
+
 ## 2026-09-14 — Comment confidence score display and live test alignment
+
 
 Node 22.14.0, Python 3.12.10. Verified on `main`:
 
