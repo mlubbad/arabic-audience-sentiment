@@ -40,6 +40,10 @@ export type JobEntry = {
   detail: string;
   attempt: number;
   createdAt: string;
+  /** Queued work can be withdrawn; a leased job belongs to its worker. */
+  cancellable: boolean;
+  /** Finished without success — worth another attempt. */
+  retryable: boolean;
 };
 
 /**
@@ -92,6 +96,12 @@ export function describeJob(
     id: job.id,
     attempt: job.attempt,
     createdAt: job.created_at,
+    // Mirrors what cancel_job and retry_job will accept. The database decides;
+    // this only avoids offering a button that is going to be refused.
+    cancellable: job.status === "queued",
+    retryable: ["failed", "blocked", "cancelled", "partial"].includes(
+      job.status,
+    ),
   };
   const reason = job.error_code ? explain(job.error_code) : null;
   // An unrecognised code is shown as itself rather than smoothed into a

@@ -61,6 +61,29 @@ export function Sync() {
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [jobsFailed, setJobsFailed] = useState(false);
   const [tick, setTick] = useState(0);
+  const [acting, setActing] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
+
+  // Both are refused by the database for a job in the wrong state or another
+  // tenant's workspace; the buttons only avoid offering what will be refused.
+  const act = (kind: "cancel_job" | "retry_job", id: string) => {
+    if (!supabase) return;
+    setActing(id);
+    setActionMessage("");
+    void supabase.rpc(kind, { w: workspaceId, j: id }).then(({ error }) => {
+      setActing(null);
+      setActionMessage(
+        error
+          ? kind === "cancel_job"
+            ? "تعذّر سحب المهمة — قد يكون عامل قد بدأها بالفعل."
+            : "تعذّرت إعادة المحاولة."
+          : kind === "cancel_job"
+            ? "سُحبت المهمة من الطابور."
+            : "أُضيفت محاولة جديدة، تستأنف من حيث توقّفت السابقة.",
+      );
+      setTick((t) => t + 1);
+    });
+  };
   useEffect(() => {
     if (!supabase || mode !== "live") {
       setJobs(null);
@@ -251,9 +274,36 @@ export function Sync() {
                       {displayDate(e.createdAt)}
                       {e.attempt > 0 ? ` · المحاولة ${e.attempt}` : ""}
                     </small>
+                    {e.cancellable && (
+                      <button
+                        type="button"
+                        className="rp-tab"
+                        disabled={acting === e.id}
+                        data-testid={`cancel-${e.id}`}
+                        onClick={() => act("cancel_job", e.id)}
+                      >
+                        سحب من الطابور
+                      </button>
+                    )}
+                    {e.retryable && (
+                      <button
+                        type="button"
+                        className="rp-tab"
+                        disabled={acting === e.id}
+                        data-testid={`retry-${e.id}`}
+                        onClick={() => act("retry_job", e.id)}
+                      >
+                        إعادة المحاولة
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
+            )}
+            {actionMessage && (
+              <p role="status" data-testid="job-action">
+                {actionMessage}
+              </p>
             )}
             {mode === "live" && (
               <button type="button" onClick={() => setTick((t) => t + 1)}>

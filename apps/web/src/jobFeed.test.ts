@@ -95,3 +95,23 @@ describe("describeJob", () => {
     expect(other.severity).toBe("warning");
   });
 });
+
+describe("what an operator may do with a job", () => {
+  const at = (status: JobRow["status"]) =>
+    describeJob(row({ status }), { workerConnected: true });
+
+  it("offers withdrawal only before a worker has taken it", () => {
+    expect(at("queued").cancellable).toBe(true);
+    // A leased job belongs to the worker holding it. Cancelling underneath it
+    // would let it commit to a job the operator believes is stopped.
+    expect(at("running").cancellable).toBe(false);
+    expect(at("succeeded").cancellable).toBe(false);
+  });
+
+  it("offers a retry only for work that finished without succeeding", () => {
+    for (const s of ["failed", "blocked", "cancelled", "partial"] as const)
+      expect(at(s).retryable).toBe(true);
+    for (const s of ["queued", "running", "succeeded"] as const)
+      expect(at(s).retryable).toBe(false);
+  });
+});
