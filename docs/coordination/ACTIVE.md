@@ -56,7 +56,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
-## Three invariants that no failing test will announce
+## Four invariants that no failing test will announce
 
 Both were flagged by `sentimentanalysis-69`, which wrote them. Each is enforced
 in one place rather than at every call site, which is what makes them easy to
@@ -90,6 +90,15 @@ anyone writes a per-class number or an accuracy into that panel, the
 single-annotator limit has to go in beside it — the set cannot establish an
 absolute accuracy. Flagged by `sentimentanalysis-69`, which built the set. Same
 shape as the two above: no test will catch it.
+
+**`create or replace` on a SQL function is a whole-body rewrite.** Build the
+replacement from the function's *current* definition, never from the migration
+that first created it — a later migration may have added something to the body,
+and starting from the original silently reverts it. This happened on
+2026-09-14: a `worker_finish` replacement drafted from the original plus one
+line dropped the run-closing insert that `20260914070000` had added. Two
+worker_gateway tests caught it, which is luck rather than design; nothing
+announces a reverted body. Flagged by `sentimentanalysis-91`, which hit it.
 
 ## Things that are shared and will collide silently
 
