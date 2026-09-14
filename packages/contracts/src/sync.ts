@@ -48,6 +48,18 @@ export const SyncStateSchema = z
       .object({
         connected: z.boolean(),
         last_heartbeat_at: timestamp.nullable(),
+        // Alive with nothing to do is not alive and working, and an operator
+        // waiting on a collection needs them apart.
+        //
+        // Defaulted rather than required, because the two halves of this
+        // contract deploy separately: the database gained the field the moment
+        // its migration was applied, while the browser keeps running whatever
+        // bundle was last shipped. A required field would make the old bundle
+        // reject the new payload; `.strict()` on this object had already made
+        // the new payload unreadable to it, and since `sync` falls back with
+        // `.catch(null)`, the panel did not error — it quietly reported the
+        // sync state as unknown. A default is what lets either side move first.
+        busy: z.boolean().default(false),
       })
       .strict(),
     queued_jobs: z.number().int().nonnegative(),

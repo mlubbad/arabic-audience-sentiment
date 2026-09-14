@@ -3,7 +3,11 @@ import { syncHealth, type SyncState } from "./syncHealth";
 
 const now = new Date("2026-09-13T12:00:00Z");
 const state = (over: Partial<SyncState> = {}): SyncState => ({
-  worker: { connected: true, last_heartbeat_at: "2026-09-13T11:59:00Z" },
+  worker: {
+    connected: true,
+    busy: false,
+    last_heartbeat_at: "2026-09-13T11:59:00Z",
+  },
   queued_jobs: 0,
   last_run: {
     started_at: "2026-09-13T11:00:00Z",
@@ -67,7 +71,11 @@ describe("sync health", () => {
   it("treats queued work with no worker as stalled, whatever the last run said", () => {
     const stalled = state({
       queued_jobs: 4,
-      worker: { connected: false, last_heartbeat_at: "2026-09-12T09:00:00Z" },
+      worker: {
+        connected: false,
+        busy: false,
+        last_heartbeat_at: "2026-09-12T09:00:00Z",
+      },
     });
     // A healthy previous run must not hide the fact that nothing is progressing.
     expect(syncHealth(stalled, now)).toMatchObject({
@@ -99,7 +107,7 @@ describe("sync health", () => {
       syncHealth(
         state({
           last_run: null,
-          worker: { connected: false, last_heartbeat_at: null },
+          worker: { connected: false, busy: false, last_heartbeat_at: null },
         }),
         now,
       ),

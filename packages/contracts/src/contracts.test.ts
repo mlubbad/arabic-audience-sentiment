@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SyncStateSchema } from "./sync";
 import {
   CommentSchema,
   CommentReviewInputSchema,
@@ -786,5 +787,47 @@ describe("searching a corpus that contains purged comments", () => {
       "fixture-v1",
     );
     expect(after.total).toBe(before.total + 1);
+  });
+});
+
+describe("the sync contract survives its two halves deploying separately", () => {
+  const now = "2026-09-14T21:00:00Z";
+  const worker = { connected: true, last_heartbeat_at: now };
+
+  it("reads a payload from a database that is ahead of the bundle", () => {
+    // This is not hypothetical. A migration added `worker.busy` to the live
+    // payload while browsers kept running the last bundle shipped. The object
+    // is `.strict()`, so the new key made the whole block unparseable — and
+    // because `sync` is `.catch(null)`, nothing errored: every signed-in user
+    // simply saw the sync state reported as unknown.
+    const ahead = SyncStateSchema.safeParse({
+      worker: { ...worker, busy: true },
+      queued_jobs: 1,
+      last_run: null,
+    });
+    expect(ahead.success).toBe(true);
+  });
+
+  it("reads a payload from a database that is behind the bundle", () => {
+    // The other direction, which is the ordinary one: the bundle ships first.
+    // A required field would break this, so the field carries a default.
+    const behind = SyncStateSchema.parse({
+      worker,
+      queued_jobs: 0,
+      last_run: null,
+    });
+    expect(behind.worker.busy).toBe(false);
+  });
+
+  it("still refuses a key nobody has defined", () => {
+    // Tolerating one field is not tolerating anything: a typo in a migration
+    // should still be caught rather than absorbed.
+    expect(
+      SyncStateSchema.safeParse({
+        worker: { ...worker, buzy: true },
+        queued_jobs: 0,
+        last_run: null,
+      }).success,
+    ).toBe(false);
   });
 });

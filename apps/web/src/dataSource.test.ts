@@ -4,7 +4,11 @@ import type { SyncState } from "./syncHealth";
 
 const NOW = new Date("2026-09-13T12:00:00Z");
 const sync = (over: Partial<SyncState> = {}): SyncState => ({
-  worker: { connected: true, last_heartbeat_at: "2026-09-13T11:55:00Z" },
+  worker: {
+    connected: true,
+    busy: false,
+    last_heartbeat_at: "2026-09-13T11:55:00Z",
+  },
   queued_jobs: 0,
   last_run: {
     started_at: "2026-09-13T09:00:00Z",
