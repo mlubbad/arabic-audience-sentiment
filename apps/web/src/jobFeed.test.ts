@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { describeJob, type JobRow } from "./jobFeed";
+import { syncErrorMessages } from "./i18n";
+import { describeJob, explainCode, type JobRow } from "./jobFeed";
 
 const row = (over: Partial<JobRow> = {}): JobRow => ({
   id: "j1",
@@ -203,5 +204,38 @@ describe("a code that carries a reason shows the reason", () => {
 
   it("still admits a tail it cannot explain", () => {
     expect(at("retry_exhausted:something_new")).toContain("something_new");
+  });
+});
+
+describe("unifying two readers must not lose what either knew", () => {
+  // The general form of a defect that shipped: `explainCode` replaced a flat
+  // lookup, and for one code the switch it routed through said *less* than the
+  // table it replaced. Nothing failed except one browser test, by luck.
+  //
+  // So: a bare code — one carrying no parameter — resolves to exactly what the
+  // table says. The switch earns the right to differ only when a parameter
+  // gives it something more specific, and the two deliberate exceptions are
+  // named here rather than left to be discovered.
+  const OVERRIDDEN = new Set([
+    // The table's "استُنفدت المحاولات المسموح بها" describes the counter
+    // rather than the situation, and the situation is the operator's whole
+    // problem. Replaced on purpose; see the case for why.
+    "retry_exhausted",
+  ]);
+
+  it.each(Object.keys(syncErrorMessages).filter((k) => !OVERRIDDEN.has(k)))(
+    "keeps the table's wording for a bare %s",
+    (code) => {
+      expect(explainCode(code)).toBe(syncErrorMessages[code]);
+    },
+  );
+
+  it("still lets a parameter earn a more specific sentence", () => {
+    const bare = explainCode("source_access_denied");
+    const specific = explainCode(
+      "source_access_denied:insufficientPermissions",
+    );
+    expect(specific).not.toBe(bare);
+    expect(specific).toContain("أعد ربط القناة");
   });
 });

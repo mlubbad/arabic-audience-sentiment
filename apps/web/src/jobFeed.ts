@@ -93,9 +93,16 @@ function explain(code: string): string | null {
     case "quota_exceeded":
       return "استُنفدت حصة يوتيوب اليومية. تتجدد تلقائيًا، وتُعاد المحاولة بعدها.";
     case "source_access_denied":
-      return tail === "insufficientPermissions"
-        ? "الإذن الممنوح لا يكفي لقراءة التعليقات. أعد ربط القناة لتجديد النطاق."
-        : `رفض يوتيوب الوصول${tail ? ` (${tail})` : ""}.`;
+      // The switch may only override the table where it has something *more*
+      // specific to say. Its bare branch said less — "رفض يوتيوب الوصول."
+      // against the table's "رفض المصدر الوصول، غالبًا بسبب الحصة أو
+      // الصلاحيات" — so unifying the two readers quietly dropped the half that
+      // tells the operator where to look. A parameter is what earns the
+      // override; without one, the table's wording stands.
+      if (tail === "insufficientPermissions")
+        return "الإذن الممنوح لا يكفي لقراءة التعليقات. أعد ربط القناة لتجديد النطاق.";
+      if (tail) return `رفض يوتيوب الوصول (${tail}).`;
+      return syncErrorMessages.source_access_denied;
     case "superseded_by_existing_request":
       return "أُلغيت لأن طلبًا مطابقًا كان في الطابور بالفعل. طلب واحد لكل قناة في كل مرة.";
     case "retry_exhausted": {
