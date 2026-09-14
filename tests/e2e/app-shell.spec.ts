@@ -62,6 +62,22 @@ test("the front door is in the header, on every route", async ({ page }) => {
   await expect(page.getByRole("link", { name: "تسجيل الدخول" })).toHaveCount(1);
 });
 
+test("the way in claims nothing it cannot show", async ({ page }) => {
+  await page.goto("/account");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  // The screen this was modelled on carries "Trusted by 200,000+ companies in
+  // 120 countries" over five customer logos. This product has no customers, so
+  // that line would be an invention — and on a product whose argument is that
+  // it reports what it measured, a fabricated number on the way in undoes the
+  // argument before the reader reaches the data.
+  //
+  // Asserted over the whole document rather than one panel, because the claim
+  // would be just as false anywhere else on the page.
+  const body = page.locator("body");
+  await expect(body).not.toContainText(/\d[\d,]{3,}\s*\+?\s*(شركة|عميل|مؤسسة)/);
+  await expect(body).not.toContainText("موثوق به من");
+});
+
 test("the connection result and unknown route offer working recovery paths", async ({
   page,
 }) => {

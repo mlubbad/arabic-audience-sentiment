@@ -359,11 +359,16 @@
   width: 100%;
   min-height: 48px;
 }
-.app-shell .account-entry form.rp-card > button[value="signup"] {
-  background: #f3f0ff;
-  border-color: #ded7fd;
-  color: var(--ml-indigo);
+/* The switch between the two screens is a link wearing a button's element,
+   because it changes what this form is rather than submitting it. */
+.app-shell .account-entry form.rp-card button.auth-link {
+  width: auto;
+  min-height: 0;
 }
+/* Signing up was the second of two buttons on one form, so it was styled as
+   the quieter of the pair. It is now the only action on its own screen — the
+   thing the reader came to do — and a primary action dressed as a secondary
+   one reads as not quite available. */
 .account-story {
   position: relative;
   overflow: hidden;

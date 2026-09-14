@@ -7,6 +7,7 @@ import {
   type AuthAction,
 } from "./authMessages";
 import { beginConnect } from "./connect";
+import { providers, type ProviderId } from "./authProviders";
 import "./report.css";
 export function Account() {
   const [session, setSession] = useState<Session | null>(null),
@@ -15,6 +16,50 @@ export function Account() {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [name, setName] = useState("");
+  // Which of the two screens is showing. A query string so the header's
+  // "تسجيل الدخول" and a "create an account" link can each land on the right
+  // one, and so a reader can send someone the signup screen directly.
+  const [joining, setJoining] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("signup"),
+  );
+  const authProviders = providers(import.meta.env.VITE_AUTH_PROVIDERS);
+
+  /**
+   * Hand off to a provider.
+   *
+   * Only ever called for a door the configuration says is open — the closed
+   * ones are disabled — but it checks again rather than trusting the caller,
+   * because the cost of being wrong is the reader losing their session to an
+   * error page from a third party.
+   */
+  function startProvider(id: ProviderId) {
+    const open = authProviders.find((p) => p.id === id && !p.closedReason);
+    if (!open || !supabase) return;
+    if (id === "sso") {
+      // Not an OAuth provider: SAML takes a domain and resolves the tenant
+      // from it, so it needs its own screen before it can be called at all.
+      setMessage(
+        "الدخول الموحَّد يحتاج نطاق مؤسستك — لم تُبنَ هذه الشاشة بعد.",
+      );
+      return;
+    }
+    setPending(true);
+    setMessage("");
+    void supabase.auth
+      .signInWithOAuth({
+        provider: id,
+        // Back to the account page, which is where the session is resolved
+        // and where the next step — creating a workspace — lives.
+        options: { redirectTo: `${window.location.origin}/account` },
+      })
+      .then(({ error }) => {
+        if (!error) return; // the browser is leaving; nothing to report
+        setPending(false);
+        setMessage("تعذّر بدء الدخول عبر هذا المزوّد.");
+      });
+  }
   const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>(
     [],
   );
@@ -174,9 +219,18 @@ export function Account() {
       )}
       {!session ? (
         <div className="account-entry">
-          <form className="rp-card" onSubmit={auth}>
-            <h2>ادخل إلى مساحة عملك</h2>
-            <p>استخدم بريدك للوصول إلى قنواتك وتقاريرك الخاصة.</p>
+          {/* Two screens, not one form with two submits.
+              Logging in and creating an account are different intentions with
+              different stakes, and a single form that did both put them on
+              adjacent buttons — so the way to a new account and the way back
+              into an existing one were one mis-click apart. */}
+          <form className="rp-card auth-card" onSubmit={auth}>
+            <h2>{joining ? "أنشئ حسابك" : "مرحبًا بعودتك"}</h2>
+            <p>
+              {joining
+                ? "معاينة خاصة — الحساب يفتح مساحة عمل واحدة تخصّك."
+                : "ادخل إلى مساحة عملك وقنواتك وتقاريرك."}
+            </p>
             <label>
               البريد الإلكتروني
               <input
@@ -191,19 +245,62 @@ export function Account() {
               كلمة المرور
               <input
                 type="password"
-                autoComplete="current-password"
+                autoComplete={joining ? "new-password" : "current-password"}
                 minLength={8}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </label>
-            <button name="action" value="signin" disabled={pending}>
-              تسجيل الدخول
+            <button
+              name="action"
+              value={joining ? "signup" : "signin"}
+              disabled={pending}
+            >
+              {joining ? "إنشاء حساب جديد" : "تسجيل الدخول"}
             </button>
-            <button name="action" value="signup" disabled={pending}>
-              إنشاء حساب جديد
-            </button>
+
+            <p className="auth-or">
+              <span>{joining ? "أو أنشئ حسابًا بـ" : "أو ادخل بـ"}</span>
+            </p>
+            {/* Every door is shown, and the closed ones say they are closed.
+                Hiding them would leave a reader who came expecting Google
+                wondering whether they misremembered; offering them live would
+                spend their one moment of intent on an error. */}
+            <ul className="auth-providers">
+              {authProviders.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    data-provider={p.id}
+                    disabled={!!p.closedReason || pending}
+                    aria-describedby={
+                      p.closedReason ? `why-${p.id}` : undefined
+                    }
+                    onClick={() => startProvider(p.id)}
+                  >
+                    {p.label}
+                  </button>
+                  {p.closedReason && (
+                    <small id={`why-${p.id}`}>{p.closedReason}</small>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            <p className="auth-switch">
+              {joining ? "لديك حساب بالفعل؟" : "لا تملك حسابًا؟"}{" "}
+              <button
+                type="button"
+                className="auth-link"
+                onClick={() => {
+                  setJoining(!joining);
+                  setMessage("");
+                }}
+              >
+                {joining ? "تسجيل الدخول" : "أنشئ حسابًا"}
+              </button>
+            </p>
           </form>
           <aside className="account-story">
             <p className="app-eyebrow">كيف تبدأ؟</p>
@@ -214,6 +311,47 @@ export function Account() {
               <li>اربط قناة يوتيوب بعد موافقتك على الإذن.</li>
               <li>اطلب الجمع، ثم تابع حالته ونتائجه في اللوحة.</li>
             </ol>
+
+            {/* The reassurance panel, and the reason it says none of the
+                things a panel like this usually says.
+
+                The reference it is modelled on reads "Trusted by 200,000+
+                companies in 120 countries" over five customer logos. We have
+                no customers, so that line and those logos would be an
+                invention — and on a product whose whole argument is that it
+                reports what it measured, a fabricated number on the way in
+                would undo the argument before the reader reaches the data.
+
+                So the panel carries what is true and checkable instead. Each
+                line is a property of the build, not a claim about a market,
+                and each one is asserted by a test in this repository. */}
+            <section className="account-trust" data-testid="account-trust">
+              <h3>ما يضمنه هذا البناء</h3>
+              <ul>
+                <li>
+                  <strong>مساحتك لا تُقرأ من مساحة أخرى.</strong> العزل مفروض في
+                  قاعدة البيانات نفسها، ومُختبَر بطلبات مباشرة لا بإخفاء أزرار.
+                </li>
+                <li>
+                  <strong>الأرقام معدودة لا مقدَّرة.</strong> كل رقم محسوب من
+                  الصفوف المحفوظة؛ وما لا يُعرف يُقال «غير معروف» ولا يُحسب
+                  صفرًا.
+                </li>
+                <li>
+                  <strong>النموذج مُقاس لا مُدّعى.</strong> قِيست ستة مصنّفات
+                  عربية على مجموعة موسومة يدويًا، ونتائجها منشورة في المستودع —
+                  بما فيها أن أيًّا منها لم يتجاوز بوّابة الدقّة.
+                </li>
+                <li>
+                  <strong>تصحيحك يعلو على النموذج.</strong> المراجعة البشرية
+                  تُلغي تنبؤ النموذج لذلك النص، وتُحفظ باسم صاحبها وسببها.
+                </li>
+              </ul>
+              <p className="account-trust-note">
+                معاينة خاصة. لا نعرض عدد عملاء ولا شعارات: لا يوجد ما نعدّه بعد،
+                ورقمٌ مُختلَق على الباب يُفسد ما تقوله اللوحة خلفه.
+              </p>
+            </section>
           </aside>
         </div>
       ) : (
