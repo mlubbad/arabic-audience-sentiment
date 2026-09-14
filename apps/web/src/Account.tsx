@@ -99,7 +99,7 @@ export function Account() {
           <div className="account-story">
             <h2>ابدأ من تجربة اللوحة</h2>
             <p>يمكنك استكشاف الواجهة ببيانات اصطناعية واضحة المصدر.</p>
-            <a href="/dashboard">فتح لوحة البيانات ←</a>
+            <a href="/dashboard">فتح لوحة البيانات</a>
           </div>
         </div>
       </div>

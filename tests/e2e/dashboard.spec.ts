@@ -1068,6 +1068,94 @@ test("the report index lists every section and marks the one in view", async ({
   await expect(links).toHaveCount(0);
 });
 
+test("one figure in a row leads, and each wears its own slice's colour", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const row = page.locator(".rp-figures-row");
+  await expect(row).toBeVisible();
+  const read = (tone: string) =>
+    row.locator(`[data-tone="${tone}"] strong`).evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { size: parseFloat(cs.fontSize), color: cs.color };
+    });
+  const [negative, positive, none] = await Promise.all([
+    read("negative"),
+    read("positive"),
+    read("none"),
+  ]);
+  // The section's own prose says the negative count is the one to act on.
+  // Three identical filled blocks said nothing was. Emphasis spent everywhere
+  // is emphasis spent nowhere, so exactly one of the three carries it.
+  expect(negative.size).toBeGreaterThan(positive.size);
+  expect(positive.size).toEqual(none.size);
+
+  // And the row speaks the donut's language. These numbers used to be yellow
+  // on indigo, eight pixels under a chart calling the same two things teal and
+  // red — one fact wearing two colour languages within a single glance.
+  const token = (name: string) =>
+    page.evaluate(
+      (n) =>
+        getComputedStyle(document.documentElement).getPropertyValue(n).trim(),
+      name,
+    );
+  const asRgb = async (hex: string) =>
+    page.evaluate((h) => {
+      const d = document.createElement("span");
+      d.style.color = h;
+      document.body.append(d);
+      const c = getComputedStyle(d).color;
+      d.remove();
+      return c;
+    }, hex);
+  expect(negative.color).toBe(await asRgb(await token("--sentiment-negative")));
+  expect(positive.color).toBe(await asRgb(await token("--sentiment-positive")));
+});
+
+test("no Arabic label is letter-spaced", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(
+    page.getByRole("table", { name: /التعليقات ضمن/ }),
+  ).toBeVisible();
+  // Arabic letters join. Tracking runs after shaping, so the connected forms
+  // are drawn with gaps between them — the word comes apart, and it reads as a
+  // rendering fault rather than as a style. Latin tracking on a Latin label is
+  // a taste question; on Arabic it is a defect, which is why this is asserted
+  // rather than left to the eye.
+  const tracked = await page.evaluate(() =>
+    [...document.querySelectorAll("body *")]
+      .filter((el) =>
+        [...el.childNodes].some(
+          (n) =>
+            n.nodeType === 3 && /[\u0600-\u06FF]/.test(n.textContent ?? ""),
+        ),
+      )
+      .map((el) => ({
+        text: (el.textContent ?? "").trim().slice(0, 24),
+        spacing: getComputedStyle(el).letterSpacing,
+      }))
+      // Only positive tracking pulls joins apart; the headings tighten very
+      // slightly, which closes nothing.
+      .filter((x) => x.spacing !== "normal" && parseFloat(x.spacing) > 0.2),
+  );
+  expect(tracked).toEqual([]);
+});
+
+test("a marker on a card says something true about the card", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const tags = page.locator(".rp-insight-tag");
+  await expect(tags.first()).toBeVisible();
+  // These four readings are independent — coverage, reply share, concentration,
+  // datedness — so numbering them 1..4 asserted a sequence that does not exist.
+  // A marker earns its place by naming its card, not by counting it.
+  const texts = await tags.allTextContents();
+  expect(texts.length).toBeGreaterThan(1);
+  for (const t of texts) expect(t.trim()).not.toMatch(/\d/);
+  expect(new Set(texts).size).toBe(texts.length);
+});
+
 test("a budget bar shows the state its sentence reports", async ({ page }) => {
   await page.goto("/sync");
   const near = page.getByTestId("budget-comment_analysis");

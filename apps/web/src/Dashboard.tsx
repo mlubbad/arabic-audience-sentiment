@@ -873,8 +873,14 @@ function DashboardBody({
               className="rp-grid rp-grid-4"
               style={{ marginTop: "var(--space-4)" }}
             >
+              {/* Named, not numbered. These four are independent readings —
+                  how much was analysed, how much is audience-to-audience, how
+                  concentrated the talk is, how much of it can be placed in
+                  time — and numbering them 1 to 4 asserted an order that is
+                  not there. A marker should say something true about what it
+                  marks; "3" said only that it came after "2". */}
               <article className="rp-insight">
-                <p className="rp-insight-tag">استنتاج 1</p>
+                <p className="rp-insight-tag">التحليل</p>
                 <p>
                   {s.total > 0
                     ? `حُلِّل ${Math.round((s.analysed / s.total) * 100)}٪ من التعليقات المطابقة. الباقي محفوظ بلا تصنيف، ولا يدخل في أي نسبة مشاعر.`
@@ -882,7 +888,7 @@ function DashboardBody({
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">استنتاج 2</p>
+                <p className="rp-insight-tag">الردود</p>
                 <p>
                   {s.total > 0
                     ? `${Math.round((s.replies / s.total) * 100)}٪ منها ردود — أي حوار بين المشاهدين أنفسهم لا خطاب موجَّه إلى القناة.`
@@ -890,7 +896,7 @@ function DashboardBody({
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">استنتاج 3</p>
+                <p className="rp-insight-tag">تركّز الحديث</p>
                 <p>
                   {s.videos.length > 0
                     ? `أنشط فيديو جمع ${n(s.videos[0].total)} تعليقًا من أصل ${n(s.total)} — أي ${Math.round((s.videos[0].total / s.total) * 100)}٪ من الحديث كله.`
@@ -898,7 +904,7 @@ function DashboardBody({
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">استنتاج 4</p>
+                <p className="rp-insight-tag">التواريخ</p>
                 <p>
                   {s.unknown_dates > 0
                     ? `${n(s.unknown_dates)} تعليقًا بلا تاريخ معروف. لا تظهر في رسوم التوقيت، ولم تُوضع في خانة افتراضية.`
@@ -1143,21 +1149,31 @@ function DashboardBody({
                     </p>
                   </article>
                 </div>
+                {/* Three figures, and the section's own prose says one of
+                    them is the one to act on — "وهي التي تستحق قراءة نصّها".
+                    They were three identical filled indigo blocks with a glow,
+                    each shouting equally, directly under a donut that had just
+                    said the same numbers in the sentiment colours. Emphasis
+                    spent three times is emphasis spent nowhere; and one fact
+                    wearing two colour languages eight pixels apart is the
+                    reader's problem, not the palette's. The lead figure is
+                    lead-sized, the other two recede, and each number wears the
+                    colour its slice wears above. */}
                 <div
-                  className="rp-grid rp-grid-3"
+                  className="rp-grid rp-grid-3 rp-figures-row"
                   style={{ marginTop: "var(--space-4)" }}
                 >
-                  <article className="rp-deep">
-                    <strong>{n(s.sentiments.positive)}</strong>
-                    <p>تعليقًا إيجابيًا ضمن المحلَّل.</p>
-                  </article>
-                  <article className="rp-deep">
+                  <article className="rp-figure" data-tone="negative">
                     <strong>{n(s.sentiments.negative)}</strong>
                     <p>
                       تعليقًا سلبيًا — وهي التي تستحق قراءة نصّها لا نسبتها.
                     </p>
                   </article>
-                  <article className="rp-deep">
+                  <article className="rp-figure" data-tone="positive">
+                    <strong>{n(s.sentiments.positive)}</strong>
+                    <p>تعليقًا إيجابيًا ضمن المحلَّل.</p>
+                  </article>
+                  <article className="rp-figure" data-tone="none">
                     <strong>{n(s.unanalysed)}</strong>
                     <p>بلا تصنيف بعد، ولا تدخل في أي نسبة أعلاه.</p>
                   </article>
@@ -1467,14 +1483,41 @@ function DashboardBody({
                     لا توجد تعليقات سلبية بإعجابات معروفة ضمن الفلاتر.
                   </p>
                 ) : (
+                  /* A heading promising a ranking, over a run of sentences
+                     that began with a number. Ranked things want a rank: the
+                     count is the mark, the text is the row, and the bar under
+                     each is that row's share of the top one — which is the
+                     only reason to order them in the first place. */
                   <ol className="engaged">
-                    {s.most_engaged_negative.map((c) => (
-                      <li key={c.id} data-testid={`engaged-${c.id}`}>
-                        <strong>{c.likes_raw ?? c.likes_value}</strong> إعجابًا
-                        — {commentText(c)}
-                        {c.reviewed && <small>مراجعة بشرية</small>}
-                      </li>
-                    ))}
+                    {s.most_engaged_negative.map((c) => {
+                      const top = s.most_engaged_negative[0].likes_value ?? 0;
+                      const likes = c.likes_value ?? 0;
+                      return (
+                        <li key={c.id} data-testid={`engaged-${c.id}`}>
+                          <span className="engaged-count">
+                            <strong>{c.likes_raw ?? c.likes_value}</strong>
+                            <span>إعجابًا</span>
+                          </span>
+                          <span className="engaged-body">
+                            <span className="engaged-text">
+                              {commentText(c)}
+                            </span>
+                            {c.reviewed && <small>مراجعة بشرية</small>}
+                            <span
+                              className="engaged-bar"
+                              aria-hidden="true"
+                              style={{
+                                // Relative to the most-liked row, not to the
+                                // page: these five are the top of a longer
+                                // list, and a bar drawn against a total the
+                                // reader cannot see measures nothing.
+                                inlineSize: `${top > 0 ? Math.max((likes / top) * 100, 2) : 0}%`,
+                              }}
+                            />
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ol>
                 )}
                 {s.negative_ranked > s.most_engaged_negative.length && (

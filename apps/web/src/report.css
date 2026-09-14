@@ -143,6 +143,17 @@
 }
 .rp-section > header {
   margin-bottom: var(--space-5);
+  /* Eight sections down one column, each opening exactly like the last, gave
+     the page no rhythm to read by — a hairline above the heading is where one
+     section visibly ends and the next begins. */
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-1);
+}
+/* Except the first, which opens under the index and needs no rule to separate
+   it from a section that is not there. */
+.rp-section:first-of-type > header {
+  padding-top: 0;
+  border-top: 0;
 }
 .rp-section h2 {
   font-size: clamp(21px, 2.4vw, 30px);
@@ -162,7 +173,13 @@
   background: var(--bg-card);
   border: 1px solid var(--border-1);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-2);
+  /* A hairline separates; a drop shadow lifts. Around twenty cards were each
+     carrying the lifting shadow, so the whole page hovered by the same amount
+     and nothing on it was above anything else. Depth is a comparison, and a
+     page where every plane is raised has none. The heavier shadow is kept for
+     the two things that genuinely sit above the page — the hero, and the one
+     figure a section singles out. */
+  box-shadow: var(--shadow-1);
   padding: var(--space-5);
 }
 .rp-grid {
@@ -224,7 +241,10 @@
 .rp-insight-tag {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  /* No tracking. Arabic letters join, and letter-spacing pulls the joins
+     apart — the shaping still runs, so the connected forms are drawn with
+     gaps between them, which reads as a rendering fault rather than as a
+     style. This was the last place in the interface still doing it. */
   color: var(--ml-indigo);
   margin-bottom: 6px;
 }
@@ -236,25 +256,62 @@
 }
 
 /* Deep cards for the three sentiment headlines. */
-.rp-deep {
-  background: var(--ml-indigo);
-  color: #fff;
+/* Three figures, one of which the section argues is the one to act on.
+   The lead keeps the width and the weight; the other two step back. Each
+   number wears its own slice's colour, so the row and the donut above it are
+   speaking about the same four things in the same terms. */
+.rp-figures-row {
+  align-items: start;
+}
+.rp-figure {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
   border-radius: var(--r-lg);
   padding: var(--space-5);
-  box-shadow: var(--shadow-glow-indigo);
+  /* The accent rule sits on the inline-start edge, which in this document is
+     the right: written as a logical property so it follows the text. */
+  border-inline-start: 3px solid var(--border-2);
 }
-.rp-deep strong {
+.rp-figure strong {
   display: block;
-  font-size: clamp(24px, 3vw, 32px);
+  font-size: clamp(22px, 2.6vw, 28px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--ml-yellow);
+  line-height: 1.2;
+  color: var(--fg-2);
 }
-.rp-deep p {
-  margin: 6px 0 0;
+.rp-figure p {
+  margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.8;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--fg-3);
+}
+.rp-figure[data-tone="negative"] {
+  /* The one figure in the row that is spent. Larger, tinted, and on the
+     brand's own shadow — because the prose beneath it says this is the number
+     the reader is meant to go and do something about. */
+  grid-column: span 1;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sentiment-negative) 6%, var(--bg-card)),
+    var(--bg-card) 70%
+  );
+  border-inline-start-color: var(--sentiment-negative);
+  box-shadow: var(--shadow-2);
+}
+.rp-figure[data-tone="negative"] strong {
+  font-size: clamp(30px, 4vw, 44px);
+  color: var(--sentiment-negative);
+}
+.rp-figure[data-tone="negative"] p {
+  color: var(--fg-2);
+  font-size: 14px;
+}
+.rp-figure[data-tone="positive"] {
+  border-inline-start-color: var(--sentiment-positive);
+}
+.rp-figure[data-tone="positive"] strong {
+  color: var(--sentiment-positive);
 }
 
 /* ---------------- pill tabs ---------------- */
@@ -935,4 +992,75 @@
 .rp-page td button:hover:not(:disabled) {
   border-color: var(--ml-indigo);
   background: var(--ml-indigo-50);
+}
+
+/* ---------------- most-engaged negatives ----------------
+   A ranked list, laid out as one: the figure is a column of its own so the
+   counts line up and the eye can run down them, and each row carries its
+   share of the top count. */
+.rp-page .engaged {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rp-page .engaged li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+}
+.rp-page .engaged-count {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+}
+.rp-page .engaged-count strong {
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--sentiment-negative);
+}
+.rp-page .engaged-count > span {
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.rp-page .engaged-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rp-page .engaged-text {
+  display: block;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--fg-1);
+}
+.rp-page .engaged-bar {
+  display: block;
+  block-size: 3px;
+  margin-top: var(--space-2);
+  border-radius: var(--r-pill);
+  background: var(--sentiment-negative);
+  opacity: 0.5;
+}
+.rp-page .engaged small {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--fg-3);
+}
+
+/* The topics card holds four lines saying the feature is not built yet, and
+   was being stretched to match the donut beside it — a third of that row was
+   white space pretending to be content. A card that shrinks to what it holds
+   says "there is little here", which is the true thing. */
+#rp-voice > .rp-grid-2 {
+  align-items: start;
 }
