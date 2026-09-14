@@ -41,13 +41,24 @@ Require valid-user
   <FilesMatch "\.(js|css)$">
     Header set Cache-Control "public, max-age=31536000, immutable" \
       "expr=%{REQUEST_STATUS} == 200"
+    # The other half of the same decision, and deliberately `!= 200` rather
+    # than a range: `== 200` is known to evaluate correctly on this host,
+    # having been measured doing it, so its negation is the one refusal that
+    # cannot be silently skipped. Saying nothing here is not neutral — a
+    # response with no Cache-Control gets whatever default the CDN applies,
+    # which on 2026-09-15 was four hours on a 401.
+    Header always set Cache-Control "no-store" "expr=%{REQUEST_STATUS} != 200"
   </FilesMatch>
   <FilesMatch "\.(html|json)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
   # Belt and braces, and the half that survives a future FilesMatch someone
   # adds without thinking about failures: nothing that went wrong is storable.
-  Header always set Cache-Control "no-store" "expr=%{REQUEST_STATUS} >= 400"
+  #
+  # `-ge`, not `>=`. Apache's `>=` compares strings, and the first version of
+  # this line used it and never fired once — the 401 it was written for came
+  # back carrying no Cache-Control at all.
+  Header always set Cache-Control "no-store" "expr=%{REQUEST_STATUS} -ge 400"
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "no-referrer"

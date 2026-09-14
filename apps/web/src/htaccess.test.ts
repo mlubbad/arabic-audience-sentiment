@@ -49,13 +49,33 @@ describe("the preview host's cache policy", () => {
   it("marks anything that went wrong as unstorable, whatever matched it", () => {
     // The guard above protects the rules that exist today. This one survives
     // the next `FilesMatch` somebody adds without thinking about failures.
-    const refusal = headerDirectives.find(
+    //
+    // `-ge`, not `>=`: Apache's `>=` is a string comparison, and the first
+    // version of this rule used it, never fired, and left the 401 with no
+    // Cache-Control for the CDN to fill in with a default. Rejecting the
+    // string form here is the point of the test, not pedantry about syntax.
+    const refusals = headerDirectives.filter(
       (d) =>
         /always\s+set\s+Cache-Control/i.test(d) &&
         /no-store/i.test(d) &&
-        /expr=%\{REQUEST_STATUS\}\s*>=\s*400/.test(d),
+        /expr=%\{REQUEST_STATUS\}\s*(?:-ge\s*400|!=\s*200)/.test(d),
     );
-    expect(refusal).toBeDefined();
+    expect(refusals.length).toBeGreaterThan(0);
+    expect(source).not.toMatch(/%\{REQUEST_STATUS\}\s*>=/);
+  });
+
+  it("refuses to store a failure for the bundle specifically", () => {
+    // The blanket rule above is the safety net. The rule inside the pattern
+    // that caused the outage is the one that has to hold on its own, because
+    // it is the only one written in an operator this host was measured
+    // evaluating.
+    const bundleRule = headerDirectives.find(
+      (d) =>
+        /always\s+set\s+Cache-Control/i.test(d) &&
+        /no-store/i.test(d) &&
+        /expr=%\{REQUEST_STATUS\}\s*!=\s*200/.test(d),
+    );
+    expect(bundleRule).toBeDefined();
   });
 
   it("keeps the password on the deployment", () => {
