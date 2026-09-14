@@ -38,39 +38,25 @@ Require valid-user
   #
   # `immutable` is a promise that the body will never change. An error page
   # about a file is not that file, so it must never carry the promise.
+  # An `expr` condition is only evaluated on a successful response here. That
+  # was measured, three times, against the deployed host: a rule carrying one
+  # is simply absent from the 401, whether it is written `set` or `always set`,
+  # `== 200`, `!= 200` or `-ge 400`. So a condition can withhold a header from
+  # an error. It can never add one to it.
+  #
+  # Which decides the shape of everything below: the refusal is unconditional
+  # and comes first, and the promise is the exception layered on top of it. Not
+  # a style choice — it is the only order in which both halves can be delivered
+  # by a server that will not evaluate a condition when things go wrong.
   <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "no-store"
     Header set Cache-Control "public, max-age=31536000, immutable" \
       "expr=%{REQUEST_STATUS} == 200"
-    # The other half of the same decision. Three things about how it is
-    # written, each of them measured against this host rather than assumed,
-    # because two earlier versions of this line were skipped in silence:
-    #
-    #   * `Header set`, not `Header always set`. Unconditional `always` works
-    #     here — the security headers below arrive on a 401. `always` *with* an
-    #     `expr` does not fire at all, and a rule that never runs looks exactly
-    #     like a rule that ran and found nothing to do.
-    #   * plain `Header set` does reach the error response on this server. That
-    #     is not a quirk being exploited; it is precisely the mechanism that
-    #     put `immutable` on the 401 in the first place, pointed the other way.
-    #   * `!= 200` rather than a range, because `== 200` above is the one
-    #     comparison this host has been observed evaluating correctly, and its
-    #     negation inherits that.
-    #
-    # Saying nothing here is not neutral. A response with no Cache-Control does
-    # not go uncached; it gets whatever default the layer above applies, which
-    # on 2026-09-15 was four hours on a 401.
-    Header set Cache-Control "no-store" "expr=%{REQUEST_STATUS} != 200"
   </FilesMatch>
   <FilesMatch "\.(html|json)$">
-    Header set Cache-Control "no-cache"
+    Header set Cache-Control "no-store"
+    Header set Cache-Control "no-cache" "expr=%{REQUEST_STATUS} == 200"
   </FilesMatch>
-  # Belt and braces, and the half that survives a future FilesMatch someone
-  # adds without thinking about failures: nothing that went wrong is storable.
-  #
-  # `-ge`, not `>=`. Apache's `>=` compares strings, and the first version of
-  # this line used it and never fired once — the 401 it was written for came
-  # back carrying no Cache-Control at all.
-  Header set Cache-Control "no-store" "expr=%{REQUEST_STATUS} -ge 400"
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "no-referrer"
