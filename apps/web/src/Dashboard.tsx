@@ -380,6 +380,23 @@ function DashboardBody({
     // Hand focus back to the row the reviewer came from.
     reviewTriggerRef.current?.focus();
   }
+  // Escape closes it. The correction form takes focus and sits above the page
+  // as an overlay, and an overlay that can only be left by finding its cancel
+  // button is a trap for exactly the reader who cannot see where it is. The
+  // listener lives with the form rather than on the page, so it exists only
+  // while there is something to close.
+  useEffect(() => {
+    if (!reviewing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      closeReview();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // Only `reviewing` belongs here: closeReview reads refs and setState, both
+    // stable for the life of the component.
+  }, [reviewing]);
   const [reason, setReason] = useState("");
   const review = useMutation({
     mutationFn: () =>
@@ -469,6 +486,24 @@ function DashboardBody({
     setLimit(25);
     setFilters(defaults);
   }
+  // Which filters are actually narrowing the answer. Ten controls can be set
+  // without the reader remembering they set them — and every figure on the
+  // page is quietly conditional on them. Naming them is the difference
+  // between a filtered report and a wrong one.
+  const activeFilters = [
+    query && `بحث: «${query}»`,
+    video && "فيديو محدَّد",
+    sentiment && `المشاعر: ${labels[sentiment as Label] ?? sentiment}`,
+    videoKind && "نوع فيديو",
+    commentType && "نوع تعليق",
+    replies !== "all" &&
+      (replies === "replies" ? "الردود فقط" : "التعليقات فقط"),
+    reviewStatus !== "all" &&
+      (reviewStatus === "reviewed" ? "المراجَعة فقط" : "غير المراجَعة فقط"),
+    dateMode !== "all" &&
+      (dateMode === "known" ? "بتاريخ معروف" : "بلا تاريخ معروف"),
+    (from || to) && "فترة محدَّدة",
+  ].filter(Boolean) as string[];
   const s = result.data;
   const active = useActiveSection(!!s && s.total > 0);
   // Aggregations for the charts, over every row the filters admit rather than
@@ -588,7 +623,29 @@ function DashboardBody({
             ))}
           </div>
         )}
-        <span className="rp-scope">{source.scope}</span>
+        {/* What the numbers below are conditional on, carried by the one bar
+            that stays on screen. A reader who scrolled past the filter panel
+            an hour ago has no other way to know the report is narrowed — and
+            a narrowed report read as a whole one is not a smaller answer, it
+            is a wrong one. */}
+        {activeFilters.length > 0 ? (
+          <p
+            className="rp-scope rp-scope-filtered"
+            data-testid="active-filters"
+          >
+            <span>مُصفّى:</span>
+            {activeFilters.map((f) => (
+              <span key={f} className="rp-scope-chip">
+                {f}
+              </span>
+            ))}
+            <button type="button" onClick={reset}>
+              اعرض الكل
+            </button>
+          </p>
+        ) : (
+          <span className="rp-scope">{source.scope}</span>
+        )}
       </nav>
       <aside
         className={`rp-provenance${source.tone === "warning" ? " warn" : ""}`}

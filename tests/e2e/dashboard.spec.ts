@@ -1271,6 +1271,51 @@ test("every pane keeps a solid the reader can fall back to", async ({
   expect(thin).toEqual([]);
 });
 
+test("the report says what it is narrowed to, wherever you have read to", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const summary = page.getByTestId("active-filters");
+  await expect(summary).toBeHidden();
+
+  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("2");
+
+  // Ten controls can be set and forgotten, and every figure on the page is
+  // quietly conditional on them. A narrowed report read as a whole one is not
+  // a smaller answer, it is a wrong one — so the condition travels with the
+  // one bar that stays on screen.
+  await expect(summary).toContainText("مُصفّى");
+  await expect(summary).toContainText("فيديو محدَّد");
+
+  // And it is still there after the filter panel is long out of view.
+  await page.evaluate(() =>
+    window.scrollTo({ top: 2500, behavior: "instant" }),
+  );
+  await expect(summary).toBeInViewport();
+
+  await summary.getByRole("button", { name: "اعرض الكل" }).click();
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(summary).toBeHidden();
+});
+
+test("escape leaves the correction overlay", async ({ page }) => {
+  await page.goto("/dashboard");
+  const row = page.locator('[data-testid="comments-table"] tbody tr').first();
+  const trigger = row.getByRole("button", { name: "تصحيح" });
+  await trigger.click();
+  const form = page.getByRole("form", { name: "تصحيح التصنيف" });
+  await expect(form).toBeVisible();
+
+  // The form takes focus and sits above the page. An overlay that can only be
+  // left by finding its cancel button is a trap for exactly the reader who
+  // cannot see where that button is.
+  await page.keyboard.press("Escape");
+  await expect(form).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
 test("a budget bar shows the state its sentence reports", async ({ page }) => {
   await page.goto("/sync");
   const near = page.getByTestId("budget-comment_analysis");
