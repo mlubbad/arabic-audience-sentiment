@@ -53,6 +53,11 @@
   align-items: center;
   gap: clamp(1rem, 3vw, 3rem);
 }
+/* The wordmark is a name, not a paragraph: the shell's running-text leading
+   made it sit in a 36px box it never filled. */
+.app-shell .app-brand {
+  line-height: 1.2;
+}
 .app-brand {
   display: inline-flex;
   align-items: center;
@@ -221,9 +226,11 @@
 .app-shell .rp-metric:first-child {
   border-top-color: var(--ml-indigo);
 }
-.app-shell .rp-metric-value {
-  font-family: var(--font-body);
-}
+/* The figure face now comes from the token, on every figure, in report.css.
+   This rule set one group of numbers in what was then the body font — the
+   right instinct, reaching the right face only because the token happened to
+   point at it. When the token was corrected to name the family the product
+   actually renders in, this rule would have quietly put the numbers back. */
 .app-shell .rp-page form.rp-card.rp-filters {
   max-width: none;
   display: grid;

@@ -96,11 +96,27 @@
   --shadow-1: 0 1px 2px rgba(14, 10, 46, 0.04);
   --shadow-2: 0 4px 14px rgba(14, 10, 46, 0.08);
 
-  /* -------- type -------------------------------------------------- */
-  /* Readex Pro carries Arabic and Latin in one family, which is why the
-     brand uses it and why an Arabic-first interface needs it: a fallback
-     stack that switches family between scripts makes a mixed line ragged. */
-  --font-body:
+  /* -------- type --------------------------------------------------
+     Two families, and which is which had drifted.
+
+     Audience Arabic is the product's voice — the landing page's face, and
+     the one every screen actually renders in. Readex Pro is the figure face:
+     Audience is an Arabic display design whose Latin digits are the weaker
+     half of it, and the numbers are what this product exists to show.
+
+     That split was already happening, but by accident and in two places at
+     once: one rule in app.css set the summary figures in the body font, and
+     everywhere else `font-variant-numeric: tabular-nums` sent the browser
+     hunting the stack for a face with a tnum table — which Audience lacks
+     and Readex has. The result was the right outcome reached by a mechanism
+     nobody had written down, and applied to a different set of elements than
+     the rule intended. Naming it makes it a decision.
+
+     Keep the two apart in use: a figure wears the numeric face, a sentence
+     wears the body face. Mixing them inside one line is what the fallback
+     stack used to do, and it reads ragged. */
+  --font-body: "Audience Arabic", "Readex Pro", system-ui, sans-serif;
+  --font-numeric:
     "Readex Pro", "IBM Plex Sans Arabic", system-ui, -apple-system, sans-serif;
   /* Parkinsans is the brand's Latin display companion. Not loaded: this
      interface is Arabic throughout and Readex Pro covers its Latin, so a

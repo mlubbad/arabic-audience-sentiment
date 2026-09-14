@@ -1156,6 +1156,66 @@ test("a marker on a card says something true about the card", async ({
   expect(new Set(texts).size).toBe(texts.length);
 });
 
+test("running text is set to a readable measure", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(
+    page.getByRole("table", { name: /التعليقات ضمن/ }),
+  ).toBeVisible();
+  // A line has a width past which the eye loses the return sweep; the
+  // conventional band is 50-60 characters. Nothing capped these, and at a
+  // 1204px desktop the section intros ran to 194 characters — three times
+  // the top of the band, and the longest lines on the page were the ones
+  // explaining how to read it.
+  const wide = await page.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll(
+      ".rp-sub, .rp-hero p, .rp-page .muted, .rp-page .rp-metric-note",
+    )) {
+      const text = (el.textContent ?? "").trim();
+      if (text.length < 90) continue;
+      const cs = getComputedStyle(el);
+      // Measure in the font's own ch, which is what the cap is written in.
+      const probe = document.createElement("span");
+      probe.style.cssText = `position:absolute;visibility:hidden;font:${cs.font}`;
+      probe.textContent = "0";
+      el.appendChild(probe);
+      const ch = probe.getBoundingClientRect().width;
+      probe.remove();
+      const chars = el.getBoundingClientRect().width / ch;
+      if (chars > 70)
+        out.push({ chars: Math.round(chars), t: text.slice(0, 30) });
+    }
+    return out;
+  });
+  expect(wide).toEqual([]);
+});
+
+test("a figure and a sentence each keep their own face", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(
+    page.getByRole("table", { name: /التعليقات ضمن/ }),
+  ).toBeVisible();
+  const first = (v: string) => v.split(",")[0].replace(/["']/g, "").trim();
+  const seen = await page.evaluate(() => {
+    const fam = (sel: string) => {
+      const el = document.querySelector(sel);
+      return el ? getComputedStyle(el).fontFamily : null;
+    };
+    return {
+      figure: fam(".rp-metric-value"),
+      sentence: fam(".rp-sub"),
+      heading: fam(".rp-section h2"),
+    };
+  });
+  // Two families with two jobs. The split used to happen by accident — one
+  // orphan rule, plus `tabular-nums` sending the browser hunting the stack for
+  // a face with a tnum table — so it landed on a different set of elements
+  // than anyone had chosen, and nothing said why.
+  expect(first(seen.figure!)).toBe("Readex Pro");
+  expect(first(seen.sentence!)).toBe("Audience Arabic");
+  expect(first(seen.heading!)).toBe("Audience Arabic");
+});
+
 test("a budget bar shows the state its sentence reports", async ({ page }) => {
   await page.goto("/sync");
   const near = page.getByTestId("budget-comment_analysis");
