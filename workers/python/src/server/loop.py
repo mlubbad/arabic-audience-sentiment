@@ -1,0 +1,155 @@
+"""A worker that keeps running, so collection does not wait for an operator.
+
+The one-shot runner beside this exists to prove a channel end to end by hand.
+It is not a product: a customer's data goes stale between the moments somebody
+remembers to run it, and the dashboard says so — "no worker connected" is an
+honest message about a real gap, not a cosmetic one.
+
+Three things this adds over calling the runner in a shell loop.
+
+The model is loaded once. Loading takes seconds and allocates hundreds of
+megabytes; doing it per job would dominate the run and thrash a shared host.
+
+Idleness is cheap and bounded. An empty queue sleeps rather than spinning, and
+after enough empty cycles the process exits so whatever supervises it starts a
+clean one — long-lived Python on shared hosting accumulates memory, and a
+scheduled restart is simpler than diagnosing that later.
+
+A failure of one job never takes the loop down. The job's own failure handling
+has already recorded an outcome; anything that escapes it is logged and the
+loop continues, because a worker that dies on one bad job stops collecting for
+every tenant it serves.
+"""
+import argparse
+import os
+import signal
+import sys
+import time
+
+import httpx
+
+from collectors.youtube_api import YouTubeAPI
+
+from .gateway import ControlPlane, ControlPlaneError, LeaseLost
+from .manual_run import survey_uploads
+from .runner import run_backfill
+
+_stop = False
+
+
+def _request_stop(signum, frame):  # noqa: ARG001 - signal handler shape
+    """Finish the job in hand, then leave. Killing mid-commit loses a lease."""
+    global _stop
+    _stop = True
+
+
+def _log(message: str) -> None:
+    # Unbuffered and timestamped: this is read from a file while it runs.
+    print(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}", flush=True)
+
+
+def build_plan(client: httpx.Client, consider: int):
+    def plan(token: str):
+        report = survey_uploads(token, client, consider=consider)
+        wanted = [c for c in report["candidates"] if (c["comments"] or 0) > 0]
+        if not wanted:
+            plan.reason = report["reason"]
+            return None, []
+        return YouTubeAPI(None, client, access_token=token), wanted
+
+    return plan
+
+
+def serve(
+    control,
+    plan,
+    analyzer=None,
+    idle_seconds: float = 60.0,
+    max_idle: int = 30,
+    run=run_backfill,
+    sleep=time.sleep,
+    should_stop=lambda: _stop,
+) -> str:
+    """The loop itself. Returns why it stopped.
+
+    Separated from argument parsing so the behaviour that matters — surviving a
+    job that raises, and standing down rather than spinning — is testable
+    without a control plane, a model or a clock.
+    """
+    idle = 0
+    while not should_stop():
+        try:
+            worked = run(control, plan, analyzer=analyzer)
+        except LeaseLost:
+            # Another worker owns this job. Not an error: take the next one.
+            _log("lease lost, another worker has it")
+            worked = True
+        except ControlPlaneError as exc:
+            # The refusal code carries no secret; the message might.
+            _log(f"control plane refused: {exc.code}")
+            worked = False
+        except Exception as exc:  # noqa: BLE001 - the loop outlives one job
+            # A worker that dies on one bad job stops collecting for every
+            # tenant it serves. The job's own handling has already recorded an
+            # outcome; what escaped it is noted and the loop goes on.
+            _log(f"job raised {type(exc).__name__}")
+            worked = False
+
+        if worked:
+            idle = 0
+            continue
+        idle += 1
+        if idle >= max_idle:
+            _log(f"idle for {idle} cycles, exiting for a clean restart")
+            return "idle"
+        sleep(idle_seconds)
+    return "stopped"
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--base", default=os.environ.get("WORKER_API_BASE_URL", ""))
+    p.add_argument("--credential", default=os.environ.get("WORKER_CREDENTIAL", ""))
+    p.add_argument("--model", default="none",
+                   choices=["none", "camelbert-da", "deterministic-test"])
+    p.add_argument("--videos", type=int, default=50)
+    p.add_argument("--idle-seconds", type=float, default=60.0,
+                   help="pause after an empty queue")
+    p.add_argument("--max-idle", type=int, default=30,
+                   help="exit after this many consecutive empty cycles")
+    args = p.parse_args()
+    if not args.base or not args.credential:
+        raise SystemExit("need WORKER_API_BASE_URL and WORKER_CREDENTIAL")
+
+    signal.signal(signal.SIGTERM, _request_stop)
+    signal.signal(signal.SIGINT, _request_stop)
+
+    analyzer = None
+    if args.model == "camelbert-da":
+        from sentiment.transformer import load_pinned
+
+        _log("loading the classifier")
+        analyzer = load_pinned()
+        _log(f"loaded {analyzer.model_id}@{analyzer.revision[:12]}")
+    elif args.model == "deterministic-test":
+        from sentiment.deterministic import DeterministicTestAnalyzer
+
+        analyzer = DeterministicTestAnalyzer()
+
+    client = httpx.Client()
+    control = ControlPlane(args.base, args.credential, client)
+    plan = build_plan(client, args.videos)
+    _log(f"worker up, model={args.model}")
+    why = serve(
+        control,
+        plan,
+        analyzer=analyzer,
+        idle_seconds=args.idle_seconds,
+        max_idle=args.max_idle,
+    )
+    _log(f"worker down ({why})")
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
