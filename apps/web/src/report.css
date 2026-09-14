@@ -627,6 +627,14 @@
   border: 1.5px solid currentcolor;
   white-space: nowrap;
 }
+.rp-chip-score {
+  opacity: 0.85;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-inline-start: 3px;
+}
+
 /* The sentiment scale, not the status scale. A chip and the donut slice it
    describes used to disagree — "سلبي" was #d94550 here and #ff6c77 eight
    pixels away — because one meaning was reading from two palettes. */

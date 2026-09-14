@@ -1,6 +1,17 @@
 # Verification
 
+## 2026-09-14 — Comment confidence score display and live test alignment
+
+Node 22.14.0, Python 3.12.10. Verified on `main`:
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npm run check` | Pass: lint, format, typecheck, Deno check, 225 unit tests, 139 SQL tests, 127 Python tests, Vite build, secret scan |
+| `E2E_PORT=5350 npm run test:e2e` | 68 passed in 59.5s |
+| `E2E_LIVE_PORT=5355 npm run test:e2e:live` | 1 passed in 3.9s; workspace switching and sign-out isolation verified with new navigation destinations |
+
 ## 2026-09-14 — Arabic NLP sentiment engine and text normalization verification
+
 
 Node 22.14.0, Python 3.12.10. Verified on `main`:
 

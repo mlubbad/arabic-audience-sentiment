@@ -1642,6 +1642,17 @@ function DashboardBody({
                           data-label={c.label ?? "none"}
                         >
                           {c.label ? labels[c.label] : "بلا تصنيف"}
+                          {c.label &&
+                            !c.reviewed &&
+                            typeof c.prediction?.class_scores?.[c.label] ===
+                              "number" && (
+                              <span className="rp-chip-score">
+                                {Math.round(
+                                  c.prediction.class_scores[c.label] * 100,
+                                )}
+                                ٪
+                              </span>
+                            )}
                         </span>
                       </div>
                       <p className="rp-comment-text">{commentText(c)}</p>
@@ -1723,7 +1734,19 @@ function DashboardBody({
                               data-label={c.label ?? "none"}
                             >
                               {c.label ? labels[c.label] : "غير محلل / قديم"}
+                              {c.label &&
+                                !c.reviewed &&
+                                typeof c.prediction?.class_scores?.[c.label] ===
+                                  "number" && (
+                                  <span className="rp-chip-score">
+                                    {Math.round(
+                                      c.prediction.class_scores[c.label] * 100,
+                                    )}
+                                    ٪
+                                  </span>
+                                )}
                             </span>
+
                             {c.reviewed && <small>مراجعة بشرية</small>}
                           </td>
                           <td>{displayDate(c.published_at)}</td>

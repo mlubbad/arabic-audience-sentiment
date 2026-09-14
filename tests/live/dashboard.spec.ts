@@ -100,7 +100,10 @@ test("switching workspaces and signing out never paints the prior tenant's comme
   await expect(
     page.getByRole("button", { name: "تسجيل الخروج" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "حالة المزامنة" }).click();
+  await page
+    .getByRole("navigation", { name: "التنقل الرئيسي" })
+    .getByRole("link", { name: "التشغيل" })
+    .click();
   await expect(page.getByTestId("sync-ws-choose")).toBeVisible();
   await expect(page.getByText("العرض التجريبي لا يحمل سجل مهام")).toHaveCount(
     0,
@@ -111,7 +114,10 @@ test("switching workspaces and signing out never paints the prior tenant's comme
     .selectOption(A);
   await expect(page.getByTestId("sync-panel")).toBeVisible();
   await expect(page.getByLabel("تغيير مساحة العمل")).toHaveValue(A);
-  await page.getByRole("link", { name: "لوحة البيانات" }).click();
+  await page
+    .getByRole("navigation", { name: "التنقل الرئيسي" })
+    .getByRole("link", { name: "نظرة عامة" })
+    .click();
   await page.getByTestId("ws-choose").getByLabel("مساحة العمل").selectOption(A);
   await expect(
     page.getByRole("cell", { name: "TENANT_A_PRIVATE_COMMENT" }),
@@ -125,12 +131,18 @@ test("switching workspaces and signing out never paints the prior tenant's comme
     page.getByRole("cell", { name: "TENANT_B_OWN_COMMENT" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "الحساب ومساحات العمل" }).click();
+  await page
+    .getByRole("navigation", { name: "التنقل الرئيسي" })
+    .getByRole("link", { name: "المصادر والحساب" })
+    .click();
   await page.getByRole("button", { name: "تسجيل الخروج" }).click();
   await expect(
     page.getByRole("button", { name: "تسجيل الدخول" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "لوحة البيانات" }).click();
+  await page
+    .getByRole("navigation", { name: "التنقل الرئيسي" })
+    .getByRole("link", { name: "نظرة عامة" })
+    .click();
   await expect(page.getByTestId("source")).toHaveAttribute(
     "data-mode",
     "sanitized_fixture",
