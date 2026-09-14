@@ -1,7 +1,17 @@
 # Private preview deployment
 
 `app.sky-develop.net`, on the shared DirectAdmin host (`skydevelop` account, `u92286`,
-origin `91.204.209.213`). Fixture-backed, password-protected, and not indexed.
+origin `91.204.209.213`). Fixture-backed and password-protected.
+
+**One of the two things keeping it out of search is not actually running.** The deploy
+ships a `robots.txt` reading `User-agent: * / Disallow: /`, but Cloudflare Managed Content
+serves its own in its place — 1836 bytes that disallow `GPTBot`, `Google-Extended` and
+`meta-externalagent` and say nothing about anyone else. Checked by fetching the live URL:
+our 26-byte file is not what comes back.
+
+The site is still not indexable, because every path answers `401` and a crawler cannot read
+what it cannot fetch. HTTP auth is the protection; the robots file was the belt to its
+braces, and the belt is missing. Worth knowing before anyone relaxes the password.
 
 ## What is deployed
 
