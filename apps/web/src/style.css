@@ -105,9 +105,16 @@ button:disabled {
   opacity: 0.5;
   cursor: wait;
 }
+/* Two tones, because focus lands on both a white card and an indigo button
+   and no single colour carries on both: the previous ring measured 2.92:1 on
+   the muted panel. The halo hugs the element and carries on dark ground; the
+   ring sits outside it and carries on pale ground. The halo fills the offset,
+   so the two are one mark rather than a ring floating away from its target. */
 :focus-visible {
-  outline: 3px solid var(--color-warning);
-  outline-offset: 3px;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--focus-halo);
+  border-radius: 3px;
 }
 .metrics {
   display: grid;

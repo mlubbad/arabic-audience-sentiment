@@ -42,6 +42,14 @@ import {
 } from "./i18n";
 import { reviewHistory } from "./reviewHistory";
 import { describeSource } from "./dataSource";
+import {
+  AXIS_TEXT,
+  GRID_LINE,
+  SENTIMENT,
+  UNMEASURABLE,
+  VOLUME,
+  VOLUME_FILL,
+} from "./chartTheme";
 ChartJS.register(
   ArcElement,
   BarElement,
@@ -59,8 +67,8 @@ const n = (v: number) => v.toLocaleString("en-US");
 
 /* Chart defaults shared by the three timing panels, so they read as one
    family rather than three charts that happen to sit together. */
-const axisText = "#6e6a85";
-const gridLine = "#e6e3f0";
+const axisText = AXIS_TEXT;
+const gridLine = GRID_LINE;
 const barOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -74,6 +82,50 @@ const barOptions = {
     },
   },
 } as const;
+/**
+ * The numbers a canvas cannot say.
+ *
+ * Chart.js draws into a <canvas>, which is a picture: the three timing panels
+ * are marked aria-hidden precisely because a screen reader announcing "canvas"
+ * helps nobody. But that left a reader who cannot see the picture with the
+ * caption and nothing else — the donut at least spells its four figures out in
+ * its legend, while the busiest hour of this channel's day existed only as a
+ * shape. This is the same data as text, folded away so it costs a sighted
+ * reader one line and gives everyone else the panel.
+ */
+function ChartFigures({
+  caption,
+  unit,
+  buckets,
+}: {
+  caption: string;
+  unit: string;
+  buckets: readonly { label: string; count: number }[];
+}) {
+  return (
+    <details className="rp-figures">
+      <summary>عرض الأرقام</summary>
+      <table>
+        <caption>{caption}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{unit}</th>
+            <th scope="col">تعليقات</th>
+          </tr>
+        </thead>
+        <tbody>
+          {buckets.map((b) => (
+            <tr key={b.label}>
+              <th scope="row">{b.label}</th>
+              <td>{n(b.count)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
+  );
+}
+
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export function Dashboard() {
   // Who is asking decides what this page is. A signed-in owner reads their own
@@ -433,6 +485,26 @@ function DashboardBody({
                 {n(s.unique_authors)} معلّقًا معروفًا
               </span>
             </div>
+            {/* The answer, on the first screen.
+                The page asks "ماذا يقول جمهورك؟" at the top and then made the
+                reader scroll past ten filter controls and four panels to find
+                out — the summary tiles counted comments, replies and authors,
+                but not the one split the product exists to produce. It stays
+                out of the pills above because those describe the extract
+                (when, how many, from whom) and this is the finding.
+                Denominator said out loud: the classified rows, not the total. */}
+            {s.analysed > 0 && (
+              <p className="rp-hero-split" data-testid="hero-split">
+                <span>من {n(s.analysed)} تعليقًا مصنَّفًا:</span>
+                {(Object.keys(s.sentiments) as Label[])
+                  .filter((k) => s.measurable.has(k))
+                  .map((k) => (
+                    <strong key={k}>
+                      {labels[k]} {n(s.sentiments[k])}
+                    </strong>
+                  ))}
+              </p>
+            )}
           </>
         ) : (
           <p>جارٍ قراءة التعليقات المحفوظة…</p>
@@ -733,7 +805,7 @@ function DashboardBody({
               style={{ marginTop: "var(--space-4)" }}
             >
               <article className="rp-insight">
-                <p className="rp-insight-tag">استنتاج ١</p>
+                <p className="rp-insight-tag">استنتاج 1</p>
                 <p>
                   {s.total > 0
                     ? `حُلِّل ${Math.round((s.analysed / s.total) * 100)}٪ من التعليقات المطابقة. الباقي محفوظ بلا تصنيف، ولا يدخل في أي نسبة مشاعر.`
@@ -741,7 +813,7 @@ function DashboardBody({
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">استنتاج ٢</p>
+                <p className="rp-insight-tag">استنتاج 2</p>
                 <p>
                   {s.total > 0
                     ? `${Math.round((s.replies / s.total) * 100)}٪ منها ردود — أي حوار بين المشاهدين أنفسهم لا خطاب موجَّه إلى القناة.`
@@ -749,7 +821,7 @@ function DashboardBody({
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">استنتاج ٣</p>
+                <p className="rp-insight-tag">استنتاج 3</p>
                 <p>
                   {s.videos.length > 0
                     ? `أنشط فيديو جمع ${n(s.videos[0].total)} تعليقًا من أصل ${n(s.total)} — أي ${Math.round((s.videos[0].total / s.total) * 100)}٪ من الحديث كله.`
@@ -757,7 +829,7 @@ function DashboardBody({
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">استنتاج ٤</p>
+                <p className="rp-insight-tag">استنتاج 4</p>
                 <p>
                   {s.unknown_dates > 0
                     ? `${n(s.unknown_dates)} تعليقًا بلا تاريخ معروف. لا تظهر في رسوم التوقيت، ولم تُوضع في خانة افتراضية.`
@@ -820,36 +892,32 @@ function DashboardBody({
                               <span>{n(v.replies)} ردًّا</span>
                               <span>{n(v.analysed)} محلَّلًا</span>
                             </span>
+                            {/* Only the segments that hold something. The 2px
+                                gap that keeps two touching fills apart would
+                                otherwise be drawn around segments of width
+                                zero, printing a sliver of "a few" where the
+                                count is none. The unanalysed remainder is a
+                                segment like any other and is drawn, not
+                                omitted: a bar that filled to 100% from four
+                                labels would claim every comment was read. */}
                             <span className="rp-bar" aria-hidden="true">
-                              <span
-                                className="pos"
-                                style={{
-                                  width: `${pct(v.sentiments.positive)}%`,
-                                }}
-                              />
-                              <span
-                                className="neg"
-                                style={{
-                                  width: `${pct(v.sentiments.negative)}%`,
-                                }}
-                              />
-                              <span
-                                className="neu"
-                                style={{
-                                  width: `${pct(v.sentiments.neutral)}%`,
-                                }}
-                              />
-                              <span
-                                className="mix"
-                                style={{ width: `${pct(v.sentiments.mixed)}%` }}
-                              />
-                              {/* The unanalysed remainder is drawn, not
-                                  omitted: a bar that fills to 100% from four
-                                  labels would claim every comment was read. */}
-                              <span
-                                className="un"
-                                style={{ width: `${pct(v.total - known)}%` }}
-                              />
+                              {(
+                                [
+                                  ["pos", v.sentiments.positive],
+                                  ["neg", v.sentiments.negative],
+                                  ["neu", v.sentiments.neutral],
+                                  ["mix", v.sentiments.mixed],
+                                  ["un", v.total - known],
+                                ] as const
+                              )
+                                .filter(([, count]) => count > 0)
+                                .map(([cls, count]) => (
+                                  <span
+                                    key={cls}
+                                    className={cls}
+                                    style={{ width: `${pct(count)}%` }}
+                                  />
+                                ))}
                             </span>
                           </span>
                           <span className="rp-video-figure">
@@ -882,15 +950,21 @@ function DashboardBody({
                               datasets: [
                                 {
                                   data: Object.values(s.sentiments),
-                                  // The brand's plotting scale. Labels
-                                  // accompany every slice; colour is never the
-                                  // only carrier.
-                                  backgroundColor: [
-                                    "#2ebd85",
-                                    "#ff6c77",
-                                    "#8e8aa6",
-                                    "#f0c419",
-                                  ],
+                                  // One scale, shared with the chips and the
+                                  // bars. Keyed by label so the four colours
+                                  // cannot drift out of step with the four
+                                  // counts beside them. Labels accompany every
+                                  // slice; colour is never the only carrier.
+                                  backgroundColor: (
+                                    Object.keys(s.sentiments) as Label[]
+                                  ).map((k) =>
+                                    s.measurable.has(k)
+                                      ? SENTIMENT[k]
+                                      : UNMEASURABLE,
+                                  ),
+                                  // White, the card's own colour: the gap is
+                                  // what keeps two touching slices two.
+                                  borderColor: "#ffffff",
                                   borderWidth: 2,
                                 },
                               ],
@@ -1010,8 +1084,8 @@ function DashboardBody({
                           datasets: [
                             {
                               data: weeks.buckets.map((b) => b.count),
-                              borderColor: "#3b27ba",
-                              backgroundColor: "rgba(59,39,186,0.10)",
+                              borderColor: VOLUME,
+                              backgroundColor: VOLUME_FILL,
                               fill: true,
                               tension: 0.3,
                               pointRadius: 0,
@@ -1021,6 +1095,13 @@ function DashboardBody({
                         options={{ ...barOptions, animation: false }}
                       />
                     </div>
+                  )}
+                  {plottable(weeks, 3) && (
+                    <ChartFigures
+                      caption="التعليقات المطابقة، حسب الأسبوع"
+                      unit="الأسبوع"
+                      buckets={weeks.buckets}
+                    />
                   )}
                   <p className="rp-metric-note">
                     {weeks.unplaceable > 0
@@ -1048,7 +1129,7 @@ function DashboardBody({
                             datasets: [
                               {
                                 data: hours.buckets.map((b) => b.count),
-                                backgroundColor: "#6b59e8",
+                                backgroundColor: VOLUME,
                                 borderRadius: 4,
                               },
                             ],
@@ -1056,6 +1137,13 @@ function DashboardBody({
                           options={{ ...barOptions, animation: false }}
                         />
                       </div>
+                    )}
+                    {plottable(hours) && (
+                      <ChartFigures
+                        caption="التعليقات المطابقة، حسب ساعة اليوم"
+                        unit="الساعة"
+                        buckets={hours.buckets}
+                      />
                     )}
                     <p className="rp-metric-note" data-testid="hours-excluded">
                       {hours.unplaceable > 0
@@ -1078,7 +1166,7 @@ function DashboardBody({
                             datasets: [
                               {
                                 data: weekdays.buckets.map((b) => b.count),
-                                backgroundColor: "#ff9080",
+                                backgroundColor: VOLUME,
                                 borderRadius: 4,
                               },
                             ],
@@ -1086,6 +1174,13 @@ function DashboardBody({
                           options={{ ...barOptions, animation: false }}
                         />
                       </div>
+                    )}
+                    {plottable(weekdays) && (
+                      <ChartFigures
+                        caption="التعليقات المطابقة، حسب يوم الأسبوع"
+                        unit="اليوم"
+                        buckets={weekdays.buckets}
+                      />
                     )}
                     <p className="rp-metric-note">اليوم بتوقيت متصفحك.</p>
                     <p className="rp-metric-note">
@@ -1179,7 +1274,8 @@ function DashboardBody({
                   </p>
                 )}
                 <div className="table-wrap">
-                  <table aria-label="مقارنة الفيديوهات ضمن الفلاتر">
+                  <table>
+                    <caption>مقارنة الفيديوهات ضمن الفلاتر</caption>
                     <thead>
                       <tr>
                         <th scope="col">الفيديو</th>
@@ -1200,14 +1296,46 @@ function DashboardBody({
                             {v.analysed === 0 ? (
                               <small>لا توجد تعليقات محللة ضمن الفلاتر</small>
                             ) : (
-                              <ul className="share">
-                                {Object.entries(v.sentiments).map(([k, n]) => (
-                                  <li key={k}>
-                                    {labels[k as Label]} {n} (
-                                    {Math.round((n / v.analysed) * 100)}٪)
-                                  </li>
-                                ))}
-                              </ul>
+                              <>
+                                {/* A comparison table whose comparison column
+                                    is a run-on sentence compares nothing: the
+                                    reader parses four numbers per row and holds
+                                    them against four more. The bar is read
+                                    across rows at a glance; the list under it
+                                    keeps the exact figures, because a bar is an
+                                    impression and this page promises counts. */}
+                                <span
+                                  className="rp-bar rp-bar-inline"
+                                  aria-hidden="true"
+                                >
+                                  {(
+                                    Object.entries(v.sentiments) as [
+                                      Label,
+                                      number,
+                                    ][]
+                                  )
+                                    .filter(([, count]) => count > 0)
+                                    .map(([k, count]) => (
+                                      <span
+                                        key={k}
+                                        style={{
+                                          width: `${(count / v.analysed) * 100}%`,
+                                          background: SENTIMENT[k],
+                                        }}
+                                      />
+                                    ))}
+                                </span>
+                                <ul className="share">
+                                  {Object.entries(v.sentiments).map(
+                                    ([k, n]) => (
+                                      <li key={k}>
+                                        {labels[k as Label]} {n} (
+                                        {Math.round((n / v.analysed) * 100)}٪)
+                                      </li>
+                                    ),
+                                  )}
+                                </ul>
+                              </>
                             )}
                           </td>
                         </tr>
@@ -1334,7 +1462,8 @@ function DashboardBody({
                   </p>
                 )}
                 <div className="table-wrap">
-                  <table aria-label="التعليقات ضمن الفلاتر">
+                  <table>
+                    <caption>التعليقات ضمن الفلاتر</caption>
                     <thead>
                       <tr>
                         <th scope="col">المؤلف</th>
@@ -1353,7 +1482,16 @@ function DashboardBody({
                           </td>
                           <td>{commentText(c)}</td>
                           <td>
-                            {c.label ? labels[c.label] : "غير محلل / قديم"}
+                            {/* The cards a hundred pixels above wear a chip for
+                                this. Printing it as bare text here made one
+                                attribute look like two and left the column
+                                impossible to scan. */}
+                            <span
+                              className="rp-chip"
+                              data-label={c.label ?? "none"}
+                            >
+                              {c.label ? labels[c.label] : "غير محلل / قديم"}
+                            </span>
                             {c.reviewed && <small>مراجعة بشرية</small>}
                           </td>
                           <td>{displayDate(c.published_at)}</td>

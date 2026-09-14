@@ -65,11 +65,14 @@
   min-height: 44px;
   cursor: pointer;
 }
+/* The same ring as the rest of the product. A landing page that marks focus
+   in its own colour teaches the reader a signal the app then abandons. */
 .landing a:focus-visible,
 .landing button:focus-visible,
 .landing summary:focus-visible {
-  outline: 3px solid #b95d08;
-  outline-offset: 5px;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--focus-halo);
 }
 .landing [id] {
   scroll-margin-top: 24px;

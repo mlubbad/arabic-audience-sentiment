@@ -168,7 +168,7 @@ export function Landing() {
         </section>
         <div className="lp-value-strip">
           <span>مصمّمة لفهم التعليقات العربية</span>
-          <span>٤ فئات للمشاعر</span>
+          <span>4 فئات للمشاعر</span>
           <span>من النظرة العامة إلى التعليق</span>
           <span>القرار الأخير لك</span>
         </div>
@@ -214,7 +214,7 @@ export function Landing() {
                 <BrandMark /> نظرة على الجمهور
               </span>
               <span className="lp-demo-label">
-                مثال توضيحي · ٤ تعليقات مؤلّفة
+                مثال توضيحي · 4 تعليقات مؤلّفة
               </span>
             </div>
             <div className="lp-demo-content">

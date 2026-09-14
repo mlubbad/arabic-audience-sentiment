@@ -931,20 +931,71 @@ test("no figure is carried by colour alone", async ({ page }) => {
   );
 });
 
-test("both tables expose their column headers to assistive technology", async ({
-  page,
-}) => {
+test("every table header declares what it heads", async ({ page }) => {
   await page.goto("/dashboard");
-  const unscoped = await page.evaluate(
-    () =>
-      [...document.querySelectorAll("table th")].filter(
-        (th) => th.getAttribute("scope") !== "col",
-      ).length,
+  // Wait for a table to exist before counting headers. Without this the
+  // evaluate ran against a page whose data had not arrived: it counted zero
+  // headers, found zero of them faulty, and passed — an accessibility test
+  // that never once looked at a table. It stayed green through every change
+  // to both tables because there was nothing in the DOM to be wrong.
+  const comments = page.getByRole("table", { name: /التعليقات ضمن الفلاتر/ });
+  await expect(comments).toBeVisible();
+  const headers = await page.evaluate(() =>
+    [...document.querySelectorAll("table th")].map((th) => ({
+      scope: th.getAttribute("scope"),
+      text: (th.textContent ?? "").trim().slice(0, 20),
+    })),
   );
-  expect(unscoped).toBe(0);
+  expect(headers.length).toBeGreaterThan(0);
+  // A th with no scope is ambiguous: the reader is told this cell is a header
+  // and not told what it heads. Row headers are legitimate — the figure tables
+  // under the charts name each row — so the rule is "declared", not "col".
+  expect(headers.filter((h) => h.scope !== "col" && h.scope !== "row")).toEqual(
+    [],
+  );
+  // And a table needs a name that is on the page, not only in the tree.
   await expect(
-    page.getByRole("table", { name: "التعليقات ضمن الفلاتر" }),
+    page.locator("table caption", { hasText: "مقارنة الفيديوهات ضمن الفلاتر" }),
   ).toBeVisible();
+});
+
+test("a chart that cannot be seen can still be read", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(
+    page.getByRole("table", { name: /التعليقات ضمن/ }),
+  ).toBeVisible();
+  // The timing panels draw into a canvas and are hidden from the accessibility
+  // tree, which is right — "canvas" announced aloud helps nobody. What was
+  // missing is what the canvas says. Every chart that is drawn publishes its
+  // figures as a table; a chart with no figures beside it is a panel that
+  // exists only for readers who can see it.
+  const drawn = page.locator(".rp-chart:not([hidden]), .rp-chart-tall");
+  const figures = page.locator(".rp-figures");
+  await expect(figures).toHaveCount(await drawn.count());
+  const first = figures.first();
+  await expect(first).not.toHaveAttribute("open", "");
+  await first.getByText("عرض الأرقام").click();
+  await expect(first.locator("table")).toBeVisible();
+  // The same number the bar is tall.
+  await expect(first.locator("tbody tr").first()).toContainText(/\d/);
+});
+
+test("a budget bar shows the state its sentence reports", async ({ page }) => {
+  await page.goto("/sync");
+  const near = page.getByTestId("budget-comment_analysis");
+  await expect(near).toContainText("اقترب الاستهلاك من الحد");
+  // The bar used to take the browser's own accent — Chrome paints <progress>
+  // green — so a panel warning about a limit showed a reassuring green bar,
+  // and a different colour in every browser. Colour and sentence now come
+  // from one state.
+  const fill = await near.locator("progress").evaluate((el) => {
+    const warning = getComputedStyle(document.documentElement)
+      .getPropertyValue("--color-warning")
+      .trim();
+    return { appearance: getComputedStyle(el).appearance, warning };
+  });
+  expect(fill.appearance).toBe("none");
+  expect(fill.warning).not.toBe("");
 });
 
 test("a sync failure reads as a sentence, not as a raw code", async ({

@@ -40,16 +40,45 @@
   --text-3: #6f6b8c;
   --link: var(--ml-indigo);
 
-  /* -------- semantic. Separate from the accent, on purpose -------- */
-  --color-success: #2ebd85;
-  --color-warning: #b8860b;
-  --color-danger: #d94550;
-  /* The donut's own scale. Rose and green at full strength read as
-     alert and confirmation; these are the plotting versions. */
-  --sentiment-positive: #2ebd85;
-  --sentiment-negative: #ff6c77;
-  --sentiment-neutral: #8e8aa6;
-  --sentiment-mixed: #f0c419;
+  /* -------- semantic. Separate from the accent, on purpose --------
+     These are read as text — "74٪ — أوشك الاستهلاك على الحد" — never as a
+     bare swatch, so they are stepped to clear 4.5:1 on both the card and the
+     muted surface rather than to look lively at a glance. The earlier steps
+     measured 2.40, 3.25 and 4.27 and were all below it. */
+  --color-success: #0f6b46;
+  --color-warning: #8a5a00;
+  --color-danger: #b3261e;
+
+  /* -------- sentiment: one scale, both jobs ------------------------
+     A single token per label now paints the mark AND sets the label's ink.
+     There used to be three sources for one meaning — chips took the status
+     colours, bars took these, and the donut hard-coded its own hex — so
+     "negative" was #d94550 in a chip and #ff6c77 eight pixels away.
+
+     Sentiment is a diverging scale (negative ← neutral → positive) with
+     "mixed" off the axis, so the midpoint is grey on purpose.
+
+     The steps are measured, not chosen by eye (scripts/validate-palette.mjs,
+     which runs in the unit suite):
+       · positive ↔ negative separate by ΔE 9.6 under deuteranopia. The old
+         green-and-rose pair measured 3.9 — indistinguishable to roughly one
+         man in twelve, on the single distinction this product exists to draw.
+       · every step clears 4.5:1 as text on the card and 3:1 as a mark.
+     The trade: darkening green to a teal that a chip can legibly wear costs
+     chroma, and the grey midpoint has almost none. Both read "low chroma"
+     to a categorical checker; for a diverging scale both are correct. */
+  --sentiment-positive: #0d7a68;
+  --sentiment-negative: #c62839;
+  --sentiment-neutral: #6b6785;
+  --sentiment-mixed: #a25000;
+
+  /* -------- focus -------------------------------------------------
+     Two tones, because one never works on every surface: the old single
+     ring measured 2.92:1 on the muted surface. The dark ring carries the
+     shape on pale ground (19:1 on the card); the light halo hugs the element
+     and carries it on the indigo buttons and the dark hero (7.7:1, 11.7:1). */
+  --focus-ring: #0e0a2e;
+  --focus-halo: #fde676;
 
   /* -------- spacing ----------------------------------------------- */
   --space-1: 4px;

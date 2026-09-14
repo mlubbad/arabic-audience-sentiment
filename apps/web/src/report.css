@@ -357,6 +357,10 @@
 /* Sentiment share as one bar, in the same order everywhere. */
 .rp-bar {
   display: flex;
+  /* The gap is the second channel. Two fills that meet on a shared edge read
+     as one band the moment their hues are close — precisely the case colour
+     alone already handles worst. 2px of surface keeps the boundary. */
+  gap: 2px;
   height: 8px;
   border-radius: var(--r-pill);
   overflow: hidden;
@@ -516,17 +520,20 @@
   border: 1.5px solid currentcolor;
   white-space: nowrap;
 }
+/* The sentiment scale, not the status scale. A chip and the donut slice it
+   describes used to disagree — "سلبي" was #d94550 here and #ff6c77 eight
+   pixels away — because one meaning was reading from two palettes. */
 .rp-chip[data-label="positive"] {
-  color: var(--color-success);
+  color: var(--sentiment-positive);
 }
 .rp-chip[data-label="negative"] {
-  color: var(--color-danger);
+  color: var(--sentiment-negative);
 }
 .rp-chip[data-label="neutral"] {
   color: var(--sentiment-neutral);
 }
 .rp-chip[data-label="mixed"] {
-  color: var(--color-warning);
+  color: var(--sentiment-mixed);
 }
 .rp-chip[data-label="none"] {
   color: var(--fg-3);
@@ -719,4 +726,134 @@
 }
 .rp-page .budgets li {
   border-radius: var(--r-md);
+}
+
+/* ---------------- the numbers behind a canvas ---------------- */
+/* Folded away by default: a sighted reader already has the picture, and a
+   table under every chart would treble the page. Open, it is the panel. */
+.rp-figures {
+  margin-top: var(--space-3);
+  font-size: 13px;
+}
+.rp-figures > summary {
+  cursor: pointer;
+  color: var(--link);
+  font-weight: 600;
+  padding: var(--space-1) 0;
+  width: fit-content;
+}
+.rp-figures table {
+  width: 100%;
+  margin-top: var(--space-2);
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.rp-figures th,
+.rp-figures td {
+  text-align: start;
+  padding: 5px var(--space-2);
+  border-block-end: 1px solid var(--border-1);
+  font-weight: 400;
+}
+.rp-figures thead th {
+  color: var(--fg-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* A table's name belongs above it, where everyone reads it, rather than in an
+   aria-label only a screen reader ever hears. */
+.rp-page table caption {
+  text-align: start;
+  color: var(--fg-3);
+  font-size: 13px;
+  padding-block-end: var(--space-2);
+}
+
+/* The share bar inside a table cell: same scale, same order, one line tall. */
+.rp-bar-inline {
+  margin-top: 0;
+  margin-bottom: var(--space-2);
+  height: 6px;
+  min-width: 90px;
+}
+
+/* The headline split, on the hero's dark ground. No sentiment colour here:
+   the scale is stepped against the white card and none of its four steps
+   holds 4.5:1 on indigo. The words carry the labels; the colour waits for the
+   panels below, where it is measured to work. */
+.rp-hero-split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-4);
+  font-size: var(--fs-small);
+  color: rgba(255, 255, 255, 0.82);
+}
+.rp-hero-split strong {
+  color: #fff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- plan budgets ---------------- */
+/* A native <progress> takes the browser's accent — Chrome paints it green. It
+   was reporting "74٪ — اقترب الاستهلاك من الحد" in warning ink above a
+   cheerful green bar, and painting a different colour in every browser. The
+   bar now says what the sentence says. */
+.rp-page .budgets progress {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  inline-size: 100%;
+  block-size: 8px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.rp-page .budgets progress::-webkit-progress-bar {
+  background: var(--bg-muted);
+  border-radius: var(--r-pill);
+}
+.rp-page .budgets progress::-webkit-progress-value {
+  background: var(--ml-indigo);
+  border-radius: var(--r-pill);
+}
+.rp-page .budgets progress::-moz-progress-bar {
+  background: var(--ml-indigo);
+  border-radius: var(--r-pill);
+}
+.rp-page
+  .budgets
+  li:has(small[data-state="warning"])
+  progress::-webkit-progress-value {
+  background: var(--color-warning);
+}
+.rp-page
+  .budgets
+  li:has(small[data-state="warning"])
+  progress::-moz-progress-bar {
+  background: var(--color-warning);
+}
+.rp-page
+  .budgets
+  li:has(small[data-state="critical"])
+  progress::-webkit-progress-value,
+.rp-page
+  .budgets
+  li:has(small[data-state="exhausted"])
+  progress::-webkit-progress-value {
+  background: var(--color-danger);
+}
+.rp-page
+  .budgets
+  li:has(small[data-state="critical"])
+  progress::-moz-progress-bar,
+.rp-page
+  .budgets
+  li:has(small[data-state="exhausted"])
+  progress::-moz-progress-bar {
+  background: var(--color-danger);
 }

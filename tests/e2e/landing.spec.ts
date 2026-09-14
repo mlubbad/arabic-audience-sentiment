@@ -9,7 +9,7 @@ test("landing demo filters illustrative comments and connects to the real dashbo
   );
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   const demo = page.locator(".lp-demo-frame");
-  await expect(demo).toContainText("٤ تعليقات مؤلّفة");
+  await expect(demo).toContainText("4 تعليقات مؤلّفة");
   await expect(demo.locator(".lp-example-comment")).toHaveCount(4);
   await demo.getByRole("button", { name: "مختلط", exact: true }).click();
   await expect(demo.locator(".lp-example-comment")).toHaveCount(1);

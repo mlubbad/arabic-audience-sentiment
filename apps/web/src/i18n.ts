@@ -35,8 +35,8 @@ export const reviewStateMessages: Record<string, string> = {
   legacy_unverified: "تعديل موروث غير موثق؛ لا يُحتسب مراجعة بشرية",
 };
 const fixtureVideoNames: Record<string, string> = {
-  "video-1": "فيديو اصطناعي ١",
-  "video-2": "فيديو اصطناعي ٢",
+  "video-1": "فيديو اصطناعي 1",
+  "video-2": "فيديو اصطناعي 2",
 };
 /**
  * The video's real title where the row carried one.
