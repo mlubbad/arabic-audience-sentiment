@@ -7,6 +7,7 @@ import {
   type AuthAction,
 } from "./authMessages";
 import { beginConnect } from "./connect";
+import "./report.css";
 export function Account() {
   const [session, setSession] = useState<Session | null>(null),
     [pending, setPending] = useState(!!supabase),
@@ -74,7 +75,10 @@ export function Account() {
   if (!supabase)
     return (
       <>
-        <h1>الحساب ومساحات العمل</h1>
+        <header className="rp-hero">
+          <p className="rp-eyebrow">الحساب</p>
+          <h1>الحساب ومساحات العمل</h1>
+        </header>
         <div className="notice">
           <h2>إعداد Supabase غير متوفر</h2>
           <p>
@@ -137,16 +141,23 @@ export function Account() {
     }
   }
   return (
-    <>
-      <h1>الحساب ومساحات العمل</h1>
-      <p>
-        حسابك في الخدمة مستقل عن قناتك. ربط القناة خطوة منفصلة تمنح الأداة إذن
-        قراءة تعليقاتك، ويمكن سحبها في أي وقت.
-      </p>
+    <div className="rp-page">
+      <header className="rp-hero">
+        <p className="rp-eyebrow">الحساب</p>
+        <h1>الحساب ومساحات العمل</h1>
+        <p>
+          حسابك في الخدمة مستقل عن قناتك. ربط القناة خطوة منفصلة تمنح الأداة إذن
+          قراءة تعليقاتك، ويمكن سحبها في أي وقت.
+        </p>
+      </header>
       {pending && <p role="status">جارٍ تنفيذ الطلب…</p>}
-      {message && <p role="status">{message}</p>}
+      {message && (
+        <div className="notice" role="status">
+          <p>{message}</p>
+        </div>
+      )}
       {!session ? (
-        <form onSubmit={auth}>
+        <form className="rp-card" onSubmit={auth}>
           <label>
             البريد الإلكتروني
             <input
@@ -187,9 +198,20 @@ export function Account() {
           >
             تسجيل الخروج
           </button>
-          <h2>مساحات العمل</h2>
+          <section className="rp-section">
+            <header>
+              <h2>مساحات العمل</h2>
+              <p className="rp-sub">
+                كل مساحة عمل تملك قناتها وبياناتها وحدودها. لا تُعرض بيانات
+                مساحة داخل أخرى.
+              </p>
+            </header>
+          </section>
           {workspaces.length === 0 ? (
-            <p>لا توجد مساحة عمل متاحة</p>
+            <p className="rp-missing">
+              <strong>لا توجد مساحة عمل متاحة</strong>
+              أنشئ واحدة أدناه لتبدأ.
+            </p>
           ) : (
             <ul className="workspace-list">
               {workspaces.map((w) => {
@@ -274,7 +296,7 @@ export function Account() {
               })}
             </ul>
           )}
-          <form onSubmit={createWorkspace}>
+          <form className="rp-card" onSubmit={createWorkspace}>
             <label>
               اسم مساحة العمل
               <input
@@ -288,6 +310,6 @@ export function Account() {
           </form>
         </>
       )}
-    </>
+    </div>
   );
 }

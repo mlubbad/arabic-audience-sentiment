@@ -14,7 +14,7 @@ import {
 } from "chart.js";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 import "./report.css";
-import { byHour, byWeek, byWeekday, commenters } from "./analytics";
+import { byHour, byWeek, byWeekday, commenters, plottable } from "./analytics";
 import {
   type Filters,
   type Label,
@@ -439,7 +439,7 @@ function DashboardBody({
         <span className="rp-scope">{source.scope}</span>
       </nav>
       <aside
-        className={source.tone === "warning" ? "notice" : "notice source-live"}
+        className={`rp-provenance${source.tone === "warning" ? " warn" : ""}`}
         data-testid="source"
         data-mode={source.mode}
       >
@@ -451,7 +451,7 @@ function DashboardBody({
           <p data-testid="source-freshness">{source.freshness}</p>
         )}
       </aside>
-      <form onSubmit={apply} className="filters">
+      <form onSubmit={apply} className="filters rp-card rp-filters">
         <label>
           البحث في التعليقات والمؤلفين
           <input
@@ -933,24 +933,32 @@ function DashboardBody({
                 </header>
                 <article className="rp-card">
                   <h3>التعليقات أسبوعيًا</h3>
-                  <div className="rp-chart rp-chart-tall" aria-hidden="true">
-                    <Line
-                      data={{
-                        labels: weeks.buckets.map((b) => b.label),
-                        datasets: [
-                          {
-                            data: weeks.buckets.map((b) => b.count),
-                            borderColor: "#3b27ba",
-                            backgroundColor: "rgba(59,39,186,0.10)",
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 0,
-                          },
-                        ],
-                      }}
-                      options={{ ...barOptions, animation: false }}
-                    />
-                  </div>
+                  {!plottable(weeks, 3) ? (
+                    <p className="rp-missing" data-testid="weeks-unplottable">
+                      <strong>لا يكفي لرسم اتجاه</strong>
+                      التعليقات المطابقة تقع في أقل من ثلاثة أسابيع. رسم خط
+                      عبرها كان سيبدو قياسًا لاتجاه، ولا يوجد اتجاه بعد.
+                    </p>
+                  ) : (
+                    <div className="rp-chart rp-chart-tall" aria-hidden="true">
+                      <Line
+                        data={{
+                          labels: weeks.buckets.map((b) => b.label),
+                          datasets: [
+                            {
+                              data: weeks.buckets.map((b) => b.count),
+                              borderColor: "#3b27ba",
+                              backgroundColor: "rgba(59,39,186,0.10)",
+                              fill: true,
+                              tension: 0.3,
+                              pointRadius: 0,
+                            },
+                          ],
+                        }}
+                        options={{ ...barOptions, animation: false }}
+                      />
+                    </div>
+                  )}
                   <p className="rp-metric-note">
                     {weeks.unplaceable > 0
                       ? `${n(weeks.unplaceable)} تعليقًا بلا تاريخ صالح لم يدخل هذا الرسم.`
@@ -963,21 +971,29 @@ function DashboardBody({
                 >
                   <article className="rp-card">
                     <h3>حسب ساعة اليوم</h3>
-                    <div className="rp-chart" aria-hidden="true">
-                      <Bar
-                        data={{
-                          labels: hours.buckets.map((b) => b.label),
-                          datasets: [
-                            {
-                              data: hours.buckets.map((b) => b.count),
-                              backgroundColor: "#6b59e8",
-                              borderRadius: 4,
-                            },
-                          ],
-                        }}
-                        options={{ ...barOptions, animation: false }}
-                      />
-                    </div>
+                    {!plottable(hours) ? (
+                      <p className="rp-missing">
+                        <strong>لا يكفي لرسم توزيع</strong>
+                        ساعة واحدة أو أقل تحمل تعليقًا. أعمدة فارغة عبر اليوم
+                        كانت ستقول إننا قِسنا فوجدنا سكونًا.
+                      </p>
+                    ) : (
+                      <div className="rp-chart" aria-hidden="true">
+                        <Bar
+                          data={{
+                            labels: hours.buckets.map((b) => b.label),
+                            datasets: [
+                              {
+                                data: hours.buckets.map((b) => b.count),
+                                backgroundColor: "#6b59e8",
+                                borderRadius: 4,
+                              },
+                            ],
+                          }}
+                          options={{ ...barOptions, animation: false }}
+                        />
+                      </div>
+                    )}
                     <p className="rp-metric-note" data-testid="hours-excluded">
                       {hours.unplaceable > 0
                         ? `${n(hours.unplaceable)} تعليقًا بتوقيت أخشن من الساعة، مستبعَد من هذا الرسم.`
@@ -986,21 +1002,28 @@ function DashboardBody({
                   </article>
                   <article className="rp-card">
                     <h3>حسب يوم الأسبوع</h3>
-                    <div className="rp-chart" aria-hidden="true">
-                      <Bar
-                        data={{
-                          labels: weekdays.buckets.map((b) => b.label),
-                          datasets: [
-                            {
-                              data: weekdays.buckets.map((b) => b.count),
-                              backgroundColor: "#ff9080",
-                              borderRadius: 4,
-                            },
-                          ],
-                        }}
-                        options={{ ...barOptions, animation: false }}
-                      />
-                    </div>
+                    {!plottable(weekdays) ? (
+                      <p className="rp-missing">
+                        <strong>لا يكفي لرسم توزيع</strong>
+                        يوم واحد أو أقل يحمل تعليقًا ضمن الفلاتر الحالية.
+                      </p>
+                    ) : (
+                      <div className="rp-chart" aria-hidden="true">
+                        <Bar
+                          data={{
+                            labels: weekdays.buckets.map((b) => b.label),
+                            datasets: [
+                              {
+                                data: weekdays.buckets.map((b) => b.count),
+                                backgroundColor: "#ff9080",
+                                borderRadius: 4,
+                              },
+                            ],
+                          }}
+                          options={{ ...barOptions, animation: false }}
+                        />
+                      </div>
+                    )}
                     <p className="rp-metric-note">اليوم بتوقيت متصفحك.</p>
                     <p className="rp-metric-note">
                       تعليقات بلا تاريخ:{" "}

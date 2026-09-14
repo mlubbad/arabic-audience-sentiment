@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LabelledComment } from "@sentiment/contracts";
-import { byHour, byWeek, byWeekday, commenters } from "./analytics";
+import { byHour, byWeek, byWeekday, commenters, plottable } from "./analytics";
 
 const c = (over: Partial<LabelledComment> = {}): LabelledComment =>
   ({
@@ -105,5 +105,32 @@ describe("commenters", () => {
     ];
     expect(commenters(rows, "comments").ranked[0].key).toBe("loud");
     expect(commenters(rows, "likes").ranked[0].key).toBe("liked");
+  });
+});
+
+describe("plottable", () => {
+  const bucketed = (...counts: number[]) => ({
+    buckets: counts.map((count, i) => ({
+      key: String(i),
+      label: String(i),
+      count,
+    })),
+    unplaceable: 0,
+  });
+
+  it("refuses to draw a claim out of one point", () => {
+    // An axis with a single filled bucket reads as a measured flat line.
+    expect(plottable(bucketed(0, 0, 5))).toBe(false);
+    expect(plottable(bucketed(0, 0, 0))).toBe(false);
+  });
+
+  it("draws once there is a shape to see", () => {
+    expect(plottable(bucketed(1, 4))).toBe(true);
+    expect(plottable(bucketed(3, 0, 9, 2))).toBe(true);
+  });
+
+  it("lets the caller ask for more before it will plot", () => {
+    expect(plottable(bucketed(1, 4), 3)).toBe(false);
+    expect(plottable(bucketed(1, 4, 2), 3)).toBe(true);
   });
 });

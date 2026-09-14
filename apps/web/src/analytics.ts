@@ -182,3 +182,16 @@ export function commenters(
   );
   return { ranked, anonymous };
 }
+
+/**
+ * Whether a set of buckets is worth drawing.
+ *
+ * A chart with one filled bucket, or none, is not a small chart — it is a
+ * claim. An axis with a flat line across it says "we measured this and it did
+ * not vary", and an empty grid says "we measured this and found nothing".
+ * Neither is true when the answer is that there was not enough to plot, so
+ * that case is written out in words instead.
+ */
+export function plottable(b: Bucketed, minimum = 2): boolean {
+  return b.buckets.filter((x) => x.count > 0).length >= minimum;
+}
