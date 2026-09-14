@@ -56,7 +56,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
-## Five invariants that no failing test will announce
+## Six invariants that no failing test will announce
 
 Both were flagged by `sentimentanalysis-69`, which wrote them. Each is enforced
 in one place rather than at every call site, which is what makes them easy to
@@ -109,6 +109,24 @@ worker process when the worker was running fine and the lease was too short: it
 took eight samples of the live `jobs` row, two minutes apart, to see `attempt`
 climbing with no error ever recorded. None of that is visible in the product.
 Found and being fixed by `sentimentanalysis-91`.
+
+**`PREPROCESSING_VERSION` is provenance, not a version string.** The analysis
+key is `model_id@revision` + `PREPROCESSING_VERSION` + `parameters_digest`, and
+it is what makes two predictions comparable. Change how text is preprocessed
+without bumping that constant and every prediction before and after carries an
+identical key while having been computed differently — the stored predictions
+become incomparable with new ones, invisibly, and nothing fails.
+
+As of 2026-09-14 a third writer in this tree (not either Claude session — the
+user also runs Antigravity and Codex, and neither can be messaged) has
+uncommitted work adding Arabic normalisation to `preprocess.py`: tashkeel
+stripping, tatweel, elongation. It is currently harmless because
+`normalize_arabic_text` is defined and called from nowhere, so the pipeline is
+unchanged and the key still tells the truth. The danger is the next commit.
+Wire it into `to_plain_text` or the analyser and bump the constant in the same
+change, or the 326 stored predictions silently stop meaning the same thing as
+the ones after it. Found by `sentimentanalysis-91`, which preserved the work
+rather than touching it.
 
 ## Things that are shared and will collide silently
 
