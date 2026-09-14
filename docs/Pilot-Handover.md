@@ -31,8 +31,26 @@ load time rather than trusted. A model with the right label names in a
 different order loads cleanly, runs, and inverts every verdict — nothing on our
 side would notice, so a mismatch refuses to run.
 
-**We do not know how accurate it is on this audience.** That is not a figure of
-speech. One sampled comment — "اظن انه في الجزيرة", a neutral remark — was
+**Six candidates were measured against a hand-labelled set of every audience
+comment on the connected channel; none beat it.** The full comparison is in
+`docs/evaluation/model-comparison.md`. The short version: the three CAMeL
+variants and a tweet-tuned MARBERT sit within 0.02 macro F1 of each other with
+McNemar p between 0.63 and 1.00, an AraBERT four-class model ties on accuracy
+exactly, and the MARBERT sentiment checkpoint the earlier research recommended
+is significantly *worse* here — p = 0.0001, accuracy 0.60 against 0.76.
+
+**No candidate meets the project's own gate of macro F1 ≥ 0.75.** The best
+four-class result is 0.588 and the best three-class result is 0.730. All six are
+weakest on neutral (F1 0.47–0.53), and the model in use over-predicts negative
+by about 17% — read the negative share as an upper bound, not a measurement.
+
+**About one comment in twenty is genuinely mixed**, and the active model has
+three classes. The dashboard says "not measured by the current model" rather
+than "0%", because a class a model cannot express is a missing capability and
+not a count of none.
+
+**What the labelled set does not settle.** One annotator, no second pass,
+no adjudication. One sampled comment — "اظن انه في الجزيرة", a neutral remark — was
 labelled negative at 0.518 confidence, barely above a coin toss. The
 distribution above is a measurement of the model's behaviour, not of the
 audience's mood, and the two should not be confused in front of a client.

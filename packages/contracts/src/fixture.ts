@@ -14,6 +14,13 @@ import { SyncStateSchema } from "./sync";
 const dashboardData = {
   revision: z.string(),
   active_analysis_key: z.string(),
+  // Which labels the active analysis can actually produce, taken from the
+  // class scores its predictions carry. A three-class model has no Mixed, and
+  // reporting "Mixed: 0" for it presents a missing capability as a
+  // measurement of none — on this channel roughly one comment in twenty is
+  // genuinely mixed, so the zero is not merely uninformative, it is wrong.
+  // Empty means nothing has been analysed and therefore nothing is known.
+  active_analysis_labels: z.array(z.string()).default([]),
   // Null means no plan has been activated, which the UI must say plainly.
   plan: UsageSummarySchema.nullable(),
   // A malformed block falls back to null rather than failing the whole read.

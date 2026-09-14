@@ -877,24 +877,43 @@ function DashboardBody({
                           />
                         </div>
                         <ul className="rp-legend">
-                          {Object.entries(s.sentiments).map(([key, v]) => (
-                            <li key={key}>
-                              <span>
-                                <span
-                                  className="rp-swatch"
-                                  style={{
-                                    background: `var(--sentiment-${key})`,
-                                  }}
-                                  aria-hidden="true"
-                                />
-                                {labels[key as Label]}: {n(v)} (
-                                {s.analysed
-                                  ? Math.round((v / s.analysed) * 100)
-                                  : 0}
-                                ٪)
-                              </span>
-                            </li>
-                          ))}
+                          {Object.entries(s.sentiments).map(([key, v]) => {
+                            // A class the analysis cannot express is reported
+                            // as unavailable, never as zero. On this channel
+                            // about one comment in twenty is genuinely mixed,
+                            // and the active model has no such class — so the
+                            // zero was not uninformative, it was wrong.
+                            const measurable = s.measurable.has(key);
+                            return (
+                              <li key={key}>
+                                <span>
+                                  <span
+                                    className="rp-swatch"
+                                    style={{
+                                      background: measurable
+                                        ? `var(--sentiment-${key})`
+                                        : "var(--border-2)",
+                                    }}
+                                    aria-hidden="true"
+                                  />
+                                  {measurable ? (
+                                    <>
+                                      {labels[key as Label]}: {n(v)} (
+                                      {s.analysed
+                                        ? Math.round((v / s.analysed) * 100)
+                                        : 0}
+                                      ٪)
+                                    </>
+                                  ) : (
+                                    <span data-testid={`unmeasurable-${key}`}>
+                                      {labels[key as Label]}: لا يقيسه النموذج
+                                      الحالي
+                                    </span>
+                                  )}
+                                </span>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </>
                     ) : (

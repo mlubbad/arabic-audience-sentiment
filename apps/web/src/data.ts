@@ -130,7 +130,12 @@ export async function loadSnapshot(
   const source = await readSource(mode, filters.workspace_id, signal);
   const comments = source.comments;
   const build = (f: Filters, cursor_reset: boolean) => {
-    const base = snapshot(comments, f, source.active_analysis_key);
+    const base = snapshot(
+      comments,
+      f,
+      source.active_analysis_key,
+      source.active_analysis_labels,
+    );
     return {
       ...base,
       // The snapshot already aggregates every video; the app only decides how

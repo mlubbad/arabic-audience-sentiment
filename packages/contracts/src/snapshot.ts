@@ -104,7 +104,12 @@ export function exportRows(
 /** How many engaged negatives the dashboard shows. */
 const ENGAGEMENT_LIMIT = 5;
 
-export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
+export function snapshot(
+  input: Comment[],
+  raw: Filters,
+  activeKey: string,
+  activeLabels: readonly string[] = [],
+) {
   const f = FiltersSchema.parse(raw);
   const rows = filteredRows(input, f, activeKey);
   // Offered filter values come from the data, so a channel's own vocabulary
@@ -200,6 +205,9 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     // was no live read. The data layer owns that answer.
     comment_types,
     video_options,
+    // Which of the four this analysis could express at all. A class the model
+    // lacks is reported as absent rather than as zero.
+    measurable: new Set(activeLabels),
     // Said out loud. A total that quietly differs from what the channel owner
     // can count on YouTube is a number they will not trust twice.
     channel_own_comments: input.filter(

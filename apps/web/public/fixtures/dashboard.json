@@ -327,5 +327,11 @@
       "video_title": "فيديو اصطناعي ١",
       "by_channel_owner": true
     }
+  ],
+  "active_analysis_labels": [
+    "positive",
+    "negative",
+    "neutral",
+    "mixed"
   ]
 }

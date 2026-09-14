@@ -426,6 +426,36 @@ describe("human corrections", () => {
     expect(oneVideo.total).toBe(1);
     expect(oneVideo.comment_types).toEqual(["اقتراح", "سؤال"]);
   });
+  it("reports a class the analysis cannot express as absent, not as zero", () => {
+    const rows: Comment[] = [
+      { ...base, id: "m1", prediction: pred("positive") },
+      { ...base, id: "m2", prediction: predNeg() },
+    ];
+    // A three-class analysis: Mixed is not in its vocabulary.
+    const three = snapshot(rows, { workspace_id: workspace }, "fixture-v1", [
+      "positive",
+      "negative",
+      "neutral",
+    ]);
+    expect(three.measurable.has("mixed")).toBe(false);
+    // The count is still zero — what changes is that the view can now tell
+    // "none were found" apart from "this model has nowhere to put them".
+    expect(three.sentiments.mixed).toBe(0);
+
+    const four = snapshot(rows, { workspace_id: workspace }, "fixture-v1", [
+      "positive",
+      "negative",
+      "neutral",
+      "mixed",
+    ]);
+    expect(four.measurable.has("mixed")).toBe(true);
+  });
+  it("treats an analysis that produced nothing as measuring nothing", () => {
+    const s = snapshot([], { workspace_id: workspace }, "fixture-v1");
+    // Not "everything is zero": no analysis has run, so no class has been
+    // measured and none of the four may be reported as counted.
+    expect([...s.measurable]).toEqual([]);
+  });
   it("keeps the channel's own replies out of every denominator", () => {
     const rows: Comment[] = [
       { ...base, id: "a1", prediction: pred("positive") },
