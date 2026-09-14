@@ -1,31 +1,36 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import "./landing.css";
+import { labels } from "./i18n";
+import { SENTIMENT } from "./chartTheme";
 import { BrandMark } from "./BrandMark";
 
+/* The demo's four comments. The labels come from the shared table rather than
+   being written again here: a visitor who learns a word on this page meets the
+   same word inside the product, and there is no second place for it to drift. */
 const examples = [
-  {
-    text: "شرح واضح، استفدت من الأمثلة كثيرًا 👏",
-    label: "positive",
-    name: "إيجابي",
-  },
-  {
-    text: "المحتوى جميل، لكن المقدمة طويلة قليلًا",
-    label: "mixed",
-    name: "مختلط",
-  },
-  {
-    text: "أتمنى توضيح المصادر في الحلقة القادمة",
-    label: "neutral",
-    name: "محايد",
-  },
-  { text: "الصوت غير واضح في هذا المقطع", label: "negative", name: "سلبي" },
+  { text: "شرح واضح، استفدت من الأمثلة كثيرًا 👏", label: "positive" },
+  { text: "المحتوى جميل، لكن المقدمة طويلة قليلًا", label: "mixed" },
+  { text: "أتمنى توضيح المصادر في الحلقة القادمة", label: "neutral" },
+  { text: "الصوت غير واضح في هذا المقطع", label: "negative" },
 ] as const;
-const colors = {
-  positive: "#8470e9",
-  negative: "#eb819a",
-  neutral: "#a5b1c6",
-  mixed: "#efbb65",
+
+/* And the colours, for the same reason and one more.
+   This page had its own map — positive a purple #8470e9, negative a pink
+   #eb819a — so a visitor learned one colour language here and met a different
+   one the moment they reached the dashboard, where positive is teal and
+   negative is red. Two languages for one meaning, on the surface that forms
+   the first impression.
+   The landing's own pair separated better under colourblind vision (ΔE 23.4
+   against the dashboard's 9.6, both clearing the ≥8 gate), but every one of
+   its four marks sat below 3:1 on white — 2.58, 2.60, 1.83 — so they were the
+   weaker set where it counts, and the dashboard's are measured against that
+   floor in `palette.test.ts`. */
+const colors: Record<(typeof examples)[number]["label"], string> = {
+  positive: SENTIMENT.positive,
+  negative: SENTIMENT.negative,
+  neutral: SENTIMENT.neutral,
+  mixed: SENTIMENT.mixed,
 };
 const numeral = new Intl.NumberFormat("ar", { numberingSystem: "arab" });
 const audiences = {
@@ -229,7 +234,10 @@ export function Landing() {
                       : { background: colors[shown[0].label] }
                   }
                   aria-label={shares
-                    .map((c) => `${c.name}: ${numeral.format(c.percent)}٪`)
+                    .map(
+                      (c) =>
+                        `${labels[c.label]}: ${numeral.format(c.percent)}٪`,
+                    )
                     .join("، ")}
                 >
                   <div>
@@ -241,7 +249,7 @@ export function Landing() {
                   {shares.map((c) => (
                     <span key={c.label}>
                       <i className={`lp-dot ${c.label}`} />
-                      {c.name} <b>{numeral.format(c.percent)}٪</b>
+                      {labels[c.label]} <b>{numeral.format(c.percent)}٪</b>
                     </span>
                   ))}
                 </div>
@@ -264,7 +272,7 @@ export function Landing() {
                       aria-pressed={selected === c.label}
                       onClick={() => setSelected(c.label)}
                     >
-                      {c.name}
+                      {labels[c.label]}
                     </button>
                   ))}
                 </div>
@@ -275,11 +283,11 @@ export function Landing() {
                         className={`lp-avatar ${c.label}`}
                         aria-hidden="true"
                       >
-                        {c.name[0]}
+                        {labels[c.label][0]}
                       </span>
                       <p>{c.text}</p>
                       <span className={`lp-sentiment ${c.label}`}>
-                        {c.name}
+                        {labels[c.label]}
                       </span>
                     </div>
                   ))}

@@ -94,7 +94,7 @@
   justify-content: center;
   min-height: 42px;
   padding: 0.45rem 0.8rem;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: #514d66;
   font-size: 0.85rem;
   font-weight: 600;
@@ -198,7 +198,7 @@
   min-height: 0;
   margin: 0 0 1.25rem;
   padding: clamp(1.5rem, 3.5vw, 2.6rem) clamp(1.5rem, 4vw, 3.2rem);
-  border-radius: 28px;
+  border-radius: var(--r-4);
   background: linear-gradient(115deg, #292541 0%, #352b85 58%, #5442bf 100%);
   box-shadow: 0 18px 42px -20px rgba(59, 39, 186, 0.5);
 }
@@ -240,13 +240,13 @@
 .app-shell .rp-nav {
   margin-bottom: 1rem;
   padding: 0.55rem 1rem;
-  border-radius: 16px;
+  border-radius: var(--r-3);
   box-shadow: 0 6px 20px rgba(35, 31, 67, 0.055);
 }
 .app-shell .rp-provenance {
   margin-bottom: 1rem;
   padding: 0.75rem 1.1rem;
-  border-radius: 14px;
+  border-radius: var(--r-2);
   background: #fff;
 }
 .app-shell .rp-provenance p {
@@ -265,7 +265,7 @@
   margin: 0 0 0.3rem;
 }
 .app-shell .rp-card {
-  border-radius: 18px;
+  border-radius: var(--r-3);
 }
 .app-shell .rp-metric {
   border-top: 3px solid #ddd5ff;
@@ -316,7 +316,7 @@
 }
 .app-shell .rp-page .notice,
 .app-shell .rp-page .loading {
-  border-radius: 16px;
+  border-radius: var(--r-3);
   box-shadow: 0 8px 28px rgba(35, 31, 67, 0.05);
 }
 .app-shell .rp-page .notice {
@@ -373,7 +373,7 @@
   position: relative;
   overflow: hidden;
   padding: clamp(1.4rem, 3vw, 2.2rem);
-  border-radius: 20px;
+  border-radius: var(--r-3);
   background: linear-gradient(160deg, #efeaff, #fff 70%);
   border: 1px solid #e5ddff;
 }
@@ -401,7 +401,7 @@
   align-items: center;
   min-height: 42px;
   padding: 0.5rem 0.9rem;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--ml-indigo);
   color: white;
   font-weight: 700;
@@ -434,7 +434,7 @@
   display: grid;
   place-items: center;
   height: 2.2rem;
-  border-radius: 12px;
+  border-radius: var(--r-2);
   background: white;
   color: var(--ml-indigo);
   font: 700 0.8rem var(--font-body);
@@ -464,7 +464,7 @@
   align-content: start;
   gap: 0.7rem;
   padding: 1.3rem;
-  border-radius: 18px;
+  border-radius: var(--r-3);
 }
 .app-shell .workspace-list li::before {
   content: "مساحة عمل";
@@ -512,7 +512,7 @@
 .sync-workspace select {
   min-width: 15rem;
   border-color: var(--border-2);
-  border-radius: 10px;
+  border-radius: var(--r-2);
 }
 .app-shell #rp-attempts {
   margin-top: 3rem;
@@ -528,7 +528,7 @@
   margin: 3rem auto;
   padding: clamp(1.5rem, 5vw, 3rem);
   border: 1px solid var(--border-1);
-  border-radius: 24px;
+  border-radius: var(--r-4);
   background: white;
   box-shadow: var(--shadow-2);
   text-align: center;
@@ -539,7 +539,7 @@
   width: 3.6rem;
   height: 3.6rem;
   margin: 0 auto 1rem;
-  border-radius: 18px;
+  border-radius: var(--r-3);
   background: #f0ebff;
   color: var(--ml-indigo);
   font-size: 2rem;
@@ -570,7 +570,7 @@
   align-items: center;
   min-height: 44px;
   padding: 0.55rem 1rem;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--ml-indigo);
   color: white;
   font-weight: 700;
@@ -613,7 +613,7 @@
     min-height: 42px;
     padding: 0.4rem 0.9rem;
     border: 1px solid #ddd7fa;
-    border-radius: 999px;
+    border-radius: var(--r-pill);
     background: #f3f0ff;
     color: var(--ml-indigo);
     font-size: 0.84rem;
@@ -634,7 +634,7 @@
   }
   .app-nav a {
     justify-content: flex-start;
-    border-radius: 10px;
+    border-radius: var(--r-2);
   }
   .app-shell > .app-main {
     padding: 1.1rem 1rem 3rem;
@@ -644,7 +644,7 @@
     padding: 1.7rem 1rem;
   }
   .app-shell .rp-page .rp-hero {
-    border-radius: 22px;
+    border-radius: var(--r-3);
   }
   .app-shell .rp-page form.rp-card.rp-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -658,7 +658,7 @@
     margin: 0 0 0.8rem;
     padding: 0.55rem 1rem;
     border: 1px solid #ded7fd;
-    border-radius: 14px;
+    border-radius: var(--r-2);
     background: #f3f0ff;
     color: var(--ml-indigo);
     font-weight: 700;

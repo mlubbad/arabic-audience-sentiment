@@ -524,7 +524,7 @@
 .rp-swatch {
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 
 /* ---------------- commenters ---------------- */

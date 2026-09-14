@@ -56,7 +56,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
-## Four invariants that no failing test will announce
+## Five invariants that no failing test will announce
 
 Both were flagged by `sentimentanalysis-69`, which wrote them. Each is enforced
 in one place rather than at every call site, which is what makes them easy to
@@ -99,6 +99,16 @@ and starting from the original silently reverts it. This happened on
 line dropped the run-closing insert that `20260914070000` had added. Two
 worker_gateway tests caught it, which is luck rather than design; nothing
 announces a reverted body. Flagged by `sentimentanalysis-91`, which hit it.
+
+**The operations page cannot currently show a job that died before committing.**
+`sync_runs` opens on the first committed batch, so a job that fails earlier
+leaves no run row and the panel shows the last *successful* run instead — which
+reads as "things were fine recently" at the exact moment they were not. This is
+why a screenshot of that page was misdiagnosed on 2026-09-14 as a stopped
+worker process when the worker was running fine and the lease was too short: it
+took eight samples of the live `jobs` row, two minutes apart, to see `attempt`
+climbing with no error ever recorded. None of that is visible in the product.
+Found and being fixed by `sentimentanalysis-91`.
 
 ## Things that are shared and will collide silently
 
@@ -149,11 +159,16 @@ they claim to catch. If you change behaviour and a test fails, read the test's
 comment before changing it: it usually records a specific defect that shipped
 once.
 
-Two whole classes of bug in this codebase come from **one meaning with two
-implementations** — sentiment colours in three places, two typefaces neither of
-which knew about the other, two tables of error codes that disagreed on the
-same screen. If you are about to add a second place where something is decided,
-that is the pattern.
+**One meaning with two implementations is the dominant bug in this codebase.**
+Six instances found so far: sentiment colours in three places; two typefaces
+neither of which knew about the other; two tables of error codes that
+disagreed on the same screen; a second reader of that table in `Sync.tsx` that
+dropped the cause entirely; the landing page keeping its own sentiment words;
+and the landing page keeping its own sentiment colours, so a visitor learned
+purple-is-positive and met teal-is-positive on the next screen.
+
+None of them failed a test. Each was found by looking for the shape. If you are
+about to add a second place where something is decided, that is the shape.
 
 ## When you finish
 
