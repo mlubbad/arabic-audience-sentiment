@@ -857,3 +857,27 @@ exercising the wrong code. Set `E2E_PORT` to run two lanes at once.
 
 `format:check` deliberately excludes Markdown: `docs/input-inventory.md` records the SHA-256
 of the two supplied specification files, and both hashes were re-verified unchanged.
+
+## 2026-09-15 — the rail's ink, and two Arabic labels that came apart
+
+`rail.test.ts` measures white-at-an-alpha over `#100d28`, the darkest point of the rail's own
+background, and holds text to 4.5:1 and the destination icons to 3:1. It reads the alphas out
+of `app.css` instead of repeating them. Three mutations were run against it and each failed
+exactly one assertion: the caption ink back to α 0.38 (≈3.1:1), the icon column changed from
+`20px` to `auto`, and the active bar's `inset-inline-start` changed to `inset-block-start`.
+
+`dashboard.spec.ts`'s "no Arabic label is letter-spaced" caught two live regressions in
+uncommitted work rather than in anything it was written for: `.app-shell .rp-page .rp-eyebrow`
+had its `letter-spacing: 0` — which exists only to undo `report.css`'s 0.16em inside the app
+shell — replaced with `0.03em`, and a caption I had just added carried 0.08em. A third,
+`.app-plan-kicker` at 0.04em, is the same defect and no test sees it: the plan card renders
+only to a signed-in reader. All three are now 0.
+
+Gates after the change: lint 0, format 0, types 0, unit 0 (232 tests), e2e 0 (68 tests),
+`check:secrets` 0.
+
+Deployed to the private preview at 2026-09-15. Evidence is the FTP transfer log — 226 on every
+file including `static/index-Dv2ALO_m.css`, the new bundle hash. The origin answers 401 on the
+page and on that path and 403 on `.htpasswd_app`, but **the 401 proves only that basic auth is
+in front**: a path that does not exist answers 401 too, so it is not evidence the new bundle
+landed. The transfer log is.

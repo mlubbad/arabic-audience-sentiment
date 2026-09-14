@@ -202,3 +202,12 @@ integration. Everything is now on one branch, `main`, in the original checkout �
 the lane branches held is an ancestor of it, so nothing was lost. The guard and its hook are
 removed. `docs/coordination/README.md` records what the protocol was, the three commits it
 correctly refused, and why it ended.
+
+## 2026-09-15 — the rail reads as a navigation
+
+The rail's three destinations each sized themselves to their own label, so no two icons shared
+a vertical edge. The cause was `.app-nav` — the removed top bar's own rule, a centred
+`inline-flex` row — still applying to its replacement, along with a mobile block that
+positioned the nav absolutely and painted it white inside a dark sheet. Both removed. The
+navigation is now a two-column grid with a fixed 20px icon column, with a group caption and a
+hairline under the lockup and above the foot. `rail.test.ts` is new; see `verification.md`.

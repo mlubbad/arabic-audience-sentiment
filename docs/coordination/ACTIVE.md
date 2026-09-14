@@ -128,6 +128,18 @@ change, or the 326 stored predictions silently stop meaning the same thing as
 the ones after it. Found by `sentimentanalysis-91`, which preserved the work
 rather than touching it.
 
+**A zero in a `letter-spacing` declaration is usually load-bearing.** Arabic
+letters join, and tracking runs after shaping, so positive tracking draws the
+connected forms with gaps between them — the word comes apart and reads as a
+rendering fault. `report.css` tracks the hero eyebrow at 0.16em for the Latin
+landing page, and `.app-shell .rp-page .rp-eyebrow { letter-spacing: 0 }`
+exists *only* to undo it inside the app. A restyle on 2026-09-15 replaced that
+zero with 0.03em, which looks like a taste change and is not one.
+`dashboard.spec.ts`'s "no Arabic label is letter-spaced" caught it, and caught
+a new caption at 0.08em in the same run. It cannot catch `.app-plan-kicker`,
+which had the same defect at 0.04em: that label renders only to a signed-in
+reader and the browser suite is signed out.
+
 ## Things that are shared and will collide silently
 
 **Port 4173.** The Vite preview server and Playwright's `webServer` both want
