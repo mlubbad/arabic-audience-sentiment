@@ -1,6 +1,17 @@
 # Progress
 
+## 2026-09-14 — Arabic NLP sentiment engine and text normalization enhancements
+
+The Python worker's sentiment analysis pipeline (`workers/python/src/sentiment/`) was upgraded with specialized Arabic text preprocessing and multi-model support:
+- Added Arabic text normalization helpers (`normalize_arabic_text`, `strip_tatweel`, `strip_tashkeel`, `reduce_elongation`) in `preprocess.py` to handle kashida/tatweel, diacritics, and character elongation while strictly preserving emojis, dialect words, and negation particles (`مش`, `ما`, `لم`, `لن`, `لا`, `ليس`).
+- Upgraded `load_pinned` in `transformer.py` to accept registered candidate model names as strings or `ModelCard` instances, with strict validation against model config (`verify_mapping`).
+- Added full support for the four-class AraBERT candidate (`PRAli22/AraBert-Arabic-Sentiment-Analysis`) with its first-class `mixed` sentiment label, alongside CAMeLBERT-DA and MARBERT variants.
+- Extended `manual_run.py` and `loop.py` to support all registered candidates dynamically via `--model`.
+- Added unit tests for Arabic normalization, tatweel/tashkeel stripping, elongation reduction, and 4-class prediction simulation.
+- All checks passed: `npm run check` (127 Python tests, 225 unit tests, 135 SQL tests, lint/format/typecheck clean) and `npm run test:e2e` (68/68 Playwright tests passed).
+
 ## 2026-09-14 — Internal pages redesigned around the landing identity
+
 
 The dashboard, account, synchronization, OAuth result and unknown-route pages now share an
 Arabic RTL application shell with the landing's mark, type, indigo action color, navigation,

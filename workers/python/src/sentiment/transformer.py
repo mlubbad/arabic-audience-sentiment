@@ -200,12 +200,18 @@ class LogitsAdapter:
         )
 
 
-def load_pinned(card: ModelCard = CAMELBERT_DA_SENTIMENT) -> LogitsAdapter:
+def load_pinned(card: ModelCard | str = CAMELBERT_DA_SENTIMENT) -> LogitsAdapter:
     """Load the checkpoint at its pinned revision and check it is what we think.
 
+    Accepts either a ModelCard or the name of a registered candidate.
     Imported here rather than at module scope so the rest of the worker — and
     every test in this suite — runs without torch installed.
     """
+    if isinstance(card, str):
+        if card not in CANDIDATES:
+            raise ValueError(f"unknown model '{card}'; choose from {sorted(CANDIDATES)}")
+        card = CANDIDATES[card]
+
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 

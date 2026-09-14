@@ -14,7 +14,7 @@ test("the inner app has a usable mobile navigation and account entry", async ({
   await expect(menu).toHaveAttribute("aria-expanded", "true");
   await page
     .getByRole("navigation", { name: "التنقل الرئيسي" })
-    .getByRole("link", { name: "حالة المزامنة" })
+    .getByRole("link", { name: "التشغيل" })
     .click();
   await expect(page).toHaveURL(/\/sync$/);
   await expect(menu).toHaveAttribute("aria-expanded", "false");
@@ -35,14 +35,16 @@ test("the inner app has a usable mobile navigation and account entry", async ({
   ).toBe(true);
 });
 
-test("the front door is in the header, on every route", async ({ page }) => {
+test("the front door is in the global chrome, on every route", async ({
+  page,
+}) => {
   // Session state is true of every route, so it is shown on every route.
   // Signing out used to live in the body of the account page — leaving meant
   // first navigating to a settings screen — and signing in was reachable only
   // by guessing that "الحساب ومساحات العمل" was also the front door.
   for (const route of ["/dashboard", "/sync", "/account"]) {
     await page.goto(route);
-    const header = page.locator(".app-header");
+    const header = page.locator(".app-rail");
     const enter = header.getByRole("link", { name: "تسجيل الدخول" });
     await expect(enter, route).toBeVisible();
     await expect(enter).toHaveAttribute("href", "/account");
@@ -53,7 +55,7 @@ test("the front door is in the header, on every route", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/dashboard");
   await expect(
-    page.locator(".app-header").getByRole("link", { name: "تسجيل الدخول" }),
+    page.locator(".app-rail").getByRole("link", { name: "تسجيل الدخول" }),
   ).toBeVisible();
 
   // Exactly one control, not one per screen.

@@ -70,3 +70,22 @@ def test_three_class_candidate_reports_mixed_as_unsupported():
 def test_language_flagging_does_not_reject_rows():
     assert is_arabic("تعليق") and not is_arabic("great video")
     assert is_analysable("great video")
+
+
+def test_arabic_normalization_tatweel_tashkeel_and_elongation():
+    from sentiment.preprocess import (
+        normalize_arabic_text,
+        reduce_elongation,
+        strip_tashkeel,
+        strip_tatweel,
+    )
+
+    # Tashkeel removal
+    assert strip_tashkeel("شُكْراً جَزِيلاً") == "شكرا جزيلا"
+    # Tatweel removal
+    assert strip_tatweel("شــــكـــراً") == "شكراً"
+    # Elongation reduction: 3+ repeated chars -> 2
+    assert reduce_elongation("راااااائع جدااااا") == "راائع جداا"
+    # Combined normalization
+    assert normalize_arabic_text("<b>شـــــكراً</b><br>رااااائع جداً 👏") == "شكراً\nراائع جداً 👏"
+

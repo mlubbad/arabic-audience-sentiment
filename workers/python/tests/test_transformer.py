@@ -174,3 +174,22 @@ def test_only_the_four_class_candidate_claims_mixed():
     # The rest have no such class. Reporting 0% Mixed for them would present a
     # missing capability as a measurement.
     assert not any(v for n, v in supports.items() if n != "arabert-4class")
+
+
+def test_four_class_model_correctly_predicts_mixed():
+    from sentiment.transformer import ARABERT_FOUR_CLASS
+
+    # Index 3 is 'mixed' in AraBERT 4-class
+    out = adapter([[0.1, 0.1, 0.1, 3.5]], card=ARABERT_FOUR_CLASS).predict(["تعليق فيه مدح ونقد"])
+    assert out[0].status == "succeeded"
+    assert out[0].label == "mixed"
+    assert set(out[0].scores) == {"positive", "negative", "neutral", "mixed"}
+    assert out[0].scores["mixed"] > 0.9
+
+
+def test_load_pinned_refuses_unknown_model_name():
+    from sentiment.transformer import load_pinned
+
+    with pytest.raises(ValueError, match="unknown model 'non-existent-model'"):
+        load_pinned("non-existent-model")
+

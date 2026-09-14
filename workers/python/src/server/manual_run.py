@@ -133,22 +133,25 @@ def main() -> None:
                    help="walk every upload that has comments, resuming from the checkpoint")
     p.add_argument("--videos", type=int, default=25,
                    help="how many recent uploads to consider (backfill only)")
+    from sentiment.transformer import CANDIDATES
+
     p.add_argument("--model", default="none",
-                   choices=["none", "camelbert-da", "deterministic-test"],
-                   help="camelbert-da runs the pinned Arabic classifier; "
+                   choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())],
+                   help="candidate Arabic classifier (e.g. arabert-4class, camelbert-da); "
                         "deterministic-test is a fixture double, NOT a model")
     args = p.parse_args()
     if not args.base or not args.credential:
         raise SystemExit("need WORKER_API_BASE_URL and WORKER_CREDENTIAL")
 
     analyzer = None
-    if args.model == "camelbert-da":
+    if args.model in CANDIDATES:
         # Imported here so the collection-only path never needs torch.
         from sentiment.transformer import load_pinned
 
-        analyzer = load_pinned()
+        analyzer = load_pinned(args.model)
     elif args.model == "deterministic-test":
         analyzer = DeterministicTestAnalyzer()
+
 
     client = httpx.Client()
     control = ControlPlane(args.base, args.credential, client)

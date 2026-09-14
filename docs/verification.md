@@ -1,6 +1,19 @@
 # Verification
 
+## 2026-09-14 — Arabic NLP sentiment engine and text normalization verification
+
+Node 22.14.0, Python 3.12.10. Verified on `main`:
+
+| Command / observation | Actual result |
+| --- | --- |
+| `pytest tests/test_sentiment.py tests/test_transformer.py` | 27 passed; verified Arabic normalization, tatweel/tashkeel stripping, elongation reduction, 4-class prediction and error handling |
+| `npm run worker:test` | 127 passed in 0.67s across 14 test suites |
+| `npm run worker:lint` | Ruff: All checks passed! |
+| `npm run check` | Full check passed: lint, Ruff, format, typecheck, Deno check, 225 unit tests, 135 SQL tests, 127 Python tests, Vite build and secret scan |
+| `E2E_PORT=5340 npm run test:e2e` | 68 passed in 1.0m (Chromium E2E suite covering app shell, dashboard, landing, and mobile UX) |
+
 ## 2026-09-14 — Internal UI redesign and Sync identity boundary
+
 
 All commands used Node 22.14.0 via `PATH=/Users/mlubbad/.nvm/versions/node/v22.14.0/bin:$PATH`.
 The browser suites started their own Vite servers on the indicated ports with

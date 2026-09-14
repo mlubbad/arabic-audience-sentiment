@@ -122,10 +122,12 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--base", default=os.environ.get("WORKER_API_BASE_URL", ""))
     # Comma-separated: one scoped credential per workspace this worker serves.
+    from sentiment.transformer import CANDIDATES
+
     p.add_argument("--credential", default=os.environ.get("WORKER_CREDENTIAL", ""),
                    help="one or more scoped worker credentials, comma-separated")
     p.add_argument("--model", default="none",
-                   choices=["none", "camelbert-da", "deterministic-test"])
+                   choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())])
     p.add_argument("--videos", type=int, default=50)
     p.add_argument("--idle-seconds", type=float, default=60.0,
                    help="pause after an empty queue")
@@ -139,16 +141,17 @@ def main() -> None:
     signal.signal(signal.SIGINT, _request_stop)
 
     analyzer = None
-    if args.model == "camelbert-da":
+    if args.model in CANDIDATES:
         from sentiment.transformer import load_pinned
 
-        _log("loading the classifier")
-        analyzer = load_pinned()
+        _log(f"loading the classifier ({args.model})")
+        analyzer = load_pinned(args.model)
         _log(f"loaded {analyzer.model_id}@{analyzer.revision[:12]}")
     elif args.model == "deterministic-test":
         from sentiment.deterministic import DeterministicTestAnalyzer
 
         analyzer = DeterministicTestAnalyzer()
+
 
     client = httpx.Client()
     credentials = [c.strip() for c in args.credential.split(",") if c.strip()]

@@ -1,9 +1,11 @@
 /* The working side of the product shares the landing's mark, type and palette.
    The report keeps its chart colors; this layer gives every route one shell. */
 .app-shell {
-  /* One number for how tall the pinned header is, so anything that has to
-     sit below it can say so instead of guessing. */
-  --app-header-h: 78px;
+  /* How much pinned chrome sits above the content. The rail is a column
+     beside it, not a band over it, so nothing does — and the report's own
+     index, which offsets itself by this, was sticking 78px down with empty
+     space above it. */
+  --app-header-h: 0px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -705,5 +707,203 @@
   }
   .app-state-actions {
     flex-direction: column;
+  }
+}
+
+/* =====================================================================
+   The rail.
+   A standing navigation column instead of four links across the top. In a
+   right-to-left document it stands on the right, which `grid-template-areas`
+   handles by itself — the columns follow the writing direction, so nothing
+   here needs a direction-specific rule.
+   ===================================================================== */
+.app-shell:has(.app-rail) {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  /* Every row named. Left to auto-placement, the private-preview notice —
+     first in the DOM — was pushed past the only named row and rendered below
+     six thousand pixels of content, which is the one place a notice about what
+     the data is cannot do its job. */
+  grid-template-areas:
+    "note note"
+    "rail main"
+    "foot foot";
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+}
+.app-shell:has(.app-rail) > .app-announcement {
+  grid-area: note;
+}
+.app-shell:has(.app-rail) > .app-footer {
+  grid-area: foot;
+}
+.app-shell:has(.app-rail) > .app-skip,
+.app-shell:has(.app-rail) > .app-menu {
+  grid-column: 1 / -1;
+}
+.app-rail {
+  grid-area: rail;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-4);
+  /* The one dark plane in the product. It is the frame, and a frame that
+     recedes lets the data be the brightest thing on screen. */
+  background: linear-gradient(180deg, #1b1740, #14112f 60%, #171338);
+  color: #fff;
+}
+.app-rail .app-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: #fff;
+  padding-inline-start: var(--space-2);
+}
+.app-rail .app-brand span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.app-rail .app-brand b {
+  font-size: 17px;
+  font-weight: 700;
+}
+.app-rail .app-brand small {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.app-rail .app-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.app-shell .app-rail .app-nav a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 11px var(--space-3);
+  border-radius: var(--r-2);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  font-weight: 600;
+  background: none;
+  border: 0;
+}
+.app-shell .app-rail .app-nav a:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+/* The current destination, marked by fill rather than by colour alone. */
+.app-shell .app-rail .app-nav a.active,
+.app-shell .app-rail .app-nav a[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.app-nav-mark {
+  font-size: 15px;
+  opacity: 0.8;
+  width: 1.1em;
+  text-align: center;
+}
+.app-rail-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.app-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-4);
+  border-radius: var(--r-3);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.app-plan-kicker {
+  font-size: 10.5px;
+  color: var(--ml-yellow);
+  font-weight: 700;
+}
+.app-plan strong {
+  font-size: 15px;
+}
+.app-plan-note {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+}
+/* The session control sits on the dark plane now, so it takes the light ink. */
+.app-rail .app-session {
+  border-inline-start: 0;
+  padding-inline-start: 0;
+  flex-wrap: wrap;
+}
+.app-rail .app-session-who {
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 100%;
+}
+.app-shell .app-rail .app-session button,
+.app-shell .app-rail a.app-session-in {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+.app-shell:has(.app-rail) > .app-main {
+  grid-area: main;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  /* On a phone the rail becomes a sheet behind the menu button, and the grid
+     collapses to one column so the content keeps the whole width. */
+  .app-shell:has(.app-rail) {
+    grid-template-columns: minmax(0, 1fr);
+    /* All three rows named here too. Naming only "main" left the notice and
+       the footer pointing at areas this template does not define, so they were
+       auto-placed into an implicit second column and squeezed the content into
+       a strip about eighty pixels wide. */
+    grid-template-areas:
+      "note"
+      "main"
+      "foot";
+  }
+  .app-rail {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-end: 0;
+    width: min(82vw, 300px);
+    z-index: 80;
+    /* Hidden past the edge it is anchored to. `transform` is physical and this
+       document is right-to-left, so `inset-inline-end: 0` puts the sheet
+       against the LEFT edge and a positive translate slid it into the middle
+       of the page instead of off it — the closed sheet stayed visible as a
+       dark band over the content. */
+    transform: translateX(-100%);
+    transition: transform var(--dur-2) var(--ease-glass);
+  }
+  .app-rail.is-open {
+    transform: none;
+  }
+  .app-shell .app-menu {
+    display: inline-flex;
+    position: sticky;
+    top: var(--space-3);
+    z-index: 90;
+    margin: var(--space-3);
+    align-self: start;
+    width: fit-content;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-rail {
+    transition: none;
   }
 }

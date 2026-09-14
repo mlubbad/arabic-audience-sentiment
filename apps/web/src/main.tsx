@@ -87,17 +87,47 @@ function SessionControl() {
   );
 }
 
+/** The product's parts, in one list.
+ *  The page title, the rail and the document title all read from it, so a
+ *  destination cannot exist in the navigation and nowhere else, or the
+ *  reverse — which is how "مقارنة الفيديوهات" came to be a section of the
+ *  report that its own index did not list. */
+const DESTINATIONS = [
+  { to: "/dashboard", label: "نظرة عامة", mark: "◴", title: "نظرة عامة" },
+  { to: "/sync", label: "التشغيل", mark: "⟳", title: "حالة المزامنة" },
+  {
+    to: "/account",
+    label: "المصادر والحساب",
+    mark: "⊕",
+    title: "الحساب ومساحات العمل",
+  },
+] as const;
+
+/** What the plan has left, where it is true: on every screen.
+ *  It used to live inside the operations page, which meant the one number a
+ *  reader needs before starting work was behind the page they visit when
+ *  something has already gone wrong. */
+function PlanCard() {
+  const { session } = useSession();
+  if (!session) return null;
+  return (
+    <Link className="app-plan" to="/sync">
+      <span className="app-plan-kicker">معاينة خاصة</span>
+      <strong>خطة الـPilot</strong>
+      <span className="app-plan-note">الحدود والاستهلاك في صفحة التشغيل</span>
+    </Link>
+  );
+}
+
 function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
   useEffect(() => {
-    const titles: Record<string, string> = {
-      "/dashboard": "لوحة البيانات",
-      "/account": "الحساب ومساحات العمل",
-      "/sync": "حالة المزامنة",
-      "/connected": "نتيجة ربط القناة",
-    };
-    document.title = `${titles[pathname] ?? "صفحة غير موجودة"} — مشاعر الجمهور`;
+    const found = DESTINATIONS.find((d) => d.to === pathname);
+    const title =
+      found?.title ??
+      (pathname === "/connected" ? "نتيجة ربط القناة" : "صفحة غير موجودة");
+    document.title = `${title} — مشاعر الجمهور`;
     setMenuOpen(false);
   }, [pathname]);
   return (
@@ -109,49 +139,56 @@ function AppLayout() {
         <span>صوت جمهورك، بوضوح أكبر</span>
         <span>معاينة خاصة · نسخة تجريبية</span>
       </div>
-      <header className="app-header">
-        <div className="app-header-inner">
-          <Link
-            className="app-brand"
-            to="/"
-            aria-label="مشاعر الجمهور — الرئيسية"
-          >
-            <BrandMark />
-            <span>
+      {/* A rail, not a bar.
+          Four links across the top said "this is a page with some links on
+          it"; a standing rail says "this is a product, and these are its
+          parts". It also gives the two things a top bar had nowhere to put:
+          which workspace you are in, and what your plan has left — both true
+          on every screen and previously buried inside one page each. */}
+      <button
+        className="app-menu"
+        type="button"
+        aria-label="قائمة التطبيق"
+        aria-expanded={menuOpen}
+        aria-controls="app-rail"
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        {menuOpen ? "إغلاق ×" : "القائمة ☰"}
+      </button>
+      <aside
+        id="app-rail"
+        className={menuOpen ? "app-rail is-open" : "app-rail"}
+      >
+        <Link
+          className="app-brand"
+          to="/"
+          aria-label="مشاعر الجمهور — الرئيسية"
+        >
+          <BrandMark />
+          <span>
+            <b>
               مشاعر الجمهور<span className="app-brand-dot">.</span>
-            </span>
-          </Link>
-          <button
-            className="app-menu"
-            type="button"
-            aria-label="قائمة التطبيق"
-            aria-expanded={menuOpen}
-            aria-controls="app-navigation"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? "إغلاق ×" : "القائمة ☰"}
-          </button>
-          <nav
-            id="app-navigation"
-            className={menuOpen ? "app-nav is-open" : "app-nav"}
-            aria-label="التنقل الرئيسي"
-          >
-            <NavLink to="/" onClick={() => setMenuOpen(false)}>
-              الرئيسية
+            </b>
+            <small>من سكاي ديفيلوب</small>
+          </span>
+        </Link>
+
+        <nav className="app-nav" aria-label="التنقل الرئيسي">
+          {DESTINATIONS.map((d) => (
+            <NavLink key={d.to} to={d.to} onClick={() => setMenuOpen(false)}>
+              <span className="app-nav-mark" aria-hidden="true">
+                {d.mark}
+              </span>
+              {d.label}
             </NavLink>
-            <NavLink to="/dashboard" onClick={() => setMenuOpen(false)}>
-              لوحة البيانات
-            </NavLink>
-            <NavLink to="/sync" onClick={() => setMenuOpen(false)}>
-              حالة المزامنة
-            </NavLink>
-            <NavLink to="/account" onClick={() => setMenuOpen(false)}>
-              الحساب ومساحات العمل
-            </NavLink>
-          </nav>
+          ))}
+        </nav>
+
+        <div className="app-rail-foot">
+          <PlanCard />
           <SessionControl />
         </div>
-      </header>
+      </aside>
       <main id="content" className="app-main">
         <Suspense
           fallback={

@@ -12,6 +12,33 @@ _ARABIC = re.compile(r"[؀-ۿݐ-ݿ]")
 
 PREPROCESSING_VERSION = "strip-html-normalize-space-v1"
 
+_TASHKEEL = re.compile(r"[\u064B-\u0652\u0670]")
+_TATWEEL = re.compile(r"\u0640+")
+_REPEATED_CHARS = re.compile(r"(.)\1{2,}", re.DOTALL)
+
+
+def strip_tashkeel(text: str) -> str:
+    """Remove Arabic diacritics (fatḥah, ḍammah, kasrah, sukūn, shaddah, tanwīn)."""
+    return _TASHKEEL.sub("", text)
+
+
+def strip_tatweel(text: str) -> str:
+    """Remove Arabic kashida/tatweel (ـ)."""
+    return _TATWEEL.sub("", text)
+
+
+def reduce_elongation(text: str) -> str:
+    """Reduce 3 or more consecutive identical characters to 2 (e.g. راااائع -> راائع)."""
+    return _REPEATED_CHARS.sub(r"\1\1", text)
+
+
+def normalize_arabic_text(text: str) -> str:
+    """Cleans and normalizes Arabic text while preserving emoji, dialect, and negation."""
+    plain = to_plain_text(text)
+    plain = strip_tatweel(plain)
+    plain = reduce_elongation(plain)
+    return plain
+
 
 def to_plain_text(raw: str) -> str:
     """HTML is removed for analysis only; the raw text is stored untouched."""
@@ -35,3 +62,4 @@ def is_analysable(text: str) -> bool:
 def is_arabic(text: str) -> bool:
     """Flags non-Arabic text for separate evaluation; it is not a rejection."""
     return _ARABIC.search(text) is not None
+

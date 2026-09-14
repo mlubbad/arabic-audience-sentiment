@@ -41,7 +41,11 @@ test("landing demo filters illustrative comments and connects to the real dashbo
   await expect(page.getByTestId("total")).toHaveText("6");
   await page.reload();
   await expect(page.getByTestId("total")).toHaveText("6");
-  await page.getByRole("link", { name: "الرئيسية", exact: true }).click();
+  // Back to the landing by the brand lockup, which is where that path lives
+  // now. The rail lists the product's own parts and no longer carries
+  // "الرئيسية" as a peer destination — a marketing page is not a section of
+  // the application, and the logo has always been the way back to it.
+  await page.getByRole("link", { name: "مشاعر الجمهور — الرئيسية" }).click();
   await page.getByRole("link", { name: "فتح الحساب", exact: false }).click();
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("الحساب");

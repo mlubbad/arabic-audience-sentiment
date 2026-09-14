@@ -99,7 +99,7 @@ test("mobile shell fits viewport and exposes honest live-configuration state", a
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "قائمة التطبيق" }).click();
-  await page.getByRole("link", { name: "الحساب ومساحات العمل" }).click();
+  await page.getByRole("link", { name: "المصادر والحساب" }).click();
   await expect(
     page.getByText("تسجيل الدخول غير متاح في هذه المعاينة"),
   ).toBeVisible();
@@ -1225,20 +1225,29 @@ test("the two pinned panes stack instead of hiding one another", async ({
   await page.evaluate(() =>
     window.scrollTo({ top: 1400, behavior: "instant" }),
   );
-  // Both the shell header and the report's index are pinned. Pinned to the
-  // same 0 they are one pane and a hidden one — and the hidden one was the
-  // index, which is the only way to move around a page this long.
+  // The report's index is pinned, and whatever chrome stands above or beside
+  // it must not cover it. When the chrome was a band across the top, both were
+  // pinned to 0 and the index was the one that disappeared. The rail is a
+  // column now, so the index should reach the very top of the viewport — an
+  // offset left over from the old header would leave a gap with nothing in it.
   const boxes = await page.evaluate(() => {
     const r = (sel: string) => {
       const el = document.querySelector(sel);
       return el ? el.getBoundingClientRect() : null;
     };
-    const h = r(".app-header")!;
+    const h = r(".app-rail")!;
     const n = r(".rp-nav")!;
-    return { headerBottom: h.bottom, navTop: n.top, navBottom: n.bottom };
+    return {
+      navTop: n.top,
+      navBottom: n.bottom,
+      railOverlapsNav: h.right > n.left && h.left < n.right,
+    };
   });
-  expect(boxes.navTop).toBeGreaterThanOrEqual(boxes.headerBottom - 1);
+  // The index is at the top of the viewport, and the rail beside it does not
+  // overlap it horizontally.
+  expect(boxes.navTop).toBeLessThan(40);
   expect(boxes.navBottom).toBeLessThan(400);
+  expect(boxes.railOverlapsNav).toBe(false);
 });
 
 test("every pane keeps a solid the reader can fall back to", async ({
@@ -1253,7 +1262,10 @@ test("every pane keeps a solid the reader can fall back to", async ({
   // Reduce Transparency, an older engine — that solid is the entire surface.
   const thin = await page.evaluate(() => {
     const out: { sel: string; alpha: number }[] = [];
-    for (const sel of [".rp-card", ".rp-nav", ".app-header", ".review"]) {
+    // The rail is not on this list: it is an opaque dark plane by design, not
+    // a pane you can see through, so it has no tint alpha to keep above a
+    // floor. Only the translucent surfaces are checked.
+    for (const sel of [".rp-card", ".rp-nav", ".review"]) {
       const el = document.querySelector(sel);
       if (!el) continue;
       const bg = getComputedStyle(el).backgroundColor;
