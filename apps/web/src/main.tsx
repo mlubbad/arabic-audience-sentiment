@@ -1,9 +1,19 @@
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, NavLink, Outlet } from "react-router";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  NavLink,
+  Link,
+  Outlet,
+  useLocation,
+} from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./style.css";
+import "./app.css";
 import { Landing } from "./Landing";
+import { BrandMark } from "./BrandMark";
 const Dashboard = lazy(() =>
   import("./Dashboard").then((m) => ({ default: m.Dashboard })),
 );
@@ -18,26 +28,109 @@ const client = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
 function AppLayout() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      "/dashboard": "لوحة البيانات",
+      "/account": "الحساب ومساحات العمل",
+      "/sync": "حالة المزامنة",
+      "/connected": "نتيجة ربط القناة",
+    };
+    document.title = `${titles[pathname] ?? "صفحة غير موجودة"} — مشاعر الجمهور`;
+    setMenuOpen(false);
+  }, [pathname]);
   return (
-    <>
-      <a className="skip" href="#content">
+    <div className="app-shell" dir="rtl">
+      <a className="skip app-skip" href="#content">
         انتقل إلى المحتوى
       </a>
-      <header>
-        <p>تحليل مشاعر الجمهور</p>
-        <nav aria-label="التنقل الرئيسي">
-          <NavLink to="/">الرئيسية</NavLink>
-          <NavLink to="/dashboard">لوحة الاختبار</NavLink>
-          <NavLink to="/account">الحساب ومساحات العمل</NavLink>
-          <NavLink to="/sync">حالة المزامنة</NavLink>
-        </nav>
+      <div className="app-announcement">
+        <span>صوت جمهورك، بوضوح أكبر</span>
+        <span>معاينة خاصة · نسخة تجريبية</span>
+      </div>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <Link
+            className="app-brand"
+            to="/"
+            aria-label="مشاعر الجمهور — الرئيسية"
+          >
+            <BrandMark />
+            <span>
+              مشاعر الجمهور<span className="app-brand-dot">.</span>
+            </span>
+          </Link>
+          <button
+            className="app-menu"
+            type="button"
+            aria-label="قائمة التطبيق"
+            aria-expanded={menuOpen}
+            aria-controls="app-navigation"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? "إغلاق ×" : "القائمة ☰"}
+          </button>
+          <nav
+            id="app-navigation"
+            className={menuOpen ? "app-nav is-open" : "app-nav"}
+            aria-label="التنقل الرئيسي"
+          >
+            <NavLink to="/" onClick={() => setMenuOpen(false)}>
+              الرئيسية
+            </NavLink>
+            <NavLink to="/dashboard" onClick={() => setMenuOpen(false)}>
+              لوحة البيانات
+            </NavLink>
+            <NavLink to="/sync" onClick={() => setMenuOpen(false)}>
+              حالة المزامنة
+            </NavLink>
+            <NavLink to="/account" onClick={() => setMenuOpen(false)}>
+              الحساب ومساحات العمل
+            </NavLink>
+          </nav>
+          <span className="app-header-note">فهم أوضح لكل تعليق</span>
+        </div>
       </header>
-      <main id="content">
-        <Suspense fallback={<p role="status">جارٍ فتح الصفحة…</p>}>
+      <main id="content" className="app-main">
+        <Suspense
+          fallback={
+            <div className="app-state" role="status">
+              <span className="app-state-symbol" aria-hidden="true">
+                ◌
+              </span>
+              <p>جارٍ فتح الصفحة…</p>
+            </div>
+          }
+        >
           <Outlet />
         </Suspense>
       </main>
-    </>
+      <footer className="app-footer">
+        <div>
+          <Link to="/">مشاعر الجمهور.</Link>
+          <span>من التعليق إلى صورة أوضح.</span>
+        </div>
+        <p>معاينة خاصة · بعض الصفحات تستخدم بيانات اصطناعية موضّحة بوضوح.</p>
+      </footer>
+    </div>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="app-state app-not-found">
+      <span className="app-state-symbol" aria-hidden="true">
+        ؟
+      </span>
+      <p className="app-eyebrow">هذه الصفحة غير متاحة</p>
+      <h1>لم نجد الصفحة التي تبحث عنها.</h1>
+      <p>يمكنك العودة إلى اللوحة أو استكشاف الخدمة من الصفحة الرئيسية.</p>
+      <div className="app-state-actions">
+        <Link to="/dashboard">فتح لوحة البيانات</Link>
+        <Link to="/">العودة للرئيسية</Link>
+      </div>
+    </div>
   );
 }
 createRoot(document.getElementById("root")!).render(
@@ -51,7 +144,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/account" element={<Account />} />
             <Route path="/sync" element={<Sync />} />
             <Route path="/connected" element={<Connected />} />
-            <Route path="*" element={<p>الصفحة غير موجودة</p>} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </BrowserRouter>

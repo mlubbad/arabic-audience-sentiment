@@ -18,6 +18,9 @@ export function Account() {
   const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>(
     [],
   );
+  const [loadedWorkspaceUserId, setLoadedWorkspaceUserId] = useState<
+    string | null
+  >(null);
   // A workspace cannot be connected without the client it owns, so the two are
   // read together rather than the button discovering the gap on click.
   const [clients, setClients] = useState<
@@ -52,6 +55,7 @@ export function Account() {
   useEffect(() => {
     if (!supabase || !session) {
       setWorkspaces([]);
+      setLoadedWorkspaceUserId(null);
       return;
     }
     let active = true;
@@ -63,6 +67,7 @@ export function Account() {
         .select("workspace_id,channel_id,status,external_channel_id"),
     ]).then(([w, c, ch]) => {
       if (!active) return;
+      setLoadedWorkspaceUserId(session.user.id);
       if (w.error) setMessage("تعذر تحميل مساحات العمل");
       else setWorkspaces(w.data ?? []);
       setClients(c.data ?? []);
@@ -74,19 +79,30 @@ export function Account() {
   }, [session]);
   if (!supabase)
     return (
-      <>
+      <div className="rp-page account-page">
         <header className="rp-hero">
           <p className="rp-eyebrow">الحساب</p>
           <h1>الحساب ومساحات العمل</h1>
+          <p>مساحة خاصة لقناتك، من الربط إلى قراءة التعليقات.</p>
         </header>
-        <div className="notice">
-          <h2>إعداد Supabase غير متوفر</h2>
-          <p>
-            يلزم عنوان مشروع تطوير ومفتاح نشر عام لتفعيل الحساب. لا تُستخدم
-            بيانات الاختبار كجلسة دخول.
-          </p>
+        <div className="account-entry">
+          <div className="app-state">
+            <span className="app-state-symbol" aria-hidden="true">
+              ◌
+            </span>
+            <h2>تسجيل الدخول غير متاح في هذه المعاينة</h2>
+            <p>
+              يلزم عنوان مشروع تطوير ومفتاح نشر عام لتفعيل الحساب. لا تُستخدم
+              بيانات الاختبار كجلسة دخول.
+            </p>
+          </div>
+          <div className="account-story">
+            <h2>ابدأ من تجربة اللوحة</h2>
+            <p>يمكنك استكشاف الواجهة ببيانات اصطناعية واضحة المصدر.</p>
+            <a href="/dashboard">فتح لوحة البيانات ←</a>
+          </div>
         </div>
-      </>
+      </div>
     );
   const client = supabase;
   async function auth(e: FormEvent<HTMLFormElement>) {
@@ -141,13 +157,13 @@ export function Account() {
     }
   }
   return (
-    <div className="rp-page">
+    <div className="rp-page account-page">
       <header className="rp-hero">
         <p className="rp-eyebrow">الحساب</p>
         <h1>الحساب ومساحات العمل</h1>
         <p>
-          حسابك في الخدمة مستقل عن قناتك. ربط القناة خطوة منفصلة تمنح الأداة إذن
-          قراءة تعليقاتك، ويمكن سحبها في أي وقت.
+          أنشئ مساحة لعملك، ثم اربط قناتك بإذنك. يمكنك العودة إلى بياناتك
+          ومراجعة حالة الجمع من مكان واحد.
         </p>
       </header>
       {pending && <p role="status">جارٍ تنفيذ الطلب…</p>}
@@ -157,47 +173,65 @@ export function Account() {
         </div>
       )}
       {!session ? (
-        <form className="rp-card" onSubmit={auth}>
-          <label>
-            البريد الإلكتروني
-            <input
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <label>
-            كلمة المرور
-            <input
-              type="password"
-              autoComplete="current-password"
-              minLength={8}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          <button name="action" value="signin" disabled={pending}>
-            تسجيل الدخول
-          </button>
-          <button name="action" value="signup" disabled={pending}>
-            إنشاء حساب
-          </button>
-        </form>
+        <div className="account-entry">
+          <form className="rp-card" onSubmit={auth}>
+            <h2>ادخل إلى مساحة عملك</h2>
+            <p>استخدم بريدك للوصول إلى قنواتك وتقاريرك الخاصة.</p>
+            <label>
+              البريد الإلكتروني
+              <input
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+            <label>
+              كلمة المرور
+              <input
+                type="password"
+                autoComplete="current-password"
+                minLength={8}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+            <button name="action" value="signin" disabled={pending}>
+              تسجيل الدخول
+            </button>
+            <button name="action" value="signup" disabled={pending}>
+              إنشاء حساب جديد
+            </button>
+          </form>
+          <aside className="account-story">
+            <p className="app-eyebrow">كيف تبدأ؟</p>
+            <h2>من قناتك إلى قراءة أوضح.</h2>
+            <p>ثلاث خطوات تفصل حسابك عن لوحة تعبّر عما جُمع فعلًا.</p>
+            <ol className="account-steps">
+              <li>أنشئ حسابك ومساحة العمل الخاصة بك.</li>
+              <li>اربط قناة يوتيوب بعد موافقتك على الإذن.</li>
+              <li>اطلب الجمع، ثم تابع حالته ونتائجه في اللوحة.</li>
+            </ol>
+          </aside>
+        </div>
       ) : (
         <>
-          <button
-            disabled={pending}
-            onClick={() => {
-              void client.auth.signOut().then(({ error }) => {
-                if (error) setMessage("تعذر تسجيل الخروج");
-              });
-            }}
-          >
-            تسجيل الخروج
-          </button>
+          <div className="account-toolbar">
+            <p>أنت داخل حسابك. اختر مساحة العمل التي تريد إدارتها.</p>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                void client.auth.signOut().then(({ error }) => {
+                  if (error) setMessage("تعذر تسجيل الخروج");
+                });
+              }}
+            >
+              تسجيل الخروج
+            </button>
+          </div>
           <section className="rp-section">
             <header>
               <h2>مساحات العمل</h2>
@@ -207,7 +241,11 @@ export function Account() {
               </p>
             </header>
           </section>
-          {workspaces.length === 0 ? (
+          {loadedWorkspaceUserId !== session.user.id ? (
+            <div className="app-state" role="status">
+              جارٍ تحميل مساحات العمل…
+            </div>
+          ) : workspaces.length === 0 ? (
             <p className="rp-missing">
               <strong>لا توجد مساحة عمل متاحة</strong>
               أنشئ واحدة أدناه لتبدأ.
@@ -296,18 +334,22 @@ export function Account() {
               })}
             </ul>
           )}
-          <form className="rp-card" onSubmit={createWorkspace}>
-            <label>
-              اسم مساحة العمل
-              <input
-                required
-                maxLength={120}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <button disabled={pending}>إنشاء مساحة عمل</button>
-          </form>
+          <section className="account-create">
+            <form className="rp-card" onSubmit={createWorkspace}>
+              <h2>مساحة أخرى لعميل أو قناة</h2>
+              <p>يبقى لكل مساحة جمهورها وبياناتها وصلاحياتها المستقلة.</p>
+              <label>
+                اسم مساحة العمل
+                <input
+                  required
+                  maxLength={120}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              <button disabled={pending}>إنشاء مساحة عمل</button>
+            </form>
+          </section>
         </>
       )}
     </div>

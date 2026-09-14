@@ -23,7 +23,11 @@ import {
 } from "./data";
 import { supabase } from "./supabase";
 import { useSession, useWorkspaces } from "./session";
-import { workspaceState, readableWorkspace } from "./workspace";
+import {
+  workspaceState,
+  readableWorkspace,
+  type WorkspaceOption,
+} from "./workspace";
 import { syncHealth } from "./syncHealth";
 import {
   budgetMessages,
@@ -37,23 +41,111 @@ import "./report.css";
 
 export function Sync() {
   const { session, loading: sessionLoading } = useSession();
-  const { workspaces, failed: workspacesFailed } = useWorkspaces(session);
+  const {
+    workspaces,
+    loading: workspacesLoading,
+    failed: workspacesFailed,
+  } = useWorkspaces(session);
+  const [chosen, setChosen] = useState<string | null>(null);
+  if (sessionLoading)
+    return (
+      <div className="app-state" role="status">
+        جارٍ تحديد حسابك…
+      </div>
+    );
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,
     signedIn: !!session,
     workspaces,
-    selectedId: null,
+    selectedId: chosen,
   });
+  if (configuredMode === "live" && session) {
+    if (workspacesLoading)
+      return (
+        <div className="app-state" role="status">
+          جارٍ تحميل مساحات العمل…
+        </div>
+      );
+    if (workspacesFailed)
+      return (
+        <div className="app-state" role="alert">
+          <h1>تعذّرت قراءة مساحات عملك.</h1>
+          <p>
+            حدّث الصفحة لإعادة المحاولة؛ لا يمكن عرض بيانات تجربة بدل بيانات
+            حسابك.
+          </p>
+        </div>
+      );
+    if (place.kind === "no_workspaces")
+      return (
+        <div className="app-state">
+          <h1>لا توجد مساحة عمل لهذا الحساب بعد.</h1>
+          <a href="/account">أنشئ مساحة عمل من صفحة الحساب</a>
+        </div>
+      );
+    if (place.kind === "choose")
+      return (
+        <div className="app-state" data-testid="sync-ws-choose">
+          <span className="app-state-symbol" aria-hidden="true">
+            ↗
+          </span>
+          <p className="app-eyebrow">حالة الجمع</p>
+          <h1>أي مساحة عمل تريد متابعة تشغيلها؟</h1>
+          <p>لكل مساحة حالة جمع وحدود خطة وسجل محاولات مستقل.</p>
+          <label className="sync-choice">
+            مساحة العمل
+            <select
+              value={chosen ?? ""}
+              onChange={(e) => setChosen(e.target.value || null)}
+            >
+              <option value="">— اختر —</option>
+              {place.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      );
+  }
   const live = readableWorkspace(place);
   const mode = resolveMode({ signedIn: !!session, workspace: live });
   const workspaceId = mode === "live" && live ? live : fixtureWorkspace;
+  const userId = session?.user.id ?? "visitor";
+  return (
+    <SyncBody
+      key={`${userId}:${mode}:${workspaceId}`}
+      userId={userId}
+      mode={mode}
+      workspaceId={workspaceId}
+      workspaceName={place.kind === "ready" ? place.name : null}
+      options={place.kind === "ready" ? place.options : []}
+      onChoose={setChosen}
+    />
+  );
+}
 
+function SyncBody({
+  userId,
+  mode,
+  workspaceId,
+  workspaceName,
+  options,
+  onChoose,
+}: {
+  userId: string;
+  mode: "live" | "sanitized_fixture";
+  workspaceId: string;
+  workspaceName: string | null;
+  options: WorkspaceOption[];
+  onChoose: (id: string) => void;
+}) {
   const snapshot = useQuery({
-    queryKey: ["sync-snapshot", mode, workspaceId],
+    queryKey: ["sync-snapshot", userId, mode, workspaceId],
     queryFn: ({ signal }) =>
       loadSnapshot(mode, { workspace_id: workspaceId }, signal),
-    enabled: !sessionLoading,
   });
 
   // The attempt log is a live-only thing: the fixture has no job table, and
@@ -82,6 +174,7 @@ export function Sync() {
             : "أُضيفت محاولة جديدة، تستأنف من حيث توقّفت السابقة.",
       );
       setTick((t) => t + 1);
+      void snapshot.refetch();
     });
   };
   useEffect(() => {
@@ -118,21 +211,41 @@ export function Sync() {
   return (
     <div className="rp-page">
       <header className="rp-hero">
-        <p className="rp-eyebrow">التشغيل</p>
+        <p className="rp-eyebrow">
+          التشغيل {workspaceName ? `· ${workspaceName}` : "· معاينة تجريبية"}
+        </p>
         <h1>حالة الجمع والتحليل</h1>
         <p>
-          هل يعمل الجمع، وماذا فعل، وكم استهلك. الأرقام هنا عن الآلة لا عن
-          الجمهور — تحليل ما قاله الجمهور في لوحة البيانات.
+          تابع نشاط الجمع، وحدود الخطة، والمحاولات من مكان واحد. ما تراه هنا يصف
+          تشغيل الخدمة؛ تعليقات الجمهور وتفسيرها في لوحة البيانات.
         </p>
       </header>
-
-      {workspacesFailed && (
-        <div className="notice" data-severity="critical">
+      {mode === "live" ? (
+        <div className="sync-workspace">
           <p>
-            تعذّرت قراءة قائمة مساحات عملك. ما يظهر أدناه من العرض التجريبي —
-            وهذا ليس معناه أنك بلا مساحات.
+            بيانات التشغيل لمساحة <strong>{workspaceName}</strong>
           </p>
+          {options.length > 1 && (
+            <label>
+              مساحة العمل
+              <select
+                aria-label="تغيير مساحة العمل"
+                value={workspaceId}
+                onChange={(e) => onChoose(e.target.value)}
+              >
+                {options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
+      ) : (
+        <p className="sync-demo">
+          بيانات تشغيل اصطناعية للتجربة، غير مرتبطة بقناة حقيقية.
+        </p>
       )}
 
       {snapshot.isPending ? (
@@ -146,100 +259,105 @@ export function Sync() {
         </div>
       ) : (
         <>
-          <section
-            className="rp-section"
-            aria-labelledby="sync-heading"
-            data-testid="sync-panel"
-          >
-            <header>
-              <h2 id="sync-heading">صحة المزامنة</h2>
-            </header>
-            <article className="rp-card">
-              <p data-testid="sync-state" data-severity={health.severity}>
-                <strong>{syncMessages[health.key]}</strong>
-              </p>
-              {health.errorCode && (
-                <p data-testid="sync-error">
-                  {syncErrorMessages[health.errorCode] ??
-                    "تعذّرت المزامنة لسبب غير مصنَّف"}{" "}
-                  (<code>{health.errorCode}</code>)
+          <div className="sync-grid">
+            <section
+              className="rp-section"
+              aria-labelledby="sync-heading"
+              data-testid="sync-panel"
+            >
+              <header>
+                <h2 id="sync-heading">صحة المزامنة</h2>
+              </header>
+              <article className="rp-card">
+                <p data-testid="sync-state" data-severity={health.severity}>
+                  <strong>{syncMessages[health.key]}</strong>
                 </p>
-              )}
-              {health.queued > 0 && (
-                <p data-testid="sync-queued">مهام منتظرة: {health.queued}</p>
-              )}
-              <p data-testid="sync-worker">
-                العامل:{" "}
-                {s?.sync?.worker.connected
-                  ? `متصل، آخر نبضة ${displayDate(s.sync.worker.last_heartbeat_at)}`
-                  : "غير متصل. لا يعمل جهاز مطوّر مغلق على مدار الساعة، ولا تُحدَّث البيانات حتى يعود."}
-              </p>
-              {run ? (
-                <p data-testid="sync-last-run">
-                  آخر تشغيل: {displayDate(run.started_at)} — المصدر {run.source}{" "}
-                  — فيديوهات {run.coverage.videos_seen}، تعليقات{" "}
-                  {run.coverage.comments_collected}.{" "}
-                  {run.coverage.complete
-                    ? "اكتمل اجتياز المصدر."
-                    : "لم يُثبت اجتياز المصدر بالكامل."}
+                {health.errorCode && (
+                  <p data-testid="sync-error">
+                    {syncErrorMessages[health.errorCode] ??
+                      "تعذّرت المزامنة لسبب غير مصنَّف"}{" "}
+                    (<code>{health.errorCode}</code>)
+                  </p>
+                )}
+                {health.queued > 0 && (
+                  <p data-testid="sync-queued">مهام منتظرة: {health.queued}</p>
+                )}
+                <p data-testid="sync-worker">
+                  العامل:{" "}
+                  {s?.sync?.worker.connected
+                    ? `متصل، آخر نبضة ${displayDate(s.sync.worker.last_heartbeat_at)}`
+                    : "غير متصل الآن. لن تُحدَّث البيانات تلقائيًا حتى يعود عامل الجمع."}
+                </p>
+                {run ? (
+                  <p data-testid="sync-last-run">
+                    آخر تشغيل: {displayDate(run.started_at)} — المصدر{" "}
+                    {run.source} — فيديوهات {run.coverage.videos_seen}، تعليقات{" "}
+                    {run.coverage.comments_collected}.{" "}
+                    {run.coverage.complete
+                      ? "اكتمل اجتياز المصدر."
+                      : "لم يُثبت اجتياز المصدر بالكامل."}
+                  </p>
+                ) : (
+                  <p data-testid="sync-last-run">لا يوجد تشغيل سابق مسجَّل.</p>
+                )}
+              </article>
+            </section>
+
+            <section
+              className="rp-section"
+              aria-labelledby="plan-heading"
+              data-testid="plan-panel"
+            >
+              <header>
+                <h2 id="plan-heading">حدود الخطة</h2>
+              </header>
+              {s?.plan == null ? (
+                <p className="rp-missing" data-testid="plan-none">
+                  <strong>لا توجد خطة مفعّلة لمساحة العمل هذه</strong>
+                  يفعّل المشغّل الخطة يدويًا في هذه المرحلة، ولا يعني ذلك نفاد
+                  الحد.
                 </p>
               ) : (
-                <p data-testid="sync-last-run">لا يوجد تشغيل سابق مسجَّل.</p>
+                <article className="rp-card">
+                  <p className="rp-sub">
+                    الخطة {s.plan.plan_key} — الفترة من{" "}
+                    {displayDate(s.plan.period_start)} حتى{" "}
+                    {displayDate(s.plan.period_end)} بتوقيت UTC.
+                  </p>
+                  <ul className="budgets">
+                    {s.plan.budgets.map((b) => {
+                      const state = budgetState(b);
+                      const share = b.allowance
+                        ? Math.min(
+                            Math.round((b.used / b.allowance) * 100),
+                            100,
+                          )
+                        : 100;
+                      return (
+                        <li
+                          key={b.event_type}
+                          data-testid={`budget-${b.event_type}`}
+                        >
+                          <strong>{budgetNames[b.event_type]}</strong>
+                          <span>
+                            {b.used} من {b.allowance} — يتبقى {b.remaining}
+                          </span>
+                          <progress
+                            max={b.allowance || 1}
+                            value={b.used}
+                            aria-hidden="true"
+                          />
+                          <small data-state={state}>
+                            {share}٪ — {budgetMessages[state]}
+                          </small>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </article>
               )}
-            </article>
-          </section>
-
-          <section
-            className="rp-section"
-            aria-labelledby="plan-heading"
-            data-testid="plan-panel"
-          >
-            <header>
-              <h2 id="plan-heading">حدود الخطة</h2>
-            </header>
-            {s?.plan == null ? (
-              <p className="rp-missing" data-testid="plan-none">
-                <strong>لا توجد خطة مفعّلة لمساحة العمل هذه</strong>
-                يفعّل المشغّل الخطة يدويًا في هذه المرحلة، ولا يعني ذلك نفاد
-                الحد.
-              </p>
-            ) : (
-              <article className="rp-card">
-                <p className="rp-sub">
-                  الخطة {s.plan.plan_key} — الفترة من{" "}
-                  {displayDate(s.plan.period_start)} حتى{" "}
-                  {displayDate(s.plan.period_end)} بتوقيت UTC.
-                </p>
-                <ul className="budgets">
-                  {s.plan.budgets.map((b) => {
-                    const state = budgetState(b);
-                    const share = b.allowance
-                      ? Math.min(Math.round((b.used / b.allowance) * 100), 100)
-                      : 100;
-                    return (
-                      <li
-                        key={b.event_type}
-                        data-testid={`budget-${b.event_type}`}
-                      >
-                        <strong>{budgetNames[b.event_type]}</strong>
-                        <span>
-                          {b.used} من {b.allowance} — يتبقى {b.remaining}
-                        </span>
-                        <progress
-                          max={b.allowance || 1}
-                          value={b.used}
-                          aria-hidden="true"
-                        />
-                        <small data-state={state}>
-                          {share}٪ — {budgetMessages[state]}
-                        </small>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </article>
-            )}
-          </section>
+            </section>
+          </div>
 
           <section className="rp-section" id="rp-attempts">
             <header>
@@ -259,6 +377,8 @@ export function Sync() {
                 <strong>تعذّرت قراءة سجل المهام</strong>
                 هذا ليس معناه أنه فارغ.
               </p>
+            ) : jobs === null ? (
+              <p role="status">جارٍ قراءة سجل المحاولات…</p>
             ) : entries.length === 0 ? (
               <p className="rp-missing">
                 <strong>لا توجد محاولات بعد</strong>
@@ -306,7 +426,13 @@ export function Sync() {
               </p>
             )}
             {mode === "live" && (
-              <button type="button" onClick={() => setTick((t) => t + 1)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setTick((t) => t + 1);
+                  void snapshot.refetch();
+                }}
+              >
                 تحديث
               </button>
             )}

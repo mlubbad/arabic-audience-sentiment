@@ -98,8 +98,11 @@ test("mobile shell fits viewport and exposes honest live-configuration state", a
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.getByRole("button", { name: "قائمة التطبيق" }).click();
   await page.getByRole("link", { name: "الحساب ومساحات العمل" }).click();
-  await expect(page.getByText("إعداد Supabase غير متوفر")).toBeVisible();
+  await expect(
+    page.getByText("تسجيل الدخول غير متاح في هذه المعاينة"),
+  ).toBeVisible();
 });
 
 test("paginates with cursors without changing totals or repeating rows", async ({
@@ -763,9 +766,10 @@ test("states plainly that nothing has synced and no worker is connected", async 
     "critical",
   );
   await expect(panel).toContainText("لم تُنفذ أي مزامنة، ولا يوجد عامل متصل");
-  // The reason a developer machine is not a scheduler must be said, not implied.
+  // Disconnected collection must say what it means for freshness without
+  // assuming a particular machine or deployment architecture.
   await expect(panel.getByTestId("sync-worker")).toContainText(
-    "لا يعمل جهاز مطوّر مغلق على مدار الساعة",
+    "لن تُحدَّث البيانات تلقائيًا حتى يعود عامل الجمع",
   );
   await expect(panel.getByTestId("sync-last-run")).toContainText(
     "لا يوجد تشغيل سابق",

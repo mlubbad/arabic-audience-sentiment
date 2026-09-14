@@ -1,5 +1,18 @@
 # Implementation decisions
 
+2026-09-14 — Internal UX follows one scoped application shell, using the landing's existing
+mark and visual tokens. The analytical report's data and label rules are unchanged; a CSS
+layer corrects the old global `header` layout and aligns account, operations and recovery
+pages without introducing a second UI framework. The report's many filters remain visible
+on desktop and are initially closed on narrow screens behind a button with `aria-expanded`;
+the form remains in the DOM so opening it preserves its state and keyboard access. The
+Sync route resolves session and workspace before a live read, and remounts per identity and
+workspace. A fixture cannot stand in for a signed-in user's missing or failed workspace
+list, because that would make a tenant-specific operations page appear populated by another
+source. An account's empty-workspace message waits for its workspace request to complete.
+Worker-disconnected copy describes its effect on freshness rather than assuming it runs on
+a developer machine, which is no longer a generally valid deployment claim.
+
 2026-09-14 — Dashboard data is scoped to the current authenticated user and workspace in both the component lifetime and React Query key. A source switch remounts the report so local filters, review dialogs, and pending correction context cannot outlive the identity they describe. Placeholder data may survive a filter change within one identity but never cross a user, mode, or workspace boundary. A signed-in account with a workspace list still loading or failed gets an explicit state, not a fixture fallback. The workspace selector remains available after the first choice and the report names the chosen workspace rather than exposing its UUID. Video filter options derive from the source workspace independent of the active filter selection; available video titles are displayed without inventing titles for unknown ids.
 
 2026-09-14 — Replace the supplied marketing-reference hero with an original generated illustration before treating the landing as a product asset. The reference archive informs composition only; it does not establish redistribution rights. Use the project's documented indigo token for landing actions. Marketing copy distinguishes the fixture example on the landing from the pilot channel's collected real comments and does not imply that live model analysis or authenticated dashboard reading has been validated.

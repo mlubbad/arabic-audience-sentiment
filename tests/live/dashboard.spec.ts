@@ -100,7 +100,18 @@ test("switching workspaces and signing out never paints the prior tenant's comme
   await expect(
     page.getByRole("button", { name: "تسجيل الخروج" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "لوحة الاختبار" }).click();
+  await page.getByRole("link", { name: "حالة المزامنة" }).click();
+  await expect(page.getByTestId("sync-ws-choose")).toBeVisible();
+  await expect(page.getByText("العرض التجريبي لا يحمل سجل مهام")).toHaveCount(
+    0,
+  );
+  await page
+    .getByTestId("sync-ws-choose")
+    .getByLabel("مساحة العمل")
+    .selectOption(A);
+  await expect(page.getByTestId("sync-panel")).toBeVisible();
+  await expect(page.getByLabel("تغيير مساحة العمل")).toHaveValue(A);
+  await page.getByRole("link", { name: "لوحة البيانات" }).click();
   await page.getByTestId("ws-choose").getByLabel("مساحة العمل").selectOption(A);
   await expect(
     page.getByRole("cell", { name: "TENANT_A_PRIVATE_COMMENT" }),
@@ -119,7 +130,7 @@ test("switching workspaces and signing out never paints the prior tenant's comme
   await expect(
     page.getByRole("button", { name: "تسجيل الدخول" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "لوحة الاختبار" }).click();
+  await page.getByRole("link", { name: "لوحة البيانات" }).click();
   await expect(page.getByTestId("source")).toHaveAttribute(
     "data-mode",
     "sanitized_fixture",

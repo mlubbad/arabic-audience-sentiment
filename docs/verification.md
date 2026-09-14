@@ -1,5 +1,30 @@
 # Verification
 
+## 2026-09-14 — Internal UI redesign and Sync identity boundary
+
+All commands used Node 22.14.0 via `PATH=/Users/mlubbad/.nvm/versions/node/v22.14.0/bin:$PATH`.
+The browser suites started their own Vite servers on the indicated ports with
+`reuseExistingServer: false` and `--strictPort`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `E2E_PORT=5334 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` before the mobile filter control | Failed waiting for `إظهار الفلاتر`; after implementation, 1 passed |
+| `npm run check` first attempt | Lint, format, typecheck and Edge Function check passed; 3 server-rendered Dashboard identity unit tests failed because `window` was read during state initialization |
+| `npm test` after guarding browser-only viewport access | 150 passed in 19 files |
+| `npm run check` after the fix | Passed: lint, Ruff, format, typecheck, Deno check, 150 unit, 126 SQL, 124 Python tests, Vite build and secret scan |
+| `E2E_PORT=5335 npm run test:e2e -- --reporter=line` first full run | 47 passed, 2 failed: old mobile navigation test bypassed the new menu, and the disconnected-worker test expected obsolete machine-specific copy |
+| `E2E_PORT=5335 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'mobile shell\|states plainly' --reporter=line` | 2 passed after updating those assertions to the intended UX |
+| `E2E_PORT=5335 npm run test:e2e -- --reporter=line` final full run | 50 passed in 41.6s, including mobile filter disclosure, callback and 404 recovery |
+| `E2E_LIVE_PORT=5336 npm run test:e2e:live -- --reporter=line` | 1 passed; fake local Auth/API responses proved the Sync workspace choice appears before any snapshot and tenant A's comments never paint under tenant B or after sign-out |
+| Desktop screenshots at 1280×800; mobile browser pass at 390px | Account, Sync and Dashboard hierarchy inspected; hero title/description stacking corrected; mobile menu, filter disclosure and horizontal-overflow assertion passed |
+| `npm run check` and `E2E_PORT=5335 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` after the mobile spacing adjustment | Full check passed again with the same counts; 2/2 targeted browser tests passed. A 390px Sync screenshot confirmed the reduced empty space in the health card |
+| `npm run format:check`, `npm run build`, and `E2E_PORT=5335 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` after styling the no-Auth account fallback | All passed; 2/2 browser tests. The credential-free account state was inspected in a 1280px screenshot |
+
+The live-mode browser test intercepts a local fake Supabase origin. It does **not** prove
+that the redesigned pages work against the deployed project's Auth, PostgREST, OAuth or
+worker. The dashboard and operations sample remain sanitized fixtures for a visitor. No
+deployment or real-model validation was performed in this increment.
+
 ## 2026-09-14 — Dashboard identity, video choices, and honest introduction
 
 On `0ea0ca0` plus the shared working-tree changes (Claude Code was editing the new report and model path concurrently), Node 22.14.0:

@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-09-14 — Internal pages redesigned around the landing identity
+
+The dashboard, account, synchronization, OAuth result and unknown-route pages now share an
+Arabic RTL application shell with the landing's mark, type, indigo action color, navigation,
+announcement and footer. Report banners, cards and filter layout are more compact and
+consistent. The account page pairs sign-in with an honest three-step explanation; its
+workspace list has a real loading state. The synchronization page groups health and limits,
+keeps the job log distinct, and names the selected workspace. Connection and missing-page
+states have working recovery links. On narrow screens the long report filter form is closed
+initially, with a labelled button to open it, so the summary is reachable sooner.
+
+The Sync route now waits for a signed-in creator's accessible workspaces and requires a
+choice when several are available. It never displays the sanitized operations fixture as a
+substitute for a signed-in workspace whose list is loading or failed; switching workspace or
+identity remounts the read. This follows the same source-truth rule already applied to the
+dashboard. The landing route's sections and marketing styling were left intact.
+
+Local checks passed: `npm run check` (150 unit, 126 SQL, 124 Python tests plus lint,
+format, typecheck, Edge Function check, build and secret scan),
+`E2E_PORT=5335 npm run test:e2e -- --reporter=line` (50/50 Chromium tests), and
+`E2E_LIVE_PORT=5336 npm run test:e2e:live -- --reporter=line` (1/1 with a fake
+local Auth/API origin). Desktop screenshots
+at 1280px and a mobile browser navigation pass were inspected. This increment was not
+deployed; the live signed-in dashboard still needs a real browser walkthrough against the
+private project. See the new entry in `docs/verification.md`.
+
 ## 2026-09-14 — Dashboard identity and source-truth repair
 
 The dashboard now waits for the signed-in user's own workspace list before reading comments. Changing account or workspace remounts the report, clearing an open correction and its filters; the query key includes the user and workspace, and placeholder rows are reused only inside that same identity. An unavailable workspace list no longer causes a silent switch to the fixture. The creator can switch between accessible workspaces after choosing one, and the source strip displays its name. The video selector uses the videos in the workspace's source data, including titles where available, rather than two fixture ids. The report introduction does not display a zero while loading or claim topic analysis. A browser test with a local fake Auth/API origin proves that delayed B data and sign-out do not display A's comments; an authenticated walkthrough against the deployed Supabase project remains outstanding. The review-history refresh race found by the full browser suite was corrected so the correction form closes after the new snapshot arrives.

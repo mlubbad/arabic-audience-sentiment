@@ -6,7 +6,11 @@ export function Connected() {
   const [params] = useSearchParams();
   const result = connectResult(params);
   return (
-    <>
+    <div className="app-state connect-result-page">
+      <span className="app-state-symbol" aria-hidden="true">
+        {result.tone === "success" ? "✓" : "!"}
+      </span>
+      <p className="app-eyebrow">ربط قناة يوتيوب</p>
       <h1>{result.heading}</h1>
       <div
         className="notice"
@@ -26,15 +30,12 @@ export function Connected() {
           </a>
         )}
       </p>
-      <p>
+      <div className="app-state-actions">
         <Link to="/account">العودة إلى الحساب</Link>
         {result.tone === "success" && (
-          <>
-            {" · "}
-            <Link to="/dashboard">فتح اللوحة</Link>
-          </>
+          <Link to="/dashboard">فتح لوحة البيانات</Link>
         )}
-      </p>
-    </>
+      </div>
+    </div>
   );
 }

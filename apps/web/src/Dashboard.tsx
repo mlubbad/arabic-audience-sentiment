@@ -210,6 +210,17 @@ function DashboardBody({
   // for the filtered set it was produced from.
   const [cursors, setCursors] = useState<string[]>([]);
   const [limit, setLimit] = useState(25);
+  const [filtersOpen, setFiltersOpen] = useState(
+    () =>
+      typeof window === "undefined" ||
+      !window.matchMedia("(max-width: 760px)").matches,
+  );
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 760px)");
+    const onResize = () => setFiltersOpen(!mobile.matches);
+    mobile.addEventListener("change", onResize);
+    return () => mobile.removeEventListener("change", onResize);
+  }, []);
   const page = {
     ...filters,
     workspace_id: workspaceId,
@@ -451,7 +462,23 @@ function DashboardBody({
           <p data-testid="source-freshness">{source.freshness}</p>
         )}
       </aside>
-      <form onSubmit={apply} className="filters rp-card rp-filters">
+      <button
+        className="rp-filter-toggle"
+        type="button"
+        aria-expanded={filtersOpen}
+        aria-controls="report-filters"
+        onClick={() => setFiltersOpen((open) => !open)}
+      >
+        {filtersOpen ? "إخفاء الفلاتر" : "إظهار الفلاتر"}
+        <span aria-hidden="true">{filtersOpen ? "−" : "+"}</span>
+      </button>
+      <form
+        id="report-filters"
+        aria-label="فلاتر التقرير"
+        hidden={!filtersOpen}
+        onSubmit={apply}
+        className="filters rp-card rp-filters"
+      >
         <label>
           البحث في التعليقات والمؤلفين
           <input

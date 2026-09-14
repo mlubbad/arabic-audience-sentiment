@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import "./landing.css";
+import { BrandMark } from "./BrandMark";
 
 const examples = [
   {
@@ -40,17 +41,6 @@ const audiences = {
   },
 };
 
-function Mark() {
-  return (
-    <span className="lp-mark" aria-hidden="true">
-      <i />
-      <i />
-      <i />
-      <i />
-    </span>
-  );
-}
-
 export function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useState("all");
@@ -81,7 +71,7 @@ export function Landing() {
       </div>
       <header className="lp-header">
         <Link className="lp-brand" to="/" aria-label="مشاعر الجمهور — الرئيسية">
-          <Mark /> مشاعر الجمهور<span className="lp-brand-dot">.</span>
+          <BrandMark /> مشاعر الجمهور<span className="lp-brand-dot">.</span>
         </Link>
         <button
           className="lp-menu"
@@ -221,7 +211,7 @@ export function Landing() {
           <div className="lp-demo-frame">
             <div className="lp-demo-top">
               <span>
-                <Mark /> نظرة على الجمهور
+                <BrandMark /> نظرة على الجمهور
               </span>
               <span className="lp-demo-label">
                 مثال توضيحي · ٤ تعليقات مؤلّفة
@@ -481,7 +471,7 @@ export function Landing() {
 
         <section className="lp-final-cta">
           <span className="lp-orbit" aria-hidden="true" />
-          <Mark />
+          <BrandMark />
           <h2>
             جمهورك يتحدث.
             <br />
@@ -499,7 +489,7 @@ export function Landing() {
       <footer className="lp-footer">
         <div>
           <Link className="lp-brand" to="/">
-            <Mark /> مشاعر الجمهور.
+            <BrandMark /> مشاعر الجمهور.
           </Link>
           <p>رؤية أوضح لما وراء تعليقات يوتيوب.</p>
         </div>

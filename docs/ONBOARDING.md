@@ -79,11 +79,11 @@ Chromium. `uv` must be installed separately.
 
 | Command | Covers | Latest run |
 | --- | --- | --- |
-| `npm run check` | lint, format, typecheck, unit, SQL, worker, build, secret scan | green |
-| `npm test` | contracts + web unit | 140 passed on 2026-09-14 |
-| `npm run test:db` | real SQL + real RLS in PGlite | 116 passed on 2026-09-14 |
-| `npm run worker:test` | Python worker via uv/pytest | 108 passed on 2026-09-14 |
-| `npm run test:e2e` | Playwright against a dev server it starts itself | 48 passed on 2026-09-14 |
+| `npm run check` | lint, format, typecheck, unit, SQL, worker, build, secret scan | green on 2026-09-14 |
+| `npm test` | contracts + web unit | 150 passed on 2026-09-14 |
+| `npm run test:db` | real SQL + real RLS in PGlite | 126 passed on 2026-09-14 |
+| `npm run worker:test` | Python worker via uv/pytest | 124 passed on 2026-09-14 |
+| `npm run test:e2e` | Playwright against a dev server it starts itself | 50 passed on 2026-09-14 |
 | `npm run test:e2e:live` | Signed-in workspace switch and sign-out in a browser against local fake Auth/API responses | 1 passed on 2026-09-14; no real account used |
 
 `npm run check` does **not** include `test:e2e`. Run that separately; it starts its own dev
