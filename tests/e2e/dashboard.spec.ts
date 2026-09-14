@@ -400,7 +400,7 @@ test("neutralises spreadsheet formulas in the file but not on screen", async ({
 test("shows the plan limit while there is still room to act", async ({
   page,
 }) => {
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   const analysis = page.getByTestId("budget-comment_analysis");
   // 74 of 100 is past the 70% notice threshold but not yet critical.
   await expect(analysis).toContainText("74 من 100 — يتبقى 26");
@@ -427,7 +427,7 @@ test("escalates to a spent state instead of only warning", async ({ page }) => {
     };
     await route.fulfill({ json: fixture });
   });
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   const analysis = page.getByTestId("budget-comment_analysis");
   await expect(analysis.locator("small")).toHaveAttribute(
     "data-state",
@@ -449,7 +449,7 @@ test("distinguishes no activated plan from no allowance left", async ({
     fixture.plan = null;
     await route.fulfill({ json: fixture });
   });
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   await expect(page.getByTestId("plan-none")).toContainText(
     "لا توجد خطة مفعّلة",
   );
@@ -759,7 +759,7 @@ async function withSync(page: import("@playwright/test").Page, sync: unknown) {
 test("states plainly that nothing has synced and no worker is connected", async ({
   page,
 }) => {
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -791,7 +791,7 @@ test("shows queued work with no worker as stalled, not as a healthy last run", a
       coverage: { videos_seen: 5, comments_collected: 900, complete: true },
     },
   });
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -816,7 +816,7 @@ test("does not present a partial collection as a completed one", async ({
       coverage: { videos_seen: 5, comments_collected: 120, complete: false },
     },
   });
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -835,7 +835,7 @@ test("reads a malformed sync block as unknown rather than healthy", async ({
   page,
 }) => {
   await withSync(page, { worker: "yes please", queued_jobs: "many" });
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   const panel = page.getByTestId("sync-panel");
   await expect(panel.getByTestId("sync-state")).toHaveAttribute(
     "data-severity",
@@ -921,7 +921,7 @@ test("no figure is carried by colour alone", async ({ page }) => {
   ).toHaveText("إيجابي: 1 (25٪)");
   // Same for the plan meters: the numbers are text beside the bar. They moved
   // to the operations page, and the rule follows them.
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   await expect(page.locator("progress").first()).toHaveAttribute(
     "aria-hidden",
     "true",
@@ -1316,8 +1316,60 @@ test("escape leaves the correction overlay", async ({ page }) => {
   await expect(trigger).toBeFocused();
 });
 
-test("a budget bar shows the state its sentence reports", async ({ page }) => {
+test("the export sits above the table it exports", async ({ page }) => {
+  await page.goto("/dashboard");
+  const table = page.locator('[data-testid="comments-table"] table');
+  await expect(table).toBeVisible();
+  // It exports the whole filtered set, not the page on screen — so the reader
+  // needs to know it exists before they start scrolling rows, not after. A
+  // control found only at the end is a control found after it was needed.
+  const order = await page.evaluate(() => {
+    const ex = document.querySelector(".export")!;
+    const tb = document.querySelector('[data-testid="comments-table"] table')!;
+    return {
+      exportTop: ex.getBoundingClientRect().top + window.scrollY,
+      tableTop: tb.getBoundingClientRect().top + window.scrollY,
+      // Node.DOCUMENT_POSITION_FOLLOWING — the export precedes the table.
+      precedes: !!(ex.compareDocumentPosition(tb) & 4),
+    };
+  });
+  expect(order.precedes).toBe(true);
+  expect(order.exportTop).toBeLessThan(order.tableTop);
+});
+
+test("the operations page does not simulate a broken machine for a stranger", async ({
+  page,
+}) => {
   await page.goto("/sync");
+  const state = page.getByTestId("sync-signed-out");
+  await expect(state).toBeVisible();
+  await expect(state).toContainText("تتبع تشغيل قناتك");
+
+  // It used to render the fixture's operating state to anyone who arrived: a
+  // red line saying no sync had run and no worker was connected, and an amber
+  // one saying a plan was at 74% — about a machine that is not theirs and is
+  // not in trouble. An operations page answers a question only an owner has.
+  await expect(page.getByTestId("sync-panel")).toHaveCount(0);
+  await expect(page.getByTestId("plan-panel")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("لم تُنفَّذ أي مزامنة");
+  await expect(page.locator("body")).not.toContainText("اقترب الاستهلاك");
+
+  // And it offers both ways on: the one that makes the page real, and the one
+  // and an explicit door to the demo — which stays reachable, because the
+  // fixture operations page is the only surface the guarantees above can be
+  // tested on without a live account. Ten tests in this file run on it.
+  await expect(
+    state.getByRole("link", { name: /سجّل الدخول/ }),
+  ).toHaveAttribute("href", "/account");
+  const demo = state.getByRole("link", { name: /كيف تبدو هذه الصفحة/ });
+  await expect(demo).toHaveAttribute("href", "/sync?demo=1");
+  await demo.click();
+  await expect(page.getByTestId("sync-panel")).toBeVisible();
+  await expect(page.getByTestId("sync-signed-out")).toHaveCount(0);
+});
+
+test("a budget bar shows the state its sentence reports", async ({ page }) => {
+  await page.goto("/sync?demo=1");
   const near = page.getByTestId("budget-comment_analysis");
   await expect(near).toContainText("اقترب الاستهلاك من الحد");
   // The bar used to take the browser's own accent — Chrome paints <progress>
@@ -1349,7 +1401,7 @@ test("a sync failure reads as a sentence, not as a raw code", async ({
       coverage: { videos_seen: 1, comments_collected: 0, complete: false },
     },
   });
-  await page.goto("/sync");
+  await page.goto("/sync?demo=1");
   const detail = page.getByTestId("sync-error");
   // The explanation leads; the identifier is supporting detail for support.
   await expect(detail).toContainText("رفض المصدر الوصول");

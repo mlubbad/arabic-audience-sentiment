@@ -1667,6 +1667,32 @@ function DashboardBody({
                     تغيّرت النتائج فأُعيد العرض من الصفحة الأولى.
                   </p>
                 )}
+                {/* Above the table, not under it.
+                    It exports the whole filtered set, not the page on screen —
+                    so it belongs with the thing it describes, before a reader
+                    has scrolled twenty-five rows past the point where knowing
+                    that would have helped. A control that only appears once
+                    you have finished reading is one you find after you needed
+                    it. */}
+                <div className="export">
+                  <button
+                    type="button"
+                    onClick={() => exporting.mutate()}
+                    disabled={exporting.isPending}
+                  >
+                    تصدير CSV
+                  </button>
+                  <p className="muted">
+                    يصدّر كل التعليقات المطابقة للفلاتر الحالية ({s.total}) وليس
+                    الصفحة المعروضة فقط. تُعطَّل صيغ الجداول في الملف دون تغيير
+                    النص المخزن.
+                  </p>
+                  {exporting.isError && (
+                    <p role="alert" data-testid="export-error">
+                      تعذر إنشاء ملف التصدير. حاول مرة أخرى.
+                    </p>
+                  )}
+                </div>
                 <div className="table-wrap">
                   <table>
                     <caption>التعليقات ضمن الفلاتر</caption>
@@ -1816,25 +1842,6 @@ function DashboardBody({
                     )}
                   </form>
                 )}
-                <div className="export">
-                  <button
-                    type="button"
-                    onClick={() => exporting.mutate()}
-                    disabled={exporting.isPending}
-                  >
-                    تصدير CSV
-                  </button>
-                  <p className="muted">
-                    يصدّر كل التعليقات المطابقة للفلاتر الحالية ({s.total}) وليس
-                    الصفحة المعروضة فقط. تُعطَّل صيغ الجداول في الملف دون تغيير
-                    النص المخزن.
-                  </p>
-                  {exporting.isError && (
-                    <p role="alert" data-testid="export-error">
-                      تعذر إنشاء ملف التصدير. حاول مرة أخرى.
-                    </p>
-                  )}
-                </div>
                 <nav className="pager" aria-label="تصفح التعليقات">
                   <button
                     type="button"

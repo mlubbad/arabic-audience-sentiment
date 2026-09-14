@@ -260,7 +260,9 @@ small {
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-top: 1rem;
+  /* A toolbar above the table it acts on, so the spacing reads as "belongs to
+     what follows" rather than "trails what came before". */
+  margin-block: 0 var(--space-3);
 }
 .export p {
   margin: 0;

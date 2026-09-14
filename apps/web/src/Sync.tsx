@@ -60,6 +60,54 @@ export function Sync() {
     workspaces,
     selectedId: chosen,
   });
+  // An explicit way in to the demo of this page. Not a workaround for the line
+  // below: the fixture operations page is the only surface on which the
+  // product's hardest guarantees can be exercised without a live account —
+  // that a stalled queue does not read as a healthy last run, that a partial
+  // collection is not presented as a complete one, that a malformed sync block
+  // reads as unknown rather than fine. Ten browser tests live on it.
+  //
+  // So the page stays available and stops being what a stranger is handed.
+  const wantsDemo =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("demo");
+
+  // A visitor who has not signed in has no collection to be the health of.
+  //
+  // This page used to render the fixture's operating state to them, which is a
+  // worker that is not connected and a plan at 74% — so the first thing a
+  // stranger saw of the product was a red line saying nothing had run and an
+  // amber one saying a limit was near, about a machine that is not theirs and
+  // is not in trouble. Two of the three panels then said, in effect, that they
+  // were empty because this is a demo.
+  //
+  // The dashboard is a different case and keeps its demo: a sanitized report
+  // shows what the product produces, and that is the thing worth showing. An
+  // operations page answers a question only an owner has.
+  if (!session && !wantsDemo)
+    return (
+      <div className="app-state" data-testid="sync-signed-out">
+        <span className="app-state-symbol" aria-hidden="true">
+          ⟳
+        </span>
+        <p className="app-eyebrow">التشغيل</p>
+        {/* The page keeps its name whether you are signed in or not. The first
+            draft of this state led with a sentence about the page instead —
+            "هذه الصفحة تتبع تشغيل قناتك" — and a browser test caught it: a
+            reader who arrives from a menu item called "حالة المزامنة" should
+            land on a heading that agrees with the thing they clicked. */}
+        <h1>حالة الجمع والتحليل</h1>
+        <p>
+          هذه الصفحة تتبع تشغيل قناتك: نشاط الجمع، وحدود خطتك، وسجل كل محاولة
+          وسببها. كلها تخص حسابًا وقناة مرتبطة به، فلا يوجد ما تتابعه قبل تسجيل
+          الدخول.
+        </p>
+        <div className="app-state-actions">
+          <a href="/account">سجّل الدخول أو أنشئ حسابًا</a>
+          <a href="/sync?demo=1">شاهد كيف تبدو هذه الصفحة</a>
+        </div>
+      </div>
+    );
   if (configuredMode === "live" && session) {
     if (workspacesLoading)
       return (
