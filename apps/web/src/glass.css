@@ -1,0 +1,196 @@
+/* =====================================================================
+   الزجاج — the surface system.
+
+   Apple's Liquid Glass is not a colour, it is a lens: a pane that samples
+   what is behind it, blurs and saturates it, tints it, and carries a bright
+   edge where light catches the bevel. Controls float in a layer above the
+   content rather than being drawn into it, and radii nest concentrically so
+   a control inside a panel echoes the panel's curve instead of fighting it.
+
+   Three things about this product decide how far that can be taken here.
+
+   1. This is a reading surface. A translucent pane over an arbitrary
+      background has an unknown luminance, and therefore unknown contrast —
+      which is exactly the property this interface spent a whole review
+      earning. So every level has a tint-opacity FLOOR, and the page ground
+      underneath is held to a narrow luminance band. Glass composited over a
+      known ground is still a known colour, and `glass.test.ts` proves the
+      floor holds for the darkest ground the app can present.
+
+   2. Transparency is an accessibility setting, not a style. `prefers-
+      reduced-transparency` and `prefers-contrast: more` collapse every pane
+      to its solid fallback — which is why each level declares `background`
+      before `backdrop-filter`, never instead of it. A browser without
+      backdrop-filter gets the same solid, so the page never depends on the
+      effect to be readable.
+
+   3. The most transparent levels carry the least text. Chrome — the header,
+      the section index, pills — can be thin because what sits on it is short
+      and large. Panels that carry paragraphs and tables are the most opaque.
+      The order is deliberate: transparency is spent where reading is not.
+      ===================================================================== */
+
+:root {
+  /* -------- the ground the glass is measured against ----------------
+     Glass has no colour of its own; it has the colour of what is behind
+     it. Fixing the ground is what makes the composite predictable, so
+     these two are part of the system, not decoration. */
+  --glass-ground: #f7f5fd;
+  --glass-ground-wash:
+    radial-gradient(
+      ellipse 80% 60% at 12% -5%,
+      rgba(107, 89, 232, 0.14),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 95% 8%,
+      rgba(255, 108, 119, 0.08),
+      transparent 55%
+    );
+
+  /* -------- the material ---------------------------------------------
+     Blur is the lens. Saturate compensates for the colour a blur washes
+     out — Apple's material reads more vivid than its backdrop, not less.
+     Brightness lifts the pane a touch off the ground so the edge reads. */
+  --glass-lens: saturate(180%) brightness(1.04);
+
+  /* level 1 — panels and cards. Carries paragraphs and tables, so it is
+     the most opaque of the translucent levels. */
+  --glass-1-tint: rgba(255, 255, 255, 0.72);
+  --glass-1-blur: blur(20px);
+  --glass-1-edge: 1px solid rgba(255, 255, 255, 0.7);
+  --glass-1-ring: 0 0 0 1px rgba(20, 17, 47, 0.05);
+  --glass-1-specular: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
+  /* level 2 — chrome that floats over scrolling content: the header, the
+     section index, the filter bar. Thinner, because what rides on it is a
+     handful of short labels. */
+  --glass-2-tint: rgba(255, 255, 255, 0.66);
+  --glass-2-blur: blur(28px);
+  --glass-2-edge: 1px solid rgba(255, 255, 255, 0.62);
+  --glass-2-ring: 0 1px 0 0 rgba(20, 17, 47, 0.06);
+  --glass-2-specular: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+
+  /* level 3 — overlays. The only level that lifts off the page with a real
+     shadow, because it is the only one that is genuinely above it. */
+  --glass-3-tint: rgba(255, 255, 255, 0.84);
+  --glass-3-blur: blur(40px);
+  --glass-3-edge: 1px solid rgba(255, 255, 255, 0.85);
+  --glass-3-lift:
+    0 24px 60px -20px rgba(20, 17, 47, 0.28), 0 2px 8px rgba(20, 17, 47, 0.06);
+  --glass-3-specular: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  /* brand glass — the one tinted pane. Spent on the hero and the primary
+     action, and nowhere else: a tint that appears everywhere is a colour,
+     not an accent. */
+  --glass-brand-tint: rgba(59, 39, 186, 0.9);
+  --glass-brand-edge: 1px solid rgba(255, 255, 255, 0.28);
+  --glass-brand-specular: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --glass-brand-lift: 0 12px 30px -12px rgba(59, 39, 186, 0.55);
+
+  /* -------- concentric geometry -------------------------------------
+     A control inside a panel should echo the panel's curve. Apple's rule
+     is inner = outer − padding; below that the two curves argue and the
+     inner one looks pinched. The audit found ten unrelated radii in the
+     app and twelve more on the landing page; this is the whole set. */
+  --r-1: 8px; /* chips, inputs, small controls */
+  --r-2: 12px; /* buttons, table cells */
+  --r-3: 18px; /* cards and panels */
+  --r-4: 26px; /* hero, overlays */
+  --r-pill: 999px;
+
+  /* -------- motion ----------------------------------------------------
+     One curve, two durations. Glass moves like a physical pane: it does
+     not bounce. */
+  --ease-glass: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-1: 160ms;
+  --dur-2: 280ms;
+}
+
+/* =====================================================================
+   The material, as three composable classes.
+   Each declares its solid background FIRST. Where backdrop-filter is
+   unavailable or switched off, that solid is what remains — which is why
+   the tints are opaque enough to read on alone.
+   ===================================================================== */
+
+.glass-1,
+.glass-2,
+.glass-3 {
+  /* The pane is its own stacking context: a backdrop-filter that inherits
+     a parent's transform samples the wrong thing. */
+  isolation: isolate;
+  transition:
+    background var(--dur-1) var(--ease-glass),
+    box-shadow var(--dur-1) var(--ease-glass);
+}
+
+.glass-1 {
+  background: var(--glass-1-tint);
+  backdrop-filter: var(--glass-1-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-1-blur) var(--glass-lens);
+  border: var(--glass-1-edge);
+  border-radius: var(--r-3);
+  box-shadow: var(--glass-1-ring), var(--glass-1-specular);
+}
+
+.glass-2 {
+  background: var(--glass-2-tint);
+  backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  border-bottom: var(--glass-2-edge);
+  box-shadow: var(--glass-2-ring), var(--glass-2-specular);
+}
+
+.glass-3 {
+  background: var(--glass-3-tint);
+  backdrop-filter: var(--glass-3-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-3-blur) var(--glass-lens);
+  border: var(--glass-3-edge);
+  border-radius: var(--r-4);
+  box-shadow: var(--glass-3-lift), var(--glass-3-specular);
+}
+
+/* The tinted pane. Text on it is white, so its floor is the opposite one:
+   the tint must be opaque enough that white never drops below 4.5:1. */
+.glass-brand {
+  background: var(--glass-brand-tint);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: var(--glass-brand-edge);
+  border-radius: var(--r-4);
+  box-shadow: var(--glass-brand-lift), var(--glass-brand-specular);
+  color: #fff;
+}
+
+/* =====================================================================
+   Reduce Transparency.
+   Apple ships this switch because the material genuinely costs some people
+   legibility. Honouring it means the solid fallback, not a thinner blur:
+   a setting that only softens the problem has not been honoured.
+   `prefers-contrast: more` gets the same treatment plus a real border,
+   because at that setting a hairline of white on white is not a border.
+   ===================================================================== */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .glass-1,
+  .glass-2,
+  .glass-3 {
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: var(--border-2);
+  }
+  .glass-brand {
+    background: var(--ml-indigo);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-1,
+  .glass-2,
+  .glass-3 {
+    transition: none;
+  }
+}

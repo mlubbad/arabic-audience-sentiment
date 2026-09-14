@@ -1,11 +1,17 @@
 /* The working side of the product shares the landing's mark, type and palette.
    The report keeps its chart colors; this layer gives every route one shell. */
 .app-shell {
+  /* One number for how tall the pinned header is, so anything that has to
+     sit below it can say so instead of guessing. */
+  --app-header-h: 78px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at 8% 190px, #f0ebff 0, transparent 28rem), #fbfafe;
+  /* The ground, from the system. Glass has the colour of what is behind it,
+     so fixing this is what makes every pane above it a known colour — and
+     what lets glass.test.ts prove the text on them still clears 4.5:1. */
+  background: var(--glass-ground-wash), var(--glass-ground);
+  background-attachment: fixed;
   color: var(--fg-1);
   font-family: "Audience Arabic", var(--font-body);
   line-height: 1.75;
@@ -36,14 +42,18 @@
   color: #d4cbff;
 }
 .app-shell > .app-header {
-  position: relative;
+  /* Level 2. Pinned, so the page passes behind it rather than under a lid. */
+  position: sticky;
+  top: 0;
   z-index: 50;
+  background: var(--glass-2-tint);
+  backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  border-bottom: var(--glass-2-edge);
+  box-shadow: var(--glass-2-ring), var(--glass-2-specular);
   display: block;
   width: 100%;
   padding: 0 1.5rem;
-  background: rgba(255, 255, 255, 0.96);
-  border-bottom: 1px solid #ebe8f2;
-  box-shadow: 0 4px 22px rgba(35, 31, 67, 0.035);
 }
 .app-header-inner {
   width: min(100%, 1220px);

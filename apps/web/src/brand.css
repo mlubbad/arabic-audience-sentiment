@@ -171,13 +171,16 @@
     #b5aaf2 100%
   );
 
-  --r-xs: 4px;
-  --r-sm: 8px;
-  --r-md: 14px;
-  --r-lg: 20px;
-  --r-xl: 28px;
-  --r-2xl: 40px;
-  --r-pill: 999px;
+  /* Aliases onto the four-step scale in glass.css. The audit counted ten
+     unrelated radii in the app and twelve on the landing page; rather than
+     rewrite every rule that names one of these, the names now point at the
+     scale, so existing usage snaps to it. Prefer --r-1..--r-4 in new code. */
+  --r-xs: var(--r-1);
+  --r-sm: var(--r-1);
+  --r-md: var(--r-2);
+  --r-lg: var(--r-3);
+  --r-xl: var(--r-4);
+  --r-2xl: var(--r-4);
 
   --shadow-3:
     0 12px 32px rgba(14, 10, 46, 0.12), 0 4px 10px rgba(14, 10, 46, 0.05);

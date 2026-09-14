@@ -92,3 +92,27 @@ export function deltaE(a: string, b: string, kind?: Vision): number {
   const y = oklab(kind ? simulate(b, kind) : linear(b));
   return 100 * Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
 }
+
+/**
+ * One translucent layer over another, in sRGB — the `source-over` the browser
+ * does when it paints a pane with an alpha.
+ *
+ * This exists because a translucent surface has no colour of its own, so the
+ * contrast of the text on it cannot be looked up; it has to be computed for
+ * the ground it happens to be over. Glass is only safe where that ground is
+ * known, which is why the system fixes it.
+ */
+export function over(layer: string, backdrop: string): string {
+  const m = layer.trim().match(/^rgba?\(([^)]+)\)$/i);
+  if (!m) return layer; // already opaque
+  const parts = m[1]
+    .split(/[,\s/]+/)
+    .filter(Boolean)
+    .map(Number);
+  const [r, g, b] = parts;
+  const a = parts.length > 3 ? parts[3] : 1;
+  const [br, bg, bb] = srgb(backdrop).map((v) => v * 255);
+  const mix = (f: number, k: number) => Math.round(f * a + k * (1 - a));
+  const hex = (v: number) => v.toString(16).padStart(2, "0");
+  return `#${hex(mix(r, br))}${hex(mix(g, bg))}${hex(mix(b, bb))}`;
+}

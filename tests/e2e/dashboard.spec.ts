@@ -1216,6 +1216,61 @@ test("a figure and a sentence each keep their own face", async ({ page }) => {
   expect(first(seen.heading!)).toBe("Audience Arabic");
 });
 
+test("the two pinned panes stack instead of hiding one another", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const index = page.locator(".rp-nav");
+  await expect(index).toBeVisible();
+  await page.evaluate(() =>
+    window.scrollTo({ top: 1400, behavior: "instant" }),
+  );
+  // Both the shell header and the report's index are pinned. Pinned to the
+  // same 0 they are one pane and a hidden one — and the hidden one was the
+  // index, which is the only way to move around a page this long.
+  const boxes = await page.evaluate(() => {
+    const r = (sel: string) => {
+      const el = document.querySelector(sel);
+      return el ? el.getBoundingClientRect() : null;
+    };
+    const h = r(".app-header")!;
+    const n = r(".rp-nav")!;
+    return { headerBottom: h.bottom, navTop: n.top, navBottom: n.bottom };
+  });
+  expect(boxes.navTop).toBeGreaterThanOrEqual(boxes.headerBottom - 1);
+  expect(boxes.navBottom).toBeLessThan(400);
+});
+
+test("every pane keeps a solid the reader can fall back to", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  await expect(
+    page.getByRole("table", { name: /التعليقات ضمن/ }),
+  ).toBeVisible();
+  // Glass is a lens, so the text on it has no fixed contrast unless the pane
+  // itself carries enough of its own colour. Where backdrop-filter is off —
+  // Reduce Transparency, an older engine — that solid is the entire surface.
+  const thin = await page.evaluate(() => {
+    const out: { sel: string; alpha: number }[] = [];
+    for (const sel of [".rp-card", ".rp-nav", ".app-header", ".review"]) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const bg = getComputedStyle(el).backgroundColor;
+      const m = bg.match(/rgba?\(([^)]+)\)/);
+      if (!m) continue;
+      const parts = m[1]
+        .split(/[,\s/]+/)
+        .filter(Boolean)
+        .map(Number);
+      const alpha = parts.length > 3 ? parts[3] : 1;
+      if (alpha < 0.6) out.push({ sel, alpha });
+    }
+    return out;
+  });
+  expect(thin).toEqual([]);
+});
+
 test("a budget bar shows the state its sentence reports", async ({ page }) => {
   await page.goto("/sync");
   const near = page.getByTestId("budget-comment_analysis");

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./brand.css";
+@import "./glass.css";
 :root {
   font-family: var(--font-body);
   color: var(--text-1);
@@ -92,14 +93,39 @@ select {
   min-height: 44px;
 }
 button {
-  border: 1px solid var(--text-2);
-  border-radius: 5px;
+  /* The tinted pane, at control size: the same edge and specular the hero
+     wears, so a button reads as a piece of the same material rather than a
+     coloured rectangle. The radius comes off the scale. */
+  border: var(--glass-brand-edge);
+  border-radius: var(--r-2);
   padding: 0.5rem 0.9rem;
-  background: var(--ml-indigo);
+  background: var(--glass-brand-tint);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  box-shadow: var(--glass-brand-specular);
   color: white;
   margin: 0.35rem;
   min-height: 44px;
   cursor: pointer;
+  transition:
+    transform var(--dur-1) var(--ease-glass),
+    box-shadow var(--dur-1) var(--ease-glass),
+    background var(--dur-1) var(--ease-glass);
+}
+button:hover:not(:disabled) {
+  box-shadow: var(--glass-brand-lift), var(--glass-brand-specular);
+}
+/* Glass panes respond to a press by settling, not by bouncing. */
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }
 button:disabled {
   opacity: 0.5;
@@ -241,7 +267,16 @@ small {
   flex: 1 1 18rem;
 }
 .review {
+  /* Level 3. The only surface in the product that is genuinely above the
+     page — it takes focus, and everything else waits for it — so it is the
+     only one that carries a real lift. */
+  background: var(--glass-3-tint);
+  backdrop-filter: var(--glass-3-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-3-blur) var(--glass-lens);
+  border: var(--glass-3-edge);
   border-inline-start: 4px solid var(--ml-indigo);
+  border-radius: var(--r-4);
+  box-shadow: var(--glass-3-lift), var(--glass-3-specular);
 }
 .review h3 {
   font-weight: 700;

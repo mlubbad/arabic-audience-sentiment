@@ -105,8 +105,23 @@
 }
 .lp-header {
   padding: 25px max(5%, calc((100% - 1220px) / 2));
-  background: #fff;
+  /* The same level-2 pane the app shell wears, so the two surfaces are made
+     of one material and a visitor crossing from here into the product does
+     not cross into a different piece of software. The solid comes first, as
+     everywhere: Reduce Transparency turns this back into the white bar it
+     has always been.
+
+     Not pinned, though the app's header is. `.landing` sets `overflow: clip`
+     for its decorative bleed, and clip takes the element out of the scroll
+     chain that `position: sticky` needs — so pinning here did not pin the
+     header, it detached it and left it floating mid-page. The material is
+     the shared thing; where a header sits is the page's own business. */
+  background: var(--glass-2-tint);
+  backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-2-blur) var(--glass-lens);
   border: 0;
+  border-bottom: var(--glass-2-edge);
+  box-shadow: var(--glass-2-ring), var(--glass-2-specular);
   display: flex;
   gap: 28px;
   justify-content: space-between;
@@ -161,7 +176,7 @@
 .lp-header-cta {
   font-size: 13px;
   border: 1px solid #ded9fb;
-  border-radius: 30px;
+  border-radius: var(--r-pill);
   padding: 9px 20px;
 }
 .lp-header-cta span {
@@ -226,7 +241,7 @@
   gap: 20px;
   padding: 12px 25px;
   min-height: 49px;
-  border-radius: 40px;
+  border-radius: var(--r-4);
   background: var(--lp-purple);
   color: white;
   font-size: 14px;
@@ -289,7 +304,7 @@
   background: #ffffffed;
   border: 1px solid #edeaf9;
   box-shadow: 0 15px 45px #32247714;
-  border-radius: 13px;
+  border-radius: var(--r-2);
   padding: 14px 18px;
   display: flex;
   align-items: center;
@@ -419,7 +434,7 @@
 .lp-demo-frame {
   background: #f8f7fd;
   border: 8px solid #302753;
-  border-radius: 20px;
+  border-radius: var(--r-3);
   box-shadow: 0 30px 60px #33225b17;
   overflow: hidden;
 }
@@ -528,7 +543,7 @@
   background: transparent;
   border: 1px solid transparent;
   color: #746b83;
-  border-radius: 30px;
+  border-radius: var(--r-pill);
   padding: 4px 16px;
   font-size: 12px;
 }
@@ -546,7 +561,7 @@
 .lp-example-comment {
   background: white;
   border: 1px solid #eeeaf4;
-  border-radius: 9px;
+  border-radius: var(--r-1);
   padding: 13px;
   display: flex;
   align-items: center;
@@ -631,7 +646,7 @@
   background: #ffffff0b;
   border: 1px solid #ffffff22;
   color: #dad5eb;
-  border-radius: 30px;
+  border-radius: var(--r-pill);
   padding: 7px 24px;
   font-size: 13px;
 }
@@ -642,7 +657,7 @@
 .lp-audience-panel {
   background: #fff;
   color: var(--lp-ink);
-  border-radius: 16px;
+  border-radius: var(--r-3);
   display: grid;
   grid-template-columns: 1fr 1fr;
   overflow: hidden;
@@ -693,7 +708,7 @@
     15px 20px 0 #a492e935,
     0 20px 45px #53408f25;
   border: 1px solid #fff;
-  border-radius: 11px;
+  border-radius: var(--r-2);
   transform: rotate(-5deg);
 }
 .lp-window-dots {
@@ -785,7 +800,7 @@
   place-items: center;
   background: #f3efff;
   color: #8070c4;
-  border-radius: 9px;
+  border-radius: var(--r-1);
 }
 .lp-trust-items h3 {
   font-size: 19px;
