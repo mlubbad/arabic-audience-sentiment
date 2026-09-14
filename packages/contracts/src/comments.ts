@@ -48,6 +48,10 @@ export const CommentSchema = z
     video_title: z.string().nullable().default(null),
     video_kind: z.enum(["video", "short", "stream"]),
     author_channel_id: z.string().nullable(),
+    // Written by the channel itself rather than by its audience. Derived from
+    // the author's channel id and the channel's own, never stored: a derived
+    // fact cannot drift away from the thing it was derived from.
+    by_channel_owner: z.boolean().default(false),
     // Null once the retention purge has run. The author is personal data
     // belonging to someone who is not the customer, so it does not outlive the
     // text it came with.

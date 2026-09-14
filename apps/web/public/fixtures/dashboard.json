@@ -72,7 +72,8 @@
         }
       },
       "reviews": [],
-      "video_title": "فيديو اصطناعي ١"
+      "video_title": "فيديو اصطناعي ١",
+      "by_channel_owner": false
     },
     {
       "id": "fixture-2",
@@ -82,7 +83,7 @@
       "video_id": "video-1",
       "video_kind": "video",
       "author_channel_id": "fixture-author-1",
-      "author_name": "مؤلف اصطناعي 2",
+      "author_name": "مؤلف اصطناعي ٢",
       "text_raw": "أتمنى تحسين الصوت",
       "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
       "likes_raw": "48",
@@ -115,7 +116,8 @@
         }
       },
       "reviews": [],
-      "video_title": "فيديو اصطناعي ١"
+      "video_title": "فيديو اصطناعي ١",
+      "by_channel_owner": false
     },
     {
       "id": "fixture-3",
@@ -167,7 +169,8 @@
           "reason": null
         }
       ],
-      "video_title": "فيديو اصطناعي ١"
+      "video_title": "فيديو اصطناعي ١",
+      "by_channel_owner": false
     },
     {
       "id": "fixture-4",
@@ -210,7 +213,8 @@
         }
       },
       "reviews": [],
-      "video_title": "فيديو اصطناعي ١"
+      "video_title": "فيديو اصطناعي ١",
+      "by_channel_owner": false
     },
     {
       "id": "fixture-5",
@@ -238,7 +242,8 @@
       "comment_type": null,
       "prediction": null,
       "reviews": [],
-      "video_title": "فيديو اصطناعي ٢"
+      "video_title": "فيديو اصطناعي ٢",
+      "by_channel_owner": false
     },
     {
       "id": "fixture-6",
@@ -290,7 +295,37 @@
           "reason": "مراجعة سابقة على النص قبل تعديله"
         }
       ],
-      "video_title": "فيديو اصطناعي ٢"
+      "video_title": "فيديو اصطناعي ٢",
+      "by_channel_owner": false
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-00000000000f",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "the-fixture-channel",
+      "author_name": "@قناة اصطناعية",
+      "text_raw": "مرحبا بك، تابع بقية الحلقات على قناتنا.",
+      "content_hash": "own-hash-1",
+      "likes_raw": "48",
+      "likes_value": 48,
+      "published_at": "2026-09-02T09:00:00Z",
+      "published_time_raw": "2026-09-02T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": true,
+      "parent_comment_id": "fixture-1",
+      "parent_source": "api",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored synthetic test data; not real commenters"
+      },
+      "comment_type": "اقتراح",
+      "prediction": null,
+      "reviews": [],
+      "video_title": "فيديو اصطناعي ١",
+      "by_channel_owner": true
     }
   ]
 }

@@ -642,6 +642,17 @@ function DashboardBody({
               <h2>الملخص</h2>
               <p className="rp-sub">
                 الأرقام أدناه تتبع الفلاتر المطبَّقة أعلاه.
+                {s.channel_own_comments > 0 && (
+                  <>
+                    {" "}
+                    <span data-testid="owner-excluded">
+                      وتستبعد {n(s.channel_own_comments)} ردًّا من القناة نفسها:
+                      ردُّ القناة على متابعيها ليس رأي جمهورها، ولا يدخل في أي
+                      مقام هنا. لذلك يقل الإجمالي عمّا يظهر على يوتيوب بهذا
+                      العدد.
+                    </span>
+                  </>
+                )}
               </p>
             </header>
             <div className="rp-grid rp-grid-5" aria-label="المؤشرات">

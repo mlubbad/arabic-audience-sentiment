@@ -30,7 +30,12 @@ function filteredRows(
 ): LabelledComment[] {
   const unique = new Map(
     input
-      .filter((c) => c.workspace_id === f.workspace_id)
+      // The channel's own replies are the brand talking to its followers —
+      // "مرحبا بك محمد، سارع الآن بمتابعة…" — not the audience answering it.
+      // Counting them dilutes every percentage on the page with the voice of
+      // the person reading it, so they leave before any denominator is taken.
+      // The rows are kept and counted separately: excluded is not deleted.
+      .filter((c) => c.workspace_id === f.workspace_id && !c.by_channel_owner)
       .map((c) => [c.id, c]),
   );
   return [...unique.values()]
@@ -109,7 +114,12 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   const comment_types = [
     ...new Set(
       input
-        .filter((c) => c.workspace_id === f.workspace_id && c.comment_type)
+        .filter(
+          (c) =>
+            c.workspace_id === f.workspace_id &&
+            !c.by_channel_owner &&
+            c.comment_type,
+        )
         .map((c) => c.comment_type as string),
     ),
   ].sort((a, b) => a.localeCompare(b, "ar"));
@@ -120,7 +130,7 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
   const video_options = [
     ...new Map(
       input
-        .filter((c) => c.workspace_id === f.workspace_id)
+        .filter((c) => c.workspace_id === f.workspace_id && !c.by_channel_owner)
         .map((c) => [c.video_id, c.video_title] as const),
     ),
   ]
@@ -190,6 +200,11 @@ export function snapshot(input: Comment[], raw: Filters, activeKey: string) {
     // was no live read. The data layer owns that answer.
     comment_types,
     video_options,
+    // Said out loud. A total that quietly differs from what the channel owner
+    // can count on YouTube is a number they will not trust twice.
+    channel_own_comments: input.filter(
+      (c) => c.workspace_id === f.workspace_id && c.by_channel_owner,
+    ).length,
     most_engaged_negative,
     // How many could be ranked, so a shown five is never mistaken for all five.
     negative_ranked: rankable.length,

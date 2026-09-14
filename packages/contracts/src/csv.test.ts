@@ -17,6 +17,7 @@ const base = {
   video_title: "حلقة تجريبية",
   video_kind: "video" as const,
   author_channel_id: "author",
+  by_channel_owner: false,
   author_name: "كاتب تجريبي",
   text_raw: "تعليق تجريبي",
   content_hash: "current",

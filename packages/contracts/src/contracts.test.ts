@@ -19,6 +19,7 @@ const base = {
   video_title: "حلقة تجريبية",
   video_kind: "video" as const,
   author_channel_id: "author",
+  by_channel_owner: false,
   author_name: "كاتب تجريبي",
   text_raw: "تعليق تجريبي",
   content_hash: "current",
@@ -424,6 +425,47 @@ describe("human corrections", () => {
     );
     expect(oneVideo.total).toBe(1);
     expect(oneVideo.comment_types).toEqual(["اقتراح", "سؤال"]);
+  });
+  it("keeps the channel's own replies out of every denominator", () => {
+    const rows: Comment[] = [
+      { ...base, id: "a1", prediction: pred("positive") },
+      { ...base, id: "a2", prediction: predNeg() },
+      // The brand answering its followers, not the audience answering it.
+      {
+        ...base,
+        id: "own",
+        by_channel_owner: true,
+        is_reply: true,
+        author_channel_id: "the-channel",
+        prediction: pred("positive"),
+      },
+    ];
+    const s = snapshot(rows, { workspace_id: workspace }, "fixture-v1");
+    expect(s.total).toBe(2);
+    expect(s.analysed).toBe(2);
+    // One positive of two, not two of three: including the channel's own
+    // reply would move the figure by a third on this sample.
+    expect(s.sentiments.positive).toBe(1);
+    expect(s.comments.map((c) => c.id)).not.toContain("own");
+    // Counted, not deleted. A total that quietly differs from what the owner
+    // sees on YouTube is one they will not trust twice.
+    expect(s.channel_own_comments).toBe(1);
+    expect(s.videos[0].total).toBe(2);
+  });
+  it("counts the channel's own replies within the workspace only", () => {
+    const rows: Comment[] = [
+      { ...base, id: "mine", by_channel_owner: true },
+      {
+        ...base,
+        id: "theirs",
+        by_channel_owner: true,
+        workspace_id: "00000000-0000-4000-8000-000000000002",
+      },
+    ];
+    expect(
+      snapshot(rows, { workspace_id: workspace }, "fixture-v1")
+        .channel_own_comments,
+    ).toBe(1);
   });
   it("offers every video the workspace has, whichever one is selected", () => {
     const rows: Comment[] = [
