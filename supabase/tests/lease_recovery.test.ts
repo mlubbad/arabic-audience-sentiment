@@ -43,8 +43,22 @@ const row = async (id: string) =>
     }>("select status,attempt,reclaims,error_code from jobs where id=$1", [id])
   ).rows[0];
 const claim = () => db.query("select * from private.claim_job($1)", [W]);
-/** Make the current lease look abandoned, as a crashed worker would leave it. */
+/**
+ * Make the current lease look abandoned, as a crashed worker would leave it,
+ * and wind `not_before` back to now.
+ *
+ * Re-claiming backs a job off once it is being handed round, so without the
+ * winding a test that drives `reclaims` upward is really testing the backoff
+ * and stalling on it. Production gets the same effect by waiting; a test
+ * should not. The backoff is asserted on its own below, where nothing winds.
+ */
 const abandon = (id: string) =>
+  db.query(
+    "update jobs set lease_expires_at=now()-interval '1 second', not_before=now() where id=$1",
+    [id],
+  );
+/** Lapse the lease and leave the clock alone. */
+const lapse = (id: string) =>
   db.query(
     "update jobs set lease_expires_at=now()-interval '1 second' where id=$1",
     [id],
@@ -154,5 +168,82 @@ describe("a lapsed lease is a recovery", () => {
     expect(after.status).toBe("failed");
     expect(after.attempt).toBe(0);
     expect(after.error_code).toBe("source_unavailable");
+  });
+});
+
+describe("a run that never committed still ran", () => {
+  const runOf = async (jobId: string) =>
+    (
+      await db.query<{ status: string; ended_at: string | null }>(
+        "select status, ended_at from sync_runs where job_id=$1",
+        [jobId],
+      )
+    ).rows[0];
+
+  it("opens the run when the work is claimed, not when it first succeeds", async () => {
+    const id = await job();
+    expect(await runOf(id)).toBeUndefined();
+    await claim();
+    // The panel could previously see nothing at all until a batch landed, so a
+    // job that died before committing showed the *previous* run as the last
+    // one — true of that run, and misleading about today.
+    expect(await runOf(id)).toMatchObject({
+      status: "running",
+      ended_at: null,
+    });
+  });
+
+  it("shows an abandoned job as a run still open, which is what it is", async () => {
+    const id = await job();
+    await claim();
+    await abandon(id);
+    // Lease lapsed, nothing finished it. This is what a worker that died, hung
+    // or was taken from mid-batch looks like, and it had no representation at
+    // all before: the run row simply did not exist.
+    const run = await runOf(id);
+    expect(run.status).toBe("running");
+    expect(run.ended_at).toBeNull();
+    const { rows } = await db.query<{ stale: boolean }>(
+      "select (lease_expires_at <= now()) stale from jobs where id=$1",
+      [id],
+    );
+    expect(rows[0].stale).toBe(true);
+  });
+
+  it("keeps one run per job when a lease is taken over", async () => {
+    const id = await job();
+    await claim();
+    await abandon(id);
+    await claim();
+    const { rows } = await db.query<{ n: number }>(
+      "select count(*)::int n from sync_runs where job_id=$1",
+      [id],
+    );
+    // A takeover continues the run it interrupted rather than starting a
+    // second one for the same piece of work.
+    expect(rows[0].n).toBe(1);
+  });
+
+  it("slows a job down only once it is being handed round", async () => {
+    const id = await job();
+    await claim();
+    const at = async () =>
+      (
+        await db.query<{ ahead: number }>(
+          "select extract(epoch from (not_before - now()))::int ahead from jobs where id=$1",
+          [id],
+        )
+      ).rows[0].ahead;
+    // First recovery is immediate: a worker that died should be taken over at
+    // once, not punished for dying.
+    await lapse(id);
+    await claim();
+    expect(await at()).toBeLessThanOrEqual(0);
+    // The second is not. A job being handed round is a different situation
+    // from a worker that crashed once. Nothing winds the clock here — that is
+    // the whole point of this test.
+    await lapse(id);
+    await claim();
+    expect(await at()).toBeGreaterThan(30);
   });
 });
