@@ -23,8 +23,19 @@ The bundle embeds the Supabase project URL and the **publishable** key. Both are
 design and already ship in any browser build. The service-role key, the Google client secret
 and the access token are not in it, which is asserted rather than assumed.
 
-**The dashboard serves fixtures.** `VITE_DASHBOARD_SOURCE` is unset, so the live read path is
-not active, and nothing on the deployed page is real data.
+**The dashboard is built live, and shows the demo to anyone not signed in.** This paragraph
+used to say the opposite — that `VITE_DASHBOARD_SOURCE` was unset and nothing on the page was
+real. It is set to `live` in `apps/web/.env.local`, which Vite loads because its root is
+`apps/web`; the shipped bundle proves it, since esbuild folded the mode constant and the
+`sanitized_fixture` branch is not in `index-*.js` at all.
+
+What keeps a stranger out is not the build, it is `resolveMode`: live is a ceiling, and a
+render only reaches it with a session **and** a resolved workspace. A signed-out visitor at
+the same URL gets the sanitized fixture, labelled as one. A signed-in owner gets their own
+channel, with RLS deciding which rows that means.
+
+So the deployed page carries three layers between a passer-by and real data: the host's basic
+auth, a session, and row-level security. Only the last of those is load-bearing.
 
 ## Redeploying
 
