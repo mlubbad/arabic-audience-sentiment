@@ -521,21 +521,27 @@ function DashboardBody({
             <option value="replies">ردود فقط</option>
           </select>
         </label>
-        <label>
-          نوع التعليق
-          <select
-            aria-label="نوع التعليق"
-            value={commentType}
-            onChange={(e) => setCommentType(e.target.value)}
-          >
-            <option value="">كل الأنواع</option>
-            {(result.data?.comment_types ?? []).map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Only when the data has types to offer. Comment types come from
+            annotations, and nothing in the collection path writes them yet, so
+            in live mode this was a control whose only option was "all" —
+            something to operate that could not change the answer. */}
+        {(result.data?.comment_types ?? []).length > 0 && (
+          <label>
+            نوع التعليق
+            <select
+              aria-label="نوع التعليق"
+              value={commentType}
+              onChange={(e) => setCommentType(e.target.value)}
+            >
+              <option value="">كل الأنواع</option>
+              {(result.data?.comment_types ?? []).map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           حالة المراجعة
           <select
