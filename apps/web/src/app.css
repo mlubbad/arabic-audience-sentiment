@@ -111,12 +111,49 @@
   background: var(--ml-indigo);
   color: white;
 }
-.app-header-note {
+/* Session state, in the slot the tagline used to hold. */
+.app-session {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   padding-inline-start: 1.1rem;
   border-inline-start: 1px solid var(--border-1);
+  font-size: 0.8rem;
+}
+.app-session-who {
   color: var(--text-3);
-  font-size: 0.75rem;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Quiet. Leaving is not the thing the header is for, and a filled button here
+   would outrank the page's own primary action from every route. */
+.app-shell .app-session button,
+.app-shell a.app-session-in {
+  margin: 0;
+  min-height: 34px;
+  padding: 0 0.9rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-2);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  color: var(--link);
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.app-shell a.app-session-in {
+  border-color: var(--ml-indigo);
+}
+.app-session-error {
+  color: var(--color-danger);
+  font-weight: 600;
 }
 .app-shell .app-menu {
   display: none;
@@ -543,8 +580,14 @@
 }
 
 @media (max-width: 1050px) {
-  .app-header-note {
+  /* On a phone the identity line goes; the control stays — leaving must not
+     require opening a menu first. */
+  .app-session-who {
     display: none;
+  }
+  .app-session {
+    padding-inline-start: 0;
+    border-inline-start: 0;
   }
   .app-shell .rp-page form.rp-card.rp-filters {
     grid-template-columns: repeat(3, minmax(0, 1fr));

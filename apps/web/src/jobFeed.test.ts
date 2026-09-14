@@ -115,3 +115,38 @@ describe("what an operator may do with a job", () => {
       expect(at(s).retryable).toBe(false);
   });
 });
+
+describe("one table for one meaning", () => {
+  const at = (error_code: string) =>
+    describeJob(
+      {
+        id: "j",
+        status: "failed",
+        attempt: 3,
+        error_code,
+        created_at: "2026-09-14T00:00:00Z",
+      },
+      { workerConnected: false },
+    ).detail;
+
+  it("explains a code the shared table knows", () => {
+    // The health panel and the attempts log sat on the same screen and
+    // disagreed about this exact code: one rendered the sentence, the other
+    // called it uninterpreted. Two tables for one meaning.
+    expect(at("retry_exhausted")).toBe("استُنفدت المحاولات المسموح بها");
+    expect(at("retry_exhausted")).not.toContain("رمز غير مفسَّر");
+  });
+
+  it("still prefers its own wording where it has some", () => {
+    // The switch handles codes carrying parameters a flat table cannot hold,
+    // so the fallback must not override it.
+    expect(at("source_access_denied:insufficientPermissions")).toContain(
+      "أعد ربط القناة",
+    );
+  });
+
+  it("still admits a code neither table knows", () => {
+    // Inventing an explanation would be worse than saying there is not one.
+    expect(at("something_new_from_the_server")).toContain("رمز غير مفسَّر");
+  });
+});

@@ -218,19 +218,13 @@ export function Account() {
         </div>
       ) : (
         <>
+          {/* Signing out moved to the header, where it is reachable from every
+              route rather than only from this one. Leaving it here as well
+              would put two controls with one name on the same screen — which
+              is one name too few, and which a strict locator reads as an
+              ambiguity rather than a convenience. */}
           <div className="account-toolbar">
             <p>أنت داخل حسابك. اختر مساحة العمل التي تريد إدارتها.</p>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                void client.auth.signOut().then(({ error }) => {
-                  if (error) setMessage("تعذر تسجيل الخروج");
-                });
-              }}
-            >
-              تسجيل الخروج
-            </button>
           </div>
           <section className="rp-section">
             <header>

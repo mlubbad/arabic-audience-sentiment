@@ -1,3 +1,4 @@
+import { syncErrorMessages } from "./i18n";
 /**
  * What one collection job actually did, said in words the operator can act on.
  *
@@ -84,7 +85,16 @@ function explain(code: string): string | null {
     case "superseded_by_existing_request":
       return "أُلغيت لأن طلبًا مطابقًا كان في الطابور بالفعل. طلب واحد لكل قناة في كل مرة.";
     default:
-      return null;
+      // The shared table, before giving up.
+      //
+      // This switch and `syncErrorMessages` were two tables for one meaning,
+      // and they disagreed on screen: the health panel above the attempts log
+      // rendered `retry_exhausted` as "استُنفدت المحاولات المسموح بها" while
+      // the log underneath it called the same code uninterpreted. The switch
+      // exists for codes that carry parameters a flat table cannot hold —
+      // `no_upload_has_comments:12_checked_0_disabled` — so it stays, and
+      // everything it does not recognise now asks the table that does.
+      return syncErrorMessages[head] ?? null;
   }
 }
 
