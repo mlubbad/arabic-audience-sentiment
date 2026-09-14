@@ -630,16 +630,36 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
       db.query("select public.usage_summary($1)", [A]),
     ).rejects.toThrow();
   });
+  it("activates the pilot plan with the workspace", async () => {
+    await user(ownerA);
+    const fresh = await db.query<{ id: string }>(
+      "select public.create_workspace('مع خطة') as id",
+    );
+    const summary = await db.query<{ summary: { plan_key: string } | null }>(
+      "select public.usage_summary($1) as summary",
+      [fresh.rows[0].id],
+    );
+    // Without this a client could sign up, connect, collect, and then watch
+    // every analysis refused for an entitlement nothing ever granted.
+    expect(summary.rows[0].summary?.plan_key).toBe("pilot");
+  });
   it("says plainly when no plan has been activated", async () => {
     await user(ownerA);
     const fresh = await db.query<{ id: string }>(
       "select public.create_workspace('بلا خطة') as id",
     );
+    // Withdrawn rather than never granted, which is the state a lapsed or
+    // revoked subscription leaves behind.
+    await admin();
+    await db.query("delete from subscriptions where workspace_id=$1", [
+      fresh.rows[0].id,
+    ]);
+    await user(ownerA);
     const summary = await db.query<{ summary: unknown }>(
       "select public.usage_summary($1) as summary",
       [fresh.rows[0].id],
     );
-    // Null means "the operator has not activated a plan", not "no allowance left".
+    // Null means "no plan is active", not "no allowance left".
     expect(summary.rows[0].summary).toBeNull();
   });
   it("exposes no definer function to a tenant without a role check inside it", async () => {

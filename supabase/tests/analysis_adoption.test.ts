@@ -130,6 +130,36 @@ describe("the first successful analysis becomes the channel's active one", () =>
     await db.exec("reset role");
   });
 
+  it("still lets a user sign up on a deployment with no plan defined", async () => {
+    // The pilot plan is seed data an operator provides. A deployment missing
+    // it should leave workspaces unentitled, not make signing up impossible —
+    // and without the guard the insert would hit the plan_key foreign key and
+    // take workspace creation down with it.
+    await db.exec("reset role");
+    await db.query("delete from subscriptions");
+    await db.query("delete from plans where key='pilot'");
+    const user = "10000000-0000-4000-8000-0000000000aa";
+    await db.query("insert into auth.users(id) values ($1)", [user]);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      user,
+    ]);
+    await db.exec("set role authenticated");
+    const made = await db.query<{ id: string }>(
+      "select public.create_workspace('بلا خطة معرّفة') as id",
+    );
+    expect(made.rows[0].id).toBeTruthy();
+    await db.exec("reset role");
+    const subs = await db.query(
+      "select 1 from subscriptions where workspace_id=$1",
+      [made.rows[0].id],
+    );
+    expect(subs.rows).toHaveLength(0);
+    // Put the seed back for the cases that follow.
+    await db.query(
+      "insert into plans(key,analysis_units,backfill_units,channels_limit,members_limit) values ('pilot',5000,20000,3,5)",
+    );
+  });
+
   it("starts with no analysis, which is why every comment read as unanalysed", async () => {
     expect(await activeKey()).toBeNull();
   });
