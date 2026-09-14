@@ -1648,7 +1648,8 @@ function DashboardBody({
                               "number" && (
                               <span className="rp-chip-score">
                                 {Math.round(
-                                  c.prediction.class_scores[c.label] * 100,
+                                  (c.prediction.class_scores[c.label] ?? 0) *
+                                    100,
                                 )}
                                 ٪
                               </span>
@@ -1740,7 +1741,8 @@ function DashboardBody({
                                   "number" && (
                                   <span className="rp-chip-score">
                                     {Math.round(
-                                      c.prediction.class_scores[c.label] * 100,
+                                      (c.prediction.class_scores[c.label] ??
+                                        0) * 100,
                                     )}
                                     ٪
                                   </span>
