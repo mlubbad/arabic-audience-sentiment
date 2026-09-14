@@ -43,6 +43,70 @@ CAMELBERT_DA_SENTIMENT = ModelCard(
 )
 
 
+# Candidates evaluated against the golden set. Every revision is a commit and
+# every mapping was read from that commit's own config.json — note that the
+# three families disagree about label order, which is precisely why the mapping
+# is declared and then verified rather than assumed from output position.
+CAMELBERT_MIX_SENTIMENT = ModelCard(
+    model_id="CAMeL-Lab/bert-base-arabic-camelbert-mix-sentiment",
+    revision="6ef16021f303c8a2bac02fd5af16601593e665d2",
+    label_mapping={0: "positive", 1: "negative", 2: "neutral"},
+    preprocessing_version=PREPROCESSING_VERSION,
+    max_length=256,
+)
+
+CAMELBERT_MSA_SENTIMENT = ModelCard(
+    model_id="CAMeL-Lab/bert-base-arabic-camelbert-msa-sentiment",
+    revision="d383f6d3a1fd2aa63c99186b0155ed4258eb512f",
+    label_mapping={0: "positive", 1: "negative", 2: "neutral"},
+    preprocessing_version=PREPROCESSING_VERSION,
+    max_length=256,
+)
+
+# MARBERT-based, and its labels start at neutral where CAMeL's start at
+# positive. Reading this model with CAMeL's order would file every positive
+# comment as neutral and every neutral one as negative.
+MARBERT_SENTIMENT = ModelCard(
+    model_id="Ammar-alhaj-ali/arabic-MARBERT-sentiment",
+    revision="db063587f876d5abcf6cdeed70648fc76a30349f",
+    label_mapping={0: "neutral", 1: "negative", 2: "positive"},
+    preprocessing_version=PREPROCESSING_VERSION,
+    max_length=256,
+)
+
+# The only candidate found with a Mixed class. Every three-class model scores
+# zero on the mixed items in the golden set — not because it gets them wrong
+# but because it has nowhere to put them — so a four-class model is the one
+# thing that could beat them on macro F1 rather than tie.
+ARABERT_FOUR_CLASS = ModelCard(
+    model_id="PRAli22/AraBert-Arabic-Sentiment-Analysis",
+    revision="eb0ec2d7c38fa0553c890b1bf8d9497c2ff4f7b8",
+    label_mapping={0: "positive", 1: "negative", 2: "neutral", 3: "mixed"},
+    preprocessing_version=PREPROCESSING_VERSION,
+    max_length=256,
+)
+
+# A second MARBERT fine-tune, on tweets. Included because the first MARBERT
+# result was poor enough to be worth a second opinion about the family rather
+# than about one checkpoint.
+MARBERT_TWEET_SENTIMENT = ModelCard(
+    model_id="3liel/marbert-arabic-tweet-sentiment-stable",
+    revision="e054995a9d17cbf2a4b761604523d1c88b8dc032",
+    label_mapping={0: "negative", 1: "neutral", 2: "positive"},
+    preprocessing_version=PREPROCESSING_VERSION,
+    max_length=256,
+)
+
+CANDIDATES: dict[str, ModelCard] = {
+    "camelbert-da": CAMELBERT_DA_SENTIMENT,
+    "camelbert-mix": CAMELBERT_MIX_SENTIMENT,
+    "camelbert-msa": CAMELBERT_MSA_SENTIMENT,
+    "marbert": MARBERT_SENTIMENT,
+    "marbert-tweet": MARBERT_TWEET_SENTIMENT,
+    "arabert-4class": ARABERT_FOUR_CLASS,
+}
+
+
 class LabelMappingMismatch(RuntimeError):
     """The checkpoint does not agree with the mapping we declared for it."""
 

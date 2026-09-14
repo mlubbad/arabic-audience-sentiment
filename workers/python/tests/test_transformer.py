@@ -136,3 +136,41 @@ def test_the_analysis_key_changes_when_the_settings_change():
     # Same weights, different truncation: a different analysis, and the key has
     # to say so or the second result silently collides with the first.
     assert other.analysis_key != CARD.analysis_key
+
+
+def test_every_candidate_is_pinned_and_declared():
+    from sentiment.transformer import CANDIDATES
+
+    for name, card in CANDIDATES.items():
+        assert len(card.revision) == 40, name
+        assert all(c in "0123456789abcdef" for c in card.revision), name
+        # Contiguous from zero and no duplicates — ModelCard enforces both, so
+        # this is really asserting that every card survived construction.
+        assert sorted(card.label_mapping) == list(range(len(card.label_mapping)))
+
+
+def test_the_candidates_disagree_about_label_order():
+    from sentiment.transformer import CANDIDATES
+
+    orders = {
+        name: tuple(card.label_mapping[i] for i in sorted(card.label_mapping))
+        for name, card in CANDIDATES.items()
+    }
+    # The reason the mapping is declared and then verified rather than assumed
+    # from output position: these families genuinely disagree. Reading the
+    # MARBERT checkpoint with CAMeL's order files every positive comment as
+    # neutral and every neutral one as negative, silently.
+    assert orders["camelbert-da"] != orders["marbert"]
+    assert orders["marbert"][0] == "neutral"
+    assert orders["camelbert-da"][0] == "positive"
+    assert len(set(orders.values())) > 1
+
+
+def test_only_the_four_class_candidate_claims_mixed():
+    from sentiment.transformer import CANDIDATES
+
+    supports = {n: c.supports_mixed for n, c in CANDIDATES.items()}
+    assert supports["arabert-4class"] is True
+    # The rest have no such class. Reporting 0% Mixed for them would present a
+    # missing capability as a measurement.
+    assert not any(v for n, v in supports.items() if n != "arabert-4class")
