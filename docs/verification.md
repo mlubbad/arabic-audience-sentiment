@@ -1408,3 +1408,7 @@ Not verified from here: the signed-in AJ360 page with its 4,456 rows (no session
 environment, and the Claude in Chrome extension is not connected), and pg_cron's first tick
 at :17 (nothing is due before 2026-09-16 ~20:50Z, so a successful tick leaves no row to
 see; `cron.job_run_details` in the SQL editor is the evidence).
+
+## 2026-09-16 — topic classification smoke call
+
+`workers/python/scripts/gemini_smoke.py` sent one POST request to `generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent` with an Arabic classification prompt, a JSON schema constraint for topic selection, and the configured API key in the `x-goog-api-key` header. Response: **status 403**, reason `API_KEY_SERVICE_BLOCKED`. The error is the API restriction in the Google Cloud console, not a failure of the key or the endpoint; it is the expected outcome for a key whose API access is not yet enabled. The fix is enabling the Generative Language API on the key's restrictions. Live-tested.
