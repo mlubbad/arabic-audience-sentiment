@@ -233,3 +233,33 @@ service authorization follow from this setup.
 بوحدة التعليق المحلَّل الموجودة، والموجز المولَّد بوحدة مستقلة تُحسب بالتقرير. مبنيّ على تجربة
 BeyondComments وتسعير Comment Finder وAwario وBrand24 وغياب الأسعار المعلنة عند Lucidya وCrowd
 Analyzer. الدفع الفعلي يبقى مؤجَّلًا؛ الصفوف تُفعَّل يدويًا. `pilot` لا تُمسّ.
+
+2026-09-15 — Selective video sync (`docs/superpowers/specs/2026-09-15-selective-video-sync-design.md`,
+tasks 1–9, `ca86ed3`…`4abfd02`).
+
+- **Selection is a table (`video_selections`), and jobs stay per-channel.** A `collect` job
+  carries no video list; the server hands the worker its due list at claim time from
+  `private.due_videos`. This keeps the pre-existing "one outstanding collection per channel"
+  invariant (`jobs_one_outstanding_collect`) and its UI wording true without a second
+  mechanism, lets a video selected mid-run be picked up by the next run rather than needing a
+  second job or a silent wait, and means the tenant cannot forge which videos a job touches —
+  the list is computed server-side from rows RLS already scopes, not read from client input.
+  Rejected: storing the video list on the job (two places deciding what to collect) and one
+  job per video (N attempt-log rows per selection, N× worse once live re-checks run
+  continuously) — both already rejected once, in `runner.py`, before this work.
+- **The scheduler lives in Postgres.** `private.schedule_all()` is the function `pg_cron`
+  would call hourly; `private.worker_tick` (wired into `svc_worker_tick`) is the
+  extension-free fallback the worker loop calls on every idle tick, so live re-checks and
+  fresh-catalogue discovery work on the live project today, without `pg_cron` enabled, and
+  without a second scheduling mechanism to keep in sync once it is.
+- **`historical_backfill` remains unmetered by this work.** The budget line already existed
+  in the plan schema; nothing in this feature reserves it, and nothing here changes that —
+  recorded as out of scope in the spec and left that way.
+- **The catalogue lives on the operations page (`/sync?ws=…`), not a new route.** It is the
+  page's first section, above the health/plan/attempts panels (which moved unchanged into
+  `OperationsPanels.tsx` so the split carries no behaviour change), because the operations
+  page already carries the plan meter the estimate reads and is where the removed
+  "request sync" button lived. No new rail destination was added.
+- **The free-tier/public-video funnel is not part of this work.** `plans.free` and the
+  `public_unverified` channel state predate this feature and are unchanged by it; selective
+  sync applies uniformly to a workspace's one connected channel regardless of plan.

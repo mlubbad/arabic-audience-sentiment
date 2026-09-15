@@ -52,7 +52,7 @@ in the attempt log; N× worse with live re-checks; already rejected in `runner.p
 | --- | --- | --- |
 | `reported_comment_count` | `integer` null | YouTube `statistics.commentCount`, which includes replies. Null is unknown; never 0 for unknown. |
 | `thumbnail_url` | `text` null | |
-| `comments_state` | `text` not null default `'unknown'`, check in `('unknown','open','disabled')` | Learned from collection, not discovery: `videos.list` does not say comments are off; only a `commentThreads` refusal does. |
+| `comments_state` | `text` not null default `'unknown'`, check in `('unknown','open','disabled')` | `comments_state` is learned twice: discovery writes `disabled` when `statistics.commentCount` is absent and `open` when present (the source omits the count when comments are off); a collection that hits `commentsDisabled` writes `disabled`, and one that exhausts a video writes `open`. |
 | `catalogued_at` | `timestamptz` null | Null for a video known only from a commit. |
 
 Provenance for the new fields goes in the existing `field_provenance`.

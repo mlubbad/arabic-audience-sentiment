@@ -65,6 +65,18 @@ queue-reliability work the migrations lane was held for. Committed through `e01d
 of it is uncommitted. The `Landing.tsx` / `landing.css` / `landing.spec.ts` changes on disk
 are not this session's and were not touched.
 
+2026-09-15, selective video sync (tasks 1–9 of
+`docs/superpowers/plans/2026-09-15-selective-video-sync.md`, `ca86ed3`…`4abfd02`, plus this
+task's records-only commit): touched `supabase/migrations/20260915130000` through
+`20260915132000` (three new files, no existing migration edited),
+`supabase/functions/_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`,
+`workers/python/src/{collectors,server}` (`youtube_api.py`, `protocol.py`, `gateway.py`,
+`runner.py`, `loop.py`, `manual_run.py`), `packages/contracts/src/selection.ts`,
+`apps/web/src/{Sync.tsx, OperationsPanels.tsx, CataloguePanel.tsx, catalogue.ts,
+WorkspaceCard.tsx, Account.tsx, strings/ar.ts, strings/en.ts}`, and
+`tests/e2e/dashboard.spec.ts` (append-only, as this file already asks). Nothing of it is
+uncommitted; `git status` shows only the untracked `.screenshots/`.
+
 ## Six invariants that no failing test will announce
 
 Both were flagged by `sentimentanalysis-69`, which wrote them. Each is enforced
@@ -189,6 +201,22 @@ project currently has `external_google_enabled`, `external_azure_enabled` and
 `saml_enabled` all false, and `site_url` still `http://localhost:3000` — which
 would break any OAuth redirect from the deployed host, and is the user's to
 fix.
+
+Pending, from selective video sync, all the user's decisions and none of them taken:
+
+- `supabase db push --linked` for the three migrations `20260915130000` through
+  `20260915132000` (catalogue columns, `video_selections`, `select_videos`/
+  `request_discovery`, the worker's due-list/catalogue/tick routes).
+- Redeploying the `worker` Edge Function — its `supabase/functions/worker/index.ts` and
+  `_shared/worker-gateway.ts` now carry the due-list, commit-catalogue, video-finished and
+  tick routes the three migrations above expect, and the deployed function does not yet.
+- `create extension pg_cron` plus `select cron.schedule('sentiment-tick', '17 * * * *',
+  $$select private.schedule_all()$$)` — until then, the worker's own idle-loop `tick()` is
+  the only thing that would run `schedule_due_work`, and only while a worker process is up.
+
+Until these three happen, no discovery or collection has run against the real channel and
+the catalogue has never been seen signed in — see `docs/verification.md`'s "Not verified"
+for 2026-09-15.
 
 ## What the tests are for
 

@@ -365,3 +365,47 @@ snapshot's `videos` aggregate, because that aggregate drops the channel's own re
 `select_videos` counts every row — the fixture's video-1 read 4 one way and 5 the other.
 The six strings for the old button are retired; the two empty states that pointed at it
 now name the catalogue.
+
+## 2026-09-15 — selective video sync, the feature as a whole
+
+The catalogue is now what starts a collection, not a single all-or-nothing button. A reader
+opens a channel's catalogue on the operations page, searches and filters it by title, kind
+and recency, sees each video's reported comment count against the plan's remaining analysis
+units, and chooses which videos to collect — the estimate moves live as the selection
+changes, and saving over the remaining quota is refused with the reason shown beside the
+disabled button rather than allowed and charged. A video already collected keeps its
+comments and costs nothing to keep; one whose comments are switched off shows a pill and
+cannot be ticked. Once saved, a selected video stays live: the worker re-checks it on the
+plan's interval for new comments until it is deselected.
+
+Underneath, discovery is a new job type. `YouTubeAPI.catalogue()` walks a channel's three
+upload-tab playlists (videos, shorts, streams), tolerating an absent tab as empty rather than
+as a failure, and records each video's title, kind, count and thumbnail — a missing comment
+count is stored as unknown, never as zero. The server learns `comments_state` from two
+places now, not one: discovery infers `disabled` from an absent count, and a collection that
+hits YouTube's own `commentsDisabled` refusal confirms it directly. `select_videos` is the
+one RPC that writes a selection, refusing another tenant's video, a video with comments off,
+or a selection the remaining `comment_analysis` units cannot cover, and it enqueues the next
+collection itself rather than leaving the reader to ask for one. A `collect` job still
+carries no video list — the worker asks for its due list at claim time, computed
+server-side from `video_selections`, so mid-run additions are picked up by the next run
+without a second job and the tenant cannot widen what a job touches. `worker_video_finished`
+records each video's own outcome — exhausted, blocked, or held for retry — separately from
+the job as a whole, which is what lets one job cover many videos honestly. A daily tick,
+`schedule_due_work`, enqueues a fresh discovery when a channel's catalogue has gone stale and
+a collection when any selected video is due; it runs from the worker's own idle loop today
+(`worker_tick`, no extension needed) and is also callable from `pg_cron` once the live
+project's owner turns that on.
+
+On the page: `Sync.tsx` (510 lines) split into `CataloguePanel.tsx` (the new section) and
+`OperationsPanels.tsx` (health, plan, attempts — moved, not rewritten), so the catalogue
+leads the operations page and the diagnosis panels that were already there follow it
+unchanged. The old "request sync" button is gone from both the account card and the
+operations page; the account card's third step is now a link straight to the catalogue.
+
+What still waits: three migrations and the redeployed `worker` Edge Function they depend on
+have not gone to the live Supabase project, so no discovery or collection has run against
+the real channel yet, and `select_videos` has not been exercised from a signed-in browser.
+`pg_cron` is not enabled; the fallback tick is what would run live today. All three are the
+user's decisions to make, not this task's to take — see `docs/verification.md` and
+`docs/coordination/ACTIVE.md` for what that leaves unverified and pending.

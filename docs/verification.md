@@ -1105,3 +1105,127 @@ suite's existing rule (positive tracking only). Seen at 1280px and 375px on the 
 server in fixture mode (`.screenshots/sync-catalogue-*.png`, untracked); the sticky
 estimate bar sits at the viewport's foot on the phone. Not seen: the live catalogue
 signed in — no session in this environment.
+
+## 2026-09-15 — selective video sync, the whole feature (tasks 1–9, `ca86ed3`…`4abfd02`)
+
+Every layer this feature touches, verified with real runs, not carried forward as a claim.
+
+**Migrations** — three new files: `20260915130000_video_catalogue_and_selections.sql`
+(catalogue columns on `videos`, `video_selections`, the two plan intervals, the backfill,
+`due_videos`, `jobs_one_outstanding_discover`); `20260915131000_select_videos.sql`
+(`select_videos`, `request_discovery`, `analysis_remaining`); `20260915132000_worker_catalogue_and_due_lists.sql`
+(`claim_job` rebuilt to carry the job's own mode, `worker_due_videos`, `worker_commit_catalogue`,
+`worker_video_finished`, `enqueue_scheduled`, `schedule_due_work`, `worker_tick`, `schedule_all`,
+the four `svc_worker_*` wrappers, `oauth_attach_channel_for` rebuilt to enqueue a first
+discovery). PGlite (`npm run test:db`): 17 files, 170 tests, all passing — the running total
+across `selection.test.ts` (16: 6 from task 1, 10 from task 2) and `worker_catalogue.test.ts`
+(8, task 3), on top of the pre-existing suite.
+
+**Gateway** (`supabase/functions/_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`) —
+`type`/`videos` on every claim response, `/worker/commit-catalogue`, `/worker/video-finished`,
+`/worker/tick` routes, two new `STATUS` codes. `worker_gateway_handler.test.ts` (8 tests) and
+the seam test in `end_to_end.test.ts` (4 tests, `liveDb` now implements all of `WorkerDb`
+against real PGlite SQL) are part of the 170 above. `npm run check:functions` (deno check over
+every function entry point): 0 errors.
+
+**Worker (Python)** — `YouTubeAPI.catalogue()` (three-tab pagination, a 404 tab, a missing
+`commentCount` mapped to `None`); `run_discover`/`_discover`, `run_backfill`/`_backfill`
+rewritten to walk the server-supplied due list and report every video's end through
+`video_finished`; `run_job` dispatches on lease type; `loop.serve` ticks every control on an
+idle round. `npm run worker:test`: 141 tests, all passing (`test_catalogue.py` 6,
+`test_discover.py` 5, `test_backfill.py` 7, `test_loop.py` 8, the rest unchanged). `npm run
+worker:lint` (ruff): 0 findings.
+
+**Contracts/web** — `packages/contracts/src/selection.ts` (`selectionEstimate`,
+`CatalogueVideoSchema`, `filterCatalogue`, `fitNewest`); `apps/web/src/catalogue.ts`
+(`mergeCatalogue`, `loadCatalogue`, `storedPerVideo`); `Sync.tsx` split into
+`OperationsPanels.tsx` and `CataloguePanel.tsx`; the account card's sync button replaced with
+a link to `/sync?ws=<id>`; `enqueue_sync` no longer called from the browser
+(`grep -rn enqueue_sync apps/web/src` — no hits). 41 ar/en string keys added, parity held by
+`tsc`.
+
+**Full gates, run fresh from this clean tree** (`export PATH="$HOME/.nvm/versions/node/v22.14.0/bin:$PATH"`
+first; `lsof -i :4173 -i :5173` empty before each):
+
+```
+npm run check > /tmp/check.log; echo $?      → 0
+npm run test:e2e > /tmp/e2e.log; echo $?     → 0
+```
+
+`check` (lint, format:check, typecheck, check:functions, test, test:db, worker:test, build,
+check:secrets, in that order, `&&`-chained so any non-zero would have stopped it): lint 0,
+format 0, types 0, functions 0, unit **325 tests / 41 files** (`vitest run --exclude
+"supabase/tests/**"`), db **170 tests / 17 files**, worker **141 tests**, build 0 (main chunk
+`index-rv5-ggUY.js` 553.74 kB / 162.24 kB gzipped, `en-Dqv1dEF_.js` 39.03 kB fetched only when
+chosen, `Sync-DS6msJBp.js` 17.60 kB), `check:secrets` 0 (298 source files, plus built assets).
+`test:e2e`: **82 tests**, port 5173 (no `E2E_PORT` override), exit code read from
+`/tmp/e2e.log` via `echo $?`, not piped through `tail`; the four catalogue tests are among the
+82 (`…:1609`, `…:1650`, `…:1672`, `…:1681` in `tests/e2e/dashboard.spec.ts`).
+
+**Mutation checks, two.**
+
+1. **The quota guard in `select_videos`** (Task 2 Step 5, from its report). The `raise
+   exception 'quota_exceeded'` branch in `private.select_videos_impl` was deleted from a copy
+   of `20260915131000_select_videos.sql`; `npx vitest run supabase/tests/selection.test.ts`
+   went red on exactly the mutated behaviour — the call that should have been refused
+   succeeded instead (`AssertionError: expected [Function] to throw error matching
+   /quota_exceeded/ but got { ... "estimate": 40, "job_id": "393f69c0-...", "queued": true,
+   "remaining_after": -10, ... }`), plus one cascading failure in the next test from the state
+   the ungated call had written. The migration was restored from a backup and diffed
+   byte-identical before the fix was re-verified green (16/16).
+2. **The `next_check_at` reschedule in `worker_video_finished`** (this task, Step 3). In
+   `supabase/migrations/20260915132000_worker_catalogue_and_due_lists.sql`, the
+   `next_check_at = now() + make_interval(mins => iv)` line was removed from the `exhausted`
+   branch's `update public.video_selections` statement, leaving `last_collected_at` and
+   `last_outcome` updated but `next_check_at` untouched. `npx vitest run
+   supabase/tests/worker_catalogue.test.ts` went red, 3 of 8 failing (the other two are
+   downstream of the same fixture row staying due when it should not). The assertion that
+   names the mutation directly:
+
+   ```
+   FAIL  supabase/tests/worker_catalogue.test.ts > worker catalogue and due lists >
+     hands a collect claim its due list and nothing beyond the selection
+   AssertionError: expected { last_outcome: 'exhausted', …(1) } to deeply equal
+     { last_outcome: 'exhausted', …(1) }
+   - Expected
+   + Received
+     {
+       "last_outcome": "exhausted",
+   -   "later": true,
+   +   "later": false,
+     }
+   ```
+
+   (`later` is the test's own comparison of the row's rescheduled `next_check_at` against the
+   moment collection started — `false` because the mutated function left it unchanged, so the
+   just-finished video was still due.) The file was restored from a backup made before the
+   edit; `git diff --stat` was empty afterward (confirmed both immediately after restoring and
+   again before staging this commit), and `npx vitest run
+   supabase/tests/worker_catalogue.test.ts` was re-run green, 8/8. The mutation was never
+   staged or committed.
+
+**Seen in the browser.** Task 9's report names the screenshots taken in fixture mode at
+1280px and 375px, `.screenshots/sync-catalogue-{1280,1280-full,375,375-full}.png` (untracked,
+still present on disk in this checkout): the toolbar (search, four kind counts with live
+counts, sort, select-view/clear/fit, refresh disabled in demo mode, the catalogue's age),
+five rows newest-first including one with `تعليقات معطّلة` in the warning colour and an
+unselectable checkbox, two rows reading a real collected count (`جُمع 5`/`جُمع 2`), the sticky
+selection bar with a live estimate and the save button's enabled state, and at 375px a row
+wrapping in three lines with the bar pinned to the viewport's foot. No new screenshots were
+taken for this task — it changes no product code.
+
+**Not verified — explicitly, and why.**
+
+- **A live `discover`/`collect` run against the real channel.** This needs all three new
+  migrations applied to the live Supabase project and the `worker` Edge Function redeployed
+  with the gateway/index.ts changes from Task 5; neither has happened (see the pending items
+  below and `docs/coordination/ACTIVE.md`). Every worker-side assertion above runs against
+  PGlite or `httpx.MockTransport`, never the live YouTube API or the live database.
+- **`select_videos` from a signed-in browser.** Task 9's report already recorded this gap
+  (Concern 2): the fixture never exercises the live RPC call, so the `quota_exceeded` message
+  match (`/quota_exceeded/.test(error.message)`) is type-checked only, not run against a real
+  PostgREST response shape. No session exists in this environment to close that gap.
+- **`pg_cron`.** The extension is not enabled on the live project and `schedule_all()` has
+  never been scheduled or invoked outside the unit tests that call it directly; the worker
+  loop's own `tick()` fallback is what has actually run, and only inside `test_loop.py`'s
+  simulated queue.
