@@ -1719,7 +1719,7 @@ and in `toCsv`, after `r.prediction?.analysis_key ?? "",` add:
 
 - [ ] **Step 9: Update the fixture JSON**
 
-Run this once from the repo root; it adds the taxonomy, an active key, and verdicts to the existing seven comments (the last one is left unclassified on purpose, and the third gets a human correction):
+Run this once from the repo root. It adds the taxonomy, an active key, and verdicts that tell the same story the sentiment fields already tell: fixture-5 was never analysed (no verdict), fixture-6 was edited after analysis (its verdict is on the old hash, so it is stale and counts as unclassified), fixture-3 carries a human correction (model said discussion, the reviewer said question), and the seventh comment is the channel's own voice and gets nothing:
 
 ```bash
 node -e '
@@ -1727,8 +1727,8 @@ const fs=require("fs");const p="apps/web/public/fixtures/dashboard.json";const d
 const T=[["question","استفسارات وأسئلة","Questions & inquiries","Asks the creator or others something, or requests information."],["religious","دعاء وذكر وتعبير ديني","Prayers & religious remarks","Prayer, supplication, remembrance of God, religious phrasing as the main content."],["praise","إشادة ودعم","Praise & support","Compliments, thanks, encouragement toward the creator or content."],["criticism","نقد واعتراض","Criticism & objection","Disagreement, complaint, or negative judgement of the content, creator or subject."],["request","طلبات واقتراحات","Requests & suggestions","Asks for future content, features, changes, or makes a suggestion."],["discussion","نقاش وتحليل الموضوع","Discussion of the subject","Substantive commentary on the topic of the video itself."],["personal","تجارب وقصص شخصية","Personal stories & experiences","Shares the commenter'"'"'s own situation or experience."],["humour","مزاح ودعابة","Humour & banter","Jokes, memes, playful remarks."],["promotion","ترويج ومحتوى دعائي","Promotion & spam","Advertising, self-promotion, links, repeated off-purpose content."],["other","خارج الموضوع / أخرى","Off-topic / other","Does not fit the above or is unrelated to the video."]];
 d.topics=T.map(([key,name_ar,name_en,description],i)=>({key,name_ar,name_en,description,position:i+1,retired:false}));
 const KEY="topics:v1+gemini-2.5-flash+p1";d.active_topic_key=KEY;
-const verdicts=["praise","question","criticism","religious","discussion","praise",null];
-d.comments.forEach((c,i)=>{const t=verdicts[i];c.topic_prediction=t?{status:"succeeded",topic_key:t,confidence:[0.93,0.88,0.71,0.97,0.64,0.9][i],content_hash:c.content_hash,classification_key:KEY,model_id:"gemini-2.5-flash",prompt_version:"p1",predicted_at:"2026-09-10T08:00:00Z",error_code:null}:null;c.topic_reviews=i===2?[{topic_key:"request",content_hash:c.content_hash,created_at:"2026-09-11T09:00:00Z",origin:"human",reviewer_id:"fixture-reviewer",reason:"يطلب حلقة عن الموضوع، لا ينتقد"}]:[];});
+const verdicts=["praise","request","discussion","criticism",null,"praise",null];
+d.comments.forEach((c,i)=>{const t=verdicts[i];const hash=i===5?"old-text-hash":c.content_hash;c.topic_prediction=t?{status:"succeeded",topic_key:t,confidence:[0.93,0.88,0.64,0.71,0,0.9][i],content_hash:hash,classification_key:KEY,model_id:"gemini-2.5-flash",prompt_version:"p1",predicted_at:"2026-09-10T08:00:00Z",error_code:null}:null;c.topic_reviews=i===2?[{topic_key:"question",content_hash:c.content_hash,created_at:"2026-09-11T09:00:00Z",origin:"human",reviewer_id:"fixture-reviewer",reason:"يسأل عن موعد الحلقة، لا يناقشها"}]:[];});
 fs.writeFileSync(p,JSON.stringify(d,null,2)+"\n");'
 ```
 
@@ -3135,20 +3135,22 @@ test("the topics card charts the fixture and counts the unclassified", async ({ 
   await expect(page.getByTestId("total")).toHaveText("6");
   const card = page.getByTestId("topics-card");
   await card.getByText("عرض الأرقام").click();
-  await expect(card.getByRole("row", { name: /إشادة ودعم/ })).toContainText("2");
-  await expect(card.getByRole("row", { name: /طلبات واقتراحات/ })).toContainText("1");
-  await expect(page.getByTestId("topics-unclassified")).toContainText("1");
+  await expect(card.getByRole("row", { name: /إشادة ودعم/ })).toContainText("1");
+  // fixture-3's model verdict was "discussion"; the human correction wins.
+  await expect(card.getByRole("row", { name: /استفسارات وأسئلة/ })).toContainText("1");
+  // fixture-5 was never analysed and fixture-6 was edited after analysis.
+  await expect(page.getByTestId("topics-unclassified")).toContainText("2");
 });
 
 test("the topic filter narrows the figures, the table and the export together", async ({ page }) => {
   await page.goto("/dashboard");
   await page.getByLabel("الموضوع", { exact: true }).selectOption("praise");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
-  await expect(page.getByTestId("total")).toHaveText("2");
-  await expect(page.locator('[data-testid="comments-table"] tbody tr')).toHaveCount(2);
+  await expect(page.getByTestId("total")).toHaveText("1");
+  await expect(page.locator('[data-testid="comments-table"] tbody tr')).toHaveCount(1);
   const { text } = await downloadCsv(page);
   const lines = text.replace(/^﻿/, "").split("\r\n").filter(Boolean);
-  expect(lines).toHaveLength(3);
+  expect(lines).toHaveLength(2);
   const header = lines[0].split(",");
   const i = header.indexOf("effective_topic");
   expect(header.slice(i, i + 3)).toEqual(["effective_topic", "topic_source", "classification_key"]);
