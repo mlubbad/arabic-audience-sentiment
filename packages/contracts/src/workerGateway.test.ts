@@ -225,4 +225,43 @@ describe("worker gateway", () => {
     expect(typed.status).toBe(400);
     expect(await typed.json()).toEqual({ code: "invalid_job_type" });
   });
+
+  it("refuses a max_rows that is present but not a positive integer, and defaults an absent one", async () => {
+    const store = db({
+      topicsDue: vi.fn(async () => ({
+        classification_key: "k",
+        active: true,
+        taxonomy: [],
+        rows: [],
+      })),
+    });
+    const base = {
+      job_id: "j1",
+      lease_token: "t1",
+      model_id: "gemini-2.5-flash",
+      prompt_version: "p1",
+    };
+    for (const max_rows of [0, -1, 2.5, "50", null, NaN, true]) {
+      const r = await handleWorkerRequest(
+        post("/worker/topics-due", { ...base, max_rows }),
+        store,
+      );
+      expect(r.status, `max_rows=${String(max_rows)}`).toBe(400);
+      expect(await r.json()).toEqual({ code: "invalid_batch" });
+    }
+    expect(store.topicsDue).not.toHaveBeenCalled();
+    const absent = await handleWorkerRequest(
+      post("/worker/topics-due", base),
+      store,
+    );
+    expect(absent.status).toBe(200);
+    expect(store.topicsDue).toHaveBeenLastCalledWith(
+      HASHED,
+      "j1",
+      "t1",
+      "gemini-2.5-flash",
+      "p1",
+      200,
+    );
+  });
 });

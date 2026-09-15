@@ -276,8 +276,13 @@ export async function handleWorkerRequest(
     if (path.endsWith("/worker/topics-due")) {
       const model = str(body, "model_id");
       const prompt = str(body, "prompt_version");
-      const max = typeof body.max_rows === "number" ? body.max_rows : 200;
+      // Absent means the default; present means a positive integer. A zero,
+      // a fraction or a string would otherwise reach the database as a
+      // number it clamps to 1 — a request that was wrong, answered anyway.
+      const max = body.max_rows === undefined ? 200 : body.max_rows;
       if (!model || !prompt) return refuse("invalid_batch");
+      if (typeof max !== "number" || !Number.isInteger(max) || max < 1)
+        return refuse("invalid_batch");
       return json(
         200,
         await db.topicsDue(credential, job, lease, model, prompt, max),

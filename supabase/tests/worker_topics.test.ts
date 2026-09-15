@@ -26,6 +26,7 @@ const due = (max = 200) =>
   scalar<{
     classification_key: string;
     active: boolean;
+    blocked?: string;
     taxonomy: { key: string; description: string }[];
     rows: {
       external_comment_id: string;
@@ -306,6 +307,15 @@ describe("the worker classifies topics", () => {
       }),
     ]);
     expect(failed).toEqual({ replayed: false, stored: 1 });
+    // Written, but not counted as a topic stored: the run's coverage names
+    // the verdicts that answered something, and a failure is a promise to
+    // try again. b1 stored three final verdicts.
+    expect(
+      await scalar<number>(
+        "select (coverage_summary->>'topics_stored')::int as v from sync_runs where job_id=$1",
+        [job.id],
+      ),
+    ).toBe(3);
     // A failed verdict is never charged.
     expect(
       await scalar<number>(
@@ -317,6 +327,12 @@ describe("the worker classifies topics", () => {
       record("c5", { content_hash: "h-c5", topic_key: "praise" }),
     ]);
     expect(retried).toEqual({ replayed: false, stored: 1 });
+    expect(
+      await scalar<number>(
+        "select (coverage_summary->>'topics_stored')::int as v from sync_runs where job_id=$1",
+        [job.id],
+      ),
+    ).toBe(4);
     // Charged exactly once, on the retry that finally succeeded.
     expect(
       await scalar<number>(
@@ -386,6 +402,17 @@ describe("the worker classifies topics", () => {
         [HASH, MODEL],
       ),
     ).rejects.toThrow(/invalid_job_type/);
+    // And the other way round: a pre-feature worker treats any job that is
+    // not discover as a collection and would ask this analyse job for its
+    // due videos, read an empty list, and mark the job done having done
+    // nothing. The server refuses the question instead.
+    await expect(
+      db.query("select private.worker_due_videos($1,$2,$3)", [
+        HASH,
+        job.id,
+        job.lease_token,
+      ]),
+    ).rejects.toThrow(/invalid_job_type/);
     await admin();
     await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
       OWNER,
@@ -444,5 +471,108 @@ describe("the worker classifies topics", () => {
       [W],
     );
     expect(tick.analyse).toBe(1);
+  });
+
+  it("hands over only what the plan can still pay for; rows charged before ride free", async () => {
+    await service();
+    // The taxonomy edit above queued a new analyse job under version 2.
+    const claimed = await db.query<{
+      id: string;
+      lease_token: string;
+      type: string;
+    }>("select id, lease_token, type from private.claim_job($1)", [W]);
+    expect(claimed.rows[0].type).toBe("analyse");
+    job = claimed.rows[0];
+    // Allowance 3, three spent (c1, c2, c5). Two fresh audience comments
+    // that would each cost a unit on success.
+    for (const ext of ["c6", "c7"])
+      await db.query(
+        `insert into comments(workspace_id,video_id,external_comment_id,is_reply,
+           text_raw,text_plain,content_hash,timestamp_precision,source,author_channel_id,author_name,published_at)
+         values ($1,$1,$2,false,'تعليق','تعليق',$3,'second','youtube_oauth','UCviewer6','مؤلف',now())`,
+        [W, ext, `h-${ext}`],
+      );
+    // Nothing remains, so the two fresh rows are not sent to Gemini to be
+    // refused at commit. The rows already charged once (c1, c2, c5) and the
+    // purged c3 cost nothing under the new version and are handed over.
+    let list = await due();
+    expect(list.rows.map((r) => r.external_comment_id).sort()).toEqual([
+      "c1",
+      "c2",
+      "c3",
+      "c5",
+    ]);
+    expect(list).not.toHaveProperty("blocked");
+    // One more unit buys exactly one of the two.
+    await db.query("update plans set topic_units=4 where key='t'");
+    list = await due();
+    const fresh = list.rows
+      .map((r) => r.external_comment_id)
+      .filter((id) => id === "c6" || id === "c7");
+    expect(fresh).toHaveLength(1);
+    expect(list.rows).toHaveLength(5);
+    await db.query("update plans set topic_units=3 where key='t'");
+  });
+
+  it("says quota_exceeded, with no rows, when all that is pending would cost and nothing remains", async () => {
+    await service();
+    const K2 = "topics:v2+gemini-2.5-flash+p1";
+    // The free rows answered under the new version; only c6 and c7 remain.
+    expect(
+      await commit("b10", [
+        record("c1", {
+          content_hash: "h-c1-v2",
+          classification_key: K2,
+          topic_key: "question",
+        }),
+        record("c2", { classification_key: K2 }),
+        record("c3", {
+          classification_key: K2,
+          status: "unsupported",
+          topic_key: null,
+          confidence: null,
+          error_code: "text_purged",
+        }),
+        record("c5", { classification_key: K2 }),
+      ]),
+    ).toEqual({ replayed: false, stored: 4 });
+    expect(
+      await scalar<number>(
+        "select count(*)::int as v from usage_events where event_type='topic_classification'",
+      ),
+    ).toBe(3);
+    const list = await due();
+    expect(list).toEqual({
+      classification_key: K2,
+      active: true,
+      taxonomy: [],
+      rows: [],
+      blocked: "quota_exceeded",
+    });
+    // The tick still sees the work; the block is the plan's, not the queue's.
+    expect(
+      await scalar<boolean>("select private.topics_pending($1,$1) as v", [W]),
+    ).toBe(true);
+    // A plan with room lifts it.
+    await db.query("update plans set topic_units=10 where key='t'");
+    const lifted = await due();
+    expect(lifted).not.toHaveProperty("blocked");
+    expect(lifted.rows.map((r) => r.external_comment_id).sort()).toEqual([
+      "c6",
+      "c7",
+    ]);
+  });
+
+  it("treats a workspace with no active plan as having nothing to spend", async () => {
+    await service();
+    await db.query(
+      "update subscriptions set status='cancelled' where workspace_id=$1",
+      [W],
+    );
+    expect((await due()).blocked).toBe("quota_exceeded");
+    await db.query(
+      "update subscriptions set status='active' where workspace_id=$1",
+      [W],
+    );
   });
 });

@@ -49,10 +49,26 @@ declare active text; ver int; begin
                  else private.topic_row_due(w, cm, active) end));
 end $$;
 
+-- What the plan can still pay for this period. No subscription, or one that
+-- is not active or outside its period, is nothing to spend — the same three
+-- refusals reserve_usage raises at commit, read here before the model is
+-- called rather than after it has been paid.
+create function private.topic_units_remaining(w uuid) returns int
+language plpgsql stable security invoker set search_path='' as $$
+declare sub record; begin
+  select s.period_start, pl.topic_units into sub
+    from public.subscriptions s join public.plans pl on pl.key = s.plan_key
+   where s.workspace_id = w and s.status = 'active'
+     and now() >= s.period_start and now() < s.period_end;
+  if not found then return 0; end if;
+  return greatest(0, sub.topic_units
+                     - private.used_units(w, 'topic_classification', sub.period_start));
+end $$;
+
 create function private.worker_topics_due(
   token_hash text, j uuid, t uuid, model_id text, prompt_version text, max_rows int) returns jsonb
 language plpgsql security invoker set search_path='' as $$
-declare w uuid; c uuid; kind text; k text; active text; rows jsonb; taxonomy jsonb; begin
+declare w uuid; c uuid; kind text; k text; active text; rows jsonb; taxonomy jsonb; remaining int; begin
   w := private.worker_job(token_hash, j, t);
   select channel_id, type into c, kind from public.jobs where id = j;
   if kind <> 'analyse' then raise exception 'invalid_job_type' using errcode='22023'; end if;
@@ -73,24 +89,56 @@ declare w uuid; c uuid; kind text; k text; active text; rows jsonb; taxonomy jso
     into taxonomy
     from public.workspace_topics tp where tp.workspace_id = w and tp.retired_at is null;
 
-  select coalesce(jsonb_agg(r), '[]'::jsonb) into rows from (
-    select cm.external_comment_id, cm.content_hash,
-           -- Purged text goes out as null so the worker records unsupported
-           -- rather than sending an empty string to the model.
-           case when cm.content_purged_at is null then cm.text_raw end as text,
-           case when parent.content_purged_at is null then parent.text_raw end as parent_text,
-           cm.is_reply
-      from public.comments cm
-      join public.videos v on v.workspace_id = w and v.id = cm.video_id
-      join public.channels ch on ch.workspace_id = w and ch.id = v.channel_id
-      left join public.comments parent on parent.workspace_id = w
-        and parent.platform = cm.platform and parent.external_comment_id = cm.external_parent_id
-     where cm.workspace_id = w and v.channel_id = c
-       and (cm.author_channel_id is null or cm.author_channel_id <> ch.external_channel_id)
-       and private.topic_row_due(w, cm, k)
-     order by cm.published_at nulls last, cm.id
-     limit least(greatest(coalesce(max_rows, 200), 1), 200)
-  ) r;
+  -- Gemini is paid per row sent; the plan is charged per comment on its first
+  -- success, once ever. So the list carries every due row that costs nothing
+  -- — charged in an earlier period or under an earlier taxonomy version, or
+  -- purged, which the worker records unsupported without a model call — and
+  -- only as many rows that would cost as the allowance still holds, so a row
+  -- is never sent to the model only to be refused at commit.
+  remaining := private.topic_units_remaining(w);
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'external_comment_id', e.external_comment_id, 'content_hash', e.content_hash,
+           'text', e.text, 'parent_text', e.parent_text, 'is_reply', e.is_reply)
+           order by e.published_at nulls last, e.id), '[]'::jsonb)
+    into rows
+    from (
+    select d.* from (
+      select r.*,
+             count(*) filter (where r.costs)
+               over (order by r.published_at nulls last, r.id
+                     rows between unbounded preceding and current row) as spent
+        from (
+          select cm.id, cm.published_at, cm.external_comment_id, cm.content_hash,
+                 -- Purged text goes out as null so the worker records unsupported
+                 -- rather than sending an empty string to the model.
+                 case when cm.content_purged_at is null then cm.text_raw end as text,
+                 case when parent.content_purged_at is null then parent.text_raw end as parent_text,
+                 cm.is_reply,
+                 cm.content_purged_at is null and not exists (
+                   select 1 from public.usage_events u
+                    where u.workspace_id = w
+                      and u.event_key = 'topics:youtube:' || cm.external_comment_id) as costs
+            from public.comments cm
+            join public.videos v on v.workspace_id = w and v.id = cm.video_id
+            join public.channels ch on ch.workspace_id = w and ch.id = v.channel_id
+            left join public.comments parent on parent.workspace_id = w
+              and parent.platform = cm.platform and parent.external_comment_id = cm.external_parent_id
+           where cm.workspace_id = w and v.channel_id = c
+             and (cm.author_channel_id is null or cm.author_channel_id <> ch.external_channel_id)
+             and private.topic_row_due(w, cm, k)
+        ) r
+    ) d
+   where d.spent <= remaining
+   order by d.published_at nulls last, d.id
+   limit least(greatest(coalesce(max_rows, 200), 1), 200)
+    ) e;
+  -- Rows to classify and nothing to pay for them: said now, before the model
+  -- is called. The tick keeps seeing the work; the block is the plan's.
+  if jsonb_array_length(rows) = 0 and remaining = 0 and private.topics_pending(w, c) then
+    return jsonb_build_object('classification_key', k, 'active', true,
+                              'taxonomy', '[]'::jsonb, 'rows', '[]'::jsonb,
+                              'blocked', 'quota_exceeded');
+  end if;
   return jsonb_build_object('classification_key', k, 'active', true,
                             'taxonomy', taxonomy, 'rows', rows);
 end $$;
@@ -98,7 +146,7 @@ end $$;
 create function private.worker_commit_topics(token_hash text, j uuid, t uuid, b text, records jsonb)
 returns jsonb language plpgsql security invoker set search_path='' as $$
 declare
-  w uuid; kind text; hash text; prior text; keys text[]; covered text[]; wanted int; n int;
+  w uuid; kind text; hash text; prior text; keys text[]; covered text[]; wanted int; n int; final int;
 begin
   w := private.worker_job(token_hash, j, t);
   select type into kind from public.jobs where id = j;
@@ -157,30 +205,35 @@ begin
       raise exception 'quota_exceeded' using errcode='53400'; end if;
   end if;
 
-  insert into public.topic_predictions(
-    workspace_id, comment_id, content_hash, classification_key, status, topic_key,
-    confidence, model_id, prompt_version, error_code)
-  select w, cm.id, r.content_hash, r.classification_key, r.status, r.topic_key,
-         r.confidence, r.model_id, r.prompt_version, r.error_code
-    from jsonb_to_recordset(records) as r(
-      external_comment_id text, content_hash text, classification_key text, status text,
-      topic_key text, confidence numeric, model_id text, prompt_version text, error_code text)
-    join public.comments cm on cm.workspace_id = w and cm.platform = 'youtube'
-     and cm.external_comment_id = r.external_comment_id
-  on conflict (workspace_id, comment_id, content_hash, classification_key) do update set
-    status = excluded.status, topic_key = excluded.topic_key, confidence = excluded.confidence,
-    error_code = excluded.error_code, model_id = excluded.model_id,
-    prompt_version = excluded.prompt_version, predicted_at = now()
-  -- Only a failure is retried. A final answer (succeeded, skipped, unsupported)
-  -- is never overwritten by a later attempt.
-  where public.topic_predictions.status = 'failed';
-  get diagnostics n = row_count;
+  with written as (
+    insert into public.topic_predictions(
+      workspace_id, comment_id, content_hash, classification_key, status, topic_key,
+      confidence, model_id, prompt_version, error_code)
+    select w, cm.id, r.content_hash, r.classification_key, r.status, r.topic_key,
+           r.confidence, r.model_id, r.prompt_version, r.error_code
+      from jsonb_to_recordset(records) as r(
+        external_comment_id text, content_hash text, classification_key text, status text,
+        topic_key text, confidence numeric, model_id text, prompt_version text, error_code text)
+      join public.comments cm on cm.workspace_id = w and cm.platform = 'youtube'
+       and cm.external_comment_id = r.external_comment_id
+    on conflict (workspace_id, comment_id, content_hash, classification_key) do update set
+      status = excluded.status, topic_key = excluded.topic_key, confidence = excluded.confidence,
+      error_code = excluded.error_code, model_id = excluded.model_id,
+      prompt_version = excluded.prompt_version, predicted_at = now()
+    -- Only a failure is retried. A final answer (succeeded, skipped, unsupported)
+    -- is never overwritten by a later attempt.
+    where public.topic_predictions.status = 'failed'
+    returning status)
+  select count(*)::int, count(*) filter (where status <> 'failed')::int
+    into n, final from written;
 
   insert into private.job_batches(job_id, batch_key, checkpoint, payload_hash, outcome)
   values (j, b, '{}'::jsonb, hash, 'partial');
+  -- The run's coverage counts verdicts that answered something. A failure is
+  -- written so it can be retried, not stored as a topic.
   update public.sync_runs set coverage_summary = coalesce(coverage_summary, '{}'::jsonb)
      || jsonb_build_object('topics_stored',
-          coalesce((coverage_summary->>'topics_stored')::int, 0) + n)
+          coalesce((coverage_summary->>'topics_stored')::int, 0) + final)
    where workspace_id = w and job_id = j;
   return jsonb_build_object('replayed', false, 'stored', n);
 end $$;
@@ -216,6 +269,21 @@ declare ch record; d int := 0; k int := 0; a int := 0; cat int; begin
   return jsonb_build_object('discover', d, 'collect', k, 'analyse', a);
 end $$;
 
+-- worker_due_videos, rebuilt from 20260915132000 with one change: it refuses
+-- a job that is not a collection. A worker built before this migration treats
+-- any job that is not discover as a collection; handed an analyse job, it
+-- would ask for due videos, read an empty list, and mark the job done having
+-- classified nothing. The deploy order (worker and edge function before these
+-- migrations, workers/deploy/README.md) is the fix; this is the guard.
+create or replace function private.worker_due_videos(token_hash text, j uuid, t uuid) returns jsonb
+language plpgsql security invoker set search_path='' as $$
+declare w uuid; c uuid; kind text; begin
+  w := private.worker_job(token_hash, j, t);
+  select channel_id, type into c, kind from public.jobs where id = j;
+  if kind <> 'collect' then raise exception 'invalid_job_type' using errcode='22023'; end if;
+  return private.due_videos(w, c);
+end $$;
+
 create function public.svc_worker_topics_due(
   credential_hash text, j uuid, t uuid, model_id text, prompt_version text, max_rows int)
 returns jsonb language sql security invoker set search_path='' as $$
@@ -226,13 +294,13 @@ returns jsonb language sql security invoker set search_path='' as $$
 
 revoke all on function
   private.topic_classification_key(uuid,text,text), private.topic_row_due(uuid,public.comments,text),
-  private.topics_pending(uuid,uuid),
+  private.topics_pending(uuid,uuid), private.topic_units_remaining(uuid),
   private.worker_topics_due(text,uuid,uuid,text,text,int), private.worker_commit_topics(text,uuid,uuid,text,jsonb),
   public.svc_worker_topics_due(text,uuid,uuid,text,text,int), public.svc_worker_commit_topics(text,uuid,uuid,text,jsonb)
   from public, anon, authenticated;
 grant execute on function
   private.topic_classification_key(uuid,text,text), private.topic_row_due(uuid,public.comments,text),
-  private.topics_pending(uuid,uuid),
+  private.topics_pending(uuid,uuid), private.topic_units_remaining(uuid),
   private.worker_topics_due(text,uuid,uuid,text,text,int), private.worker_commit_topics(text,uuid,uuid,text,jsonb),
   public.svc_worker_topics_due(text,uuid,uuid,text,text,int), public.svc_worker_commit_topics(text,uuid,uuid,text,jsonb)
   to service_role;

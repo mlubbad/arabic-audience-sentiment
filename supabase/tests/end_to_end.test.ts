@@ -165,7 +165,7 @@ describe("worker to database, through the real handler", () => {
       [A],
     );
     await db.query(
-      "insert into plans(key,analysis_units,backfill_units) values ('t',10,0)",
+      "insert into plans(key,analysis_units,backfill_units,topic_units) values ('t',10,0,10)",
     );
     await db.query(
       `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
@@ -334,5 +334,177 @@ describe("worker to database, through the real handler", () => {
     expect(await badCredential.json()).toEqual({
       code: "invalid_worker_credential",
     });
+  });
+
+  it("runs topics-due and commit-topics through the handler into the database", async () => {
+    // An analyse job over the two comments the collect run above stored.
+    await db.query(
+      "insert into jobs(workspace_id,channel_id,type,dedupe_key) values ($1,$1,'analyse','d2')",
+      [A],
+    );
+    const claimed = await post("/worker/claim", {});
+    expect(claimed.status).toBe(200);
+    const lease = (await claimed.json()) as {
+      job_id: string;
+      lease_token: string;
+      type: string;
+      videos: unknown[];
+    };
+    expect(lease.type).toBe("analyse");
+    // An analyse claim carries no due-video list: the gateway does not ask,
+    // and the database would refuse the question for this job type.
+    expect(lease.videos).toEqual([]);
+
+    // The body ControlPlane.topics_due posts, key for key.
+    const due = await post("/worker/topics-due", {
+      job_id: lease.job_id,
+      lease_token: lease.lease_token,
+      model_id: "gemini-2.5-flash",
+      prompt_version: "p1",
+      max_rows: 200,
+    });
+    expect(due.status).toBe(200);
+    const list = (await due.json()) as {
+      classification_key: string;
+      active: boolean;
+      taxonomy: { key: string; description: string }[];
+      rows: {
+        external_comment_id: string;
+        content_hash: string;
+        text: string | null;
+        parent_text: string | null;
+        is_reply: boolean;
+      }[];
+      blocked?: string;
+    };
+    // The exact keys run_topics and topics.analysis.classify read.
+    expect(Object.keys(list).sort()).toEqual([
+      "active",
+      "classification_key",
+      "rows",
+      "taxonomy",
+    ]);
+    expect(list.classification_key).toBe("topics:v1+gemini-2.5-flash+p1");
+    expect(list.active).toBe(true);
+    expect(list.taxonomy.map((t) => t.key)).toContain("question");
+    const rows = Object.fromEntries(
+      list.rows.map((r) => [r.external_comment_id, r]),
+    );
+    expect(Object.keys(rows).sort()).toEqual(["cmt-1", "cmt-2"]);
+    expect(Object.keys(rows["cmt-2"]).sort()).toEqual([
+      "content_hash",
+      "external_comment_id",
+      "is_reply",
+      "parent_text",
+      "text",
+    ]);
+    // The reply travels with its parent's text, as the prompt needs it.
+    expect(rows["cmt-2"]).toMatchObject({
+      is_reply: true,
+      text: "أتمنى تحسين الصوت",
+      parent_text: "المحتوى واضح ومفيد ﹢",
+    });
+    // The verdict is joined to the text it judged: the hash the client will
+    // echo back is the one the collect run stored.
+    expect(rows["cmt-1"].content_hash).toBe(
+      (golden.envelope.payload.comments as { content_hash: string }[])[0]
+        .content_hash,
+    );
+
+    // The records topics.analysis.classify builds, key for key, under the
+    // batch key run_topics derives (round 1, slice 0, sorted ids).
+    const record = (
+      r: (typeof list.rows)[number],
+      verdict: Partial<{
+        status: string;
+        topic_key: string | null;
+        confidence: number | null;
+        error_code: string | null;
+      }>,
+    ) => ({
+      external_comment_id: r.external_comment_id,
+      content_hash: r.content_hash,
+      classification_key: list.classification_key,
+      status: "succeeded",
+      topic_key: "question",
+      confidence: 0.9,
+      model_id: "gemini-2.5-flash",
+      prompt_version: "p1",
+      error_code: null,
+      ...verdict,
+    });
+    const batchKey = createHash("sha256")
+      .update("1:0:cmt-1,cmt-2")
+      .digest("hex")
+      .slice(0, 32);
+    const committed = await post("/worker/commit-topics", {
+      job_id: lease.job_id,
+      lease_token: lease.lease_token,
+      batch_key: batchKey,
+      records: [
+        record(rows["cmt-1"], { topic_key: "praise" }),
+        record(rows["cmt-2"], {
+          status: "failed",
+          topic_key: null,
+          confidence: null,
+          error_code: "gemini_unavailable",
+        }),
+      ],
+    });
+    expect(committed.status).toBe(200);
+    expect(await committed.json()).toEqual({ replayed: false, stored: 2 });
+
+    // The verdict landed in PGlite, against the row the collect run stored,
+    // and the one success was metered as a topic unit.
+    const verdicts = await db.query<{
+      external_comment_id: string;
+      status: string;
+      topic_key: string | null;
+    }>(
+      `select c.external_comment_id, p.status, p.topic_key from topic_predictions p
+       join comments c on c.id=p.comment_id and c.content_hash=p.content_hash
+       order by c.external_comment_id`,
+    );
+    expect(verdicts.rows).toEqual([
+      {
+        external_comment_id: "cmt-1",
+        status: "succeeded",
+        topic_key: "praise",
+      },
+      { external_comment_id: "cmt-2", status: "failed", topic_key: null },
+    ]);
+    expect(
+      await scalar(
+        "select count(*)::int as n from usage_events where event_type='topic_classification'",
+      ),
+    ).toBe(1);
+    // The first success adopted the key, so the dashboard's read is now live.
+    expect(
+      (
+        await db.query<{ active_topic_key: string }>(
+          "select active_topic_key from workspaces where id=$1",
+          [A],
+        )
+      ).rows[0].active_topic_key,
+    ).toBe(list.classification_key);
+    // Only the failed row is due again.
+    const again = (await (
+      await post("/worker/topics-due", {
+        job_id: lease.job_id,
+        lease_token: lease.lease_token,
+        model_id: "gemini-2.5-flash",
+        prompt_version: "p1",
+        max_rows: 200,
+      })
+    ).json()) as typeof list;
+    expect(again.rows.map((r) => r.external_comment_id)).toEqual(["cmt-2"]);
+
+    const finished = await post("/worker/finish", {
+      job_id: lease.job_id,
+      lease_token: lease.lease_token,
+      outcome: "partial",
+      error_code: "gemini_unavailable",
+    });
+    expect(finished.status).toBe(200);
   });
 });
