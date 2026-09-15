@@ -32,7 +32,7 @@ class Control:
 def test_a_job_that_raises_does_not_take_the_worker_down():
     calls = []
 
-    def run(control, build, analyzer=None):
+    def run(control, build, analyzer=None, classifier=None):
         calls.append(len(calls))
         if len(calls) == 1:
             raise ValueError("something in the collector")
@@ -70,7 +70,7 @@ def test_work_resets_the_idle_count():
     results = [True, False, True, False, False]
     calls = []
 
-    def run(control, build, analyzer=None):
+    def run(control, build, analyzer=None, classifier=None):
         calls.append(1)
         return results.pop(0) if results else False
 
@@ -87,7 +87,7 @@ def test_work_resets_the_idle_count():
 def test_a_stop_request_ends_the_loop_between_jobs():
     seen = []
 
-    def run(control, build, analyzer=None):
+    def run(control, build, analyzer=None, classifier=None):
         seen.append(1)
         return True
 
@@ -106,7 +106,7 @@ def test_a_stop_request_ends_the_loop_between_jobs():
 def test_every_tenant_gets_a_turn():
     seen = []
 
-    def run(control, build, analyzer=None):
+    def run(control, build, analyzer=None, classifier=None):
         seen.append(control)
         return False
 
@@ -125,7 +125,7 @@ def test_every_tenant_gets_a_turn():
 def test_one_quiet_tenant_does_not_stand_the_worker_down():
     calls = []
 
-    def run(control, build, analyzer=None):
+    def run(control, build, analyzer=None, classifier=None):
         calls.append(control)
         # "b" always has work; "a" never does.
         return control == "b"

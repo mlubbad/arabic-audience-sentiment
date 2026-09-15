@@ -5,10 +5,14 @@ worker's own machine. This is its counterpart against the control plane: it
 resumes from the checkpoint the server is holding, so an interrupted worker
 picks up where it stopped rather than starting the video again.
 """
+import hashlib
+
 from collectors.protocol import CollectionError
+from topics.analysis import classify
+from topics.protocol import TopicError
 
 from .analysis import AnalysisError, analyse
-from .gateway import ControlPlane, LeaseLost
+from .gateway import ControlPlane, ControlPlaneError, LeaseLost
 
 # Outcomes a worker may declare. Anything else is reported as a failure rather
 # than guessed at.
@@ -260,7 +264,63 @@ def run_backfill(control: ControlPlane, build_collector, analyzer=None) -> bool:
     return _backfill(control, lease, build_collector, analyzer)
 
 
-def run_job(control: ControlPlane, build_collector, analyzer=None) -> bool:
+# How many due lists one analyse job will work through before standing down.
+# 50 × 200 rows is ten thousand verdicts; a list that never shrinks is a bug,
+# not a backlog, and the job says partial rather than spinning on it.
+_TOPIC_ROUNDS = 50
+
+
+def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
+    """Classify what the server says lacks a topic, until it says nothing does.
+
+    Each round asks for up to 200 rows under the key the server assigns for
+    this classifier, commits their verdicts under a key derived from their ids
+    (so a retry replays instead of re-charging), and asks again. Gemini's own
+    failures arrive as failed verdicts and make the job partial; the control
+    plane's refusals end it blocked.
+    """
+    if classifier is None:
+        control.finish(lease, "blocked", "no_topic_classifier")
+        return True
+    first_failure: str | None = None
+    rounds = 0
+    try:
+        while True:
+            due = control.topics_due(lease, classifier.model_id, classifier.prompt_version)
+            if not due.get("active", False):
+                control.finish(lease, "blocked", "topic_model_not_active")
+                return True
+            rows = [r for r in due.get("rows") or [] if isinstance(r, dict)]
+            if not rows:
+                break
+            rounds += 1
+            if rounds > _TOPIC_ROUNDS:
+                first_failure = first_failure or "topics_due_list_not_shrinking"
+                break
+            control.heartbeat(lease)
+            try:
+                records = classify(classifier, due.get("taxonomy") or [],
+                                   due["classification_key"], rows)
+            except TopicError as exc:
+                first_failure = first_failure or exc.code
+                break
+            for r in records:
+                if r["status"] == "failed" and first_failure is None:
+                    first_failure = r["error_code"] or "classification_failed"
+            ids = ",".join(sorted(r["external_comment_id"] for r in records))
+            key = hashlib.sha256(ids.encode()).hexdigest()[:32]
+            control.commit_topics(lease, key, records)
+        control.finish(lease, "partial" if first_failure else "exhausted", first_failure)
+    except LeaseLost:
+        raise
+    except ControlPlaneError as exc:
+        if exc.retryable:
+            raise
+        control.finish(lease, "blocked", exc.code)
+    return True
+
+
+def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=None) -> bool:
     """Claim whatever is next and run it by its type. False means no work.
 
     The claim is consumed here; the lease is handed down rather than claiming
@@ -271,4 +331,6 @@ def run_job(control: ControlPlane, build_collector, analyzer=None) -> bool:
         return False
     if lease.get("type") == "discover":
         return _discover(control, lease, build_collector)
+    if lease.get("type") == "analyse":
+        return run_topics(control, lease, classifier)
     return _backfill(control, lease, build_collector, analyzer)

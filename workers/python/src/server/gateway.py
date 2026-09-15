@@ -236,3 +236,19 @@ class ControlPlane:
     def tick(self) -> dict[str, Any] | None:
         """Ask the server to enqueue whatever is due for this credential's workspace."""
         return self._post("/worker/tick")
+
+    def topics_due(self, lease: dict[str, Any], model_id: str, prompt_version: str,
+                   max_rows: int = 200) -> dict[str, Any]:
+        """The rows this analyse job should classify, and the key they will be filed under."""
+        data = self._post("/worker/topics-due", {
+            "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+            "model_id": model_id, "prompt_version": prompt_version, "max_rows": max_rows,
+        })
+        return data or {}
+
+    def commit_topics(self, lease: dict[str, Any], batch_key: str,
+                      records: list[dict[str, Any]]) -> dict[str, Any] | None:
+        return self._post("/worker/commit-topics", {
+            "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+            "batch_key": batch_key, "records": records,
+        })

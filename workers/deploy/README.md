@@ -25,7 +25,10 @@ Copy `workers/python/src` to `~/sentiment-worker/src`, and write
 ```
 WORKER_API_BASE_URL=https://<project>.supabase.co/functions/v1
 WORKER_CREDENTIAL=<the scoped worker credential>
+GEMINI_API_KEY=<the Gemini key, for topic classification>
 ```
+
+Without it the worker still collects and labels sentiment; topic jobs are reported blocked with `no_topic_classifier`.
 
 A credential is scoped to one workspace and is the only kind of secret on the
 host. It is not a Supabase key and cannot read anything but its own queue.
