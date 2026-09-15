@@ -1431,3 +1431,14 @@ frame — grey, the fixture ids are not real videos) and 375px (three lines per 
 sticky bar). `layers.test.ts` holds: the backdrop is `color-mix` over a token, no raw
 colour. Not verified: a real embed playing (needs a real id — the live AJ360 page after the
 next deploy).
+
+## 2026-09-16 — preview deploy of 9b33540
+
+The user ran `npm run build && npm run deploy:preview`: 32 files at 226, including
+`static/index-C4A43vPo.js` (554,317 bytes), `static/Sync-Br8MqkKj.js` (20,594) and
+`static/index-O6BZyaxP.css` (64,581); the sweep removed the twelve superseded hashed
+assets of the previous build. Those three were fetched back over basic auth and are
+byte-identical to the local `dist`; the served Sync chunk carries `cat-pager`,
+`cat-select-page` and `youtube-nocookie.com/embed`. `/sync?demo=1` on the host renders
+the pager ("الصفحة 1 من 1"), the link beside each title, and the same bar. The live AJ360
+page with real ids — 90 pages and a real embed — is the user's to open; not seen from here.
