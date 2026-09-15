@@ -997,3 +997,18 @@ text that says the same thing — unchanged by this work and noted, not fixed.
 Gates: lint 0, format 0, types 0, unit 0 (289), e2e 0 (74, port 5199, exit from a log file),
 build 0. Screenshots of the overview at 1280px before and after each step were compared by
 eye and are indistinguishable, which is the intent: the change is where the values live.
+
+## 2026-09-15 — every gate on HEAD `3e62ee6`, from a clean worktree
+
+Run in a worktree of HEAD alone, because the working tree carries another session's
+in-flight edits: lint 0 · format 0 · types 0 · unit **303** (38 files) · db **142** (15 files,
+PGlite) · worker **127** · browser **74** (port 5201, exit code from a log file) · build 0 ·
+`check:secrets` 0 in the real checkout (273 files; in the worktree it tripped on the
+node_modules symlink the worktree needed, an artefact of the setup, not of the code).
+
+Against the earlier proof table's figures (unit 173, db 126, worker 124, browser 60): every
+layer grew, none shrank.
+
+The rail's two pieces are signed-in only and rendered in `RailState.test.ts` from forced
+state; not driven in a browser. The three browser assertions in `dashboard.spec.ts` that
+pinned the old "worker" sentences were updated to the new ones and pass.

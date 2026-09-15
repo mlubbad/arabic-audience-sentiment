@@ -276,3 +276,26 @@ there and keeps the backlog mechanism with an empty set. The rail's alphas stay 
 `rgba(255,255,255,α)` on purpose: `rail.test.ts` measures them, and it now reads the ground
 from the token rather than a copy. The line count went *up* by 21 (comments); the measure that
 means something went from 56 to 0.
+
+## 2026-09-15 — the rail carries state; "the worker" leaves the reader's sentences
+
+`3e62ee6`. Two of the three decisions left after the audit's numbered items. The rail now
+holds the workspace (a name, or a select when there is a choice) above the navigation and the
+collection line in the foot — the operations page's own health sentence, read from the same
+`syncHealth` and the same string table, so a test asserts the two agree by construction. The
+operations page's own switch is removed; it now reads the overview's cache entry under the
+overview's key instead of fetching the source again under its own. Every reader-facing
+sentence that said "عامل الجمع" now says what is true of the collection — running, or stopped
+with nothing running — in both locales; the term survives only in the attempt log's forensic
+lines.
+
+**Not done, and why:** the overview's own switch is still in `Dashboard.tsx`, and the audit's
+"empty state is the setup path" (the numbered steps in place of the charts when a workspace
+has no comments yet) is also in `Dashboard.tsx` — and another session was rewriting that file
+in the working tree while this was being made (its dashboard-strings pass; my edit to it was
+overwritten once, at 16:34). Both wait for that pass to land. The `RailState.test.ts` case
+"is the only switch" says so in its comment and checks the operations page only.
+
+Committed from the index alone: `ar.ts` and `en.ts` carried that session's uncommitted hunks
+beside mine, so mine were staged by rebuilding each file from HEAD, and the result was
+verified in a throwaway worktree of HEAD plus the staged diff before committing.
