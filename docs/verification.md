@@ -1454,3 +1454,20 @@ button, 0.85 under `(hover: none)`. Browser test extended: the badge's computed 
 0 → 1 on hover; the dialog's left and right margins equal within 4px at 1280px and its
 width ≤ 720. `npm run check` exit 0 · `npm run test:e2e` exit 0 (84). Seen on the dev server:
 badge on hover, dialog centred over the page.
+
+## 2026-09-16 — preview deploy of e82168f, from this session
+
+The user's two runs of `deploy:preview` left the host untouched: the FTP listing still
+showed the 22:13 files, and the "new chunk answers 200" check was the `.htaccess` SPA
+fallback returning `index.html` — a probe that proves nothing (recorded so it is not
+trusted again; a 200 on `/static/<hash>.js` must be followed by a byte comparison). Run
+from this session: 32 files at 226, eleven superseded assets swept. Served
+`index-wjqPVJpc.js`, `index-wnnYzwdH.css` and `Sync-BpieInGg.js` are byte-identical to the
+local `dist`; the Sync chunk carries `cat-play`, the CSS `margin:auto` and
+`min(88vw,720px)` on `.cat-preview`. In the in-app browser at 1280px the dialog opens
+centred at 720px with YouTube's player loaded ("This video is unavailable" — the fixture's
+id is not a real video; the user saw a real one play on AJ360 earlier).
+
+Also read from the live catalogue, for `docs/pricing.md`: 4,456 videos carrying 167,302
+reported comments (112,387 videos · 53,775 shorts · 1,140 streams), the heaviest 10,631,
+no unknown counts — paged through PostgREST in five ranges of 1,000.
