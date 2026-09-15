@@ -31,6 +31,15 @@ class Batch:
     outcome: Outcome
 
 
+@dataclass(frozen=True)
+class Catalogue:
+    """Every video the source listed. complete is whether every tab was read
+    to its end — never a claim that every video that exists was listed."""
+    videos: list[dict]
+    complete: bool
+    reason: str | None = None
+
+
 class CollectionError(Exception):
     def __init__(self, code: str, outcome: Outcome = "failed", retryable: bool = False):
         super().__init__(code)  # Never retain transport URLs/keys or raw provider errors.

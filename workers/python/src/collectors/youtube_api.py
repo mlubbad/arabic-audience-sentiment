@@ -9,7 +9,7 @@ import json
 import re
 from collections.abc import Iterator
 import httpx
-from .protocol import Batch, CollectionError, RawComment
+from .protocol import Batch, Catalogue, CollectionError, RawComment
 
 
 class YouTubeAPI:
@@ -26,7 +26,7 @@ class YouTubeAPI:
         # owner's authority is never filed as public data.
         self.source = "youtube_oauth" if access_token else "youtube_data_api_public"
 
-    def _get(self, resource, params):
+    def _get(self, resource, params, allow_404=False):
         headers = {"authorization": f"Bearer {self.token}"} if self.token else {}
         query = params if self.token else {**params, "key": self.key}
         try:
@@ -58,6 +58,8 @@ class YouTubeAPI:
                 f"source_access_denied:{reason}" if reason else "source_access_denied",
                 "blocked",
             )
+        if response.status_code == 404 and allow_404:
+            return None
         if response.status_code >= 500:
             raise CollectionError("source_unavailable", retryable=True)
         if response.status_code != 200:
@@ -143,3 +145,103 @@ class YouTubeAPI:
             yield Batch(comments, None if done else json.dumps(state), "exhausted" if done else "partial")
             if done:
                 return
+
+    _TABS = (("video", "LF"), ("short", "SH"), ("stream", "LV"))
+    _DURATION = re.compile(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
+
+    def _playlist(self, playlist_id: str) -> list[str] | None:
+        """Every video id in a playlist, or None when the playlist is absent."""
+        ids: list[str] = []
+        page = None
+        while True:
+            params = {"part": "contentDetails", "playlistId": playlist_id, "maxResults": 50}
+            if page:
+                params["pageToken"] = page
+            data = self._get("playlistItems", params, allow_404=True)
+            if data is None:
+                return None if not ids else ids
+            try:
+                ids.extend(i["contentDetails"]["videoId"] for i in data["items"])
+            except (KeyError, TypeError):
+                raise CollectionError("invalid_response") from None
+            nxt = data.get("nextPageToken")
+            if nxt and nxt == page:
+                raise CollectionError("repeated_page_token", "partial")
+            page = nxt
+            if not page:
+                return ids
+
+    def catalogue(self) -> Catalogue:
+        """The channel's videos across its three tabs, with the source's counts.
+
+        Cost: about two quota units per fifty videos. The tab playlists are the
+        uploads id with LF/SH/LV inserted after UU; a 404 on one is an empty
+        tab. If all three are absent the plain uploads list stands in and the
+        kind is recorded as unclassified rather than guessed.
+        """
+        data = self._get("channels", {"part": "contentDetails", "mine": "true"})
+        if not data["items"]:
+            raise CollectionError("no_channel_for_credential", "blocked")
+        try:
+            uploads = data["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+        except (KeyError, TypeError):
+            raise CollectionError("invalid_response") from None
+        base = uploads[2:]
+
+        found: dict[str, dict] = {}
+        any_tab = False
+        for kind, suffix in self._TABS:
+            ids = self._playlist(f"UU{suffix}{base}")
+            if ids is None:
+                continue
+            any_tab = True
+            for vid in ids:
+                if vid in found:
+                    found[vid]["tabs"].append(kind)
+                else:
+                    found[vid] = {"kind": kind, "tabs": [kind]}
+        unclassified = False
+        if not any_tab:
+            unclassified = True
+            for vid in self._playlist(uploads) or []:
+                found.setdefault(vid, {"kind": "video", "tabs": []})
+
+        videos: list[dict] = []
+        ids = list(found)
+        for start in range(0, len(ids), 50):
+            chunk = ids[start:start + 50]
+            data = self._get("videos", {"part": "snippet,statistics,contentDetails",
+                                        "id": ",".join(chunk)})
+            for item in data["items"]:
+                try:
+                    vid = item["id"]
+                    s = item.get("snippet", {})
+                    raw = item.get("statistics", {}).get("commentCount")
+                    provenance = {"source": self.source, "adapter_revision": self.revision,
+                                  "discovered_in_tabs": found[vid]["tabs"]}
+                    if unclassified:
+                        provenance["kind_unclassified"] = True
+                    videos.append({
+                        "external_video_id": vid,
+                        "title": s.get("title") or "",
+                        "kind": found[vid]["kind"],
+                        "published_at": s.get("publishedAt"),
+                        "thumbnail_url": (s.get("thumbnails") or {}).get("medium", {}).get("url"),
+                        "duration_sec": self._seconds(item.get("contentDetails", {}).get("duration")),
+                        # None is the setting being off, never a count of zero.
+                        "reported_comment_count": None if raw is None else int(raw),
+                        "field_provenance": provenance,
+                    })
+                except (KeyError, TypeError, ValueError):
+                    raise CollectionError("invalid_response") from None
+        return Catalogue(videos=videos, complete=True)
+
+    @classmethod
+    def _seconds(cls, iso: str | None) -> int | None:
+        if not iso:
+            return None
+        m = cls._DURATION.match(iso)
+        if not m:
+            return None
+        h, mi, s = (int(x) if x else 0 for x in m.groups())
+        return h * 3600 + mi * 60 + s
