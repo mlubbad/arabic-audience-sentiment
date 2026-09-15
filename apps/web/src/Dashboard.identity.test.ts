@@ -200,7 +200,10 @@ describe("dashboard identity boundary", () => {
     expect(forged).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
-  it("keeps workspace switching available after a creator chooses one", () => {
+  it("does not keep a switch of its own once a creator has chosen", () => {
+    // Switching lives in the rail now (RailState.tsx), one control on every
+    // screen. A second select with the same name inside the page would be
+    // the two-implementations shape this codebase keeps finding.
     shared.forcedPlace = {
       kind: "ready",
       id: B,
@@ -211,9 +214,7 @@ describe("dashboard identity boundary", () => {
       ],
     };
     const html = render();
-    expect(html).toContain('aria-label="تغيير مساحة العمل"');
-    expect(html).toContain("مساحة أ");
-    expect(html).toContain("مساحة ب");
+    expect(html).not.toContain('aria-label="تغيير مساحة العمل"');
     expect(html).toContain('data-testid="source-scope">مساحة ب');
     expect(html).not.toContain(`data-testid="source-scope">مساحة العمل ${B}`);
   });

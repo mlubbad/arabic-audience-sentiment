@@ -86,11 +86,11 @@ describe("the rail's workspace", () => {
   });
 
   it("is the only switch: neither page keeps its own", () => {
-    // Two selects with one name on one screen is one name too few. The
-    // overview's own is still there until the other session's pass on that
-    // file lands; the operations page's is gone.
-    const sync = readFileSync(new URL("./Sync.tsx", import.meta.url), "utf8");
-    expect(sync).not.toContain("S.changeWorkspace");
+    // Two selects with one name on one screen is one name too few.
+    for (const page of ["Dashboard.tsx", "Sync.tsx"]) {
+      const src = readFileSync(new URL(`./${page}`, import.meta.url), "utf8");
+      expect(src, page).not.toContain("S.changeWorkspace");
+    }
   });
 });
 

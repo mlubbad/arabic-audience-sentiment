@@ -230,24 +230,9 @@ export function Dashboard() {
         chooseTestId: "ws-choose",
       }}
     >
-      {place.kind === "ready" && place.options.length > 1 && (
-        <div className="notice">
-          <label>
-            {S.workspaceLabel}
-            <select
-              aria-label={S.changeWorkspace}
-              value={place.id}
-              onChange={(e) => setChosen(e.target.value)}
-            >
-              {place.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
+      {/* Switching workspaces is the rail's, on every screen (RailState.tsx).
+          The select that used to sit here was one of two — the operations
+          page had its own — for one control. */}
       <DashboardBody
         key={`${userId}:${mode}:${workspaceId}`}
         userId={userId}
