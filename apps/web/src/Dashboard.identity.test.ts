@@ -200,6 +200,38 @@ describe("dashboard identity boundary", () => {
     expect(forged).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
+  it("shows a workspace with no comments the path it is on, not an apology", () => {
+    // The first screen every new reader sees. The channel row and the sync
+    // state decide the steps; nothing here is inferred from the comment count
+    // alone, which is zero in both a fresh workspace and a filtered-out one.
+    const empty = {
+      ...sourceFor(B, "unused"),
+      comments: [],
+      sync: {
+        worker: { connected: true, last_heartbeat_at: null, busy: false },
+        queued_jobs: 1,
+        last_run: null,
+      },
+    };
+    shared.cache.set(key("user-b", B), empty);
+    shared.cache.set(JSON.stringify(["connection-status", B]), {
+      channel_id: "ch",
+      status: "connected",
+    });
+    const html = render();
+    expect(html).toContain('data-testid="empty-setup"');
+    // Connected, and a request in the queue: done, done, in progress.
+    const path = html.slice(html.indexOf('data-testid="empty-setup"'));
+    expect(path.match(/data-status="done"/g)).toHaveLength(2);
+    expect(path).toContain('data-status="pending"');
+    expect(path).not.toContain('aria-current="step"');
+    // No channel row at all: connecting is the step, collecting waits.
+    shared.cache.delete(JSON.stringify(["connection-status", B]));
+    const fresh = render().slice(render().indexOf('data-testid="empty-setup"'));
+    expect(fresh).toContain('data-status="next"');
+    expect(fresh).toContain('data-status="later"');
+  });
+
   it("does not keep a switch of its own once a creator has chosen", () => {
     // Switching lives in the rail now (RailState.tsx), one control on every
     // screen. A second select with the same name inside the page would be

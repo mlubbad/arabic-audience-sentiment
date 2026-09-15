@@ -631,15 +631,16 @@
   direction: ltr;
   unicode-bidi: isolate;
 }
-/* The visitor's three steps, inside a workspace card, with a state each.
-   The state word sits where the visitor's list has its number, so the two
-   lists read as the same list — which they are. */
-.app-shell .workspace-list .setup-steps {
+/* The visitor's three steps with a state each — inside a workspace card, and
+   in the overview's empty state where the charts will be. The state word
+   sits where the visitor's list has its number, so the lists read as the
+   same list — which they are. */
+.app-shell .setup-steps {
   width: 100%;
   gap: 0.55rem;
   margin: 0.2rem 0;
 }
-.app-shell .workspace-list .setup-steps li {
+.app-shell .setup-steps li {
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 0.7rem;
@@ -650,17 +651,22 @@
   color: var(--text-3);
   font-size: 0.88rem;
 }
-.app-shell .workspace-list .setup-steps li::before {
+.app-shell .setup-steps li::before {
   content: none;
 }
-.app-shell .workspace-list .setup-steps li small {
+.app-shell .setup-steps li small {
   grid-column: 2;
   color: var(--text-3);
   font-size: 0.8rem;
 }
-.app-shell .workspace-list .setup-steps li[data-status="next"] {
+.app-shell .setup-steps li[data-status="next"] {
   color: var(--text-1);
   font-weight: 600;
+}
+.app-shell .empty .setup-steps {
+  max-width: 34rem;
+  margin: 1.4rem auto 1.6rem;
+  text-align: start;
 }
 .setup-step-state {
   display: inline-flex;

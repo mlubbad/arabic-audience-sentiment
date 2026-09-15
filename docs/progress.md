@@ -328,3 +328,15 @@ source of truth; nothing an Arabic reader sees moved.
 
 Not translated: `Landing.tsx` (another session's uncommitted work on it; Arabic by design
 for now), and stored data — workspace names, video titles, the fixture reviewer's name.
+
+## 2026-09-15 — the empty overview is the setup path; the overview's switch goes
+
+`54b15a4` and the commit after. The two pieces that waited for the dashboard-strings pass:
+the overview's own workspace select is gone (the rail has the one), and a workspace with no
+comments yet sees the three steps with a state each where the charts will be — `SetupPath`,
+extracted from the account card so both draw the same list; the second step from a small
+`connection_status` read, the third from the sync state the source already carries, through
+`latestJobFromSync`. This closes the audit's five architectural decisions; the numbered
+problems were closed earlier today. The fixture never has an empty workspace, so the browser
+suite cannot reach this state; it is rendered in the identity test from forced cache entries
+and was checked visually by injecting the rendered path into the fixture page.

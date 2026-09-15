@@ -21,6 +21,7 @@
  * guessing.
  */
 
+import type { SyncState } from "@sentiment/contracts";
 import type { StringKey, Strings } from "./strings";
 
 export type StepKey = "workspace" | "channel" | "collect";
@@ -141,4 +142,24 @@ export function setupProgress(
     }
 
   return [first, second, third];
+}
+
+/**
+ * The third step's input, read from the sync state the overview already has.
+ *
+ * The account page places a workspace on the steps from its newest job row.
+ * The overview does not read the job table; it reads the source, and the
+ * source carries the sync state — the last run and the queue. Both say the
+ * same thing about the third step, and this says how: queued work is a
+ * request in flight, and a run's status is the job's.
+ */
+export function latestJobFromSync(
+  sync: SyncState | null,
+): { status: JobStatus } | null {
+  if (!sync) return null;
+  if (sync.queued_jobs > 0) return { status: "queued" };
+  const run = sync.last_run;
+  if (!run) return null;
+  // A run's five statuses are the job's own words for the same five states.
+  return { status: run.status };
 }

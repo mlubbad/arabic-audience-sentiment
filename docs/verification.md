@@ -1047,3 +1047,12 @@ log: 30 files at 226, including `static/index-B5_hTwqU.js` (549,437 bytes) and t
 only when chosen; the sweep removed the nine superseded hashed assets of the previous
 build. Origin probes are not evidence either way (basic auth answers 401 on every path, and
 Cloudflare still serves a deleted asset from cache); the log is.
+
+## 2026-09-15 — the empty overview
+
+Unit 308 (38 files), browser 78 (port 5201, exit from a log file), lint 0, format 0, types 0.
+The identity test forces a live source with no comments, a queued job and a connected channel
+row, and reads done · done · in progress; with no channel row, next · later. `latestJobFromSync`
+is tested over the five run statuses and the queue. Visual check: the rendered path injected
+into the fixture overview's empty section at 1280px — pills, detail line and the two actions
+lay out as the account card's do.

@@ -8,8 +8,9 @@
  * rendered and read in a unit test without standing up a session.
  */
 import type { ReactNode } from "react";
-import { setupProgress, type SetupStep } from "./setup";
-import { useStrings, type StringKey } from "./strings";
+import { setupProgress } from "./setup";
+import { SetupPath } from "./SetupPath";
+import { useStrings } from "./strings";
 
 export type ChannelRow = {
   workspace_id: string;
@@ -24,14 +25,6 @@ export type JobRow = {
   workspace_id: string;
   status: string;
   created_at: string;
-};
-
-const stepWords: Record<SetupStep["status"], StringKey> = {
-  done: "stepStateDone",
-  next: "stepStateNext",
-  later: "stepStateLater",
-  pending: "stepStatePending",
-  attention: "stepStateAttention",
 };
 
 export function WorkspaceCard({
@@ -87,25 +80,7 @@ export function WorkspaceCard({
       )}
       {/* Where this workspace is on the three steps: the visitor's list, with
           a state on each line. */}
-      <ol
-        className="account-steps setup-steps"
-        data-testid={`setup-${workspace.id}`}
-        aria-label={S.stepsLabel}
-      >
-        {steps.map((step) => (
-          <li
-            key={step.key}
-            data-status={step.status}
-            aria-current={step.status === "next" ? "step" : undefined}
-          >
-            <span className="setup-step-state">
-              {S[stepWords[step.status]]}
-            </span>
-            <span>{step.title}</span>
-            {step.detail && <small>{step.detail}</small>}
-          </li>
-        ))}
-      </ol>
+      <SetupPath steps={steps} testId={`setup-${workspace.id}`} />
       {/* Shown only when it can actually work: without a client the server
           would refuse, and a button that always fails is worse than no button. */}
       {/* Connected: the next thing to do is collect. enqueue_sync creates the

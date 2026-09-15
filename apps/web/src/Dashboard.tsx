@@ -41,6 +41,9 @@ import { useLocale } from "./locale";
 import { useStrings, type StringKey } from "./strings";
 import { reviewHistory } from "./reviewHistory";
 import { describeSource } from "./dataSource";
+import { useChannelStatus } from "./channelStatus";
+import { latestJobFromSync, setupProgress } from "./setup";
+import { SetupPath } from "./SetupPath";
 import {
   AXIS_TEXT,
   GRID_LINE,
@@ -312,6 +315,8 @@ function DashboardBody({
     queryKey: ["dashboard-source", userId, mode, workspaceId],
     queryFn: ({ signal }) => loadSource(mode, workspaceId, signal),
   });
+  // For the empty state's setup path only; live only, and cheap.
+  const channel = useChannelStatus(mode, workspaceId);
   // Filters are a pure function of a read, so they are computed rather than
   // fetched. Serialised, because `page` is a fresh object every render and
   // depending on its identity would recompute the whole snapshot each time.
@@ -1017,6 +1022,24 @@ function DashboardBody({
                 <>
                   <h2>{S.emptyNoCommentsTitle}</h2>
                   <p>{S.emptyNoCommentsLead}</p>
+                  {/* The path the reader is on, where the charts will be.
+                      This is the first screen every new reader sees, and it
+                      used to be an apology with two links. The steps are the
+                      account page's, from the same function; the second is
+                      read from the channel row, the third from the sync
+                      state the source already carries. */}
+                  {mode === "live" && (
+                    <SetupPath
+                      steps={setupProgress(
+                        {
+                          channel: channel.data ?? null,
+                          latestJob: latestJobFromSync(s.sync ?? null),
+                        },
+                        S,
+                      )}
+                      testId="empty-setup"
+                    />
+                  )}
                   <div className="empty-actions">
                     <a href="/sync">{S.emptyFollowCollection}</a>
                     <a href="/account">{S.emptyConnectOrSync}</a>
