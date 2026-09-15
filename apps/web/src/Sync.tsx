@@ -12,24 +12,21 @@
  * decision, so the demo has an operations page too and the two can never
  * disagree about what the sync state is.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { budgetState } from "@sentiment/contracts";
 import {
   configuredMode,
+  deriveSnapshot,
   fixtureWorkspace,
-  loadSnapshot,
+  loadSource,
   resolveMode,
 } from "./data";
 import { supabase } from "./supabase";
 import { useSession, useWorkspaces } from "./session";
 import { useWorkspaceSelection } from "./workspaceSelection";
 import { WorkspaceGate } from "./WorkspaceGate";
-import {
-  workspaceState,
-  readableWorkspace,
-  type WorkspaceOption,
-} from "./workspace";
+import { workspaceState, readableWorkspace } from "./workspace";
 import { syncHealth } from "./syncHealth";
 import { displayDate } from "./i18n";
 import { useLocale } from "./locale";
@@ -133,8 +130,6 @@ export function Sync() {
           mode={mode}
           workspaceId={workspaceId}
           workspaceName={place.kind === "ready" ? place.name : null}
-          options={place.kind === "ready" ? place.options : []}
-          onChoose={setChosen}
         />
       )}
     </WorkspaceGate>
@@ -146,22 +141,22 @@ function SyncBody({
   mode,
   workspaceId,
   workspaceName,
-  options,
-  onChoose,
 }: {
   userId: string;
   mode: "live" | "sanitized_fixture";
   workspaceId: string;
   workspaceName: string | null;
-  options: WorkspaceOption[];
-  onChoose: (id: string) => void;
 }) {
   const S = useStrings();
   const lang = useLocale();
+  // The same cache entry the overview reads, under the same key. This page
+  // used to fetch the whole source again under a key of its own, so the rail
+  // — which now shows collection state on every screen — would have been a
+  // third reader of one 600KB read. One entry, three readers; the sync state
+  // is a field of the source, and the derivation is pure.
   const snapshot = useQuery({
-    queryKey: ["sync-snapshot", userId, mode, workspaceId],
-    queryFn: ({ signal }) =>
-      loadSnapshot(mode, { workspace_id: workspaceId }, signal),
+    queryKey: ["dashboard-source", userId, mode, workspaceId],
+    queryFn: ({ signal }) => loadSource(mode, workspaceId, signal),
   });
 
   // The attempt log is a live-only thing: the fixture has no job table, and
@@ -257,7 +252,13 @@ function SyncBody({
     };
   }, [mode, workspaceId, tick]);
 
-  const s = snapshot.data;
+  const s = useMemo(
+    () =>
+      snapshot.data
+        ? deriveSnapshot(snapshot.data, mode, { workspace_id: workspaceId })
+        : undefined,
+    [snapshot.data, mode, workspaceId],
+  );
   const health = syncHealth(s?.sync ?? null, new Date());
   const run = s?.sync?.last_run ?? null;
   const connected = !!s?.sync?.worker.connected;
@@ -276,31 +277,10 @@ function SyncBody({
             "تابع … من مكان واحد" was a pitch and is gone. */}
         <p>{S.opsLead}</p>
       </header>
-      {mode === "live" ? (
-        <div className="sync-workspace">
-          <p>
-            {S.opsWorkspaceData} <strong>{workspaceName}</strong>
-          </p>
-          {options.length > 1 && (
-            <label>
-              {S.workspaceLabel}
-              <select
-                aria-label={S.changeWorkspace}
-                value={workspaceId}
-                onChange={(e) => onChoose(e.target.value)}
-              >
-                {options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-      ) : (
-        <p className="sync-demo">{S.opsDemoNote}</p>
-      )}
+      {/* The workspace's name is in the head above and in the rail; the
+          switch that used to sit here lives in the rail now (RailState.tsx),
+          one control for every screen instead of one per page. */}
+      {mode !== "live" && <p className="sync-demo">{S.opsDemoNote}</p>}
 
       {snapshot.isPending ? (
         <p role="status">{S.opsReading}</p>

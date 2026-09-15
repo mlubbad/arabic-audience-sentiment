@@ -1113,6 +1113,70 @@
 .app-shell .app-rail .app-nav a[aria-current="page"] .app-nav-mark {
   color: var(--ml-indigo-300);
 }
+/* ---- the rail's state: which workspace, and whether collection runs ----
+   Above the navigation, the workspace: a name when there is one, a select
+   when there is a choice. In the foot, the collection line: a dot for the
+   glance and the operations page's own sentence for the meaning. */
+.app-rail-workspace {
+  padding: var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  margin-bottom: var(--space-3);
+}
+.app-rail-workspace-name {
+  display: block;
+  padding: 0 12px;
+  color: var(--ink-on-dark);
+  font-size: 0.95rem;
+}
+.app-shell .app-rail-workspace select {
+  width: calc(100% - 24px);
+  margin: 0 12px;
+  min-height: 40px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-2);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-on-dark);
+  font-size: 0.9rem;
+}
+.app-rail-collection {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.8);
+}
+.app-rail-collection .app-rail-caption {
+  padding: 0;
+}
+.app-rail-collection [data-severity] {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.app-rail-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+}
+/* Semantic inks are stepped for white; on the dark plane the glance needs
+   the brand's light accents instead. Measured on --plane-dark: cyan at
+   12.8:1, yellow at 15.1:1, rose-300 at 10.3:1. The sentence beside the dot
+   carries the meaning; the dot is only the glance. */
+.app-rail-collection [data-severity="ok"] .app-rail-dot {
+  background: var(--ml-cyan);
+}
+.app-rail-collection [data-severity="warning"] .app-rail-dot {
+  background: var(--fg-on-brand);
+}
+.app-rail-collection [data-severity="critical"] .app-rail-dot {
+  background: var(--ml-rose-300);
+}
 .app-rail-foot {
   margin-top: auto;
   display: flex;

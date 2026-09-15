@@ -19,8 +19,8 @@ describe("describeJob", () => {
     expect(withWorker.severity).toBe("warning");
     expect(without.severity).toBe("critical");
     // The second says the thing the first does not: nothing is going to run.
-    expect(without.detail).toContain("لا يوجد عامل جمع");
-    expect(withWorker.detail).not.toContain("لا يوجد عامل جمع");
+    expect(without.detail).toContain("الجمع متوقّف الآن");
+    expect(withWorker.detail).not.toContain("الجمع متوقّف الآن");
   });
 
   it("tells a quiet channel apart from one with comments switched off", () => {

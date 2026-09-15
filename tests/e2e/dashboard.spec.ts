@@ -763,11 +763,13 @@ test("states plainly that nothing has synced and no worker is connected", async 
     "data-severity",
     "critical",
   );
-  await expect(panel).toContainText("لم تُنفذ أي مزامنة، ولا يوجد عامل متصل");
+  await expect(panel).toContainText(
+    "لم تُنفذ أي مزامنة بعد، والجمع متوقّف الآن",
+  );
   // Disconnected collection must say what it means for freshness without
   // assuming a particular machine or deployment architecture.
   await expect(panel.getByTestId("sync-worker")).toContainText(
-    "لن تُحدَّث البيانات تلقائيًا حتى يعود عامل الجمع",
+    "لن تُحدَّث البيانات حتى يعود",
   );
   await expect(panel.getByTestId("sync-last-run")).toContainText(
     "لا يوجد تشغيل سابق",
@@ -795,7 +797,7 @@ test("shows queued work with no worker as stalled, not as a healthy last run", a
     "data-severity",
     "critical",
   );
-  await expect(panel).toContainText("مهام منتظرة ولا يوجد عامل متصل");
+  await expect(panel).toContainText("مهام منتظرة والجمع متوقّف");
   await expect(panel.getByTestId("sync-queued")).toContainText("3");
 });
 

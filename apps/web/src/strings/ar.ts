@@ -28,6 +28,13 @@ export const ar = {
   menuClose: "إغلاق ×",
   navLabel: "التنقل الرئيسي",
   navCaption: "التنقّل",
+  // The rail carries state, not signposts: which workspace, and whether
+  // collection is running — said in the same words the operations page uses.
+  railWorkspaceCaption: "مساحة العمل",
+  railWorkspaceNone: "لم تُختر مساحة عمل بعد",
+  railCollectionCaption: "الجمع",
+  railCollectionReading: "جارٍ قراءة حالة الجمع…",
+  railCollectionUnavailable: "تعذّرت قراءة حالة الجمع",
   navOverview: "نظرة عامة",
   navOperations: "التشغيل",
   navAccount: "المصادر والحساب",
@@ -203,8 +210,13 @@ export const ar = {
   noWorkspaceStrong: "لا توجد مساحة عمل متاحة",
   noWorkspaceLead: "أنشئ واحدة أدناه لتبدأ.",
   syncRequestFailed: "تعذر تسجيل طلب المزامنة.",
+  // "عامل الجمع" was the product's word for a process the reader cannot see,
+  // start or stop. The reader-facing sentences say what is true of the
+  // collection instead — running, or stopped with nothing running — and what
+  // they can do. The term survives only in the attempt log's forensic lines,
+  // where it names the thing an operator is actually inspecting.
   syncRequestStanding:
-    "طلب المزامنة قائم. لكل قناة طلب واحد في كل مرة، ولن يبدأ حتى يعمل عامل الجمع — التفاصيل في صفحة «حالة المزامنة».",
+    "طلب المزامنة مسجَّل. لكل قناة طلب واحد في كل مرة، ويبدأ حين يكون الجمع يعمل — حالته الآن في صفحة «حالة المزامنة».",
   anotherWorkspaceTitle: "مساحة أخرى لعميل أو قناة",
   anotherWorkspaceLead: "يبقى لكل مساحة جمهورها وبياناتها وصلاحياتها المستقلة.",
   workspaceNameLabel: "اسم مساحة العمل",
@@ -239,9 +251,9 @@ export const ar = {
       "انتهى المصدر دون إثبات التغطية الكاملة؛ لا يعني ذلك جمع كل التعليقات",
     failed: "فشلت آخر مزامنة",
     blocked: "تعذّر الوصول إلى المصدر في آخر مزامنة",
-    stalled: "توجد مهام منتظرة ولا يوجد عامل متصل لتنفيذها",
+    stalled: "توجد مهام منتظرة والجمع متوقّف — لا شيء يعمل لتنفيذها",
     never_run: "لم تُنفذ أي مزامنة بعد",
-    never_run_no_worker: "لم تُنفذ أي مزامنة، ولا يوجد عامل متصل",
+    never_run_no_worker: "لم تُنفذ أي مزامنة بعد، والجمع متوقّف الآن",
     no_data: "لا تتوفر بيانات عن حالة المزامنة",
   },
   /** Known collector failures in plain words. The raw code stays visible as
@@ -301,11 +313,11 @@ export const ar = {
   jobUnexplainedCode: (code: string) => `رمز غير مفسَّر: ${code}`,
   jobNoReason: "لم يُسجَّل سبب.",
   jobQueuedHeadline: "في الانتظار",
-  jobQueuedWithWorker: "في الطابور، ولم يلتقطها عامل الجمع بعد.",
+  jobQueuedWithWorker: "في الطابور، ولم يبدأ الجمع فيها بعد.",
   jobQueuedNoWorker:
-    "في الطابور، ولا يوجد عامل جمع يعمل الآن. لن تبدأ حتى يعمل واحد.",
+    "في الطابور، والجمع متوقّف الآن — لا شيء يعمل. لن تبدأ حتى يعود.",
   jobRunningHeadline: "قيد التنفيذ",
-  jobRunningDetail: "عامل الجمع يعمل على هذه المهمة الآن.",
+  jobRunningDetail: "الجمع يعمل على هذه المهمة الآن.",
   jobSucceededHeadline: "اكتملت",
   jobSucceededDetail:
     "انتهت المهمة إلى نهايتها. عدد ما وصل يظهر في اللوحة، وقد يكون صفرًا إن لم يكن هناك تعليق.",
@@ -391,10 +403,10 @@ export const ar = {
   opsHealthTitle: "صحة المزامنة",
   opsUnclassifiedFailure: "تعذّرت المزامنة لسبب غير مصنَّف",
   opsQueued: (n: number) => `مهام منتظرة: ${n}`,
-  opsWorkerLabel: "العامل:",
-  opsWorkerConnected: (heartbeat: string) => `متصل، آخر نبضة ${heartbeat}`,
+  opsWorkerLabel: "الجمع:",
+  opsWorkerConnected: (heartbeat: string) => `يعمل، آخر إشارة ${heartbeat}`,
   opsWorkerDisconnected:
-    "غير متصل الآن. لن تُحدَّث البيانات تلقائيًا حتى يعود عامل الجمع.",
+    "متوقّف الآن — لا شيء يعمل. لن تُحدَّث البيانات حتى يعود.",
   opsRequesting: "جارٍ الطلب…",
   opsNoChannelBefore: "لا توجد قناة مرتبطة بمساحة العمل هذه.",
   opsNoChannelLink: "اربط قناة من صفحة الحساب",
@@ -432,7 +444,7 @@ export const ar = {
   opsRetried: "أُضيفت محاولة جديدة، تستأنف من حيث توقّفت السابقة.",
   opsSyncRequestFailed: "تعذّر تسجيل طلب المزامنة.",
   opsSyncRequestStanding:
-    "طلب المزامنة قائم. لكل قناة طلب واحد في كل مرة، ويبدأ حين يعمل عامل الجمع.",
+    "طلب المزامنة مسجَّل. لكل قناة طلب واحد في كل مرة، ويبدأ حين يكون الجمع يعمل.",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,

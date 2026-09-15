@@ -204,12 +204,26 @@ const PlanCard = lazy(() =>
   import("./PlanCard").then((m) => ({ default: m.PlanCard })),
 );
 
-function RailPlan() {
+const WorkspaceSwitch = lazy(() =>
+  import("./RailState").then((m) => ({ default: m.WorkspaceSwitch })),
+);
+const CollectionState = lazy(() =>
+  import("./RailState").then((m) => ({ default: m.CollectionState })),
+);
+
+/** The rail's state, for a signed-in reader only. */
+function RailState({ part }: { part: "workspace" | "collection" | "plan" }) {
   const { session } = useSession();
   if (!session) return null;
+  const Part =
+    part === "workspace"
+      ? WorkspaceSwitch
+      : part === "collection"
+        ? CollectionState
+        : PlanCard;
   return (
     <Suspense fallback={null}>
-      <PlanCard />
+      <Part />
     </Suspense>
   );
 }
@@ -284,6 +298,8 @@ function AppLayout() {
           </span>
         </Link>
 
+        <RailState part="workspace" />
+
         <nav className="app-nav" aria-label={S.navLabel}>
           {/* A heading for the group, not decoration: the rail carries three
               kinds of thing — where you are, what your plan has left, and who
@@ -304,7 +320,8 @@ function AppLayout() {
         </nav>
 
         <div className="app-rail-foot">
-          <RailPlan />
+          <RailState part="collection" />
+          <RailState part="plan" />
           <SessionControl />
         </div>
       </aside>

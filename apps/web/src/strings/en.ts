@@ -14,6 +14,11 @@ export const en: Strings = {
   menuClose: "Close ×",
   navLabel: "Main navigation",
   navCaption: "Navigate",
+  railWorkspaceCaption: "Workspace",
+  railWorkspaceNone: "No workspace chosen yet",
+  railCollectionCaption: "Collection",
+  railCollectionReading: "Reading collection state…",
+  railCollectionUnavailable: "Collection state could not be read",
   navOverview: "Overview",
   navOperations: "Operations",
   navAccount: "Sources & account",
@@ -199,7 +204,7 @@ export const en: Strings = {
   noWorkspaceLead: "Create one below to begin.",
   syncRequestFailed: "The sync request could not be registered.",
   syncRequestStanding:
-    "A sync request is standing. Each channel has one request at a time, and it will not start until a collector is running — details on the “Sync status” page.",
+    "Your sync request is in. Each channel has one request at a time, and it starts when collection is running — its state right now is on the “Sync status” page.",
   anotherWorkspaceTitle: "Another workspace for a client or channel",
   anotherWorkspaceLead:
     "Each workspace keeps its own audience, data and permissions.",
@@ -236,9 +241,11 @@ export const en: Strings = {
       "The source ended without proving full coverage; that does not mean every comment was collected",
     failed: "The last sync failed",
     blocked: "The source could not be reached in the last sync",
-    stalled: "Jobs are waiting and no collector is connected to run them",
+    stalled:
+      "Jobs are waiting and collection is stopped — nothing is running to take them",
     never_run: "No sync has run yet",
-    never_run_no_worker: "No sync has run, and no collector is connected",
+    never_run_no_worker:
+      "No sync has run yet, and collection is stopped right now",
     no_data: "No data about the sync status is available",
   },
   syncErrorMessages: {
@@ -300,11 +307,11 @@ export const en: Strings = {
   jobUnexplainedCode: (code: string) => `Unexplained code: ${code}`,
   jobNoReason: "No reason was recorded.",
   jobQueuedHeadline: "Waiting",
-  jobQueuedWithWorker: "In the queue; no collector has picked it up yet.",
+  jobQueuedWithWorker: "In the queue; collection has not started on it yet.",
   jobQueuedNoWorker:
-    "In the queue, and no collector is running now. It will not start until one does.",
+    "In the queue, and collection is stopped right now — nothing is running. It will not start until it resumes.",
   jobRunningHeadline: "In progress",
-  jobRunningDetail: "A collector is working on this job now.",
+  jobRunningDetail: "Collection is working on this job now.",
   jobSucceededHeadline: "Completed",
   jobSucceededDetail:
     "The job ran to its end. What arrived is counted on the dashboard, and may be zero if there were no comments.",
@@ -392,11 +399,11 @@ export const en: Strings = {
   opsHealthTitle: "Sync health",
   opsUnclassifiedFailure: "The sync failed for an unclassified reason",
   opsQueued: (n: number) => `Jobs waiting: ${n}`,
-  opsWorkerLabel: "Collector:",
+  opsWorkerLabel: "Collection:",
   opsWorkerConnected: (heartbeat: string) =>
-    `connected, last heartbeat ${heartbeat}`,
+    `running, last sign of life ${heartbeat}`,
   opsWorkerDisconnected:
-    "not connected now. Data will not refresh automatically until the collector returns.",
+    "stopped right now — nothing is running. Data will not refresh until it resumes.",
   opsRequesting: "Requesting…",
   opsNoChannelBefore: "No channel is connected to this workspace.",
   opsNoChannelLink: "Connect a channel from the account page",
@@ -437,5 +444,5 @@ export const en: Strings = {
     "A new attempt was added; it resumes where the previous one stopped.",
   opsSyncRequestFailed: "The sync request could not be registered.",
   opsSyncRequestStanding:
-    "A sync request is standing. Each channel has one request at a time, and it starts when a collector is running.",
+    "Your sync request is in. Each channel has one request at a time, and it starts when collection is running.",
 };
