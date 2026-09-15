@@ -340,3 +340,11 @@ extracted from the account card so both draw the same list; the second step from
 problems were closed earlier today. The fixture never has an empty workspace, so the browser
 suite cannot reach this state; it is rendered in the identity test from forced cache entries
 and was checked visually by injecting the rendered path into the fixture page.
+
+## 2026-09-15 — the landing page follows the language choice
+
+`b956c64`, once the session holding `Landing.tsx` had committed (`95be0b4`). The last
+Arabic-only surface reads the shared strings through the same hook, sets the document
+language while mounted, and carries the switch in its bar; a choice made there reaches the
+shell and back. The demo comments stay Arabic as data, tagged `lang="ar" dir="rtl"`; arrows
+and digits follow the language; `landing.css` places with logical properties now.

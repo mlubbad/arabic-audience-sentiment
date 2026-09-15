@@ -1071,3 +1071,12 @@ What this preview carries that the last did not: the rail's workspace switch and
 line, the page-level switches removed, the empty overview as the setup path, "the worker"
 gone from reader-facing sentences, app.css with no raw colour, and the landing on the brand's
 ink, accent, sentiment scale and a 13px type floor.
+
+## 2026-09-15 — landing translation
+
+Gates after `b956c64`: format 0, types 0, lint 0, unit 308/308, e2e 78/78 (port 5199,
+exit code from a log file), build 0. `language.spec.ts` walks the choice from the landing
+into the dashboard and asserts the demo comments keep `lang="ar" dir="rtl"` inside a
+left-to-right page and the CTA's arrow turns with the text. Seen at 1280px in both
+languages; the Arabic page is unchanged. English chunk 37.6 kB (12.9 gzipped); main
+552.0 kB (161.7 gzipped).

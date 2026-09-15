@@ -54,7 +54,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 | `docs/coordination/ACTIVE.md` | `sentimentanalysis-82` maintains it; everyone reads it | |
 | `docs/progress.md`, `decisions.md`, `verification.md` | shared, append-only | |
 | `apps/web/src/locale.ts`, `locale.css`, `strings/**`, `LanguageSwitch.tsx`, `tests/e2e/language.spec.ts` | **done** — English language support landed as `f9b2840`…`7478dc0` by the audit-phase-two Claude session; free | 2026-09-15 |
-| UI text in `apps/web/src/**` | **every sentence now lives in `strings/ar.ts` with a typed English twin in `strings/en.ts`.** A new sentence goes there, in both languages, or `tsc` fails. `Landing.tsx` is the one exception: Arabic only, and still held by the session with uncommitted work on it | 2026-09-15 |
+| UI text in `apps/web/src/**` | **every sentence now lives in `strings/ar.ts` with a typed English twin in `strings/en.ts`.** A new sentence goes there, in both languages, or `tsc` fails. `Landing.tsx` included since `b956c64` — the demo's four comments are the one deliberate Arabic-only text, as data | 2026-09-15 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
