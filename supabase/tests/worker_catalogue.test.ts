@@ -14,8 +14,18 @@ const CRED_A = "a".repeat(64);
 const CRED_B = "b".repeat(64);
 let db: PGlite;
 
-const claim = async (cred: string) =>
-  (
+// As the gateway runs: service_role bypasses RLS but holds only the
+// privileges it was granted. Running these entry points as superuser hid a
+// missing grant on private.plan_limit until the first live tick answered
+// 42501 (20260915150000).
+const asWorker = async () => {
+  await db.exec("reset role");
+  await db.exec("set role service_role");
+};
+
+const claim = async (cred: string) => {
+  await asWorker();
+  return (
     await db.query<{
       id: string;
       lease_token: string;
@@ -25,6 +35,7 @@ const claim = async (cred: string) =>
       cred,
     ])
   ).rows[0];
+};
 const one = async <T>(sql: string, params: unknown[]) =>
   (await db.query<T>(sql, params)).rows[0];
 
@@ -99,6 +110,7 @@ describe("worker catalogue and due lists", () => {
       "select id, lease_token from jobs where workspace_id=$1 and type='discover' and status='running'",
       [A],
     );
+    await asWorker();
     await expect(
       db.query("select svc_worker_commit_catalogue($1,$2,$3,$4)", [
         CRED_A,
@@ -114,6 +126,7 @@ describe("worker catalogue and due lists", () => {
       (await db.query("select 1 from videos where workspace_id=$1", [A])).rows,
     ).toHaveLength(0);
 
+    await asWorker();
     const r = await one<{ r: { videos: number } }>(
       "select svc_worker_commit_catalogue($1,$2,$3,$4) as r",
       [
@@ -183,6 +196,7 @@ describe("worker catalogue and due lists", () => {
       "select id, lease_token from jobs where workspace_id=$1 and type='discover' and status='running'",
       [A],
     );
+    await asWorker();
     await db.query("select svc_worker_commit_catalogue($1,$2,$3,$4)", [
       CRED_A,
       lease.id,
@@ -200,6 +214,7 @@ describe("worker catalogue and due lists", () => {
       [],
     );
     expect(v).toEqual({ title: "أول", reported_comment_count: 15 });
+    await asWorker();
     await db.query("select svc_worker_finish($1,$2,$3,'succeeded',null)", [
       CRED_A,
       lease.id,
@@ -213,6 +228,7 @@ describe("worker catalogue and due lists", () => {
       [A],
     );
     const lease = await claim(CRED_A);
+    await asWorker();
     await expect(
       db.query("select svc_worker_commit_catalogue($1,$2,$3,'[]')", [
         CRED_B,
@@ -220,6 +236,7 @@ describe("worker catalogue and due lists", () => {
         lease.lease_token,
       ]),
     ).rejects.toThrow(/forbidden|lease_lost/);
+    await asWorker();
     await db.query("select svc_worker_finish($1,$2,$3,'succeeded',null)", [
       CRED_A,
       lease.id,
@@ -247,6 +264,7 @@ describe("worker catalogue and due lists", () => {
     );
     const lease = await claim(CRED_A);
     expect(lease.type).toBe("collect");
+    await asWorker();
     const due = await one<{
       d: { video_id: string; external_video_id: string }[];
     }>("select svc_worker_due_videos($1,$2,$3) as d", [
@@ -257,6 +275,7 @@ describe("worker catalogue and due lists", () => {
     // b is disabled: selected, but not read.
     expect(due.d.map((v) => v.external_video_id)).toEqual(["aaaaaaaaaaa"]);
 
+    await asWorker();
     await db.query(
       "select svc_worker_video_finished($1,$2,$3,$4,'exhausted',null)",
       [CRED_A, lease.id, lease.lease_token, a.id],
@@ -266,18 +285,21 @@ describe("worker catalogue and due lists", () => {
       [a.id],
     );
     expect(sel).toEqual({ last_outcome: "exhausted", later: true });
+    await asWorker();
     const again = await one<{ d: unknown[] }>(
       "select svc_worker_due_videos($1,$2,$3) as d",
       [CRED_A, lease.id, lease.lease_token],
     );
     expect(again.d).toEqual([]);
 
+    await asWorker();
     await expect(
       db.query(
         "select svc_worker_video_finished($1,$2,$3,$4,'sideways',null)",
         [CRED_A, lease.id, lease.lease_token, a.id],
       ),
     ).rejects.toThrow(/invalid_outcome/);
+    await asWorker();
     await db.query("select svc_worker_finish($1,$2,$3,'succeeded',null)", [
       CRED_A,
       lease.id,
@@ -300,6 +322,7 @@ describe("worker catalogue and due lists", () => {
       [A],
     );
     const lease = await claim(CRED_A);
+    await asWorker();
     await db.query(
       "select svc_worker_video_finished($1,$2,$3,$4,'blocked','comments_disabled')",
       [CRED_A, lease.id, lease.lease_token, a.id],
@@ -312,6 +335,7 @@ describe("worker catalogue and due lists", () => {
     await db.query("update videos set comments_state='open' where id=$1", [
       a.id,
     ]);
+    await asWorker();
     await db.query("select svc_worker_finish($1,$2,$3,'succeeded',null)", [
       CRED_A,
       lease.id,
@@ -322,11 +346,13 @@ describe("worker catalogue and due lists", () => {
   it("the tick enqueues a discover for an uncatalogued channel and a collect for due videos, once", async () => {
     await db.exec("reset role");
     // B: never catalogued, nothing selected.
+    await asWorker();
     const first = await one<{ r: { discover: number; collect: number } }>(
       "select svc_worker_tick($1) as r",
       [CRED_B],
     );
     expect(first.r).toEqual({ discover: 1, collect: 0 });
+    await asWorker();
     const second = await one<{ r: { discover: number; collect: number } }>(
       "select svc_worker_tick($1) as r",
       [CRED_B],
@@ -347,6 +373,7 @@ describe("worker catalogue and due lists", () => {
       "update jobs set created_at=now()-interval '2 hours' where workspace_id=$1",
       [A],
     );
+    await asWorker();
     const third = await one<{ r: { discover: number; collect: number } }>(
       "select svc_worker_tick($1) as r",
       [CRED_A],
@@ -356,6 +383,7 @@ describe("worker catalogue and due lists", () => {
 
   it("a collect that failed is not re-enqueued for an hour, whatever the rate limit says", async () => {
     await db.exec("reset role");
+    await asWorker();
     const tick = () =>
       one<{ r: { discover: number; collect: number } }>(
         "select svc_worker_tick($1) as r",

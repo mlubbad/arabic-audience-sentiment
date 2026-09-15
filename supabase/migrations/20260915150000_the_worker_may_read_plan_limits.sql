@@ -1,0 +1,11 @@
+-- The first live tick answered 42501.
+--
+-- 20260913190000 revoked private.plan_limit from tenants because it was only
+-- ever called from definer functions that run as the owner. The worker-side
+-- functions added on 20260915132000 and 20260915140000 (schedule_due_work,
+-- enqueue_scheduled, worker_video_finished) are security invoker and run as
+-- service_role, which was never granted execute — so the deployed gateway's
+-- first tick was refused at the plan-limit read. The PGlite suite ran the
+-- svc_* entry points as superuser and could not see it; worker_catalogue
+-- now runs them under `set role service_role`.
+grant execute on function private.plan_limit(uuid,text) to service_role;
