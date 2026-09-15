@@ -904,3 +904,20 @@ the shell.
 
 Not verified: the live callback storing a name (needs the migration applied and a real
 consent flow), and the owner's page against a real session — rendered from rows only.
+
+## 2026-09-15 — migration 20260915080000 applied to the live project
+
+`supabase migration list --linked` showed every local migration through `20260914200000`
+already remote and this one alone pending, so the live body of `oauth_attach_channel_for`
+was the one the tests built from. `db push --linked --dry-run` named the single file;
+`db push --linked` applied it.
+
+Probed over PostgREST as the publishable key, which is the boundary a stranger reaches:
+`connection_status?select=title` answers 401 / 42501 (the column exists; Postgres reached
+the privilege check) where `select=nope` answers 400 / 42703. `rpc/svc_oauth_attach_channel`
+answers 401 / 42501 both with the seven names the deployed callback sends and with the nine
+the new one sends — so the function resolved either way, and the deployed Edge Function is
+not broken by the rebuild.
+
+Not yet done: the Edge Function itself is not redeployed, so no name reaches the database
+until it is; the column stays null and the page shows the labelled id.
