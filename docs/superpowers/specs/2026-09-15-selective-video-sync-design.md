@@ -179,20 +179,27 @@ new comments arrive; YouTube's count is not a promise of what is retrievable.
 - Caveat, recorded: live re-checks happen only while a worker process runs. That is the
   standing hosting blocker, unchanged by this work.
 
-## 5. UI — `/videos?ws=…`
+## 5. UI — the operations page (`/sync?ws=…`)
 
-A fourth rail destination, "الفيديوهات", between the overview and operations, behind the
-same `WorkspaceGate` and the shared `?ws=` selection. The account card's third step and the
-operations page's "طلب مزامنة" become a link, "اختر الفيديوهات"; `setup.ts` step 3 is
-reworded to match. Every new sentence lives in `strings/ar.ts` with its `en.ts` twin.
+The catalogue is the first section of the existing operations page, `Sync.tsx`, above the
+health and plan panels — the page whose "طلب مزامنة" button it replaces, and the page that
+already carries the plan meter. No new route and no new rail destination. The account card's
+third step becomes a link to `/sync?ws=<id>`, "اختر الفيديوهات"; `setup.ts` step 3 is
+reworded to match. The page heading keeps agreeing with the rail's "التشغيل" (a browser test
+holds that). Every new sentence lives in `strings/ar.ts` with its `en.ts` twin.
+
+Page order after the head: **catalogue** (this work) → **health** and **plan** side by side
+(as today, minus the request button) → **attempts** (as today). The operations page grows
+long; the catalogue is the action and comes first, the diagnosis follows it.
 
 Reads: `videos` and `video_selections` for the workspace (RLS), `connection_status`, the
-standing `collect` / `discover` jobs, and `usage_summary` under the query key the rail
-already uses.
+standing `collect` / `discover` jobs (the attempt log already reads `jobs`), and the
+snapshot's `plan`, which the page already has — the estimate line reads the same
+`budgets` entry the plan panel draws, one source.
 
-- **Head strip**: the plan meter (`budgetState`, the operations page's thresholds) and the
-  live selection line — "المحدد: 12 فيديو · حتى 1,240 تعليقًا · يتبقى بعدها 3,348", with
-  "و3 بعدد غير معروف" when applicable. Sticky at the bottom below 768px.
+- **Selection bar**: the live selection line — "المحدد: 12 فيديو · حتى 1,240 تعليقًا · يتبقى
+  بعدها 3,348", with "و3 بعدد غير معروف" when applicable — beside "احفظ الاختيار" and
+  "تحديث القائمة" (which shows the catalogue's age). Sticky at the bottom below 768px.
 - **Toolbar**: title search (client-side substring on the whole catalogue, one RLS read;
   server-side search is out of scope), kind tabs الكل / فيديو / شورت / بث with counts, sort
   newest / oldest / most commented, select all in view / clear, and "اختر الأحدث بما يناسب
@@ -202,13 +209,15 @@ already uses.
   (unselectable, reason inline) / جزئي with the code through `explainCode`. Filter, sort and
   "fit" are pure functions in `apps/web/src/catalogue.ts`.
 - **Submit**: "احفظ الاختيار" sends the diff to `select_videos`; over quota, the button is
-  disabled with the reason beside it. Feedback is scoped to the bar. "تحديث القائمة" shows the
-  catalogue's age and calls `request_discovery`.
-- **States**: not connected → link to the account page, as `Sync.tsx` does; no catalogue yet
-  → the discover job's state through `describeJob`; read failed → retry.
+  disabled with the reason beside it. Feedback is scoped to the bar, as on the account page.
+- **States**: not connected → link to the account page, as the page does today; no catalogue
+  yet → the discover job's state through `describeJob`; read failed → retry.
 - **Demo**: `apps/web/public/fixtures/dashboard.json` gains a small `catalogue` array so
-  `/videos?demo=1` exists for browser tests, as `/sync?demo=1` does.
+  `/sync?demo=1` exercises the section in the browser suite, as it exercises the rest.
 - Tokens only, no raw colour (`layers.test.ts` holds it); no letter-spacing on Arabic.
+- `Sync.tsx` is 510 lines and would pass 800: the catalogue section is its own component,
+  `Catalogue.tsx`, and the health/plan/attempts panels move to `OperationsPanels.tsx`, so
+  each file holds one thing. No behaviour change in the move.
 
 ## 6. Testing
 
@@ -223,8 +232,9 @@ already uses.
   `run_backfill` over a server-supplied list calling `video_finished` per video.
 - **Contracts / web unit**: `selectionEstimate`; filter, sort, fit; ar/en key parity; the
   page rendered from forced rows for the signed-in states.
-- **Browser (fixture)**: search narrows rows; tabs; select all in view; the estimate moves;
-  the hard stop; the sticky bar at 375px; no letter-spaced Arabic.
+- **Browser (fixture, `/sync?demo=1`)**: search narrows rows; tabs; select all in view; the
+  estimate moves; the hard stop; the sticky bar at 375px; no letter-spaced Arabic; the ten
+  existing operations-page tests still pass after the split.
 - Every new assertion mutation-checked and recorded in `docs/verification.md`.
 
 ## Out of scope, recorded
