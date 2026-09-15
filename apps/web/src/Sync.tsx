@@ -14,7 +14,6 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { budgetState } from "@sentiment/contracts";
 import {
   configuredMode,
   deriveSnapshot,
@@ -28,15 +27,10 @@ import { useWorkspaceSelection } from "./workspaceSelection";
 import { WorkspaceGate } from "./WorkspaceGate";
 import { workspaceState, readableWorkspace } from "./workspace";
 import { syncHealth } from "./syncHealth";
-import { displayDate } from "./i18n";
 import { useLocale } from "./locale";
 import { useStrings } from "./strings";
-import {
-  describeJob,
-  explainCode,
-  type JobEntry,
-  type JobRow,
-} from "./jobFeed";
+import { describeJob, type JobEntry, type JobRow } from "./jobFeed";
+import { OperationsPanels } from "./OperationsPanels";
 import "./report.css";
 
 export function Sync() {
@@ -164,9 +158,10 @@ function SyncBody({
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [jobsFailed, setJobsFailed] = useState(false);
   // The channel, read here for one reason: this page is where a reader learns
-  // that nothing has collected, and the only button that starts a collection
-  // was on the account page. Being told "لم تُنفَّذ أي مزامنة" by a screen
-  // that cannot start one leaves the reader to guess where the remedy lives.
+  // that nothing has collected, and without a connected channel nothing can
+  // start one. Being told "لم تُنفَّذ أي مزامنة" by a screen that cannot say
+  // where the remedy lives leaves the reader to guess; the health card names
+  // the account page in that case.
   const [channelId, setChannelId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [acting, setActing] = useState<string | null>(null);
@@ -193,29 +188,10 @@ function SyncBody({
       void snapshot.refetch();
     });
   };
-  const requestSync = () => {
-    if (!supabase || !channelId) return;
-    setActing("enqueue");
-    setActionMessage("");
-    void supabase
-      .rpc("enqueue_sync", {
-        w: workspaceId,
-        c: channelId,
-        // Not a timestamp. The database holds one outstanding collection per
-        // channel and answers a repeat with the job already waiting; a key
-        // that changes on every click asks it for a new one each time.
-        k: `sync-page-${workspaceId}`,
-      })
-      .then(({ error }) => {
-        setActing(null);
-        // Never "أُضيفت": a second click is answered with the first job, and
-        // claiming a new one was queued would be false on every click but one.
-        setActionMessage(
-          error ? S.opsSyncRequestFailed : S.opsSyncRequestStanding,
-        );
-        setTick((t) => t + 1);
-        void snapshot.refetch();
-      });
+  // Re-read the live-only rows and the snapshot together, after an action.
+  const refresh = () => {
+    setTick((t) => t + 1);
+    void snapshot.refetch();
   };
   useEffect(() => {
     if (!supabase || mode !== "live") {
@@ -292,217 +268,22 @@ function SyncBody({
           </button>
         </div>
       ) : (
-        <>
-          <div className="sync-grid">
-            <section
-              className="rp-section"
-              aria-labelledby="sync-heading"
-              data-testid="sync-panel"
-            >
-              <header>
-                <h2 id="sync-heading">{S.opsHealthTitle}</h2>
-              </header>
-              <article className="rp-card">
-                <p data-testid="sync-state" data-severity={health.severity}>
-                  <strong>{S.syncMessages[health.key]}</strong>
-                </p>
-                {health.errorCode && (
-                  <p data-testid="sync-error">
-                    {explainCode(health.errorCode, S) ??
-                      S.opsUnclassifiedFailure}{" "}
-                    (<code>{health.errorCode}</code>)
-                  </p>
-                )}
-                {health.queued > 0 && (
-                  <p data-testid="sync-queued">{S.opsQueued(health.queued)}</p>
-                )}
-                <p data-testid="sync-worker">
-                  {S.opsWorkerLabel}{" "}
-                  {s?.sync?.worker.connected
-                    ? S.opsWorkerConnected(
-                        displayDate(s.sync.worker.last_heartbeat_at, lang),
-                      )
-                    : S.opsWorkerDisconnected}
-                </p>
-                {/* The remedy, beside the diagnosis. Offered only when it can
-                    work: without a connected channel the server refuses, and a
-                    button that always fails is worse than no button — so that
-                    case says where to go instead. */}
-                {mode === "live" && (
-                  <div className="sync-actions">
-                    {channelId ? (
-                      <button
-                        type="button"
-                        data-testid="sync-request"
-                        disabled={acting === "enqueue"}
-                        onClick={requestSync}
-                      >
-                        {acting === "enqueue" ? S.opsRequesting : S.requestSync}
-                      </button>
-                    ) : (
-                      <p className="muted" data-testid="sync-no-channel">
-                        {S.opsNoChannelBefore}{" "}
-                        <a href="/account">{S.opsNoChannelLink}</a>{" "}
-                        {S.opsNoChannelAfter}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {run ? (
-                  <p data-testid="sync-last-run">
-                    {S.opsLastRun(
-                      displayDate(run.started_at, lang),
-                      run.source,
-                      run.coverage.videos_seen,
-                      run.coverage.comments_collected,
-                    )}{" "}
-                    {run.coverage.complete
-                      ? S.opsTraversalComplete
-                      : S.opsTraversalUnproven}
-                  </p>
-                ) : (
-                  <p data-testid="sync-last-run">{S.opsNoPreviousRun}</p>
-                )}
-              </article>
-            </section>
-
-            <section
-              className="rp-section"
-              aria-labelledby="plan-heading"
-              data-testid="plan-panel"
-            >
-              <header>
-                <h2 id="plan-heading">{S.opsPlanTitle}</h2>
-              </header>
-              {s?.plan == null ? (
-                <p className="rp-missing" data-testid="plan-none">
-                  <strong>{S.opsNoPlanStrong}</strong>
-                  {S.opsNoPlanLead}
-                </p>
-              ) : (
-                <article className="rp-card">
-                  <p className="rp-sub">
-                    {S.opsPlanPeriod(
-                      s.plan.plan_key,
-                      displayDate(s.plan.period_start, lang),
-                      displayDate(s.plan.period_end, lang),
-                    )}
-                  </p>
-                  <ul className="budgets">
-                    {s.plan.budgets.map((b) => {
-                      const state = budgetState(b);
-                      const share = b.allowance
-                        ? Math.min(
-                            Math.round((b.used / b.allowance) * 100),
-                            100,
-                          )
-                        : 100;
-                      return (
-                        <li
-                          key={b.event_type}
-                          data-testid={`budget-${b.event_type}`}
-                        >
-                          <strong>
-                            {b.event_type === "comment_analysis"
-                              ? S.budgetAnalysis
-                              : S.budgetBackfill}
-                          </strong>
-                          <span>
-                            {S.opsBudgetLine(b.used, b.allowance, b.remaining)}
-                          </span>
-                          <progress
-                            max={b.allowance || 1}
-                            value={b.used}
-                            aria-hidden="true"
-                          />
-                          <small data-state={state}>
-                            {S.opsShare(share, S.budgetMessages[state])}
-                          </small>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </article>
-              )}
-            </section>
-          </div>
-
-          <section className="rp-section" id="rp-attempts">
-            <header>
-              <h2>{S.opsAttemptsTitle}</h2>
-              <p className="rp-sub">{S.opsAttemptsLead}</p>
-            </header>
-            {mode !== "live" ? (
-              <p className="rp-missing">
-                <strong>{S.opsDemoNoLogStrong}</strong>
-                {S.opsDemoNoLogLead}
-              </p>
-            ) : jobsFailed ? (
-              <p className="rp-missing" data-testid="jobs-failed">
-                <strong>{S.opsLogFailedStrong}</strong>
-                {S.opsLogFailedLead}
-              </p>
-            ) : jobs === null ? (
-              <p role="status">{S.opsLogReading}</p>
-            ) : entries.length === 0 ? (
-              <p className="rp-missing">
-                <strong>{S.opsNoAttemptsStrong}</strong>
-                {S.opsNoAttemptsLead}
-              </p>
-            ) : (
-              <ul className="history" data-testid="attempts">
-                {entries.map((e) => (
-                  <li key={e.id} data-severity={e.severity}>
-                    <strong>{e.headline}</strong>
-                    <span>{e.detail}</span>
-                    <small>
-                      {displayDate(e.createdAt, lang)}
-                      {e.attempt > 0 ? S.opsAttemptN(e.attempt) : ""}
-                    </small>
-                    {e.cancellable && (
-                      <button
-                        type="button"
-                        className="rp-tab"
-                        disabled={acting === e.id}
-                        data-testid={`cancel-${e.id}`}
-                        onClick={() => act("cancel_job", e.id)}
-                      >
-                        {S.opsCancel}
-                      </button>
-                    )}
-                    {e.retryable && (
-                      <button
-                        type="button"
-                        className="rp-tab"
-                        disabled={acting === e.id}
-                        data-testid={`retry-${e.id}`}
-                        onClick={() => act("retry_job", e.id)}
-                      >
-                        {S.retry}
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {actionMessage && (
-              <p role="status" data-testid="job-action">
-                {actionMessage}
-              </p>
-            )}
-            {mode === "live" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setTick((t) => t + 1);
-                  void snapshot.refetch();
-                }}
-              >
-                {S.refresh}
-              </button>
-            )}
-          </section>
-        </>
+        <OperationsPanels
+          s={s}
+          health={health}
+          run={run}
+          mode={mode}
+          channelId={channelId}
+          jobs={jobs}
+          jobsFailed={jobsFailed}
+          entries={entries}
+          acting={acting}
+          actionMessage={actionMessage}
+          act={act}
+          refresh={refresh}
+          lang={lang}
+          S={S}
+        />
       )}
     </div>
   );
