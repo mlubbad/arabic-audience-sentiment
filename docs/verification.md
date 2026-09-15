@@ -949,3 +949,21 @@ operations link lands on `/sync?ws=abc-123`. Not driven in a browser: the signed
 a remembered choice being written back to the address, and a choice from the select updating
 it — because the suite has no session. Those paths are the pure `reconcileSelection`, tested
 directly, and the hook is a shell over it.
+
+## 2026-09-15 — preview deploy of c51f1f4
+
+Built from a detached worktree at `c51f1f4`, not from the checkout: the working tree carried
+another session's uncommitted edits to `app.css`, `landing.css` and `Landing.tsx`, and a
+build there would have shipped them under this commit's name. The clean `dist` was copied
+into `apps/web/dist` for the script to read.
+
+Evidence is the transfer log: 27 files at 226, including `static/index-CEmKVrNK.js`
+(511.09 kB) and `index-D9msRF2r.css`; the sweep then removed the eight superseded hashed
+assets. Probing the origin proves nothing either way and this time proved it twice over: the
+new bundle answers 401 (basic auth, as every path does) while the *previous* bundle
+`index-Bp6sxIUa.js` still answers 200 — `server: cloudflare`, `age: 9641`, `immutable` — a
+CDN cache hit for a file the host no longer has. A green probe on an old asset is not a
+rollback and not a failed deploy; it is a cache.
+
+`5c10eb5` (six indigo tints, `app.css` only) landed on `main` while the upload ran and is not
+in this deploy.
