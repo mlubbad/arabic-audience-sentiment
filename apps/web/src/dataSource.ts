@@ -13,6 +13,7 @@
  */
 import type { SyncState } from "./syncHealth";
 import { syncHealth } from "./syncHealth";
+import type { Strings } from "./strings";
 import type { DataMode } from "./data";
 
 /**
@@ -42,27 +43,31 @@ export type SourceDescription = {
   tone: "neutral" | "warning";
 };
 
-function coverageSentence(sync: SyncState | null): string {
+function coverageSentence(sync: SyncState | null, S: Strings): string {
   const run = sync?.last_run;
-  if (!run) return "لم تُسجَّل بعد أي عملية جمع لهذه المساحة.";
+  if (!run) return S.dsNoRun;
   const { comments_collected, videos_seen, complete } = run.coverage;
-  const counted = `${count(comments_collected)} تعليقًا من ${count(videos_seen)} فيديو`;
+  const counted = S.dsCounted(count(comments_collected), count(videos_seen));
   // "Complete" means the source was read to its end, never that every comment
   // that exists was retrieved. Saying "all comments" would be a claim nobody
   // can support.
   return complete
-    ? `${counted}. قُرئ المصدر حتى نهايته في آخر عملية جمع.`
-    : `${counted}. لم يُقرأ المصدر حتى نهايته، فالتغطية جزئية.`;
+    ? S.dsCoverageComplete(counted)
+    : S.dsCoveragePartial(counted);
 }
 
-function freshnessSentence(sync: SyncState | null, now: Date): string {
+function freshnessSentence(
+  sync: SyncState | null,
+  now: Date,
+  S: Strings,
+): string {
   const health = syncHealth(sync, now);
   if (health.key === "no_data" || health.key === "never_run")
-    return "لا توجد عملية جمع سابقة.";
-  if (health.staleHours === null) return "حالة الجمع غير معروفة.";
+    return S.dsNoPreviousRun;
+  if (health.staleHours === null) return S.dsHealthUnknown;
   const hours = Math.round(health.staleHours);
-  if (hours < 1) return "آخر تحديث قبل أقل من ساعة.";
-  return `آخر تحديث قبل ${count(hours)} ساعة.`;
+  if (hours < 1) return S.dsUpdatedUnderHour;
+  return S.dsUpdatedHours(count(hours));
 }
 
 export function describeSource(input: {
@@ -74,8 +79,9 @@ export function describeSource(input: {
   /** Null while the snapshot has not been read. Not zero — see below. */
   total: number | null;
   now: Date;
+  S: Strings;
 }): SourceDescription {
-  const { mode, workspaceId, workspaceName, persisted, sync, total, now } =
+  const { mode, workspaceId, workspaceName, persisted, sync, total, now, S } =
     input;
   // The strip is shown beside the title from the first paint, before any data
   // has arrived. "Not read yet" and "read, and empty" are different answers, and
@@ -84,29 +90,23 @@ export function describeSource(input: {
   if (mode === "sanitized_fixture")
     return {
       mode,
-      badge: "بيانات اصطناعية",
-      scope: "مساحة عمل تجريبية، غير مرتبطة بأي قناة",
-      coverage: unread
-        ? "جارٍ قراءة بيانات الاختبار."
-        : `${count(total)} تعليقًا مؤلَّفًا للاختبار. لا يمثل أي جمهور حقيقي.`,
+      badge: S.dsFixtureBadge,
+      scope: S.dsFixtureScope,
+      coverage: unread ? S.dsFixtureReading : S.dsFixtureCoverage(count(total)),
       // Keyed on the same flag the write path uses, so it cannot say one thing
       // while the code does another.
-      persistence: persisted
-        ? "التصحيحات تُحفظ."
-        : "التصحيحات تبقى في هذه الجلسة فقط ولا تُرسل إلى أي خادم.",
+      persistence: persisted ? S.dsReviewsPersist : S.dsReviewsSessionOnly,
       freshness: null,
       tone: "warning",
     };
 
   return {
     mode,
-    badge: "بيانات مباشرة",
-    scope: workspaceName?.trim() || `مساحة العمل ${workspaceId}`,
-    coverage: unread ? "جارٍ قراءة البيانات." : coverageSentence(sync),
-    persistence: persisted
-      ? "التصحيحات تُحفظ في سجل المراجعة ولا يمكن تعديلها بعد الحفظ."
-      : "التصحيحات لا تُحفظ.",
-    freshness: unread ? null : freshnessSentence(sync, now),
+    badge: S.dsLiveBadge,
+    scope: workspaceName?.trim() || S.dsWorkspaceById(workspaceId),
+    coverage: unread ? S.dsReadingLive : coverageSentence(sync, S),
+    persistence: persisted ? S.dsReviewsLogged : S.dsReviewsNotSaved,
+    freshness: unread ? null : freshnessSentence(sync, now, S),
     tone: "neutral",
   };
 }

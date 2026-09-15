@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { syncErrorMessages } from "./i18n";
+import { ar } from "./strings/ar";
+const syncErrorMessages: Record<string, string> = ar.syncErrorMessages;
 import { describeJob, explainCode, type JobRow } from "./jobFeed";
 
 const row = (over: Partial<JobRow> = {}): JobRow => ({
@@ -13,8 +14,8 @@ const row = (over: Partial<JobRow> = {}): JobRow => ({
 
 describe("describeJob", () => {
   it("separates waiting-with-a-worker from waiting-with-none", () => {
-    const withWorker = describeJob(row(), { workerConnected: true });
-    const without = describeJob(row(), { workerConnected: false });
+    const withWorker = describeJob(row(), { workerConnected: true }, ar);
+    const without = describeJob(row(), { workerConnected: false }, ar);
     expect(withWorker.severity).toBe("warning");
     expect(without.severity).toBe("critical");
     // The second says the thing the first does not: nothing is going to run.
@@ -29,6 +30,7 @@ describe("describeJob", () => {
         error_code: "no_upload_has_comments:12_checked_0_disabled",
       }),
       { workerConnected: true },
+      ar,
     );
     const off = describeJob(
       row({
@@ -36,6 +38,7 @@ describe("describeJob", () => {
         error_code: "no_upload_has_comments:12_checked_9_disabled",
       }),
       { workerConnected: true },
+      ar,
     );
     expect(quiet.detail).toContain("12");
     expect(quiet.detail).toContain("هادئة");
@@ -50,10 +53,12 @@ describe("describeJob", () => {
         error_code: "source_access_denied:insufficientPermissions",
       }),
       { workerConnected: true },
+      ar,
     );
     const other = describeJob(
       row({ status: "blocked", error_code: "source_access_denied:forbidden" }),
       { workerConnected: true },
+      ar,
     );
     expect(scope.detail).toContain("أعد ربط القناة");
     // A different denial must not borrow the reconnect advice, which would
@@ -66,15 +71,20 @@ describe("describeJob", () => {
     const unknown = describeJob(
       row({ status: "failed", error_code: "wat_is_this" }),
       { workerConnected: true },
+      ar,
     );
     expect(unknown.detail).toContain("wat_is_this");
     expect(unknown.severity).toBe("critical");
   });
 
   it("does not promise comments when a run merely finished", () => {
-    const done = describeJob(row({ status: "succeeded" }), {
-      workerConnected: true,
-    });
+    const done = describeJob(
+      row({ status: "succeeded" }),
+      {
+        workerConnected: true,
+      },
+      ar,
+    );
     expect(done.severity).toBe("ok");
     // A run against a video with no comments succeeds. Saying "collected the
     // comments" next to an empty table is the failure mode this guards.
@@ -88,10 +98,15 @@ describe("describeJob", () => {
         error_code: "superseded_by_existing_request",
       }),
       { workerConnected: true },
+      ar,
     );
-    const other = describeJob(row({ status: "cancelled" }), {
-      workerConnected: true,
-    });
+    const other = describeJob(
+      row({ status: "cancelled" }),
+      {
+        workerConnected: true,
+      },
+      ar,
+    );
     expect(superseded.severity).toBe("muted");
     expect(other.severity).toBe("warning");
   });
@@ -99,7 +114,7 @@ describe("describeJob", () => {
 
 describe("what an operator may do with a job", () => {
   const at = (status: JobRow["status"]) =>
-    describeJob(row({ status }), { workerConnected: true });
+    describeJob(row({ status }), { workerConnected: true }, ar);
 
   it("offers withdrawal only before a worker has taken it", () => {
     expect(at("queued").cancellable).toBe(true);
@@ -128,6 +143,7 @@ describe("one table for one meaning", () => {
         created_at: "2026-09-14T00:00:00Z",
       },
       { workerConnected: false },
+      ar,
     ).detail;
 
   it("explains a code the shared table knows", () => {
@@ -167,6 +183,7 @@ describe("a code that carries a reason shows the reason", () => {
         created_at: "2026-09-14T00:00:00Z",
       },
       { workerConnected: false },
+      ar,
     ).detail;
 
   it("says what 'no reason recorded' actually means", () => {
@@ -226,14 +243,15 @@ describe("unifying two readers must not lose what either knew", () => {
   it.each(Object.keys(syncErrorMessages).filter((k) => !OVERRIDDEN.has(k)))(
     "keeps the table's wording for a bare %s",
     (code) => {
-      expect(explainCode(code)).toBe(syncErrorMessages[code]);
+      expect(explainCode(code, ar)).toBe(syncErrorMessages[code]);
     },
   );
 
   it("still lets a parameter earn a more specific sentence", () => {
-    const bare = explainCode("source_access_denied");
+    const bare = explainCode("source_access_denied", ar);
     const specific = explainCode(
       "source_access_denied:insufficientPermissions",
+      ar,
     );
     expect(specific).not.toBe(bare);
     expect(specific).toContain("أعد ربط القناة");

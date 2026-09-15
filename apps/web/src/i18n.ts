@@ -1,42 +1,37 @@
-export const labels = {
-  positive: "إيجابي",
-  negative: "سلبي",
-  neutral: "محايد",
-  mixed: "مختلط",
-};
+/**
+ * Helpers over the strings: dates, video names, purged text, sentiment labels.
+ *
+ * The code tables that used to live here — sentiment labels, budget states,
+ * review states, sync states and collector failures — are in `strings/ar.ts`
+ * and `strings/en.ts` now, typed so the two carry the same codes. What stays
+ * is the handful of functions that combine a string with a value.
+ */
+import { stringsFor, type Strings } from "./strings";
+import type { Locale } from "./locale";
+
+/** The Arabic sentiment words, for the one surface that is Arabic only: the
+ *  landing page. Everything inside the shell reads `S.labels`. */
+export const labels = stringsFor("ar").labels;
+
 export const locale = {
   language: "ar",
   direction: "rtl",
   timezone: "Asia/Istanbul",
 } as const;
-export function displayDate(date: string | null) {
+
+/** `Intl` formats in the interface language; the timezone is the product's. */
+export function displayDate(date: string | null, lang: Locale) {
   return date
-    ? new Intl.DateTimeFormat("ar", {
+    ? new Intl.DateTimeFormat(lang, {
         timeZone: locale.timezone,
         dateStyle: "medium",
       }).format(new Date(date))
-    : "تاريخ غير معروف";
+    : stringsFor(lang).unknownDate;
 }
-export const budgetNames: Record<string, string> = {
-  comment_analysis: "تحليل التعليقات",
-  historical_backfill: "استيراد تاريخي",
-};
-export const budgetMessages: Record<string, string> = {
-  ok: "ضمن الحد",
-  warning: "اقترب الاستهلاك من الحد",
-  critical: "الاستهلاك قارب النفاد",
-  exhausted:
-    "نفد الحد؛ لن تُحلَّل دفعات جديدة حتى تُرفع الخطة أو تبدأ فترة جديدة",
-};
-export const reviewStateMessages: Record<string, string> = {
-  in_force: "سارية: هذه هي النتيجة المعتمدة حاليًا",
-  superseded_by_review: "حلّت محلها مراجعة أحدث",
-  superseded_by_edit: "لا تنطبق بعد تغيّر النص؛ تحتاج إعادة تدقيق",
-  legacy_unverified: "تعديل موروث غير موثق؛ لا يُحتسب مراجعة بشرية",
-};
-const fixtureVideoNames: Record<string, string> = {
-  "video-1": "فيديو اصطناعي 1",
-  "video-2": "فيديو اصطناعي 2",
+
+const fixtureVideoNumbers: Record<string, string> = {
+  "video-1": "1",
+  "video-2": "2",
 };
 /**
  * The video's real title where the row carried one.
@@ -46,35 +41,15 @@ const fixtureVideoNames: Record<string, string> = {
  * video — and the id is still what is shown when no title came through, since
  * a wrong name is worse than an honest identifier.
  */
-export function videoLabel(id: string, title?: string | null) {
-  return title ?? fixtureVideoNames[id] ?? id;
+export function videoLabel(
+  id: string,
+  title: string | null | undefined,
+  S: Strings,
+) {
+  if (title) return title;
+  const n = fixtureVideoNumbers[id];
+  return n ? S.fixtureVideo(n) : id;
 }
-export const syncMessages: Record<string, string> = {
-  healthy: "آخر مزامنة اكتملت حديثًا",
-  running: "مزامنة قيد التنفيذ الآن؛ النتيجة غير معروفة بعد",
-  stale: "مضى وقت طويل على آخر مزامنة؛ قد تكون البيانات قديمة",
-  partial: "آخر مزامنة توقفت قبل نهايتها؛ التغطية جزئية وليست اكتمالًا",
-  incomplete_coverage:
-    "انتهى المصدر دون إثبات التغطية الكاملة؛ لا يعني ذلك جمع كل التعليقات",
-  failed: "فشلت آخر مزامنة",
-  blocked: "تعذّر الوصول إلى المصدر في آخر مزامنة",
-  stalled: "توجد مهام منتظرة ولا يوجد عامل متصل لتنفيذها",
-  never_run: "لم تُنفذ أي مزامنة بعد",
-  never_run_no_worker: "لم تُنفذ أي مزامنة، ولا يوجد عامل متصل",
-  no_data: "لا تتوفر بيانات عن حالة المزامنة",
-};
-/** Known collector failures in plain Arabic. The raw code stays visible as
- *  supporting detail, so support can act on it without the user decoding it. */
-export const syncErrorMessages: Record<string, string> = {
-  source_access_denied: "رفض المصدر الوصول، غالبًا بسبب الحصة أو الصلاحيات",
-  source_unavailable: "المصدر غير متاح مؤقتًا",
-  source_http_error: "رد المصدر بخطأ غير متوقع",
-  invalid_response: "وصل رد غير صالح من المصدر",
-  network_failure: "تعذّر الاتصال بالمصدر",
-  source_ended_without_completion: "انتهى المصدر قبل اكتمال الجمع",
-  repeated_page_token: "تكرّر مؤشر الصفحة، فأُوقف الجمع لتفادي حلقة لا تنتهي",
-  retry_exhausted: "استُنفدت المحاولات المسموح بها",
-};
 
 /**
  * What to show where a comment's text used to be.
@@ -84,13 +59,10 @@ export const syncErrorMessages: Record<string, string> = {
  * rule the platform's terms require. Rendering a blank would read as a comment
  * nobody wrote.
  */
-export const PURGED_TEXT = "[حُذف النص بعد انتهاء مدة الاحتفاظ]";
-export const PURGED_AUTHOR = "[غير محتفظ به]";
-
-export function commentText(c: {
-  text_raw: string | null;
-  content_purged_at: string | null;
-}): string {
+export function commentText(
+  c: { text_raw: string | null; content_purged_at: string | null },
+  S: Strings,
+): string {
   if (c.text_raw !== null) return c.text_raw;
-  return c.content_purged_at ? PURGED_TEXT : "";
+  return c.content_purged_at ? S.purgedText : "";
 }

@@ -6,6 +6,8 @@
  * request back. The translation lives in the app because the app is where the
  * person is, and because an unrecognised code must still say something useful.
  */
+import type { StringKey, Strings } from "./strings";
+
 export type ConnectResult = {
   tone: "success" | "notice" | "error";
   heading: string;
@@ -16,66 +18,30 @@ export type ConnectResult = {
 
 const FAILURES: Record<
   string,
-  { detail: string; action: ConnectResult["action"] }
+  { detail: StringKey; action: ConnectResult["action"] }
 > = {
-  declined: {
-    detail:
-      "لم تُمنح الصلاحية، فلم يُربط شيء ولم يُحفظ أي رمز. يمكنك المحاولة مرة أخرى متى شئت.",
-    action: "retry",
-  },
-  youtube_api_not_enabled: {
-    detail:
-      "واجهة YouTube Data API v3 غير مفعّلة في مشروع Google Cloud الخاص بك. فعّلها ثم أعد المحاولة؛ الموافقة التي منحتها الآن لا تكفي وحدها.",
-    action: "console",
-  },
-  youtube_scope_missing: {
-    detail:
-      "الصلاحية الممنوحة لا تشمل قراءة بيانات يوتيوب. أعد المحاولة واقبل الطلب كاملًا.",
-    action: "retry",
-  },
-  youtube_quota_exceeded: {
-    detail: "استُهلكت حصة يوتيوب اليومية. تعود غدًا، وعندها أعد المحاولة.",
-    action: null,
-  },
-  no_channel_on_account: {
-    detail:
-      "لا توجد قناة يوتيوب على هذا الحساب. سجّل الدخول بحساب Google الذي يملك القناة.",
-    action: "retry",
-  },
-  ambiguous_channel: {
-    detail:
-      "هذا الحساب يملك أكثر من قناة، ولا نختار نيابة عنك. اختر حساب قناة واحدة.",
-    action: "retry",
-  },
-  no_refresh_token: {
-    detail:
-      "لم تمنح Google صلاحية متجددة، والجمع يحتاجها ليستمر بعد إغلاق المتصفح. أعد المحاولة واقبل الطلب كاملًا.",
-    action: "retry",
-  },
-  invalid_state: {
-    detail:
-      "انتهت صلاحية طلب الربط أو استُخدم من قبل. ابدأ من جديد؛ هذا القيد هو ما يمنع إعادة استخدام رابط قديم.",
-    action: "retry",
-  },
-  invalid_callback: {
-    detail: "الرابط الذي عدت به غير مكتمل. ابدأ الربط من جديد.",
-    action: "retry",
-  },
-  channel_already_connected: {
-    detail: "هذه القناة مرتبطة بمساحة عمل أخرى. افصلها هناك أولًا.",
-    action: null,
-  },
+  declined: { detail: "crDeclined", action: "retry" },
+  youtube_api_not_enabled: { detail: "crApiNotEnabled", action: "console" },
+  youtube_scope_missing: { detail: "crScopeMissing", action: "retry" },
+  youtube_quota_exceeded: { detail: "crQuotaExceeded", action: null },
+  no_channel_on_account: { detail: "crNoChannel", action: "retry" },
+  ambiguous_channel: { detail: "crAmbiguousChannel", action: "retry" },
+  no_refresh_token: { detail: "crNoRefreshToken", action: "retry" },
+  invalid_state: { detail: "crInvalidState", action: "retry" },
+  invalid_callback: { detail: "crInvalidCallback", action: "retry" },
+  channel_already_connected: { detail: "crAlreadyConnected", action: null },
 };
 
-export function connectResult(params: URLSearchParams): ConnectResult {
+export function connectResult(
+  params: URLSearchParams,
+  S: Strings,
+): ConnectResult {
   if (params.get("status") === "connected") {
     const channel = params.get("channel");
     return {
       tone: "success",
-      heading: "تم ربط القناة",
-      detail: channel
-        ? `القناة متصلة الآن. سيبدأ الجمع في أول مزامنة (${channel}).`
-        : "القناة متصلة الآن. سيبدأ الجمع في أول مزامنة.",
+      heading: S.crConnectedHeading,
+      detail: channel ? S.crConnectedDetailWith(channel) : S.crConnectedDetail,
       action: null,
     };
   }
@@ -85,15 +51,15 @@ export function connectResult(params: URLSearchParams): ConnectResult {
     return {
       // Declining is a choice, not a failure, and should not be coloured as one.
       tone: code === "declined" ? "notice" : "error",
-      heading: code === "declined" ? "لم يكتمل الربط" : "تعذر إتمام الربط",
-      detail: known.detail,
+      heading: code === "declined" ? S.crIncompleteHeading : S.crFailedHeading,
+      detail: S[known.detail],
       action: known.action,
     };
   return {
     tone: "error",
-    heading: "تعذر إتمام الربط",
+    heading: S.crFailedHeading,
     // The code and nothing else: it is diagnosable without being server text.
-    detail: `تعذر إتمام الطلب. رمز الخطأ: ${code || "unknown"}`,
+    detail: S.crUnknownDetail(code || "unknown"),
     action: "retry",
   };
 }

@@ -205,4 +205,237 @@ export const en: Strings = {
     "Each workspace keeps its own audience, data and permissions.",
   workspaceNameLabel: "Workspace name",
   createWorkspace: "Create workspace",
+
+  labels: {
+    positive: "Positive",
+    negative: "Negative",
+    neutral: "Neutral",
+    mixed: "Mixed",
+  },
+  budgetMessages: {
+    ok: "Within the limit",
+    warning: "Usage is approaching the limit",
+    critical: "Usage is nearly exhausted",
+    exhausted:
+      "Limit reached; no new batches will be analysed until the plan is raised or a new period begins",
+  },
+  reviewStateMessages: {
+    in_force: "In force: this is the result currently in effect",
+    superseded_by_review: "Superseded by a newer review",
+    superseded_by_edit:
+      "No longer applies after the text changed; needs re-checking",
+    legacy_unverified: "Legacy, unverified edit; not counted as a human review",
+  },
+  syncMessages: {
+    healthy: "The last sync completed recently",
+    running: "A sync is running now; the outcome is not known yet",
+    stale: "It has been a long time since the last sync; the data may be old",
+    partial:
+      "The last sync stopped before its end; coverage is partial, not complete",
+    incomplete_coverage:
+      "The source ended without proving full coverage; that does not mean every comment was collected",
+    failed: "The last sync failed",
+    blocked: "The source could not be reached in the last sync",
+    stalled: "Jobs are waiting and no collector is connected to run them",
+    never_run: "No sync has run yet",
+    never_run_no_worker: "No sync has run, and no collector is connected",
+    no_data: "No data about the sync status is available",
+  },
+  syncErrorMessages: {
+    source_access_denied:
+      "The source refused access, usually quota or permissions",
+    source_unavailable: "The source is temporarily unavailable",
+    source_http_error: "The source answered with an unexpected error",
+    invalid_response: "An invalid response arrived from the source",
+    network_failure: "The source could not be reached",
+    source_ended_without_completion:
+      "The source ended before collection completed",
+    repeated_page_token:
+      "A page token repeated, so collection stopped to avoid an endless loop",
+    retry_exhausted: "The allowed attempts were used up",
+  },
+  unknownDate: "Unknown date",
+  fixtureVideo: (n: string) => `Synthetic video ${n}`,
+  purgedText: "[Text removed after the retention period]",
+  purgedAuthor: "[Not retained]",
+  weekdays: [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ],
+
+  jobCommentsDisabled:
+    "Comments are disabled on this video. There is nothing to collect from it, and that is a setting on the video itself, not a fault in the tool.",
+  jobNoUploadHasComments: "None of the videos checked has any comments yet.",
+  jobNoUploadHasCommentsCounted: (checked: string, disabled: number) =>
+    `${checked} of the latest videos were checked, and none has a comment yet.${
+      disabled > 0
+        ? ` ${disabled} of them have comments turned off.`
+        : " None of them has comments turned off — the channel is simply quiet."
+    } The tool is working; there is nothing to read.`,
+  jobNoVideo: "No video suitable for collection was found on this channel.",
+  jobChannelNotConnected:
+    "No channel is connected to this job. Connect a YouTube channel first.",
+  jobCredentialExpired:
+    "The granted permission has expired. Reconnect the channel to renew it.",
+  jobQuotaExceeded:
+    "The daily YouTube quota is used up. It renews automatically, and the attempt is retried afterwards.",
+  jobInsufficientPermissions:
+    "The granted permission is not enough to read comments. Reconnect the channel to renew the scope.",
+  jobAccessDeniedWith: (reason: string) =>
+    `YouTube refused access (${reason}).`,
+  jobSuperseded:
+    "Cancelled because an identical request was already in the queue. One request per channel at a time.",
+  jobRetryExhaustedNoReason:
+    "The limit was reached without any worker recording a reason. This is not a collection failure: it is what a job taken from a worker that was still running looks like. Check the lease duration before restarting the worker.",
+  jobRetryExhausted: (why: string) =>
+    `The allowed limit was reached. Last reason a worker recorded: ${why}`,
+  jobLeaseThrashing: (times: string) =>
+    `This job changed hands ${times} times without finishing. It is not slow; nothing can hold on to it — check the worker itself, not the lease duration.`,
+  jobLeaseThrashingRepeatedly: "repeatedly",
+  jobUnexplainedCode: (code: string) => `Unexplained code: ${code}`,
+  jobNoReason: "No reason was recorded.",
+  jobQueuedHeadline: "Waiting",
+  jobQueuedWithWorker: "In the queue; no collector has picked it up yet.",
+  jobQueuedNoWorker:
+    "In the queue, and no collector is running now. It will not start until one does.",
+  jobRunningHeadline: "In progress",
+  jobRunningDetail: "A collector is working on this job now.",
+  jobSucceededHeadline: "Completed",
+  jobSucceededDetail:
+    "The job ran to its end. What arrived is counted on the dashboard, and may be zero if there were no comments.",
+  jobPartialHeadline: "Partially completed",
+  jobPartialDetail:
+    "It stopped before exhausting the source: what was found is saved, and the rest was not read.",
+  jobFailedHeadline: "Failed",
+  jobBlockedHeadline: "Blocked",
+  jobCancelledHeadline: "Cancelled",
+
+  crDeclined:
+    "Permission was not granted, so nothing was connected and no token was stored. You can try again whenever you like.",
+  crApiNotEnabled:
+    "The YouTube Data API v3 is not enabled in your Google Cloud project. Enable it and try again; the consent you just gave is not enough on its own.",
+  crScopeMissing:
+    "The permission granted does not include reading YouTube data. Try again and accept the full request.",
+  crQuotaExceeded:
+    "The daily YouTube quota is used up. It returns tomorrow; try again then.",
+  crNoChannel:
+    "There is no YouTube channel on this account. Sign in with the Google account that owns the channel.",
+  crAmbiguousChannel:
+    "This account owns more than one channel, and we do not choose for you. Pick a single-channel account.",
+  crNoRefreshToken:
+    "Google did not grant a renewable permission, and collection needs one to continue after the browser closes. Try again and accept the full request.",
+  crInvalidState:
+    "The connection request expired or was already used. Start again; that restriction is what stops an old link being reused.",
+  crInvalidCallback:
+    "The link you returned with is incomplete. Start the connection again.",
+  crAlreadyConnected:
+    "This channel is connected to another workspace. Disconnect it there first.",
+  crConnectedHeading: "Channel connected",
+  crConnectedDetail:
+    "The channel is connected now. Collection starts with the first sync.",
+  crConnectedDetailWith: (channel: string) =>
+    `The channel is connected now. Collection starts with the first sync (${channel}).`,
+  crIncompleteHeading: "The connection was not completed",
+  crFailedHeading: "The connection could not be completed",
+  crUnknownDetail: (code: string) =>
+    `The request could not be completed. Error code: ${code}`,
+  connectedEyebrow: "Connecting a YouTube channel",
+  enableApiLink: "Open the YouTube Data API activation page",
+  backToAccount: "Back to the account",
+
+  dsNoRun: "No collection has been recorded for this workspace yet.",
+  dsCounted: (comments: string, videos: string) =>
+    `${comments} comments from ${videos} videos`,
+  dsCoverageComplete: (counted: string) =>
+    `${counted}. The source was read to its end in the last collection.`,
+  dsCoveragePartial: (counted: string) =>
+    `${counted}. The source was not read to its end, so coverage is partial.`,
+  dsNoPreviousRun: "There is no previous collection.",
+  dsHealthUnknown: "The collection status is unknown.",
+  dsUpdatedUnderHour: "Last updated less than an hour ago.",
+  dsUpdatedHours: (hours: string) => `Last updated ${hours} hours ago.`,
+  dsFixtureBadge: "Synthetic data",
+  dsFixtureScope: "A demo workspace, not connected to any channel",
+  dsFixtureReading: "Reading the test data.",
+  dsFixtureCoverage: (total: string) =>
+    `${total} comments written for testing. They represent no real audience.`,
+  dsReviewsPersist: "Corrections are saved.",
+  dsReviewsSessionOnly:
+    "Corrections stay in this session only and are not sent to any server.",
+  dsLiveBadge: "Live data",
+  dsWorkspaceById: (id: string) => `Workspace ${id}`,
+  dsReadingLive: "Reading the data.",
+  dsReviewsLogged:
+    "Corrections are saved to the review log and cannot be edited once saved.",
+  dsReviewsNotSaved: "Corrections are not saved.",
+
+  opsEyebrow: "Operations",
+  opsTitle: "Collection and analysis status",
+  opsSignedOutLead:
+    "This page follows your channel's operation: collection activity, your plan's limits, and a log of every attempt and its reason. All of it belongs to an account and a channel connected to it, so there is nothing to follow before signing in.",
+  opsSignInOrJoin: "Sign in or create an account",
+  opsSeeDemo: "See what this page looks like",
+  opsLead:
+    "What you see here describes the service's operation; the audience's comments and their reading are on the dashboard.",
+  opsDemoTag: "demo preview",
+  opsWorkspaceData: "Operations data for workspace",
+  opsDemoNote:
+    "Synthetic operations data for the demo, not connected to a real channel.",
+  opsReading: "Reading the operations status…",
+  opsReadFailed: "The operations status could not be read.",
+  retry: "Try again",
+  opsHealthTitle: "Sync health",
+  opsUnclassifiedFailure: "The sync failed for an unclassified reason",
+  opsQueued: (n: number) => `Jobs waiting: ${n}`,
+  opsWorkerLabel: "Collector:",
+  opsWorkerConnected: (heartbeat: string) =>
+    `connected, last heartbeat ${heartbeat}`,
+  opsWorkerDisconnected:
+    "not connected now. Data will not refresh automatically until the collector returns.",
+  opsRequesting: "Requesting…",
+  opsNoChannelBefore: "No channel is connected to this workspace.",
+  opsNoChannelLink: "Connect a channel from the account page",
+  opsNoChannelAfter: "to start collecting.",
+  opsLastRun: (at: string, source: string, videos: number, comments: number) =>
+    `Last run: ${at} — source ${source} — videos ${videos}, comments ${comments}.`,
+  opsTraversalComplete: "The source was traversed completely.",
+  opsTraversalUnproven: "Full traversal of the source was not proven.",
+  opsNoPreviousRun: "No previous run is recorded.",
+  opsPlanTitle: "Plan limits",
+  opsNoPlanStrong: "No plan is active for this workspace",
+  opsNoPlanLead:
+    "The operator activates plans manually at this stage; this does not mean the limit is reached.",
+  opsPlanPeriod: (key: string, from: string, to: string) =>
+    `${key} plan — period from ${from} to ${to}, UTC.`,
+  opsBudgetLine: (used: number, allowance: number, remaining: number) =>
+    `${used} of ${allowance} — ${remaining} left`,
+  opsShare: (share: number, message: string) => `${share}% — ${message}`,
+  opsAttemptsTitle: "Attempt log",
+  opsAttemptsLead:
+    "Every collection attempt, newest first, with the reason for what happened.",
+  opsDemoNoLogStrong: "The demo carries no job log",
+  opsDemoNoLogLead:
+    "Jobs belong to a real account and a connected channel. No invented log is shown here to make the place look full.",
+  opsLogFailedStrong: "The job log could not be read",
+  opsLogFailedLead: "That does not mean it is empty.",
+  opsLogReading: "Reading the attempt log…",
+  opsNoAttemptsStrong: "No attempts yet",
+  opsNoAttemptsLead: "Request a sync from the account page.",
+  opsAttemptN: (n: number) => ` · attempt ${n}`,
+  opsCancel: "Withdraw from the queue",
+  refresh: "Refresh",
+  opsCancelFailed:
+    "The job could not be withdrawn — a worker may have started it already.",
+  opsRetryFailed: "The retry could not be registered.",
+  opsCancelled: "The job was withdrawn from the queue.",
+  opsRetried:
+    "A new attempt was added; it resumes where the previous one stopped.",
+  opsSyncRequestFailed: "The sync request could not be registered.",
+  opsSyncRequestStanding:
+    "A sync request is standing. Each channel has one request at a time, and it starts when a collector is running.",
 };

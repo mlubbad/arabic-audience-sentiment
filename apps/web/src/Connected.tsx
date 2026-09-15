@@ -1,16 +1,18 @@
 import { Link, useSearchParams } from "react-router";
 import { connectResult } from "./connectResult";
+import { useStrings } from "./strings";
 
 /** Where Google's callback hands the person back, inside the product. */
 export function Connected() {
   const [params] = useSearchParams();
-  const result = connectResult(params);
+  const S = useStrings();
+  const result = connectResult(params, S);
   return (
     <div className="app-state connect-result-page">
       <span className="app-state-symbol" aria-hidden="true">
         {result.tone === "success" ? "✓" : "!"}
       </span>
-      <p className="app-eyebrow">ربط قناة يوتيوب</p>
+      <p className="app-eyebrow">{S.connectedEyebrow}</p>
       <h1>{result.heading}</h1>
       <div
         className="notice"
@@ -26,14 +28,14 @@ export function Connected() {
             target="_blank"
             rel="noreferrer"
           >
-            افتح صفحة تفعيل YouTube Data API
+            {S.enableApiLink}
           </a>
         )}
       </p>
       <div className="app-state-actions">
-        <Link to="/account">العودة إلى الحساب</Link>
+        <Link to="/account">{S.backToAccount}</Link>
         {result.tone === "success" && (
-          <Link to="/dashboard">فتح لوحة البيانات</Link>
+          <Link to="/dashboard">{S.openDashboard}</Link>
         )}
       </div>
     </div>

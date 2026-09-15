@@ -1,4 +1,4 @@
-import { syncErrorMessages } from "./i18n";
+import type { Strings } from "./strings";
 /**
  * What one collection job actually did, said in words the operator can act on.
  *
@@ -62,36 +62,32 @@ export type JobEntry = {
  * in that table, so the panel fell through to "لسبب غير مصنَّف" and lost the
  * part that mattered.
  */
-export function explainCode(code: string): string | null {
-  return explain(code);
+export function explainCode(code: string, S: Strings): string | null {
+  return explain(code, S);
 }
 
-function explain(code: string): string | null {
+function explain(code: string, S: Strings): string | null {
   const [head, ...rest] = code.split(":");
   const tail = rest.join(":");
   switch (head) {
     case "comments_disabled":
     case "explicitly_disabled":
-      return "التعليقات مُعطَّلة على هذا الفيديو. لا شيء يمكن جمعه منه، وهذا إعداد في الفيديو نفسه لا خلل في الأداة.";
+      return S.jobCommentsDisabled;
     case "no_upload_has_comments": {
       // `12_checked_0_disabled` — counts, not prose, so they are read out.
       const m = tail.match(/^(\d+)_checked_(\d+)_disabled$/);
-      if (!m) return "لا يحمل أيٌّ من الفيديوهات المفحوصة تعليقات بعد.";
+      if (!m) return S.jobNoUploadHasComments;
       const [, checked, disabled] = m;
-      const off =
-        Number(disabled) > 0
-          ? ` ${disabled} منها التعليقات مغلقة عليه.`
-          : " ولا واحد منها التعليقات مغلقة عليه — القناة هادئة فحسب.";
-      return `فُحص ${checked} من أحدث الفيديوهات، ولا يحمل أيٌّ منها تعليقًا بعد.${off} الأداة تعمل؛ لا يوجد ما تقرؤه.`;
+      return S.jobNoUploadHasCommentsCounted(checked, Number(disabled));
     }
     case "no_video_to_collect":
-      return "لم يُعثر على فيديو صالح للجمع في هذه القناة.";
+      return S.jobNoVideo;
     case "channel_not_connected":
-      return "لا توجد قناة مرتبطة بهذه المهمة. اربط قناة يوتيوب أولًا.";
+      return S.jobChannelNotConnected;
     case "credential_expired":
-      return "انتهت صلاحية الإذن الممنوح. أعد ربط القناة لتجديده.";
+      return S.jobCredentialExpired;
     case "quota_exceeded":
-      return "استُنفدت حصة يوتيوب اليومية. تتجدد تلقائيًا، وتُعاد المحاولة بعدها.";
+      return S.jobQuotaExceeded;
     case "source_access_denied":
       // The switch may only override the table where it has something *more*
       // specific to say. Its bare branch said less — "رفض يوتيوب الوصول."
@@ -100,11 +96,11 @@ function explain(code: string): string | null {
       // tells the operator where to look. A parameter is what earns the
       // override; without one, the table's wording stands.
       if (tail === "insufficientPermissions")
-        return "الإذن الممنوح لا يكفي لقراءة التعليقات. أعد ربط القناة لتجديد النطاق.";
-      if (tail) return `رفض يوتيوب الوصول (${tail}).`;
-      return syncErrorMessages.source_access_denied;
+        return S.jobInsufficientPermissions;
+      if (tail) return S.jobAccessDeniedWith(tail);
+      return S.syncErrorMessages.source_access_denied;
     case "superseded_by_existing_request":
-      return "أُلغيت لأن طلبًا مطابقًا كان في الطابور بالفعل. طلب واحد لكل قناة في كل مرة.";
+      return S.jobSuperseded;
     case "retry_exhausted": {
       // The distinction the operator most needs, and the one a flat table
       // cannot carry. "Exhausted with no reason recorded" does not mean the
@@ -112,14 +108,14 @@ function explain(code: string): string | null {
       // a job taken from a worker that was still running looks like. Restarting
       // the worker is the wrong response to it.
       if (!tail || tail === "no_error_recorded")
-        return "بلغت الحدّ دون أن يسجّل أي عامل سببًا. هذا ليس فشلًا في الجمع: هكذا تبدو مهمّة انتُزعت من عامل كان يعمل. افحص مدّة الحيازة قبل أن تعيد تشغيل العامل.";
-      const why = explain(tail);
-      return `بلغت الحدّ المسموح. آخر سبب سجّله عامل: ${why ?? tail}`;
+        return S.jobRetryExhaustedNoReason;
+      const why = explain(tail, S);
+      return S.jobRetryExhausted(why ?? tail);
     }
     case "lease_thrashing":
       // Not a slow job. A job nothing can hold, which is a different problem
       // and deserves a different word.
-      return `تغيّرت يد هذه المهمة ${tail || "مرارًا"} مرّة دون أن تُنهى. ليست بطيئة؛ لا شيء يقدر على إمساكها — افحص العامل نفسه لا مدّة الحيازة.`;
+      return S.jobLeaseThrashing(tail || S.jobLeaseThrashingRepeatedly);
     default:
       // The shared table, before giving up.
       //
@@ -130,13 +126,14 @@ function explain(code: string): string | null {
       // exists for codes that carry parameters a flat table cannot hold —
       // `no_upload_has_comments:12_checked_0_disabled` — so it stays, and
       // everything it does not recognise now asks the table that does.
-      return syncErrorMessages[head] ?? null;
+      return (S.syncErrorMessages as Record<string, string>)[head] ?? null;
   }
 }
 
 export function describeJob(
   job: JobRow,
   opts: { workerConnected: boolean },
+  S: Strings,
 ): JobEntry {
   const base = {
     id: job.id,
@@ -149,62 +146,60 @@ export function describeJob(
       job.status,
     ),
   };
-  const reason = job.error_code ? explain(job.error_code) : null;
+  const reason = job.error_code ? explain(job.error_code, S) : null;
   // An unrecognised code is shown as itself rather than smoothed into a
   // reassuring sentence: an unexplained code is a question, and inventing an
   // explanation for it would be worse than admitting there isn't one.
   const fallback = job.error_code
-    ? `رمز غير مفسَّر: ${job.error_code}`
-    : "لم يُسجَّل سبب.";
+    ? S.jobUnexplainedCode(job.error_code)
+    : S.jobNoReason;
 
   switch (job.status) {
     case "queued":
       return {
         ...base,
         severity: opts.workerConnected ? "warning" : "critical",
-        headline: "في الانتظار",
+        headline: S.jobQueuedHeadline,
         detail: opts.workerConnected
-          ? "في الطابور، ولم يلتقطها عامل الجمع بعد."
-          : "في الطابور، ولا يوجد عامل جمع يعمل الآن. لن تبدأ حتى يعمل واحد.",
+          ? S.jobQueuedWithWorker
+          : S.jobQueuedNoWorker,
       };
     case "running":
       return {
         ...base,
         severity: "ok",
-        headline: "قيد التنفيذ",
-        detail: "عامل الجمع يعمل على هذه المهمة الآن.",
+        headline: S.jobRunningHeadline,
+        detail: S.jobRunningDetail,
       };
     case "succeeded":
       return {
         ...base,
         severity: "ok",
-        headline: "اكتملت",
+        headline: S.jobSucceededHeadline,
         // Deliberately not "جُمعت التعليقات": a run can end successfully having
         // read a video that has none, and claiming otherwise would put a
         // success next to an empty table.
-        detail:
-          "انتهت المهمة إلى نهايتها. عدد ما وصل يظهر في اللوحة، وقد يكون صفرًا إن لم يكن هناك تعليق.",
+        detail: S.jobSucceededDetail,
       };
     case "partial":
       return {
         ...base,
         severity: "warning",
-        headline: "اكتملت جزئيًا",
-        detail:
-          `توقّفت قبل استيفاء المصدر، فما وُجد محفوظ وما تبقّى لم يُقرأ. ${reason ?? ""}`.trim(),
+        headline: S.jobPartialHeadline,
+        detail: `${S.jobPartialDetail} ${reason ?? ""}`.trim(),
       };
     case "failed":
       return {
         ...base,
         severity: "critical",
-        headline: "فشلت",
+        headline: S.jobFailedHeadline,
         detail: reason ?? fallback,
       };
     case "blocked":
       return {
         ...base,
         severity: "critical",
-        headline: "متوقّفة",
+        headline: S.jobBlockedHeadline,
         detail: reason ?? fallback,
       };
     case "cancelled":
@@ -215,7 +210,7 @@ export function describeJob(
           job.error_code === "superseded_by_existing_request"
             ? "muted"
             : "warning",
-        headline: "أُلغيت",
+        headline: S.jobCancelledHeadline,
         detail: reason ?? fallback,
       };
   }

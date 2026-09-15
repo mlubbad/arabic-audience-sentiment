@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ar } from "./strings/ar";
 import { describeSource } from "./dataSource";
 import type { SyncState } from "./syncHealth";
 
@@ -28,6 +29,7 @@ const live = (over = {}) =>
     sync: sync(),
     total: 4899,
     now: NOW,
+    S: ar,
     ...over,
   });
 const fixture = (over = {}) =>
@@ -38,6 +40,7 @@ const fixture = (over = {}) =>
     sync: null,
     total: 6,
     now: NOW,
+    S: ar,
     ...over,
   });
 

@@ -36,16 +36,9 @@ function placeable(c: LabelledComment): Date | null {
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 // Sunday-first, matching how an Arabic week is read and how the reference
-// orders its own weekday chart.
-const DAYS = [
-  "الأحد",
-  "الاثنين",
-  "الثلاثاء",
-  "الأربعاء",
-  "الخميس",
-  "الجمعة",
-  "السبت",
-];
+// orders its own weekday chart. The names come from the strings, in the
+// interface language; the order is fixed here.
+const WEEK = 7;
 
 export function byHour(comments: LabelledComment[]): Bucketed {
   const counts = new Map(HOURS.map((h) => [h, 0]));
@@ -68,8 +61,12 @@ export function byHour(comments: LabelledComment[]): Bucketed {
   };
 }
 
-export function byWeekday(comments: LabelledComment[]): Bucketed {
-  const counts = new Map(DAYS.map((_, i) => [i, 0]));
+export function byWeekday(
+  comments: LabelledComment[],
+  /** Seven names, Sunday first. */
+  dayNames: readonly string[],
+): Bucketed {
+  const counts = new Map(Array.from({ length: WEEK }, (_, i) => [i, 0]));
   let unplaceable = 0;
   for (const c of comments) {
     const d = placeable(c);
@@ -80,7 +77,7 @@ export function byWeekday(comments: LabelledComment[]): Bucketed {
     counts.set(d.getDay(), (counts.get(d.getDay()) ?? 0) + 1);
   }
   return {
-    buckets: DAYS.map((label, i) => ({
+    buckets: dayNames.slice(0, WEEK).map((label, i) => ({
       key: String(i),
       label,
       count: counts.get(i) ?? 0,

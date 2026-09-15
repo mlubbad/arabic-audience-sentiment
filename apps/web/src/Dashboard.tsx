@@ -36,14 +36,9 @@ import { useSession, useWorkspaces } from "./session";
 import { useWorkspaceSelection } from "./workspaceSelection";
 import { WorkspaceGate } from "./WorkspaceGate";
 import { workspaceState, readableWorkspace } from "./workspace";
-import {
-  labels,
-  reviewStateMessages,
-  videoLabel,
-  displayDate,
-  commentText,
-  PURGED_AUTHOR,
-} from "./i18n";
+import { videoLabel, displayDate, commentText } from "./i18n";
+import { useLocale } from "./locale";
+import { useStrings } from "./strings";
 import { reviewHistory } from "./reviewHistory";
 import { describeSource } from "./dataSource";
 import {
@@ -274,6 +269,9 @@ function DashboardBody({
   workspaceId: string;
   workspaceName: string | null;
 }) {
+  const S = useStrings();
+  const lang = useLocale();
+  const labels = S.labels;
   const [filters, setFilters] = useState<Filters>(defaults),
     [query, setQuery] = useState(""),
     [video, setVideo] = useState(""),
@@ -548,7 +546,7 @@ function DashboardBody({
   // array only when the read or the filters actually changed.
   const rows = s?.filtered ?? [];
   const hours = useMemo(() => byHour(rows), [rows]);
-  const weekdays = useMemo(() => byWeekday(rows), [rows]);
+  const weekdays = useMemo(() => byWeekday(rows, S.weekdays), [rows, S]);
   const weeks = useMemo(() => byWeek(rows), [rows]);
   const [peopleBy, setPeopleBy] = useState<"comments" | "likes">("comments");
   const people = useMemo(() => commenters(rows, peopleBy), [rows, peopleBy]);
@@ -583,6 +581,7 @@ function DashboardBody({
     sync: s?.sync ?? null,
     total: s?.total ?? null,
     now: new Date(),
+    S,
   });
   const span = s?.timeline ?? [];
   const range =
@@ -746,7 +745,7 @@ function DashboardBody({
                 of the ones it does. */}
             {(s?.video_options ?? []).map((v) => (
               <option key={v.id} value={v.id}>
-                {videoLabel(v.id, v.title)}
+                {videoLabel(v.id, v.title, S)}
               </option>
             ))}
           </select>
@@ -1111,7 +1110,7 @@ function DashboardBody({
                         >
                           <span>
                             <span className="rp-video-title">
-                              {videoLabel(v.id, v.title)}
+                              {videoLabel(v.id, v.title, S)}
                             </span>
                             <span className="rp-video-meta">
                               <span>{n(v.total)} تعليقًا</span>
@@ -1525,7 +1524,7 @@ function DashboardBody({
                     <tbody>
                       {s.comparison.map((v) => (
                         <tr key={v.id} data-testid={`compare-${v.id}`}>
-                          <td>{videoLabel(v.id, v.title)}</td>
+                          <td>{videoLabel(v.id, v.title, S)}</td>
                           <td>{v.total}</td>
                           <td>{v.replies}</td>
                           <td>{v.analysed}</td>
@@ -1616,7 +1615,7 @@ function DashboardBody({
                           </span>
                           <span className="engaged-body">
                             <span className="engaged-text">
-                              {commentText(c)}
+                              {commentText(c, S)}
                             </span>
                             {c.reviewed && <small>مراجعة بشرية</small>}
                             <span
@@ -1694,7 +1693,7 @@ function DashboardBody({
                         <span className="rp-comment-who">
                           {/* A purged author is named as purged, not left
                               blank and not replaced with a plausible name. */}
-                          {c.author_name ?? PURGED_AUTHOR}
+                          {c.author_name ?? S.purgedAuthor}
                         </span>
                         <span
                           className="rp-chip"
@@ -1715,9 +1714,9 @@ function DashboardBody({
                             )}
                         </span>
                       </div>
-                      <p className="rp-comment-text">{commentText(c)}</p>
+                      <p className="rp-comment-text">{commentText(c, S)}</p>
                       <div className="rp-comment-foot">
-                        <span>{displayDate(c.published_at)}</span>
+                        <span>{displayDate(c.published_at, lang)}</span>
                         <span>
                           {/* Unknown likes are said to be unknown. Rendering a
                               zero here would be a number we invented. */}
@@ -1780,10 +1779,10 @@ function DashboardBody({
                       {s.comments.map((c) => (
                         <tr key={c.id}>
                           <td>
-                            {c.author_name ?? PURGED_AUTHOR}
+                            {c.author_name ?? S.purgedAuthor}
                             {c.is_reply && <small>رد</small>}
                           </td>
-                          <td>{commentText(c)}</td>
+                          <td>{commentText(c, S)}</td>
                           <td>
                             {/* The cards a hundred pixels above wear a chip for
                                 this. Printing it as bare text here made one
@@ -1810,7 +1809,7 @@ function DashboardBody({
 
                             {c.reviewed && <small>مراجعة بشرية</small>}
                           </td>
-                          <td>{displayDate(c.published_at)}</td>
+                          <td>{displayDate(c.published_at, lang)}</td>
                           <td>
                             <button
                               type="button"
@@ -1838,7 +1837,7 @@ function DashboardBody({
                   >
                     <h3>تصحيح تصنيف تعليق</h3>
                     <blockquote data-testid="review-text">
-                      {commentText(reviewing)}
+                      {commentText(reviewing, S)}
                     </blockquote>
                     <p className="muted">
                       التصنيف الحالي:{" "}
@@ -1858,12 +1857,12 @@ function DashboardBody({
                             ({ review: r, state }, i) => (
                               <li key={`${r.created_at}-${i}`}>
                                 <strong>{labels[r.label]}</strong>
-                                <span>{displayDate(r.created_at)}</span>
+                                <span>{displayDate(r.created_at, lang)}</span>
                                 <span data-testid="review-by">
                                   {r.reviewer_id ?? "مراجع غير معروف"}
                                 </span>
                                 <small data-state={state}>
-                                  {reviewStateMessages[state]}
+                                  {S.reviewStateMessages[state]}
                                 </small>
                                 {r.reason && (
                                   <q data-testid="review-reason">{r.reason}</q>

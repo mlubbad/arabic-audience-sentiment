@@ -31,7 +31,9 @@ import {
   type WorkspaceOption,
 } from "./workspace";
 import { syncHealth } from "./syncHealth";
-import { budgetMessages, budgetNames, displayDate, syncMessages } from "./i18n";
+import { displayDate } from "./i18n";
+import { useLocale } from "./locale";
+import { useStrings } from "./strings";
 import {
   describeJob,
   explainCode,
@@ -53,6 +55,7 @@ export function Sync() {
   const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
     route: true,
   });
+  const S = useStrings();
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,
@@ -89,21 +92,17 @@ export function Sync() {
       <span className="app-state-symbol" aria-hidden="true">
         ⟳
       </span>
-      <p className="app-eyebrow">التشغيل</p>
+      <p className="app-eyebrow">{S.opsEyebrow}</p>
       {/* The page keeps its name whether you are signed in or not. The first
             draft of this state led with a sentence about the page instead —
             "هذه الصفحة تتبع تشغيل قناتك" — and a browser test caught it: a
             reader who arrives from a menu item called "حالة المزامنة" should
             land on a heading that agrees with the thing they clicked. */}
-      <h1>حالة الجمع والتحليل</h1>
-      <p>
-        هذه الصفحة تتبع تشغيل قناتك: نشاط الجمع، وحدود خطتك، وسجل كل محاولة
-        وسببها. كلها تخص حسابًا وقناة مرتبطة به، فلا يوجد ما تتابعه قبل تسجيل
-        الدخول.
-      </p>
+      <h1>{S.opsTitle}</h1>
+      <p>{S.opsSignedOutLead}</p>
       <div className="app-state-actions">
-        <a href="/account">سجّل الدخول أو أنشئ حسابًا</a>
-        <a href="/sync?demo=1">شاهد كيف تبدو هذه الصفحة</a>
+        <a href="/account">{S.opsSignInOrJoin}</a>
+        <a href="/sync?demo=1">{S.opsSeeDemo}</a>
       </div>
     </div>
   );
@@ -121,9 +120,9 @@ export function Sync() {
       chosen={chosen}
       onChoose={setChosen}
       words={{
-        eyebrow: "حالة الجمع",
-        chooseTitle: "أي مساحة عمل تريد متابعة تشغيلها؟",
-        chooseLead: "لكل مساحة حالة جمع وحدود خطة وسجل محاولات مستقل.",
+        eyebrow: S.gateOperationsEyebrow,
+        chooseTitle: S.gateOperationsTitle,
+        chooseLead: S.gateOperationsLead,
         chooseTestId: "sync-ws-choose",
       }}
     >
@@ -157,6 +156,8 @@ function SyncBody({
   options: WorkspaceOption[];
   onChoose: (id: string) => void;
 }) {
+  const S = useStrings();
+  const lang = useLocale();
   const snapshot = useQuery({
     queryKey: ["sync-snapshot", userId, mode, workspaceId],
     queryFn: ({ signal }) =>
@@ -187,11 +188,11 @@ function SyncBody({
       setActionMessage(
         error
           ? kind === "cancel_job"
-            ? "تعذّر سحب المهمة — قد يكون عامل قد بدأها بالفعل."
-            : "تعذّرت إعادة المحاولة."
+            ? S.opsCancelFailed
+            : S.opsRetryFailed
           : kind === "cancel_job"
-            ? "سُحبت المهمة من الطابور."
-            : "أُضيفت محاولة جديدة، تستأنف من حيث توقّفت السابقة.",
+            ? S.opsCancelled
+            : S.opsRetried,
       );
       setTick((t) => t + 1);
       void snapshot.refetch();
@@ -215,9 +216,7 @@ function SyncBody({
         // Never "أُضيفت": a second click is answered with the first job, and
         // claiming a new one was queued would be false on every click but one.
         setActionMessage(
-          error
-            ? "تعذّر تسجيل طلب المزامنة."
-            : "طلب المزامنة قائم. لكل قناة طلب واحد في كل مرة، ويبدأ حين يعمل عامل الجمع.",
+          error ? S.opsSyncRequestFailed : S.opsSyncRequestStanding,
         );
         setTick((t) => t + 1);
         void snapshot.refetch();
@@ -263,33 +262,30 @@ function SyncBody({
   const run = s?.sync?.last_run ?? null;
   const connected = !!s?.sync?.worker.connected;
   const entries: JobEntry[] = (jobs ?? []).map((j) =>
-    describeJob(j, { workerConnected: connected }),
+    describeJob(j, { workerConnected: connected }, S),
   );
 
   return (
     <div className="rp-page">
       <header className="rp-hero">
         <p className="rp-eyebrow">
-          التشغيل {workspaceName ? `· ${workspaceName}` : "· معاينة تجريبية"}
+          {S.opsEyebrow} · {workspaceName ?? S.opsDemoTag}
         </p>
-        <h1>حالة الجمع والتحليل</h1>
+        <h1>{S.opsTitle}</h1>
         {/* The one sentence that orients — this page against the other one.
             "تابع … من مكان واحد" was a pitch and is gone. */}
-        <p>
-          ما تراه هنا يصف تشغيل الخدمة؛ تعليقات الجمهور وتفسيرها في لوحة
-          البيانات.
-        </p>
+        <p>{S.opsLead}</p>
       </header>
       {mode === "live" ? (
         <div className="sync-workspace">
           <p>
-            بيانات التشغيل لمساحة <strong>{workspaceName}</strong>
+            {S.opsWorkspaceData} <strong>{workspaceName}</strong>
           </p>
           {options.length > 1 && (
             <label>
-              مساحة العمل
+              {S.workspaceLabel}
               <select
-                aria-label="تغيير مساحة العمل"
+                aria-label={S.changeWorkspace}
                 value={workspaceId}
                 onChange={(e) => onChoose(e.target.value)}
               >
@@ -303,18 +299,16 @@ function SyncBody({
           )}
         </div>
       ) : (
-        <p className="sync-demo">
-          بيانات تشغيل اصطناعية للتجربة، غير مرتبطة بقناة حقيقية.
-        </p>
+        <p className="sync-demo">{S.opsDemoNote}</p>
       )}
 
       {snapshot.isPending ? (
-        <p role="status">جارٍ قراءة حالة التشغيل…</p>
+        <p role="status">{S.opsReading}</p>
       ) : snapshot.isError ? (
         <div role="alert" className="notice">
-          <p>تعذّرت قراءة حالة التشغيل.</p>
+          <p>{S.opsReadFailed}</p>
           <button type="button" onClick={() => void snapshot.refetch()}>
-            إعادة المحاولة
+            {S.retry}
           </button>
         </div>
       ) : (
@@ -326,27 +320,29 @@ function SyncBody({
               data-testid="sync-panel"
             >
               <header>
-                <h2 id="sync-heading">صحة المزامنة</h2>
+                <h2 id="sync-heading">{S.opsHealthTitle}</h2>
               </header>
               <article className="rp-card">
                 <p data-testid="sync-state" data-severity={health.severity}>
-                  <strong>{syncMessages[health.key]}</strong>
+                  <strong>{S.syncMessages[health.key]}</strong>
                 </p>
                 {health.errorCode && (
                   <p data-testid="sync-error">
-                    {explainCode(health.errorCode) ??
-                      "تعذّرت المزامنة لسبب غير مصنَّف"}{" "}
+                    {explainCode(health.errorCode, S) ??
+                      S.opsUnclassifiedFailure}{" "}
                     (<code>{health.errorCode}</code>)
                   </p>
                 )}
                 {health.queued > 0 && (
-                  <p data-testid="sync-queued">مهام منتظرة: {health.queued}</p>
+                  <p data-testid="sync-queued">{S.opsQueued(health.queued)}</p>
                 )}
                 <p data-testid="sync-worker">
-                  العامل:{" "}
+                  {S.opsWorkerLabel}{" "}
                   {s?.sync?.worker.connected
-                    ? `متصل، آخر نبضة ${displayDate(s.sync.worker.last_heartbeat_at)}`
-                    : "غير متصل الآن. لن تُحدَّث البيانات تلقائيًا حتى يعود عامل الجمع."}
+                    ? S.opsWorkerConnected(
+                        displayDate(s.sync.worker.last_heartbeat_at, lang),
+                      )
+                    : S.opsWorkerDisconnected}
                 </p>
                 {/* The remedy, beside the diagnosis. Offered only when it can
                     work: without a connected channel the server refuses, and a
@@ -361,28 +357,31 @@ function SyncBody({
                         disabled={acting === "enqueue"}
                         onClick={requestSync}
                       >
-                        {acting === "enqueue" ? "جارٍ الطلب…" : "طلب مزامنة"}
+                        {acting === "enqueue" ? S.opsRequesting : S.requestSync}
                       </button>
                     ) : (
                       <p className="muted" data-testid="sync-no-channel">
-                        لا توجد قناة مرتبطة بمساحة العمل هذه.{" "}
-                        <a href="/account">اربط قناة من صفحة الحساب</a> ليبدأ
-                        الجمع.
+                        {S.opsNoChannelBefore}{" "}
+                        <a href="/account">{S.opsNoChannelLink}</a>{" "}
+                        {S.opsNoChannelAfter}
                       </p>
                     )}
                   </div>
                 )}
                 {run ? (
                   <p data-testid="sync-last-run">
-                    آخر تشغيل: {displayDate(run.started_at)} — المصدر{" "}
-                    {run.source} — فيديوهات {run.coverage.videos_seen}، تعليقات{" "}
-                    {run.coverage.comments_collected}.{" "}
+                    {S.opsLastRun(
+                      displayDate(run.started_at, lang),
+                      run.source,
+                      run.coverage.videos_seen,
+                      run.coverage.comments_collected,
+                    )}{" "}
                     {run.coverage.complete
-                      ? "اكتمل اجتياز المصدر."
-                      : "لم يُثبت اجتياز المصدر بالكامل."}
+                      ? S.opsTraversalComplete
+                      : S.opsTraversalUnproven}
                   </p>
                 ) : (
-                  <p data-testid="sync-last-run">لا يوجد تشغيل سابق مسجَّل.</p>
+                  <p data-testid="sync-last-run">{S.opsNoPreviousRun}</p>
                 )}
               </article>
             </section>
@@ -393,20 +392,21 @@ function SyncBody({
               data-testid="plan-panel"
             >
               <header>
-                <h2 id="plan-heading">حدود الخطة</h2>
+                <h2 id="plan-heading">{S.opsPlanTitle}</h2>
               </header>
               {s?.plan == null ? (
                 <p className="rp-missing" data-testid="plan-none">
-                  <strong>لا توجد خطة مفعّلة لمساحة العمل هذه</strong>
-                  يفعّل المشغّل الخطة يدويًا في هذه المرحلة، ولا يعني ذلك نفاد
-                  الحد.
+                  <strong>{S.opsNoPlanStrong}</strong>
+                  {S.opsNoPlanLead}
                 </p>
               ) : (
                 <article className="rp-card">
                   <p className="rp-sub">
-                    الخطة {s.plan.plan_key} — الفترة من{" "}
-                    {displayDate(s.plan.period_start)} حتى{" "}
-                    {displayDate(s.plan.period_end)} بتوقيت UTC.
+                    {S.opsPlanPeriod(
+                      s.plan.plan_key,
+                      displayDate(s.plan.period_start, lang),
+                      displayDate(s.plan.period_end, lang),
+                    )}
                   </p>
                   <ul className="budgets">
                     {s.plan.budgets.map((b) => {
@@ -422,9 +422,13 @@ function SyncBody({
                           key={b.event_type}
                           data-testid={`budget-${b.event_type}`}
                         >
-                          <strong>{budgetNames[b.event_type]}</strong>
+                          <strong>
+                            {b.event_type === "comment_analysis"
+                              ? S.budgetAnalysis
+                              : S.budgetBackfill}
+                          </strong>
                           <span>
-                            {b.used} من {b.allowance} — يتبقى {b.remaining}
+                            {S.opsBudgetLine(b.used, b.allowance, b.remaining)}
                           </span>
                           <progress
                             max={b.allowance || 1}
@@ -432,7 +436,7 @@ function SyncBody({
                             aria-hidden="true"
                           />
                           <small data-state={state}>
-                            {share}٪ — {budgetMessages[state]}
+                            {S.opsShare(share, S.budgetMessages[state])}
                           </small>
                         </li>
                       );
@@ -445,28 +449,25 @@ function SyncBody({
 
           <section className="rp-section" id="rp-attempts">
             <header>
-              <h2>سجل المحاولات</h2>
-              <p className="rp-sub">
-                كل محاولة جمع بترتيب زمني عكسي، ومعها سبب ما حدث.
-              </p>
+              <h2>{S.opsAttemptsTitle}</h2>
+              <p className="rp-sub">{S.opsAttemptsLead}</p>
             </header>
             {mode !== "live" ? (
               <p className="rp-missing">
-                <strong>العرض التجريبي لا يحمل سجل مهام</strong>
-                المهام تخص حسابًا حقيقيًا وقناة مرتبطة. لن يُعرض هنا سجل مُختلق
-                ليبدو المكان ممتلئًا.
+                <strong>{S.opsDemoNoLogStrong}</strong>
+                {S.opsDemoNoLogLead}
               </p>
             ) : jobsFailed ? (
               <p className="rp-missing" data-testid="jobs-failed">
-                <strong>تعذّرت قراءة سجل المهام</strong>
-                هذا ليس معناه أنه فارغ.
+                <strong>{S.opsLogFailedStrong}</strong>
+                {S.opsLogFailedLead}
               </p>
             ) : jobs === null ? (
-              <p role="status">جارٍ قراءة سجل المحاولات…</p>
+              <p role="status">{S.opsLogReading}</p>
             ) : entries.length === 0 ? (
               <p className="rp-missing">
-                <strong>لا توجد محاولات بعد</strong>
-                اطلب مزامنة من صفحة الحساب.
+                <strong>{S.opsNoAttemptsStrong}</strong>
+                {S.opsNoAttemptsLead}
               </p>
             ) : (
               <ul className="history" data-testid="attempts">
@@ -475,8 +476,8 @@ function SyncBody({
                     <strong>{e.headline}</strong>
                     <span>{e.detail}</span>
                     <small>
-                      {displayDate(e.createdAt)}
-                      {e.attempt > 0 ? ` · المحاولة ${e.attempt}` : ""}
+                      {displayDate(e.createdAt, lang)}
+                      {e.attempt > 0 ? S.opsAttemptN(e.attempt) : ""}
                     </small>
                     {e.cancellable && (
                       <button
@@ -486,7 +487,7 @@ function SyncBody({
                         data-testid={`cancel-${e.id}`}
                         onClick={() => act("cancel_job", e.id)}
                       >
-                        سحب من الطابور
+                        {S.opsCancel}
                       </button>
                     )}
                     {e.retryable && (
@@ -497,7 +498,7 @@ function SyncBody({
                         data-testid={`retry-${e.id}`}
                         onClick={() => act("retry_job", e.id)}
                       >
-                        إعادة المحاولة
+                        {S.retry}
                       </button>
                     )}
                   </li>
@@ -517,7 +518,7 @@ function SyncBody({
                   void snapshot.refetch();
                 }}
               >
-                تحديث
+                {S.refresh}
               </button>
             )}
           </section>

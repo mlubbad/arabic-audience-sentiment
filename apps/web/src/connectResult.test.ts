@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { ar } from "./strings/ar";
 import { connectResult } from "./connectResult";
 
-const at = (q: string) => connectResult(new URLSearchParams(q));
+const at = (q: string) => connectResult(new URLSearchParams(q), ar);
 
 describe("coming back from Google", () => {
   it("says what to do about a project that has the API switched off", () => {

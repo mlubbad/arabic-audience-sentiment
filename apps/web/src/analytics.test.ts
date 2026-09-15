@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ar } from "./strings/ar";
 import type { LabelledComment } from "@sentiment/contracts";
 import { byHour, byWeek, byWeekday, commenters, plottable } from "./analytics";
 
@@ -62,7 +63,7 @@ describe("timing", () => {
   });
 
   it("keeps every weekday on the axis, including the silent ones", () => {
-    const d = byWeekday([c()]);
+    const d = byWeekday([c()], ar.weekdays);
     // A missing Friday must read as a quiet Friday, not as no Friday.
     expect(d.buckets).toHaveLength(7);
     expect(d.buckets.filter((b) => b.count === 0)).toHaveLength(6);
