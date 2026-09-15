@@ -30,7 +30,7 @@ import {
   direction,
   useLocale,
 } from "./locale";
-import { useStrings, type Strings } from "./strings";
+import { useStrings, type StringKey } from "./strings";
 import { LanguageSwitch } from "./LanguageSwitch";
 const Dashboard = lazy(() =>
   import("./Dashboard").then((m) => ({ default: m.Dashboard })),
@@ -192,8 +192,8 @@ const DESTINATIONS = [
   },
 ] as const satisfies readonly {
   to: string;
-  label: keyof Strings;
-  title: keyof Strings;
+  label: StringKey;
+  title: StringKey;
   scoped: boolean;
 }[];
 

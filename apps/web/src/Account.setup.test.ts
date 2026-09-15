@@ -9,6 +9,8 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { ar } from "./strings/ar";
+import { resetLocale, setLocale } from "./locale";
 import { WorkspaceCard, type ChannelRow } from "./WorkspaceCard";
 import { setupSteps } from "./setup";
 
@@ -92,7 +94,7 @@ describe("a workspace card", () => {
 
   it("shows the visitor's three sentences, in order, to the owner too", () => {
     const html = render();
-    const positions = setupSteps.map((s) => html.indexOf(s.title));
+    const positions = setupSteps.map((s) => html.indexOf(ar[s.title]));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     // And the visitor's list is the same list, not a second copy of it.
@@ -101,7 +103,8 @@ describe("a workspace card", () => {
       "utf8",
     );
     expect(account).toContain("setupSteps.map(");
-    for (const step of setupSteps) expect(account).not.toContain(step.title);
+    for (const step of setupSteps)
+      expect(account).not.toContain(ar[step.title]);
   });
 
   it("offers the way back through consent exactly while no name is stored", () => {
@@ -136,6 +139,24 @@ describe("a workspace card", () => {
         channel: { ...connected, handle: null, title: null },
       }),
     ).not.toContain("relink-");
+  });
+
+  it("speaks English when the interface does, from the same rows", () => {
+    setLocale("en");
+    try {
+      const html = render({
+        channel: { ...connected, handle: null, title: null },
+        latestJob: { workspace_id: W1, status: "queued", created_at: "" },
+      });
+      expect(html).toContain("Connected channel: ");
+      expect(html).toContain("In progress");
+      expect(html).toContain("Reconnect to store the channel");
+      // The workspace's own name is data and stays as the owner wrote it;
+      // everything the interface says around it is English.
+      expect(html.replace("قناة الأخبار", "")).not.toMatch(/[\u0600-\u06FF]/);
+    } finally {
+      resetLocale();
+    }
   });
 
   it("carries its own feedback inside the card, after its action", () => {

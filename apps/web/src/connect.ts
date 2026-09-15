@@ -11,28 +11,38 @@
  * OAuth unconfigured, and a network that is simply down.
  */
 import { supabase } from "./supabase";
+import type { StringKey, Strings } from "./strings";
 
+/** A code, never a message: the sentence is chosen where it is shown, in the
+ *  reader's language, and a server's own text — which can quote a URL, and a
+ *  URL can carry a key — never reaches the screen. */
 export type ConnectOutcome =
   | { kind: "redirect"; url: string }
-  | { kind: "error"; message: string };
+  | { kind: "error"; code: string };
 
-const MESSAGES: Record<string, string> = {
-  unauthenticated: "سجّل الدخول أولًا لربط قناة.",
-  forbidden: "لا تملك صلاحية ربط قناة في مساحة العمل هذه.",
-  invalid_client: "مساحة العمل هذه بلا عميل. أنشئ مساحة عمل جديدة.",
-  oauth_not_configured: "ربط يوتيوب غير مهيّأ على هذا الخادم.",
-  invalid_request: "بيانات الطلب ناقصة.",
+const MESSAGES: Record<string, StringKey> = {
+  unauthenticated: "connectUnauthenticated",
+  forbidden: "connectForbidden",
+  invalid_client: "connectInvalidClient",
+  oauth_not_configured: "connectNotConfigured",
+  invalid_request: "connectInvalidRequest",
+  unreachable: "serviceUnreachable",
 };
+
+/** The sentence for an outcome's code. Unknown codes are shown as codes. */
+export function connectErrorMessage(code: string, S: Strings): string {
+  const key = MESSAGES[code];
+  return key ? S[key] : S.connectUnknownError(code);
+}
 
 export async function beginConnect(
   workspaceId: string,
   clientId: string,
 ): Promise<ConnectOutcome> {
-  if (!supabase)
-    return { kind: "error", message: MESSAGES.oauth_not_configured };
+  if (!supabase) return { kind: "error", code: "oauth_not_configured" };
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
-  if (!token) return { kind: "error", message: MESSAGES.unauthenticated };
+  if (!token) return { kind: "error", code: "unauthenticated" };
 
   try {
     const response = await fetch(
@@ -57,13 +67,11 @@ export async function beginConnect(
     if (!response.ok || !body.url)
       return {
         kind: "error",
-        // A code we do not recognise is shown as a code, never as server text.
-        message:
-          MESSAGES[body.code ?? ""] ??
-          `تعذر بدء الربط. رمز الخطأ: ${body.code ?? response.status}`,
+        // A code we do not recognise is passed on as a code, never as server text.
+        code: body.code ?? String(response.status),
       };
     return { kind: "redirect", url: body.url };
   } catch {
-    return { kind: "error", message: "تعذر الاتصال بالخدمة. حاول مجدداً." };
+    return { kind: "error", code: "unreachable" };
   }
 }

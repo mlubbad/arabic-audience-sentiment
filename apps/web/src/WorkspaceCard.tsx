@@ -9,6 +9,7 @@
  */
 import type { ReactNode } from "react";
 import { setupProgress, type SetupStep } from "./setup";
+import { useStrings, type StringKey } from "./strings";
 
 export type ChannelRow = {
   workspace_id: string;
@@ -25,12 +26,12 @@ export type JobRow = {
   created_at: string;
 };
 
-const stepWords: Record<SetupStep["status"], string> = {
-  done: "تم",
-  next: "الخطوة التالية",
-  later: "لاحقًا",
-  pending: "قيد التنفيذ",
-  attention: "يحتاج انتباهك",
+const stepWords: Record<SetupStep["status"], StringKey> = {
+  done: "stepStateDone",
+  next: "stepStateNext",
+  later: "stepStateLater",
+  pending: "stepStatePending",
+  attention: "stepStateAttention",
 };
 
 export function WorkspaceCard({
@@ -54,7 +55,8 @@ export function WorkspaceCard({
   onSync: (channel: ChannelRow) => void;
   onConnect: () => void;
 }) {
-  const steps = setupProgress({ channel, latestJob });
+  const S = useStrings();
+  const steps = setupProgress({ channel, latestJob }, S);
   return (
     <li>
       <strong>{workspace.name}</strong>
@@ -67,28 +69,28 @@ export function WorkspaceCard({
       {channel ? (
         <span data-testid={`channel-${workspace.id}`}>
           {channel.status === "connected"
-            ? "قناة مرتبطة: "
+            ? S.channelConnected
             : channel.status === "public_unverified"
-              ? "قناة عامة بلا إذن بعد: "
-              : `القناة تحتاج إعادة ربط (${channel.status}): `}
+              ? S.channelSeeded
+              : S.channelNeedsRelink(channel.status)}
           {channel.title || channel.handle ? (
             <b>{channel.title ?? channel.handle}</b>
           ) : (
             <>
-              <span className="muted">المعرّف</span>{" "}
+              <span className="muted">{S.channelIdLabel}</span>{" "}
               <code>{channel.external_channel_id}</code>
             </>
           )}
         </span>
       ) : (
-        <span>لا توجد قناة مرتبطة بعد</span>
+        <span>{S.channelNone}</span>
       )}
       {/* Where this workspace is on the three steps: the visitor's list, with
           a state on each line. */}
       <ol
         className="account-steps setup-steps"
         data-testid={`setup-${workspace.id}`}
-        aria-label="خطوات الإعداد"
+        aria-label={S.stepsLabel}
       >
         {steps.map((step) => (
           <li
@@ -96,7 +98,9 @@ export function WorkspaceCard({
             data-status={step.status}
             aria-current={step.status === "next" ? "step" : undefined}
           >
-            <span className="setup-step-state">{stepWords[step.status]}</span>
+            <span className="setup-step-state">
+              {S[stepWords[step.status]]}
+            </span>
             <span>{step.title}</span>
             {step.detail && <small>{step.detail}</small>}
           </li>
@@ -115,7 +119,7 @@ export function WorkspaceCard({
           data-testid={`sync-${workspace.id}`}
           onClick={() => onSync(channel)}
         >
-          طلب مزامنة
+          {S.requestSync}
         </button>
       )}
       {hasClient && channel?.status !== "connected" && (
@@ -125,7 +129,7 @@ export function WorkspaceCard({
           data-testid={`connect-${workspace.id}`}
           onClick={onConnect}
         >
-          ربط قناة يوتيوب
+          {S.connectChannel}
         </button>
       )}
       {/* A channel connected before the callback asked Google for a name has
@@ -145,7 +149,7 @@ export function WorkspaceCard({
             data-testid={`relink-${workspace.id}`}
             onClick={onConnect}
           >
-            إعادة الربط لحفظ اسم القناة
+            {S.relinkForName}
           </button>
         )}
       {feedback}

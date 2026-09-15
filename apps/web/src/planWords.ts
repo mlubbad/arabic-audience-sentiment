@@ -13,7 +13,7 @@
  * operations page with the rest of the detail.
  */
 import { budgetState, type UsageSummary } from "@sentiment/contracts";
-import { budgetNames } from "./i18n";
+import type { Strings } from "./strings";
 
 export type PlanCardWords = {
   /** The workspace the figures belong to, or why there is none. */
@@ -24,38 +24,40 @@ export type PlanCardWords = {
   tone: "ok" | "warning" | "critical" | "exhausted" | "none";
 };
 
-export function planCardWords(input: {
-  workspaceName: string | null;
-  /** Signed in with more than one workspace and none chosen yet. */
-  choosing: boolean;
-  loading: boolean;
-  failed: boolean;
-  plan: UsageSummary | null;
-}): PlanCardWords {
+export function planCardWords(
+  input: {
+    workspaceName: string | null;
+    /** Signed in with more than one workspace and none chosen yet. */
+    choosing: boolean;
+    loading: boolean;
+    failed: boolean;
+    plan: UsageSummary | null;
+  },
+  S: Strings,
+): PlanCardWords {
   const { workspaceName, choosing, loading, failed, plan } = input;
   if (choosing)
     return {
-      kicker: "لم تُختر مساحة عمل",
-      title: "الحدود لكل مساحة",
-      note: "اختر مساحة عمل لترى ما تبقّى من خطتها.",
+      kicker: S.planNoneChosenKicker,
+      title: S.planNoneChosenTitle,
+      note: S.planNoneChosenNote,
       tone: "none",
     };
-  const kicker = workspaceName ?? "مساحة العمل";
-  if (loading)
-    return { kicker, title: "جارٍ قراءة الخطة…", note: "", tone: "none" };
+  const kicker = workspaceName ?? S.planKickerFallback;
+  if (loading) return { kicker, title: S.planLoading, note: "", tone: "none" };
   if (failed)
     return {
       kicker,
-      title: "تعذّرت قراءة الخطة",
+      title: S.planFailedTitle,
       // Not "no plan": a failed read says nothing about the limit either way.
-      note: "لا يعني ذلك نفاد الحد. حدّث الصفحة لإعادة المحاولة.",
+      note: S.planFailedNote,
       tone: "none",
     };
   if (!plan)
     return {
       kicker,
-      title: "لا خطة مفعّلة",
-      note: "يفعّل المشغّل الخطة يدويًا في هذه المرحلة.",
+      title: S.planNoneTitle,
+      note: S.planNoneNote,
       tone: "none",
     };
   const analysis =
@@ -64,13 +66,17 @@ export function planCardWords(input: {
   const tone = budgetState(analysis);
   // Western digits, as the report uses them.
   const n = (v: number) => v.toLocaleString("en-US");
+  const name =
+    analysis.event_type === "comment_analysis"
+      ? S.budgetAnalysis
+      : S.budgetBackfill;
   return {
     kicker,
-    title: `خطة ${plan.plan_key}`,
+    title: S.planTitle(plan.plan_key),
     note:
       tone === "exhausted"
-        ? `${budgetNames[analysis.event_type]}: نفد الحد (${n(analysis.allowance)})`
-        : `${budgetNames[analysis.event_type]}: يتبقى ${n(analysis.remaining)} من ${n(analysis.allowance)}`,
+        ? S.planExhausted(name, n(analysis.allowance))
+        : S.planRemaining(name, n(analysis.remaining), n(analysis.allowance)),
     tone,
   };
 }

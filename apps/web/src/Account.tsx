@@ -6,7 +6,8 @@ import {
   authSuccessMessage,
   type AuthAction,
 } from "./authMessages";
-import { beginConnect } from "./connect";
+import { beginConnect, connectErrorMessage } from "./connect";
+import { useStrings } from "./strings";
 import { providers, type ProviderId } from "./authProviders";
 import { setupSteps } from "./setup";
 import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
@@ -24,6 +25,7 @@ type Scope = "page" | "auth" | "create" | `ws:${string}`;
 type Note = { at: Scope; text: string };
 
 export function Account() {
+  const S = useStrings();
   const [session, setSession] = useState<Session | null>(null),
     [busy, setBusy] = useState<Scope | null>(supabase ? "page" : null),
     [note, setNote] = useState<Note | null>(null);
@@ -36,7 +38,7 @@ export function Account() {
     if (busy === at)
       return (
         <p className="account-feedback" role="status">
-          جارٍ تنفيذ الطلب…
+          {S.working}
         </p>
       );
     if (note?.at === at)
@@ -58,7 +60,7 @@ export function Account() {
       typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).has("signup"),
   );
-  const authProviders = providers(import.meta.env.VITE_AUTH_PROVIDERS);
+  const authProviders = providers(import.meta.env.VITE_AUTH_PROVIDERS, S);
 
   /**
    * Hand off to a provider.
@@ -74,10 +76,7 @@ export function Account() {
     if (id === "sso") {
       // Not an OAuth provider: SAML takes a domain and resolves the tenant
       // from it, so it needs its own screen before it can be called at all.
-      say(
-        "auth",
-        "الدخول الموحَّد يحتاج نطاق مؤسستك — لم تُبنَ هذه الشاشة بعد.",
-      );
+      say("auth", S.ssoNeedsDomain);
       return;
     }
     setBusy("auth");
@@ -92,7 +91,7 @@ export function Account() {
       .then(({ error }) => {
         if (!error) return; // the browser is leaving; nothing to report
         setBusy(null);
-        say("auth", "تعذّر بدء الدخول عبر هذا المزوّد.");
+        say("auth", S.providerStartFailed);
       });
   }
   const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>(
@@ -117,7 +116,7 @@ export function Account() {
       if (active) {
         setSession(data.session);
         setBusy(null);
-        if (error) say("page", "تعذر قراءة جلسة الحساب");
+        if (error) say("page", S.sessionReadFailed);
       }
     });
     const { data } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -152,7 +151,7 @@ export function Account() {
     ]).then(([w, c, ch, j]) => {
       if (!active) return;
       setLoadedWorkspaceUserId(session.user.id);
-      if (w.error) say("page", "تعذر تحميل مساحات العمل");
+      if (w.error) say("page", S.workspacesLoadFailed);
       else setWorkspaces(w.data ?? []);
       setClients(c.data ?? []);
       setChannels(ch.data ?? []);
@@ -166,25 +165,22 @@ export function Account() {
     return (
       <div className="rp-page account-page">
         <header className="rp-hero">
-          <p className="rp-eyebrow">الحساب</p>
-          <h1>الحساب ومساحات العمل</h1>
-          <p>مساحات عملك، وقنواتها، وحالة إعداد كلٍّ منها.</p>
+          <p className="rp-eyebrow">{S.accountEyebrow}</p>
+          <h1>{S.accountTitle}</h1>
+          <p>{S.accountLead}</p>
         </header>
         <div className="account-entry">
           <div className="app-state">
             <span className="app-state-symbol" aria-hidden="true">
               ◌
             </span>
-            <h2>تسجيل الدخول غير متاح في هذه المعاينة</h2>
-            <p>
-              يلزم عنوان مشروع تطوير ومفتاح نشر عام لتفعيل الحساب. لا تُستخدم
-              بيانات الاختبار كجلسة دخول.
-            </p>
+            <h2>{S.accountUnavailableTitle}</h2>
+            <p>{S.accountUnavailableLead}</p>
           </div>
           <div className="account-story">
-            <h2>ابدأ من تجربة اللوحة</h2>
-            <p>يمكنك استكشاف الواجهة ببيانات اصطناعية واضحة المصدر.</p>
-            <a href="/dashboard">فتح لوحة البيانات</a>
+            <h2>{S.accountTryDashboardTitle}</h2>
+            <p>{S.accountTryDashboardLead}</p>
+            <a href="/dashboard">{S.openDashboard}</a>
           </div>
         </div>
       </div>
@@ -207,11 +203,11 @@ export function Account() {
       say(
         "auth",
         error
-          ? authErrorMessage(error)
-          : authSuccessMessage(action, !!data.session),
+          ? authErrorMessage(error, S)
+          : authSuccessMessage(action, !!data.session, S),
       );
     } catch {
-      say("auth", "تعذر الاتصال بالخدمة. حاول مجدداً.");
+      say("auth", S.serviceUnreachable);
     } finally {
       setBusy(null);
     }
@@ -225,20 +221,20 @@ export function Account() {
         workspace_name: name,
       });
       if (error) {
-        say("create", "تعذر إنشاء مساحة العمل");
+        say("create", S.createWorkspaceFailed);
         return;
       }
       const { data, error: loadError } = await client
         .from("workspaces")
         .select("id,name");
-      if (loadError) say("create", "تم الإنشاء وتعذر تحديث القائمة");
+      if (loadError) say("create", S.createWorkspaceListFailed);
       else {
         setWorkspaces(data ?? []);
         setName("");
-        say("create", "تم إنشاء مساحة العمل");
+        say("create", S.createWorkspaceDone);
       }
     } catch {
-      say("create", "تعذر الاتصال بالخدمة");
+      say("create", S.serviceUnreachable);
     } finally {
       setBusy(null);
     }
@@ -250,9 +246,9 @@ export function Account() {
           the tool, to a reader who had already bought the argument by
           signing in. The head now says what the page holds. */}
       <header className="rp-hero">
-        <p className="rp-eyebrow">الحساب</p>
-        <h1>الحساب ومساحات العمل</h1>
-        <p>مساحات عملك، وقنواتها، وحالة إعداد كلٍّ منها.</p>
+        <p className="rp-eyebrow">{S.accountEyebrow}</p>
+        <h1>{S.accountTitle}</h1>
+        <p>{S.accountLead}</p>
       </header>
       {feedback("page")}
       {!session ? (
@@ -263,14 +259,10 @@ export function Account() {
               adjacent buttons — so the way to a new account and the way back
               into an existing one were one mis-click apart. */}
           <form className="rp-card auth-card" onSubmit={auth}>
-            <h2>{joining ? "أنشئ حسابك" : "مرحبًا بعودتك"}</h2>
-            <p>
-              {joining
-                ? "معاينة خاصة — الحساب يفتح مساحة عمل واحدة تخصّك."
-                : "ادخل إلى مساحة عملك وقنواتك وتقاريرك."}
-            </p>
+            <h2>{joining ? S.authJoinTitle : S.authReturnTitle}</h2>
+            <p>{joining ? S.authJoinLead : S.authReturnLead}</p>
             <label>
-              البريد الإلكتروني
+              {S.emailLabel}
               <input
                 type="email"
                 autoComplete="email"
@@ -280,7 +272,7 @@ export function Account() {
               />
             </label>
             <label>
-              كلمة المرور
+              {S.passwordLabel}
               <input
                 type="password"
                 autoComplete={joining ? "new-password" : "current-password"}
@@ -296,11 +288,11 @@ export function Account() {
               value={joining ? "signup" : "signin"}
               disabled={pending}
             >
-              {joining ? "إنشاء حساب جديد" : "تسجيل الدخول"}
+              {joining ? S.createAccount : S.signIn}
             </button>
 
             <p className="auth-or">
-              <span>{joining ? "أو أنشئ حسابًا بـ" : "أو ادخل بـ"}</span>
+              <span>{joining ? S.orJoinWith : S.orSignInWith}</span>
             </p>
             {/* Every door is shown, and the closed ones say they are closed.
                 Hiding them would leave a reader who came expecting Google
@@ -328,7 +320,7 @@ export function Account() {
             </ul>
 
             <p className="auth-switch">
-              {joining ? "لديك حساب بالفعل؟" : "لا تملك حسابًا؟"}{" "}
+              {joining ? S.haveAccount : S.noAccount}{" "}
               <button
                 type="button"
                 className="auth-link"
@@ -337,19 +329,19 @@ export function Account() {
                   setNote(null);
                 }}
               >
-                {joining ? "تسجيل الدخول" : "أنشئ حسابًا"}
+                {joining ? S.signIn : S.joinLink}
               </button>
             </p>
           </form>
           <aside className="account-story">
-            <p className="app-eyebrow">كيف تبدأ؟</p>
-            <h2>من قناتك إلى قراءة أوضح.</h2>
-            <p>ثلاث خطوات تفصل حسابك عن لوحة تعبّر عما جُمع فعلًا.</p>
+            <p className="app-eyebrow">{S.howToStartEyebrow}</p>
+            <h2>{S.howToStartTitle}</h2>
+            <p>{S.howToStartLead}</p>
             {/* The same three sentences the owner sees with a state on each,
                 once signed in. Written once in `setup.ts`. */}
             <ol className="account-steps">
               {setupSteps.map((step) => (
-                <li key={step.key}>{step.title}</li>
+                <li key={step.key}>{S[step.title]}</li>
               ))}
             </ol>
 
@@ -367,31 +359,26 @@ export function Account() {
                 line is a property of the build, not a claim about a market,
                 and each one is asserted by a test in this repository. */}
             <section className="account-trust" data-testid="account-trust">
-              <h3>ما يضمنه هذا البناء</h3>
+              <h3>{S.trustTitle}</h3>
               <ul>
                 <li>
-                  <strong>مساحتك لا تُقرأ من مساحة أخرى.</strong> العزل مفروض في
-                  قاعدة البيانات نفسها، ومُختبَر بطلبات مباشرة لا بإخفاء أزرار.
+                  <strong>{S.trustIsolationStrong}</strong>
+                  {S.trustIsolation}
                 </li>
                 <li>
-                  <strong>الأرقام معدودة لا مقدَّرة.</strong> كل رقم محسوب من
-                  الصفوف المحفوظة؛ وما لا يُعرف يُقال «غير معروف» ولا يُحسب
-                  صفرًا.
+                  <strong>{S.trustCountedStrong}</strong>
+                  {S.trustCounted}
                 </li>
                 <li>
-                  <strong>النموذج مُقاس لا مُدّعى.</strong> قِيست ستة مصنّفات
-                  عربية على مجموعة موسومة يدويًا، ونتائجها منشورة في المستودع —
-                  بما فيها أن أيًّا منها لم يتجاوز بوّابة الدقّة.
+                  <strong>{S.trustMeasuredStrong}</strong>
+                  {S.trustMeasured}
                 </li>
                 <li>
-                  <strong>تصحيحك يعلو على النموذج.</strong> المراجعة البشرية
-                  تُلغي تنبؤ النموذج لذلك النص، وتُحفظ باسم صاحبها وسببها.
+                  <strong>{S.trustReviewStrong}</strong>
+                  {S.trustReview}
                 </li>
               </ul>
-              <p className="account-trust-note">
-                معاينة خاصة. لا نعرض عدد عملاء ولا شعارات: لا يوجد ما نعدّه بعد،
-                ورقمٌ مُختلَق على الباب يُفسد ما تقوله اللوحة خلفه.
-              </p>
+              <p className="account-trust-note">{S.trustNote}</p>
             </section>
           </aside>
         </div>
@@ -403,25 +390,22 @@ export function Account() {
               is one name too few, and which a strict locator reads as an
               ambiguity rather than a convenience. */}
           <div className="account-toolbar">
-            <p>أنت داخل حسابك. اختر مساحة العمل التي تريد إدارتها.</p>
+            <p>{S.insideAccount}</p>
           </div>
           <section className="rp-section">
             <header>
-              <h2>مساحات العمل</h2>
-              <p className="rp-sub">
-                كل مساحة عمل تملك قناتها وبياناتها وحدودها. لا تُعرض بيانات
-                مساحة داخل أخرى.
-              </p>
+              <h2>{S.workspacesTitle}</h2>
+              <p className="rp-sub">{S.workspacesLead}</p>
             </header>
           </section>
           {loadedWorkspaceUserId !== session.user.id ? (
             <div className="app-state" role="status">
-              جارٍ تحميل مساحات العمل…
+              {S.gateLoadingWorkspaces}
             </div>
           ) : workspaces.length === 0 ? (
             <p className="rp-missing">
-              <strong>لا توجد مساحة عمل متاحة</strong>
-              أنشئ واحدة أدناه لتبدأ.
+              <strong>{S.noWorkspaceStrong}</strong>
+              {S.noWorkspaceLead}
             </p>
           ) : (
             <ul className="workspace-list">
@@ -461,9 +445,7 @@ export function Account() {
                           // every click after the first.
                           say(
                             scope,
-                            error
-                              ? "تعذر تسجيل طلب المزامنة."
-                              : "طلب المزامنة قائم. لكل قناة طلب واحد في كل مرة، ولن يبدأ حتى يعمل عامل الجمع — التفاصيل في صفحة «حالة المزامنة».",
+                            error ? S.syncRequestFailed : S.syncRequestStanding,
                           );
                           // The step list reads the newest job; a request the
                           // server accepted is one, whether it was created now
@@ -486,7 +468,8 @@ export function Account() {
                       void beginConnect(w.id, workspaceClient.id).then(
                         (out) => {
                           setBusy(null);
-                          if (out.kind === "error") say(scope, out.message);
+                          if (out.kind === "error")
+                            say(scope, connectErrorMessage(out.code, S));
                           // Google's consent screen is a full navigation, not a
                           // popup: a popup here is blocked as often as not.
                           else window.location.assign(out.url);
@@ -500,10 +483,10 @@ export function Account() {
           )}
           <section className="account-create">
             <form className="rp-card" onSubmit={createWorkspace}>
-              <h2>مساحة أخرى لعميل أو قناة</h2>
-              <p>يبقى لكل مساحة جمهورها وبياناتها وصلاحياتها المستقلة.</p>
+              <h2>{S.anotherWorkspaceTitle}</h2>
+              <p>{S.anotherWorkspaceLead}</p>
               <label>
-                اسم مساحة العمل
+                {S.workspaceNameLabel}
                 <input
                   required
                   maxLength={120}
@@ -512,7 +495,7 @@ export function Account() {
                 />
               </label>
               {feedback("create")}
-              <button disabled={pending}>إنشاء مساحة عمل</button>
+              <button disabled={pending}>{S.createWorkspace}</button>
             </form>
           </section>
         </>

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ar } from "./strings/ar";
 
 const getSession = vi.fn();
 vi.mock("./supabase", () => ({ supabase: { auth: { getSession } } }));
@@ -86,10 +87,12 @@ describe("starting a connection from the browser", () => {
           async () => new Response(JSON.stringify({ code }), { status: 403 }),
         ),
       );
-      const { beginConnect } = await load();
+      const { beginConnect, connectErrorMessage } = await load();
       const out = await beginConnect("ws-1", "client-1");
       expect(out.kind).toBe("error");
-      expect((out as { message: string }).message).toContain(fragment);
+      // The outcome carries a code; the sentence is chosen where it is shown.
+      const message = connectErrorMessage((out as { code: string }).code, ar);
+      expect(message).toContain(fragment);
     }
   });
 
@@ -107,10 +110,12 @@ describe("starting a connection from the browser", () => {
           ),
       ),
     );
-    const { beginConnect } = await load();
-    const out = (await beginConnect("ws-1", "client-1")) as { message: string };
-    expect(out.message).toContain("surprise");
-    expect(out.message).not.toContain("apikey");
+    const { beginConnect, connectErrorMessage } = await load();
+    const out = (await beginConnect("ws-1", "client-1")) as { code: string };
+    const message = connectErrorMessage(out.code, ar);
+    expect(message).toContain("surprise");
+    expect(message).not.toContain("apikey");
+    expect(JSON.stringify(out)).not.toContain("apikey");
   });
 
   it("survives the service being unreachable", async () => {

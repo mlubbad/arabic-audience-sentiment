@@ -6,6 +6,7 @@ import { useWorkspaceSelection } from "./workspaceSelection";
 import { workspaceState } from "./workspace";
 import { configuredMode, fixtureWorkspace } from "./data";
 import { planCardWords } from "./planWords";
+import { useStrings } from "./strings";
 import { supabase } from "./supabase";
 
 /** What the plan has left, where it is true: on every screen.
@@ -43,14 +44,18 @@ export function PlanCard() {
       return UsageSummarySchema.nullable().parse(data);
     },
   });
+  const S = useStrings();
   if (!session || configuredMode !== "live") return null;
-  const words = planCardWords({
-    workspaceName: place.kind === "ready" ? place.name : null,
-    choosing: place.kind === "choose",
-    loading: listLoading || (!!workspaceId && plan.isPending),
-    failed: listFailed || plan.isError,
-    plan: plan.data ?? null,
-  });
+  const words = planCardWords(
+    {
+      workspaceName: place.kind === "ready" ? place.name : null,
+      choosing: place.kind === "choose",
+      loading: listLoading || (!!workspaceId && plan.isPending),
+      failed: listFailed || plan.isError,
+      plan: plan.data ?? null,
+    },
+    S,
+  );
   return (
     <Link className="app-plan" to="/sync" data-tone={words.tone}>
       <span className="app-plan-kicker">{words.kicker}</span>

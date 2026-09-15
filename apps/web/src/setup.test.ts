@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { ar } from "./strings/ar";
+import { en } from "./strings/en";
 import { setupProgress, setupSteps } from "./setup";
 
 const statuses = (steps: ReturnType<typeof setupProgress>) =>
@@ -6,41 +8,41 @@ const statuses = (steps: ReturnType<typeof setupProgress>) =>
 
 describe("where a workspace is on the three steps", () => {
   it("a bare workspace: connect is next, collecting cannot start yet", () => {
-    const steps = setupProgress({ channel: null, latestJob: null });
+    const steps = setupProgress({ channel: null, latestJob: null }, ar);
     expect(statuses(steps)).toEqual(["done", "next", "later"]);
   });
 
   it("connected and never collected: collecting is the one thing to do", () => {
-    const steps = setupProgress({
-      channel: { status: "connected" },
-      latestJob: null,
-    });
+    const steps = setupProgress(
+      { channel: { status: "connected" }, latestJob: null },
+      ar,
+    );
     expect(statuses(steps)).toEqual(["done", "done", "next"]);
   });
 
   it("a channel whose grant stopped working needs attention, not a repeat of step two", () => {
     for (const status of ["reconnect_required", "disconnected"]) {
-      const steps = setupProgress({ channel: { status }, latestJob: null });
+      const steps = setupProgress({ channel: { status }, latestJob: null }, ar);
       expect(statuses(steps), status).toEqual(["done", "attention", "later"]);
       expect(steps[1].detail).toContain("إعادة ربط");
     }
   });
 
   it("a public channel the operator seeded is step two not yet taken, not step two gone wrong", () => {
-    const steps = setupProgress({
-      channel: { status: "public_unverified" },
-      latestJob: null,
-    });
+    const steps = setupProgress(
+      { channel: { status: "public_unverified" }, latestJob: null },
+      ar,
+    );
     expect(statuses(steps)).toEqual(["done", "next", "later"]);
     expect(steps[1].detail).toContain("ملكيتها");
   });
 
   it("a job that ran counts, partial included; one in flight is pending; one that stopped needs attention", () => {
     const at = (job: string) =>
-      setupProgress({
-        channel: { status: "connected" },
-        latestJob: { status: job },
-      });
+      setupProgress(
+        { channel: { status: "connected" }, latestJob: { status: job } },
+        ar,
+      );
     expect(statuses(at("succeeded"))).toEqual(["done", "done", "done"]);
     expect(statuses(at("partial"))).toEqual(["done", "done", "done"]);
     expect(statuses(at("queued"))[2]).toBe("pending");
@@ -50,7 +52,13 @@ describe("where a workspace is on the three steps", () => {
   });
 
   it("uses the visitor's three sentences, unchanged", () => {
-    const steps = setupProgress({ channel: null, latestJob: null });
-    expect(steps.map((s) => s.title)).toEqual(setupSteps.map((s) => s.title));
+    const steps = setupProgress({ channel: null, latestJob: null }, ar);
+    expect(steps.map((s) => s.title)).toEqual(
+      setupSteps.map((s) => ar[s.title]),
+    );
+    // And the English reads the same three keys, in the same order.
+    expect(
+      setupProgress({ channel: null, latestJob: null }, en).map((s) => s.title),
+    ).toEqual(setupSteps.map((s) => en[s.title]));
   });
 });

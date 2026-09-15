@@ -19,6 +19,8 @@
  * false), so all three render closed. That is not a placeholder: it is what is
  * true, and it stops being true the moment the configuration changes.
  */
+import type { StringKey, Strings } from "./strings";
+
 export type ProviderId = "google" | "azure" | "sso";
 
 export type Provider = {
@@ -36,10 +38,10 @@ const ORDER: { id: ProviderId; label: string }[] = [
   { id: "sso", label: "SSO" },
 ];
 
-const CLOSED: Record<ProviderId, string> = {
-  google: "الدخول عبر Google لم يُفعَّل بعد على هذا المشروع.",
-  azure: "الدخول عبر Microsoft لم يُفعَّل بعد على هذا المشروع.",
-  sso: "الدخول الموحَّد للمؤسسات (SAML) لم يُفعَّل بعد.",
+const CLOSED: Record<ProviderId, StringKey> = {
+  google: "providerClosedGoogle",
+  azure: "providerClosedAzure",
+  sso: "providerClosedSso",
 };
 
 /**
@@ -57,12 +59,12 @@ export function enabledProviders(raw: string | undefined): Set<ProviderId> {
   );
 }
 
-export function providers(raw: string | undefined): Provider[] {
+export function providers(raw: string | undefined, S: Strings): Provider[] {
   const on = enabledProviders(raw);
   return ORDER.map(({ id, label }) => ({
     id,
     label,
-    closedReason: on.has(id) ? null : CLOSED[id],
+    closedReason: on.has(id) ? null : S[CLOSED[id]],
   }));
 }
 

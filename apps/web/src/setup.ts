@@ -21,6 +21,8 @@
  * guessing.
  */
 
+import type { StringKey, Strings } from "./strings";
+
 export type StepKey = "workspace" | "channel" | "collect";
 
 export type StepStatus =
@@ -44,11 +46,12 @@ export type SetupStep = {
   detail: string | null;
 };
 
-/** The promise, in order. */
-export const setupSteps: { key: StepKey; title: string }[] = [
-  { key: "workspace", title: "أنشئ حسابك ومساحة العمل الخاصة بك." },
-  { key: "channel", title: "اربط قناة يوتيوب بعد موافقتك على الإذن." },
-  { key: "collect", title: "اطلب الجمع، ثم تابع حالته ونتائجه في اللوحة." },
+/** The promise, in order. The sentences live in `strings/`; this names them,
+ *  so the visitor's list and the owner's read the same three. */
+export const setupSteps: { key: StepKey; title: StringKey }[] = [
+  { key: "workspace", title: "stepWorkspace" },
+  { key: "channel", title: "stepChannel" },
+  { key: "collect", title: "stepCollect" },
 ];
 
 export type ChannelStatus =
@@ -66,14 +69,20 @@ export type JobStatus =
   | "blocked"
   | "cancelled";
 
-export function setupProgress(input: {
-  /** The workspace's channel row, or null when none has been attached. */
-  channel: { status: ChannelStatus | string } | null;
-  /** The most recent job for the workspace, or null when none was ever asked for. */
-  latestJob: { status: JobStatus | string } | null;
-}): SetupStep[] {
+export function setupProgress(
+  input: {
+    /** The workspace's channel row, or null when none has been attached. */
+    channel: { status: ChannelStatus | string } | null;
+    /** The most recent job for the workspace, or null when none was ever asked for. */
+    latestJob: { status: JobStatus | string } | null;
+  },
+  S: Strings,
+): SetupStep[] {
   const { channel, latestJob } = input;
-  const [workspace, link, collect] = setupSteps;
+  const [workspace, link, collect] = setupSteps.map((step) => ({
+    key: step.key,
+    title: S[step.title],
+  }));
 
   // Being on this list at all means the first step happened.
   const first: SetupStep = { ...workspace, status: "done", detail: null };
@@ -89,7 +98,7 @@ export function setupProgress(input: {
     second = {
       ...link,
       status: "next",
-      detail: "القناة مسجَّلة بلا إذن بعد؛ اربطها لتأكيد ملكيتها.",
+      detail: S.stepChannelSeeded,
     };
   else
     // A grant that existed and no longer works: revoked, expired, or cut. The
@@ -98,7 +107,7 @@ export function setupProgress(input: {
     second = {
       ...link,
       status: "attention",
-      detail: "القناة تحتاج إعادة ربط؛ الإذن السابق لم يعد صالحًا.",
+      detail: S.stepChannelLapsed,
     };
 
   let third: SetupStep;
@@ -118,7 +127,7 @@ export function setupProgress(input: {
         third = {
           ...collect,
           status: "pending",
-          detail: "الطلب قائم؛ تفاصيل التقدّم في صفحة التشغيل.",
+          detail: S.stepCollectPending,
         };
         break;
       default:
@@ -127,7 +136,7 @@ export function setupProgress(input: {
         third = {
           ...collect,
           status: "attention",
-          detail: "آخر محاولة لم تكتمل؛ السبب في صفحة التشغيل.",
+          detail: S.stepCollectFailed,
         };
     }
 

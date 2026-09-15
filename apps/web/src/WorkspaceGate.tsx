@@ -18,6 +18,7 @@
  */
 import type { ReactNode } from "react";
 import type { WorkspaceOption, WorkspaceState } from "./workspace";
+import { useStrings } from "./strings";
 
 export type GateWords = {
   /** The page's own name, as the rail calls it. */
@@ -52,35 +53,33 @@ export function WorkspaceGate({
   words: GateWords;
   children: ReactNode;
 }) {
+  const S = useStrings();
   if (sessionLoading)
     return (
       <div className="app-state" role="status">
-        جارٍ تحديد حسابك…
+        {S.gateResolvingAccount}
       </div>
     );
   if (live) {
     if (workspacesLoading)
       return (
         <div className="app-state" role="status">
-          جارٍ تحميل مساحات العمل…
+          {S.gateLoadingWorkspaces}
         </div>
       );
     if (workspacesFailed)
       return (
         <div className="app-state" role="alert">
-          <h1>تعذّرت قراءة مساحات عملك.</h1>
-          <p>
-            حدّث الصفحة لإعادة المحاولة؛ لا يمكن عرض بيانات تجربة بدل بيانات
-            حسابك.
-          </p>
+          <h1>{S.gateWorkspacesFailedTitle}</h1>
+          <p>{S.gateWorkspacesFailedLead}</p>
         </div>
       );
     if (place.kind === "no_workspaces")
       return (
         <div className="app-state">
-          <h1>لا توجد مساحة عمل لهذا الحساب بعد.</h1>
+          <h1>{S.gateNoWorkspaceTitle}</h1>
           <div className="app-state-actions">
-            <a href="/account">أنشئ مساحة عمل من صفحة الحساب</a>
+            <a href="/account">{S.gateCreateFromAccount}</a>
           </div>
         </div>
       );
@@ -108,6 +107,7 @@ function WorkspaceChoice({
   onChoose: (id: string | null) => void;
   words: GateWords;
 }) {
+  const S = useStrings();
   return (
     <div className="app-state" data-testid={words.chooseTestId}>
       <span className="app-state-symbol" aria-hidden="true">
@@ -117,12 +117,12 @@ function WorkspaceChoice({
       <h1>{words.chooseTitle}</h1>
       <p>{words.chooseLead}</p>
       <label className="sync-choice">
-        مساحة العمل
+        {S.workspaceLabel}
         <select
           value={chosen ?? ""}
           onChange={(e) => onChoose(e.target.value || null)}
         >
-          <option value="">— اختر —</option>
+          <option value="">{S.choosePlaceholder}</option>
           {options.map((option) => (
             <option key={option.id} value={option.id}>
               {option.name}

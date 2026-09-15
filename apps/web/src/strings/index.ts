@@ -5,6 +5,12 @@ import { en } from "./en";
 
 export type { Strings };
 
+/** The keys whose value is a plain sentence — what a table of labels may
+ *  point at. Counted sentences are functions and are called by name. */
+export type StringKey = {
+  [K in keyof Strings]: Strings[K] extends string ? K : never;
+}[keyof Strings];
+
 const all: Record<Locale, Strings> = { ar, en };
 
 export function stringsFor(locale: Locale): Strings {
