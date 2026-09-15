@@ -921,3 +921,16 @@ not broken by the rebuild.
 
 Not yet done: the Edge Function itself is not redeployed, so no name reaches the database
 until it is; the column stays null and the page shows the labelled id.
+
+## 2026-09-15 — oauth-callback redeployed, version 7
+
+`npm run check:functions` clean, then `supabase functions deploy oauth-callback
+--no-verify-jwt` — the flag because the live function ran with `verify_jwt: false` (a redirect
+from Google carries no Supabase JWT) and a deploy without it would have turned that on.
+`functions list` afterwards: version 6 → 7, `verify_jwt` still false, ACTIVE. A bare GET to
+`/functions/v1/oauth-callback` answers 303 to `/connected?status=error&code=invalid_callback`,
+which is the handler's own refusal of a callback with no code and no state — so the new
+bundle is the one answering.
+
+Not verified: a real consent round trip. The name is stored only when a channel owner goes
+through Google again, and the one connected channel's owner has not yet.
