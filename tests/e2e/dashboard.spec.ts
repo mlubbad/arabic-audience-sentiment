@@ -1903,3 +1903,29 @@ test("a topic correction changes the chip and the chart, with a reason", async (
     card.getByRole("row", { name: /استفسارات وأسئلة/ }),
   ).toContainText("2");
 });
+
+// ---- topic classification, final fix wave (2026-09-16) — append-only ------
+
+test("a workspace whose topics were never run shows the not-run text and no topic controls", async ({
+  page,
+}) => {
+  // The fixture carries a taxonomy either way — every workspace has one from
+  // its first day — so the taxonomy's presence is not what says a model has
+  // run. The active key is.
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const response = await route.fetch();
+    const fixture = await response.json();
+    fixture.active_topic_key = "";
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  const card = page.getByTestId("topics-card");
+  await expect(card).toContainText("لم يُشغَّل تصنيف الموضوعات بعد");
+  await expect(card.locator(".rp-chart-topics")).toHaveCount(0);
+  await expect(page.getByLabel("الموضوع", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("topic-chip")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "تعديل الموضوع" })).toHaveCount(
+    0,
+  );
+});

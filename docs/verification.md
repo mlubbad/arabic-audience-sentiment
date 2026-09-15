@@ -1541,3 +1541,34 @@ contracts (`effectiveTopic`, the filter, `topic_counts`, the CSV columns, the fi
 the dashboard (card, filter, chip, correction mode, history, Sync job kind and error
 strings, the third budget line) — has been exercised against the live project. All of it is
 covered only by the fixture data and the unit/PGlite suites named above.
+
+## 2026-09-16 — topic classification, final fix wave: `npm run check` green at the fix-wave head
+
+Run after the eleven review findings were fixed (the worker seam in `01c97a6`, the SQL,
+gateway and seam tests in `f074d01`, the dashboard gate, e2e test and docs in the commit
+that carries this entry). `npm run check` exited 0; gate by gate, in the order the script
+runs them:
+
+| Gate | Command | Result |
+| --- | --- | --- |
+| lint | `eslint . && ruff check .` | pass, "All checks passed!" |
+| format:check | `prettier --check …` | pass, "All matched files use Prettier code style!" — the four files the previous entry recorded as unformatted were fixed in `cf84011` |
+| typecheck | `tsc --noEmit` | pass |
+| check:functions | `deno check` over the three edge functions | pass |
+| test | `vitest run --exclude "supabase/tests/**"` | **344 passed, 42 files** (343 before; `workerGateway.test.ts` gained the `max_rows` refusal) |
+| test:db | `vitest run supabase/tests` | **202 passed, 20 files** (198 before; `worker_topics.test.ts` 13, of which four are new — the quota cap, the `quota_exceeded` block, the no-plan case, and `worker_due_videos` refusing an `analyse` job — plus `topics_stored` assertions in an existing one; `end_to_end.test.ts` 5, the topics seam through the real handler new) |
+| worker:test | `uv run pytest` | **175 passed** (168 before; `test_run_topics.py` 9 — one-round stop, 25+5 slices, blocked due list new, the batch-key assertion changed — and `test_gemini.py` 17 — safety settings, bisection, a half failing again, a single item not split new) |
+| build | `vite build` | pass, built in 2.49s |
+| check:secrets | `node scripts/check-secrets.mjs` | pass, 323 source files plus built assets |
+
+Outside `npm run check`: `npm run test:e2e -- tests/e2e/dashboard.spec.ts` — **74 passed**
+in 1.1m (73 before; the appended not-run test new). The new test failed first against the
+unfixed gate — the Topic filter was present with `active_topic_key: ""` — and passed once
+`Dashboard.tsx` gated it on the key. Every Important item's test was likewise seen red
+before the change: four in `test_run_topics.py`, three in `test_gemini.py`, five in
+`worker_topics.test.ts`.
+
+Still not live-tested: nothing in this wave touched the live project. The three migrations
+remain unapplied, the edge function undeployed with its topic routes, and the Gemini key
+still refused by Google (see the entry above). The quota cap, the `blocked` answer and the
+deploy-order guard are PGlite- and unit-tested only.

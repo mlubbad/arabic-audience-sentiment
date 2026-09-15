@@ -518,3 +518,60 @@ against it — the Gemini key on file was refused by Google in Task 1's smoke ca
 or endpoint failure), so a live run would fail immediately even if deployed. Everything
 above is fixture- and unit-tested only; see `docs/verification.md` for the counts and what
 each gate showed.
+
+## 2026-09-16 — topic classification, the final review's eleven findings
+
+The whole-branch review of `0866318`…`cf84011` found nothing Critical, five Important items
+at the retry/quota seam between `run_topics`, the Gemini adapter and the server RPCs, and
+six Minor ones. All eleven are fixed in this wave; the three migrations `20260916010000`–
+`012000` are still applied nowhere, so `20260916011000` was edited in place rather than
+followed by a fourth file.
+
+**The seam.** `run_topics` (`workers/python/src/server/runner.py`) now classifies and
+commits each due list in slices of 25 rows, with a heartbeat before each slice; the batch
+key is `sha256("{round}:{slice offset}:{sorted ids}")[:32]`, so a same-set retry after a
+Gemini outage in a later round is a new batch, not a `batch_conflict`, while a replay of
+the very same slice still replays. A round in which no verdict was final (`succeeded`,
+`skipped`, `unsupported`) ends the job `partial` there — nothing stored can shrink the due
+list, and asking again would only re-send the same rows up to the 50-round bound, which
+stays. A due answer carrying `blocked` finishes the job `blocked` with that code before any
+model call.
+
+**Paid before the plan check.** `worker_topics_due` reads the remaining
+`topic_classification` allowance (new `private.topic_units_remaining`: no subscription, or
+one inactive or outside its period, is zero) and hands over only as many rows *that would
+cost a unit* as remain. A row costs nothing when its comment was charged before — a
+taxonomy edit re-classifies for free, as `reserve_usage`'s once-ever rule already says — or
+when its text is purged (recorded `unsupported`, never sent), and those ride outside the
+cap; this is a deliberate refinement of the finding's `least(limit, remaining)`, which
+would have blocked a workspace at its allowance from a free re-run after a taxonomy edit.
+When nothing can be handed over, nothing remains, and `topics_pending` is still true, the
+answer is `blocked: 'quota_exceeded'` with no rows and no taxonomy.
+
+**Deploy order.** The worker service and the `worker` Edge Function must be updated
+*before* the three migrations are pushed: a worker built before this feature treats any
+job that is not `discover` as a collection, and handed an `analyse` job it would walk the
+empty due-video list its claim carries and mark the job `succeeded` having classified
+nothing. `workers/deploy/README.md` carries this under "Order of a deploy that adds a job
+type". As a guard, `private.worker_due_videos` is rebuilt in `20260916011000` to raise
+`invalid_job_type` for any job whose type is not `collect`, so a gateway that did ask on
+such a worker's behalf is refused rather than answered.
+
+**Safety-blocked chunks.** `gemini.py` sends the four harm categories at `BLOCK_NONE` —
+the request classifies the audience's text and generates nothing — and, when a chunk of
+more than one item comes back with no candidate or unparseable, splits it once in half and
+classifies each half; a half that fails again fails as before.
+
+**Seams tested.** `tests/e2e/dashboard.spec.ts` (append-only) gained a test that serves
+the fixture with `active_topic_key: ""` and asserts the not-run text, no chart, no topic
+filter, no chips, no topic-correction button. `supabase/tests/end_to_end.test.ts` drives
+`/worker/topics-due` and `/worker/commit-topics` through `handleWorkerRequest` into PGlite
+with the Python client's own body shapes and the batch key `run_topics` derives.
+
+**Minor.** The Topic filter in `Dashboard.tsx` is gated on `active_topic_key`, not on the
+taxonomy's presence (every workspace has one from its first day). `docs/decisions.md` now
+says key and description are sent to Google, not the name. The design spec's
+`topic_source` vocabulary is `model|human_review|none`, matching `label_source` and the
+code. `coverage_summary.topics_stored` counts only final verdicts. The gateway refuses a
+`max_rows` that is present but not a positive integer. `docs/verification.md` records the
+`npm run check` gates at this head.

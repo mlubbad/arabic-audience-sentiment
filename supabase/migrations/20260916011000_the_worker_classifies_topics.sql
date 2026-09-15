@@ -272,9 +272,10 @@ end $$;
 -- worker_due_videos, rebuilt from 20260915132000 with one change: it refuses
 -- a job that is not a collection. A worker built before this migration treats
 -- any job that is not discover as a collection; handed an analyse job, it
--- would ask for due videos, read an empty list, and mark the job done having
--- classified nothing. The deploy order (worker and edge function before these
--- migrations, workers/deploy/README.md) is the fix; this is the guard.
+-- would walk an empty due-video list and mark the job done having classified
+-- nothing. The deploy order (worker and edge function before these
+-- migrations, workers/deploy/README.md) is the fix; this is the guard, for a
+-- gateway that asks the question on such a worker's behalf.
 create or replace function private.worker_due_videos(token_hash text, j uuid, t uuid) returns jsonb
 language plpgsql security invoker set search_path='' as $$
 declare w uuid; c uuid; kind text; begin

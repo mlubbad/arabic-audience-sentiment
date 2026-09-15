@@ -260,7 +260,8 @@ proceeds fixture-tested until it is.
   and `topic_reviewed`; the output adds `topics` (taxonomy for the control) and
   `topic_counts` (`Record<key, number>` plus `unclassified`), computed over the same filtered
   rows as every other figure. `exportRows` carries the same fields.
-- `csv.ts`: columns `effective_topic`, `topic_source` (`model|human|none`),
+- `csv.ts`: columns `effective_topic`, `topic_source` (`model|human_review|none`, the same
+  vocabulary as `label_source`),
   `classification_key` after `analysis_key`. The key is exported, not the display name, so a
   rename never changes an old export's meaning.
 - `fixture.ts`: fixture comments carry topic predictions across several keys and one topic

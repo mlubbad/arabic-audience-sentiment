@@ -279,7 +279,8 @@ plan `docs/superpowers/plans/2026-09-15-topic-classification.md`, tasks 1–10,
   reasoning `active_analysis_labels` already applies to sentiment.
 - **What is sent to Google, and what is withheld.** `worker_topics_due` hands the worker the
   comment's text, its parent's text (or an explicit note that the parent is unavailable, for
-  a reply whose parent was purged), and the workspace's taxonomy (key, name, description) —
+  a reply whose parent was purged), and the workspace's taxonomy (key and description; the
+  display names never leave the database) —
   never the author, any id, or the workspace. `gemini.py` puts the key only in the
   `x-goog-api-key` header, never in a URL, and constrains the response to the taxonomy's own
   keys via a JSON schema enum so the model cannot name a topic nobody chose; a response

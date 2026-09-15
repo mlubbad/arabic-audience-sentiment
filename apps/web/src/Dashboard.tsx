@@ -805,10 +805,11 @@ function DashboardBody({
             ))}
           </select>
         </label>
-        {/* Offered only when the source carries a taxonomy: a filter on a
-            dimension no row has would narrow every figure to nothing and
-            leave the reader to guess why. */}
-        {(result.data?.topics ?? []).length > 0 && (
+        {/* Offered only once a topic model has run: every workspace carries
+            a taxonomy from its first day, so its presence says nothing. A
+            filter on a dimension no row has yet would narrow every figure to
+            nothing and leave the reader to guess why. */}
+        {!!result.data?.active_topic_key && (
           <label>
             {S.topicFilterLabel}
             <select

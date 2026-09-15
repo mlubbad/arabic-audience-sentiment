@@ -45,6 +45,21 @@ starve a quiet one, and a round counts as idle only when every credential came
 back empty. The classifier is loaded once and shared, which is the reason to
 run one worker over several tenants rather than one process each.
 
+## Order of a deploy that adds a job type
+
+The worker service and the `worker` Edge Function go out **before** the
+migrations that teach the queue a new job type — for topic classification, the
+three migrations `20260916010000`–`20260916012000`. A worker built before
+that change treats any job that is not `discover` as a collection: handed an
+`analyse` job by a queue that already knows the type, it walks the empty
+due-video list the claim carries (the gateway asks for one only on a
+`collect` claim) and marks the job `succeeded` having classified nothing —
+and the tick will not queue another while that one counts as done. As a
+guard, `worker_due_videos` raises `invalid_job_type` for anything but
+`collect`, so a gateway that did ask on the worker's behalf is refused rather
+than answered; a refused job is still a job that ran and failed. Update the
+service, redeploy the function, then push the migrations.
+
 ## Continuously
 
 `run-worker.sh` in this directory starts one worker under `flock`. Schedule it:
