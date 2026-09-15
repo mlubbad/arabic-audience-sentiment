@@ -967,3 +967,13 @@ rollback and not a failed deploy; it is a cache.
 
 `5c10eb5` (six indigo tints, `app.css` only) landed on `main` while the upload ran and is not
 in this deploy.
+
+## 2026-09-15 — migration 20260915110000 applied to the live project
+
+`db push --linked --dry-run` named the one pending file; `db push --linked` applied it,
+backfill and partial unique index included, without error — so the live table held no
+channel with two connected grants, or the index would have refused. The entry point still
+answers 401 / 42501 over PostgREST with the nine named arguments, so the `create or replace`
+landed on the same signature.
+
+Not verified: a re-link on the live channel (needs the owner's consent round trip).
