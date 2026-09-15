@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd agent for the collection worker on this Mac.
+
+  The agent runs from a detached checkout at
+    ~/Library/Application Support/sentiment-worker/checkout
+  because macOS (TCC) keeps launchd agents out of ~/Documents, where the
+  working checkout lives. Install once: scripts/worker-service-update.sh
+  creates that checkout, syncs its venv, copies .env.local, installs this
+  file into ~/Library/LaunchAgents and bootstraps it; run it again after
+  every change to the worker to move the service to the current main.
+  Stop / start / status:
+    launchctl kill TERM gui/$(id -u)/com.skydevelop.sentiment-worker   (finishes the job in hand, then exits; KeepAlive restarts it)
+    launchctl bootout gui/$(id -u)/com.skydevelop.sentiment-worker     (stops for good until bootstrapped again)
+    launchctl print gui/$(id -u)/com.skydevelop.sentiment-worker
+  Log: ~/Library/Application Support/sentiment-worker/service.log
+
+  A LaunchAgent runs while this user is logged in and the machine is awake:
+  a sleeping laptop is a stopped worker. That is the standing hosting
+  blocker; this closes the "someone must start it by hand" half of it.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.skydevelop.sentiment-worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>/Users/mlubbad/Library/Application Support/sentiment-worker/checkout/scripts/worker-service.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/mlubbad/Library/Application Support/sentiment-worker/checkout</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>ExitTimeOut</key>
+  <integer>600</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/mlubbad/Library/Application Support/sentiment-worker/service.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/mlubbad/Library/Application Support/sentiment-worker/service.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/mlubbad/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HOME</key>
+    <string>/Users/mlubbad</string>
+    <key>UV_CACHE_DIR</key>
+    <string>/Users/mlubbad/Library/Application Support/sentiment-worker/uv-cache</string>
+  </dict>
+</dict>
+</plist>
