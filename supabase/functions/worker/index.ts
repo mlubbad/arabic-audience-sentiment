@@ -136,5 +136,42 @@ Deno.serve((request) =>
       });
       if (error) failed(error);
     },
+    dueVideos: async (hash, j, t) => {
+      const { data, error } = await db.rpc("svc_worker_due_videos", {
+        credential_hash: hash,
+        j,
+        t,
+      });
+      if (error) failed(error);
+      return data ?? [];
+    },
+    commitCatalogue: async (hash, j, t, payload) => {
+      const { data, error } = await db.rpc("svc_worker_commit_catalogue", {
+        credential_hash: hash,
+        j,
+        t,
+        payload,
+      });
+      if (error) failed(error);
+      return data;
+    },
+    videoFinished: async (hash, j, t, v, outcome, errorCode) => {
+      const { error } = await db.rpc("svc_worker_video_finished", {
+        credential_hash: hash,
+        j,
+        t,
+        v,
+        outcome,
+        error_code: errorCode,
+      });
+      if (error) failed(error);
+    },
+    tick: async (hash) => {
+      const { data, error } = await db.rpc("svc_worker_tick", {
+        credential_hash: hash,
+      });
+      if (error) failed(error);
+      return data;
+    },
   }),
 );

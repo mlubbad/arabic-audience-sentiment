@@ -47,6 +47,28 @@ export interface WorkerDb {
     outcome: string,
     errorCode: string | null,
   ): Promise<void>;
+  /** The videos a collect job should read, decided by the server. */
+  dueVideos?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+  ): Promise<unknown>;
+  commitCatalogue(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    payload: unknown[],
+  ): Promise<unknown>;
+  videoFinished(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    videoId: string,
+    outcome: string,
+    errorCode: string | null,
+  ): Promise<void>;
+  /** Enqueue whatever is due for this credential's workspace. No lease. */
+  tick(credentialHash: string): Promise<unknown>;
 }
 
 /** Refusals the worker client tells apart. Anything else is a 500 with no detail. */
@@ -59,6 +81,8 @@ const STATUS: Record<string, number> = {
   invalid_batch: 400,
   batch_too_large: 400,
   invalid_outcome: 400,
+  invalid_catalogue: 400,
+  invalid_video: 400,
   // A workspace with no plan, or one outside its period, is a decision about
   // entitlement — not a fault in this service. These were missing from the
   // map, so metering refused a batch of real predictions and the worker was
@@ -144,13 +168,27 @@ export async function handleWorkerRequest(
       const accessToken = db.accessTokenFor
         ? await db.accessTokenFor(credential, String(claimed.id))
         : null;
+      const type = String(claimed.type ?? "collect");
+      const videos =
+        type === "collect" && db.dueVideos
+          ? await db.dueVideos(
+              credential,
+              String(claimed.id),
+              String(claimed.lease_token),
+            )
+          : [];
       return json(200, {
         job_id: claimed.id,
         lease_token: claimed.lease_token,
         checkpoint: claimed.checkpoint ?? null,
         access_token: accessToken,
+        type,
+        videos,
       });
     }
+
+    if (path.endsWith("/worker/tick"))
+      return json(200, await db.tick(credential));
 
     // Route first: an unknown path is 404 whatever the body looks like, so a
     // typo is never reported as a malformed request.
@@ -158,6 +196,8 @@ export async function handleWorkerRequest(
       "/worker/heartbeat",
       "/worker/commit-batch",
       "/worker/finish",
+      "/worker/commit-catalogue",
+      "/worker/video-finished",
     ];
     if (!leased.some((route) => path.endsWith(route)))
       return json(404, { code: "not_found" });
@@ -191,6 +231,27 @@ export async function handleWorkerRequest(
       const outcome = str(body, "outcome");
       if (!outcome) return refuse("invalid_batch");
       await db.finish(credential, job, lease, outcome, str(body, "error_code"));
+      return json(200, {});
+    }
+    if (path.endsWith("/worker/commit-catalogue")) {
+      if (!Array.isArray(body.payload)) return refuse("invalid_catalogue");
+      return json(
+        200,
+        await db.commitCatalogue(credential, job, lease, body.payload),
+      );
+    }
+    if (path.endsWith("/worker/video-finished")) {
+      const video = str(body, "video_id");
+      const outcome = str(body, "outcome");
+      if (!video || !outcome) return refuse("invalid_batch");
+      await db.videoFinished(
+        credential,
+        job,
+        lease,
+        video,
+        outcome,
+        str(body, "error_code"),
+      );
       return json(200, {});
     }
     return json(404, { code: "not_found" });

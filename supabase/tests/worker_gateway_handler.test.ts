@@ -13,6 +13,9 @@ const base = (): WorkerDb => ({
   heartbeat: vi.fn(async () => {}),
   commitBatch: vi.fn(async () => ({})),
   finish: vi.fn(async () => {}),
+  commitCatalogue: vi.fn(async () => ({ videos: 0 })),
+  videoFinished: vi.fn(async () => {}),
+  tick: vi.fn(async () => ({ discover: 0, collect: 0 })),
 });
 const post = (db: WorkerDb, path = "/worker/claim", bearer = "cred") =>
   handleWorkerRequest(
@@ -38,6 +41,7 @@ describe("what a claim hands the worker", () => {
         id: "job-1",
         lease_token: "lease-1",
         checkpoint: null,
+        type: "collect",
       }),
       accessTokenFor: async () => "ya29.short-lived",
     };
@@ -48,6 +52,8 @@ describe("what a claim hands the worker", () => {
       "checkpoint",
       "job_id",
       "lease_token",
+      "type",
+      "videos",
     ]);
     expect(JSON.stringify(body)).not.toContain("refresh");
   });
@@ -90,5 +96,127 @@ describe("what a claim hands the worker", () => {
     const response = await post({ ...base(), accessTokenFor });
     expect(response.status).toBe(204);
     expect(accessTokenFor).not.toHaveBeenCalled();
+  });
+});
+
+describe("the due list and the catalogue", () => {
+  const send = (db: WorkerDb, path: string, body: unknown) =>
+    handleWorkerRequest(
+      new Request(`https://edge.invalid${path}`, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer cred",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }),
+      db,
+    );
+
+  it("hands a collect claim its due videos, and a discover claim none", async () => {
+    const dueVideos = vi.fn(async () => [
+      { video_id: "v", external_video_id: "a".repeat(11), title: "t" },
+    ]);
+    const db: WorkerDb = {
+      ...base(),
+      claim: async () => ({
+        id: "j",
+        lease_token: "l",
+        checkpoint: null,
+        type: "collect",
+      }),
+      dueVideos,
+    };
+    const body = (await (await post(db)).json()) as {
+      type: string;
+      videos: unknown[];
+    };
+    expect(body.type).toBe("collect");
+    expect(body.videos).toHaveLength(1);
+    expect(dueVideos).toHaveBeenCalledWith(expect.any(String), "j", "l");
+
+    const discover: WorkerDb = {
+      ...base(),
+      claim: async () => ({
+        id: "j",
+        lease_token: "l",
+        checkpoint: null,
+        type: "discover",
+      }),
+      dueVideos,
+    };
+    const d = (await (await post(discover)).json()) as {
+      type: string;
+      videos: unknown[];
+    };
+    expect(d).toMatchObject({ type: "discover", videos: [] });
+    expect(dueVideos).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits a catalogue only as an array under a live lease", async () => {
+    const db = base();
+    const bad = await send(db, "/worker/commit-catalogue", {
+      job_id: "j",
+      lease_token: "l",
+      payload: {},
+    });
+    expect(bad.status).toBe(400);
+    const ok = await send(db, "/worker/commit-catalogue", {
+      job_id: "j",
+      lease_token: "l",
+      payload: [],
+    });
+    expect(ok.status).toBe(200);
+    expect(db.commitCatalogue).toHaveBeenCalledWith(
+      expect.any(String),
+      "j",
+      "l",
+      [],
+    );
+  });
+
+  it("records a video's end with its outcome and code", async () => {
+    const db = base();
+    const r = await send(db, "/worker/video-finished", {
+      job_id: "j",
+      lease_token: "l",
+      video_id: "v",
+      outcome: "blocked",
+      error_code: "comments_disabled",
+    });
+    expect(r.status).toBe(200);
+    expect(db.videoFinished).toHaveBeenCalledWith(
+      expect.any(String),
+      "j",
+      "l",
+      "v",
+      "blocked",
+      "comments_disabled",
+    );
+    const missing = await send(db, "/worker/video-finished", {
+      job_id: "j",
+      lease_token: "l",
+    });
+    expect(missing.status).toBe(400);
+  });
+
+  it("ticks without a lease and maps a refused catalogue to 400", async () => {
+    const db = base();
+    const t = await send(db, "/worker/tick", {});
+    expect(t.status).toBe(200);
+    expect(await t.json()).toEqual({ discover: 0, collect: 0 });
+    const refusing: WorkerDb = {
+      ...base(),
+      commitCatalogue: async () => {
+        throw { code: "invalid_catalogue" };
+      },
+    };
+    const r = await send(refusing, "/worker/commit-catalogue", {
+      job_id: "j",
+      lease_token: "l",
+      payload: [],
+    });
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ code: "invalid_catalogue" });
   });
 });
