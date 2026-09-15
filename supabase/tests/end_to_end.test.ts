@@ -71,6 +71,37 @@ const liveDb: WorkerDb = {
       errorCode,
     ]);
   },
+  async dueVideos(hash, job, lease) {
+    const r = await db.query<{ result: unknown }>(
+      "select private.worker_due_videos($1,$2,$3) as result",
+      [hash, job, lease],
+    );
+    return r.rows[0].result;
+  },
+  async commitCatalogue(hash, job, lease, payload) {
+    const r = await db.query<{ result: unknown }>(
+      "select private.worker_commit_catalogue($1,$2,$3,$4) as result",
+      [hash, job, lease, JSON.stringify(payload)],
+    );
+    return r.rows[0].result;
+  },
+  async videoFinished(hash, job, lease, video, outcome, errorCode) {
+    await db.query("select private.worker_video_finished($1,$2,$3,$4,$5,$6)", [
+      hash,
+      job,
+      lease,
+      video,
+      outcome,
+      errorCode,
+    ]);
+  },
+  async tick(hash) {
+    const r = await db.query<{ result: unknown }>(
+      "select private.worker_tick($1) as result",
+      [hash],
+    );
+    return r.rows[0].result;
+  },
 };
 
 const post = (path: string, body: unknown) =>
@@ -165,6 +196,8 @@ describe("worker to database, through the real handler", () => {
       job_id: string;
       lease_token: string;
       checkpoint: unknown;
+      type: string;
+      videos: unknown[];
     };
     // The exact keys the Python client reads. A jobs row keyed `id` would make
     // every later call raise KeyError, which no mock-based test would catch.
@@ -177,8 +210,17 @@ describe("worker to database, through the real handler", () => {
       "checkpoint",
       "job_id",
       "lease_token",
+      // type and videos joined the claim so a collect job is handed its due
+      // list without a second round trip. The seeded job is a real 'collect'
+      // row with no video_selections, so this also exercises the real
+      // worker_due_videos -> due_videos SQL path, not a stand-in: an empty
+      // channel must come back as an empty list, not null or an error.
+      "type",
+      "videos",
     ]);
     expect(lease.lease_token).toBeTruthy();
+    expect(lease.type).toBe("collect");
+    expect(lease.videos).toEqual([]);
 
     expect(
       (
