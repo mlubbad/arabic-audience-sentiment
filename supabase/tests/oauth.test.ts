@@ -272,6 +272,44 @@ describe("youtube connection", () => {
     expect(kept.rows[0]).toEqual({ handle: "@named", title: "قناة مسمّاة" });
   });
 
+  it("retires the previous grant when a channel is re-linked, and holds one live grant per channel", async () => {
+    await admin();
+    const twice = "UC" + "t".repeat(22);
+    const link = async (name: string) => {
+      await user(ownerB);
+      await db.query("select public.oauth_start($1,$1,$2,$3)", [
+        B,
+        h(name),
+        VERIFIER,
+      ]);
+      await admin();
+      return (await attach(h(name), twice)).rows[0].id;
+    };
+    const first = await link("h-twice-1");
+    expect(await link("h-twice-2")).toBe(first);
+    // Two rows, one of them live. The worker's reader picks among connected
+    // rows by `id desc`, and ids are random: with two connected rows the grant
+    // it collected with was a coin toss. Now there is one to choose from.
+    const rows = await db.query<{ status: string; n: number }>(
+      "select status, count(*)::int as n from private.oauth_connections where channel_id=$1 group by status order by status",
+      [first],
+    );
+    expect(rows.rows).toEqual([
+      { status: "connected", n: 1 },
+      { status: "superseded", n: 1 },
+    ]);
+    // And the table refuses a second live grant outright, so a writer that
+    // forgets to retire the old one is stopped rather than quietly restoring
+    // the coin toss.
+    await expect(
+      db.query(
+        `insert into private.oauth_connections(workspace_id,channel_id,connected_by,encrypted_tokens,key_version,granted_scopes,status)
+         values ($1,$2,$3,$4,'k1',$5,'connected')`,
+        [B, first, ownerB, CIPHERTEXT, ["youtube.readonly"]],
+      ),
+    ).rejects.toThrow(/oauth_connections_one_connected/);
+  });
+
   it("keeps tokens out of every tenant-visible path", async () => {
     await user(ownerA);
     await expect(
