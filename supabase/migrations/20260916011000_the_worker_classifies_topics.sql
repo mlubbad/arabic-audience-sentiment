@@ -26,11 +26,14 @@ $$;
 
 -- What the tick asks: is there anything for an analyse job to do on this
 -- channel? Under the active key when there is one; before any classification
--- has run, any audience comment with no succeeded verdict at all.
+-- has run, any audience comment with no answered verdict under the
+-- workspace's current taxonomy version — a verdict recorded under an earlier
+-- version (a taxonomy edit bumps the version and clears the active key) does
+-- not count as answered, or a re-edited taxonomy would never be rescheduled.
 create function private.topics_pending(w uuid, c uuid) returns boolean
 language plpgsql stable security invoker set search_path='' as $$
-declare active text; begin
-  select active_topic_key into active from public.workspaces where id = w;
+declare active text; ver int; begin
+  select active_topic_key, topic_taxonomy_version into active, ver from public.workspaces where id = w;
   return exists (
     select 1 from public.comments cm
       join public.videos v on v.workspace_id = w and v.id = cm.video_id
@@ -41,7 +44,8 @@ declare active text; begin
                  then not exists (select 1 from public.topic_predictions p
                                    where p.workspace_id = w and p.comment_id = cm.id
                                      and p.content_hash = cm.content_hash
-                                     and p.status in ('succeeded','skipped','unsupported'))
+                                     and p.status in ('succeeded','skipped','unsupported')
+                                     and p.classification_key like 'topics:v' || ver::text || '+%')
                  else private.topic_row_due(w, cm, active) end));
 end $$;
 
@@ -116,6 +120,8 @@ begin
         or r->>'status' not in ('succeeded','skipped','failed','unsupported')
         or ((r->>'status' = 'succeeded') <> (r->>'topic_key' is not null))
         or (r ? 'confidence' and jsonb_typeof(r->'confidence') not in ('number','null'))
+        or coalesce(r->>'model_id','') !~ '^[A-Za-z0-9._-]{1,80}$'
+        or coalesce(r->>'prompt_version','') !~ '^[A-Za-z0-9._-]{1,20}$'
         or r->>'classification_key' is distinct from
            private.topic_classification_key(w, r->>'model_id', r->>'prompt_version')) then
     raise exception 'invalid_batch' using errcode='22023'; end if;
@@ -161,7 +167,13 @@ begin
       topic_key text, confidence numeric, model_id text, prompt_version text, error_code text)
     join public.comments cm on cm.workspace_id = w and cm.platform = 'youtube'
      and cm.external_comment_id = r.external_comment_id
-  on conflict (workspace_id, comment_id, content_hash, classification_key) do nothing;
+  on conflict (workspace_id, comment_id, content_hash, classification_key) do update set
+    status = excluded.status, topic_key = excluded.topic_key, confidence = excluded.confidence,
+    error_code = excluded.error_code, model_id = excluded.model_id,
+    prompt_version = excluded.prompt_version, predicted_at = now()
+  -- Only a failure is retried. A final answer (succeeded, skipped, unsupported)
+  -- is never overwritten by a later attempt.
+  where public.topic_predictions.status = 'failed';
   get diagnostics n = row_count;
 
   insert into private.job_batches(job_id, batch_key, checkpoint, payload_hash, outcome)
@@ -172,6 +184,15 @@ begin
    where workspace_id = w and job_id = j;
   return jsonb_build_object('replayed', false, 'stored', n);
 end $$;
+
+-- A retry that turns a failed verdict into a success is an update, not an
+-- insert, and it may be the workspace's first success: adopt_first_topic_
+-- classification (20260916010000) only fires on insert, so an update needs
+-- its own trigger to the same effect.
+create trigger adopt_first_topic_classification_on_update
+  after update on public.topic_predictions
+  referencing new table as new_predictions
+  for each statement execute function private.adopt_first_topic_classification();
 
 -- schedule_due_work, rebuilt from 20260915132000 with one addition: an
 -- analyse job for a channel with unclassified comments.

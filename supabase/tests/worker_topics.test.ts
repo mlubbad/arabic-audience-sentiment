@@ -287,6 +287,76 @@ describe("the worker classifies topics", () => {
     ).toBe(2);
   });
 
+  it("retries a failed verdict into a success: charged once, and a later success is never overwritten", async () => {
+    await service();
+    // A fresh audience comment, never classified before.
+    await db.query(
+      `insert into comments(workspace_id,video_id,external_comment_id,is_reply,
+         text_raw,text_plain,content_hash,timestamp_precision,source,author_channel_id,author_name,published_at)
+       values ($1,$1,'c5',false,'تعليق جديد','تعليق جديد','h-c5','second','youtube_oauth','UCviewer5','مؤلف',now())`,
+      [W],
+    );
+    const failed = await commit("b7", [
+      record("c5", {
+        content_hash: "h-c5",
+        status: "failed",
+        topic_key: null,
+        confidence: null,
+        error_code: "gemini_unavailable",
+      }),
+    ]);
+    expect(failed).toEqual({ replayed: false, stored: 1 });
+    // A failed verdict is never charged.
+    expect(
+      await scalar<number>(
+        "select count(*)::int as v from usage_events where event_type='topic_classification'",
+      ),
+    ).toBe(2);
+
+    const retried = await commit("b8", [
+      record("c5", { content_hash: "h-c5", topic_key: "praise" }),
+    ]);
+    expect(retried).toEqual({ replayed: false, stored: 1 });
+    // Charged exactly once, on the retry that finally succeeded.
+    expect(
+      await scalar<number>(
+        "select count(*)::int as v from usage_events where event_type='topic_classification'",
+      ),
+    ).toBe(3);
+    expect(
+      await scalar<{ status: string; topic_key: string }>(
+        `select jsonb_build_object('status',status,'topic_key',topic_key) as v
+           from topic_predictions where workspace_id=$1 and content_hash='h-c5'
+             and comment_id=(select id from comments where external_comment_id='c5')`,
+        [W],
+      ),
+    ).toEqual({ status: "succeeded", topic_key: "praise" });
+    // No longer due: the retry's success answered it.
+    expect((await due()).rows.map((r) => r.external_comment_id)).not.toContain(
+      "c5",
+    );
+
+    // A final answer is never overwritten by a later attempt under the same key.
+    const overwrite = await commit("b9", [
+      record("c5", {
+        content_hash: "h-c5",
+        status: "failed",
+        topic_key: null,
+        confidence: null,
+        error_code: "gemini_unavailable",
+      }),
+    ]);
+    expect(overwrite).toEqual({ replayed: false, stored: 0 });
+    expect(
+      await scalar<{ status: string; topic_key: string }>(
+        `select jsonb_build_object('status',status,'topic_key',topic_key) as v
+           from topic_predictions where workspace_id=$1 and content_hash='h-c5'
+             and comment_id=(select id from comments where external_comment_id='c5')`,
+        [W],
+      ),
+    ).toEqual({ status: "succeeded", topic_key: "praise" });
+  });
+
   it("tells a worker whose model is not the active one to stand down", async () => {
     await service();
     const list = await scalar<{ active: boolean; rows: unknown[] }>(
@@ -323,5 +393,56 @@ describe("the worker classifies topics", () => {
     await db.exec("set role authenticated");
     await expect(due()).rejects.toThrow();
     await admin();
+  });
+
+  it("a taxonomy edit reopens verdicts recorded under the old version", async () => {
+    await admin();
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      OWNER,
+    ]);
+    await db.exec("set role authenticated");
+    await db.query("select set_workspace_topics($1, $2::jsonb)", [
+      W,
+      JSON.stringify([
+        {
+          key: "question",
+          name_ar: "استفسارات",
+          name_en: "Questions",
+          description: "Asks something.",
+        },
+        {
+          key: "praise",
+          name_ar: "إشادة",
+          name_en: "Praise",
+          description: "Compliments.",
+        },
+        {
+          key: "other",
+          name_ar: "أخرى",
+          name_en: "Other",
+          description: "Anything else.",
+        },
+      ]),
+    ]);
+    await admin();
+
+    await service();
+    // Every existing verdict was recorded under v1; none of them count under
+    // the bumped version, so the channel has something due again.
+    expect(
+      await scalar<boolean>("select private.topics_pending($1,$1) as v", [W]),
+    ).toBe(true);
+    // The tick's one-outstanding rule would otherwise block a new analyse
+    // job behind the one this file claimed in the first test and never
+    // finished.
+    await db.query(
+      "update jobs set status='succeeded', lease_token=null, lease_expires_at=null where id=$1",
+      [job.id],
+    );
+    const tick = await scalar<{ analyse: number }>(
+      "select private.schedule_due_work($1) as v",
+      [W],
+    );
+    expect(tick.analyse).toBe(1);
   });
 });
