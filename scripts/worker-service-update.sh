@@ -21,7 +21,9 @@ fi
 # The credentials travel by copy: a symlink into ~/Documents would be refused
 # by the same rule that keeps the agent out of it.
 cp "$REPO/.env.local" "$CO/.env.local"
-UV_CACHE_DIR="$SVC/uv-cache" "${UV_BIN:-$HOME/.local/bin/uv}" --directory "$CO/workers/python" sync --frozen >/dev/null
+# The model runtime is a dependency group kept out of the default install; the
+# service is the one process that loads it.
+UV_CACHE_DIR="$SVC/uv-cache" "${UV_BIN:-$HOME/.local/bin/uv}" --directory "$CO/workers/python" sync --frozen --group inference >/dev/null
 
 cp "$CO/scripts/$LABEL.plist" "$PLIST"
 # bootout is a no-op error when the agent is not loaded; the restart is the point.
