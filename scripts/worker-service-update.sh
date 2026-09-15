@@ -27,7 +27,15 @@ UV_CACHE_DIR="$SVC/uv-cache" "${UV_BIN:-$HOME/.local/bin/uv}" --directory "$CO/w
 
 cp "$CO/scripts/$LABEL.plist" "$PLIST"
 # bootout is a no-op error when the agent is not loaded; the restart is the point.
+# It sends SIGTERM, and the loop finishes the job in hand before it exits — a
+# bootstrap issued while the old run is still leaving fails with "Input/output
+# error", so wait for the service to be gone first (ExitTimeOut is 600 s).
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+i=0
+while launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; do
+  i=$((i + 1)); [ "$i" -gt 620 ] && { echo "the old run did not exit" >&2; exit 1; }
+  sleep 1
+done
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "service at $(git -C "$CO" rev-parse --short HEAD); log: $SVC/service.log"
 launchctl print "gui/$(id -u)/$LABEL" | grep -E "state =|pid =" || true
