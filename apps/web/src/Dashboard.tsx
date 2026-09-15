@@ -477,22 +477,29 @@ function DashboardBody({
     setVerdict(c.label ?? "neutral");
     setReviewing(c);
   }
-  function apply(e: FormEvent) {
-    e.preventDefault();
-    if (dateMode !== "unknown" && from && to && from >= to) {
-      setFormError("يجب أن يسبق تاريخ البداية تاريخ النهاية");
-      return;
-    }
-    setFormError("");
-    setCursorNotice(false);
-    setCursors([]);
+  /**
+   * The filters, from the controls, in one place.
+   *
+   * There used to be two of these. The form built `video_ids`, which is the
+   * field the contract defines; the video cards in the comparison section
+   * built `video_id`, which is not a field at all. `FiltersSchema` is strict,
+   * so clicking a video put an unrecognised key at the root of the filters and
+   * the whole report vanished behind an error — while choosing the same video
+   * from the dropdown two inches away worked perfectly.
+   *
+   * The card's own comment said it "goes through the same apply path". It did
+   * not; it wrote its own object beside it. So there is one path now, and the
+   * card passes what it changed rather than restating everything.
+   */
+  function filtersFrom(over: { video?: string } = {}): Filters {
+    const chosenVideo = over.video ?? video;
     // A range describes known dates, so it is not sent when the user has asked
     // for the rows that have no date at all.
     const ranged = dateMode !== "unknown";
-    setFilters({
+    return {
       ...defaults,
       q: query,
-      video_ids: video ? [video] : [],
+      video_ids: chosenVideo ? [chosenVideo] : [],
       video_kind: (videoKind || undefined) as Filters["video_kind"],
       sentiments: sentiment ? [sentiment as Label] : [],
       replies,
@@ -507,7 +514,22 @@ function DashboardBody({
         ranged && to
           ? new Date(to + "T00:00:00+03:00").toISOString()
           : undefined,
-    });
+    };
+  }
+  /** Narrowing the report: validate, drop the paging, and set them. */
+  function applyFilters(over: { video?: string } = {}) {
+    if (dateMode !== "unknown" && from && to && from >= to) {
+      setFormError("يجب أن يسبق تاريخ البداية تاريخ النهاية");
+      return;
+    }
+    setFormError("");
+    setCursorNotice(false);
+    setCursors([]);
+    setFilters(filtersFrom(over));
+  }
+  function apply(e: FormEvent) {
+    e.preventDefault();
+    applyFilters();
   }
   function reset() {
     setQuery("");
@@ -1089,16 +1111,17 @@ function DashboardBody({
                           data-testid={`rp-video-${v.id}`}
                           onClick={() => {
                             // Selecting a video is a filter change like any
-                            // other, so it goes through the same apply path
-                            // and resets paging rather than leaving a cursor
-                            // pointing into the previous result set.
+                            // other, so it goes through the same apply path —
+                            // which resets paging and builds the filters from
+                            // one definition rather than a second one here.
+                            //
+                            // `next` is passed rather than relied upon from
+                            // state: setVideo has not landed yet when this
+                            // runs, so reading `video` would apply the
+                            // previous selection.
                             const next = video === v.id ? "" : v.id;
                             setVideo(next);
-                            goTo([]);
-                            setFilters((f) => ({
-                              ...f,
-                              video_id: next || undefined,
-                            }));
+                            applyFilters({ video: next });
                           }}
                         >
                           <span>

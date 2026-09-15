@@ -1567,3 +1567,37 @@ test("filtering does not re-read the source it cannot change", async ({
   // all of them.
   expect(reads).toBe(afterLoad);
 });
+
+test("drilling into a video from the comparison filters to it", async ({
+  page,
+}) => {
+  // The path the operator actually took, and the one no test covered: the
+  // video is chosen by clicking it in the comparison section rather than from
+  // the dropdown in the filter form. The two wrote different filter objects —
+  // `video_ids` from the form, `video_id` from the card — and only one of
+  // those names exists in the contract, which is `.strict()`.
+  //
+  // So the click produced an unrecognised key at the root of the filters and
+  // every figure on the page disappeared behind "وصلت بياناتك، لكن تعذّر
+  // تطبيق الفلاتر عليها". Retrying could not help: the filters are state, and
+  // re-deriving them throws again.
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+
+  const card = page.getByTestId("rp-video-video-2");
+  await card.scrollIntoViewIfNeeded();
+  await card.click();
+
+  await expect(page.getByTestId("load-error")).toBeHidden();
+  await expect(page.getByTestId("total")).toHaveText("2");
+  await expect(page.getByTestId("active-filters")).toContainText(
+    "فيديو محدَّد",
+  );
+  await expect(card).toHaveAttribute("aria-pressed", "true");
+
+  // Clicking it again clears the filter rather than leaving a key behind.
+  await card.click();
+  await expect(page.getByTestId("load-error")).toBeHidden();
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(card).toHaveAttribute("aria-pressed", "false");
+});
