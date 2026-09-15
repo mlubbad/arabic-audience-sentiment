@@ -9,6 +9,7 @@ What is sent: the taxonomy (key and description), the comment text, and a
 reply's parent text. Never an author, an id, or a workspace.
 """
 import json
+import math
 import time
 from typing import Any
 
@@ -36,6 +37,8 @@ def build_prompt(taxonomy: list[dict], items: list[TopicItem]) -> str:
     for local, item in enumerate(items):
         if item.is_reply and item.parent_text:
             lines.append(f"[{local}] رد على: {item.parent_text}\n    الرد: {item.text}")
+        elif item.is_reply:
+            lines.append(f"[{local}] رد على تعليق لم يعد متاحًا:\n    الرد: {item.text}")
         else:
             lines.append(f"[{local}] {item.text}")
     return "\n".join(lines)
@@ -91,7 +94,8 @@ class GeminiTopicClassifier:
             a = by_index.get(local)
             key = a.get("topic_key") if a else None
             conf = a.get("confidence") if a else None
-            if key not in keys or not isinstance(conf, (int, float)):
+            if (key not in keys or not isinstance(conf, (int, float)) or isinstance(conf, bool)
+                    or not math.isfinite(conf)):
                 verdicts.append(TopicVerdict("failed", None, None, "gemini_bad_response"))
                 continue
             verdicts.append(TopicVerdict("succeeded", key, min(max(float(conf), 0.0), 1.0), None))

@@ -58,6 +58,12 @@ def test_a_reply_is_shown_with_its_parent():
     assert "question — asks" in prompt
 
 
+def test_a_reply_without_its_parent_says_so():
+    prompt = build_prompt(TAXONOMY, [TopicItem(0, "آمين", None, True)])
+    assert "رد على تعليق لم يعد متاحًا" in prompt
+    assert "رد على: " not in prompt
+
+
 def test_chunks_of_twenty_five_and_verdicts_in_order():
     fake = Fake([(200, answer([(i, "praise") for i in range(CHUNK)])),
                  (200, answer([(0, "question"), (1, "praise")]))])
@@ -90,6 +96,13 @@ def test_a_missing_index_fails_only_that_item():
     assert b.topic_key == "praise"
 
 
+def test_non_numeric_confidence_fails_only_that_item():
+    fake = Fake([(200, {"candidates": [{"content": {"parts": [{"text": json.dumps(
+        [{"index": 0, "topic_key": "praise", "confidence": "x"}])}]}}]})])
+    [v] = fake.classifier().classify(TAXONOMY, items(1))
+    assert v.error_code == "gemini_bad_response"
+
+
 def test_unparseable_text_fails_the_chunk():
     fake = Fake([(200, {"candidates": [{"content": {"parts": [{"text": "not json"}]}}]})])
     [v] = fake.classifier().classify(TAXONOMY, items(1))
@@ -106,6 +119,7 @@ def test_nothing_raised_carries_the_url():
     fake = Fake([(400, {"error": {"message": "bad request at https://x.invalid?key=secret-key"}})])
     [v] = fake.classifier().classify(TAXONOMY, items(1))
     assert v.status == "failed" and "secret-key" not in (v.error_code or "")
+    assert v.error_code == "gemini_refused"
 
 
 def test_prompt_version_is_declared():
