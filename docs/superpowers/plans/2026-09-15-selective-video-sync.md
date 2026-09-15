@@ -272,6 +272,14 @@ alter table public.videos
 
 alter table public.channels add column catalogued_at timestamptz;
 
+-- The view the browser reads channels through, rebuilt from 20260915080000
+-- with the new column appended (a replace may add trailing columns).
+create or replace view public.connection_status
+  with (security_invoker = true) as
+  select c.workspace_id, c.id as channel_id, c.external_channel_id, c.handle,
+         c.status, c.active_analysis_key, c.title, c.catalogued_at
+  from public.channels c;
+
 create table public.video_selections (
   workspace_id uuid not null,
   channel_id uuid not null,
@@ -2495,7 +2503,7 @@ async function readLive(workspaceId: string): Promise<CatalogueRead> {
     videos: (videos.data ?? []) as RawVideo[],
     selections: (selections.data ?? []) as RawSelection[],
     channelId: connected?.channel_id ?? null,
-    cataloguedAt: (connected as { catalogued_at?: string | null } | undefined)?.catalogued_at ?? null,
+    cataloguedAt: connected?.catalogued_at ?? null,
   };
 }
 
@@ -2508,7 +2516,7 @@ export async function loadCatalogue(
 }
 ```
 
-Check whether the `connection_status` view exposes `catalogued_at` — it is a view over `channels` created in an earlier migration; if it does not select `catalogued_at`, add to the Task 3 migration (before it is applied anywhere; it is not yet) a `create or replace view public.connection_status` built from the view's current definition (find it with `grep -n "connection_status" supabase/migrations/*.sql`) plus the column. Export `VideoAggregate` from `packages/contracts/src/index.ts` if it is not already.
+`connection_status` carries `catalogued_at` since Task 1's migration. `VideoAggregate` and `UsageSummary` already reach the barrel through `export * from "./snapshot"` / `"./usage"`.
 
 `apps/web/public/fixtures/catalogue.json`:
 
@@ -2922,7 +2930,7 @@ export function Catalogue({
 }
 ```
 
-`UsageSummary` and `VideoAggregate` types must be exported from the contracts barrel (check `packages/contracts/src/index.ts`; add `export type { VideoAggregate } from "./snapshot";` if missing).
+`UsageSummary` and `VideoAggregate` are already exported from the contracts barrel.
 
 In `Sync.tsx`'s `SyncBody`, render `<Catalogue mode={mode} workspaceId={workspaceId} plan={s?.plan ?? null} snapshotVideos={s?.videos ?? []} jobs={jobs} onChanged={() => { setTick((t) => t + 1); void snapshot.refetch(); }} />` before `<OperationsPanels …/>`, inside the `snapshot.isPending / isError` branches so the page still has one loading and one failed state. In fixture mode the save button is disabled by `dirty && !channelId`? No — the fixture has a `channelId`, and `supabase` is null in fixture mode, so `save()` returns at once; the button is enabled so the browser test can assert enablement. Keep it that way and let `save()` no-op without `supabase`.
 
@@ -2997,4 +3005,4 @@ git commit -m "Record selective video sync: what was built, what was run, what w
 
 - **Spec coverage:** §1 → Task 1; §2 → Tasks 3, 6, 7 (+ OAuth enqueue in Task 3); §3 → Tasks 2, 4; §4 → Tasks 3, 5, 7; §5 → Tasks 8, 9; §6 → each task's tests. The spec's "`comments_state` learned from collection, not discovery" was wrong about the source (Task 10 amends it).
 - **Types:** `CatalogueVideo` (Task 4) is what `mergeCatalogue` (Task 8) returns and `Catalogue.tsx` (Task 9) consumes; the wire `videos[]` items (`video_id, external_video_id, title`) match between Task 3 `due_videos`, Task 5 handler, and Task 7 runner (`video["external_video_id"]` for the source, `video["video_id"]` for `video_finished`); `select_videos` returns `{job_id, queued, deferred, estimate, unknown_count, remaining_after}` in Task 2 and Task 9 reads `queued`/`deferred`.
-- **Placeholders:** none; where an existing identifier is uncertain (token names in CSS, the `connection_status` view's columns, `UsageSummary`/`VideoAggregate` exports) the step names the grep to run.
+- **Placeholders:** none; where an existing identifier is uncertain (token names in CSS) the step names the grep to run.
