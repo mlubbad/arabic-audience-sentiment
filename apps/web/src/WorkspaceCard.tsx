@@ -1,6 +1,7 @@
 /**
  * One workspace on the account page: its channel, where it is on the three
- * steps, and the one action that moves it along.
+ * steps, and the one thing that moves it along — connecting, or the way to
+ * the catalogue once it is connected.
  *
  * Presentational on purpose. The account page owns the session, the tables
  * and the requests; this takes rows and callbacks, so the owner's screen —
@@ -34,7 +35,6 @@ export function WorkspaceCard({
   latestJob,
   pending,
   feedback,
-  onSync,
   onConnect,
 }: {
   workspace: { id: string; name: string };
@@ -45,7 +45,6 @@ export function WorkspaceCard({
   pending: boolean;
   /** What this card has to say for itself — its own note, or that it is working. */
   feedback: ReactNode;
-  onSync: (channel: ChannelRow) => void;
   onConnect: () => void;
 }) {
   const S = useStrings();
@@ -83,19 +82,18 @@ export function WorkspaceCard({
       <SetupPath steps={steps} testId={`setup-${workspace.id}`} />
       {/* Shown only when it can actually work: without a client the server
           would refuse, and a button that always fails is worse than no button. */}
-      {/* Connected: the next thing to do is collect. enqueue_sync creates the
-          job; a worker picks it up. Both halves are said plainly in the
-          message, because a queued job with no worker looks identical to
-          nothing happening. */}
+      {/* Connected: the next thing to do is choose what to collect. This was
+          a "request sync" button that enqueued a whole-channel job from here;
+          collection is now per video, chosen on the operations page, so the
+          card points there — a link, not an action, because the choice is
+          the action and it needs the catalogue in front of the reader. */}
       {channel?.status === "connected" && (
-        <button
-          type="button"
-          disabled={pending}
+        <a
+          href={`/sync?ws=${workspace.id}`}
           data-testid={`sync-${workspace.id}`}
-          onClick={() => onSync(channel)}
         >
-          {S.requestSync}
-        </button>
+          {S.chooseVideos}
+        </a>
       )}
       {hasClient && channel?.status !== "connected" && (
         <button

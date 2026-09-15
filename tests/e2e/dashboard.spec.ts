@@ -1603,3 +1603,84 @@ test("drilling into a video from the comparison filters to it", async ({
   await expect(page.getByTestId("total")).toHaveText("6");
   await expect(card).toHaveAttribute("aria-pressed", "false");
 });
+
+// ---- the catalogue on the operations page (selective video sync) ----
+
+test("the catalogue narrows by search and kind, and prices a selection live", async ({
+  page,
+}) => {
+  await page.goto("/sync?demo=1");
+  const cat = page.getByTestId("catalogue");
+  await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(5);
+  await page.getByTestId("cat-search").fill("بث");
+  await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(1);
+  await page.getByTestId("cat-search").fill("");
+  await page.getByTestId("cat-kind-short").click();
+  await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(1);
+  await page.getByTestId("cat-kind-all").click();
+  // 26 units remain in the fixture plan; video-3 reports 18 and holds none.
+  await page.getByTestId("cat-check-video-3").check();
+  await expect(page.getByTestId("cat-estimate")).toContainText(
+    "حتى 18 تعليقًا",
+  );
+  await expect(page.getByTestId("cat-estimate")).toContainText("يتبقى بعدها 8");
+  await page.getByTestId("cat-check-video-5").check();
+  await expect(page.getByTestId("cat-estimate")).toContainText(
+    "و1 بعدد غير معروف",
+  );
+  await expect(page.getByTestId("cat-save")).toBeEnabled();
+});
+
+test("the catalogue stops at the quota and says why", async ({ page }) => {
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    fixture.plan.budgets[0] = {
+      event_type: "comment_analysis",
+      used: 90,
+      allowance: 100,
+      remaining: 10,
+    };
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/sync?demo=1");
+  await page.getByTestId("cat-check-video-3").check();
+  await expect(page.getByTestId("cat-save")).toBeDisabled();
+  await expect(page.getByTestId("cat-estimate")).toContainText(
+    "يتجاوز ما تبقى",
+  );
+  await page.getByTestId("cat-fit").click();
+  // Nothing fits 10 units (video-3 is 18, the rest are selected, off, or unknown).
+  await expect(page.getByTestId("cat-check-video-3")).not.toBeChecked();
+});
+
+test("a disabled video cannot be selected and says so", async ({ page }) => {
+  await page.goto("/sync?demo=1");
+  await expect(page.getByTestId("cat-check-video-4")).toBeDisabled();
+  await expect(page.getByTestId("cat-state-video-4")).toHaveText(
+    "تعليقات معطّلة",
+  );
+  await expect(page.getByTestId("cat-state-video-1")).toContainText("جُمع 5");
+});
+
+test("at phone width the selection bar stays reachable", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.goto("/sync?demo=1");
+  await page.getByTestId("cat-check-video-3").check();
+  const bar = page.getByTestId("cat-estimate");
+  const box = await bar.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(700);
+  // The same rule as "no Arabic label is letter-spaced" above, on the one
+  // section that is new: positive tracking pulls Arabic joins apart. The
+  // section heading inherits `.rp-section h2`'s -0.01em like every heading
+  // on the page, which tightens by a fifth of a pixel and closes nothing —
+  // so, as there, only positive tracking counts.
+  const spacing = await page
+    .getByTestId("catalogue")
+    .evaluate((el) =>
+      [...el.querySelectorAll("*")]
+        .map((n) => getComputedStyle(n).letterSpacing)
+        .filter((v) => v !== "normal" && parseFloat(v) > 0),
+    );
+  expect(spacing).toEqual([]);
+});

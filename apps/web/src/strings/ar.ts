@@ -113,7 +113,6 @@ export const ar = {
     `القناة تحتاج إعادة ربط (${status}): `,
   channelIdLabel: "المعرّف",
   channelNone: "لا توجد قناة مرتبطة بعد",
-  requestSync: "طلب مزامنة",
   connectChannel: "ربط قناة يوتيوب",
   relinkForName: "إعادة الربط لحفظ اسم القناة",
 
@@ -209,14 +208,11 @@ export const ar = {
     "كل مساحة عمل تملك قناتها وبياناتها وحدودها. لا تُعرض بيانات مساحة داخل أخرى.",
   noWorkspaceStrong: "لا توجد مساحة عمل متاحة",
   noWorkspaceLead: "أنشئ واحدة أدناه لتبدأ.",
-  syncRequestFailed: "تعذر تسجيل طلب المزامنة.",
   // "عامل الجمع" was the product's word for a process the reader cannot see,
   // start or stop. The reader-facing sentences say what is true of the
   // collection instead — running, or stopped with nothing running — and what
   // they can do. The term survives only in the attempt log's forensic lines,
   // where it names the thing an operator is actually inspecting.
-  syncRequestStanding:
-    "طلب المزامنة مسجَّل. لكل قناة طلب واحد في كل مرة، ويبدأ حين يكون الجمع يعمل — حالته الآن في صفحة «حالة المزامنة».",
   anotherWorkspaceTitle: "مساحة أخرى لعميل أو قناة",
   anotherWorkspaceLead: "يبقى لكل مساحة جمهورها وبياناتها وصلاحياتها المستقلة.",
   workspaceNameLabel: "اسم مساحة العمل",
@@ -407,7 +403,6 @@ export const ar = {
   opsWorkerConnected: (heartbeat: string) => `يعمل، آخر إشارة ${heartbeat}`,
   opsWorkerDisconnected:
     "متوقّف الآن — لا شيء يعمل. لن تُحدَّث البيانات حتى يعود.",
-  opsRequesting: "جارٍ الطلب…",
   opsNoChannelBefore: "لا توجد قناة مرتبطة بمساحة العمل هذه.",
   opsNoChannelLink: "اربط قناة من صفحة الحساب",
   opsNoChannelAfter: "ليبدأ الجمع.",
@@ -434,7 +429,7 @@ export const ar = {
   opsLogFailedLead: "هذا ليس معناه أنه فارغ.",
   opsLogReading: "جارٍ قراءة سجل المحاولات…",
   opsNoAttemptsStrong: "لا توجد محاولات بعد",
-  opsNoAttemptsLead: "اطلب مزامنة من صفحة الحساب.",
+  opsNoAttemptsLead: "اختر فيديوهات من القائمة أعلاه لتبدأ محاولة.",
   opsAttemptN: (n: number) => ` · المحاولة ${n}`,
   opsCancel: "سحب من الطابور",
   refresh: "تحديث",
@@ -442,9 +437,6 @@ export const ar = {
   opsRetryFailed: "تعذّرت إعادة المحاولة.",
   opsCancelled: "سُحبت المهمة من الطابور.",
   opsRetried: "أُضيفت محاولة جديدة، تستأنف من حيث توقّفت السابقة.",
-  opsSyncRequestFailed: "تعذّر تسجيل طلب المزامنة.",
-  opsSyncRequestStanding:
-    "طلب المزامنة مسجَّل. لكل قناة طلب واحد في كل مرة، ويبدأ حين يكون الجمع يعمل.",
 
   // ---- the catalogue: which videos, what they cost, what was collected ----
   catTitle: "الفيديوهات",
@@ -460,6 +452,7 @@ export const ar = {
   catKindVideo: "فيديو",
   catKindShort: "شورت",
   catKindStream: "بث",
+  catSortLabel: "الترتيب",
   catSortNewest: "الأحدث",
   catSortOldest: "الأقدم",
   catSortMost: "الأكثر تعليقًا",
@@ -602,8 +595,8 @@ export const ar = {
   emptyNoCommentsTitle: "لم تصل تعليقات بعد",
   emptyNoCommentsLead:
     "لا توجد تعليقات محفوظة لمساحة العمل هذه. لا علاقة للفلاتر بذلك — لم يكتمل جمعٌ بعد.",
-  emptyFollowCollection: "تابع حالة الجمع",
-  emptyConnectOrSync: "اربط قناة أو اطلب مزامنة",
+  emptyFollowCollection: "اختر الفيديوهات وتابع الجمع",
+  emptyConnectOrSync: "اربط قناة",
   emptyNoMatchTitle: "لا توجد تعليقات مطابقة لهذه الفلاتر",
   emptyNoMatchLead: (total: string) =>
     `${total} تعليقًا محفوظًا في مساحة العمل، ولا واحد منها يطابق ما اخترته. وسّع الفلاتر أو أعد ضبطها.`,

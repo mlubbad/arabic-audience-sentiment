@@ -25,7 +25,12 @@ const { tableResults, from } = vi.hoisted(() => {
 });
 vi.mock("./supabase", () => ({ supabase: { from } }));
 
-import { loadCatalogue, mergeCatalogue, type RawCatalogue } from "./catalogue";
+import {
+  loadCatalogue,
+  mergeCatalogue,
+  storedPerVideo,
+  type RawCatalogue,
+} from "./catalogue";
 
 const raw: RawCatalogue = {
   videos: [
@@ -60,18 +65,40 @@ const raw: RawCatalogue = {
   ],
 };
 
+describe("storedPerVideo", () => {
+  const row = (id: string, video_id: string, by_channel_owner: boolean) =>
+    ({
+      id,
+      video_id,
+      by_channel_owner,
+      workspace_id: "w1",
+    }) as unknown as import("@sentiment/contracts").Comment;
+
+  it("counts every stored row, the channel's own replies included", () => {
+    // The server prices a selection with `count(*)` over the video's rows;
+    // the dashboard's aggregate leaves the owner's replies out. The
+    // catalogue must agree with the server, or its estimate says "fits" for
+    // a selection the database then refuses.
+    const counts = storedPerVideo(
+      [
+        row("c1", "video-1", false),
+        row("c2", "video-1", true),
+        row("c2", "video-1", true), // a duplicate row is one comment
+        row("c3", "video-2", false),
+        { ...row("c4", "video-1", false), workspace_id: "other" },
+      ],
+      "w1",
+    );
+    expect(counts).toEqual([
+      { id: "video-1", total: 2 },
+      { id: "video-2", total: 1 },
+    ]);
+  });
+});
+
 describe("mergeCatalogue", () => {
   it("joins the source's list with the selection and the stored count", () => {
-    const rows = mergeCatalogue(raw, [
-      {
-        id: "video-1",
-        title: "فيديو ١",
-        total: 5,
-        analysed: 5,
-        replies: 1,
-        sentiments: { positive: 1, negative: 1, neutral: 3, mixed: 0 },
-      },
-    ]);
+    const rows = mergeCatalogue(raw, [{ id: "video-1", total: 5 }]);
     expect(rows.find((r) => r.id === "video-1")).toMatchObject({
       selected: true,
       collected: 5,

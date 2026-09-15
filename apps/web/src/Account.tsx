@@ -428,39 +428,6 @@ export function Account() {
                     }
                     pending={pending}
                     feedback={feedback(scope)}
-                    onSync={(channel) => {
-                      setBusy(scope);
-                      setNote(null);
-                      void client
-                        .rpc("enqueue_sync", {
-                          w: w.id,
-                          c: channel.channel_id,
-                          k: `manual-${Date.now()}`,
-                        })
-                        .then(({ error }) => {
-                          setBusy(null);
-                          // Deliberately not "أُضيفت": the server answers a
-                          // repeat request with the job already waiting, so
-                          // claiming a new one was added would be a lie on
-                          // every click after the first.
-                          say(
-                            scope,
-                            error ? S.syncRequestFailed : S.syncRequestStanding,
-                          );
-                          // The step list reads the newest job; a request the
-                          // server accepted is one, whether it was created now
-                          // or was already waiting.
-                          if (!error)
-                            setJobs((prev) => [
-                              {
-                                workspace_id: w.id,
-                                status: "queued",
-                                created_at: new Date().toISOString(),
-                              },
-                              ...prev,
-                            ]);
-                        });
-                    }}
                     onConnect={() => {
                       if (!workspaceClient) return;
                       setBusy(scope);

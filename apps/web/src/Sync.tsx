@@ -30,6 +30,8 @@ import { syncHealth } from "./syncHealth";
 import { useLocale } from "./locale";
 import { useStrings } from "./strings";
 import { describeJob, type JobEntry, type JobRow } from "./jobFeed";
+import { storedPerVideo } from "./catalogue";
+import { Catalogue } from "./CataloguePanel";
 import { OperationsPanels } from "./OperationsPanels";
 import "./report.css";
 
@@ -235,6 +237,14 @@ function SyncBody({
         : undefined,
     [snapshot.data, mode, workspaceId],
   );
+  // What is stored per video, for the catalogue's price. From the source's
+  // comments, not from `s.videos`: that aggregate has already dropped the
+  // channel's own replies, and the server counts them (see `storedPerVideo`).
+  const stored = useMemo(
+    () =>
+      snapshot.data ? storedPerVideo(snapshot.data.comments, workspaceId) : [],
+    [snapshot.data, workspaceId],
+  );
   const health = syncHealth(s?.sync ?? null, new Date());
   const run = s?.sync?.last_run ?? null;
   const connected = !!s?.sync?.worker.connected;
@@ -268,22 +278,37 @@ function SyncBody({
           </button>
         </div>
       ) : (
-        <OperationsPanels
-          s={s}
-          health={health}
-          run={run}
-          mode={mode}
-          channelId={channelId}
-          jobs={jobs}
-          jobsFailed={jobsFailed}
-          entries={entries}
-          acting={acting}
-          actionMessage={actionMessage}
-          act={act}
-          refresh={refresh}
-          lang={lang}
-          S={S}
-        />
+        <>
+          {/* The action first, the diagnosis after it: what the channel has
+              and what is chosen, then whether collection is running and what
+              it costs. The catalogue reads the plan's remaining figure from
+              the same snapshot the plan panel prints, so its estimate and the
+              meter below it can never disagree. */}
+          <Catalogue
+            mode={mode}
+            workspaceId={workspaceId}
+            plan={s?.plan ?? null}
+            stored={stored}
+            jobs={jobs}
+            onChanged={refresh}
+          />
+          <OperationsPanels
+            s={s}
+            health={health}
+            run={run}
+            mode={mode}
+            channelId={channelId}
+            jobs={jobs}
+            jobsFailed={jobsFailed}
+            entries={entries}
+            acting={acting}
+            actionMessage={actionMessage}
+            act={act}
+            refresh={refresh}
+            lang={lang}
+            S={S}
+          />
+        </>
       )}
     </div>
   );

@@ -111,7 +111,6 @@ export const en: Strings = {
     `The channel needs reconnecting (${status}): `,
   channelIdLabel: "ID",
   channelNone: "No channel connected yet",
-  requestSync: "Request a sync",
   connectChannel: "Connect a YouTube channel",
   relinkForName: "Reconnect to store the channel's name",
 
@@ -208,9 +207,6 @@ export const en: Strings = {
     "Each workspace owns its channel, its data and its limits. One workspace's data is never shown inside another.",
   noWorkspaceStrong: "No workspace available",
   noWorkspaceLead: "Create one below to begin.",
-  syncRequestFailed: "The sync request could not be registered.",
-  syncRequestStanding:
-    "Your sync request is in. Each channel has one request at a time, and it starts when collection is running — its state right now is on the “Sync status” page.",
   anotherWorkspaceTitle: "Another workspace for a client or channel",
   anotherWorkspaceLead:
     "Each workspace keeps its own audience, data and permissions.",
@@ -411,7 +407,6 @@ export const en: Strings = {
     `running, last sign of life ${heartbeat}`,
   opsWorkerDisconnected:
     "stopped right now — nothing is running. Data will not refresh until it resumes.",
-  opsRequesting: "Requesting…",
   opsNoChannelBefore: "No channel is connected to this workspace.",
   opsNoChannelLink: "Connect a channel from the account page",
   opsNoChannelAfter: "to start collecting.",
@@ -439,7 +434,7 @@ export const en: Strings = {
   opsLogFailedLead: "That does not mean it is empty.",
   opsLogReading: "Reading the attempt log…",
   opsNoAttemptsStrong: "No attempts yet",
-  opsNoAttemptsLead: "Request a sync from the account page.",
+  opsNoAttemptsLead: "Choose videos from the catalogue above to start one.",
   opsAttemptN: (n: number) => ` · attempt ${n}`,
   opsCancel: "Withdraw from the queue",
   refresh: "Refresh",
@@ -449,9 +444,6 @@ export const en: Strings = {
   opsCancelled: "The job was withdrawn from the queue.",
   opsRetried:
     "A new attempt was added; it resumes where the previous one stopped.",
-  opsSyncRequestFailed: "The sync request could not be registered.",
-  opsSyncRequestStanding:
-    "Your sync request is in. Each channel has one request at a time, and it starts when collection is running.",
 
   catTitle: "Videos",
   catLead:
@@ -467,6 +459,7 @@ export const en: Strings = {
   catKindVideo: "Video",
   catKindShort: "Short",
   catKindStream: "Stream",
+  catSortLabel: "Sort",
   catSortNewest: "Newest",
   catSortOldest: "Oldest",
   catSortMost: "Most commented",
@@ -612,8 +605,8 @@ export const en: Strings = {
   emptyNoCommentsTitle: "No comments have arrived yet",
   emptyNoCommentsLead:
     "There are no stored comments for this workspace. The filters have nothing to do with it — no collection has completed yet.",
-  emptyFollowCollection: "Follow the collection status",
-  emptyConnectOrSync: "Connect a channel or request a sync",
+  emptyFollowCollection: "Choose the videos and follow the collection",
+  emptyConnectOrSync: "Connect a channel",
   emptyNoMatchTitle: "No comments match these filters",
   emptyNoMatchLead: (total: string) =>
     `${total} ${pl(total, "comment is", "comments are")} stored in the workspace, and none matches what you chose. Widen the filters or reset them.`,

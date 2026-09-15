@@ -35,7 +35,6 @@ function render(over: Partial<Parameters<typeof WorkspaceCard>[0]> = {}) {
       latestJob: null,
       pending: false,
       feedback: null,
-      onSync: () => {},
       onConnect: () => {},
       ...over,
     }),
@@ -76,7 +75,9 @@ describe("a workspace card", () => {
 
   it("places the workspace on the three steps from what the page loaded", () => {
     // Connected, newest job failed → step three needs attention, nothing is
-    // "next" because the reader's move is on the operations page.
+    // "next" because the reader's move is on the operations page. `sync-<id>`
+    // is that move: once a link to the catalogue (`/sync?ws=<id>`), no longer
+    // a button that enqueued a whole-channel job from here.
     const failed = render({
       channel: connected,
       latestJob: { workspace_id: W1, status: "failed", created_at: "" },
@@ -162,6 +163,8 @@ describe("a workspace card", () => {
   });
 
   it("carries its own feedback inside the card, after its action", () => {
+    // `sync-<id>` is the catalogue link now, not a request button; the note
+    // still belongs after it, inside the card.
     const html = render({
       channel: connected,
       feedback: createElement("p", { className: "account-feedback" }, "قائم"),

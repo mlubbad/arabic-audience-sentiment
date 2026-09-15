@@ -3,13 +3,13 @@
  *
  * Live: two RLS-scoped table reads (`videos`, `video_selections`) — not a
  * rewrite of `dashboard_snapshot`. The stored comment count per video comes
- * from the snapshot the page already holds (its `videos` aggregate), so this
- * module never re-reads the comments. Fixture: one JSON file.
+ * from the source the page already holds, so this module never re-reads the
+ * comments. Fixture: one JSON file.
  */
 import {
   CatalogueVideoSchema,
   type CatalogueVideo,
-  type VideoAggregate,
+  type Comment,
 } from "@sentiment/contracts";
 import type { DataMode } from "./data";
 import { supabase } from "./supabase";
@@ -36,9 +36,41 @@ export type CatalogueRead = RawCatalogue & {
   cataloguedAt: string | null;
 };
 
+/** How many rows of a video are in the database. */
+export type StoredCount = { id: string; total: number };
+
+/**
+ * Rows stored per video, from the source's comments.
+ *
+ * Deliberately NOT the snapshot's `videos` aggregate. That aggregate is taken
+ * downstream of `filteredRows`, which drops the channel's own replies before
+ * any denominator — right for every percentage on the dashboard, wrong here.
+ * "Collected" is what `select_videos` subtracts from YouTube's reported count
+ * to price a selection, and it counts every row (`count(*) from comments
+ * where video_id = …`), the owner's replies included, because YouTube's
+ * count includes them too. Reading the aggregate instead reported one fewer
+ * for a video with an owner reply in it and priced its re-collection one unit
+ * too high — the browser's estimate and the server's refusal disagreeing
+ * about the same video. Same shape as `channel_own_comments`: counted from
+ * the unfiltered input, on purpose, and said so.
+ */
+export function storedPerVideo(
+  comments: Comment[],
+  workspaceId: string,
+): StoredCount[] {
+  const seen = new Set<string>();
+  const totals = new Map<string, number>();
+  for (const c of comments) {
+    if (c.workspace_id !== workspaceId || seen.has(c.id)) continue;
+    seen.add(c.id);
+    totals.set(c.video_id, (totals.get(c.video_id) ?? 0) + 1);
+  }
+  return [...totals].map(([id, total]) => ({ id, total }));
+}
+
 export function mergeCatalogue(
   raw: RawCatalogue,
-  collected: VideoAggregate[],
+  collected: StoredCount[],
 ): CatalogueVideo[] {
   const stored = new Map(collected.map((v) => [v.id, v.total]));
   const chosen = new Map(raw.selections.map((s) => [s.video_id, s]));
