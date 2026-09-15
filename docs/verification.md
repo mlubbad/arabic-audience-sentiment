@@ -1056,3 +1056,18 @@ row, and reads done · done · in progress; with no channel row, next · later. 
 is tested over the five run statuses and the queue. Visual check: the rendered path injected
 into the fixture overview's empty section at 1280px — pills, detail line and the two actions
 lay out as the account card's do.
+
+## 2026-09-15 — preview deploy of 95be0b4
+
+Built from the checkout itself this time: the tree was clean at `95be0b4` (the landing work
+is committed), so no detached worktree was needed. Transfer log: 31 files at 226 — every one
+of the build's 31 — including `static/index-Dke0SM9B.js` (549,493 bytes),
+`static/index-T93yXpfz.css` (58,945 bytes; the tokenised app layer and the landing's unified
+system), and the two new chunks `RailState-D65vhTeh.js` (2,427) and `SetupPath-RvFaERm1.js`
+(1,611). The sweep removed the ten superseded hashed assets of `ddb5081`'s build. Exit 0.
+Origin probes are not evidence either way (basic auth answers 401 on every path); the log is.
+
+What this preview carries that the last did not: the rail's workspace switch and collection
+line, the page-level switches removed, the empty overview as the setup path, "the worker"
+gone from reader-facing sentences, app.css with no raw colour, and the landing on the brand's
+ink, accent, sentiment scale and a 13px type floor.
