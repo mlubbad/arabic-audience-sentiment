@@ -15,10 +15,22 @@ const as = async (id: string) => {
   await db.exec("set role authenticated");
 };
 const snapshot = async () =>
-  (await db.query<{ v: { topics: { key: string; retired: boolean }[]; active_topic_key: string;
-    comments: { id: string; topic_prediction: { topic_key: string; classification_key: string } | null;
-                topic_reviews: { topic_key: string; reviewer_id: string }[] }[] } }>(
-    "select dashboard_snapshot($1) as v", [W])).rows[0].v;
+  (
+    await db.query<{
+      v: {
+        topics: { key: string; retired: boolean }[];
+        active_topic_key: string;
+        comments: {
+          id: string;
+          topic_prediction: {
+            topic_key: string;
+            classification_key: string;
+          } | null;
+          topic_reviews: { topic_key: string; reviewer_id: string }[];
+        }[];
+      };
+    }>("select dashboard_snapshot($1) as v", [W])
+  ).rows[0].v;
 
 describe("the dashboard reads topics", () => {
   beforeAll(async () => {
@@ -36,9 +48,18 @@ describe("the dashboard reads topics", () => {
       await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
     await db.exec("reset role");
     await db.query("insert into auth.users(id) values ($1)", [OWNER]);
-    await db.query("insert into workspaces(id,name,created_by) values ($1,'w',$2)", [W, OWNER]);
-    await db.query("insert into memberships values ($1,$2,'workspace_owner')", [W, OWNER]);
-    await db.query("insert into clients(id,workspace_id,name) values ($1,$1,'c')", [W]);
+    await db.query(
+      "insert into workspaces(id,name,created_by) values ($1,'w',$2)",
+      [W, OWNER],
+    );
+    await db.query("insert into memberships values ($1,$2,'workspace_owner')", [
+      W,
+      OWNER,
+    ]);
+    await db.query(
+      "insert into clients(id,workspace_id,name) values ($1,$1,'c')",
+      [W],
+    );
     await db.query(
       `insert into channels(id,workspace_id,client_id,external_channel_id,status)
        values ($1,$1,$1,$2,'connected')`,
@@ -90,10 +111,16 @@ describe("the dashboard reads topics", () => {
       [W, C1],
     );
     await as(OWNER);
-    await db.query("select submit_topic_review($1,$2,'h1','request','طلب')", [W, C1]);
+    await db.query("select submit_topic_review($1,$2,'h1','request','طلب')", [
+      W,
+      C1,
+    ]);
     const s = await snapshot();
     expect(s.active_topic_key).toBe(KEY);
-    expect(s.comments[0].topic_prediction).toMatchObject({ topic_key: "question", classification_key: KEY });
+    expect(s.comments[0].topic_prediction).toMatchObject({
+      topic_key: "question",
+      classification_key: KEY,
+    });
     expect(s.comments[0].topic_reviews).toEqual([
       expect.objectContaining({ topic_key: "request", reviewer_id: OWNER }),
     ]);

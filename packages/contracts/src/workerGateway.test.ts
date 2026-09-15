@@ -155,36 +155,72 @@ describe("worker gateway", () => {
 
   it("routes the topic pair with only the fields the database reads", async () => {
     const store = db({
-      topicsDue: vi.fn(async () => ({ classification_key: "k", active: true, taxonomy: [], rows: [] })),
+      topicsDue: vi.fn(async () => ({
+        classification_key: "k",
+        active: true,
+        taxonomy: [],
+        rows: [],
+      })),
       commitTopics: vi.fn(async () => ({ replayed: false, stored: 2 })),
     });
     const due = await handleWorkerRequest(
       post("/worker/topics-due", {
-        job_id: "j1", lease_token: "t1", model_id: "gemini-2.5-flash", prompt_version: "p1",
-        max_rows: 50, workspace_id: "ignored",
+        job_id: "j1",
+        lease_token: "t1",
+        model_id: "gemini-2.5-flash",
+        prompt_version: "p1",
+        max_rows: 50,
+        workspace_id: "ignored",
       }),
       store,
     );
     expect(due.status).toBe(200);
-    expect(store.topicsDue).toHaveBeenCalledWith(HASHED, "j1", "t1", "gemini-2.5-flash", "p1", 50);
+    expect(store.topicsDue).toHaveBeenCalledWith(
+      HASHED,
+      "j1",
+      "t1",
+      "gemini-2.5-flash",
+      "p1",
+      50,
+    );
     const commit = await handleWorkerRequest(
       post("/worker/commit-topics", {
-        job_id: "j1", lease_token: "t1", batch_key: "b", records: [{ external_comment_id: "c1" }],
+        job_id: "j1",
+        lease_token: "t1",
+        batch_key: "b",
+        records: [{ external_comment_id: "c1" }],
       }),
       store,
     );
     expect(await commit.json()).toEqual({ replayed: false, stored: 2 });
-    expect(store.commitTopics).toHaveBeenCalledWith(HASHED, "j1", "t1", "b", [{ external_comment_id: "c1" }]);
+    expect(store.commitTopics).toHaveBeenCalledWith(HASHED, "j1", "t1", "b", [
+      { external_comment_id: "c1" },
+    ]);
     for (const [path, body] of [
-      ["/worker/topics-due", { job_id: "j1", lease_token: "t1", prompt_version: "p1" }],
-      ["/worker/commit-topics", { job_id: "j1", lease_token: "t1", batch_key: "b", records: "no" }],
+      [
+        "/worker/topics-due",
+        { job_id: "j1", lease_token: "t1", prompt_version: "p1" },
+      ],
+      [
+        "/worker/commit-topics",
+        { job_id: "j1", lease_token: "t1", batch_key: "b", records: "no" },
+      ],
     ] as const) {
       const r = await handleWorkerRequest(post(path, body), store);
       expect(r.status).toBe(400);
     }
     const typed = await handleWorkerRequest(
-      post("/worker/commit-topics", { job_id: "j1", lease_token: "t1", batch_key: "b", records: [] }),
-      db({ commitTopics: vi.fn(async () => { throw { message: "invalid_job_type" }; }) }),
+      post("/worker/commit-topics", {
+        job_id: "j1",
+        lease_token: "t1",
+        batch_key: "b",
+        records: [],
+      }),
+      db({
+        commitTopics: vi.fn(async () => {
+          throw { message: "invalid_job_type" };
+        }),
+      }),
     );
     expect(typed.status).toBe(400);
     expect(await typed.json()).toEqual({ code: "invalid_job_type" });

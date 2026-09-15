@@ -278,12 +278,18 @@ export async function handleWorkerRequest(
       const prompt = str(body, "prompt_version");
       const max = typeof body.max_rows === "number" ? body.max_rows : 200;
       if (!model || !prompt) return refuse("invalid_batch");
-      return json(200, await db.topicsDue(credential, job, lease, model, prompt, max));
+      return json(
+        200,
+        await db.topicsDue(credential, job, lease, model, prompt, max),
+      );
     }
     if (path.endsWith("/worker/commit-topics")) {
       const key = str(body, "batch_key");
       if (!key || !Array.isArray(body.records)) return refuse("invalid_batch");
-      return json(200, await db.commitTopics(credential, job, lease, key, body.records));
+      return json(
+        200,
+        await db.commitTopics(credential, job, lease, key, body.records),
+      );
     }
     return json(404, { code: "not_found" });
   } catch (error) {
