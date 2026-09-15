@@ -94,9 +94,6 @@ create table public.topic_predictions (
   foreign key (workspace_id, comment_id) references public.comments (workspace_id, id),
   foreign key (workspace_id, topic_key) references public.workspace_topics (workspace_id, key)
 );
-create index topic_predictions_by_comment
-  on public.topic_predictions(workspace_id, comment_id, content_hash, classification_key);
-
 -- Adopted on first success only, as 20260914030000 does for sentiment: a
 -- workspace with no active classification takes the one that just ran; one
 -- that has must not have it swapped underneath it.

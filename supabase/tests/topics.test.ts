@@ -25,7 +25,7 @@ const as = async (id: string) => {
   await db.exec("set role authenticated");
 };
 const admin = () => db.exec("reset role");
-const scalar = async <T,>(sql: string, params: unknown[] = []) =>
+const scalar = async <T>(sql: string, params: unknown[] = []) =>
   (await db.query<{ v: T }>(sql, params)).rows[0].v;
 
 const predict = (
@@ -67,8 +67,14 @@ describe("a comment has a topic", () => {
         "insert into workspaces(id,name,created_by) values ($1,'w',$2)",
         [w, u],
       );
-      await db.query("insert into memberships values ($1,$2,'workspace_owner')", [w, u]);
-      await db.query("insert into clients(id,workspace_id,name) values ($1,$1,'c')", [w]);
+      await db.query(
+        "insert into memberships values ($1,$2,'workspace_owner')",
+        [w, u],
+      );
+      await db.query(
+        "insert into clients(id,workspace_id,name) values ($1,$1,'c')",
+        [w],
+      );
       await db.query(
         `insert into channels(id,workspace_id,client_id,external_channel_id,status)
          values ($1,$1,$1,$2,'connected')`,
@@ -97,35 +103,75 @@ describe("a comment has a topic", () => {
 
   it("seeds ten topics into every workspace, existing or new", async () => {
     await admin();
-    expect(await scalar<number>("select count(*)::int as v from workspace_topics where workspace_id=$1", [W])).toBe(10);
+    expect(
+      await scalar<number>(
+        "select count(*)::int as v from workspace_topics where workspace_id=$1",
+        [W],
+      ),
+    ).toBe(10);
     const keys = await db.query<{ key: string }>(
       "select key from workspace_topics where workspace_id=$1 order by position",
       [W],
     );
     expect(keys.rows.map((r) => r.key)).toEqual([
-      "question", "religious", "praise", "criticism", "request",
-      "discussion", "personal", "humour", "promotion", "other",
+      "question",
+      "religious",
+      "praise",
+      "criticism",
+      "request",
+      "discussion",
+      "personal",
+      "humour",
+      "promotion",
+      "other",
     ]);
-    expect(await scalar<number>("select topic_taxonomy_version as v from workspaces where id=$1", [W])).toBe(1);
+    expect(
+      await scalar<number>(
+        "select topic_taxonomy_version as v from workspaces where id=$1",
+        [W],
+      ),
+    ).toBe(1);
   });
 
   it("refuses a succeeded prediction without a topic and a topic without success", async () => {
     await admin();
     await expect(predict(C1, "h1", KEY, "succeeded", null)).rejects.toThrow();
     await expect(predict(C1, "h1", KEY, "failed", "praise")).rejects.toThrow();
-    await expect(predict(C1, "h1", KEY, "succeeded", "not_a_topic")).rejects.toThrow();
+    await expect(
+      predict(C1, "h1", KEY, "succeeded", "not_a_topic"),
+    ).rejects.toThrow();
   });
 
   it("adopts the first successful classification as the workspace's active key", async () => {
     await admin();
-    expect(await scalar<string | null>("select active_topic_key as v from workspaces where id=$1", [W])).toBeNull();
+    expect(
+      await scalar<string | null>(
+        "select active_topic_key as v from workspaces where id=$1",
+        [W],
+      ),
+    ).toBeNull();
     await predict(C1, "h0", KEY, "failed", null); // a failure adopts nothing
-    expect(await scalar<string | null>("select active_topic_key as v from workspaces where id=$1", [W])).toBeNull();
+    expect(
+      await scalar<string | null>(
+        "select active_topic_key as v from workspaces where id=$1",
+        [W],
+      ),
+    ).toBeNull();
     await predict(C1, "h1", KEY);
-    expect(await scalar<string | null>("select active_topic_key as v from workspaces where id=$1", [W])).toBe(KEY);
+    expect(
+      await scalar<string | null>(
+        "select active_topic_key as v from workspaces where id=$1",
+        [W],
+      ),
+    ).toBe(KEY);
     await predict(C2, "h1", "topics:v1+other-model+p1");
     // Later analyses do not take over silently.
-    expect(await scalar<string | null>("select active_topic_key as v from workspaces where id=$1", [W])).toBe(KEY);
+    expect(
+      await scalar<string | null>(
+        "select active_topic_key as v from workspaces where id=$1",
+        [W],
+      ),
+    ).toBe(KEY);
   });
 
   it("stores one verdict per comment, text and key", async () => {
@@ -142,10 +188,16 @@ describe("a comment has a topic", () => {
     );
     expect(id).toMatch(/[0-9a-f-]{36}/);
     await expect(
-      db.query("select submit_topic_review($1,$2,'stale','request','x')", [W, C1]),
+      db.query("select submit_topic_review($1,$2,'stale','request','x')", [
+        W,
+        C1,
+      ]),
     ).rejects.toThrow(/stale_comment_text/);
     await expect(
-      db.query("select submit_topic_review($1,$2,'h1','not_a_topic','x')", [W, C1]),
+      db.query("select submit_topic_review($1,$2,'h1','not_a_topic','x')", [
+        W,
+        C1,
+      ]),
     ).rejects.toThrow(/invalid_topic/);
     await expect(
       db.query("select submit_topic_review($1,$2,'h1','request','')", [W, C1]),
@@ -160,34 +212,83 @@ describe("a comment has a topic", () => {
 
   it("is append-only and refuses a stranger by direct call", async () => {
     await admin();
-    await expect(db.query("delete from topic_reviews")).rejects.toThrow(/append_only/);
+    await expect(db.query("delete from topic_reviews")).rejects.toThrow(
+      /append_only/,
+    );
     await as(STRANGER);
     await expect(
       db.query("select submit_topic_review($1,$2,'h1','request','x')", [W, C1]),
     ).rejects.toThrow(/forbidden/);
-    expect(await scalar<number>("select count(*)::int as v from topic_predictions")).toBe(0);
-    expect(await scalar<number>("select count(*)::int as v from workspace_topics where workspace_id=$1", [W])).toBe(0);
+    expect(
+      await scalar<number>("select count(*)::int as v from topic_predictions"),
+    ).toBe(0);
+    expect(
+      await scalar<number>(
+        "select count(*)::int as v from workspace_topics where workspace_id=$1",
+        [W],
+      ),
+    ).toBe(0);
   });
 
   it("retires rather than deletes on a taxonomy edit, bumps the version and unseats the key", async () => {
     await as(OWNER);
     const version = await scalar<number>(
       `select set_workspace_topics($1, $2::jsonb) as v`,
-      [W, JSON.stringify([
-        { key: "question", name_ar: "أسئلة", name_en: "Questions", description: "Asks something." },
-        { key: "praise", name_ar: "إشادة", name_en: "Praise", description: "Compliments." },
-        { key: "shipping", name_ar: "الشحن", name_en: "Shipping", description: "Delivery questions." },
-      ])],
+      [
+        W,
+        JSON.stringify([
+          {
+            key: "question",
+            name_ar: "أسئلة",
+            name_en: "Questions",
+            description: "Asks something.",
+          },
+          {
+            key: "praise",
+            name_ar: "إشادة",
+            name_en: "Praise",
+            description: "Compliments.",
+          },
+          {
+            key: "shipping",
+            name_ar: "الشحن",
+            name_en: "Shipping",
+            description: "Delivery questions.",
+          },
+        ]),
+      ],
     );
     expect(version).toBe(2);
     await admin();
-    expect(await scalar<number>("select count(*)::int as v from workspace_topics where workspace_id=$1 and retired_at is null", [W])).toBe(3);
-    expect(await scalar<number>("select count(*)::int as v from workspace_topics where workspace_id=$1 and retired_at is not null", [W])).toBe(8);
-    expect(await scalar<string | null>("select active_topic_key as v from workspaces where id=$1", [W])).toBeNull();
+    expect(
+      await scalar<number>(
+        "select count(*)::int as v from workspace_topics where workspace_id=$1 and retired_at is null",
+        [W],
+      ),
+    ).toBe(3);
+    expect(
+      await scalar<number>(
+        "select count(*)::int as v from workspace_topics where workspace_id=$1 and retired_at is not null",
+        [W],
+      ),
+    ).toBe(8);
+    expect(
+      await scalar<string | null>(
+        "select active_topic_key as v from workspaces where id=$1",
+        [W],
+      ),
+    ).toBeNull();
     // Old verdicts remain: history, not deleted.
-    expect(await scalar<number>("select count(*)::int as v from topic_predictions where workspace_id=$1", [W])).toBe(4);
+    expect(
+      await scalar<number>(
+        "select count(*)::int as v from topic_predictions where workspace_id=$1",
+        [W],
+      ),
+    ).toBe(4);
     await as(STRANGER);
-    await expect(db.query("select set_workspace_topics($1,'[]'::jsonb)", [W])).rejects.toThrow(/forbidden/);
+    await expect(
+      db.query("select set_workspace_topics($1,'[]'::jsonb)", [W]),
+    ).rejects.toThrow(/forbidden/);
   });
 
   it("meters topic classification as its own kind against its own allowance", async () => {
@@ -208,12 +309,13 @@ describe("a comment has a topic", () => {
     expect(granted).toEqual(["topics:youtube:a", "topics:youtube:b"]);
     await admin();
     await as(OWNER);
-    const summary = await scalar<{ budgets: { event_type: string; used: number; allowance: number }[] }>(
-      "select usage_summary($1) as v",
-      [W],
-    );
+    const summary = await scalar<{
+      budgets: { event_type: string; used: number; allowance: number }[];
+    }>("select usage_summary($1) as v", [W]);
     expect(summary.budgets.map((b) => b.event_type)).toEqual([
-      "comment_analysis", "historical_backfill", "topic_classification",
+      "comment_analysis",
+      "historical_backfill",
+      "topic_classification",
     ]);
     expect(summary.budgets[2]).toMatchObject({ used: 2, allowance: 2 });
   });
