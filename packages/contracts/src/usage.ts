@@ -4,7 +4,11 @@ import { timestamp } from "./primitives";
 
 export const BudgetSchema = z
   .object({
-    event_type: z.enum(["comment_analysis", "historical_backfill"]),
+    event_type: z.enum([
+      "comment_analysis",
+      "historical_backfill",
+      "topic_classification",
+    ]),
     used: z.number().int().nonnegative(),
     allowance: z.number().int().nonnegative(),
     remaining: z.number().int().nonnegative(),

@@ -616,6 +616,12 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
         allowance: 2,
         remaining: 2,
       },
+      {
+        event_type: "topic_classification",
+        used: 0,
+        allowance: 0,
+        remaining: 0,
+      },
     ]);
 
     // Another tenant's plan is not readable, and neither is an anonymous one.
