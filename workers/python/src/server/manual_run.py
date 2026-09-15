@@ -132,7 +132,8 @@ def main() -> None:
     p.add_argument("--backfill", action="store_true",
                    help="walk every upload that has comments, resuming from the checkpoint")
     p.add_argument("--videos", type=int, default=25,
-                   help="how many recent uploads to consider (backfill only)")
+                   help="how many recent uploads to consider (single-video path only; "
+                        "a --backfill run reads whichever videos the server hands down)")
     from sentiment.transformer import CANDIDATES
 
     p.add_argument("--model", default="none",
@@ -159,7 +160,7 @@ def main() -> None:
     survey: dict[str, object] = {}
 
     def build(token: str):
-        report = survey_uploads(token, client)
+        report = survey_uploads(token, client, consider=args.videos)
         survey.update(report)
         if report["chosen"] is None:
             # Carried on the callable itself so the runner can record it
@@ -171,20 +172,10 @@ def main() -> None:
         return YouTubeAPI(None, client, access_token=token), report["chosen"]["video_id"]
 
     if args.backfill:
-        def plan(token: str):
-            report = survey_uploads(token, client, consider=args.videos)
-            survey.update(report)
-            # Only videos that have something to read. A video with no comments
-            # costs a request and returns nothing, and a channel of those would
-            # spend the quota discovering it one at a time.
-            wanted = [c for c in report["candidates"] if (c["comments"] or 0) > 0]
-            if not wanted:
-                plan.reason = report["reason"]
-                return None, []
-            chosen["videos"] = len(wanted)
-            return YouTubeAPI(None, client, access_token=token), wanted
-
-        worked = run_backfill(control, plan, analyzer=analyzer)
+        # Which videos to read is the server's decision, carried on the
+        # lease — this only has to build a collector for the claimed token.
+        worked = run_backfill(control, lambda token: YouTubeAPI(None, client, access_token=token),
+                              analyzer=analyzer)
     else:
         worked = run_once(
             control,

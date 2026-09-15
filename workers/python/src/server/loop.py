@@ -31,8 +31,7 @@ import httpx
 from collectors.youtube_api import YouTubeAPI
 
 from .gateway import ControlPlane, ControlPlaneError, LeaseLost
-from .manual_run import survey_uploads
-from .runner import run_backfill
+from .runner import run_job
 
 _stop = False
 
@@ -48,25 +47,19 @@ def _log(message: str) -> None:
     print(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}", flush=True)
 
 
-def build_plan(client: httpx.Client, consider: int):
-    def plan(token: str):
-        report = survey_uploads(token, client, consider=consider)
-        wanted = [c for c in report["candidates"] if (c["comments"] or 0) > 0]
-        if not wanted:
-            plan.reason = report["reason"]
-            return None, []
-        return YouTubeAPI(None, client, access_token=token), wanted
-
-    return plan
+def build_collector(client: httpx.Client):
+    def build(token: str):
+        return YouTubeAPI(None, client, access_token=token)
+    return build
 
 
 def serve(
     controls,
-    plan,
+    build,
     analyzer=None,
     idle_seconds: float = 60.0,
     max_idle: int = 30,
-    run=run_backfill,
+    run=run_job,
     sleep=time.sleep,
     should_stop=lambda: _stop,
 ) -> str:
@@ -87,7 +80,7 @@ def serve(
         control = queue[turn % len(queue)]
         turn += 1
         try:
-            worked = run(control, plan, analyzer=analyzer)
+            worked = run(control, build, analyzer=analyzer)
         except LeaseLost:
             # Another worker owns this job. Not an error: take the next one.
             _log("lease lost, another worker has it")
@@ -111,6 +104,14 @@ def serve(
         # quiet tenant never stands the worker down for the others.
         if idle % len(queue) != 0:
             continue
+        # A quiet round is the moment to ask the server for more work: every
+        # credential just came back empty, so this is not competing with a
+        # job in progress for the same tenant.
+        for c in queue:
+            try:
+                c.tick()
+            except ControlPlaneError as exc:
+                _log(f"tick refused: {exc.code}")
         if idle // len(queue) >= max_idle:
             _log(f"idle for {idle // len(queue)} rounds, exiting for a clean restart")
             return "idle"
@@ -128,7 +129,6 @@ def main() -> None:
                    help="one or more scoped worker credentials, comma-separated")
     p.add_argument("--model", default="none",
                    choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())])
-    p.add_argument("--videos", type=int, default=50)
     p.add_argument("--idle-seconds", type=float, default=60.0,
                    help="pause after an empty queue")
     p.add_argument("--max-idle", type=int, default=30,
@@ -156,11 +156,11 @@ def main() -> None:
     client = httpx.Client()
     credentials = [c.strip() for c in args.credential.split(",") if c.strip()]
     controls = [ControlPlane(args.base, c, client) for c in credentials]
-    plan = build_plan(client, args.videos)
+    build = build_collector(client)
     _log(f"worker up, model={args.model}, tenants={len(controls)}")
     why = serve(
         controls,
-        plan,
+        build,
         analyzer=analyzer,
         idle_seconds=args.idle_seconds,
         max_idle=args.max_idle,

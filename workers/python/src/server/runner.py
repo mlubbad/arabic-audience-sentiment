@@ -130,33 +130,59 @@ def run_once(
     return True
 
 
-def run_backfill(control: ControlPlane, build_plan, analyzer=None) -> bool:
-    """Claim one job and walk a channel's videos. False means no work.
+def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
+    """List the channel's videos and commit the list. The lease is already claimed.
 
-    The whole channel is one job, not one job per video: the queue already
-    refuses a second outstanding collection per channel, and a job per video
-    would need that rule relaxed for no gain. Progress lives in the job's
-    checkpoint, so an interrupted run resumes at the video it was inside
-    rather than at the start of the channel.
-
-    A video read to its end is recorded as done and never read again. A video
-    that stops early leaves the run partial with the cursor held, which is the
-    honest state: some of this channel has been read and the rest has not.
+    An incomplete listing is partial: the videos it did find are real, the
+    claim that this is the whole channel is not.
     """
-    lease = control.claim()
-    if lease is None:
-        return False
-
     token = lease.get("access_token")
     if not token:
         control.finish(lease, "blocked", "channel_not_connected")
         return True
+    try:
+        collector = build_collector(token)
+        result = collector.catalogue()
+        control.heartbeat(lease)
+        control.commit_catalogue(lease, result.videos)
+        control.finish(lease, "exhausted" if result.complete else "partial",
+                       None if result.complete else result.reason)
+    except LeaseLost:
+        raise
+    except CollectionError as exc:
+        control.finish(
+            lease, exc.outcome if exc.outcome in _DECLARABLE else "blocked", exc.code
+        )
+    return True
 
-    collector, videos = build_plan(token)
-    if collector is None or not videos:
-        reason = getattr(build_plan, "reason", None)
-        control.finish(lease, "blocked", reason or "no_video_to_collect")
+
+def run_discover(control: ControlPlane, build_collector) -> bool:
+    """Claim one discover job: list the channel's videos and commit the list."""
+    lease = control.claim()
+    if lease is None:
+        return False
+    return _discover(control, lease, build_collector)
+
+
+def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None) -> bool:
+    """Walk the videos the server handed on the lease. The lease is already claimed.
+
+    The whole channel is one job, not one job per video: the queue refuses a
+    second outstanding collection per channel. Which videos to read is the
+    server's decision (the selection table, filtered to what is due), carried
+    on the lease; the worker cannot widen it. Progress lives in the job's
+    checkpoint, so an interrupted run resumes at the video it was inside.
+
+    A video read to its end is reported finished and not read again this run.
+    A video whose comments are switched off is reported and skipped; anything
+    else that stops early leaves the run partial with the cursor held.
+    """
+    token = lease.get("access_token")
+    if not token:
+        control.finish(lease, "blocked", "channel_not_connected")
         return True
+    collector = build_collector(token)
+    videos = [v for v in (lease.get("videos") or []) if isinstance(v, dict)]
 
     done, current = _resume_progress(lease)
     cursor = _resume_cursor(lease)
@@ -165,7 +191,7 @@ def run_backfill(control: ControlPlane, build_plan, analyzer=None) -> bool:
 
     try:
         for video in videos:
-            vid = video["video_id"]
+            vid = video["external_video_id"]
             if vid in done:
                 continue
             # The held cursor belongs to one video. Starting another video from
@@ -173,29 +199,40 @@ def run_backfill(control: ControlPlane, build_plan, analyzer=None) -> bool:
             # issued.
             start = cursor if vid == current else None
             video_outcome = "partial"
-            for batch in collector.batches(vid, start):
-                predictions: list = []
-                if analyzer is not None:
-                    try:
-                        predictions = analyse(analyzer, batch.comments)
-                    except AnalysisError:
-                        analysis_failed = True
-                control.heartbeat(lease)
-                control.commit_batch(
-                    lease, vid, video.get("title"), batch, predictions,
-                    progress={"video": vid, "done": sorted(done)},
-                )
-                video_outcome = (
-                    batch.outcome if batch.outcome in _DECLARABLE else "failed"
-                )
-                if batch.outcome != "partial":
-                    break
+            try:
+                for batch in collector.batches(vid, start):
+                    predictions: list = []
+                    if analyzer is not None:
+                        try:
+                            predictions = analyse(analyzer, batch.comments)
+                        except AnalysisError:
+                            analysis_failed = True
+                    control.heartbeat(lease)
+                    control.commit_batch(
+                        lease, vid, video.get("title"), batch, predictions,
+                        progress={"video": vid, "done": sorted(done)},
+                    )
+                    video_outcome = (
+                        batch.outcome if batch.outcome in _DECLARABLE else "failed"
+                    )
+                    if batch.outcome != "partial":
+                        break
+            except CollectionError as exc:
+                if exc.code != "comments_disabled":
+                    raise
+                # A property of the video, not of the run. Learned back into
+                # the catalogue and the next video is read.
+                control.video_finished(lease, video["video_id"], "blocked", exc.code)
+                done.add(vid)
+                continue
             if video_outcome != "exhausted":
                 # Stop the run here. The checkpoint names this video and the
                 # ones behind it, so the next attempt continues rather than
                 # repeating the channel.
+                control.video_finished(lease, video["video_id"], video_outcome)
                 outcome = video_outcome
                 break
+            control.video_finished(lease, video["video_id"], "exhausted")
             done.add(vid)
         if analysis_failed and outcome == "exhausted":
             outcome = "partial"
@@ -207,3 +244,25 @@ def run_backfill(control: ControlPlane, build_plan, analyzer=None) -> bool:
             lease, exc.outcome if exc.outcome in _DECLARABLE else "blocked", exc.code
         )
     return True
+
+
+def run_backfill(control: ControlPlane, build_collector, analyzer=None) -> bool:
+    """Claim one collect job and walk the videos the server handed it. False means no work."""
+    lease = control.claim()
+    if lease is None:
+        return False
+    return _backfill(control, lease, build_collector, analyzer)
+
+
+def run_job(control: ControlPlane, build_collector, analyzer=None) -> bool:
+    """Claim whatever is next and run it by its type. False means no work.
+
+    The claim is consumed here; the lease is handed down rather than claiming
+    twice — a job must never be claimed twice.
+    """
+    lease = control.claim()
+    if lease is None:
+        return False
+    if lease.get("type") == "discover":
+        return _discover(control, lease, build_collector)
+    return _backfill(control, lease, build_collector, analyzer)

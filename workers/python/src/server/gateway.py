@@ -218,3 +218,21 @@ class ControlPlane:
                 "error_code": error_code,
             },
         )
+
+    def commit_catalogue(self, lease: dict[str, Any], videos: list[dict[str, Any]]) -> dict[str, Any] | None:
+        return self._post(
+            "/worker/commit-catalogue",
+            {"job_id": lease["job_id"], "lease_token": lease["lease_token"], "payload": videos},
+        )
+
+    def video_finished(self, lease: dict[str, Any], video_id: str, outcome: str,
+                       error_code: str | None = None) -> None:
+        self._post(
+            "/worker/video-finished",
+            {"job_id": lease["job_id"], "lease_token": lease["lease_token"],
+             "video_id": video_id, "outcome": outcome, "error_code": error_code},
+        )
+
+    def tick(self) -> dict[str, Any] | None:
+        """Ask the server to enqueue whatever is due for this credential's workspace."""
+        return self._post("/worker/tick")
