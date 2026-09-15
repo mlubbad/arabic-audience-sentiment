@@ -31,6 +31,7 @@ import {
   resolveMode,
   submitReview,
 } from "./data";
+import { failureCode } from "./failure";
 import { useSession, useWorkspaces } from "./session";
 import { workspaceState, readableWorkspace } from "./workspace";
 import {
@@ -382,6 +383,15 @@ function DashboardBody({
     // screen has no answer", and both are recovered from the same button.
     isError: read.isError || derived?.ok === false,
     refetch: read.refetch,
+    // Which half failed, and how. Without this the notice is the same sentence
+    // for a lost connection, a server that changed shape and a filter that
+    // cannot be applied — three problems with three different answers, and the
+    // reader is told to try again for all of them.
+    failure: read.isError
+      ? failureCode("read", read.error)
+      : derived?.ok === false
+        ? failureCode("view", derived.error)
+        : null,
   };
   // Sticky, because recovery re-requests page one and that response no longer
   // carries the reset flag. The user should still be told why the page moved.
@@ -885,8 +895,19 @@ function DashboardBody({
         </p>
       )}
       {result.isError && (
-        <div role="alert" className="notice">
-          <p>تعذر تحميل البيانات. حاول مرة أخرى.</p>
+        <div role="alert" className="notice" data-testid="load-error">
+          <p>
+            {result.failure?.startsWith("view:")
+              ? "وصلت بياناتك، لكن تعذّر تطبيق الفلاتر عليها."
+              : "تعذر تحميل البيانات. حاول مرة أخرى."}
+          </p>
+          {/* Small, and last. It is for the person who has to fix it, not for
+              the person reading the report — but it is on the screen, because
+              the alternative is fetching the payload by hand to find out what
+              a page in front of you already knows. */}
+          <p className="muted" data-testid="failure-code">
+            رمز العطل: <code>{result.failure}</code>
+          </p>
           <button onClick={() => void result.refetch()}>إعادة المحاولة</button>
         </div>
       )}

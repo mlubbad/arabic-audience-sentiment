@@ -88,7 +88,13 @@ describe("a read that cannot be turned into a screen", () => {
     // Rendering at all is half the assertion: an uncaught throw here fails the
     // test by propagating, which is precisely the production symptom.
     const html = renderToStaticMarkup(createElement(Dashboard));
-    expect(html).toContain("تعذر تحميل البيانات");
     expect(html).toContain("إعادة المحاولة");
+    // And it must say which half failed. A read that arrived and a view that
+    // could not be built from it are different problems with different
+    // answers, and telling the reader to try again is only right for one of
+    // them — retrying a derivation that throws will throw again.
+    expect(html).toContain("وصلت بياناتك");
+    expect(html).toContain('data-testid="failure-code"');
+    expect(html).toContain("view:");
   });
 });
