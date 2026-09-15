@@ -197,7 +197,7 @@ export function Dashboard() {
   if (sessionLoading)
     return (
       <div role="status" className="loading">
-        جارٍ تحديد حسابك…
+        جارٍ تحديد حسابك
       </div>
     );
   const place = workspaceState({
@@ -211,13 +211,13 @@ export function Dashboard() {
     if (workspacesLoading)
       return (
         <div role="status" className="loading">
-          جارٍ تحميل مساحات العمل…
+          جارٍ تحميل مساحات العمل
         </div>
       );
     if (workspacesFailed)
       return (
         <div role="alert" className="notice">
-          تعذّرت قراءة مساحات عملك. حدّث الصفحة لإعادة المحاولة.
+          تعذّر قراءة مساحات عملك. حدّث الصفحة لإعادة المحاولة.
         </div>
       );
     if (place.kind === "no_workspaces")
