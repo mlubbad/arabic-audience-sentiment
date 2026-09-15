@@ -1113,10 +1113,19 @@
        the footer pointing at areas this template does not define, so they were
        auto-placed into an implicit second column and squeezed the content into
        a strip about eighty pixels wide. */
+    /* Four rows, and the menu owns one of them. Naming only three left
+       `.app-menu` with no area at all: it resolved to
+       `auto / 1 / auto / -1` and was auto-placed into an implicit row AFTER
+       the footer, where `position: sticky` then held it. Measured at 375px
+       before the fix — button top 758px, footer top 583px — so on a phone
+       the only way to reach the navigation was to scroll past the end of
+       the page. */
     grid-template-areas:
       "note"
+      "menu"
       "main"
       "foot";
+    grid-template-rows: auto auto 1fr auto;
   }
   .app-rail {
     position: fixed;
@@ -1135,6 +1144,14 @@
   .app-rail.is-open {
     transform: none;
   }
+  /* Explicit placement, and NOT the line that fixes this: removing it and
+     keeping the row above still passes the browser test, because the menu
+     then auto-places into the empty named row anyway. The template row is
+     what carries the guarantee. This stays so the placement does not depend
+     on the menu remaining the first unplaced child of the shell. */
+  .app-shell:has(.app-rail) > .app-menu {
+    grid-area: menu;
+  }
   .app-shell .app-menu {
     display: inline-flex;
     position: sticky;
@@ -1142,6 +1159,7 @@
     z-index: 90;
     margin: var(--space-3);
     align-self: start;
+    justify-self: start;
     width: fit-content;
   }
 }

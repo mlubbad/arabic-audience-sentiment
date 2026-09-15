@@ -23,6 +23,7 @@ import {
 } from "./data";
 import { supabase } from "./supabase";
 import { useSession, useWorkspaces } from "./session";
+import { useWorkspaceSelection } from "./workspaceSelection";
 import {
   workspaceState,
   readableWorkspace,
@@ -45,7 +46,10 @@ export function Sync() {
     loading: workspacesLoading,
     failed: workspacesFailed,
   } = useWorkspaces(session);
-  const [chosen, setChosen] = useState<string | null>(null);
+  // One selection for the whole product. This was `useState(null)` here
+  // and again in the other page; both routes are lazy, so the answer died
+  // on every navigation and the question came back.
+  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null);
   if (sessionLoading)
     return (
       <div className="app-state" role="status">

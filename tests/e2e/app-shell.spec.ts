@@ -96,3 +96,35 @@ test("the connection result and unknown route offer working recovery paths", asy
   await page.getByRole("link", { name: "فتح لوحة البيانات" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 });
+
+test("on a phone the menu button is above the content, not past the end of it", async ({
+  page,
+}) => {
+  // "the inner app has a usable mobile navigation" above has passed since it
+  // was written, and the navigation was not usable: the button opened the
+  // sheet correctly, so clicking it worked — from wherever it happened to be.
+  // Where it happened to be was underneath the footer. The shell's mobile grid
+  // named three areas ("note" / "main" / "foot") and `.app-menu` was given
+  // none, so it resolved to `auto / 1 / auto / -1`, was auto-placed into an
+  // implicit row after every named one, and `position: sticky` then pinned it
+  // there. Measured at 375px before the fix: button top 758px, footer top
+  // 583px. On a long page it is thousands of pixels down.
+  //
+  // So this asserts position, which is what "reachable" means, rather than
+  // behaviour, which was never broken.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/dashboard");
+  const menu = page.getByRole("button", { name: "قائمة التطبيق" });
+  await expect(menu).toBeVisible();
+
+  const menuBox = await menu.boundingBox();
+  const mainBox = await page.locator("#content").boundingBox();
+  const footBox = await page.locator(".app-footer").boundingBox();
+  if (!menuBox || !mainBox || !footBox) throw new Error("no layout to measure");
+
+  expect(menuBox.y).toBeLessThan(mainBox.y);
+  expect(menuBox.y).toBeLessThan(footBox.y);
+  // And within the first screen without scrolling, which is the practical
+  // claim: a control you have to go looking for is not navigation.
+  expect(menuBox.y).toBeLessThan(812);
+});
