@@ -1158,6 +1158,16 @@
   color: rgba(255, 255, 255, 0.6);
   line-height: 1.5;
 }
+/* The figure's state, in the ink of the figure itself. The words already say
+   it; the colour is for the glance. Both inks measured on the rail's ground:
+   yellow 13.1:1, rose 10.3:1. */
+.app-plan[data-tone="warning"] .app-plan-note,
+.app-plan[data-tone="critical"] .app-plan-note {
+  color: #ffd166;
+}
+.app-plan[data-tone="exhausted"] .app-plan-note {
+  color: #ffa8af;
+}
 /* The session control sits on the dark plane now, so it takes the light ink. */
 .app-rail .app-session {
   border-inline-start: 0;

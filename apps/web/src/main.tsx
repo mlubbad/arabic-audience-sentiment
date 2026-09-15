@@ -158,19 +158,20 @@ const DESTINATIONS = [
   },
 ] as const;
 
-/** What the plan has left, where it is true: on every screen.
- *  It used to live inside the operations page, which meant the one number a
- *  reader needs before starting work was behind the page they visit when
- *  something has already gone wrong. */
-function PlanCard() {
+/** Loaded only once there is a session to have a plan for: the card reads the
+ *  contracts and the data module, which a visitor on the landing page has no
+ *  use for and would otherwise carry in the main bundle. */
+const PlanCard = lazy(() =>
+  import("./PlanCard").then((m) => ({ default: m.PlanCard })),
+);
+
+function RailPlan() {
   const { session } = useSession();
   if (!session) return null;
   return (
-    <Link className="app-plan" to="/sync">
-      <span className="app-plan-kicker">معاينة خاصة</span>
-      <strong>خطة الـPilot</strong>
-      <span className="app-plan-note">الحدود والاستهلاك في صفحة التشغيل</span>
-    </Link>
+    <Suspense fallback={null}>
+      <PlanCard />
+    </Suspense>
   );
 }
 
@@ -244,7 +245,7 @@ function AppLayout() {
         </nav>
 
         <div className="app-rail-foot">
-          <PlanCard />
+          <RailPlan />
           <SessionControl />
         </div>
       </aside>
