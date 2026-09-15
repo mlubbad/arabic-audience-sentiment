@@ -881,3 +881,26 @@ file including `static/index-Dv2ALO_m.css`, the new bundle hash. The origin answ
 page and on that path and 403 on `.htpasswd_app`, but **the 401 proves only that basic auth is
 in front**: a path that does not exist answers 401 too, so it is not evidence the new bundle
 landed. The transfer log is.
+
+## 2026-09-15 — audit phase two
+
+Gates after `e01dc5e`: lint 0, format 0, types 0, `check:functions` 0, unit 0 (277 tests, 34
+files), db 0 (140 tests against PGlite, including the new attach-with-names case and its
+nameless-reconnect half), e2e 0 (74 tests, exit code checked from a log file, port 5199),
+build 0, `check:secrets` 0.
+
+What the browser suite cannot see, and what stands in for it: every signed-in surface touched
+here — the workspace gate's four states, the owner's card with its steps and channel line,
+the plan card — is rendered in a unit test from forced state or handed-in rows, since the
+suite runs signed out with no Supabase. The card was extracted as a presentational component
+for that reason; a first draft seeded `useState` by declaration index and was discarded as too
+brittle to trust.
+
+Measured, not asserted by test: the five step-state pills on their tints, lowest 5.23:1
+(attention) and highest 7.97:1 (later); the plan note's warning and exhausted inks on the
+rail's ground, 13.1:1 and 10.3:1. The main bundle before and after the plan card: 510.58 kB →
+510.54 kB, after a first draft had taken it to 591.59 kB by importing the data module into
+the shell.
+
+Not verified: the live callback storing a name (needs the migration applied and a real
+consent flow), and the owner's page against a real session — rendered from rows only.

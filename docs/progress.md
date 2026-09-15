@@ -211,3 +211,33 @@ a vertical edge. The cause was `.app-nav` — the removed top bar's own rule, a 
 positioned the nav absolutely and painted it white inside a dark sheet. Both removed. The
 navigation is now a two-column grid with a fixed 20px icon column, with a group caption and a
 hairline under the lockup and above the foot. `rail.test.ts` is new; see `verification.md`.
+
+## 2026-09-15 — audit phase two: the tool stops pitching and starts saying where you are
+
+Five commits on `main`, `2cd5eec`…`e01dc5e`, against items 3–6, 8 and 9 of the UX audit.
+Phase one (the shared workspace selection, the menu button's grid row) was already committed
+by the other session as `0e818c5`.
+
+- **One box for the four questions on the way in.** `WorkspaceGate.tsx` renders loading,
+  failed, no-workspace and choose for both the overview and the operations page; the two used
+  to answer them in different markup. The seventh instance of "one meaning, two
+  implementations". A source-level test refuses either page its own chooser again.
+- **The three steps, with a state each.** `setup.ts` holds the sentences the visitor already
+  read and `setupProgress` places a workspace on them from the channel row and its newest job.
+  The owner's card shows them; the visitor's list reads the same array.
+- **The channel by name.** Nothing had ever stored one — the callback asked YouTube for
+  `part=id`. It now asks for the snippet; migration `20260915080000` adds `channels.title`,
+  rebuilds `svc_oauth_attach_channel` with two defaulted name parameters, and keeps stored
+  names across a nameless reconnect. **Not applied to the live project.** The account page
+  reads the view with `select *` so a build ahead of the migration still shows channels.
+- **Feedback where the action was.** One `message` string for the page became a scoped note
+  rendered inside the form or card that produced it.
+- **The rail's plan card carries the figure.** `usage_summary` for the chosen workspace,
+  analysis budget remaining, coloured by the operations page's thresholds; lazy, so the
+  landing bundle did not grow.
+- **Page heads, not heroes.** Inside the shell `.rp-hero` is flat on the page ground, names the
+  page and the workspace, and the pitch sentences are gone.
+
+Still open from the audit: the selection is not in the URL (item 1's remainder), and the CSS
+layer count (item 7) — the honest measure there is how many rules override the token layer,
+not the line count.
