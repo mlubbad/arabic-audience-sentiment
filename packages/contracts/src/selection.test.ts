@@ -33,20 +33,47 @@ describe("selectionEstimate", () => {
     expect(selectionEstimate(rows, new Set(["a", "b", "c"]), 30)).toEqual({
       estimate: 24,
       unknownCount: 1,
+      outstanding: 0,
       remainingAfter: 6,
       exceeds: false,
     });
   });
-  it("ignores what is already selected and flags an overrun", () => {
+  it("prices what is already selected and not yet stored as outstanding, not as the estimate", () => {
+    // Selected with 100 reported and 90 stored: 10 still to come, spoken for
+    // before this selection is priced. The same rule select_videos refuses on.
     const rows = [
-      v({ id: "a", selected: true, reported_comment_count: 100 }),
+      v({
+        id: "a",
+        selected: true,
+        reported_comment_count: 100,
+        collected: 90,
+      }),
       v({ id: "b", reported_comment_count: 31 }),
     ];
-    expect(selectionEstimate(rows, new Set(["a", "b"]), 30)).toMatchObject({
+    expect(selectionEstimate(rows, new Set(["a", "b"]), 50)).toMatchObject({
       estimate: 31,
+      outstanding: 10,
+      exceeds: false,
+      remainingAfter: 9,
+    });
+    // 31 alone would fit 40; beside the 10 outstanding it does not.
+    expect(selectionEstimate(rows, new Set(["a", "b"]), 40)).toMatchObject({
+      estimate: 31,
+      outstanding: 10,
       exceeds: true,
       remainingAfter: -1,
     });
+    // A selection being removed is not outstanding; an unknown count is 0.
+    const withUnknown = [
+      ...rows,
+      v({ id: "c", selected: true, reported_comment_count: null }),
+    ];
+    expect(
+      selectionEstimate(withUnknown, new Set(["b"]), 40, new Set(["a"])),
+    ).toMatchObject({ estimate: 31, outstanding: 0, remainingAfter: 9 });
+    expect(
+      selectionEstimate(withUnknown, new Set(["a", "b", "c"]), 40),
+    ).toMatchObject({ outstanding: 10, unknownCount: 0 });
   });
   it("with no plan, nothing is known about the remainder", () => {
     expect(

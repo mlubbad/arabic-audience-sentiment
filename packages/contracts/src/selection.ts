@@ -33,23 +33,39 @@ const cost = (r: CatalogueVideo) =>
     ? null
     : Math.max(0, r.reported_comment_count - r.collected);
 
+/**
+ * `estimate` is what the additions would cost; `outstanding` is what the
+ * selections already stored and not yet collected still will. The units left
+ * have to cover both — two selections that each fit alone were both accepted
+ * against the same remainder before the server counted the second. A
+ * selection being removed is not outstanding; an unknown count is nothing
+ * here, as it is in the estimate, and is reported apart there.
+ */
 export function selectionEstimate(
   videos: CatalogueVideo[],
   adding: Set<string>,
   remaining: number | null,
+  removing: Set<string> = new Set(),
 ) {
   let estimate = 0;
   let unknownCount = 0;
+  let outstanding = 0;
   for (const r of videos) {
-    if (!adding.has(r.id) || r.selected) continue;
+    if (r.selected) {
+      if (!removing.has(r.id)) outstanding += cost(r) ?? 0;
+      continue;
+    }
+    if (!adding.has(r.id)) continue;
     const c = cost(r);
     if (c === null) unknownCount++;
     else estimate += c;
   }
-  const remainingAfter = remaining === null ? null : remaining - estimate;
+  const remainingAfter =
+    remaining === null ? null : remaining - outstanding - estimate;
   return {
     estimate,
     unknownCount,
+    outstanding,
     remainingAfter,
     exceeds: remainingAfter !== null && remainingAfter < 0,
   };

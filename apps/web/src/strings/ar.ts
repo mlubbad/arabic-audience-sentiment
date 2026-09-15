@@ -469,6 +469,9 @@ export const ar = {
   catSaving: "يُحفظ…",
   catSaved: "حُفظ الاختيار وطُلب الجمع.",
   catSavedDeferred: "حُفظ الاختيار؛ الجمع في الدورة القادمة.",
+  catSavedRunning:
+    "حُفظ الاختيار؛ الجمع الجاري لا يشمله، والدورة القادمة تشمله.",
+  catSavedRemoved: "حُفظ الاختيار.",
   catSaveFailed: "تعذّر حفظ الاختيار.",
   catSaveQuota: "رُفض الاختيار: يتجاوز ما تبقى من الحصة.",
   catCountUnknown: "—",

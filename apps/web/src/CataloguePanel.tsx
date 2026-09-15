@@ -32,10 +32,24 @@ import { loadCatalogue, mergeCatalogue, type StoredCount } from "./catalogue";
 import { supabase } from "./supabase";
 import { displayDate } from "./i18n";
 import { useLocale } from "./locale";
-import { useStrings } from "./strings";
+import { useStrings, type Strings } from "./strings";
 import { describeJob, explainCode, type JobRow } from "./jobFeed";
 
 const KINDS = ["all", "video", "short", "stream"] as const;
+
+/** What select_videos says about the collection, as the reader is told it.
+ *  A run already under way took its due list when it was claimed, so the new
+ *  video waits for the next cycle and the sentence says so; a removal alone
+ *  asks for no collection and the sentence says nothing about one. */
+export function savedFeedback(
+  r: { queued: boolean; deferred: boolean; already_running: boolean },
+  S: Strings,
+) {
+  if (r.already_running) return S.catSavedRunning;
+  if (r.queued) return S.catSaved;
+  if (r.deferred) return S.catSavedDeferred;
+  return S.catSavedRemoved;
+}
 
 export function Catalogue({
   mode,
@@ -88,7 +102,10 @@ export function Catalogue({
   const removing = rows
     .filter((r) => r.selected && !ticked.has(r.id))
     .map((r) => r.id);
-  const est = selectionEstimate(rows, adding, remaining);
+  const est = selectionEstimate(rows, adding, remaining, new Set(removing));
+  // What the stored selections still owe, whatever is ticked: the budget the
+  // fit button has to work inside.
+  const owed = selectionEstimate(rows, new Set(), remaining).outstanding;
   const collecting = (jobs ?? []).some((j) => j.status === "running");
   // No catalogue yet, but a discover job on the way: say where that job is,
   // in the attempt log's own words, rather than "no videos" as if nothing
@@ -136,8 +153,16 @@ export function Catalogue({
           );
           return;
         }
-        const r = data as { queued: boolean; deferred: boolean };
-        setFeedback(r.queued ? S.catSaved : S.catSavedDeferred);
+        setFeedback(
+          savedFeedback(
+            data as {
+              queued: boolean;
+              deferred: boolean;
+              already_running: boolean;
+            },
+            S,
+          ),
+        );
         void read.refetch();
         onChanged();
       });
@@ -259,7 +284,7 @@ export function Catalogue({
                 setTicked(
                   new Set([
                     ...rows.filter((r) => r.selected).map((r) => r.id),
-                    ...fitNewest(rows, remaining ?? 0),
+                    ...fitNewest(rows, Math.max(0, (remaining ?? 0) - owed)),
                   ]),
                 )
               }
@@ -364,7 +389,9 @@ export function Catalogue({
             data-exceeds={est.exceeds}
           >
             <span>
-              {S.catSelected(ticked.size, est.estimate)}
+              {/* Everything ticked that is not yet stored: this selection's
+                  additions and what the stored selections still owe. */}
+              {S.catSelected(ticked.size, est.estimate + est.outstanding)}
               {est.unknownCount > 0
                 ? ` · ${S.catUnknownCount(est.unknownCount)}`
                 : ""}

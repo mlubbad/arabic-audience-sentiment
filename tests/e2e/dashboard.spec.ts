@@ -1627,19 +1627,34 @@ test("the catalogue narrows by search and kind, and prices a selection live", as
   for (const id of ["video-1", "video-2", "video-3", "video-4", "video-5"])
     await expect(page.getByTestId(`cat-check-${id}`)).not.toBeChecked();
   await expect(page.getByTestId("cat-save")).toBeEnabled();
+  // With the stored two off, nothing is owed: the whole remainder is free.
+  await expect(page.getByTestId("cat-estimate")).toContainText("حتى 0 تعليقًا");
+  await expect(page.getByTestId("cat-estimate")).toContainText(
+    "يتبقى بعدها 26",
+  );
   // Back to what is stored, then narrow by kind.
   await page.getByTestId("cat-check-video-1").check();
   await page.getByTestId("cat-check-video-2").check();
   await expect(page.getByTestId("cat-save")).toBeDisabled();
+  // The stored selections still owe what YouTube reports beyond what is
+  // stored — video-1 7 of 5, video-2 3 of 2 — and the bar counts that
+  // before anything new is ticked: 3 outstanding of the 26 remaining.
+  await expect(page.getByTestId("cat-estimate")).toContainText(
+    "المحدد: 2 فيديو · حتى 3 تعليقًا",
+  );
+  await expect(page.getByTestId("cat-estimate")).toContainText(
+    "يتبقى بعدها 23",
+  );
   await page.getByTestId("cat-kind-short").click();
   await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(1);
   await page.getByTestId("cat-kind-all").click();
-  // 26 units remain in the fixture plan; video-3 reports 18 and holds none.
+  // 26 units remain in the fixture plan; video-3 reports 18 and holds none,
+  // on top of the 3 outstanding.
   await page.getByTestId("cat-check-video-3").check();
   await expect(page.getByTestId("cat-estimate")).toContainText(
-    "حتى 18 تعليقًا",
+    "حتى 21 تعليقًا",
   );
-  await expect(page.getByTestId("cat-estimate")).toContainText("يتبقى بعدها 8");
+  await expect(page.getByTestId("cat-estimate")).toContainText("يتبقى بعدها 5");
   await page.getByTestId("cat-check-video-5").check();
   await expect(page.getByTestId("cat-estimate")).toContainText(
     "و1 بعدد غير معروف",

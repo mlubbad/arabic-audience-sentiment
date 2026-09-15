@@ -19,7 +19,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 vi.mock("./supabase", () => ({ supabase: null }));
 
-import { Catalogue } from "./CataloguePanel";
+import { Catalogue, savedFeedback } from "./CataloguePanel";
 
 const job = (over: Partial<JobRow> = {}): JobRow => ({
   id: "j1",
@@ -99,5 +99,29 @@ describe("the catalogue before it exists", () => {
     shared.query.data = { ...(shared.query.data as object), channelId: null };
     const off = render();
     expect(off).toMatch(/data-testid="cat-refresh"[^>]*disabled/);
+  });
+});
+
+describe("what the panel says after a save", () => {
+  // The four answers select_videos gives, each its own sentence. The static
+  // render cannot press the button, so the sentence is chosen by a function
+  // the button calls, and that is what is asserted.
+  const r = (over: Partial<Parameters<typeof savedFeedback>[0]>) => ({
+    queued: false,
+    deferred: false,
+    already_running: false,
+    ...over,
+  });
+  it("names the collection that was requested, deferred, already running, or not needed", () => {
+    expect(savedFeedback(r({ queued: true }), ar)).toBe(ar.catSaved);
+    expect(savedFeedback(r({ deferred: true }), ar)).toBe(ar.catSavedDeferred);
+    // A run under way took its due list when it was claimed: the new video
+    // is not in it, and the sentence must not say otherwise.
+    expect(savedFeedback(r({ already_running: true }), ar)).toBe(
+      ar.catSavedRunning,
+    );
+    // A removal alone: saved, and nothing about collection.
+    expect(savedFeedback(r({}), ar)).toBe(ar.catSavedRemoved);
+    expect(ar.catSavedRemoved).not.toContain("الجمع");
   });
 });

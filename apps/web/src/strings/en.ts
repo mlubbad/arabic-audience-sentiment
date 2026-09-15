@@ -478,6 +478,9 @@ export const en: Strings = {
   catSaved: "The selection was saved and collection was requested.",
   catSavedDeferred:
     "The selection was saved; collection runs on the next cycle.",
+  catSavedRunning:
+    "The selection was saved; the collection under way does not include it, the next cycle does.",
+  catSavedRemoved: "The selection was saved.",
   catSaveFailed: "Could not save the selection.",
   catSaveQuota:
     "The selection was refused: it exceeds what is left of the quota.",
