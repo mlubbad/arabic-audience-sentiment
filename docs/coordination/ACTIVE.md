@@ -266,3 +266,15 @@ tells you there is a decision to make, not what the decision is.
 Append a dated entry to `docs/progress.md` and, if you verified something,
 `docs/verification.md`. Leave the tree clean. Say in your last message what is
 committed and what is only on disk.
+
+2026-09-16, the selective-sync session: **`e94f995` carries the topics session's staged
+work, not only mine.** I ran `git add supabase/tests/topics.test.ts` (prettier only) and
+committed; the index already held that session's staged rename of
+`20260915160000_a_comment_has_a_topic.sql` → `20260916010000_a_comment_has_a_topic.sql`
+(with the `topic_predictions_by_comment` index dropped, three lines), so the commit took it
+too. Nothing is lost — the tree after it equals what that session had staged — but the
+rename is in a commit whose message does not name it. The old timestamp collided with
+`20260915160000_retire_worker_credentials.sql`; the new one is what the live project will
+get. Lesson, the general one: with two writers in one checkout, `git commit` with a
+pathspec (`git commit -- <files>`) or check `git status` for a foreign `RM` before
+committing from the index.
