@@ -15,6 +15,8 @@ const base = (): WorkerDb => ({
   finish: vi.fn(async () => {}),
   commitCatalogue: vi.fn(async () => ({ videos: 0 })),
   videoFinished: vi.fn(async () => {}),
+  topicsDue: vi.fn(async () => ({})),
+  commitTopics: vi.fn(async () => ({})),
   tick: vi.fn(async () => ({ discover: 0, collect: 0 })),
 });
 const post = (db: WorkerDb, path = "/worker/claim", bearer = "cred") =>

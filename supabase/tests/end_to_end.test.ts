@@ -95,6 +95,20 @@ const liveDb: WorkerDb = {
       errorCode,
     ]);
   },
+  async topicsDue(hash, job, lease, modelId, promptVersion, maxRows) {
+    const r = await db.query<{ result: unknown }>(
+      "select private.worker_topics_due($1,$2,$3,$4,$5,$6) as result",
+      [hash, job, lease, modelId, promptVersion, maxRows],
+    );
+    return r.rows[0].result;
+  },
+  async commitTopics(hash, job, lease, batchKey, records) {
+    const r = await db.query<{ result: unknown }>(
+      "select private.worker_commit_topics($1,$2,$3,$4,$5) as result",
+      [hash, job, lease, batchKey, JSON.stringify(records)],
+    );
+    return r.rows[0].result;
+  },
   async tick(hash) {
     const r = await db.query<{ result: unknown }>(
       "select private.worker_tick($1) as result",
