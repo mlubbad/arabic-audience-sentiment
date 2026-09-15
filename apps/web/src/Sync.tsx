@@ -24,6 +24,7 @@ import {
 import { supabase } from "./supabase";
 import { useSession, useWorkspaces } from "./session";
 import { useWorkspaceSelection } from "./workspaceSelection";
+import { WorkspaceGate } from "./WorkspaceGate";
 import {
   workspaceState,
   readableWorkspace,
@@ -50,12 +51,6 @@ export function Sync() {
   // and again in the other page; both routes are lazy, so the answer died
   // on every navigation and the question came back.
   const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null);
-  if (sessionLoading)
-    return (
-      <div className="app-state" role="status">
-        جارٍ تحديد حسابك…
-      </div>
-    );
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,
@@ -87,94 +82,61 @@ export function Sync() {
   // The dashboard is a different case and keeps its demo: a sanitized report
   // shows what the product produces, and that is the thing worth showing. An
   // operations page answers a question only an owner has.
-  if (!session && !wantsDemo)
-    return (
-      <div className="app-state" data-testid="sync-signed-out">
-        <span className="app-state-symbol" aria-hidden="true">
-          ⟳
-        </span>
-        <p className="app-eyebrow">التشغيل</p>
-        {/* The page keeps its name whether you are signed in or not. The first
+  const signedOut = !session && !wantsDemo && (
+    <div className="app-state" data-testid="sync-signed-out">
+      <span className="app-state-symbol" aria-hidden="true">
+        ⟳
+      </span>
+      <p className="app-eyebrow">التشغيل</p>
+      {/* The page keeps its name whether you are signed in or not. The first
             draft of this state led with a sentence about the page instead —
             "هذه الصفحة تتبع تشغيل قناتك" — and a browser test caught it: a
             reader who arrives from a menu item called "حالة المزامنة" should
             land on a heading that agrees with the thing they clicked. */}
-        <h1>حالة الجمع والتحليل</h1>
-        <p>
-          هذه الصفحة تتبع تشغيل قناتك: نشاط الجمع، وحدود خطتك، وسجل كل محاولة
-          وسببها. كلها تخص حسابًا وقناة مرتبطة به، فلا يوجد ما تتابعه قبل تسجيل
-          الدخول.
-        </p>
-        <div className="app-state-actions">
-          <a href="/account">سجّل الدخول أو أنشئ حسابًا</a>
-          <a href="/sync?demo=1">شاهد كيف تبدو هذه الصفحة</a>
-        </div>
+      <h1>حالة الجمع والتحليل</h1>
+      <p>
+        هذه الصفحة تتبع تشغيل قناتك: نشاط الجمع، وحدود خطتك، وسجل كل محاولة
+        وسببها. كلها تخص حسابًا وقناة مرتبطة به، فلا يوجد ما تتابعه قبل تسجيل
+        الدخول.
+      </p>
+      <div className="app-state-actions">
+        <a href="/account">سجّل الدخول أو أنشئ حسابًا</a>
+        <a href="/sync?demo=1">شاهد كيف تبدو هذه الصفحة</a>
       </div>
-    );
-  if (configuredMode === "live" && session) {
-    if (workspacesLoading)
-      return (
-        <div className="app-state" role="status">
-          جارٍ تحميل مساحات العمل…
-        </div>
-      );
-    if (workspacesFailed)
-      return (
-        <div className="app-state" role="alert">
-          <h1>تعذّرت قراءة مساحات عملك.</h1>
-          <p>
-            حدّث الصفحة لإعادة المحاولة؛ لا يمكن عرض بيانات تجربة بدل بيانات
-            حسابك.
-          </p>
-        </div>
-      );
-    if (place.kind === "no_workspaces")
-      return (
-        <div className="app-state">
-          <h1>لا توجد مساحة عمل لهذا الحساب بعد.</h1>
-          <a href="/account">أنشئ مساحة عمل من صفحة الحساب</a>
-        </div>
-      );
-    if (place.kind === "choose")
-      return (
-        <div className="app-state" data-testid="sync-ws-choose">
-          <span className="app-state-symbol" aria-hidden="true">
-            ↗
-          </span>
-          <p className="app-eyebrow">حالة الجمع</p>
-          <h1>أي مساحة عمل تريد متابعة تشغيلها؟</h1>
-          <p>لكل مساحة حالة جمع وحدود خطة وسجل محاولات مستقل.</p>
-          <label className="sync-choice">
-            مساحة العمل
-            <select
-              value={chosen ?? ""}
-              onChange={(e) => setChosen(e.target.value || null)}
-            >
-              <option value="">— اختر —</option>
-              {place.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      );
-  }
+    </div>
+  );
   const live = readableWorkspace(place);
   const mode = resolveMode({ signedIn: !!session, workspace: live });
   const workspaceId = mode === "live" && live ? live : fixtureWorkspace;
   const userId = session?.user.id ?? "visitor";
   return (
-    <SyncBody
-      key={`${userId}:${mode}:${workspaceId}`}
-      userId={userId}
-      mode={mode}
-      workspaceId={workspaceId}
-      workspaceName={place.kind === "ready" ? place.name : null}
-      options={place.kind === "ready" ? place.options : []}
+    <WorkspaceGate
+      sessionLoading={sessionLoading}
+      live={configuredMode === "live" && !!session}
+      workspacesLoading={workspacesLoading}
+      workspacesFailed={workspacesFailed}
+      place={place}
+      chosen={chosen}
       onChoose={setChosen}
-    />
+      words={{
+        eyebrow: "حالة الجمع",
+        chooseTitle: "أي مساحة عمل تريد متابعة تشغيلها؟",
+        chooseLead: "لكل مساحة حالة جمع وحدود خطة وسجل محاولات مستقل.",
+        chooseTestId: "sync-ws-choose",
+      }}
+    >
+      {signedOut || (
+        <SyncBody
+          key={`${userId}:${mode}:${workspaceId}`}
+          userId={userId}
+          mode={mode}
+          workspaceId={workspaceId}
+          workspaceName={place.kind === "ready" ? place.name : null}
+          options={place.kind === "ready" ? place.options : []}
+          onChoose={setChosen}
+        />
+      )}
+    </WorkspaceGate>
   );
 }
 

@@ -730,6 +730,21 @@
   text-align: start;
   margin: 1.2rem 0;
 }
+/* The one control the gate carries: the workspace question, on both pages. */
+.app-state .sync-choice {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 22rem;
+  margin: 1.4rem auto 0;
+  text-align: start;
+  font-weight: 700;
+}
+.app-state .sync-choice select {
+  min-height: 44px;
+  border-color: var(--border-2);
+  border-radius: var(--r-2);
+  font-weight: 400;
+}
 
 @media (max-width: 1050px) {
   /* On a phone the identity line goes; the control stays — leaving must not

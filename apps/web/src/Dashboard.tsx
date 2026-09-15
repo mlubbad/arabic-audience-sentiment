@@ -34,6 +34,7 @@ import {
 import { failureCode } from "./failure";
 import { useSession, useWorkspaces } from "./session";
 import { useWorkspaceSelection } from "./workspaceSelection";
+import { WorkspaceGate } from "./WorkspaceGate";
 import { workspaceState, readableWorkspace } from "./workspace";
 import {
   labels,
@@ -198,12 +199,6 @@ export function Dashboard() {
   // and again in the other page; both routes are lazy, so the answer died
   // on every navigation and the question came back.
   const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null);
-  if (sessionLoading)
-    return (
-      <div role="status" className="loading">
-        جارٍ تحديد حسابك
-      </div>
-    );
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,
@@ -211,47 +206,6 @@ export function Dashboard() {
     workspaces,
     selectedId: chosen,
   });
-  if (configuredMode === "live" && session) {
-    if (workspacesLoading)
-      return (
-        <div role="status" className="loading">
-          جارٍ تحميل مساحات العمل
-        </div>
-      );
-    if (workspacesFailed)
-      return (
-        <div role="alert" className="notice">
-          تعذّر قراءة مساحات عملك. حدّث الصفحة لإعادة المحاولة.
-        </div>
-      );
-    if (place.kind === "no_workspaces")
-      return (
-        <div className="notice">
-          <h1>لا توجد مساحة عمل لهذا الحساب بعد.</h1>
-          <a href="/account">أنشئ مساحة عمل من صفحة الحساب</a>
-        </div>
-      );
-    if (place.kind === "choose")
-      return (
-        <div className="notice" data-testid="ws-choose">
-          <h1>اختر مساحة العمل التي تريد قراءة بياناتها</h1>
-          <label>
-            مساحة العمل
-            <select
-              value={chosen ?? ""}
-              onChange={(e) => setChosen(e.target.value || null)}
-            >
-              <option value="">— اختر —</option>
-              {place.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      );
-  }
   const live = readableWorkspace(place);
   const mode = resolveMode({ signedIn: !!session, workspace: live });
   // In fixture mode the id is the fixture's, never a real one left over from a
@@ -262,7 +216,22 @@ export function Dashboard() {
   // A new identity remounts the whole report, including any open review dialog.
   // No comment or pending correction from a previous tenant survives the switch.
   return (
-    <>
+    <WorkspaceGate
+      sessionLoading={sessionLoading}
+      live={configuredMode === "live" && !!session}
+      workspacesLoading={workspacesLoading}
+      workspacesFailed={workspacesFailed}
+      place={place}
+      chosen={chosen}
+      onChoose={setChosen}
+      words={{
+        eyebrow: "نظرة عامة",
+        chooseTitle: "أي مساحة عمل تريد قراءة تعليقاتها؟",
+        chooseLead:
+          "لكل مساحة قناتها وتعليقاتها؛ لا تُعرض بيانات مساحة داخل أخرى.",
+        chooseTestId: "ws-choose",
+      }}
+    >
       {place.kind === "ready" && place.options.length > 1 && (
         <div className="notice">
           <label>
@@ -288,7 +257,7 @@ export function Dashboard() {
         workspaceId={workspaceId}
         workspaceName={place.kind === "ready" ? place.name : null}
       />
-    </>
+    </WorkspaceGate>
   );
 }
 
