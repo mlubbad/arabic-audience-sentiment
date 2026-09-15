@@ -35,6 +35,8 @@ const base = {
   content_purged_at: null,
   reviews: [],
   prediction: null,
+  topic_prediction: null,
+  topic_reviews: [],
 };
 const pred = (label: "positive" | "mixed", hash = "current") => ({
   status: "succeeded" as const,

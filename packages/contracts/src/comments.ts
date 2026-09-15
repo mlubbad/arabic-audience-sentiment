@@ -1,6 +1,7 @@
 /** Comments, model predictions and human corrections. */
 import { z } from "zod";
 import { LabelSchema, timestamp, type Label } from "./primitives";
+import { TopicPredictionSchema, TopicReviewSchema } from "./topics";
 
 export const PredictionSchema = z
   .object({
@@ -35,40 +36,6 @@ export const ReviewSchema = z
       v.origin !== "human" || (v.reason !== null && v.reason.trim().length > 0),
     "a human review must state a reason",
   );
-// The topic counterpart of PredictionSchema/ReviewSchema above — same shape
-// of guarantee, over `workspace_topics` rather than the sentiment label. Kept
-// optional on the comment below rather than given full field-by-field
-// validation here: that is the topic Zod work's job (this task only makes the
-// dashboard's SQL carry the data), and an optional field cannot make a fixture
-// or an older bundle that has never heard of topics unparseable.
-export const TopicPredictionSchema = z
-  .object({
-    status: z.enum(["succeeded", "skipped", "failed", "unsupported"]),
-    topic_key: z.string().min(1).nullable(),
-    confidence: z.number().min(0).max(1).nullable(),
-    content_hash: z.string().min(1),
-    classification_key: z.string().min(1),
-    model_id: z.string().min(1),
-    prompt_version: z.string().min(1),
-    predicted_at: timestamp,
-    error_code: z.string().nullable(),
-  })
-  .strict()
-  .refine(
-    (v) =>
-      v.status === "succeeded" ? v.topic_key !== null : v.topic_key === null,
-    "Only successful classifications have a topic",
-  );
-export const TopicReviewSchema = z
-  .object({
-    topic_key: z.string().min(1),
-    content_hash: z.string(),
-    created_at: timestamp,
-    origin: z.enum(["human"]),
-    reviewer_id: z.string().min(1),
-    reason: z.string().min(1),
-  })
-  .strict();
 export const CommentSchema = z
   .object({
     id: z.string().min(1),
@@ -127,11 +94,11 @@ export const CommentSchema = z
     content_purged_at: timestamp.nullable().default(null),
     prediction: PredictionSchema.nullable(),
     reviews: z.array(ReviewSchema),
-    // Optional (not defaulted): a fixture or an older payload that predates
-    // topics simply omits the key rather than being read as "no topics".
-    // `dashboard_snapshot_impl` (20260916012000) always sends both now.
-    topic_prediction: TopicPredictionSchema.nullable().optional(),
-    topic_reviews: z.array(TopicReviewSchema).optional(),
+    // The topic dimension, kept apart from sentiment (handoff §A5). Defaults
+    // so a fixture or a server that predates topics still parses; the
+    // dashboard then shows "no topic classification has run yet".
+    topic_prediction: TopicPredictionSchema.nullable().default(null),
+    topic_reviews: z.array(TopicReviewSchema).default([]),
   })
   .strict();
 export type Comment = z.infer<typeof CommentSchema>;

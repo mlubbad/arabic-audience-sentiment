@@ -13,6 +13,8 @@ export const FiltersSchema = z
     to: timestamp.optional(),
     date_mode: z.enum(["all", "known", "unknown"]).default("all"),
     sentiments: z.array(LabelSchema).default([]),
+    // Topic keys, or UNCLASSIFIED for rows with no effective topic.
+    topics: z.array(z.string().max(40)).max(50).default([]),
     comment_type: z.string().optional(),
     replies: z.enum(["all", "comments", "replies"]).default("all"),
     review_status: z.enum(["all", "reviewed", "unreviewed"]).default("all"),

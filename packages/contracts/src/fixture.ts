@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 import { CommentSchema } from "./comments";
+import { TopicSchema } from "./topics";
 import { UsageSummarySchema } from "./usage";
 import { SyncStateSchema } from "./sync";
 
@@ -21,6 +22,10 @@ const dashboardData = {
   // genuinely mixed, so the zero is not merely uninformative, it is wrong.
   // Empty means nothing has been analysed and therefore nothing is known.
   active_analysis_labels: z.array(z.string()).default([]),
+  // The workspace's topic taxonomy and the key whose verdicts are effective.
+  // Empty means no topic classification has run; the card says so.
+  topics: z.array(TopicSchema).default([]),
+  active_topic_key: z.string().default(""),
   // Null means no plan has been activated, which the UI must say plainly.
   plan: UsageSummarySchema.nullable(),
   // A malformed block falls back to null rather than failing the whole read.

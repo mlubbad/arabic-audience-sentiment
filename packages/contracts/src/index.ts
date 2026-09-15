@@ -11,6 +11,7 @@
 export { LabelSchema, type Label } from "./primitives";
 export * from "./filters";
 export * from "./comments";
+export * from "./topics";
 export * from "./jobs";
 export * from "./usage";
 export * from "./sync";

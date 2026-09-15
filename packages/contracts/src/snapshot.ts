@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { FiltersSchema, type Filters } from "./filters";
 import { effectiveLabel, type Comment } from "./comments";
+import { effectiveTopic, UNCLASSIFIED } from "./topics";
 import { type Label } from "./primitives";
 
 export type VideoAggregate = {
@@ -17,6 +18,8 @@ export type VideoAggregate = {
 export type LabelledComment = Comment & {
   label: Label | null;
   reviewed: boolean;
+  topic: string | null;
+  topic_reviewed: boolean;
 };
 
 /**
@@ -27,6 +30,7 @@ function filteredRows(
   input: Comment[],
   f: z.output<typeof FiltersSchema>,
   activeKey: string,
+  activeTopicKey: string,
 ): LabelledComment[] {
   const unique = new Map(
     input
@@ -39,7 +43,11 @@ function filteredRows(
       .map((c) => [c.id, c]),
   );
   return [...unique.values()]
-    .map((c) => ({ ...c, ...effectiveLabel(c, activeKey) }))
+    .map((c) => ({
+      ...c,
+      ...effectiveLabel(c, activeKey),
+      ...effectiveTopic(c, activeTopicKey),
+    }))
     .filter((c) => {
       if (
         (f.client_id && c.client_id !== f.client_id) ||
@@ -66,6 +74,8 @@ function filteredRows(
           return false;
       }
       if (f.sentiments.length && (!c.label || !f.sentiments.includes(c.label)))
+        return false;
+      if (f.topics.length && !f.topics.includes(c.topic ?? UNCLASSIFIED))
         return false;
       if (f.comment_type && c.comment_type !== f.comment_type) return false;
       if (
@@ -96,8 +106,14 @@ export function exportRows(
   input: Comment[],
   raw: Filters,
   activeKey: string,
+  activeTopicKey = "",
 ): LabelledComment[] {
-  return filteredRows(input, FiltersSchema.parse(raw), activeKey);
+  return filteredRows(
+    input,
+    FiltersSchema.parse(raw),
+    activeKey,
+    activeTopicKey,
+  );
 }
 
 /** Pure fixture/reference implementation. Server queries must separately enforce RLS. */
@@ -109,9 +125,10 @@ export function snapshot(
   raw: Filters,
   activeKey: string,
   activeLabels: readonly string[] = [],
+  activeTopicKey = "",
 ) {
   const f = FiltersSchema.parse(raw);
-  const rows = filteredRows(input, f, activeKey);
+  const rows = filteredRows(input, f, activeKey, activeTopicKey);
   // Offered filter values come from the data, so a channel's own vocabulary
   // drives the control instead of a hard-coded per-customer list. Scoped to the
   // workspace but deliberately not to the other filters: narrowing this with
@@ -152,7 +169,12 @@ export function snapshot(
   // the whole snapshot once per video would not survive a channel with 194.
   const videos = new Map<string, VideoAggregate>(),
     timeline = new Map<string, number>();
+  // One bar per topic, over the same filtered rows as the sentiment figures;
+  // the unclassified are counted, never hidden.
+  const topic_counts: Record<string, number> = { [UNCLASSIFIED]: 0 };
   for (const c of rows) {
+    topic_counts[c.topic ?? UNCLASSIFIED] =
+      (topic_counts[c.topic ?? UNCLASSIFIED] ?? 0) + 1;
     if (c.label) sentiments[c.label]++;
     let video = videos.get(c.video_id);
     if (!video) {
@@ -235,6 +257,7 @@ export function snapshot(
     analysed,
     unanalysed: rows.length - analysed,
     sentiments,
+    topic_counts,
     replies: rows.filter((c) => c.is_reply).length,
     unknown_dates: rows.filter((c) => !c.published_at).length,
     unique_authors: new Set(

@@ -13,6 +13,9 @@ export const CSV_COLUMNS = [
   "label_source",
   "prediction_status",
   "analysis_key",
+  "effective_topic",
+  "topic_source",
+  "classification_key",
   "published_at",
   "published_time_raw",
   "timestamp_precision",
@@ -42,6 +45,11 @@ function labelSource(row: LabelledComment): string {
   return row.label ? "model" : "none";
 }
 
+function topicSource(row: LabelledComment): string {
+  if (row.topic_reviewed) return "human_review";
+  return row.topic ? "model" : "none";
+}
+
 /**
  * Renders already-filtered rows. Takes the output of exportRows so the file and
  * the dashboard cannot disagree about which comments are in scope.
@@ -63,6 +71,11 @@ export function toCsv(rows: LabelledComment[]): string {
       labelSource(r),
       r.prediction?.status ?? "",
       r.prediction?.analysis_key ?? "",
+      // The key, not the display name: a rename must not change what an old
+      // file says.
+      r.topic ?? "",
+      topicSource(r),
+      r.topic_prediction?.classification_key ?? "",
       r.published_at ?? "",
       r.published_time_raw ?? "",
       r.timestamp_precision,

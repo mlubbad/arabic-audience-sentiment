@@ -38,6 +38,8 @@ const base = {
   content_purged_at: null,
   reviews: [],
   prediction: null,
+  topic_prediction: null,
+  topic_reviews: [],
 };
 const predNeg = () => ({ ...pred("positive"), label: "negative" as const });
 const pred = (label: "positive" | "mixed", hash = "current") => ({
