@@ -348,3 +348,20 @@ Arabic-only surface reads the shared strings through the same hook, sets the doc
 language while mounted, and carries the switch in its bar; a choice made there reaches the
 shell and back. The demo comments stay Arabic as data, tagged `lang="ar" dir="rtl"`; arrows
 and digits follow the language; `landing.css` places with logical properties now.
+
+## 2026-09-15 — the catalogue on the operations page (selective video sync, task 9)
+
+`03491fc`…`01f09c6`. The operations page opens with the catalogue: what the channel
+has, what each video costs against the plan's remaining analysis units, what is chosen.
+`Sync.tsx` composes `Catalogue` (`CataloguePanel.tsx`) above `OperationsPanels.tsx`, the
+health/plan/attempts panels moved out unchanged — the page still holds the one snapshot
+and the one job read and hands the values down. The "request sync" button is gone from
+both pages: the account card's `sync-<id>` is a link to `/sync?ws=<id>` reading
+«اختر الفيديوهات», and `enqueue_sync` is called from nowhere in the browser. Two things the
+brief did not anticipate: `Catalogue.tsx` cannot sit beside `catalogue.ts` on this
+filesystem (`./Catalogue` resolves to the loader for tsc and Vite alike), hence the file
+name; and "collected" is counted from the source's rows (`storedPerVideo`), not the
+snapshot's `videos` aggregate, because that aggregate drops the channel's own replies and
+`select_videos` counts every row — the fixture's video-1 read 4 one way and 5 the other.
+The six strings for the old button are retired; the two empty states that pointed at it
+now name the catalogue.

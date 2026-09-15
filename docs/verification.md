@@ -1090,3 +1090,18 @@ now carrying the landing's English); the sweep removed the twelve superseded has
 assets — twelve rather than nine because the other session's landing and dashboard
 commits had re-hashed their chunks since the last deploy. The log is the evidence; the
 origin's 401 and Cloudflare's cache are not.
+
+## 2026-09-15 — the catalogue on the operations page
+
+Gates at `96ee693` (CSS-only commit after): `npm run check` exit 0 (lint, format, types,
+functions, unit 322/322 across 40 files, db, worker, build, secrets); `npm run test:e2e`
+exit 0, 82/82 in 1.1 min on port 5173, exit code read from the log file. The four new
+browser tests were run red first (`catalogue` test id not found, all four failing) and
+green after. Two of the brief's expectations met the tree: "جُمع 5" for video-1 is the
+server's count and the snapshot aggregate's 4 is not — fixed at the source, with a unit
+test in `catalogue.test.ts` that counts an owner's reply; and the phone-width test's
+tracking filter refused the −0.01em every `.rp-section h2` carries, so it applies the
+suite's existing rule (positive tracking only). Seen at 1280px and 375px on the dev
+server in fixture mode (`.screenshots/sync-catalogue-*.png`, untracked); the sticky
+estimate bar sits at the viewport's foot on the phone. Not seen: the live catalogue
+signed in — no session in this environment.
