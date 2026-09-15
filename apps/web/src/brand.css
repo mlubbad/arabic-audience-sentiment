@@ -148,6 +148,32 @@
      `--bg-card`, which is the same value with a different job. */
   --ink-on-dark: #ffffff;
 
+  /* -------- the dark chrome ----------------------------------------
+     The rail and the announcement bar sit on one dark plane; the footer on
+     a softer one. These were written in app.css as bare hex — the rail's
+     ground twice, two shades apart — and rail.test.ts measured the rail's
+     ink against a constant copied from there. The constant now reads from
+     here. Ink on each plane is measured: secondary ink 9.0:1 on the dark
+     plane (--ml-indigo-300), footer ink 10.5:1 on the soft one. */
+  --plane-dark: #100d28;
+  --plane-dark-2: #25223f;
+  --ink-on-dark-2: #d8d4e9;
+
+  /* -------- the warning strip ---------------------------------------
+     The provenance notice above the dashboard: a warm ground, a warm
+     border, and an amber bar down its edge that goes orange when the
+     source itself is in doubt. Eight bare values in app.css, two of them
+     within ΔE 1.4 of each other. The ink is --color-warning, 5.6:1 on this
+     ground. The bar is a mark beside text that says the same thing; it
+     measures 2.0:1 and 2.7:1 and is not the carrier. */
+  --warning-bg: #fff8f0;
+  --warning-border: #fee2cb;
+  --warning-mark: #f59e0b;
+  --warning-mark-strong: #f97316;
+
+  /* The tint behind a "done" — the success ink's own ground, 5.7:1. */
+  --success-100: #e3f3ec;
+
   --ml-grad-warm-cool: linear-gradient(
     135deg,
     #ff6c77 0%,

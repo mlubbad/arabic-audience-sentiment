@@ -17,10 +17,13 @@ import { describe, expect, it } from "vitest";
 import { contrast, over } from "./palette";
 
 const css = readFileSync(new URL("./app.css", import.meta.url), "utf8");
+const brand = readFileSync(new URL("./brand.css", import.meta.url), "utf8");
 
 /** The darkest point of the rail's own background — the plane the ink sits on.
- *  The radial wash on top of it only lightens, so this is the worst case. */
-const RAIL_GROUND = "#100d28";
+ *  The radial wash on top of it only lightens, so this is the worst case.
+ *  Read from the token, not copied: a copy here measured against a value that
+ *  app.css could have moved away from. */
+const RAIL_GROUND = brand.match(/--plane-dark:\s*(#[0-9a-fA-F]{6})/)![1];
 
 function alphaOf(selector: string, prop = "color"): number {
   const block = css.slice(css.indexOf(selector));

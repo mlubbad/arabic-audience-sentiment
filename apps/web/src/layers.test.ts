@@ -47,38 +47,23 @@ for (const f of ["brand.css", "glass.css"])
 
 /** app.css's raw colours, each with the token it stands nearest to (ΔE,
  *  palette.ts). 34 on 2026-09-15; the work of the audit's third phase is to
- *  empty this list. Struck so far: the six indigo tints within ΔE 3 whose
- *  meaning matched the token's — a hover, a focus border, four pale grounds.
- *  Still here within ΔE 3 and deliberately so: the rail's ground (#100d28,
- *  #0d0a22) is not `--focus-ring` though it nearly equals it, the warning
- *  strip's warm off-whites are not `--bg-page`, and the "done" tint is not
- *  `--bg-muted` — those want tokens of their own, which is the next step. */
+ *  empty this list. Struck so far: six indigo tints within ΔE 3 whose meaning
+ *  matched the token's (a hover, a focus border, four pale grounds); then
+ *  three families that had no token and got one — the dark chrome, the
+ *  warning strip, the "done" tint — and two inks the brand already named
+ *  (--ml-indigo-300 on the dark plane, --fg-on-brand for the kicker). */
 const APP_BACKLOG = new Set([
-  "#c4b8ff", // --ml-indigo-300 ΔE 4.4 — rail ink, measured in rail.test.ts
+  "#c4b8ff", // --ml-indigo-300 ΔE 4.4 — the rail's brand-mark gradient only
   "#ff5c67", // --ml-rose ΔE 3.0
   "#312e81", // --ml-indigo-800 ΔE 5.0
   "#ded7fd", // --ml-indigo-100 ΔE 3.0
-  "#ffd166", // --ml-yellow ΔE 5.0 — rail kicker
-  "#0d0a22", // --focus-ring ΔE 2.5 — rail ground
   "#22203a", // --text-1 ΔE 5.6
-  "#25223f", // --text-1 ΔE 6.4
-  "#d8d4e9", // --border-2 ΔE 2.1
-  "#fdfbf7", // --bg-page ΔE 0.8
-  "#fae8c8", // --ml-yellow-100 ΔE 3.1 — provenance warning strip
-  "#f59e0b", // no token within ΔE 14 — warning strip, amber family
-  "#fff8f0", // --bg-page ΔE 1.4
-  "#fee2cb", // --ml-rose-100 ΔE 3.5
-  "#f97316", // no token within ΔE 9 — amber family
-  "#92400e", // --sentiment-mixed ΔE 5.3 — amber family
-  "#78350f", // --color-warning ΔE 10.7 — amber family
   "#ddd5ff", // --ml-indigo-100 ΔE 3.6
   "#4338ca", // --ml-indigo ΔE 4.4
   "#4f46e5", // --ml-indigo-500 ΔE 6.2
   "#3730a3", // --ml-indigo ΔE 3.9
   "#cbbeff", // --ml-indigo-300 ΔE 6.2
-  "#e3f3ec", // --bg-muted ΔE 2.8 — the "done" step tint
   "#ddd7fa", // --ml-indigo-100 ΔE 3.0
-  "#100d28", // --focus-ring ΔE 1.6 — rail ground, measured in rail.test.ts
   "#826df8", // --ml-indigo-500 ΔE 6.4
   "#ff8f98", // --ml-rose-300 ΔE 5.6
   "#9584ff", // --ml-indigo-300 ΔE 11.6

@@ -34,7 +34,7 @@
   justify-content: center;
   gap: 1.25rem;
   padding: 0.4rem 1rem;
-  background: #0d0a22;
+  background: var(--plane-dark);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--ink-on-dark);
   font-size: 0.74rem;
@@ -42,7 +42,7 @@
   text-align: center;
 }
 .app-announcement span + span {
-  color: #c4b8ff;
+  color: var(--ml-indigo-300);
 }
 .app-shell > .app-header {
   /* Level 2. Pinned, so the page passes behind it rather than under a lid. */
@@ -179,8 +179,8 @@
   justify-content: space-between;
   gap: 2rem;
   padding: 2rem max(1.5rem, calc((100% - 1220px) / 2));
-  background: #25223f;
-  color: #d8d4e9;
+  background: var(--plane-dark-2);
+  color: var(--ink-on-dark-2);
   font-size: 0.78rem;
 }
 .app-footer > div {
@@ -298,27 +298,25 @@
   margin-bottom: 1.25rem;
   padding: 1rem 1.25rem;
   border-radius: 12px;
-  background: #fdfbf7;
-  border: 1px solid #fae8c8;
-  border-inline-start: 4px solid #f59e0b;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-inline-start: 4px solid var(--warning-mark);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 .app-shell .rp-provenance.warn {
-  background: #fff8f0;
-  border-color: #fee2cb;
-  border-inline-start-color: #f97316;
+  border-inline-start-color: var(--warning-mark-strong);
 }
 .app-shell .rp-provenance strong {
   display: block;
   font-size: 14px;
   font-weight: 700;
-  color: #92400e;
+  color: var(--color-warning);
   margin-bottom: 4px;
 }
 .app-shell .rp-provenance p {
   line-height: 1.6;
   font-size: 13.5px;
-  color: #78350f;
+  color: var(--color-warning);
 }
 .app-shell .rp-section {
   margin-bottom: 3.4rem;
@@ -663,7 +661,7 @@
   white-space: nowrap;
 }
 [data-status="done"] > .setup-step-state {
-  background: #e3f3ec;
+  background: var(--success-100);
   color: var(--color-success);
 }
 [data-status="next"] > .setup-step-state {
@@ -967,7 +965,7 @@
       rgba(99, 78, 230, 0.16) 0%,
       transparent 70%
     ),
-    #100d28;
+    var(--plane-dark);
   border-inline-end: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
   color: var(--ink-on-dark);
@@ -1090,7 +1088,7 @@
 }
 .app-shell .app-rail .app-nav a.active .app-nav-mark,
 .app-shell .app-rail .app-nav a[aria-current="page"] .app-nav-mark {
-  color: #c4b8ff;
+  color: var(--ml-indigo-300);
 }
 .app-rail-foot {
   margin-top: auto;
@@ -1128,7 +1126,7 @@
 }
 .app-plan-kicker {
   font-size: 11px;
-  color: #ffd166;
+  color: var(--fg-on-brand);
   font-weight: 700;
   /* Same reason. This label is only rendered to a signed-in reader, so no
      browser test sees it — which is exactly why it is worth writing down. */
@@ -1145,10 +1143,10 @@
 }
 /* The figure's state, in the ink of the figure itself. The words already say
    it; the colour is for the glance. Both inks measured on the rail's ground:
-   yellow 13.1:1, rose 10.3:1. */
+   yellow 15.1:1, rose 10.3:1. */
 .app-plan[data-tone="warning"] .app-plan-note,
 .app-plan[data-tone="critical"] .app-plan-note {
-  color: #ffd166;
+  color: var(--fg-on-brand);
 }
 .app-plan[data-tone="exhausted"] .app-plan-note {
   color: var(--ml-rose-300);
