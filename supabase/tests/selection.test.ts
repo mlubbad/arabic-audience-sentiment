@@ -4,7 +4,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const W = "00000000-0000-4000-8000-000000000001";
 const OTHER = "00000000-0000-4000-8000-000000000002";
@@ -75,10 +75,6 @@ describe("video selections", () => {
     for (const f of files.slice(cut + 1))
       await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
   });
-  afterAll(async () => {
-    await db?.close();
-  });
-
   it("backfills a live selection for every video that already has comments", async () => {
     await db.exec("reset role");
     const rows = await db.query<{ video_id: string; last_outcome: string | null }>(
@@ -171,5 +167,113 @@ describe("video selections", () => {
       ),
     ).rejects.toThrow(/jobs_one_outstanding_discover/);
     await db.query("update jobs set status='succeeded' where dedupe_key='d1'");
+  });
+});
+
+describe("select_videos", () => {
+  const call = (user: string, add: string[], remove: string[] = [], w = W) =>
+    as(user).then(() =>
+      db.query<{ r: Record<string, unknown> }>(
+        "select select_videos($1,$1,$2::uuid[],$3::uuid[]) as r",
+        [w, add, remove],
+      ),
+    );
+
+  it("refuses another tenant, and a video outside the channel", async () => {
+    await expect(call(OUTSIDER, [V2])).rejects.toThrow(/forbidden/);
+    await expect(call(OWNER, [V3])).rejects.toThrow(/invalid_video/);
+  });
+
+  it("refuses a video whose comments are switched off", async () => {
+    await db.exec("reset role");
+    await db.query("update videos set comments_state='disabled' where id=$1", [V2]);
+    await expect(call(OWNER, [V2])).rejects.toThrow(/comments_disabled/);
+    await db.exec("reset role");
+    await db.query("update videos set comments_state='open', reported_comment_count=40 where id=$1", [V2]);
+  });
+
+  it("refuses a selection the remaining analysis units cannot cover, and writes nothing", async () => {
+    await db.exec("reset role");
+    // pilot: 5000 analysis units. Spend all but 30.
+    await db.query(
+      `insert into usage_events(workspace_id,period_start,event_key,event_type,units,state)
+       select $1, s.period_start, 'spent', 'comment_analysis', 4970, 'charged'
+         from subscriptions s where s.workspace_id=$1`,
+      [W],
+    );
+    await expect(call(OWNER, [V2])).rejects.toThrow(/quota_exceeded/);
+    await db.exec("reset role");
+    expect(
+      (await db.query("select 1 from video_selections where video_id=$1", [V2])).rows,
+    ).toHaveLength(0);
+  });
+
+  it("does not count comments already stored against the estimate", async () => {
+    await db.exec("reset role");
+    // V1 reports 25 and already holds 1 comment: 24 to collect. Deselect it
+    // first so it is an addition again.
+    await db.query("delete from video_selections where video_id=$1", [V1]);
+    await db.query("update videos set reported_comment_count=25 where id=$1", [V1]);
+    const r = await call(OWNER, [V1]);
+    expect(r.rows[0].r.estimate).toBe(24);
+    expect(r.rows[0].r.remaining_after).toBe(6);
+    expect(r.rows[0].r.unknown_count).toBe(0);
+  });
+
+  it("reports unknown counts apart rather than as zero", async () => {
+    await db.exec("reset role");
+    await db.query("update videos set reported_comment_count=null where id=$1", [V2]);
+    await db.query("delete from usage_events where workspace_id=$1", [W]);
+    const r = await call(OWNER, [V2]);
+    expect(r.rows[0].r.estimate).toBe(0);
+    expect(r.rows[0].r.unknown_count).toBe(1);
+  });
+
+  it("queues one collection for the channel and answers a repeat with the same job", async () => {
+    await db.exec("reset role");
+    const first = await db.query<{ id: string }>(
+      "select id from jobs where workspace_id=$1 and type='collect' and status in ('queued','running')",
+      [W],
+    );
+    expect(first.rows).toHaveLength(1);
+    const again = await call(OWNER, [V1], []);
+    expect(again.rows[0].r.job_id).toBe(first.rows[0].id);
+    expect(again.rows[0].r.queued).toBe(true);
+  });
+
+  it("removes a selection and keeps the comments", async () => {
+    const r = await call(OWNER, [], [V1]);
+    expect(r.rows[0].r.queued).toBe(false);
+    await db.exec("reset role");
+    expect((await db.query("select 1 from video_selections where video_id=$1", [V1])).rows).toHaveLength(0);
+    expect((await db.query("select 1 from comments where video_id=$1", [V1])).rows).toHaveLength(1);
+  });
+
+  it("swallows the rate limit and says the work is deferred", async () => {
+    await db.exec("reset role");
+    await db.query("update jobs set status='succeeded' where workspace_id=$1 and status in ('queued','running')", [W]);
+    await db.query("update plans set min_sync_interval_minutes=60 where key='pilot'");
+    const r = await call(OWNER, [V1]);
+    expect(r.rows[0].r.queued).toBe(false);
+    expect(r.rows[0].r.deferred).toBe(true);
+    await db.exec("reset role");
+    await db.query("update plans set min_sync_interval_minutes=0 where key='pilot'");
+  });
+
+  it("refuses when the workspace has no active plan", async () => {
+    await db.exec("reset role");
+    await db.query("update subscriptions set status='paused' where workspace_id=$1", [W]);
+    await expect(call(OWNER, [V2], [])).rejects.toThrow(/no_active_plan/);
+    await db.exec("reset role");
+    await db.query("update subscriptions set status='active' where workspace_id=$1", [W]);
+  });
+
+  it("request_discovery queues one discover per channel", async () => {
+    await as(OWNER);
+    const a = await db.query<{ j: string }>("select request_discovery($1,$1) as j", [W]);
+    const b = await db.query<{ j: string }>("select request_discovery($1,$1) as j", [W]);
+    expect(a.rows[0].j).toBe(b.rows[0].j);
+    await as(OUTSIDER);
+    await expect(db.query("select request_discovery($1,$1)", [W])).rejects.toThrow(/forbidden/);
   });
 });
