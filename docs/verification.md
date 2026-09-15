@@ -1297,3 +1297,60 @@ three before it in `docs/coordination/ACTIVE.md`); `already_running` has not bee
 a signed-in browser against a real running job, and the backoff has not been watched across
 a real hour — both are PGlite-only, like the rest of this feature's server side.
 
+
+## 2026-09-15 — the first live run of selective sync, and what it found
+
+Pushed by the user in this order: migrations `20260915130000`–`140000` (`db push --linked`,
+four applied, nothing else pending), `supabase functions deploy worker --no-verify-jwt`
+(version 8 → 9, `verify_jwt` false), then `20260915150000` after the first tick answered
+`control_plane_error:42501` — `private.plan_limit` had been revoked from tenants on
+2026-09-13 and never granted to `service_role`, which the new security-invoker worker
+functions run as. `worker_catalogue.test.ts` now runs every `svc_*` entry point under
+`set role service_role`; without the grant it fails 4/9 with `permission denied for
+function plan_limit`, with it 9/9.
+
+`POST /worker/tick` with each credential, after the grant: personal workspace
+`{discover: 1, collect: 0}` (nothing selected there), AJ360 `{discover: 1, collect: 1}` (the
+39 backfilled selections were due at once). A second tick on each answered zeros — the
+one-outstanding rule and, after the run, the pilot's new 30-minute `sync_interval`.
+
+**Discovery is real.** Both `discover` jobs succeeded through the deployed gateway and the
+live YouTube API: the personal channel 12 videos in 4 s; **AJ360 4,456 videos in 78 s
+(2,194 videos · 2,253 shorts · 9 streams)**, `channels.catalogued_at` set, every row `open`.
+The handoff's "194" was a much smaller snapshot. A single unpaged PostgREST read of
+`videos` answered exactly 1,000 rows and no error — the final review's "can wait" item was
+load-bearing after all. `catalogue.ts` now reads `videos` and `video_selections` in pages of
+1,000 by a stable key until a short page (`68ddf99`); the unit test drives 1,456 rows through
+two ranges and an exact 1,000 through a second, empty one, and is red without the paging.
+
+**The collect was not ours.** AJ360's `collect` was claimed at 20:17:36Z — two minutes
+before this session's worker came up at 20:19:53Z — walked 30 *recent uploads* (the old
+`build_plan` survey; the checkpoint's `done` list is their external ids), committed 418
+comments, finished `succeeded`, and called `video-finished` for none of them: the 39
+selection rows kept the backfill's `next_check_at`. `worker_seen` keeps advancing on both
+workspaces every ~60 s while no worker runs on this machine (`pgrep`, `launchctl`, `crontab`
+all empty): **an instance of the pre-selection worker, holding both credentials, is running
+somewhere else.** Until it is stopped or the credentials are revoked it will keep claiming
+collects and reading the channel's newest uploads regardless of the selection.
+
+`video-finished` itself works: a probe job queued directly, claimed through the gateway
+with a live lease (39 due videos handed down, access token present), one call for
+`0271170f…` → `last_collected_at` now, `next_check_at` +24 h, `last_outcome` exhausted, in
+1.1 s. The probe job and its run row were then deleted. Two `worker_job`-guarded routes
+called with a *dead* lease hung for over two minutes before answering 500
+`control_plane_error` rather than 409 `lease_lost` in ~1 s; `worker_tick` (no lease) answers
+in 0.8 s. `lease_lost` is raised with SQLSTATE `40001`, which PostgREST treats as a
+serialization failure and retries with backoff. Latent since 2026-09-13; not hit by any
+worker so far because a live worker holds a live lease. Recorded, not fixed here.
+
+**Model load on this Mac.** transformers 4.57 refuses `torch.load` on torch 2.2.2 (the last
+x86_64 macOS build) and the pinned CAMeL revision ships only `pytorch_model.bin`. The same
+tensors were re-saved as `model.safetensors` inside the HF cache for that revision
+(`b0df630d…`, 436,362,324 bytes, 202 tensors), the stale `.no_exist` marker removed, and the
+loop runs with `HF_HUB_OFFLINE=1`: same model id, same revision, same analysis key; two
+probes scored 0.99 positive / 0.99 negative. A local-cache workaround, not a repository
+change; any machine with torch ≥ 2.6 needs none of it.
+
+Not verified: a `collect` run by the *new* worker over a due list end to end (the old
+worker took the only one); `select_videos` from a signed-in browser (the web bundle is not
+deployed yet); pg_cron.
