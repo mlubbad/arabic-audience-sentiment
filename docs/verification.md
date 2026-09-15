@@ -1354,3 +1354,34 @@ change; any machine with torch ≥ 2.6 needs none of it.
 Not verified: a `collect` run by the *new* worker over a due list end to end (the old
 worker took the only one); `select_videos` from a signed-in browser (the web bundle is not
 deployed yet); pg_cron.
+
+## 2026-09-15 — the old worker retired, and the first collect by the new one
+
+Nothing on this machine ran the old worker (`ps` over every user, `launchctl`, `crontab`,
+Docker, tmux/screen: nothing), while `worker_seen` kept advancing on both workspaces every
+~60 s with this session's loop stopped. So the credentials were rotated: two new ones
+registered through `svc_register_worker_credential` (labels `rotated-2026-09-15`), the
+retire route added as `20260915160000` (tested in PGlite under `set role service_role`: the
+other active credential of the workspace is revoked, the named one kept, the other
+workspace untouched, the revoked one refused at claim; `keep_at_least_one` and
+`unknown_credential` refused), pushed by the user, then `svc_retire_worker_credentials`
+called once per workspace (`1` retired each). Probed at the gateway afterwards: the old pair
+answers `401` on `/worker/tick`, the new pair `200`. The old worker, wherever it is, has
+polled into a 401 since 20:45Z and can claim nothing.
+
+The new loop was started on the new pair (`HF_HUB_OFFLINE=1`, camelbert-da, two tenants).
+Its own idle tick enqueued AJ360's `collect` at 20:47Z, once the pilot's 30-minute
+`sync_interval` since the previous collect had passed — `{collect: 0}` on every earlier
+tick, which is the throttle working. The run: claimed 20:48:44Z, finished 20:52:20Z,
+`succeeded`, `videos_seen: 38, comments_collected: 462, complete: true` — **38 is the due
+list exactly** (39 selections minus the one the probe had already rescheduled), not the
+channel's newest uploads. All 38 selection rows carry `last_collected_at` inside the run,
+`last_outcome: exhausted`, and `next_check_at` on 2026-09-16; the next tick answers
+`{collect: 0, discover: 0}`, because nothing is due until then. `comments` gained 2 rows
+since 20:45Z: 2 genuinely new comments on the 38 videos; the other 460 were already stored
+and cost nothing again — the idempotent metering the pricing page promises.
+
+Live and verified now: discover (both channels), collect over a server-supplied due list,
+`video-finished` scheduling the next check, the tick's throttle, credential rotation.
+Still not verified: `select_videos` from a signed-in browser (the web bundle with the
+paging fix, `68ddf99`, is not deployed yet), pg_cron.
