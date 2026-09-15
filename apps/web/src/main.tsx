@@ -1,4 +1,10 @@
-import React, { lazy, Suspense, useEffect, useState } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -12,11 +18,20 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./style.css";
 import "./app.css";
+import "./locale.css";
 import { Landing } from "./Landing";
 import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
 import { supabase } from "./supabase";
 import { carriedSearch } from "./workspaceUrl";
+import {
+  applyToDocument,
+  DEFAULT_LOCALE,
+  direction,
+  useLocale,
+} from "./locale";
+import { useStrings, type Strings } from "./strings";
+import { LanguageSwitch } from "./LanguageSwitch";
 const Dashboard = lazy(() =>
   import("./Dashboard").then((m) => ({ default: m.Dashboard })),
 );
@@ -46,6 +61,7 @@ const client = new QueryClient({
  */
 function SessionControl() {
   const { session, loading } = useSession();
+  const S = useStrings();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   // Nothing at all until it is known. A "sign in" that flips to "sign out" a
@@ -54,13 +70,13 @@ function SessionControl() {
   if (!session)
     return (
       <Link className="app-session app-session-in" to="/account">
-        تسجيل الدخول
+        {S.signIn}
       </Link>
     );
   return (
     <div className="app-session">
       <span className="app-session-who" title={session.user.email ?? undefined}>
-        {session.user.email ?? "حسابك"}
+        {session.user.email ?? S.yourAccount}
       </span>
       <button
         type="button"
@@ -77,11 +93,11 @@ function SessionControl() {
           });
         }}
       >
-        {busy ? "جارٍ الخروج…" : "تسجيل الخروج"}
+        {busy ? S.signingOut : S.signOut}
       </button>
       {failed && (
         <span role="alert" className="app-session-error">
-          تعذّر تسجيل الخروج
+          {S.signOutFailed}
         </span>
       )}
     </div>
@@ -154,15 +170,32 @@ const DESTINATIONS = [
   // carries the current `?ws=` and the address stays the one to copy on the
   // way across. The account page lists every workspace and reads no such
   // parameter; stamping one on it would be a claim the page does not make.
-  { to: "/dashboard", label: "نظرة عامة", title: "نظرة عامة", scoped: true },
-  { to: "/sync", label: "التشغيل", title: "حالة المزامنة", scoped: true },
+  // `label` and `title` are keys into the strings, so the rail and the
+  // document title change language with everything else.
+  {
+    to: "/dashboard",
+    label: "navOverview",
+    title: "titleOverview",
+    scoped: true,
+  },
+  {
+    to: "/sync",
+    label: "navOperations",
+    title: "titleOperations",
+    scoped: true,
+  },
   {
     to: "/account",
-    label: "المصادر والحساب",
-    title: "الحساب ومساحات العمل",
+    label: "navAccount",
+    title: "titleAccount",
     scoped: false,
   },
-] as const;
+] as const satisfies readonly {
+  to: string;
+  label: keyof Strings;
+  title: keyof Strings;
+  scoped: boolean;
+}[];
 
 /** Loaded only once there is a session to have a plan for: the card reads the
  *  contracts and the data module, which a visitor on the landing page has no
@@ -185,22 +218,40 @@ function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname, search } = useLocation();
   const carried = carriedSearch(search);
+  const locale = useLocale();
+  const S = useStrings();
+  // The language lands on <html> before paint, where CSS `:lang()` and the
+  // bidi algorithm read it. The shell is the only surface that speaks two
+  // languages: the landing page is Arabic and stays so, which is why leaving
+  // the shell puts the document back the way index.html declared it.
+  useLayoutEffect(() => {
+    applyToDocument(locale);
+    return () => applyToDocument(DEFAULT_LOCALE);
+  }, [locale]);
   useEffect(() => {
     const found = DESTINATIONS.find((d) => d.to === pathname);
-    const title =
-      found?.title ??
-      (pathname === "/connected" ? "نتيجة ربط القناة" : "صفحة غير موجودة");
-    document.title = `${title} — مشاعر الجمهور`;
+    const title = found
+      ? S[found.title]
+      : pathname === "/connected"
+        ? S.titleConnected
+        : S.titleNotFound;
+    document.title = `${title} — ${S.brand}`;
     setMenuOpen(false);
-  }, [pathname]);
+  }, [pathname, S]);
   return (
-    <div className="app-shell" dir="rtl">
+    <div className="app-shell" dir={direction(locale)}>
       <a className="skip app-skip" href="#content">
-        انتقل إلى المحتوى
+        {S.skipToContent}
       </a>
+      {/* The switch lives in the announcement bar, not the rail foot where it
+          was first put. Measured: the rail is a sticky 100vh plane under a
+          34px bar, so at the top of the page its foot is 34px below the fold
+          and a control there is the first thing clipped. The bar is on every
+          screen size, above the fold, and on a phone needs no menu opened. */}
       <div className="app-announcement">
-        <span>صوت جمهورك، بوضوح أكبر</span>
-        <span>معاينة خاصة · نسخة تجريبية</span>
+        <span>{S.announcementLead}</span>
+        <span>{S.announcementTag}</span>
+        <LanguageSwitch />
       </div>
       {/* A rail, not a bar.
           Four links across the top said "this is a page with some links on
@@ -211,36 +262,33 @@ function AppLayout() {
       <button
         className="app-menu"
         type="button"
-        aria-label="قائمة التطبيق"
+        aria-label={S.menuLabel}
         aria-expanded={menuOpen}
         aria-controls="app-rail"
         onClick={() => setMenuOpen((open) => !open)}
       >
-        {menuOpen ? "إغلاق ×" : "القائمة ☰"}
+        {menuOpen ? S.menuClose : S.menuOpen}
       </button>
       <aside
         id="app-rail"
         className={menuOpen ? "app-rail is-open" : "app-rail"}
       >
-        <Link
-          className="app-brand"
-          to="/"
-          aria-label="مشاعر الجمهور — الرئيسية"
-        >
+        <Link className="app-brand" to="/" aria-label={S.brandHomeLabel}>
           <BrandMark />
           <span>
             <b>
-              مشاعر الجمهور<span className="app-brand-dot">.</span>
+              {S.brand}
+              <span className="app-brand-dot">.</span>
             </b>
-            <small>من سكاي ديفيلوب</small>
+            <small>{S.brandOwner}</small>
           </span>
         </Link>
 
-        <nav className="app-nav" aria-label="التنقل الرئيسي">
+        <nav className="app-nav" aria-label={S.navLabel}>
           {/* A heading for the group, not decoration: the rail carries three
               kinds of thing — where you are, what your plan has left, and who
               you are — and unlabelled they read as one undifferentiated list. */}
-          <p className="app-rail-caption">التنقّل</p>
+          <p className="app-rail-caption">{S.navCaption}</p>
           {DESTINATIONS.map((d) => (
             <NavLink
               key={d.to}
@@ -250,7 +298,7 @@ function AppLayout() {
               <span className="app-nav-mark" aria-hidden="true">
                 <NavIcon to={d.to} />
               </span>
-              {d.label}
+              {S[d.label]}
             </NavLink>
           ))}
         </nav>
@@ -267,7 +315,7 @@ function AppLayout() {
               <span className="app-state-symbol" aria-hidden="true">
                 ◌
               </span>
-              <p>جارٍ فتح الصفحة…</p>
+              <p>{S.pageOpening}</p>
             </div>
           }
         >
@@ -276,27 +324,29 @@ function AppLayout() {
       </main>
       <footer className="app-footer">
         <div>
-          <Link to="/">مشاعر الجمهور.</Link>
-          <span>من التعليق إلى صورة أوضح.</span>
+          <Link to="/">{S.brand}.</Link>
+          <span>{S.footerTagline}</span>
         </div>
-        <p>معاينة خاصة · بعض الصفحات تستخدم بيانات اصطناعية موضّحة بوضوح.</p>
+        <p>{S.footerNote}</p>
       </footer>
     </div>
   );
 }
 
 function NotFound() {
+  const S = useStrings();
+  const locale = useLocale();
   return (
     <div className="app-state app-not-found">
       <span className="app-state-symbol" aria-hidden="true">
-        ؟
+        {locale === "ar" ? "؟" : "?"}
       </span>
-      <p className="app-eyebrow">هذه الصفحة غير متاحة</p>
-      <h1>لم نجد الصفحة التي تبحث عنها.</h1>
-      <p>يمكنك العودة إلى اللوحة أو استكشاف الخدمة من الصفحة الرئيسية.</p>
+      <p className="app-eyebrow">{S.notFoundEyebrow}</p>
+      <h1>{S.notFoundTitle}</h1>
+      <p>{S.notFoundLead}</p>
       <div className="app-state-actions">
-        <Link to="/dashboard">فتح لوحة البيانات</Link>
-        <Link to="/">العودة للرئيسية</Link>
+        <Link to="/dashboard">{S.openDashboard}</Link>
+        <Link to="/">{S.backHome}</Link>
       </div>
     </div>
   );

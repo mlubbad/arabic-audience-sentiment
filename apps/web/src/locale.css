@@ -1,0 +1,44 @@
+/* What changes with the interface language, and nothing else.
+   Kept apart from app.css on purpose: the rules here are keyed on the
+   document's `lang`, which the locale store writes, and they must outrank
+   the Arabic-first rules they adjust — so each carries the selector it
+   overrides plus `:lang(en)`, which is one pseudo-class heavier.
+
+   Two things differ between the scripts. Arabic letters join, so every
+   `letter-spacing: 0` in app.css is load-bearing (see ACTIVE.md); Latin
+   letters do not, so English gets its tracking back where the report design
+   had it. And the body face is the Arabic one, with the Latin face as its
+   fallback; in English the Latin face leads. */
+
+.app-shell:lang(en) {
+  font-family: var(--font-latin);
+}
+.app-shell .rp-page .rp-eyebrow:lang(en) {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.app-rail-caption:lang(en),
+.app-plan-kicker:lang(en) {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-lang {
+  margin-inline-start: 0.25rem;
+  min-height: 24px;
+  padding: 0.05rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-on-dark);
+  font: 600 0.74rem var(--font-latin);
+  line-height: 1.4;
+}
+.app-lang:lang(ar) {
+  font-family: var(--font-body);
+}
+.app-lang:hover,
+.app-lang:focus-visible {
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
+}

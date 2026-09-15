@@ -1,0 +1,41 @@
+/** The English translation. Typed against the Arabic, so a missing line is a
+ *  type error, not a key name on screen. See `ar.ts` for the rules. */
+import type { Strings } from "./ar";
+
+export const en: Strings = {
+  brand: "Audience Sentiment",
+  brandOwner: "by Sky Develop",
+  brandHomeLabel: "Audience Sentiment — home",
+  skipToContent: "Skip to content",
+  announcementLead: "Your audience's voice, more clearly",
+  announcementTag: "Private preview · beta",
+  menuLabel: "App menu",
+  menuOpen: "Menu ☰",
+  menuClose: "Close ×",
+  navLabel: "Main navigation",
+  navCaption: "Navigate",
+  navOverview: "Overview",
+  navOperations: "Operations",
+  navAccount: "Sources & account",
+  titleOverview: "Overview",
+  titleOperations: "Sync status",
+  titleAccount: "Account & workspaces",
+  titleConnected: "Channel connection result",
+  titleNotFound: "Page not found",
+  pageOpening: "Opening the page…",
+  footerTagline: "From comments to a clearer picture.",
+  footerNote:
+    "Private preview · some pages use synthetic data, and say so plainly.",
+  notFoundEyebrow: "This page is not available",
+  notFoundTitle: "We could not find the page you were looking for.",
+  notFoundLead: "Go back to the dashboard, or start from the home page.",
+  openDashboard: "Open the dashboard",
+  backHome: "Back to home",
+  signIn: "Sign in",
+  yourAccount: "Your account",
+  signOut: "Sign out",
+  signingOut: "Signing out…",
+  signOutFailed: "Could not sign out",
+  switchToOther: "العربية",
+  switchLabel: "Change interface language",
+};

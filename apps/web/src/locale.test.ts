@@ -1,0 +1,119 @@
+/**
+ * The interface language: remembered, validated, defaulting to Arabic, and
+ * written onto the document.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  applyToDocument,
+  currentLocale,
+  direction,
+  otherLocale,
+  resetLocale,
+  setLocale,
+} from "./locale";
+import { ar } from "./strings/ar";
+import { en } from "./strings/en";
+
+function stubStorage(initial: Record<string, string> = {}) {
+  const map = new Map(Object.entries(initial));
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => map.get(k) ?? null,
+    setItem: (k: string, v: string) => void map.set(k, v),
+    removeItem: (k: string) => void map.delete(k),
+  });
+  return map;
+}
+
+beforeEach(() => {
+  stubStorage();
+  resetLocale();
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("the interface language", () => {
+  it("is Arabic until asked otherwise, and is not read from the browser", () => {
+    vi.stubGlobal("navigator", { language: "en-GB" });
+    expect(currentLocale()).toBe("ar");
+  });
+
+  it("remembers the choice across a reload", () => {
+    const map = stubStorage();
+    resetLocale();
+    setLocale("en");
+    expect(map.get("audience.locale")).toBe("en");
+    resetLocale();
+    // A fresh module reading the same storage: the reload.
+    map.set("audience.locale", "en");
+    expect(currentLocale()).toBe("en");
+  });
+
+  it("refuses a stored value it does not know, so a hand-edited key costs only the default", () => {
+    stubStorage({ "audience.locale": "fr" });
+    resetLocale();
+    expect(currentLocale()).toBe("ar");
+    stubStorage({ "audience.locale": '{"x":1}' });
+    resetLocale();
+    expect(currentLocale()).toBe("ar");
+    // And the setter will not take one either, whatever the caller claims.
+    setLocale("xx" as never);
+    expect(currentLocale()).toBe("ar");
+  });
+
+  it("survives storage that throws", () => {
+    vi.stubGlobal("localStorage", {
+      getItem() {
+        throw new Error("SecurityError");
+      },
+      setItem() {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem() {},
+    });
+    resetLocale();
+    expect(currentLocale()).toBe("ar");
+    expect(() => setLocale("en")).not.toThrow();
+    expect(currentLocale()).toBe("en");
+  });
+
+  it("pairs the language with its direction and its alternative", () => {
+    expect(direction("ar")).toBe("rtl");
+    expect(direction("en")).toBe("ltr");
+    expect(otherLocale("ar")).toBe("en");
+    expect(otherLocale("en")).toBe("ar");
+  });
+
+  it("writes lang and dir onto the document together", () => {
+    const doc = { documentElement: { lang: "", dir: "" } } as Document;
+    applyToDocument("en", doc);
+    expect(doc.documentElement).toMatchObject({ lang: "en", dir: "ltr" });
+    applyToDocument("ar", doc);
+    expect(doc.documentElement).toMatchObject({ lang: "ar", dir: "rtl" });
+  });
+});
+
+describe("the two string sets", () => {
+  const keys = Object.keys(ar) as (keyof typeof ar)[];
+
+  it("cover the same keys — the type says so, and this says so at runtime too", () => {
+    expect(Object.keys(en).sort()).toEqual([...keys].sort());
+  });
+
+  it("are each written in their own script, with no Arabic left in the English", () => {
+    for (const key of keys) {
+      const a = ar[key];
+      const e = en[key];
+      expect(typeof e, key).toBe(typeof a);
+      if (typeof a === "string") {
+        expect(a.trim(), key).not.toBe("");
+        if (key !== "switchToOther")
+          expect(e as string, key).not.toMatch(/[\u0600-\u06FF]/);
+        expect((e as string).trim(), key).not.toBe("");
+      }
+    }
+    // The one deliberate exception: the switch names the other language in
+    // that language.
+    expect(en.switchToOther).toBe("العربية");
+  });
+});
