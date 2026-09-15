@@ -28,7 +28,7 @@
      as the same material as everything else, only coloured. */
   border: var(--glass-brand-edge);
   box-shadow: var(--glass-brand-lift), var(--glass-brand-specular);
-  color: #fff;
+  color: var(--ink-on-dark);
   padding: clamp(28px, 5vw, 56px) var(--rp-gutter);
   box-shadow: var(--shadow-glow-indigo);
   margin-bottom: var(--space-6);
@@ -68,7 +68,7 @@
   line-height: 1.25;
   letter-spacing: -0.01em;
   margin: 0 0 var(--space-4);
-  color: #fff;
+  color: var(--ink-on-dark);
   text-wrap: balance;
   max-width: 20ch;
 }
@@ -95,7 +95,7 @@
   background: rgba(255, 255, 255, 0.12);
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 /* ---------------- sticky section nav ---------------- */
@@ -390,7 +390,7 @@
 .rp-page .rp-tab[aria-pressed="true"] {
   background: var(--ml-indigo);
   border-color: var(--ml-indigo);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 /* ---------------- videos ---------------- */
@@ -907,7 +907,7 @@
   color: rgba(255, 255, 255, 0.82);
 }
 .rp-hero-split strong {
-  color: #fff;
+  color: var(--ink-on-dark);
   font-family: var(--font-numeric);
   font-weight: 700;
 }
@@ -1001,7 +1001,7 @@
 .rp-page .empty-actions button:first-child {
   background: var(--ml-indigo);
   border-color: var(--ml-indigo);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 /* The action beside the diagnosis. */
@@ -1014,7 +1014,7 @@
   border-radius: var(--r-sm);
   border: 1px solid var(--ml-indigo);
   background: var(--ml-indigo);
-  color: #fff;
+  color: var(--ink-on-dark);
   font-family: inherit;
   font-size: var(--fs-small);
   font-weight: 700;

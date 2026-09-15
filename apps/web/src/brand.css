@@ -142,6 +142,11 @@
   --fg-2: #3f3a5c;
   --fg-3: #6e6a85;
   --fg-on-brand: #fde676;
+  /* White ink on the dark planes — the rail, the indigo buttons, the
+     landing hero. It was `color: #fff` in seventeen places across two
+     layers, which is one meaning written seventeen times; and it is not
+     `--bg-card`, which is the same value with a different job. */
+  --ink-on-dark: #ffffff;
 
   --ml-grad-warm-cool: linear-gradient(
     135deg,
