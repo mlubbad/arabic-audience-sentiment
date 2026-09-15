@@ -87,9 +87,6 @@ describe("worker catalogue and due lists", () => {
       );
     }
   });
-  afterAll(async () => {
-    await db?.close();
-  });
 
   it("a claimed discover job opens a run in discover mode", async () => {
     await db.query(
@@ -438,4 +435,79 @@ describe("worker catalogue and due lists", () => {
     );
     expect(n.n).toBe(1);
   });
+});
+
+describe("retiring worker credentials", () => {
+  // The old worker could not be found; the only way to stop it was to make
+  // its credential stop answering. Retire everything but the named ones.
+  it("revokes every other active credential of the workspace and nothing beyond it", async () => {
+    await db.exec("reset role");
+    const NEW_A = "c".repeat(64);
+    await db.query(
+      "insert into private.worker_credentials(token_hash,label,workspace_id) values ($1,'new',$2)",
+      [NEW_A, A],
+    );
+    const keep = (
+      await db.query<{ id: string }>(
+        "select id from private.worker_credentials where token_hash=$1",
+        [NEW_A],
+      )
+    ).rows[0].id;
+    await asWorker();
+    const n = await one<{ n: number }>(
+      "select svc_retire_worker_credentials($1,$2::uuid[]) as n",
+      [A, [keep]],
+    );
+    expect(n.n).toBe(1);
+    await db.exec("reset role");
+    const rows = await db.query<{ token_hash: string; status: string }>(
+      "select token_hash, status from private.worker_credentials where workspace_id=$1 order by token_hash",
+      [A],
+    );
+    expect(rows.rows).toEqual([
+      { token_hash: CRED_A, status: "revoked" },
+      { token_hash: NEW_A, status: "active" },
+    ]);
+    // B's credential is untouched, and the old one no longer claims.
+    const b = await one<{ status: string }>(
+      "select status from private.worker_credentials where token_hash=$1",
+      [CRED_B],
+    );
+    expect(b.status).toBe("active");
+    await asWorker();
+    await expect(
+      db.query("select * from svc_worker_claim($1)", [CRED_A]),
+    ).rejects.toThrow(/invalid_worker_credential/);
+    const stillMine = await db.query("select * from svc_worker_claim($1)", [
+      NEW_A,
+    ]);
+    expect(stillMine.rows).toBeDefined();
+  });
+
+  it("refuses to leave a workspace with no credential, and refuses a stranger's id", async () => {
+    await asWorker();
+    await expect(
+      db.query("select svc_retire_worker_credentials($1,$2::uuid[])", [A, []]),
+    ).rejects.toThrow(/keep_at_least_one/);
+    const bId = (
+      await (async () => {
+        await db.exec("reset role");
+        return db.query<{ id: string }>(
+          "select id from private.worker_credentials where token_hash=$1",
+          [CRED_B],
+        );
+      })()
+    ).rows[0].id;
+    await asWorker();
+    await expect(
+      db.query("select svc_retire_worker_credentials($1,$2::uuid[])", [
+        A,
+        [bId],
+      ]),
+    ).rejects.toThrow(/unknown_credential/);
+  });
+});
+
+afterAll(async () => {
+  await db?.close();
 });
