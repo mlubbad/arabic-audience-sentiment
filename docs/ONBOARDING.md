@@ -235,7 +235,10 @@ for the private pilot channel; do not expose or copy their credentials.
 What *is* real, as of 2026-09-14: a Supabase development project holds the
 schema; the built front end is deployed privately; Auth and OAuth were exercised;
 and 65 genuine comments reached the database through an OAuth-backed manual
-worker run. The worker is not yet a persistent scheduled service. The corrected
+worker run. The worker runs as a launchd
+agent on the development Mac since 2026-09-16 (`scripts/worker-service-update.sh`; log under
+`~/Library/Application Support/sentiment-worker`), which is a service while that Mac is awake
+and logged in — not a hosted one. The corrected
 landing asset and the new signed-in dashboard need a fresh private deploy and
 authenticated browser verification. `docs/verification.md` records the evidence
 and its limits.

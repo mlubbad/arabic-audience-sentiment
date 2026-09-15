@@ -1471,3 +1471,19 @@ id is not a real video; the user saw a real one play on AJ360 earlier).
 Also read from the live catalogue, for `docs/pricing.md`: 4,456 videos carrying 167,302
 reported comments (112,387 videos · 53,775 shorts · 1,140 streams), the heaviest 10,631,
 no unknown counts — paged through PostgREST in five ranges of 1,000.
+
+## 2026-09-16 — the worker service
+
+First attempt, plist pointing at the working checkout: `state = spawn scheduled, last
+exit code = 126`, log `shell-init: error retrieving current directory: getcwd: cannot
+access parent directories: Operation not permitted` and the same on the script — launchd
+agents are kept out of `~/Documents`. Moved to a detached worktree under
+`~/Library/Application Support/sentiment-worker/checkout` (`git worktree add --detach`).
+Second attempt: `ModuleNotFoundError: No module named 'torch'` three runs in a row, thirty
+seconds apart — `uv sync --frozen` installs no model runtime by design; the update script
+now syncs `--group inference`. Third: `loaded CAMeL-Lab/…@b0df630d23e5`, `worker up, …
+tenants=2`, `state = running`, and `worker_seen` advanced on both workspaces within a
+minute. Then `launchctl kill KILL` on the running agent: `runs = 2`, a new pid, `worker up`
+again 5 s later; the orphaned python child of the killed run logged `worker down (stopped)`
+when launchd reaped it. `pgrep` shows one uv and one python afterwards, no orphan. Not
+verified: a reboot (RunAtLoad) — the plist says so, the day has not.

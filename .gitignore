@@ -24,3 +24,6 @@ supabase/.branches/
 
 # per-plan scratch for subagent-driven development; git history is the record
 .superpowers/
+
+# hand-started worker logs (the service logs under ~/Library/Application Support/sentiment-worker)
+.worker-logs/

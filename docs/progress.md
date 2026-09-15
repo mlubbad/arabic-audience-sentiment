@@ -443,3 +443,18 @@ pressing the thumbnail or the title opens a dialog with the privacy-enhanced emb
 exists only while the dialog is open. Esc and the backdrop close it. Seen at 1280px and
 375px on the dev server; two browser tests (a routed 120-row catalogue for the pager; the
 link targets and the player on the fixture) join the suite.
+
+## 2026-09-16 — the worker is a service
+
+`544c4ae`, `bf5386b`. A launchd agent, `com.skydevelop.sentiment-worker`, with `RunAtLoad`
+and `KeepAlive`: the loop still exits on its own after thirty idle minutes "for a clean
+restart", and launchd is now the thing that restarts it, thirty seconds later. It cannot
+run from `~/Documents` — macOS keeps background agents out of it and the first attempt
+answered "Operation not permitted" on the script itself — so it runs from a detached
+checkout under `~/Library/Application Support/sentiment-worker/checkout`, with its own venv
+(`--group inference`, the runtime the default install leaves out on purpose) and a copy of
+`.env.local`. `scripts/worker-service-update.sh` is the one way that checkout moves: it
+detaches it at the working checkout's HEAD, syncs, copies the credentials, reinstalls the
+plist and bootstraps. What this is: a worker that comes back after its own exit, after a
+kill, and after a login. What it is not: hosted — a sleeping laptop is still a stopped
+worker, and the hosting blocker keeps that half.
