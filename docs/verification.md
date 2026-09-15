@@ -977,3 +977,23 @@ answers 401 / 42501 over PostgREST with the nine named arguments, so the `create
 landed on the same signature.
 
 Not verified: a re-link on the live channel (needs the owner's consent round trip).
+
+## 2026-09-15 — app.css carries no raw colour
+
+Baseline, from a script over the six layers with comments stripped, before any change:
+style 0 · report 7 · app 56 (37 distinct; 14 equal to a token, 34 not; 12 within ΔE 3 of one)
+· landing 95. After: style 0 · report 0 · app 0 · landing 95 (out of scope). `layers.test.ts`
+asserts the three zeros and that no layer repeats a token's value; `rail.test.ts` now reads
+`--plane-dark` from `brand.css`.
+
+Contrasts measured where a value moved (WebAIM formula, same as `palette.ts`): focus border on
+its own focused ground 4.50:1 (needs 3); warning ink `--color-warning` on `--warning-bg`
+5.63:1 (was 6.86 / 8.61); white on the button's hover stop `--ml-indigo-500` 4.98:1 (was
+6.29; 14px bold needs 4.5); rail secondary ink `--ml-indigo-300` on `--plane-dark` 9.00:1;
+active bar 9.00:1 (was 6.33); kicker `--fg-on-brand` 15.09:1 (was 13.12); footer ink 10.52:1;
+success pill 5.70:1. The warning strip's edge bars measure 2.04 and 2.66 and are marks beside
+text that says the same thing — unchanged by this work and noted, not fixed.
+
+Gates: lint 0, format 0, types 0, unit 0 (289), e2e 0 (74, port 5199, exit from a log file),
+build 0. Screenshots of the overview at 1280px before and after each step were compared by
+eye and are indistinguishable, which is the intent: the change is where the values live.

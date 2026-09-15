@@ -76,7 +76,7 @@
   align-items: center;
   gap: 0.6rem;
   flex: 0 0 auto;
-  color: #22203a;
+  color: var(--text-1);
   font-size: 1.3rem;
   font-weight: 700;
   white-space: nowrap;
@@ -111,7 +111,7 @@
 }
 .lp-mark i:nth-child(4) {
   height: 10px;
-  background: #ff5c67;
+  background: var(--ml-rose);
 }
 /* The navigation's only styling now lives with the rail. What was here was
    the top bar's: a centred pill row, laid out with `align-items: center`.
@@ -339,7 +339,7 @@
   box-shadow: 0 4px 20px rgba(15, 13, 35, 0.04);
 }
 .app-shell .rp-metric {
-  border-top: 3px solid #ddd5ff;
+  border-top: 3px solid var(--ml-indigo-100);
   border-radius: 14px;
   transition:
     transform 0.15s ease,
@@ -427,25 +427,39 @@
   cursor: pointer;
   transition: all 0.15s ease;
 }
+/* The primary action, in the brand's own indigo. It was painted in another
+   palette's — #4338ca, #312e81, #4f46e5, #3730a3 are a well-known utility
+   framework's indigo-700/900/600/800 — ΔE 4 to 6 from the brand's steps,
+   which is close enough to look like the brand and far enough to be a
+   second implementation of it. White ink on the hover's lightest stop
+   measures 4.98:1. */
 .app-shell .rp-filters button[type="submit"] {
-  background: linear-gradient(135deg, #4338ca 0%, #312e81 100%);
-  border: 1px solid #312e81;
+  background: linear-gradient(
+    135deg,
+    var(--ml-indigo) 0%,
+    var(--ml-indigo-800) 100%
+  );
+  border: 1px solid var(--ml-indigo-800);
   color: var(--ink-on-dark);
   box-shadow: 0 2px 8px rgba(67, 56, 202, 0.3);
 }
 .app-shell .rp-filters button[type="submit"]:hover {
-  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+  background: linear-gradient(
+    135deg,
+    var(--ml-indigo-500) 0%,
+    var(--ml-indigo) 100%
+  );
   box-shadow: 0 4px 14px rgba(67, 56, 202, 0.4);
   transform: translateY(-1px);
 }
 .app-shell .rp-filters button[type="button"] {
   background: var(--ml-indigo-50);
-  border: 1px solid #ded7fd;
+  border: 1px solid var(--ml-indigo-100);
   color: var(--ml-indigo);
 }
 .app-shell .rp-filters button[type="button"]:hover {
   background: var(--ml-indigo-100);
-  border-color: #cbbeff;
+  border-color: var(--ml-indigo-300);
 }
 .app-shell .rp-page .notice,
 .app-shell .rp-page .loading {
@@ -835,7 +849,7 @@
     justify-content: center;
     min-height: 42px;
     padding: 0.4rem 0.9rem;
-    border: 1px solid #ddd7fa;
+    border: 1px solid var(--ml-indigo-100);
     border-radius: var(--r-pill);
     background: var(--ml-indigo-50);
     color: var(--ml-indigo);
@@ -863,7 +877,7 @@
     min-height: 46px;
     margin: 0 0 0.8rem;
     padding: 0.55rem 1rem;
-    border: 1px solid #ded7fd;
+    border: 1px solid var(--ml-indigo-100);
     border-radius: var(--r-2);
     background: var(--ml-indigo-50);
     color: var(--ml-indigo);
@@ -987,11 +1001,19 @@
   opacity: 0.85;
 }
 .app-rail .lp-mark i {
-  background: linear-gradient(180deg, #c4b8ff 0%, #826df8 100%);
+  background: linear-gradient(
+    180deg,
+    var(--ml-indigo-300) 0%,
+    var(--ml-indigo-500) 100%
+  );
   box-shadow: 0 0 8px rgba(181, 170, 242, 0.35);
 }
 .app-rail .lp-mark i:nth-child(4) {
-  background: linear-gradient(180deg, #ff8f98 0%, #ff5c67 100%);
+  background: linear-gradient(
+    180deg,
+    var(--ml-rose-300) 0%,
+    var(--ml-rose) 100%
+  );
   box-shadow: 0 0 8px rgba(255, 92, 103, 0.45);
 }
 .app-rail .app-brand span {
@@ -1072,7 +1094,8 @@
      document is right-to-left, so it rounded the edge against the page and
      squared the one against the rail — the mirror of what was drawn. */
   border-radius: 3px;
-  background: #9584ff;
+  /* The same ink as the active icon beside it: one colour for "here". */
+  background: var(--ml-indigo-300);
 }
 .app-nav-mark {
   display: inline-flex;

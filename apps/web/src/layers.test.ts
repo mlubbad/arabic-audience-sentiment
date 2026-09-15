@@ -45,29 +45,16 @@ for (const f of ["brand.css", "glass.css"])
   for (const m of read(f).matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{3,8})\b/g))
     if (!tokens.has(norm(m[2]))) tokens.set(norm(m[2]), `--${m[1]}`);
 
-/** app.css's raw colours, each with the token it stands nearest to (ΔE,
- *  palette.ts). 34 on 2026-09-15; the work of the audit's third phase is to
- *  empty this list. Struck so far: six indigo tints within ΔE 3 whose meaning
- *  matched the token's (a hover, a focus border, four pale grounds); then
- *  three families that had no token and got one — the dark chrome, the
- *  warning strip, the "done" tint — and two inks the brand already named
- *  (--ml-indigo-300 on the dark plane, --fg-on-brand for the kicker). */
-const APP_BACKLOG = new Set([
-  "#c4b8ff", // --ml-indigo-300 ΔE 4.4 — the rail's brand-mark gradient only
-  "#ff5c67", // --ml-rose ΔE 3.0
-  "#312e81", // --ml-indigo-800 ΔE 5.0
-  "#ded7fd", // --ml-indigo-100 ΔE 3.0
-  "#22203a", // --text-1 ΔE 5.6
-  "#ddd5ff", // --ml-indigo-100 ΔE 3.6
-  "#4338ca", // --ml-indigo ΔE 4.4
-  "#4f46e5", // --ml-indigo-500 ΔE 6.2
-  "#3730a3", // --ml-indigo ΔE 3.9
-  "#cbbeff", // --ml-indigo-300 ΔE 6.2
-  "#ddd7fa", // --ml-indigo-100 ΔE 3.0
-  "#826df8", // --ml-indigo-500 ΔE 6.4
-  "#ff8f98", // --ml-rose-300 ΔE 5.6
-  "#9584ff", // --ml-indigo-300 ΔE 11.6
-]);
+/** app.css's raw colours. 34 on 2026-09-15, listed here by value with the
+ *  token each stood nearest to (ΔE, palette.ts), and worked down to none in
+ *  four steps: 21 repeats of a token's value; six indigo tints within ΔE 3
+ *  whose meaning matched; three families that had no token and got one (the
+ *  dark chrome, the warning strip, the "done" tint); and the rest, which were
+ *  decisions — a primary button painted in another framework's indigo, the
+ *  rail's brand mark, five pale borders, two inks. The set stays as the
+ *  mechanism: a raw colour that has to enter app.css is added here with its
+ *  reason, and the empty set is the state to keep. */
+const APP_BACKLOG = new Set<string>([]);
 
 describe("the layers above the tokens", () => {
   it("never write a token's value out again", () => {

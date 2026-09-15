@@ -253,3 +253,26 @@ rail's plan card only reads. The rail's links to the two scoped pages carry the 
 `?ws=`; the link to the account page does not, because that page reads no such parameter.
 Opening `/dashboard?ws=B` renders B; opening it with an id outside the list asks, and does
 not fall back to a guess — both rendered in the identity test inside a `MemoryRouter`.
+
+## 2026-09-15 — audit item seven: the layers above the tokens
+
+Measured first, and the measurement changed the diagnosis. The audit said four layers write
+over the token layer; `style.css` carried no raw colour at all, `report.css` seven (all
+`#fff`), and `app.css` 56 uses of 37 values — the whole of the problem inside the tool.
+`landing.css` carries 95 and is the marketing page's, loaded only by it, and open in another
+session; not touched.
+
+Worked down in four commits, `981c84a`…`ef66d20` and the one after: 21 repeats of a token's
+value (all seventeen `color: #fff` were white ink on a dark plane, now `--ink-on-dark`); six
+indigo drifts within ΔE 3 whose meaning matched; three families that had no token and got one
+(`--plane-dark`/`-2`, the warning strip's four, `--success-100`) and two inks the brand had
+already named; and the last fourteen, which were decisions — the primary button repainted from
+another framework's indigo into the brand's, the rail's mark and its active bar onto the
+brand's steps, five pale borders, two inks. Every contrast that could move was measured before
+it did; the lowest is the button's hover at 4.98:1.
+
+`app.css` and `report.css` now carry no raw hex outside comments; `layers.test.ts` holds it
+there and keeps the backlog mechanism with an empty set. The rail's alphas stay as
+`rgba(255,255,255,α)` on purpose: `rail.test.ts` measures them, and it now reads the ground
+from the token rather than a copy. The line count went *up* by 21 (comments); the measure that
+means something went from 56 to 0.
