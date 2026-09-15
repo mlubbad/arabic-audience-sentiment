@@ -1037,3 +1037,13 @@ main chunk measured 580.32 kB and was rejected.
 
 Not verified: any signed-in surface in English against a real session (rendered from rows in
 unit tests only), and screen-reader pronunciation of the switch's `lang`-tagged label.
+
+## 2026-09-15 — preview deploy of ddb5081
+
+Built from a detached worktree at `ddb5081`, as before, because the checkout still carries
+another session's uncommitted `Landing.tsx` / `landing.css` / `landing.spec.ts`. Transfer
+log: 30 files at 226, including `static/index-B5_hTwqU.js` (549,437 bytes) and the new
+`static/en-CVnvERZx.js` (31,233 bytes) — the English strings as their own chunk, fetched
+only when chosen; the sweep removed the nine superseded hashed assets of the previous
+build. Origin probes are not evidence either way (basic auth answers 401 on every path, and
+Cloudflare still serves a deleted asset from cache); the log is.
