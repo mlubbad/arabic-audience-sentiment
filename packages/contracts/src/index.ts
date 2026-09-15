@@ -17,3 +17,4 @@ export * from "./sync";
 export * from "./fixture";
 export * from "./snapshot";
 export * from "./csv";
+export * from "./selection";
