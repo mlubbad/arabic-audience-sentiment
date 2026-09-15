@@ -79,7 +79,7 @@ async function readLive(workspaceId: string): Promise<CatalogueRead> {
       .select("channel_id,status,catalogued_at")
       .eq("workspace_id", workspaceId),
   ]);
-  if (videos.error || selections.error)
+  if (videos.error || selections.error || channel.error)
     throw new Error("catalogue_unavailable");
   const connected = (channel.data ?? []).find((c) => c.status === "connected");
   return {

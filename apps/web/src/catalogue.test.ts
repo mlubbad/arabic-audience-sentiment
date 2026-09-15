@@ -1,5 +1,31 @@
-import { describe, expect, it } from "vitest";
-import { mergeCatalogue, type RawCatalogue } from "./catalogue";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// A minimal stand-in for the three `.from(table).select(...).eq(...)` reads
+// `readLive` makes, keyed by table name so each of the three can be told to
+// fail independently. Mirrors the `vi.mock("./supabase", ...)` pattern used
+// by connect.test.ts and data.test.ts for the same reason: the real client
+// needs a configured project, and the module under test resolves `supabase`
+// at call time, not at import time.
+type TableResult = {
+  data: unknown[] | null;
+  error: { message: string } | null;
+};
+const { tableResults, from } = vi.hoisted(() => {
+  const tableResults: Record<string, TableResult> = {
+    videos: { data: [], error: null },
+    video_selections: { data: [], error: null },
+    connection_status: { data: [], error: null },
+  };
+  const from = vi.fn((table: string) => ({
+    select: () => ({
+      eq: async () => tableResults[table],
+    }),
+  }));
+  return { tableResults, from };
+});
+vi.mock("./supabase", () => ({ supabase: { from } }));
+
+import { loadCatalogue, mergeCatalogue, type RawCatalogue } from "./catalogue";
 
 const raw: RawCatalogue = {
   videos: [
@@ -64,5 +90,42 @@ describe("mergeCatalogue", () => {
         [],
       ),
     ).toThrow();
+  });
+});
+
+describe("loadCatalogue's live read", () => {
+  beforeEach(() => {
+    tableResults.videos = { data: [], error: null };
+    tableResults.video_selections = { data: [], error: null };
+    tableResults.connection_status = { data: [], error: null };
+  });
+
+  it("resolves when all three reads succeed", async () => {
+    await expect(loadCatalogue("live", "workspace-1")).resolves.toMatchObject({
+      channelId: null,
+      cataloguedAt: null,
+    });
+  });
+
+  // The bug this guards against: a failed `connection_status` read was
+  // swallowed and produced `{ channelId: null, cataloguedAt: null }` — the
+  // same shape as "no connected channel" — so a transient failure read as
+  // "connect a channel first" instead of as an error. `channelStatus.ts`
+  // throws on the same read failing; `readLive` must match it.
+  it("refuses the read when connection_status fails, rather than reporting no connected channel", async () => {
+    tableResults.connection_status = {
+      data: null,
+      error: { message: "boom" },
+    };
+    await expect(loadCatalogue("live", "workspace-1")).rejects.toThrow(
+      "catalogue_unavailable",
+    );
+  });
+
+  it("still refuses when videos or video_selections fails", async () => {
+    tableResults.videos = { data: null, error: { message: "boom" } };
+    await expect(loadCatalogue("live", "workspace-1")).rejects.toThrow(
+      "catalogue_unavailable",
+    );
   });
 });
