@@ -1385,3 +1385,26 @@ Live and verified now: discover (both channels), collect over a server-supplied 
 `video-finished` scheduling the next check, the tick's throttle, credential rotation.
 Still not verified: `select_videos` from a signed-in browser (the web bundle with the
 paging fix, `68ddf99`, is not deployed yet), pg_cron.
+
+## 2026-09-16 — the deployed catalogue, seen
+
+The user ran `npm run build && npm run deploy:preview`. Every chunk the served `index.html`
+references (`index-EyYl8MHZ.js`, `Sync-DEqfL_0d.js`, `Account-…`, `Dashboard-…`,
+`PlanCard-…`, `RailState-…`, `SetupPath-…`, `i18n-…`, `syncHealth-…`, `workspace-…`), the
+CSS and `fixtures/catalogue.json` were fetched back over basic auth and compared with the
+local `dist` byte for byte: identical, so what the host serves is the build of `e81af96`,
+paging included (`range(` and `catalogue_unavailable` present in the served Sync chunk).
+
+A false alarm first: opening the host as `https://user:pass@host/sync?demo=1` in the in-app
+browser gave a blank page with React error #321 and a `removeChild` NotFoundError on every
+route, while the identical bytes rendered under `vite preview`. The `<script type="module">`
+resolved against the credentialed URL, the chunks' own imports resolved against the plain
+one, and the browser instantiated the entry module twice — two Reacts. With the credentials
+cached and a plain URL the page renders: the catalogue first, five fixture rows, the
+disabled row unselectable, "المحدد: 2 فيديو · حتى 3 تعليقًا · يتبقى بعدها 23". Nothing to
+fix in the product; a real visitor enters the password in the browser's prompt.
+
+Not verified from here: the signed-in AJ360 page with its 4,456 rows (no session in this
+environment, and the Claude in Chrome extension is not connected), and pg_cron's first tick
+at :17 (nothing is due before 2026-09-16 ~20:50Z, so a successful tick leaves no row to
+see; `cron.job_run_details` in the SQL editor is the evidence).
