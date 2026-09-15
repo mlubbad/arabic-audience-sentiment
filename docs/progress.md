@@ -299,3 +299,32 @@ overwritten once, at 16:34). Both wait for that pass to land. The `RailState.tes
 Committed from the index alone: `ar.ts` and `en.ts` carried that session's uncommitted hunks
 beside mine, so mine were staged by rebuilding each file from HEAD, and the result was
 verified in a throwaway worktree of HEAD plus the staged diff before committing.
+
+## 2026-09-15 — the interface speaks English
+
+Five commits, `f9b2840`…`7478dc0`, taken over from the Antigravity session that claimed the
+feature in ACTIVE.md and stopped before writing code. Arabic stays the default and the
+source of truth; nothing an Arabic reader sees moved.
+
+- **`locale.ts`** — a module store like `workspaceSelection.ts`, not a context: Arabic unless
+  asked, never inferred from the browser, remembered under `audience.locale`, validated on
+  the way back in, written onto `<html lang dir>` before paint and only while the shell is
+  mounted (the landing page stays Arabic).
+- **`strings/ar.ts` → `strings/en.ts`** — the Arabic is the key set; the English is typed
+  against it, so a missing line fails `tsc` and nothing ever shows a key name. Counted
+  sentences are functions; code tables and word lists are typed to carry the same shape.
+  English is a separate chunk fetched only when chosen.
+- **Every module that owned a sentence now owns a map from a code to a key** and takes the
+  strings as an argument: `authMessages`, `authProviders`, `connect` (which returns a code
+  now, not a message), `setup`, `planWords`, `jobFeed`, `dataSource`, `connectResult`,
+  `analytics`, `i18n`. The merge rule in `explain()` and the three invariants — one source
+  for the setup sentences, the legend from `measurable`, no number in the trust panel — hold
+  in both languages.
+- **The switch** names the other language in that language and sits in the announcement
+  bar: the rail foot, where it was first put, is 34px below the fold at the top of the page.
+- **`locale.css`** — the only CSS, kept out of `app.css` which another session held: the
+  Latin face and the eyebrow tracking under `:lang(en)`, and the phone-width sheet's hide
+  transform mirrored, which the first English render at 375px showed as a dark band.
+
+Not translated: `Landing.tsx` (another session's uncommitted work on it; Arabic by design
+for now), and stored data — workspace names, video titles, the fixture reviewer's name.

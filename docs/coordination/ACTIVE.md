@@ -53,8 +53,8 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 | `workers/python/src/labelling/**` | free | |
 | `docs/coordination/ACTIVE.md` | `sentimentanalysis-82` maintains it; everyone reads it | |
 | `docs/progress.md`, `decisions.md`, `verification.md` | shared, append-only | |
-| `apps/web/src/locale.ts`, `locale.css`, `strings/**`, `LanguageSwitch.tsx`, `tests/e2e/language.spec.ts` | the audit-phase-two Claude session — English language support, taken over from Antigravity, which stopped before writing code | 2026-09-15 |
-| every `apps/web/src/*.tsx` and `*.ts` that carries UI text, **except `Landing.tsx`** | the same session, one file group per commit, in this order: shell → account → operations → dashboard. Announced here; `Landing.tsx` / `landing.css` stay with the session that has uncommitted work on them | 2026-09-15 |
+| `apps/web/src/locale.ts`, `locale.css`, `strings/**`, `LanguageSwitch.tsx`, `tests/e2e/language.spec.ts` | **done** — English language support landed as `f9b2840`…`7478dc0` by the audit-phase-two Claude session; free | 2026-09-15 |
+| UI text in `apps/web/src/**` | **every sentence now lives in `strings/ar.ts` with a typed English twin in `strings/en.ts`.** A new sentence goes there, in both languages, or `tsc` fails. `Landing.tsx` is the one exception: Arabic only, and still held by the session with uncommitted work on it | 2026-09-15 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 

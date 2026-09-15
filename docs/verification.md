@@ -1012,3 +1012,28 @@ layer grew, none shrank.
 The rail's two pieces are signed-in only and rendered in `RailState.test.ts` from forced
 state; not driven in a browser. The three browser assertions in `dashboard.spec.ts` that
 pinned the old "worker" sentences were updated to the new ones and pass.
+
+## 2026-09-15 — English language support
+
+Gates after `7478dc0`: lint 0, format 0, types 0, unit 0 (304 tests, 38 files), e2e 0 (78
+tests, port 5199, exit code read from a log file), build 0, `check:secrets` 0.
+
+Browser: `language.spec.ts` — Arabic by default; the switch flips `<html lang dir>`, the rail,
+the document title and the switch's own label; a reload comes back in English; the landing
+page stays Arabic afterwards; in English the rail caption regains tracking and the shell takes
+the Latin face; at 375px the closed sheet is off-screen and opens on request, measured through
+its transition. The other 74 tests are unchanged and still locate every control by its Arabic
+name — which is the proof that the default did not move.
+
+Unit: the store refuses an unknown stored value and survives storage that throws; the two
+string sets carry the same keys, tables and list shapes, and no Arabic is left in the English
+except the switch's own word; the English counts change the noun at one and only at one; the
+workspace card renders in English from the same rows.
+
+Bundle, `npm run build` before and after: main chunk 511.09 → 549.46 kB (150.03 → 161.18
+gzipped), Dashboard chunk 231.50 → 222.53 kB, English 31.23 kB (10.71 gzipped) fetched only
+when chosen. Net for an Arabic reader +29 kB raw. An intermediate build with both sets in the
+main chunk measured 580.32 kB and was rejected.
+
+Not verified: any signed-in surface in English against a real session (rendered from rows in
+unit tests only), and screen-reader pronunciation of the switch's `lang`-tagged label.
