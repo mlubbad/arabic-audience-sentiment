@@ -166,6 +166,20 @@ Deno.serve((request) =>
       });
       if (error) failed(error);
     },
+    topicsDue: async (hash, j, t, modelId, promptVersion, maxRows) => {
+      const { data, error } = await db.rpc("svc_worker_topics_due", {
+        credential_hash: hash, j, t, model_id: modelId, prompt_version: promptVersion, max_rows: maxRows,
+      });
+      if (error) failed(error);
+      return data;
+    },
+    commitTopics: async (hash, j, t, b, records) => {
+      const { data, error } = await db.rpc("svc_worker_commit_topics", {
+        credential_hash: hash, j, t, b, records,
+      });
+      if (error) failed(error);
+      return data;
+    },
     tick: async (hash) => {
       const { data, error } = await db.rpc("svc_worker_tick", {
         credential_hash: hash,

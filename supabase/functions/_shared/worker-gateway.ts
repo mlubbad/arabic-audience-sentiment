@@ -67,6 +67,22 @@ export interface WorkerDb {
     outcome: string,
     errorCode: string | null,
   ): Promise<void>;
+  /** The rows an analyse job should classify, under the key the server assigns. */
+  topicsDue(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    modelId: string,
+    promptVersion: string,
+    maxRows: number,
+  ): Promise<unknown>;
+  commitTopics(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    batchKey: string,
+    records: unknown[],
+  ): Promise<unknown>;
   /** Enqueue whatever is due for this credential's workspace. No lease. */
   tick(credentialHash: string): Promise<unknown>;
 }
@@ -83,6 +99,7 @@ const STATUS: Record<string, number> = {
   invalid_outcome: 400,
   invalid_catalogue: 400,
   invalid_video: 400,
+  invalid_job_type: 400,
   // A workspace with no plan, or one outside its period, is a decision about
   // entitlement — not a fault in this service. These were missing from the
   // map, so metering refused a batch of real predictions and the worker was
@@ -198,6 +215,8 @@ export async function handleWorkerRequest(
       "/worker/finish",
       "/worker/commit-catalogue",
       "/worker/video-finished",
+      "/worker/topics-due",
+      "/worker/commit-topics",
     ];
     if (!leased.some((route) => path.endsWith(route)))
       return json(404, { code: "not_found" });
@@ -253,6 +272,18 @@ export async function handleWorkerRequest(
         str(body, "error_code"),
       );
       return json(200, {});
+    }
+    if (path.endsWith("/worker/topics-due")) {
+      const model = str(body, "model_id");
+      const prompt = str(body, "prompt_version");
+      const max = typeof body.max_rows === "number" ? body.max_rows : 200;
+      if (!model || !prompt) return refuse("invalid_batch");
+      return json(200, await db.topicsDue(credential, job, lease, model, prompt, max));
+    }
+    if (path.endsWith("/worker/commit-topics")) {
+      const key = str(body, "batch_key");
+      if (!key || !Array.isArray(body.records)) return refuse("invalid_batch");
+      return json(200, await db.commitTopics(credential, job, lease, key, body.records));
     }
     return json(404, { code: "not_found" });
   } catch (error) {
