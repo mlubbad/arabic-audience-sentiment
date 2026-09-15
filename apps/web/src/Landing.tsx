@@ -1,13 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Link } from "react-router";
 import "./landing.css";
-import { labels } from "./i18n";
 import { SENTIMENT } from "./chartTheme";
 import { BrandMark } from "./BrandMark";
+import { applyToDocument, direction, useLocale } from "./locale";
+import { useStrings } from "./strings";
+import { LanguageSwitch } from "./LanguageSwitch";
 
-/* The demo's four comments. The labels come from the shared table rather than
-   being written again here: a visitor who learns a word on this page meets the
-   same word inside the product, and there is no second place for it to drift. */
+/* The demo's four comments. Their labels come from the shared strings rather
+   than being written again here: a visitor who learns a word on this page
+   meets the same word inside the product, and there is no second place for it
+   to drift. The comments themselves stay Arabic in every interface language —
+   they are the data the product reads, not something it says — and carry
+   their own `lang` so a left-to-right page still shapes them right. */
 const examples = [
   { text: "شرح واضح، استفدت من الأمثلة كثيرًا 👏", label: "positive" },
   { text: "المحتوى جميل، لكن المقدمة طويلة قليلًا", label: "mixed" },
@@ -32,24 +37,37 @@ const colors: Record<(typeof examples)[number]["label"], string> = {
   neutral: SENTIMENT.neutral,
   mixed: SENTIMENT.mixed,
 };
-const numeral = new Intl.NumberFormat("ar", { numberingSystem: "arab" });
-const audiences = {
-  creator: {
-    title: "فيديوك التالي يبدأ بالإنصات.",
-    text: "ارجع إلى التعليقات التي تستحق انتباهك. قارن استقبال فيديوهاتك، وافهم أين يتفق جمهورك وأين تختلف آراؤه.",
-    tags: ["قارن الفيديوهات", "راجع ردود الفعل", "خطّط للمحتوى"],
-  },
-  agency: {
-    title: "لكل عميل جمهوره. ولكل جمهور صوته.",
-    text: "قراءة واضحة لكل جمهور، وتقارير تحتفظ بالفلاتر التي بنيت عليها نتائجك. جرّب المراجعة والتصدير الآن؛ تجربة التنقّل بين العملاء ضمن تطوير النسخة الأولية.",
-    tags: ["مساحات عمل مستقلة", "تقارير قابلة للتصدير", "مراجعة بشرية"],
-  },
+/* Arabic-Indic digits on the Arabic page — the one surface that uses them,
+   as a landing does — and Western digits in English. */
+const numerals = {
+  ar: new Intl.NumberFormat("ar", { numberingSystem: "arab" }),
+  en: new Intl.NumberFormat("en"),
 };
 
 export function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useState("all");
-  const [audience, setAudience] = useState<keyof typeof audiences>("creator");
+  const [audience, setAudience] = useState<"creator" | "agency">("creator");
+  const locale = useLocale();
+  const S = useStrings();
+  const labels = S.labels;
+  const numeral = numerals[locale];
+  const audiences = {
+    creator: {
+      eyebrow: S.lpForYou,
+      title: S.lpCreatorTitle,
+      text: S.lpCreatorText,
+      tags: S.lpCreatorTags,
+      space: S.lpYourChannelSpace,
+    },
+    agency: {
+      eyebrow: S.lpForTeam,
+      title: S.lpAgencyTitle,
+      text: S.lpAgencyText,
+      tags: S.lpAgencyTags,
+      space: S.lpClientSpace,
+    },
+  };
   const shown = examples.filter(
     (c) => selected === "all" || c.label === selected,
   );
@@ -59,51 +77,60 @@ export function Landing() {
       (shown.filter((row) => row.label === c.label).length / shown.length) *
       100,
   }));
+  const pct = (v: number) =>
+    `${numeral.format(v)}${locale === "ar" ? "٪" : "%"}`;
+  // The language on the document, before paint, for as long as this page is
+  // mounted — the shell does the same for itself.
+  useLayoutEffect(() => {
+    applyToDocument(locale);
+  }, [locale]);
   useEffect(() => {
     const previous = document.title;
-    document.title = "مشاعر الجمهور — افهم ما وراء تعليقات يوتيوب";
+    document.title = S.lpTitle;
     return () => {
       document.title = previous;
     };
-  }, []);
+  }, [S]);
   return (
-    <div className="landing" dir="rtl">
+    <div className="landing" dir={direction(locale)}>
       <a className="lp-skip" href="#landing-content">
-        انتقل إلى المحتوى
+        {S.skipToContent}
       </a>
       <div className="lp-announcement">
-        صوت جمهورك، بوضوح أكبر <span>معاينة خاصة · نسخة تجريبية</span>
+        {S.announcementLead} <span>{S.announcementTag}</span>
+        <LanguageSwitch />
       </div>
       <header className="lp-header">
-        <Link className="lp-brand" to="/" aria-label="مشاعر الجمهور — الرئيسية">
-          <BrandMark /> مشاعر الجمهور<span className="lp-brand-dot">.</span>
+        <Link className="lp-brand" to="/" aria-label={S.brandHomeLabel}>
+          <BrandMark /> {S.brand}
+          <span className="lp-brand-dot">.</span>
         </Link>
         <button
           className="lp-menu"
-          aria-label="القائمة الرئيسية"
+          aria-label={S.lpMenuLabel}
           aria-expanded={menuOpen}
           aria-controls="landing-nav"
           onClick={() => setMenuOpen(!menuOpen)}
         >
-          {menuOpen ? "إغلاق ×" : "القائمة ☰"}
+          {menuOpen ? S.menuClose : S.menuOpen}
         </button>
         <nav
           id="landing-nav"
           className={menuOpen ? "lp-nav is-open" : "lp-nav"}
-          aria-label="تنقل صفحة الهبوط"
+          aria-label={S.lpNavLabel}
         >
           <a href="#why" onClick={() => setMenuOpen(false)}>
-            لماذا مشاعر الجمهور؟
+            {S.lpNavWhy}
           </a>
           <a href="#experience" onClick={() => setMenuOpen(false)}>
-            شاهد التجربة
+            {S.lpNavExperience}
           </a>
           <a href="#questions" onClick={() => setMenuOpen(false)}>
-            أسئلة شائعة
+            {S.lpNavFaq}
           </a>
         </nav>
         <Link className="lp-header-cta" to="/account">
-          فتح الحساب <span aria-hidden="true">↖</span>
+          {S.lpOpenAccount} <span aria-hidden="true">{S.arrowUpForward}</span>
         </Link>
       </header>
       <main id="landing-content" className="lp-main">
@@ -113,35 +140,29 @@ export function Landing() {
               <span className="lp-youtube" aria-hidden="true">
                 ▶
               </span>{" "}
-              تعليقات يوتيوب. رؤية أوضح.
+              {S.lpHeroEyebrow}
             </span>
             <h1 id="hero-title">
-              وراء كل تعليق،
+              {S.lpHeroLine1}
               <br />
-              صوت يستحق
+              {S.lpHeroLine2}
               <br />
-              <em>أن تفهمه.</em>
+              <em>{S.lpHeroLine3}</em>
             </h1>
-            <p>
-              لا تكتفِ بعدّ التعليقات. افهم مشاعر جمهورك، قارن فيديوهاتك، وارجع
-              إلى الكلمات التي تصنع الفرق.
-            </p>
+            <p>{S.lpHeroLead}</p>
             <div className="lp-actions">
               <Link className="lp-button" to="/dashboard">
-                استكشف اللوحة <span aria-hidden="true">←</span>
+                {S.lpExploreDashboard}{" "}
+                <span aria-hidden="true">{S.arrowForward}</span>
               </Link>
               <a className="lp-text-link" href="#experience">
-                شاهد كيف تعمل <span aria-hidden="true">↙</span>
+                {S.lpSeeHow}{" "}
+                <span aria-hidden="true">{S.arrowDownForward}</span>
               </a>
             </div>
-            <p className="lp-caption">
-              المثال المعروض هنا توضيحي؛ بيانات قناتك تتطلب تسجيل الدخول والربط.
-            </p>
+            <p className="lp-caption">{S.lpHeroCaption}</p>
           </div>
-          <div
-            className="lp-hero-art"
-            aria-label="تصوّر بصري لتحويل التعليقات إلى رؤية واضحة"
-          >
+          <div className="lp-hero-art" aria-label={S.lpHeroArtLabel}>
             <div className="lp-art-halo" />
             <img
               src="/landing/audience-growth-original.png"
@@ -153,46 +174,43 @@ export function Landing() {
             <div className="lp-floating lp-floating-top">
               <span className="lp-spark">✦</span>
               <div>
-                <b>أبعد من الإعجابات</b>
-                <span>افهم ما يقوله جمهورك فعلًا</span>
+                <b>{S.lpFloatTopStrong}</b>
+                <span>{S.lpFloatTop}</span>
               </div>
             </div>
             <div className="lp-floating lp-floating-bottom">
               <span className="lp-comment-icon">”</span>
               <div>
-                <b>«جميل، لكن…»</b>
+                <b>{S.lpFloatBottomStrong}</b>
                 <span>
-                  <i className="lp-dot mixed" /> مشاعر مختلطة، وليست محايدة
+                  <i className="lp-dot mixed" /> {S.lpFloatBottom}
                 </span>
               </div>
             </div>
           </div>
           <div className="lp-hero-word" aria-hidden="true">
-            صوت جمهورك
+            {S.lpHeroWord}
           </div>
         </section>
         <div className="lp-value-strip">
-          <span>مصمّمة لفهم التعليقات العربية</span>
-          <span>4 فئات للمشاعر</span>
-          <span>من النظرة العامة إلى التعليق</span>
-          <span>القرار الأخير لك</span>
+          <span>{S.lpValue1}</span>
+          <span>{S.lpValue2}</span>
+          <span>{S.lpValue3}</span>
+          <span>{S.lpValue4}</span>
         </div>
 
         <section className="lp-statement" id="why" aria-labelledby="why-title">
           <span className="lp-orbit lp-orbit-one" aria-hidden="true" />
           <span className="lp-orbit lp-orbit-two" aria-hidden="true" />
-          <span className="lp-eyebrow">من ضجيج التعليقات إلى وضوح الصورة</span>
+          <span className="lp-eyebrow">{S.lpWhyEyebrow}</span>
           <h2 id="why-title">
-            المشاهدات تقول كم شخصًا وصل إليه محتواك.
+            {S.lpWhyLine1}
             <br />
-            <em>التعليقات تقرّبك مما شعروا به.</em>
+            <em>{S.lpWhyLine2}</em>
           </h2>
-          <p>
-            اجمع قراءتك للمشاعر والمقارنات والتعليقات في مكان واحد، واحتفظ
-            بالسياق خلف كل رقم.
-          </p>
+          <p>{S.lpWhyLead}</p>
           <a className="lp-button lp-button-light" href="#experience">
-            قرّب الصورة <span aria-hidden="true">↓</span>
+            {S.lpZoomIn} <span aria-hidden="true">↓</span>
           </a>
         </section>
 
@@ -202,29 +220,24 @@ export function Landing() {
           aria-labelledby="experience-title"
         >
           <div className="lp-section-heading">
-            <span className="lp-eyebrow">جرّب الفكرة</span>
+            <span className="lp-eyebrow">{S.lpExperienceEyebrow}</span>
             <h2 id="experience-title">
-              صورة كاملة.
+              {S.lpExperienceLine1}
               <br />
-              <em>وتفاصيل تستحق التوقف.</em>
+              <em>{S.lpExperienceLine2}</em>
             </h2>
-            <p>
-              اختر شعورًا لتقرأ مثالًا. هكذا تنتقل من ملخص الجمهور إلى التعليق
-              نفسه.
-            </p>
+            <p>{S.lpExperienceLead}</p>
           </div>
           <div className="lp-demo-frame">
             <div className="lp-demo-top">
               <span>
-                <BrandMark /> نظرة على الجمهور
+                <BrandMark /> {S.lpDemoBrand}
               </span>
-              <span className="lp-demo-label">
-                مثال توضيحي · 4 تعليقات مؤلّفة
-              </span>
+              <span className="lp-demo-label">{S.lpDemoLabel}</span>
             </div>
             <div className="lp-demo-content">
               <div className="lp-demo-chart">
-                <span className="lp-mini-label">المشاعر ضمن الاختيار</span>
+                <span className="lp-mini-label">{S.lpDemoChartLabel}</span>
                 <div
                   className="lp-donut"
                   role="img"
@@ -234,22 +247,19 @@ export function Landing() {
                       : { background: colors[shown[0].label] }
                   }
                   aria-label={shares
-                    .map(
-                      (c) =>
-                        `${labels[c.label]}: ${numeral.format(c.percent)}٪`,
-                    )
-                    .join("، ")}
+                    .map((c) => `${labels[c.label]}: ${pct(c.percent)}`)
+                    .join(S.listSeparator)}
                 >
                   <div>
                     <strong>{numeral.format(shown.length)}</strong>
-                    <span>تعليقات ضمن الاختيار</span>
+                    <span>{S.lpDemoInSelection}</span>
                   </div>
                 </div>
                 <div className="lp-legend">
                   {shares.map((c) => (
                     <span key={c.label}>
                       <i className={`lp-dot ${c.label}`} />
-                      {labels[c.label]} <b>{numeral.format(c.percent)}٪</b>
+                      {labels[c.label]} <b>{pct(c.percent)}</b>
                     </span>
                   ))}
                 </div>
@@ -258,13 +268,13 @@ export function Landing() {
                 <div
                   className="lp-demo-filters"
                   role="group"
-                  aria-label="تصفية المثال حسب المشاعر"
+                  aria-label={S.lpDemoFilterLabel}
                 >
                   <button
                     aria-pressed={selected === "all"}
                     onClick={() => setSelected("all")}
                   >
-                    الكل
+                    {S.all}
                   </button>
                   {examples.map((c) => (
                     <button
@@ -285,7 +295,9 @@ export function Landing() {
                       >
                         {labels[c.label][0]}
                       </span>
-                      <p>{c.text}</p>
+                      <p lang="ar" dir="rtl">
+                        {c.text}
+                      </p>
                       <span className={`lp-sentiment ${c.label}`}>
                         {labels[c.label]}
                       </span>
@@ -293,72 +305,61 @@ export function Landing() {
                   ))}
                 </div>
                 <Link className="lp-demo-link" to="/dashboard">
-                  اكتشف الفلاتر والتصحيح والتصدير في اللوحة{" "}
-                  <span aria-hidden="true">←</span>
+                  {S.lpDemoLink}{" "}
+                  <span aria-hidden="true">{S.arrowForward}</span>
                 </Link>
               </div>
             </div>
           </div>
           <div className="lp-benefits">
             <div>
-              <span>01 / افهم</span>
-              <h3>المشاعر ليست لونين فقط.</h3>
-              <p>
-                إيجابي، سلبي، محايد، ومختلط. والتعليق غير المحلّل يظل واضحًا
-                خارج نسب المشاعر.
-              </p>
+              <span>{S.lpBenefit1Tag}</span>
+              <h3>{S.lpBenefit1Title}</h3>
+              <p>{S.lpBenefit1}</p>
             </div>
             <div>
-              <span>02 / قارن</span>
-              <h3>ضع كل فيديو في سياقه.</h3>
-              <p>
-                غيّر الفيديو أو الفترة لترى النتائج ضمن نفس الفلاتر، ثم افحص
-                التعليقات التي تقف خلفها.
-              </p>
+              <span>{S.lpBenefit2Tag}</span>
+              <h3>{S.lpBenefit2Title}</h3>
+              <p>{S.lpBenefit2}</p>
             </div>
             <div>
-              <span>03 / راجع</span>
-              <h3>خبرتك جزء من الصورة.</h3>
-              <p>
-                راجع التصنيف وصحّحه مع ذكر السبب. قراءة الآلة بداية، والمراجعة
-                البشرية تمنحها سياقًا.
-              </p>
+              <span>{S.lpBenefit3Tag}</span>
+              <h3>{S.lpBenefit3Title}</h3>
+              <p>{S.lpBenefit3}</p>
             </div>
           </div>
         </section>
 
         <section className="lp-audience" aria-labelledby="audience-title">
           <div className="lp-section-heading">
-            <span className="lp-eyebrow">مساحة لعملك، مهما كان دورك</span>
+            <span className="lp-eyebrow">{S.lpAudienceEyebrow}</span>
             <h2 id="audience-title">
-              قريب من جمهورك.
+              {S.lpAudienceLine1}
               <br />
-              مناسب لطريقة عملك.
+              {S.lpAudienceLine2}
             </h2>
           </div>
           <div
             className="lp-audience-tabs"
             role="group"
-            aria-label="اختر طبيعة عملك"
+            aria-label={S.lpAudienceTabsLabel}
           >
             <button
               aria-pressed={audience === "creator"}
               onClick={() => setAudience("creator")}
             >
-              صنّاع المحتوى
+              {S.lpCreators}
             </button>
             <button
               aria-pressed={audience === "agency"}
               onClick={() => setAudience("agency")}
             >
-              الوكالات والفرق
+              {S.lpAgencies}
             </button>
           </div>
           <div className="lp-audience-panel" aria-live="polite">
             <div className="lp-audience-copy">
-              <span className="lp-eyebrow">
-                {audience === "creator" ? "لك ولجمهورك" : "لفريقك وعملائك"}
-              </span>
+              <span className="lp-eyebrow">{audiences[audience].eyebrow}</span>
               <h3>{audiences[audience].title}</h3>
               <p>{audiences[audience].text}</p>
               <div className="lp-tags">
@@ -367,7 +368,8 @@ export function Landing() {
                 ))}
               </div>
               <Link className="lp-text-link" to="/dashboard">
-                استكشف تجربة العمل <span aria-hidden="true">←</span>
+                {S.lpExploreWork}{" "}
+                <span aria-hidden="true">{S.arrowForward}</span>
               </Link>
             </div>
             <div className="lp-workspace-art" aria-hidden="true">
@@ -376,12 +378,12 @@ export function Landing() {
                   ● ● ●
                 </div>
                 <span className="lp-mini-label">
-                  {audience === "creator" ? "مساحة قناتك" : "مساحة العميل"}
+                  {audiences[audience].space}
                 </span>
                 <div className="lp-video-row">
                   <span>▶</span>
                   <div>
-                    <b>فهمٌ أعمق للمحتوى</b>
+                    <b>{S.lpVideoRow}</b>
                     <i />
                   </div>
                 </div>
@@ -391,50 +393,39 @@ export function Landing() {
                   ))}
                 </div>
                 <div className="lp-window-note">
-                  تصفية واحدة، صورة متّسقة <span>✓</span>
+                  {S.lpWindowNote} <span>✓</span>
                 </div>
               </div>
-              <span className="lp-art-caption">
-                تصوّر للواجهة · بيانات توضيحية
-              </span>
+              <span className="lp-art-caption">{S.lpArtCaption}</span>
             </div>
           </div>
         </section>
 
         <section className="lp-section lp-trust" aria-labelledby="trust-title">
           <div>
-            <span className="lp-eyebrow">وضوح يمكنك البناء عليه</span>
+            <span className="lp-eyebrow">{S.lpTrustEyebrow}</span>
             <h2 id="trust-title">
-              الثقة تبدأ
+              {S.lpTrustLine1}
               <br />
-              بمعرفة <em>حدود البيانات.</em>
+              {S.lpTrustLine2} <em>{S.lpTrustLine3}</em>
             </h2>
-            <p>
-              ليس كل تعليق متاحًا، وليس كل تصنيف يقينًا. لذلك نُظهر ما تم تحليله
-              وما يحتاج مراجعة.
-            </p>
+            <p>{S.lpTrustLead}</p>
           </div>
           <div className="lp-trust-items">
             <div>
               <span>◉</span>
-              <h3>سياق خلف كل نسبة</h3>
-              <p>
-                تعرّف على التعليقات المحلّلة، والتواريخ غير المعروفة، ونطاق
-                الفلاتر قبل تفسير النتائج.
-              </p>
+              <h3>{S.lpTrust1Title}</h3>
+              <p>{S.lpTrust1}</p>
             </div>
             <div>
               <span>↻</span>
-              <h3>حالة الجمع ظاهرة</h3>
-              <p>التغطية الجزئية أو تعذّر الجمع لا تعني أن جمهورك لم يعلّق.</p>
+              <h3>{S.lpTrust2Title}</h3>
+              <p>{S.lpTrust2}</p>
             </div>
             <div>
-              <span>↗</span>
-              <h3>تقرير يعكس ما تراه</h3>
-              <p>
-                صدّر التعليقات وفق الفلاتر نفسها، مع الاحتفاظ بمصدر التصنيف وسجل
-                المراجعة المتاح.
-              </p>
+              <span>{S.arrowUpForward}</span>
+              <h3>{S.lpTrust3Title}</h3>
+              <p>{S.lpTrust3}</p>
             </div>
           </div>
         </section>
@@ -445,29 +436,18 @@ export function Landing() {
           aria-labelledby="faq-title"
         >
           <div>
-            <span className="lp-eyebrow">قبل أن تبدأ</span>
-            <h2 id="faq-title">أسئلة في محلّها.</h2>
-            <p>هذه نسخة تجريبية. إليك ما تستطيع تجربته الآن.</p>
+            <span className="lp-eyebrow">{S.lpFaqEyebrow}</span>
+            <h2 id="faq-title">{S.lpFaqTitle}</h2>
+            <p>{S.lpFaqLead}</p>
           </div>
           <div className="lp-faq-list">
-            {[
-              [
-                "هل البيانات في التجربة من قناة حقيقية؟",
-                "المثال التفاعلي في هذه الصفحة يستخدم تعليقات اصطناعية معلّمة بوضوح. حُفظت تعليقات قناة اختبار حقيقية في الخدمة، ويجري توصيلها باللوحة الحية لصاحب مساحة العمل.",
-              ],
-              [
-                "هل يمكنني ربط قناتي الآن؟",
-                "ربط يوتيوب متاح ضمن التجربة الخاصة للحسابات المخوّلة، وقد جُمعت تعليقات حقيقية لقناة اختبار. تتطلب المزامنة تشغيل العامل، وما زال تحليل المشاعر بالنموذج الحي والتحقق من اللوحة الحية قيد الإكمال.",
-              ],
-              [
-                "هل تحليل المشاعر دقيق دائمًا؟",
-                "لا. السخرية واللهجات والسياق قد تجعل التصنيف ملتبسًا. لذلك تتضمن التجربة فئة للمشاعر المختلطة وتصحيحًا بشريًا؛ لم نعتمد بعد نتيجة دقة لنموذج حي.",
-              ],
-              [
-                "هل تُحفظ تصحيحاتي في التجربة؟",
-                "التصحيحات على البيانات الاصطناعية تبقى في جلسة المتصفح فقط، ولا تُرسل إلى خادم. يوضّح مصدر البيانات داخل اللوحة متى تكون المراجعات محفوظة.",
-              ],
-            ].map(([q, a]) => (
+            {/* Question, answer, question, answer: a flat list in the strings,
+                read in pairs, so a translation cannot carry a question without
+                its answer or an answer under the wrong question. */}
+            {Array.from({ length: S.lpFaq.length / 2 }, (_, i) => [
+              S.lpFaq[i * 2],
+              S.lpFaq[i * 2 + 1],
+            ]).map(([q, a]) => (
               <details key={q}>
                 <summary>
                   {q}
@@ -483,34 +463,33 @@ export function Landing() {
           <span className="lp-orbit" aria-hidden="true" />
           <BrandMark />
           <h2>
-            جمهورك يتحدث.
+            {S.lpFinalLine1}
             <br />
-            <em>ابدأ بالإنصات.</em>
+            <em>{S.lpFinalLine2}</em>
           </h2>
-          <p>خذ جولة في تجربة عربية تجعل التعليقات أقرب إلى الفهم.</p>
+          <p>{S.lpFinalLead}</p>
           <Link className="lp-button" to="/dashboard">
-            استكشف اللوحة <span aria-hidden="true">←</span>
+            {S.lpExploreDashboard}{" "}
+            <span aria-hidden="true">{S.arrowForward}</span>
           </Link>
-          <span className="lp-caption">
-            المثال هنا توضيحي · ربط القناة للحسابات المخوّلة
-          </span>
+          <span className="lp-caption">{S.lpFinalCaption}</span>
         </section>
       </main>
       <footer className="lp-footer">
         <div>
           <Link className="lp-brand" to="/">
-            <BrandMark /> مشاعر الجمهور.
+            <BrandMark /> {S.brand}.
           </Link>
-          <p>رؤية أوضح لما وراء تعليقات يوتيوب.</p>
+          <p>{S.lpFooterTagline}</p>
         </div>
-        <nav aria-label="روابط التذييل">
-          <Link to="/dashboard">اللوحة</Link>
-          <Link to="/account">الحساب</Link>
-          <a href="#questions">أسئلة شائعة</a>
+        <nav aria-label={S.lpFooterNavLabel}>
+          <Link to="/dashboard">{S.lpFooterDashboard}</Link>
+          <Link to="/account">{S.lpFooterAccount}</Link>
+          <a href="#questions">{S.lpNavFaq}</a>
         </nav>
         <div className="lp-footer-bottom">
-          <span>مشاعر الجمهور · نسخة أولية</span>
-          <span>معاينة خاصة — ليست إطلاقًا عامًا</span>
+          <span>{S.lpFooterVersion}</span>
+          <span>{S.lpFooterPreview}</span>
         </div>
       </footer>
     </div>

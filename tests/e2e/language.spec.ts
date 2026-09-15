@@ -47,16 +47,35 @@ test("the shell opens in Arabic, switches to English on request, and remembers i
   await expect(rail.getByRole("link", { name: "نظرة عامة" })).toBeVisible();
 });
 
-test("the landing page stays Arabic whatever the shell was last set to", async ({
+test("the landing follows the choice, and a choice made there reaches the shell", async ({
   page,
 }) => {
-  await page.goto("/dashboard");
-  await page.getByTestId("language-switch").click();
-  await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  // The shell owns the document's language only while it is mounted.
   await page.goto("/");
-  await expect(page.locator("html")).toHaveAttribute("lang", "ar");
-  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("lang", "ar");
+  await expect(
+    page.getByRole("link", { name: "استكشف اللوحة" }).first(),
+  ).toBeVisible();
+  await page.getByTestId("language-switch").click();
+  await expect(html).toHaveAttribute("lang", "en");
+  await expect(html).toHaveAttribute("dir", "ltr");
+  await expect(page.locator(".landing")).toHaveAttribute("dir", "ltr");
+  await expect(page).toHaveTitle(/Audience Sentiment/);
+  // The arrow points the way the text now runs.
+  const cta = page.getByRole("link", { name: "Explore the dashboard" }).first();
+  await expect(cta).toBeVisible();
+  // The demo comments are the data the product reads, and stay Arabic —
+  // shaped right-to-left inside a left-to-right page.
+  const sample = page.locator(".lp-example-comment p").first();
+  await expect(sample).toHaveAttribute("lang", "ar");
+  await expect(sample).toHaveAttribute("dir", "rtl");
+  // Into the product: still English, no second choice asked.
+  await cta.click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(html).toHaveAttribute("lang", "en");
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeVisible();
 });
 
 test("in English, tracking returns to the Latin labels the Arabic rules had zeroed", async ({

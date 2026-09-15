@@ -29,7 +29,11 @@ describe("the landing speaks the product's language", () => {
     for (const word of Object.values(labels)) {
       expect(body.includes(`"${word}"`), word).toBe(false);
     }
-    expect(raw).toContain('from "./i18n"');
+    // The shared strings, through the same hook the product reads them with
+    // — so the landing's four words are the dashboard's four words in either
+    // language, not a copy that happens to match today.
+    expect(raw).toContain('from "./strings"');
+    expect(src).toContain("S.labels");
   });
 
   it("writes no sentiment colour of its own", () => {

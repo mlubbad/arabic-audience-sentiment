@@ -350,12 +350,12 @@
 }
 .lp-floating-top {
   top: 8%;
-  right: 7%;
+  inset-inline-start: 7%;
   transform: rotate(4deg);
 }
 .lp-floating-bottom {
   bottom: -2%;
-  left: 9%;
+  inset-inline-end: 9%;
   transform: rotate(-3deg);
 }
 .lp-spark {
@@ -747,7 +747,7 @@
 }
 .lp-window-dots {
   font: 10px Arial;
-  text-align: left;
+  text-align: end;
   color: #c8c0d8;
   margin-bottom: 18px;
 }
@@ -797,7 +797,7 @@
   padding-top: 15px;
 }
 .lp-window-note span {
-  float: left;
+  float: inline-end;
   color: #7862bd;
 }
 .lp-art-caption {
@@ -826,7 +826,7 @@
 }
 .lp-trust-items > div > span {
   position: absolute;
-  right: 0;
+  inset-inline-start: 0;
   top: 3px;
   width: 33px;
   height: 33px;
@@ -1072,10 +1072,10 @@
   }
   .lp-floating-top {
     top: 1%;
-    right: 0;
+    inset-inline-start: 0;
   }
   .lp-floating-bottom {
-    left: 0;
+    inset-inline-end: 0;
     bottom: 2%;
   }
   .lp-hero-word {
@@ -1232,4 +1232,23 @@
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* ---- what changes with the interface language ---------------------------
+   The physical `left`/`right` this file used to place its floats and marks
+   are logical properties now, so the page mirrors with `dir`. Two things do
+   not follow from direction alone: the face, and tracking — every Arabic
+   label here is untracked because Arabic letters join, and English gets the
+   landing's display tracking back. */
+.landing:lang(en) {
+  font-family: var(--font-latin);
+}
+.landing:lang(en) .lp-eyebrow,
+.landing:lang(en) .lp-benefits > div > span {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.landing .lp-announcement .app-lang {
+  vertical-align: middle;
+  margin-inline-start: 0.9rem;
 }
