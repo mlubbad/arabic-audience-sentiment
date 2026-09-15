@@ -1823,3 +1823,83 @@ test("each video links to YouTube and plays inside the page", async ({
   await expect(dialog).toBeHidden();
   await expect(page.getByTestId("cat-check-video-3")).toBeChecked();
 });
+
+// ---- topic classification (2026-09-15) — append-only block ----------------
+
+test("the topics card charts the fixture and counts the unclassified", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  const card = page.getByTestId("topics-card");
+  await card.getByText("عرض الأرقام").click();
+  await expect(card.getByRole("row", { name: /إشادة ودعم/ })).toContainText(
+    "1",
+  );
+  // fixture-3's model verdict was "discussion"; the human correction wins.
+  await expect(
+    card.getByRole("row", { name: /استفسارات وأسئلة/ }),
+  ).toContainText("1");
+  // fixture-5 was never analysed and fixture-6 was edited after analysis.
+  await expect(page.getByTestId("topics-unclassified")).toContainText("2");
+});
+
+test("the topic filter narrows the figures, the table and the export together", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  await page.getByLabel("الموضوع", { exact: true }).selectOption("praise");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("1");
+  await expect(
+    page.locator('[data-testid="comments-table"] tbody tr'),
+  ).toHaveCount(1);
+  const { text } = await downloadCsv(page);
+  const lines = text
+    .replace(/^\uFEFF/, "")
+    .split("\r\n")
+    .filter(Boolean);
+  expect(lines).toHaveLength(2);
+  const header = lines[0].split(",");
+  const i = header.indexOf("effective_topic");
+  expect(header.slice(i, i + 3)).toEqual([
+    "effective_topic",
+    "topic_source",
+    "classification_key",
+  ]);
+  expect(lines[1].split(",")[i]).toBe("praise");
+});
+
+test("a topic correction changes the chip and the chart, with a reason", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  // The row's topic button is named without the word "تصحيح": the sentiment
+  // button beside it is located by that word alone throughout this file.
+  await page
+    .locator('[data-testid="comments-table"] tbody tr')
+    .filter({ hasText: "المحتوى واضح ومفيد" })
+    .getByRole("button", { name: "تعديل الموضوع" })
+    .click();
+  await page
+    .getByLabel("الموضوع الصحيح", { exact: true })
+    .selectOption("question");
+  await page.getByLabel("سبب التصحيح").fill("يسأل عن مصدر المعلومة");
+  await page.getByRole("button", { name: "حفظ التصحيح" }).click();
+  await expect(page.getByRole("form", { name: "تصحيح الموضوع" })).toHaveCount(
+    0,
+  );
+  const row = page
+    .locator('[data-testid="comments-table"] tbody tr')
+    .filter({ hasText: "المحتوى واضح ومفيد" });
+  await expect(row.getByTestId("topic-chip")).toContainText("استفسارات وأسئلة");
+  // The topic chip's own marker, not the sentiment one: fixture-3's row holds
+  // a legacy sentiment amendment beside a human topic verdict, and an earlier
+  // block asserts that row never says "مراجعة بشرية".
+  await expect(row.getByTestId("topic-chip")).toContainText("تصحيح بشري");
+  const card = page.getByTestId("topics-card");
+  await card.getByText("عرض الأرقام").click();
+  await expect(
+    card.getByRole("row", { name: /استفسارات وأسئلة/ }),
+  ).toContainText("2");
+});

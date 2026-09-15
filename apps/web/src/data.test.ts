@@ -308,3 +308,38 @@ describe("a cursor outlives the rows it pointed at", () => {
     ).toBe(readsAfterLoad);
   });
 });
+
+describe("a topic correction in fixture mode", () => {
+  // The same rules as the sentiment path, on the topic dimension: kept in the
+  // session, never sent, and refused against text that changed.
+  it("refuses a verdict on text that changed, without falling back to the server", async () => {
+    const { submitTopicReview, fixtureWorkspace } = await loadModule();
+    await expect(
+      submitTopicReview("sanitized_fixture", {
+        workspace_id: fixtureWorkspace,
+        comment_id: target.id,
+        content_hash: "hash-of-older-text",
+        topic_key: "question",
+        reason: "يسأل عن مصدر المعلومة",
+      }),
+    ).rejects.toThrow("stale_comment_text");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps the correction in the session view as one topic review", async () => {
+    const { submitTopicReview, loadSource, fixtureWorkspace } =
+      await loadModule();
+    await submitTopicReview("sanitized_fixture", {
+      workspace_id: fixtureWorkspace,
+      comment_id: target.id,
+      content_hash: target.content_hash,
+      topic_key: "question",
+      reason: "يسأل عن مصدر المعلومة",
+    });
+    const source = await loadSource("sanitized_fixture", fixtureWorkspace);
+    const row = source.comments.find((c) => c.id === target.id)!;
+    expect(row.topic_reviews).toHaveLength(1);
+    expect(row.topic_reviews[0].topic_key).toBe("question");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

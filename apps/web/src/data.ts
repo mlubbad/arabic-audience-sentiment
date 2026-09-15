@@ -2,7 +2,9 @@ import {
   CommentReviewInputSchema,
   FixtureSchema,
   LiveSnapshotSchema,
+  TopicReviewInputSchema,
   applyReview,
+  applyTopicReview,
   exportObjectPath,
   exportRows,
   snapshot,
@@ -10,6 +12,7 @@ import {
   type Comment,
   type CommentReviewInput,
   type Filters,
+  type TopicReviewInput,
 } from "@sentiment/contracts";
 import { supabase } from "./supabase";
 /**
@@ -79,11 +82,19 @@ export const reviewsArePersisted = (mode: DataMode) =>
 // anywhere. They go through the same shared applyReview rules the server RPC
 // mirrors, so the dashboard recomputes identically either way.
 const sessionReviews: { input: CommentReviewInput; at: string }[] = [];
+// The topic dimension keeps its own log, as the server does: a sentiment
+// verdict and a topic verdict on the same comment are two corrections, and
+// neither supersedes the other.
+const sessionTopicReviews: { input: TopicReviewInput; at: string }[] = [];
 
 function withSessionReviews(comments: Comment[]): Comment[] {
-  return sessionReviews.reduce(
+  const labelled = sessionReviews.reduce(
     (acc, r) => applyReview(acc, r.input, r.at, fixtureReviewer),
     comments,
+  );
+  return sessionTopicReviews.reduce(
+    (acc, r) => applyTopicReview(acc, r.input, r.at, fixtureReviewer),
+    labelled,
   );
 }
 
@@ -155,6 +166,7 @@ export function deriveSnapshot(
       f,
       source.active_analysis_key,
       source.active_analysis_labels,
+      source.active_topic_key,
     );
     return {
       ...base,
@@ -168,6 +180,10 @@ export function deriveSnapshot(
       // belongs to the same read as the numbers beside it.
       plan: source.plan,
       sync: source.sync,
+      // The taxonomy and the key the topic counts were taken under, so the
+      // card names its buckets from the same read that counted them.
+      topics: source.topics,
+      active_topic_key: source.active_topic_key,
       cursor_reset,
     };
   };
@@ -222,6 +238,33 @@ export async function submitReview(mode: DataMode, raw: CommentReviewInput) {
   sessionReviews.push({ input, at: new Date().toISOString() });
 }
 
+export async function submitTopicReview(mode: DataMode, raw: TopicReviewInput) {
+  const input = TopicReviewInputSchema.parse(raw);
+  if (mode === "live") {
+    // As submit_comment_review: a verdict and the hash it was formed against,
+    // never an identity — the RPC takes the reviewer from the session.
+    const { error } = await supabase!.rpc("submit_topic_review", {
+      w: input.workspace_id,
+      c: input.comment_id,
+      seen_hash: input.content_hash,
+      topic: input.topic_key,
+      why: input.reason,
+    });
+    if (error) throw new Error("review_rejected");
+    return;
+  }
+  const fixture = await readFixture();
+  // Validated against the current fixture, so a stale hash is refused here
+  // rather than on the next reload.
+  applyTopicReview(
+    withSessionReviews(fixture.comments),
+    input,
+    new Date().toISOString(),
+    fixtureReviewer,
+  );
+  sessionTopicReviews.push({ input, at: new Date().toISOString() });
+}
+
 /**
  * Builds the export from the filters currently on screen, through the same
  * shared row selection the dashboard uses. In fixture mode the file is produced
@@ -231,7 +274,12 @@ export async function submitReview(mode: DataMode, raw: CommentReviewInput) {
  */
 export async function buildExport(mode: DataMode, filters: Filters) {
   const source = await loadSource(mode, filters.workspace_id);
-  const rows = exportRows(source.comments, filters, source.active_analysis_key);
+  const rows = exportRows(
+    source.comments,
+    filters,
+    source.active_analysis_key,
+    source.active_topic_key,
+  );
   return {
     rows: rows.length,
     filename: exportObjectPath(filters.workspace_id, new Date())

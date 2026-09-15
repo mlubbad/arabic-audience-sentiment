@@ -150,6 +150,7 @@ export const en: Strings = {
     `${name}: ${remaining} of ${allowance} left`,
   budgetAnalysis: "Comment analysis",
   budgetBackfill: "Historical backfill",
+  budgetTopics: "Topic classification",
 
   working: "Working…",
   ssoNeedsDomain:
@@ -293,6 +294,18 @@ export const en: Strings = {
     "The granted permission has expired. Reconnect the channel to renew it.",
   jobQuotaExceeded:
     "The daily YouTube quota is used up. It renews automatically, and the attempt is retried afterwards.",
+  jobKindTopics: "Topic classification",
+  jobNoTopicClassifier:
+    "The worker has no topic classifier configured. Add the Gemini key to the worker's settings for classification to run.",
+  jobTopicModelNotActive:
+    "The topic model the worker runs is not this workspace's active one, so nothing was classified.",
+  jobGeminiRateLimited:
+    "Gemini paused requests for exceeding its limit. It will be retried.",
+  jobGeminiUnavailable: "Gemini did not respond. It will be retried.",
+  jobGeminiBadResponse:
+    "Gemini answered in an unexpected shape for some comments; they will be retried.",
+  jobGeminiRefused:
+    "Gemini refused the request. Check the Gemini key and its restrictions in the worker's settings.",
   jobInsufficientPermissions:
     "The granted permission is not enough to read comments. Reconnect the channel to renew the scope.",
   jobAccessDeniedWith: (reason: string) =>
@@ -640,9 +653,26 @@ export const en: Strings = {
   noLabelsLead:
     "The comments are stored and no classifier has run on them, so there is no sentiment share to show. This is an absence of analysis, not a neutral audience.",
   topicsTitle: "Topics",
-  topicsUnavailableStrong: "Not available yet",
-  topicsUnavailableLead:
-    "Sorting comments into topics needs a language-model layer that has not been built. No chart derived from keywords will be shown here and presented as topic analysis.",
+  topicsNotRunStrong: "Topic classification has not run yet",
+  topicsNotRunLead:
+    "Sorting comments into topics needs a language-model layer run by the worker. Once it runs, the topics and their counts appear here.",
+  topicsUnclassified: (n: string) => `${n} not yet classified`,
+  topicsCaption: "Comments by topic",
+  topicsUnit: "Topic",
+  topicFilterLabel: "Topic",
+  topicAll: "All topics",
+  topicUnclassifiedOption: "Not yet classified",
+  topicNone: "no topic",
+  chipTopic: (name: string) => `Topic: ${name}`,
+  topicReviewed: "human correction",
+  correctTopic: "Change topic",
+  correctTopicFor: (author: string) =>
+    `Change the topic of the comment by ${author}`,
+  correctTopicLabel: "Correct topic",
+  reviewTopicTitle: "Correct the topic",
+  reviewTopicCurrent: (topic: string) => `Current topic: ${topic}`,
+  reviewKindSentiment: "sentiment",
+  reviewKindTopic: "topic",
   figureNegative:
     "negative comments — the ones worth reading in full, not as a share.",
   figurePositive: "positive comments among those analysed.",

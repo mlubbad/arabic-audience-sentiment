@@ -152,6 +152,7 @@ export const ar = {
     `${name}: يتبقى ${remaining} من ${allowance}`,
   budgetAnalysis: "تحليل التعليقات",
   budgetBackfill: "استيراد تاريخي",
+  budgetTopics: "تصنيف الموضوعات",
 
   // ---- the account page (Account.tsx) ----
   working: "جارٍ تنفيذ الطلب…",
@@ -294,6 +295,18 @@ export const ar = {
   jobCredentialExpired: "انتهت صلاحية الإذن الممنوح. أعد ربط القناة لتجديده.",
   jobQuotaExceeded:
     "استُنفدت حصة يوتيوب اليومية. تتجدد تلقائيًا، وتُعاد المحاولة بعدها.",
+  jobKindTopics: "تصنيف الموضوعات",
+  jobNoTopicClassifier:
+    "لا يوجد مصنِّف موضوعات مهيّأ لدى العامل. أضف مفتاح Gemini إلى إعدادات العامل ليعمل التصنيف.",
+  jobTopicModelNotActive:
+    "نموذج الموضوعات الذي يشغّله العامل ليس النموذج الفعّال في مساحة العمل، فلم يُصنَّف شيء.",
+  jobGeminiRateLimited:
+    "أوقف Gemini الطلبات مؤقتًا لتجاوز الحد. تُعاد المحاولة لاحقًا.",
+  jobGeminiUnavailable: "لم يستجب Gemini. تُعاد المحاولة لاحقًا.",
+  jobGeminiBadResponse:
+    "أجاب Gemini بصيغة غير متوقعة لبعض التعليقات؛ ستُعاد محاولتها.",
+  jobGeminiRefused:
+    "رفض Gemini الطلب. تحقق من مفتاح Gemini وقيوده في إعدادات العامل.",
   jobInsufficientPermissions:
     "الإذن الممنوح لا يكفي لقراءة التعليقات. أعد ربط القناة لتجديد النطاق.",
   jobAccessDeniedWith: (reason: string) => `رفض يوتيوب الوصول (${reason}).`,
@@ -629,9 +642,32 @@ export const ar = {
   noLabelsLead:
     "التعليقات محفوظة ولم يُشغَّل عليها نموذج تصنيف، فلا توجد نسبة مشاعر تُعرض. هذا غياب تحليل، لا حياد جمهور.",
   topicsTitle: "الموضوعات",
-  topicsUnavailableStrong: "غير متاح بعد",
-  topicsUnavailableLead:
-    "تصنيف التعليقات إلى موضوعات يحتاج طبقة نموذج لغوي لم تُبنَ بعد. لن يُعرض هنا رسم مشتق من كلمات مفتاحية ويُقدَّم كأنه تحليل موضوعي.",
+  // Topics
+  topicsNotRunStrong: "لم يُشغَّل تصنيف الموضوعات بعد",
+  topicsNotRunLead:
+    "يحتاج تصنيف التعليقات إلى موضوعات طبقةَ نموذجٍ لغوي يشغّلها العامل. ما إن تعمل، تظهر هنا الموضوعات بأعدادها.",
+  topicsUnclassified: (n: string) => `${n} لم تُصنَّف بعد`,
+  topicsCaption: "التعليقات حسب الموضوع",
+  topicsUnit: "الموضوع",
+  topicFilterLabel: "الموضوع",
+  topicAll: "كل الموضوعات",
+  topicUnclassifiedOption: "غير مصنَّف بعد",
+  topicNone: "بلا موضوع",
+  chipTopic: (name: string) => `الموضوع: ${name}`,
+  // Not `humanReview`: a row can carry a legacy sentiment amendment beside a
+  // human topic verdict, and the two markers must not read as one.
+  topicReviewed: "تصحيح بشري",
+  // The row button and its accessible name avoid the word "تصحيح": the
+  // sentiment button beside it is found by that word alone, in the tests and
+  // by anyone reading the row, and a second button carrying it would make the
+  // two indistinguishable. "تعديل" says what happens without borrowing it.
+  correctTopic: "تعديل الموضوع",
+  correctTopicFor: (author: string) => `تعديل الموضوع لتعليق ${author}`,
+  correctTopicLabel: "الموضوع الصحيح",
+  reviewTopicTitle: "تصحيح الموضوع",
+  reviewTopicCurrent: (topic: string) => `الموضوع الحالي: ${topic}`,
+  reviewKindSentiment: "التصنيف",
+  reviewKindTopic: "الموضوع",
   figureNegative: "تعليقًا سلبيًا — وهي التي تستحق قراءة نصّها لا نسبتها.",
   figurePositive: "تعليقًا إيجابيًا ضمن المحلَّل.",
   figureUnanalysed: "بلا تصنيف بعد، ولا تدخل في أي نسبة أعلاه.",

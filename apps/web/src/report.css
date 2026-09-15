@@ -502,6 +502,11 @@
 .rp-chart-tall {
   height: 320px;
 }
+/* Horizontal bars, one row per topic name: the names are long Arabic phrases
+   and would not fit as x-axis ticks. */
+.rp-chart-topics {
+  height: 16rem;
+}
 .rp-chart-donut {
   height: 240px;
   max-width: 300px;
@@ -653,6 +658,20 @@
 .rp-chip[data-label="none"] {
   color: var(--fg-3);
   border-style: dashed;
+}
+/* The topic chip sits beside the sentiment chip and must not read as one:
+   sentiment has a colour scale, a topic is a name. Filled, muted, no hue. */
+.rp-chip-topic {
+  margin-inline-start: 0.35rem;
+  background: var(--bg-muted);
+  color: var(--fg-2);
+  border-color: transparent;
+}
+.rp-chip-topic[data-topic="none"] {
+  color: var(--fg-3);
+  border-color: currentcolor;
+  border-style: dashed;
+  background: transparent;
 }
 
 /* ---------------- states ---------------- */

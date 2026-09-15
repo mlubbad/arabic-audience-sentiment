@@ -147,7 +147,9 @@ export function OperationsPanels({
                       <strong>
                         {b.event_type === "comment_analysis"
                           ? S.budgetAnalysis
-                          : S.budgetBackfill}
+                          : b.event_type === "topic_classification"
+                            ? S.budgetTopics
+                            : S.budgetBackfill}
                       </strong>
                       <span>
                         {S.opsBudgetLine(b.used, b.allowance, b.remaining)}

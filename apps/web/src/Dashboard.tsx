@@ -16,6 +16,7 @@ import { Bar, Doughnut, Line } from "react-chartjs-2";
 import "./report.css";
 import { byHour, byWeek, byWeekday, commenters, plottable } from "./analytics";
 import {
+  UNCLASSIFIED,
   type Filters,
   type Label,
   type LabelledComment,
@@ -30,6 +31,7 @@ import {
   configuredMode,
   resolveMode,
   submitReview,
+  submitTopicReview,
 } from "./data";
 import { failureCode } from "./failure";
 import { useSession, useWorkspaces } from "./session";
@@ -264,7 +266,8 @@ function DashboardBody({
   const [filters, setFilters] = useState<Filters>(defaults),
     [query, setQuery] = useState(""),
     [video, setVideo] = useState(""),
-    [sentiment, setSentiment] = useState("");
+    [sentiment, setSentiment] = useState(""),
+    [topic, setTopic] = useState("");
   const [from, setFrom] = useState(""),
     [to, setTo] = useState(""),
     [formError, setFormError] = useState("");
@@ -357,6 +360,13 @@ function DashboardBody({
         ? failureCode("view", derived.error)
         : null,
   };
+  // A topic is stored by key and shown by name, in the reader's language. The
+  // key is the fallback so a retired or unknown key is still visible as itself
+  // rather than as nothing.
+  const topicName = (key: string) =>
+    result.data?.topics.find((t) => t.key === key)?.[
+      lang === "ar" ? "name_ar" : "name_en"
+    ] ?? key;
   // Sticky, because recovery re-requests page one and that response no longer
   // carries the reset flag. The user should still be told why the page moved.
   const [cursorNotice, setCursorNotice] = useState(false);
@@ -374,6 +384,12 @@ function DashboardBody({
   const client = useQueryClient();
   const [reviewing, setReviewing] = useState<LabelledComment | null>(null);
   const [verdict, setVerdict] = useState<Label>("neutral");
+  // One form, two kinds of correction. The kind decides which select is
+  // shown, which mutation the submit goes to, and which history leads.
+  const [reviewKind, setReviewKind] = useState<"sentiment" | "topic">(
+    "sentiment",
+  );
+  const [topicVerdict, setTopicVerdict] = useState("");
   const reviewFormRef = useRef<HTMLFormElement | null>(null);
   const reviewTriggerRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
@@ -421,6 +437,23 @@ function DashboardBody({
       setReason("");
     },
   });
+  const topicReview = useMutation({
+    mutationFn: () =>
+      submitTopicReview(mode, {
+        workspace_id: workspaceId,
+        comment_id: reviewing!.id,
+        content_hash: reviewing!.content_hash,
+        topic_key: topicVerdict,
+        reason,
+      }),
+    onSuccess: async () => {
+      // The same re-read as a sentiment correction, for the same reason: the
+      // chip, the topic chart and the topic filter must move together.
+      await client.invalidateQueries({ queryKey: ["dashboard-source"] });
+      closeReview();
+      setReason("");
+    },
+  });
   const exporting = useMutation({
     mutationFn: () => buildExport(mode, page),
     onSuccess: ({ csv, filename }) => {
@@ -438,7 +471,20 @@ function DashboardBody({
     reviewTriggerRef.current = trigger;
     review.reset();
     setReason("");
+    setReviewKind("sentiment");
     setVerdict(c.label ?? "neutral");
+    setReviewing(c);
+  }
+  function startTopicReview(c: LabelledComment, trigger: HTMLButtonElement) {
+    reviewTriggerRef.current = trigger;
+    topicReview.reset();
+    setReason("");
+    setReviewKind("topic");
+    // Preselect the current topic, or the first live one when there is none:
+    // a select with no value would submit an empty key and be refused.
+    setTopicVerdict(
+      c.topic ?? result.data?.topics.find((t) => !t.retired)?.key ?? "",
+    );
     setReviewing(c);
   }
   /**
@@ -466,6 +512,7 @@ function DashboardBody({
       video_ids: chosenVideo ? [chosenVideo] : [],
       video_kind: (videoKind || undefined) as Filters["video_kind"],
       sentiments: sentiment ? [sentiment as Label] : [],
+      topics: topic ? [topic] : [],
       replies,
       date_mode: dateMode,
       comment_type: commentType || undefined,
@@ -499,6 +546,7 @@ function DashboardBody({
     setQuery("");
     setVideo("");
     setSentiment("");
+    setTopic("");
     setFrom("");
     setTo("");
     setFormError("");
@@ -520,6 +568,10 @@ function DashboardBody({
     query && S.chipSearch(query),
     video && S.chipVideo,
     sentiment && S.chipSentiment(labels[sentiment as Label] ?? sentiment),
+    topic &&
+      S.chipTopic(
+        topic === UNCLASSIFIED ? S.topicUnclassifiedOption : topicName(topic),
+      ),
     videoKind && S.chipVideoKind,
     commentType && S.chipCommentType,
     replies !== "all" &&
@@ -753,6 +805,29 @@ function DashboardBody({
             ))}
           </select>
         </label>
+        {/* Offered only when the source carries a taxonomy: a filter on a
+            dimension no row has would narrow every figure to nothing and
+            leave the reader to guess why. */}
+        {(result.data?.topics ?? []).length > 0 && (
+          <label>
+            {S.topicFilterLabel}
+            <select
+              aria-label={S.topicFilterLabel}
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+            >
+              <option value="">{S.topicAll}</option>
+              {(result.data?.topics ?? [])
+                .filter((t) => !t.retired)
+                .map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {lang === "ar" ? t.name_ar : t.name_en}
+                  </option>
+                ))}
+              <option value={UNCLASSIFIED}>{S.topicUnclassifiedOption}</option>
+            </select>
+          </label>
+        )}
         <label>
           {S.videoKindLabel}
           <select
@@ -1236,16 +1311,99 @@ function DashboardBody({
                       </p>
                     )}
                   </article>
-                  <article className="rp-card">
+                  <article className="rp-card" data-testid="topics-card">
                     <h3>{S.topicsTitle}</h3>
-                    {/* The reference groups comments into themes with a
-                        language model. We have not built that layer, and
-                        clustering by keyword would produce topic names nobody
-                        chose and a chart that looks like analysis. */}
-                    <p className="rp-missing">
-                      <strong>{S.topicsUnavailableStrong}</strong>
-                      {S.topicsUnavailableLead}
-                    </p>
+                    {/* Real verdicts only: the buckets are the taxonomy the
+                        workspace chose, counted under its active topic model,
+                        and a human correction wins over the model's verdict
+                        by the same rule the sentiment chart uses. Until a
+                        model has run there is nothing to draw, and the card
+                        says so rather than clustering by keyword and calling
+                        that analysis. */}
+                    {!s.active_topic_key ? (
+                      <p className="rp-missing">
+                        <strong>{S.topicsNotRunStrong}</strong>
+                        {S.topicsNotRunLead}
+                      </p>
+                    ) : (
+                      (() => {
+                        const buckets = s.topics
+                          .filter((t) => !t.retired)
+                          .map((t) => ({
+                            key: t.key,
+                            label: lang === "ar" ? t.name_ar : t.name_en,
+                            count: s.topic_counts[t.key] ?? 0,
+                          }))
+                          .filter((b) => b.count > 0)
+                          .sort(
+                            (a, b) =>
+                              b.count - a.count ||
+                              a.key.localeCompare(b.key, "en"),
+                          );
+                        const unclassified = s.topic_counts[UNCLASSIFIED] ?? 0;
+                        return (
+                          <>
+                            {buckets.length > 0 && (
+                              <div
+                                className="rp-chart rp-chart-topics"
+                                aria-hidden="true"
+                              >
+                                <Bar
+                                  data={{
+                                    labels: buckets.map((b) => b.label),
+                                    datasets: [
+                                      {
+                                        data: buckets.map((b) => b.count),
+                                        backgroundColor: VOLUME,
+                                        borderRadius: 4,
+                                      },
+                                    ],
+                                  }}
+                                  options={{
+                                    ...barOptions,
+                                    indexAxis: "y" as const,
+                                    animation: false,
+                                    // Horizontal, so the count axis is x: the
+                                    // shared options pin whole numbers on y,
+                                    // and a third of a comment is not a tick.
+                                    scales: {
+                                      x: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                          color: axisText,
+                                          precision: 0,
+                                        },
+                                        grid: { color: gridLine },
+                                      },
+                                      y: {
+                                        ticks: { color: axisText },
+                                        grid: { display: false },
+                                      },
+                                    },
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <ChartFigures
+                              caption={S.topicsCaption}
+                              unit={S.topicsUnit}
+                              buckets={buckets}
+                            />
+                            {/* Not a bucket: an unclassified comment has no
+                                topic, and drawing it as one would make the
+                                gap look like a theme. */}
+                            {unclassified > 0 && (
+                              <p
+                                className="rp-metric-note"
+                                data-testid="topics-unclassified"
+                              >
+                                {S.topicsUnclassified(n(unclassified))}
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()
+                    )}
                   </article>
                 </div>
                 {/* Three figures, and the section's own prose says one of
@@ -1766,6 +1924,22 @@ function DashboardBody({
                             </span>
 
                             {c.reviewed && <small>{S.humanReview}</small>}
+                            {/* The topic beside the sentiment, once a model
+                                has run. "No topic" is said in words so an
+                                empty cell is not mistaken for an unclassified
+                                one: the two mean different things. */}
+                            {s.active_topic_key && (
+                              <span
+                                className="rp-chip rp-chip-topic"
+                                data-topic={c.topic ?? "none"}
+                                data-testid="topic-chip"
+                              >
+                                {c.topic ? topicName(c.topic) : S.topicNone}
+                                {c.topic_reviewed && (
+                                  <small>{S.topicReviewed}</small>
+                                )}
+                              </span>
+                            )}
                           </td>
                           <td>{displayDate(c.published_at, lang)}</td>
                           <td>
@@ -1778,6 +1952,19 @@ function DashboardBody({
                             >
                               {S.correct}
                             </button>
+                            {s.active_topic_key && (
+                              <button
+                                type="button"
+                                onClick={(e) =>
+                                  startTopicReview(c, e.currentTarget)
+                                }
+                                aria-label={S.correctTopicFor(
+                                  c.author_name ?? S.purgedAuthor,
+                                )}
+                              >
+                                {S.correctTopic}
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1789,33 +1976,50 @@ function DashboardBody({
                     className="review"
                     ref={reviewFormRef}
                     tabIndex={-1}
-                    aria-label={S.reviewFormLabel}
+                    aria-label={
+                      reviewKind === "topic"
+                        ? S.reviewTopicTitle
+                        : S.reviewFormLabel
+                    }
                     onSubmit={(e) => {
                       e.preventDefault();
-                      review.mutate();
+                      (reviewKind === "topic" ? topicReview : review).mutate();
                     }}
                   >
-                    <h3>{S.reviewTitle}</h3>
+                    <h3>
+                      {reviewKind === "topic"
+                        ? S.reviewTopicTitle
+                        : S.reviewTitle}
+                    </h3>
                     <blockquote data-testid="review-text">
                       {commentText(reviewing, S)}
                     </blockquote>
                     <p className="muted">
-                      {S.reviewCurrent(
-                        reviewing.label
-                          ? labels[reviewing.label]
-                          : S.unanalysed,
-                      )}
+                      {reviewKind === "topic"
+                        ? S.reviewTopicCurrent(
+                            reviewing.topic
+                              ? topicName(reviewing.topic)
+                              : S.topicNone,
+                          )
+                        : S.reviewCurrent(
+                            reviewing.label
+                              ? labels[reviewing.label]
+                              : S.unanalysed,
+                          )}
                     </p>
                     <div data-testid="review-history">
                       <h4>{S.reviewHistoryTitle}</h4>
-                      {reviewing.reviews.length === 0 ? (
+                      {reviewing.reviews.length === 0 &&
+                      reviewing.topic_reviews.length === 0 ? (
                         <p className="muted">{S.reviewHistoryEmpty}</p>
                       ) : (
                         <ol className="history">
                           {reviewHistory(reviewing).map(
                             ({ review: r, state }, i) => (
                               <li key={`${r.created_at}-${i}`}>
-                                <strong>{labels[r.label]}</strong>
+                                <strong>
+                                  {S.reviewKindSentiment}: {labels[r.label]}
+                                </strong>
                                 <span>{displayDate(r.created_at, lang)}</span>
                                 <span data-testid="review-by">
                                   {r.reviewer_id ?? S.reviewerUnknown}
@@ -1829,23 +2033,69 @@ function DashboardBody({
                               </li>
                             ),
                           )}
+                          {/* The topic verdicts, under the same in-force rule.
+                              reviewHistory reads only origin, hash and date,
+                              so a topic review passes through it with its key
+                              standing where a label would; the cast is inert. */}
+                          {reviewHistory({
+                            reviews: reviewing.topic_reviews.map((r) => ({
+                              ...r,
+                              label: r.topic_key as Label,
+                            })),
+                            content_hash: reviewing.content_hash,
+                          }).map(({ review: r, state }, i) => (
+                            <li key={`topic-${r.created_at}-${i}`}>
+                              <strong>
+                                {S.reviewKindTopic}: {topicName(r.label)}
+                              </strong>
+                              <span>{displayDate(r.created_at, lang)}</span>
+                              <span data-testid="review-by">
+                                {r.reviewer_id ?? S.reviewerUnknown}
+                              </span>
+                              <small data-state={state}>
+                                {S.reviewStateMessages[state]}
+                              </small>
+                              {r.reason && (
+                                <q data-testid="review-reason">{r.reason}</q>
+                              )}
+                            </li>
+                          ))}
                         </ol>
                       )}
                     </div>
-                    <label>
-                      {S.correctLabel}
-                      <select
-                        aria-label={S.correctLabel}
-                        value={verdict}
-                        onChange={(e) => setVerdict(e.target.value as Label)}
-                      >
-                        {Object.entries(labels).map(([key, text]) => (
-                          <option key={key} value={key}>
-                            {text}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {reviewKind === "topic" ? (
+                      <label>
+                        {S.correctTopicLabel}
+                        <select
+                          aria-label={S.correctTopicLabel}
+                          value={topicVerdict}
+                          onChange={(e) => setTopicVerdict(e.target.value)}
+                        >
+                          {(result.data?.topics ?? [])
+                            .filter((t) => !t.retired)
+                            .map((t) => (
+                              <option key={t.key} value={t.key}>
+                                {lang === "ar" ? t.name_ar : t.name_en}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <label>
+                        {S.correctLabel}
+                        <select
+                          aria-label={S.correctLabel}
+                          value={verdict}
+                          onChange={(e) => setVerdict(e.target.value as Label)}
+                        >
+                          {Object.entries(labels).map(([key, text]) => (
+                            <option key={key} value={key}>
+                              {text}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                     <label>
                       {S.correctionReason}
                       <input
@@ -1855,21 +2105,30 @@ function DashboardBody({
                         required
                       />
                     </label>
-                    {review.isError && (
+                    {(reviewKind === "topic" ? topicReview : review)
+                      .isError && (
                       <p role="alert" data-testid="review-error">
-                        {review.error.message === "stale_comment_text"
+                        {(reviewKind === "topic" ? topicReview : review).error
+                          ?.message === "stale_comment_text"
                           ? S.reviewStale
                           : S.reviewSaveFailed}
                       </p>
                     )}
                     <div>
-                      <button type="submit" disabled={review.isPending}>
+                      <button
+                        type="submit"
+                        disabled={
+                          (reviewKind === "topic" ? topicReview : review)
+                            .isPending
+                        }
+                      >
                         {S.saveCorrection}
                       </button>
                       <button
                         type="button"
                         onClick={() => {
                           review.reset();
+                          topicReview.reset();
                           closeReview();
                         }}
                       >

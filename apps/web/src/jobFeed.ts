@@ -119,6 +119,21 @@ function explain(code: string, S: Strings): string | null {
       // Not a slow job. A job nothing can hold, which is a different problem
       // and deserves a different word.
       return S.jobLeaseThrashing(tail || S.jobLeaseThrashingRepeatedly);
+    // What a topic job can end on. The first two are configuration — nothing
+    // Gemini said — and the operator's fix is in the worker's settings; the
+    // Gemini ones are the model's answer, and only the refusal is not retried.
+    case "no_topic_classifier":
+      return S.jobNoTopicClassifier;
+    case "topic_model_not_active":
+      return S.jobTopicModelNotActive;
+    case "gemini_rate_limited":
+      return S.jobGeminiRateLimited;
+    case "gemini_unavailable":
+      return S.jobGeminiUnavailable;
+    case "gemini_bad_response":
+      return S.jobGeminiBadResponse;
+    case "gemini_refused":
+      return S.jobGeminiRefused;
     default:
       // The shared table, before giving up.
       //
@@ -134,6 +149,20 @@ function explain(code: string, S: Strings): string | null {
 }
 
 export function describeJob(
+  job: JobRow,
+  opts: { workerConnected: boolean },
+  S: Strings,
+): JobEntry {
+  const entry = describeJobStatus(job, opts, S);
+  // A topic job is a different kind of work and is named as such in the log,
+  // so a blocked topic job is not read as a stalled collection.
+  return job.type === "analyse"
+    ? { ...entry, headline: `${S.jobKindTopics} — ${entry.headline}` }
+    : entry;
+}
+
+/** The status half: the same sentences for every kind of job. */
+function describeJobStatus(
   job: JobRow,
   opts: { workerConnected: boolean },
   S: Strings,

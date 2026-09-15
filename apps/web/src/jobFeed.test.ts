@@ -111,6 +111,32 @@ describe("describeJob", () => {
     expect(superseded.severity).toBe("muted");
     expect(other.severity).toBe("warning");
   });
+
+  it("names a topic job as one, and explains its own codes", () => {
+    const topics = describeJob(
+      {
+        ...row(),
+        type: "analyse",
+        status: "blocked",
+        error_code: "no_topic_classifier",
+      },
+      { workerConnected: true },
+      ar,
+    );
+    expect(topics.headline).toContain(ar.jobKindTopics);
+    expect(topics.detail).toBe(ar.jobNoTopicClassifier);
+    expect(explainCode("gemini_rate_limited", ar)).toBe(
+      ar.jobGeminiRateLimited,
+    );
+    expect(explainCode("gemini_unavailable", ar)).toBe(ar.jobGeminiUnavailable);
+    expect(explainCode("gemini_bad_response", ar)).toBe(
+      ar.jobGeminiBadResponse,
+    );
+    expect(explainCode("gemini_refused", ar)).toBe(ar.jobGeminiRefused);
+    expect(explainCode("topic_model_not_active", ar)).toBe(
+      ar.jobTopicModelNotActive,
+    );
+  });
 });
 
 describe("what an operator may do with a job", () => {
