@@ -125,3 +125,50 @@ def test_nothing_raised_carries_the_url():
 def test_prompt_version_is_declared():
     assert PROMPT_VERSION == "p1"
     assert GeminiTopicClassifier("k", httpx.Client()).prompt_version == "p1"
+
+
+def test_the_request_turns_the_safety_filters_off_for_classification():
+    # The model generates nothing here: it reads the audience's text and names
+    # a topic from a list. Google's defaults block harassment and hate as if
+    # the request were asking to produce them, which fails the whole chunk.
+    fake = Fake([(200, answer([(0, "praise")]))])
+    fake.classifier().classify(TAXONOMY, items(1))
+    body = json.loads(fake.requests[0].content)
+    assert body["safetySettings"] == [
+        {"category": c, "threshold": "BLOCK_NONE"} for c in (
+            "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT")]
+
+
+def test_a_safety_blocked_chunk_is_split_in_half_and_each_half_classified():
+    # One blocked comment must not poison the twenty-four beside it.
+    fake = Fake([
+        (200, {"candidates": [{"finishReason": "SAFETY"}]}),
+        (200, answer([(0, "praise"), (1, "question")])),
+        (200, answer([(0, "question"), (1, "praise")])),
+    ])
+    verdicts = fake.classifier().classify(TAXONOMY, items(4))
+    assert len(fake.requests) == 3
+    assert [v.topic_key for v in verdicts] == ["praise", "question", "question", "praise"]
+    # Each half is numbered from zero, as a chunk of its own.
+    second = json.loads(fake.requests[2].content)["contents"][0]["parts"][0]["text"]
+    assert "[0] نص 2" in second and "[1] نص 3" in second
+
+
+def test_a_half_that_fails_again_fails_as_before_and_the_other_half_still_lands():
+    fake = Fake([
+        (200, {"candidates": [{"finishReason": "SAFETY"}]}),
+        (200, {"candidates": [{"finishReason": "SAFETY"}]}),
+        (200, answer([(0, "praise")])),
+    ])
+    a, b = fake.classifier().classify(TAXONOMY, items(2))
+    assert (a.status, a.error_code) == ("failed", "gemini_bad_response")
+    assert b.topic_key == "praise"
+    assert len(fake.requests) == 3
+
+
+def test_a_single_item_that_is_blocked_is_not_split_further():
+    fake = Fake([(200, {"candidates": [{"finishReason": "SAFETY"}]})])
+    [v] = fake.classifier().classify(TAXONOMY, items(1))
+    assert v.error_code == "gemini_bad_response"
+    assert len(fake.requests) == 1

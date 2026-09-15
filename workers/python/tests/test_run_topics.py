@@ -14,9 +14,9 @@ TAX = [{"key": "question", "description": "asks"}, {"key": "praise", "descriptio
 
 
 class Plane:
-    def __init__(self, due=(), active=True, refuse_commit=None):
+    def __init__(self, due=(), active=True, refuse_commit=None, blocked=None):
         self.due_lists = [list(d) for d in due]
-        self.active, self.refuse_commit = active, refuse_commit
+        self.active, self.refuse_commit, self.blocked = active, refuse_commit, blocked
         self.calls, self.committed, self.finished = [], [], None
 
     def handler(self, request):
@@ -29,8 +29,10 @@ class Plane:
         if path == "topics-due":
             assert body["model_id"] == "deterministic-test-classifier"
             rows = self.due_lists.pop(0) if self.due_lists else []
-            return httpx.Response(200, json={"classification_key": KEY, "active": self.active,
-                                             "taxonomy": TAX, "rows": rows})
+            reply = {"classification_key": KEY, "active": self.active, "taxonomy": TAX, "rows": rows}
+            if self.blocked:
+                reply.update(rows=[], taxonomy=[], blocked=self.blocked)
+            return httpx.Response(200, json=reply)
         if path == "commit-topics":
             self.committed.append(body)
             if self.refuse_commit:
@@ -55,9 +57,12 @@ def test_classifies_until_the_due_list_is_empty_then_succeeds():
     assert plane.committed[0]["records"][0]["classification_key"] == KEY
     assert plane.finished == ("succeeded", None)
     assert plane.calls.count("heartbeat") >= 2
-    # The batch key is the sorted ids' digest, so a retry of the same rows replays.
-    expected = hashlib.sha256("c1,c2".encode()).hexdigest()[:32]
+    # The batch key names the round, the slice and the sorted ids: a replay of
+    # the same slice in the same round replays, a later round's attempt at the
+    # same rows (after an outage) is a new batch rather than a batch_conflict.
+    expected = hashlib.sha256("1:0:c1,c2".encode()).hexdigest()[:32]
     assert plane.committed[0]["batch_key"] == expected
+    assert plane.committed[1]["batch_key"] == hashlib.sha256("2:0:c3".encode()).hexdigest()[:32]
 
 
 def test_no_classifier_blocks_the_job_and_says_why():
@@ -100,3 +105,45 @@ def test_a_due_list_that_never_shrinks_stops_after_a_bound():
     run_job(plane.plane(), None, classifier=DeterministicTestClassifier())
     assert len(plane.committed) <= 50
     assert plane.finished[0] == "partial"
+
+
+def test_a_round_with_no_final_verdict_ends_the_job_after_one_round():
+    # Nothing stored can shrink the due list, so asking again would re-send
+    # the same rows to Gemini until the round bound. One round, then partial.
+    class Down:
+        model_id, prompt_version = "deterministic-test-classifier", "t1"
+
+        def classify(self, taxonomy, items):
+            return [TopicVerdict("failed", None, None, "gemini_unavailable") for _ in items]
+
+    plane = Plane(due=[[row(1), row(2)], [row(1), row(2)], [row(1), row(2)]])
+    run_job(plane.plane(), None, classifier=Down())
+    assert plane.calls.count("topics-due") == 1
+    assert len(plane.committed) == 1
+    assert plane.finished == ("partial", "gemini_unavailable")
+
+
+def test_a_due_list_is_committed_in_slices_of_twenty_five():
+    # One Gemini chunk, one commit: a failure late in the list does not
+    # discard the verdicts already paid for earlier in it.
+    plane = Plane(due=[[row(i) for i in range(30)], []])
+    run_job(plane.plane(), None, classifier=DeterministicTestClassifier())
+    assert [len(c["records"]) for c in plane.committed] == [25, 5]
+    assert plane.committed[0]["records"][0]["external_comment_id"] == "c0"
+    assert plane.committed[1]["records"][0]["external_comment_id"] == "c25"
+    first = ",".join(sorted(f"c{i}" for i in range(25)))
+    assert plane.committed[0]["batch_key"] == hashlib.sha256(f"1:0:{first}".encode()).hexdigest()[:32]
+    second = ",".join(sorted(f"c{i}" for i in range(25, 30)))
+    assert plane.committed[1]["batch_key"] == hashlib.sha256(f"1:25:{second}".encode()).hexdigest()[:32]
+    # A heartbeat before every slice, not only before the round.
+    assert plane.calls.count("heartbeat") >= 2
+    assert plane.finished == ("succeeded", None)
+
+
+def test_a_blocked_due_list_ends_the_job_blocked_before_any_model_call():
+    # The server found rows to classify but no allowance to pay for them. The
+    # worker must not send them to Gemini and then learn that at commit time.
+    plane = Plane(due=[[row(1)]], blocked="quota_exceeded")
+    run_job(plane.plane(), None, classifier=DeterministicTestClassifier())
+    assert plane.committed == []
+    assert plane.finished == ("blocked", "quota_exceeded")

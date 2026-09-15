@@ -60,10 +60,19 @@ class GeminiTopicClassifier:
             out.extend(self._chunk(taxonomy, items[start:start + CHUNK]))
         return out
 
-    def _chunk(self, taxonomy: list[dict], items: list[TopicItem]) -> list[TopicVerdict]:
+    def _chunk(self, taxonomy: list[dict], items: list[TopicItem],
+               split: bool = True) -> list[TopicVerdict]:
         keys = [t["key"] for t in taxonomy]
         body = {
             "contents": [{"role": "user", "parts": [{"text": build_prompt(taxonomy, items)}]}],
+            # This classifies the audience's text; it generates nothing. Google's
+            # default thresholds judge the *input* and return no candidate for a
+            # chunk holding one harsh comment, which would fail the other
+            # twenty-four beside it with gemini_bad_response.
+            "safetySettings": [
+                {"category": c, "threshold": "BLOCK_NONE"} for c in (
+                    "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
+                    "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT")],
             "generationConfig": {
                 "temperature": 0,
                 "responseMimeType": "application/json",
@@ -84,6 +93,13 @@ class GeminiTopicClassifier:
         try:
             answers = self._ask(body)
         except TopicError as exc:
+            if exc.code == "gemini_bad_response" and split and len(items) > 1:
+                # A blocked or unparseable answer names no item. One level of
+                # bisection isolates the offender to a half; a half that fails
+                # again fails as a whole, as before.
+                half = len(items) // 2
+                return (self._chunk(taxonomy, items[:half], split=False)
+                        + self._chunk(taxonomy, items[half:], split=False))
             return [TopicVerdict("failed", None, None, exc.code) for _ in items]
         by_index: dict[int, Any] = {}
         for a in answers:

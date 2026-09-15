@@ -268,16 +268,35 @@ def run_backfill(control: ControlPlane, build_collector, analyzer=None) -> bool:
 # 50 × 200 rows is ten thousand verdicts; a list that never shrinks is a bug,
 # not a backlog, and the job says partial rather than spinning on it.
 _TOPIC_ROUNDS = 50
+# Rows classified and committed together. One Gemini chunk, one commit: a
+# failure late in a due list does not discard the verdicts already paid for
+# earlier in it, and a retry re-sends one chunk, not two hundred rows.
+_TOPIC_SLICE = 25
+_FINAL = {"succeeded", "skipped", "unsupported"}
+
+
+def _topic_batch_key(rounds: int, start: int, records: list[dict]) -> str:
+    """Names the round, the slice and the sorted ids.
+
+    The ids alone would make a second attempt at the same rows — after an
+    outage, in a later round — collide with the first as batch_conflict, since
+    the verdicts differ. The round and the offset make it a new batch, while a
+    replay of the very same slice (a lost 200 after a stored commit) still
+    replays.
+    """
+    ids = ",".join(sorted(r["external_comment_id"] for r in records))
+    return hashlib.sha256(f"{rounds}:{start}:{ids}".encode()).hexdigest()[:32]
 
 
 def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
     """Classify what the server says lacks a topic, until it says nothing does.
 
     Each round asks for up to 200 rows under the key the server assigns for
-    this classifier, commits their verdicts under a key derived from their ids
-    (so a retry replays instead of re-charging), and asks again. Gemini's own
-    failures arrive as failed verdicts and make the job partial; the control
-    plane's refusals end it blocked.
+    this classifier, classifies and commits them in slices of 25, and asks
+    again. Gemini's own failures arrive as failed verdicts and make the job
+    partial; a round that stores nothing final ends the job there, because
+    nothing stored can shrink the list and asking again would only re-send
+    the same rows. The control plane's refusals end it blocked.
     """
     if classifier is None:
         control.finish(lease, "blocked", "no_topic_classifier")
@@ -290,6 +309,12 @@ def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
             if not due.get("active", False):
                 control.finish(lease, "blocked", "topic_model_not_active")
                 return True
+            # The server saw rows to classify and no allowance to pay for
+            # them. Said before the model is called, not learned at commit.
+            blocked = due.get("blocked")
+            if isinstance(blocked, str) and blocked:
+                control.finish(lease, "blocked", blocked)
+                return True
             rows = [r for r in due.get("rows") or [] if isinstance(r, dict)]
             if not rows:
                 break
@@ -297,19 +322,27 @@ def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
             if rounds > _TOPIC_ROUNDS:
                 first_failure = first_failure or "topics_due_list_not_shrinking"
                 break
-            control.heartbeat(lease)
-            try:
-                records = classify(classifier, due.get("taxonomy") or [],
-                                   due["classification_key"], rows)
-            except TopicError as exc:
-                first_failure = first_failure or exc.code
+            taxonomy = due.get("taxonomy") or []
+            any_final = False
+            stopped = False
+            for start in range(0, len(rows), _TOPIC_SLICE):
+                control.heartbeat(lease)
+                try:
+                    records = classify(classifier, taxonomy, due["classification_key"],
+                                       rows[start:start + _TOPIC_SLICE])
+                except TopicError as exc:
+                    first_failure = first_failure or exc.code
+                    stopped = True
+                    break
+                for r in records:
+                    if r["status"] in _FINAL:
+                        any_final = True
+                    elif first_failure is None:
+                        first_failure = r["error_code"] or "classification_failed"
+                control.commit_topics(lease, _topic_batch_key(rounds, start, records), records)
+            if stopped or not any_final:
+                first_failure = first_failure or "classification_failed"
                 break
-            for r in records:
-                if r["status"] == "failed" and first_failure is None:
-                    first_failure = r["error_code"] or "classification_failed"
-            ids = ",".join(sorted(r["external_comment_id"] for r in records))
-            key = hashlib.sha256(ids.encode()).hexdigest()[:32]
-            control.commit_topics(lease, key, records)
         control.finish(lease, "partial" if first_failure else "exhausted", first_failure)
     except LeaseLost:
         raise
