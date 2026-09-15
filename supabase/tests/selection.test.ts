@@ -145,11 +145,13 @@ describe("video selections", () => {
       [W],
     );
     expect(live.rows[0].v).toBe(1440);
+    // The pilot plan's rate limit is 30 minutes since
+    // 20260915140000: the tick's backoff assumed a non-zero value.
     const gap = await db.query<{ v: number }>(
       "select private.plan_limit($1,'sync_interval') as v",
       [W],
     );
-    expect(gap.rows[0].v).toBe(0);
+    expect(gap.rows[0].v).toBe(30);
   });
 
   it("lists due videos oldest-due first and leaves out disabled ones", async () => {
@@ -317,7 +319,7 @@ describe("select_videos", () => {
     expect(r.rows[0].r.deferred).toBe(true);
     await db.exec("reset role");
     await db.query(
-      "update plans set min_sync_interval_minutes=0 where key='pilot'",
+      "update plans set min_sync_interval_minutes=30 where key='pilot'",
     );
   });
 
@@ -336,6 +338,13 @@ describe("select_videos", () => {
   });
 
   it("request_discovery queues one discover per channel", async () => {
+    // d1 from the schema tests is within the pilot's 30-minute rate limit;
+    // this test is about dedupe, not the limit.
+    await db.exec("reset role");
+    await db.query(
+      "update jobs set created_at=now()-interval '2 hours' where workspace_id=$1 and type='discover'",
+      [W],
+    );
     await as(OWNER);
     const a = await db.query<{ j: string }>(
       "select request_discovery($1,$1) as j",
@@ -350,5 +359,123 @@ describe("select_videos", () => {
     await expect(
       db.query("select request_discovery($1,$1)", [W]),
     ).rejects.toThrow(/forbidden/);
+  });
+});
+
+describe("select_videos accounts for what is already chosen", () => {
+  const V4 = "20000000-0000-4000-8000-000000000004";
+  const V5 = "20000000-0000-4000-8000-000000000005";
+  const V6 = "20000000-0000-4000-8000-000000000006";
+  const call = (user: string, add: string[], remove: string[] = []) =>
+    as(user).then(() =>
+      db.query<{ r: Record<string, unknown> }>(
+        "select select_videos($1,$1,$2::uuid[],$3::uuid[]) as r",
+        [W, add, remove],
+      ),
+    );
+
+  beforeAll(async () => {
+    await db.exec("reset role");
+    await db.query("delete from video_selections where workspace_id=$1", [W]);
+    await db.query("delete from usage_events where workspace_id=$1", [W]);
+    // Every earlier job finished and aged past the pilot's 30-minute rate
+    // limit, so the first selection below queues a collection.
+    await db.query(
+      "update jobs set status='succeeded' where workspace_id=$1 and status in ('queued','running')",
+      [W],
+    );
+    await db.query(
+      "update jobs set created_at=now()-interval '2 hours' where workspace_id=$1",
+      [W],
+    );
+    // pilot: 5000 analysis units. Two videos that fit alone and not together,
+    // and a small one.
+    await db.query(
+      `insert into videos(id,workspace_id,channel_id,external_video_id,title,comments_state,reported_comment_count)
+       values ($1,$4,$4,'ddddddddddd','٤','open',4000),($2,$4,$4,'eeeeeeeeeee','٥','open',4000),
+              ($3,$4,$4,'fffffffffff','٦','open',900)`,
+      [V4, V5, V6, W],
+    );
+  });
+
+  it("refuses a second selection that fits alone but not with the first", async () => {
+    // The first 4000 is accepted and nothing is outstanding before it.
+    const first = await call(OWNER, [V4]);
+    expect(first.rows[0].r).toMatchObject({
+      estimate: 4000,
+      outstanding: 0,
+      remaining_after: 1000,
+    });
+    // The second 4000 fits 5000 on its own; it does not fit beside the first,
+    // which is chosen and not yet stored. Before the fix both were accepted
+    // and both reported remaining_after: 1000.
+    await expect(call(OWNER, [V5])).rejects.toThrow(/quota_exceeded/);
+    await db.exec("reset role");
+    expect(
+      (await db.query("select 1 from video_selections where video_id=$1", [V5]))
+        .rows,
+    ).toHaveLength(0);
+    // 900 fits behind the 4000 still outstanding.
+    const third = await call(OWNER, [V6]);
+    expect(third.rows[0].r).toMatchObject({
+      estimate: 900,
+      outstanding: 4000,
+      remaining_after: 100,
+    });
+  });
+
+  it("does not count a selection being removed in the same call", async () => {
+    // Swap the first 4000 for the second: outstanding is the 900 alone.
+    const r = await call(OWNER, [V5], [V4]);
+    expect(r.rows[0].r).toMatchObject({
+      estimate: 4000,
+      outstanding: 900,
+      remaining_after: 100,
+    });
+  });
+
+  it("says a running collection will not include the new video", async () => {
+    await db.exec("reset role");
+    // The collection the selections above queued has been claimed.
+    const job = await db.query<{ id: string }>(
+      `update jobs set status='running', lease_token=gen_random_uuid(),
+              lease_expires_at=now()+interval '5 minutes'
+        where workspace_id=$1 and type='collect' and status='queued' returning id`,
+      [W],
+    );
+    expect(job.rows).toHaveLength(1);
+    // V2 has no known count, so it costs nothing against the 4900 outstanding.
+    const r = await call(OWNER, [V2]);
+    expect(r.rows[0].r).toMatchObject({
+      queued: false,
+      deferred: false,
+      already_running: true,
+      job_id: job.rows[0].id,
+    });
+  });
+
+  it("a removal alone requests no collection and needs no plan", async () => {
+    await db.exec("reset role");
+    await db.query(
+      "update subscriptions set status='paused' where workspace_id=$1",
+      [W],
+    );
+    // A paused plan must still let the tenant deselect.
+    const r = await call(OWNER, [], [V4]);
+    expect(r.rows[0].r).toMatchObject({
+      queued: false,
+      deferred: false,
+      already_running: false,
+      estimate: 0,
+    });
+    await db.exec("reset role");
+    expect(
+      (await db.query("select 1 from video_selections where video_id=$1", [V4]))
+        .rows,
+    ).toHaveLength(0);
+    await db.query(
+      "update subscriptions set status='active' where workspace_id=$1",
+      [W],
+    );
   });
 });

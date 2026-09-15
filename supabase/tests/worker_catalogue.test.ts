@@ -341,6 +341,12 @@ describe("worker catalogue and due lists", () => {
       "update video_selections set next_check_at=now()-interval '1 minute' where video_id=$1",
       [a.id],
     );
+    // c1 and c2 succeeded within the pilot's 30-minute rate limit; the tick
+    // honours it, so they are aged past it first.
+    await db.query(
+      "update jobs set created_at=now()-interval '2 hours' where workspace_id=$1",
+      [A],
+    );
     const third = await one<{ r: { discover: number; collect: number } }>(
       "select svc_worker_tick($1) as r",
       [CRED_A],
@@ -348,10 +354,50 @@ describe("worker catalogue and due lists", () => {
     expect(third.r).toEqual({ discover: 0, collect: 1 });
   });
 
+  it("a collect that failed is not re-enqueued for an hour, whatever the rate limit says", async () => {
+    await db.exec("reset role");
+    const tick = () =>
+      one<{ r: { discover: number; collect: number } }>(
+        "select svc_worker_tick($1) as r",
+        [CRED_A],
+      );
+    // The collect the tick just queued fails. The video is still due.
+    const failed = await one<{ id: string }>(
+      "update jobs set status='failed', error_code='source_rate_limited' where workspace_id=$1 and type='collect' and status='queued' returning id",
+      [A],
+    );
+    expect(failed).toBeDefined();
+    // Within the hour: nothing, even with the rate limit out of the way.
+    await db.query(
+      "update jobs set created_at=now()-interval '45 minutes' where id=$1",
+      [failed.id],
+    );
+    expect((await tick()).r).toEqual({ discover: 0, collect: 0 });
+    // After the hour: the collection is tried again.
+    await db.query(
+      "update jobs set created_at=now()-interval '61 minutes' where id=$1",
+      [failed.id],
+    );
+    expect((await tick()).r).toEqual({ discover: 0, collect: 1 });
+    // A job that succeeded 45 minutes ago is past the rate limit and carries
+    // no backoff.
+    await db.query(
+      "update jobs set status='succeeded', created_at=now()-interval '45 minutes' where workspace_id=$1 and type='collect' and status='queued'",
+      [A],
+    );
+    expect((await tick()).r).toEqual({ discover: 0, collect: 1 });
+    await db.query(
+      "update jobs set status='succeeded', created_at=now()-interval '2 hours' where workspace_id=$1 and status in ('queued','running')",
+      [A],
+    );
+  });
+
   it("connecting a channel queues its first discovery", async () => {
     await db.exec("reset role");
+    // Past the pilot's 30-minute rate limit; the queued discover from the
+    // tick above is finished and aged.
     await db.query(
-      "update jobs set status='succeeded' where workspace_id=$1 and status in ('queued','running')",
+      "update jobs set status='succeeded', created_at=now()-interval '2 hours' where workspace_id=$1",
       [B],
     );
     await db.query(

@@ -178,6 +178,30 @@ describe("live dashboard read", () => {
     );
   });
 
+  it("reports the last collection as the last run, not a newer discovery", async () => {
+    // A discover run that succeeded after the last collect carries no
+    // comment coverage; read as last_run it would say the collection found
+    // nothing and never finished.
+    await db.exec("reset role");
+    await db.query(
+      `insert into sync_runs(workspace_id,channel_id,mode,source,status,started_at,ended_at,coverage_summary)
+       values ($1,$1,'collect','youtube_oauth','succeeded',now()-interval '2 hours',now()-interval '2 hours',
+               '{"videos_seen":3,"comments_collected":2,"complete":true}'),
+              ($1,$1,'discover','youtube_oauth','succeeded',now()-interval '1 hour',now()-interval '1 hour',
+               '{"videos_found":9}')`,
+      [A],
+    );
+    await as(ownerA);
+    const live = LiveSnapshotSchema.parse(await read(A));
+    expect(live.sync?.last_run?.coverage).toEqual({
+      videos_seen: 3,
+      comments_collected: 2,
+      complete: true,
+    });
+    await db.exec("reset role");
+    await db.query("delete from sync_runs where workspace_id=$1", [A]);
+  });
+
   it("refuses another tenant's workspace instead of returning an empty one", async () => {
     // Tested as a direct call, not by hiding a control. An empty snapshot would
     // read as a healthy workspace with no comments.
