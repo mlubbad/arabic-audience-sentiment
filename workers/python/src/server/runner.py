@@ -181,6 +181,12 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     if not token:
         control.finish(lease, "blocked", "channel_not_connected")
         return True
+    # An explicit empty list is a channel with nothing due. No list at all is a
+    # gateway that never computed one, and a run that read nothing because it
+    # was handed nothing must not be recorded as a collection that succeeded.
+    if "videos" not in lease:
+        control.finish(lease, "blocked", "no_due_list")
+        return True
     collector = build_collector(token)
     videos = [v for v in (lease.get("videos") or []) if isinstance(v, dict)]
 

@@ -40,7 +40,10 @@ def drive(pages, videos, checkpoint=None, access_token="ya29.ok"):
         if path == "claim":
             return httpx.Response(200, json={
                 "job_id": "j1", "lease_token": "t1", "type": "collect",
-                "checkpoint": checkpoint, "videos": videos,
+                "checkpoint": checkpoint,
+                # None leaves the key out altogether, as a gateway that
+                # predates due lists would.
+                **({"videos": videos} if videos is not None else {}),
                 **({"access_token": access_token} if access_token else {}),
             })
         if path == "commit-batch":
@@ -138,6 +141,16 @@ def test_reports_each_exhausted_video_and_an_empty_due_list_is_a_success():
 
     worked, sent, collector = drive({}, [])
     assert worked is True and sent["finish"] == "succeeded" and collector.asked == []
+
+
+def test_a_lease_with_no_due_list_at_all_is_blocked_not_an_empty_success():
+    # An explicit [] is a channel with nothing due. A lease that carries no
+    # list is a gateway that never computed one; finishing that as succeeded
+    # would record a collection that read nothing as a collection.
+    worked, sent, collector = drive({}, None)
+    assert worked is True
+    assert (sent["finish"], sent["error_code"]) == ("blocked", "no_due_list")
+    assert collector.asked == [] and sent["commits"] == []
 
 
 def test_a_disabled_video_is_reported_and_skipped_not_the_whole_run():
