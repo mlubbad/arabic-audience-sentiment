@@ -16,6 +16,7 @@ export type ChannelRow = {
   status: string;
   external_channel_id: string;
   handle: string | null;
+  title: string | null;
 };
 
 export type JobRow = {
@@ -57,11 +58,12 @@ export function WorkspaceCard({
   return (
     <li>
       <strong>{workspace.name}</strong>
-      {/* The channel by its name where one is known. The id is what YouTube
-          calls it — `UC…`, 24 opaque characters — and printing it as though
-          it were the channel's name told the reader nothing they could
-          recognise. When no handle is stored the id is still shown, labelled
-          as an id, because an unlabelled one reads as a fault. */}
+      {/* The channel by its name where one is known: the title it shows,
+          else its @handle. The id is what YouTube calls it — `UC…`, 24 opaque
+          characters — and printing it as though it were the channel's name
+          told the reader nothing they could recognise. When no name is stored
+          the id is still shown, labelled as an id, because an unlabelled one
+          reads as a fault. */}
       {channel ? (
         <span data-testid={`channel-${workspace.id}`}>
           {channel.status === "connected"
@@ -69,8 +71,8 @@ export function WorkspaceCard({
             : channel.status === "public_unverified"
               ? "قناة عامة بلا إذن بعد: "
               : `القناة تحتاج إعادة ربط (${channel.status}): `}
-          {channel.handle ? (
-            <b>{channel.handle}</b>
+          {channel.title || channel.handle ? (
+            <b>{channel.title ?? channel.handle}</b>
           ) : (
             <>
               <span className="muted">المعرّف</span>{" "}

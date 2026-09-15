@@ -20,6 +20,7 @@ const connected: ChannelRow = {
   status: "connected",
   external_channel_id: "UCxxxxxxxxxxxxxxxxxxxxxx",
   handle: "@akhbar",
+  title: "قناة الأخبار الرسمية",
 };
 
 function render(over: Partial<Parameters<typeof WorkspaceCard>[0]> = {}) {
@@ -39,11 +40,18 @@ function render(over: Partial<Parameters<typeof WorkspaceCard>[0]> = {}) {
 }
 
 describe("a workspace card", () => {
-  it("names the channel by its handle, and labels a bare id as an id", () => {
-    expect(render({ channel: connected })).toContain("<b>@akhbar</b>");
+  it("names the channel by its title, then its handle, and labels a bare id as an id", () => {
+    expect(render({ channel: connected })).toContain(
+      "<b>قناة الأخبار الرسمية</b>",
+    );
+    expect(render({ channel: { ...connected, title: null } })).toContain(
+      "<b>@akhbar</b>",
+    );
     // The id was printed as though it were a name. It still appears — it is
-    // the only identity there is when no handle is stored — but as an id.
-    const bare = render({ channel: { ...connected, handle: null } });
+    // the only identity there is when no name is stored — but as an id.
+    const bare = render({
+      channel: { ...connected, handle: null, title: null },
+    });
     expect(bare).toContain("<code>UCxxxxxxxxxxxxxxxxxxxxxx</code>");
     expect(bare).toContain("المعرّف");
     expect(bare).not.toContain("قناة مرتبطة: UC");
@@ -51,7 +59,12 @@ describe("a workspace card", () => {
 
   it("says what a seeded public channel is, rather than that it needs re-linking", () => {
     const html = render({
-      channel: { ...connected, status: "public_unverified", handle: null },
+      channel: {
+        ...connected,
+        status: "public_unverified",
+        handle: null,
+        title: null,
+      },
     });
     expect(html).toContain("قناة عامة بلا إذن بعد");
     expect(html).not.toContain("إعادة ربط (");

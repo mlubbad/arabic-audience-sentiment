@@ -218,6 +218,60 @@ describe("youtube connection", () => {
     ).toBe("public_unverified");
   });
 
+  it("stores the channel's names when Google sends them, and keeps them when it does not", async () => {
+    await admin();
+    const named = "UC" + "n".repeat(22);
+    await user(ownerB);
+    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+      B,
+      h("h-named"),
+      VERIFIER,
+    ]);
+    await admin();
+    // The service entry point, as the Edge Function calls it: by name, with
+    // the two names beside the id.
+    const st = await db.query<{ user_id: string; client_id: string }>(
+      "select user_id, client_id from private.oauth_consume_state($1)",
+      [h("h-named")],
+    );
+    const ch = await db.query<{ id: string }>(
+      `select public.svc_oauth_attach_channel(
+         u => $1, w => $2, c => $3, external_channel => $4, tokens => $5,
+         key_version => 'k1', scopes => $6,
+         channel_handle => '@named', channel_title => 'قناة مسمّاة') as id`,
+      [
+        st.rows[0].user_id,
+        B,
+        st.rows[0].client_id,
+        named,
+        CIPHERTEXT,
+        ["youtube.readonly"],
+      ],
+    );
+    // A tenant reads them from the same view that carries the status.
+    await user(ownerB);
+    const seen = await db.query<{ handle: string; title: string }>(
+      "select handle, title from connection_status where channel_id=$1",
+      [ch.rows[0].id],
+    );
+    expect(seen.rows[0]).toEqual({ handle: "@named", title: "قناة مسمّاة" });
+
+    // A reconnect that carries no names — an older deploy of the callback, or
+    // a snippet Google left out — must not erase the ones already stored.
+    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+      B,
+      h("h-named-again"),
+      VERIFIER,
+    ]);
+    await admin();
+    await attach(h("h-named-again"), named);
+    const kept = await db.query<{ handle: string; title: string }>(
+      "select handle, title from channels where id=$1",
+      [ch.rows[0].id],
+    );
+    expect(kept.rows[0]).toEqual({ handle: "@named", title: "قناة مسمّاة" });
+  });
+
   it("keeps tokens out of every tenant-visible path", async () => {
     await user(ownerA);
     await expect(

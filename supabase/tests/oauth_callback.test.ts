@@ -114,6 +114,32 @@ describe("completing a YouTube connection", () => {
     });
   });
 
+  it("carries the channel's names when Google sends them, and nulls when it does not", async () => {
+    const { attached, calls } = await run({
+      channels: {
+        items: [
+          { id: CHANNEL, snippet: { title: "قناة", customUrl: "@qanah" } },
+        ],
+      },
+    });
+    expect(calls[1].url).toContain("part=id,snippet");
+    expect(attached[0]).toMatchObject({
+      externalChannel: CHANNEL,
+      handle: "@qanah",
+      title: "قناة",
+    });
+    // No snippet, or one with nothing usable in it, is not a failed connection:
+    // the id is the contract and the name is a label on it.
+    const bare = await run({ channels: { items: [{ id: CHANNEL }] } });
+    expect(bare.attached[0]).toMatchObject({ handle: null, title: null });
+    const odd = await run({
+      channels: {
+        items: [{ id: CHANNEL, snippet: { title: 7, customUrl: " " } }],
+      },
+    });
+    expect(odd.attached[0]).toMatchObject({ handle: null, title: null });
+  });
+
   it("takes the verifier from the stored state, never from the request", async () => {
     // PKCE is worth nothing if the caller supplies both halves of it.
     const { calls } = await run();

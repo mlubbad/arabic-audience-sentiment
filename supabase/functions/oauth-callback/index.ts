@@ -64,6 +64,8 @@ Deno.serve(async (request) => {
             w: input.workspaceId,
             c: input.clientId,
             external_channel: input.externalChannel,
+            channel_handle: input.handle,
+            channel_title: input.title,
             // bytea over PostgREST travels as a hex literal.
             tokens:
               "\\x" +

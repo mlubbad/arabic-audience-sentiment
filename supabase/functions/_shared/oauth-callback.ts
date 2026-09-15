@@ -39,6 +39,10 @@ export interface CallbackDb {
     workspaceId: string;
     clientId: string;
     externalChannel: string;
+    /** The channel's `@handle` and title as Google reports them, or null for
+     *  each one Google leaves out. Names, not identity: the id is identity. */
+    handle: string | null;
+    title: string | null;
     sealedTokens: Uint8Array;
     keyVersion: string;
     scopes: string[];
@@ -48,8 +52,11 @@ export interface CallbackDb {
 /** Injected so tests need no network, and so nothing here can reach the internet by accident. */
 export type Http = (url: string, init: RequestInit) => Promise<Response>;
 
+// `snippet` for the name. The id alone was all the product needed to collect,
+// and all it showed: the account page printed `UC…` where a channel name
+// should have been, because nothing had ever asked Google for one.
 const CHANNELS_URL =
-  "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true";
+  "https://www.googleapis.com/youtube/v3/channels?part=id,snippet&mine=true";
 
 export class ConnectError extends Error {
   constructor(readonly code: string) {
@@ -163,11 +170,17 @@ async function refusalReason(response: Response): Promise<string> {
   }
 }
 
+export type OwnChannel = {
+  id: string;
+  handle: string | null;
+  title: string | null;
+};
+
 /** Whose channel this is, according to Google rather than according to the caller. */
 export async function fetchOwnChannel(
   accessToken: string,
   http: Http,
-): Promise<string> {
+): Promise<OwnChannel> {
   const response = await http(CHANNELS_URL, {
     method: "GET",
     headers: { authorization: `Bearer ${accessToken}` },
@@ -186,7 +199,12 @@ export async function fetchOwnChannel(
       throw new ConnectError("youtube_scope_missing");
     throw new ConnectError("channel_lookup_failed");
   }
-  const body = (await response.json()) as { items?: { id?: unknown }[] };
+  const body = (await response.json()) as {
+    items?: {
+      id?: unknown;
+      snippet?: { title?: unknown; customUrl?: unknown };
+    }[];
+  };
   const items = body.items ?? [];
   // No channel is a real answer: a Google account without a YouTube channel
   // authorises fine and owns nothing. Inventing one would attach the wrong id.
@@ -197,7 +215,16 @@ export async function fetchOwnChannel(
   const id = items[0]?.id;
   if (typeof id !== "string" || !id)
     throw new ConnectError("channel_lookup_failed");
-  return id;
+  // The name is a courtesy and the id is the contract: a snippet Google did
+  // not send, or sent malformed, costs the reader a label, not the connection.
+  const snippet = items[0]?.snippet;
+  const text = (v: unknown, max: number) =>
+    typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
+  return {
+    id,
+    handle: text(snippet?.customUrl, 100),
+    title: text(snippet?.title, 200),
+  };
 }
 
 export async function handleCallback(input: {
@@ -229,7 +256,9 @@ export async function handleCallback(input: {
     userId: binding.user_id,
     workspaceId: binding.workspace_id,
     clientId: binding.client_id,
-    externalChannel: channel,
+    externalChannel: channel.id,
+    handle: channel.handle,
+    title: channel.title,
     sealedTokens: await sealTokens(key, {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,

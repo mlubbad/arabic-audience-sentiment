@@ -138,9 +138,12 @@ export function Account() {
     void Promise.all([
       supabase.from("workspaces").select("id,name"),
       supabase.from("clients").select("id,workspace_id"),
-      supabase
-        .from("connection_status")
-        .select("workspace_id,channel_id,status,external_channel_id,handle"),
+      // Every column the view exposes, rather than a list. `title` arrives
+      // with migration 20260915080000, and a build that names it against a
+      // database that does not have it yet gets an error and an empty list —
+      // every card reading "no channel" until the migration lands. The view
+      // is the safety boundary here, not the column list.
+      supabase.from("connection_status").select("*"),
       supabase
         .from("jobs")
         .select("workspace_id,status,created_at")
