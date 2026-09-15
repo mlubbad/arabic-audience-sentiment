@@ -57,12 +57,13 @@ def test_classifies_until_the_due_list_is_empty_then_succeeds():
     assert plane.committed[0]["records"][0]["classification_key"] == KEY
     assert plane.finished == ("succeeded", None)
     assert plane.calls.count("heartbeat") >= 2
-    # The batch key names the round, the slice and the sorted ids: a replay of
-    # the same slice in the same round replays, a later round's attempt at the
-    # same rows (after an outage) is a new batch rather than a batch_conflict.
-    expected = hashlib.sha256("1:0:c1,c2".encode()).hexdigest()[:32]
+    # The batch key names the lease, the round, the slice and the sorted ids:
+    # a replay of the same slice in the same round replays, a later round's
+    # attempt at the same rows (after an outage) is a new batch rather than a
+    # batch_conflict, and a re-claimed job — a new token — starts afresh.
+    expected = hashlib.sha256("t1:1:0:c1,c2".encode()).hexdigest()[:32]
     assert plane.committed[0]["batch_key"] == expected
-    assert plane.committed[1]["batch_key"] == hashlib.sha256("2:0:c3".encode()).hexdigest()[:32]
+    assert plane.committed[1]["batch_key"] == hashlib.sha256("t1:2:0:c3".encode()).hexdigest()[:32]
 
 
 def test_no_classifier_blocks_the_job_and_says_why():
@@ -132,9 +133,9 @@ def test_a_due_list_is_committed_in_slices_of_twenty_five():
     assert plane.committed[0]["records"][0]["external_comment_id"] == "c0"
     assert plane.committed[1]["records"][0]["external_comment_id"] == "c25"
     first = ",".join(sorted(f"c{i}" for i in range(25)))
-    assert plane.committed[0]["batch_key"] == hashlib.sha256(f"1:0:{first}".encode()).hexdigest()[:32]
+    assert plane.committed[0]["batch_key"] == hashlib.sha256(f"t1:1:0:{first}".encode()).hexdigest()[:32]
     second = ",".join(sorted(f"c{i}" for i in range(25, 30)))
-    assert plane.committed[1]["batch_key"] == hashlib.sha256(f"1:25:{second}".encode()).hexdigest()[:32]
+    assert plane.committed[1]["batch_key"] == hashlib.sha256(f"t1:1:25:{second}".encode()).hexdigest()[:32]
     # A heartbeat before every slice, not only before the round.
     assert plane.calls.count("heartbeat") >= 2
     assert plane.finished == ("succeeded", None)

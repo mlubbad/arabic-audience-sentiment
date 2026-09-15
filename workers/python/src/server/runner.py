@@ -275,17 +275,20 @@ _TOPIC_SLICE = 25
 _FINAL = {"succeeded", "skipped", "unsupported"}
 
 
-def _topic_batch_key(rounds: int, start: int, records: list[dict]) -> str:
-    """Names the round, the slice and the sorted ids.
+def _topic_batch_key(lease: dict, rounds: int, start: int, records: list[dict]) -> str:
+    """Names the lease, the round, the slice and the sorted ids.
 
     The ids alone would make a second attempt at the same rows — after an
     outage, in a later round — collide with the first as batch_conflict, since
-    the verdicts differ. The round and the offset make it a new batch, while a
-    replay of the very same slice (a lost 200 after a stored commit) still
-    replays.
+    the verdicts differ. The round and the offset make it a new batch within a
+    lease; the lease token makes a re-claimed job (whose round 1 repeats the
+    first attempt's round 1 with different verdicts) start afresh. A replay of
+    the very same slice under the same lease (a lost 200 after a stored
+    commit) still replays.
     """
     ids = ",".join(sorted(r["external_comment_id"] for r in records))
-    return hashlib.sha256(f"{rounds}:{start}:{ids}".encode()).hexdigest()[:32]
+    salt = f"{lease['lease_token']}:{rounds}:{start}:{ids}"
+    return hashlib.sha256(salt.encode()).hexdigest()[:32]
 
 
 def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
@@ -339,7 +342,7 @@ def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
                         any_final = True
                     elif first_failure is None:
                         first_failure = r["error_code"] or "classification_failed"
-                control.commit_topics(lease, _topic_batch_key(rounds, start, records), records)
+                control.commit_topics(lease, _topic_batch_key(lease, rounds, start, records), records)
             if stopped or not any_final:
                 first_failure = first_failure or "classification_failed"
                 break

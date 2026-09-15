@@ -563,13 +563,40 @@ describe("the worker classifies topics", () => {
     ]);
   });
 
-  it("treats a workspace with no active plan as having nothing to spend", async () => {
+  it("hands over a free row that sorts behind a costing one when nothing remains", async () => {
     await service();
+    // Allowance back to what is spent, so nothing remains.
+    await db.query("update plans set topic_units=3 where key='t'");
+    // c8: never charged, published earliest of all — it sorts first and
+    // costs. c5: charged before; its text changed, so it is due and free.
+    await db.query(
+      `insert into comments(workspace_id,video_id,external_comment_id,is_reply,
+         text_raw,text_plain,content_hash,timestamp_precision,source,author_channel_id,author_name,published_at)
+       values ($1,$1,'c8',false,'تعليق مبكر','تعليق مبكر','h-c8','second','youtube_oauth','UCviewer8','مؤلف',now()-interval '1 year')`,
+      [W],
+    );
+    await db.query(
+      "update comments set content_hash='h-c5-v2', text_raw='نص معدل', text_plain='نص معدل' where external_comment_id='c5'",
+    );
+    const list = await due();
+    // The free row is handed over although a costing row precedes it; the
+    // costing rows (c6, c7, c8) are held back; nothing is blocked.
+    expect(list.rows.map((r) => r.external_comment_id)).toEqual(["c5"]);
+    expect(list).not.toHaveProperty("blocked");
+    await db.query("update plans set topic_units=10 where key='t'");
+  });
+
+  it("treats a workspace with no active plan as having nothing to spend, free rows included", async () => {
+    await service();
+    // c5 is due and free under a live plan (the test above); without one the
+    // commit would refuse it all the same, so it is not handed over either.
     await db.query(
       "update subscriptions set status='cancelled' where workspace_id=$1",
       [W],
     );
-    expect((await due()).blocked).toBe("quota_exceeded");
+    const list = await due();
+    expect(list.rows).toEqual([]);
+    expect(list.blocked).toBe("quota_exceeded");
     await db.query(
       "update subscriptions set status='active' where workspace_id=$1",
       [W],

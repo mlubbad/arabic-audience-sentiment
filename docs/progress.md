@@ -575,3 +575,17 @@ says key and description are sent to Google, not the name. The design spec's
 code. `coverage_summary.topics_stored` counts only final verdicts. The gateway refuses a
 `max_rows` that is present but not a positive integer. `docs/verification.md` records the
 `npm run check` gates at this head.
+
+## 2026-09-16 — topic classification, the re-review's two corrections
+
+Two corrections to the entry above, from the coordinator's re-review of the fix wave.
+The batch key `run_topics` derives is salted with the lease token —
+`sha256("{lease_token}:{round}:{slice offset}:{sorted ids}")[:32]` — so a re-claimed job,
+whose round 1 repeats the first attempt's round 1 with different verdicts, starts afresh
+instead of hitting `batch_conflict`; within one lease a replay still replays. And the
+quota window in `worker_topics_due` no longer drops a free row that sorts behind more
+costing rows than remain: the predicate is `not costs or spent <= remaining`, so a free row
+is handed over wherever it sorts. While there: a workspace with no active plan (or one
+outside its period) is now told `blocked: 'quota_exceeded'` with *no* rows, free ones
+included, because `reserve_usage` would refuse every record at commit; a plan with nothing
+left still hands the free rows over.

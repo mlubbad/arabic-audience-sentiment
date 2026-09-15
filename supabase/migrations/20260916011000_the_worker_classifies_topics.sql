@@ -49,10 +49,10 @@ declare active text; ver int; begin
                  else private.topic_row_due(w, cm, active) end));
 end $$;
 
--- What the plan can still pay for this period. No subscription, or one that
--- is not active or outside its period, is nothing to spend — the same three
--- refusals reserve_usage raises at commit, read here before the model is
--- called rather than after it has been paid.
+-- What the plan can still pay for this period. Null when there is no
+-- subscription, or it is not active or outside its period — the refusals
+-- reserve_usage raises at commit for every record, charged before or not,
+-- read here before the model is called rather than after it has been paid.
 create function private.topic_units_remaining(w uuid) returns int
 language plpgsql stable security invoker set search_path='' as $$
 declare sub record; begin
@@ -60,7 +60,7 @@ declare sub record; begin
     from public.subscriptions s join public.plans pl on pl.key = s.plan_key
    where s.workspace_id = w and s.status = 'active'
      and now() >= s.period_start and now() < s.period_end;
-  if not found then return 0; end if;
+  if not found then return null; end if;
   return greatest(0, sub.topic_units
                      - private.used_units(w, 'topic_classification', sub.period_start));
 end $$;
@@ -128,13 +128,17 @@ declare w uuid; c uuid; kind text; k text; active text; rows jsonb; taxonomy jso
              and private.topic_row_due(w, cm, k)
         ) r
     ) d
-   where d.spent <= remaining
+   -- Under a live plan a free row is always handed over, wherever it sorts,
+   -- and a costing row only while the costing rows up to and including it
+   -- fit the allowance. Without one nothing can be committed, so nothing is.
+   where remaining is not null and (not d.costs or d.spent <= remaining)
    order by d.published_at nulls last, d.id
    limit least(greatest(coalesce(max_rows, 200), 1), 200)
     ) e;
   -- Rows to classify and nothing to pay for them: said now, before the model
   -- is called. The tick keeps seeing the work; the block is the plan's.
-  if jsonb_array_length(rows) = 0 and remaining = 0 and private.topics_pending(w, c) then
+  if jsonb_array_length(rows) = 0 and coalesce(remaining, 0) = 0
+     and private.topics_pending(w, c) then
     return jsonb_build_object('classification_key', k, 'active', true,
                               'taxonomy', '[]'::jsonb, 'rows', '[]'::jsonb,
                               'blocked', 'quota_exceeded');

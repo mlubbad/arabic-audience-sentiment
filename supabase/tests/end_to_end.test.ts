@@ -412,7 +412,7 @@ describe("worker to database, through the real handler", () => {
     );
 
     // The records topics.analysis.classify builds, key for key, under the
-    // batch key run_topics derives (round 1, slice 0, sorted ids).
+    // batch key run_topics derives (lease token, round 1, slice 0, sorted ids).
     const record = (
       r: (typeof list.rows)[number],
       verdict: Partial<{
@@ -434,7 +434,7 @@ describe("worker to database, through the real handler", () => {
       ...verdict,
     });
     const batchKey = createHash("sha256")
-      .update("1:0:cmt-1,cmt-2")
+      .update(`${lease.lease_token}:1:0:cmt-1,cmt-2`)
       .digest("hex")
       .slice(0, 32);
     const committed = await post("/worker/commit-topics", {
