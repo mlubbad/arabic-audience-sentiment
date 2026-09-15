@@ -204,9 +204,12 @@ fix.
 
 Pending, from selective video sync, all the user's decisions and none of them taken:
 
-- `supabase db push --linked` for the three migrations `20260915130000` through
-  `20260915132000` (catalogue columns, `video_selections`, `select_videos`/
-  `request_discovery`, the worker's due-list/catalogue/tick routes).
+- `supabase db push --linked` for the four migrations `20260915130000` through
+  `20260915140000` (catalogue columns, `video_selections`, `select_videos`/
+  `request_discovery`, the worker's due-list/catalogue/tick routes, and — the fourth, from
+  the final review — the quota priced against every outstanding selection, the last run
+  being the last *collect* run, the tick's hour-long backoff after a failed job, and the
+  pilot plan's 30-minute rate limit).
 - Redeploying the `worker` Edge Function — its `supabase/functions/worker/index.ts` and
   `_shared/worker-gateway.ts` now carry the due-list, commit-catalogue, video-finished and
   tick routes the three migrations above expect, and the deployed function does not yet.
@@ -214,7 +217,7 @@ Pending, from selective video sync, all the user's decisions and none of them ta
   $$select private.schedule_all()$$)` — until then, the worker's own idle-loop `tick()` is
   the only thing that would run `schedule_due_work`, and only while a worker process is up.
 
-Until these three happen, no discovery or collection has run against the real channel and
+Until these happen, no discovery or collection has run against the real channel and
 the catalogue has never been seen signed in — see `docs/verification.md`'s "Not verified"
 for 2026-09-15.
 

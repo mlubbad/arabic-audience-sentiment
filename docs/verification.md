@@ -1229,3 +1229,71 @@ taken for this task — it changes no product code.
   never been scheduled or invoked outside the unit tests that call it directly; the worker
   loop's own `tick()` fallback is what has actually run, and only inside `test_loop.py`'s
   simulated queue.
+
+## 2026-09-15 — the final review's five findings (`d7727a3`…`8998e35`)
+
+Each finding was reproduced by a test written before the fix and watched fail for the
+finding's own reason, then pass. Node `v22.14.0`; logs read from files, exit codes from `$?`.
+
+**SQL** (`supabase/migrations/20260915140000_selection_accounting_and_backoff.sql`; each
+replaced body copied from its current definition and diffed against it — the diffs show only
+the named lines). `npx vitest run supabase/tests/{selection,worker_catalogue,dashboard_read}.test.ts`
+before the migration existed: 7 failed / 28 passed —
+
+- `refuses a second selection that fits alone but not with the first`: the second 4000 on a
+  5000 plan was accepted (`{ job_id: null, queued: false, … }` where `quota_exceeded` was
+  expected) and the response carried no `outstanding`.
+- `a removal alone requests no collection and needs no plan`: `error: no_active_plan` on a
+  remove-only call under a paused subscription.
+- `says a running collection will not include the new video`: no `already_running` key.
+- `reports the last collection as the last run, not a newer discovery`: `videos_seen: 0`
+  (the discover run) where the collect run's `3` was expected.
+- `a collect that failed is not re-enqueued for an hour`: the tick after a failed collect
+  answered `{ collect: 1 }`.
+- `answers the new plan intervals`: pilot `sync_interval` 0 where 30 was expected.
+
+After: 35/35, and `npm run test:db` 17 files, 176 tests. The probes' numbers: first
+selection of 4000 → `estimate 4000, outstanding 0, remaining_after 1000`; second 4000 →
+refused, nothing written; then 900 → `estimate 900, outstanding 4000, remaining_after 100`;
+swapping the first 4000 for the second in one call → `outstanding 900` (the removed
+selection is not owed). A failed collect aged 45 minutes → tick `collect: 0`; aged 61 →
+`collect: 1`; a succeeded job aged 45 minutes (past the 30-minute limit) → `collect: 1`.
+
+Two existing tests moved with the pilot plan's new rate limit rather than with any
+behaviour: the tick test and `connecting a channel queues its first discovery` now age the
+earlier jobs past thirty minutes first, and `request_discovery queues one discover per
+channel` ages the schema tests' `d1`; each is about dedupe, not the limit, and says so.
+
+**Worker** (`workers/python/src/server/runner.py`, `tests/test_backfill.py`): the new test
+drove a claim whose JSON carries no `videos` key at all; before the fix
+`('succeeded', None)` where `('blocked', 'no_due_list')` was expected. After: `npm run
+worker:test` 142 passed, `worker:lint` clean. An explicit `[]` still finishes `succeeded`
+(the existing assertion, unchanged).
+
+**Contract and panel** (`packages/contracts/src/selection.ts`, `apps/web/src/CataloguePanel.tsx`,
+`strings/{ar,en}.ts`): `selectionEstimate` red on the missing `outstanding` (2 failed / 6
+passed), green 8/8 — a selected video with 100 reported and 90 stored owes 10, so 31 more
+fits 50 (`remainingAfter 9`) and not 40 (`exceeds`, `-1`); a selection being removed owes
+nothing; an unknown count owes nothing. `savedFeedback` red as `is not a function`, green
+4/4 across the four answers `select_videos` gives; the removal sentence is asserted to say
+nothing about collection. `npm run typecheck` 0 — the two new sentences have English twins.
+
+**Browser** (`tests/e2e/dashboard.spec.ts`, the catalogue block): run against the changed
+panel before the assertions moved, the bar read `المحدد: 3 فيديو · حتى 21 تعليقًا · يتبقى
+بعدها 5` where `حتى 18` / `يتبقى بعدها 8` were asserted — the fixture's stored selections
+owe 3 (video-1 reports 7 and holds 5; video-2 reports 3 and holds 2; the brief's "4/2 stored
+→ 4" counted video-1 from the dashboard's aggregate, which drops the owner's reply — the
+server, `storedPerVideo` and the row's own `جُمع 5` count 5). The assertions now read 3
+owed before anything is ticked (`حتى 3` / `يتبقى بعدها 23`), nothing owed once the stored two
+are cleared (`حتى 0` / `يتبقى بعدها 26`), and 21 / 5 with video-3 ticked. 4/4 in isolation.
+
+**Gates.** `npm run check > /tmp/check.log; echo $?` → 0 (lint and ruff clean, Prettier
+clean, tsc 0, unit 41 files / 326 tests, db 17 / 176, worker 142, build, secrets).
+`npm run test:e2e > /tmp/e2e.log; echo $?` → 0, 82 passed in 1.1 minutes, load average
+under 5, nothing on 4173 or 5173 beforehand.
+
+**Not verified.** The fourth migration is not applied to the live project (pending beside the
+three before it in `docs/coordination/ACTIVE.md`); `already_running` has not been seen from
+a signed-in browser against a real running job, and the backoff has not been watched across
+a real hour — both are PGlite-only, like the rest of this feature's server side.
+

@@ -409,3 +409,23 @@ the real channel yet, and `select_videos` has not been exercised from a signed-i
 `pg_cron` is not enabled; the fallback tick is what would run live today. All three are the
 user's decisions to make, not this task's to take — see `docs/verification.md` and
 `docs/coordination/ACTIVE.md` for what that leaves unverified and pending.
+
+## 2026-09-15 — the final review's five findings
+
+A whole-branch review of selective video sync confirmed five defects with PGlite probes, and
+each is fixed with the test that failed first (`d7727a3`, `a2eacbe`, `8998e35`; one new
+migration, `20260915140000_selection_accounting_and_backoff.sql`, no shipped file edited).
+The quota check in `select_videos` priced only the call's own additions, so two selections
+that each fit alone were both accepted against the same units; it now counts what every
+stored selection still owes, before it writes, and the bar on the operations page says the
+same figure. The operations page called the newest sync run of any mode the last run, so a
+finished discovery read as a collection that found nothing; only collect runs count now. A
+collection that failed was re-enqueued on every idle tick while the pilot plan had no rate
+limit; a failed, blocked, partial or cancelled job now rests an hour, and the pilot plan
+rate-limits at thirty minutes. The worker finished a collect lease that carried no due list
+as a success; it is blocked as `no_due_list` now, while an empty list is still a channel
+with nothing due. And a save reported "collection requested" while a collection was already
+running — a run whose list was fixed when it was claimed — or when nothing was added at
+all; the panel now says which of four things happened, in both languages. A removal alone
+also reads no plan, so a paused tenant can deselect.
+
