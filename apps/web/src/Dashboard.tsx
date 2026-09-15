@@ -38,7 +38,7 @@ import { WorkspaceGate } from "./WorkspaceGate";
 import { workspaceState, readableWorkspace } from "./workspace";
 import { videoLabel, displayDate, commentText } from "./i18n";
 import { useLocale } from "./locale";
-import { useStrings } from "./strings";
+import { useStrings, type StringKey } from "./strings";
 import { reviewHistory } from "./reviewHistory";
 import { describeSource } from "./dataSource";
 import {
@@ -101,15 +101,16 @@ function ChartFigures({
   unit: string;
   buckets: readonly { label: string; count: number }[];
 }) {
+  const S = useStrings();
   return (
     <details className="rp-figures">
-      <summary>عرض الأرقام</summary>
+      <summary>{S.figuresShow}</summary>
       <table>
         <caption>{caption}</caption>
         <thead>
           <tr>
             <th scope="col">{unit}</th>
-            <th scope="col">تعليقات</th>
+            <th scope="col">{S.figuresComments}</th>
           </tr>
         </thead>
         <tbody>
@@ -130,15 +131,15 @@ function ChartFigures({
  *  how "مقارنة الفيديوهات" and "أكثر التعليقات السلبية تفاعلًا" came to exist
  *  on the page and nowhere in the navigation that claims to enumerate it. */
 const SECTIONS = [
-  { id: "rp-summary", label: "الملخص" },
-  { id: "rp-videos", label: "الفيديوهات" },
-  { id: "rp-voice", label: "صوت الجمهور" },
-  { id: "rp-timing", label: "التوقيت" },
-  { id: "rp-people", label: "المعلّقون" },
-  { id: "rp-compare", label: "المقارنة" },
-  { id: "rp-engaged", label: "الأكثر تفاعلًا" },
-  { id: "rp-comments", label: "التعليقات" },
-] as const;
+  { id: "rp-summary", label: "secSummary" },
+  { id: "rp-videos", label: "secVideos" },
+  { id: "rp-voice", label: "secVoice" },
+  { id: "rp-timing", label: "secTiming" },
+  { id: "rp-people", label: "secPeople" },
+  { id: "rp-compare", label: "secCompare" },
+  { id: "rp-engaged", label: "secEngaged" },
+  { id: "rp-comments", label: "secComments" },
+] as const satisfies readonly { id: string; label: StringKey }[];
 
 /**
  * Which section the reader is in.
@@ -196,6 +197,7 @@ export function Dashboard() {
   const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
     route: true,
   });
+  const S = useStrings();
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,
@@ -222,19 +224,18 @@ export function Dashboard() {
       chosen={chosen}
       onChoose={setChosen}
       words={{
-        eyebrow: "نظرة عامة",
-        chooseTitle: "أي مساحة عمل تريد قراءة تعليقاتها؟",
-        chooseLead:
-          "لكل مساحة قناتها وتعليقاتها؛ لا تُعرض بيانات مساحة داخل أخرى.",
+        eyebrow: S.gateOverviewEyebrow,
+        chooseTitle: S.gateOverviewTitle,
+        chooseLead: S.gateOverviewLead,
         chooseTestId: "ws-choose",
       }}
     >
       {place.kind === "ready" && place.options.length > 1 && (
         <div className="notice">
           <label>
-            مساحة العمل
+            {S.workspaceLabel}
             <select
-              aria-label="تغيير مساحة العمل"
+              aria-label={S.changeWorkspace}
               value={place.id}
               onChange={(e) => setChosen(e.target.value)}
             >
@@ -492,7 +493,7 @@ function DashboardBody({
   /** Narrowing the report: validate, drop the paging, and set them. */
   function applyFilters(over: { video?: string } = {}) {
     if (dateMode !== "unknown" && from && to && from >= to) {
-      setFormError("يجب أن يسبق تاريخ البداية تاريخ النهاية");
+      setFormError(S.dateOrderError);
       return;
     }
     setFormError("");
@@ -526,18 +527,18 @@ function DashboardBody({
   // page is quietly conditional on them. Naming them is the difference
   // between a filtered report and a wrong one.
   const activeFilters = [
-    query && `بحث: «${query}»`,
-    video && "فيديو محدَّد",
-    sentiment && `المشاعر: ${labels[sentiment as Label] ?? sentiment}`,
-    videoKind && "نوع فيديو",
-    commentType && "نوع تعليق",
+    query && S.chipSearch(query),
+    video && S.chipVideo,
+    sentiment && S.chipSentiment(labels[sentiment as Label] ?? sentiment),
+    videoKind && S.chipVideoKind,
+    commentType && S.chipCommentType,
     replies !== "all" &&
-      (replies === "replies" ? "الردود فقط" : "التعليقات فقط"),
+      (replies === "replies" ? S.chipRepliesOnly : S.chipCommentsOnly),
     reviewStatus !== "all" &&
-      (reviewStatus === "reviewed" ? "المراجَعة فقط" : "غير المراجَعة فقط"),
+      (reviewStatus === "reviewed" ? S.chipReviewedOnly : S.chipUnreviewedOnly),
     dateMode !== "all" &&
-      (dateMode === "known" ? "بتاريخ معروف" : "بلا تاريخ معروف"),
-    (from || to) && "فترة محدَّدة",
+      (dateMode === "known" ? S.chipDatedOnly : S.chipUndatedOnly),
+    (from || to) && S.chipPeriod,
   ].filter(Boolean) as string[];
   const s = result.data;
   const active = useActiveSection(!!s && s.total > 0);
@@ -587,7 +588,7 @@ function DashboardBody({
   const range =
     span.length > 0
       ? `${span[0].date} — ${span[span.length - 1].date}`
-      : "لا توجد تواريخ معروفة";
+      : S.noKnownDates;
   return (
     <div className="rp-page">
       {/* A page head, not a hero. Inside the shell this is styled flat, on
@@ -597,9 +598,9 @@ function DashboardBody({
           way the operations page's already did. */}
       <header className="rp-hero">
         <p className="rp-eyebrow">
-          نظرة عامة {workspaceName ? `· ${workspaceName}` : "· معاينة تجريبية"}
+          {S.dashEyebrow} · {workspaceName ?? S.dashDemoTag}
         </p>
-        <h1>ماذا يقول جمهورك — وأين يقوله؟</h1>
+        <h1>{S.dashTitle}</h1>
         {/* Before the read returns there is no count, and `?? 0` would have
             printed "قراءة 0 تعليقًا" over a page that is still loading —
             unknown rendered as a measurement of none. The banner says what it
@@ -610,15 +611,12 @@ function DashboardBody({
                 محسوب من الصفوف المحفوظة — لا تقدير ولا استقراء" — is a pitch
                 about the method; the provenance strip below says what the
                 data is, which is the checkable version of it. */}
-            <p>
-              قراءة {n(s.total)} تعليقًا عبر {s.videos.length} فيديو، مع من
-              قالها ومتى.
-            </p>
+            <p>{S.dashRead(n(s.total), s.videos.length)}</p>
             <div className="rp-pills">
               <span className="rp-pill">{range}</span>
-              <span className="rp-pill">{n(s.total)} تعليقًا</span>
+              <span className="rp-pill">{S.pillComments(n(s.total))}</span>
               <span className="rp-pill">
-                {n(s.unique_authors)} معلّقًا معروفًا
+                {S.pillAuthors(n(s.unique_authors))}
               </span>
             </div>
             {/* The answer, on the first screen.
@@ -631,7 +629,7 @@ function DashboardBody({
                 Denominator said out loud: the classified rows, not the total. */}
             {s.analysed > 0 && (
               <p className="rp-hero-split" data-testid="hero-split">
-                <span>من {n(s.analysed)} تعليقًا مصنَّفًا:</span>
+                <span>{S.splitOf(n(s.analysed))}</span>
                 {(Object.keys(s.sentiments) as Label[])
                   .filter((k) => s.measurable.has(k))
                   .map((k) => (
@@ -643,7 +641,7 @@ function DashboardBody({
             )}
           </>
         ) : (
-          <p>جارٍ قراءة التعليقات المحفوظة…</p>
+          <p>{S.readingStored}</p>
         )}
       </header>
       {/* Two sections were missing from this list and two more were being
@@ -651,7 +649,7 @@ function DashboardBody({
           unrendered, and the nav went on linking to six of them. A control
           that does nothing when pressed is worse than an absent one — the
           reader concludes the page is broken rather than empty. */}
-      <nav className="rp-nav" aria-label="أقسام التقرير">
+      <nav className="rp-nav" aria-label={S.reportSectionsLabel}>
         {s && s.total > 0 && (
           <div className="rp-nav-links">
             {SECTIONS.map((section) => (
@@ -664,7 +662,7 @@ function DashboardBody({
                 // removed.
                 aria-current={active === section.id ? "true" : undefined}
               >
-                {section.label}
+                {S[section.label]}
               </a>
             ))}
           </div>
@@ -679,14 +677,14 @@ function DashboardBody({
             className="rp-scope rp-scope-filtered"
             data-testid="active-filters"
           >
-            <span>مُصفّى:</span>
+            <span>{S.filteredLabel}</span>
             {activeFilters.map((f) => (
               <span key={f} className="rp-scope-chip">
                 {f}
               </span>
             ))}
             <button type="button" onClick={reset}>
-              اعرض الكل
+              {S.showAll}
             </button>
           </p>
         ) : (
@@ -713,18 +711,18 @@ function DashboardBody({
         aria-controls="report-filters"
         onClick={() => setFiltersOpen((open) => !open)}
       >
-        {filtersOpen ? "إخفاء الفلاتر" : "إظهار الفلاتر"}
+        {filtersOpen ? S.hideFilters : S.showFilters}
         <span aria-hidden="true">{filtersOpen ? "−" : "+"}</span>
       </button>
       <form
         id="report-filters"
-        aria-label="فلاتر التقرير"
+        aria-label={S.filtersLabel}
         hidden={!filtersOpen}
         onSubmit={apply}
         className="filters rp-card rp-filters"
       >
         <label>
-          البحث في التعليقات والمؤلفين
+          {S.searchLabel}
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -732,13 +730,13 @@ function DashboardBody({
           />
         </label>
         <label>
-          الفيديو
+          {S.videoLabelText}
           <select
-            aria-label="الفيديو"
+            aria-label={S.videoLabelText}
             value={video}
             onChange={(e) => setVideo(e.target.value)}
           >
-            <option value="">كل الفيديوهات</option>
+            <option value="">{S.allVideos}</option>
             {/* Built from the videos actually in the current read. These were
                 hard-coded to the two fixture ids, so a live account was
                 offered a choice between two videos it does not have and none
@@ -751,13 +749,13 @@ function DashboardBody({
           </select>
         </label>
         <label>
-          المشاعر
+          {S.sentimentLabel}
           <select
-            aria-label="المشاعر"
+            aria-label={S.sentimentLabel}
             value={sentiment}
             onChange={(e) => setSentiment(e.target.value)}
           >
-            <option value="">كل المشاعر</option>
+            <option value="">{S.allSentiments}</option>
             {Object.entries(labels).map(([key, text]) => (
               <option key={key} value={key}>
                 {text}
@@ -766,30 +764,30 @@ function DashboardBody({
           </select>
         </label>
         <label>
-          نوع الفيديو
+          {S.videoKindLabel}
           <select
-            aria-label="نوع الفيديو"
+            aria-label={S.videoKindLabel}
             value={videoKind}
             onChange={(e) => setVideoKind(e.target.value)}
           >
-            <option value="">كل الأنواع</option>
-            <option value="video">فيديو</option>
-            <option value="short">شورت</option>
-            <option value="stream">بث</option>
+            <option value="">{S.allKinds}</option>
+            <option value="video">{S.kindVideo}</option>
+            <option value="short">{S.kindShort}</option>
+            <option value="stream">{S.kindStream}</option>
           </select>
         </label>
         <label>
-          نوع المشاركة
+          {S.participationLabel}
           <select
-            aria-label="نوع المشاركة"
+            aria-label={S.participationLabel}
             value={replies}
             onChange={(e) =>
               setReplies(e.target.value as "all" | "comments" | "replies")
             }
           >
-            <option value="all">تعليقات وردود</option>
-            <option value="comments">تعليقات أصلية فقط</option>
-            <option value="replies">ردود فقط</option>
+            <option value="all">{S.commentsAndReplies}</option>
+            <option value="comments">{S.originalOnly}</option>
+            <option value="replies">{S.repliesOnly}</option>
           </select>
         </label>
         {/* Only when the data has types to offer. Comment types come from
@@ -798,13 +796,13 @@ function DashboardBody({
             something to operate that could not change the answer. */}
         {(result.data?.comment_types ?? []).length > 0 && (
           <label>
-            نوع التعليق
+            {S.commentTypeLabel}
             <select
-              aria-label="نوع التعليق"
+              aria-label={S.commentTypeLabel}
               value={commentType}
               onChange={(e) => setCommentType(e.target.value)}
             >
-              <option value="">كل الأنواع</option>
+              <option value="">{S.allKinds}</option>
               {(result.data?.comment_types ?? []).map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -814,9 +812,9 @@ function DashboardBody({
           </label>
         )}
         <label>
-          حالة المراجعة
+          {S.reviewStatusLabel}
           <select
-            aria-label="حالة المراجعة"
+            aria-label={S.reviewStatusLabel}
             value={reviewStatus}
             onChange={(e) =>
               setReviewStatus(
@@ -824,27 +822,27 @@ function DashboardBody({
               )
             }
           >
-            <option value="all">الكل</option>
-            <option value="reviewed">مراجَعة بشريًا</option>
-            <option value="unreviewed">دون مراجعة</option>
+            <option value="all">{S.all}</option>
+            <option value="reviewed">{S.reviewedByHuman}</option>
+            <option value="unreviewed">{S.unreviewed}</option>
           </select>
         </label>
         <label>
-          التاريخ
+          {S.dateLabel}
           <select
-            aria-label="التاريخ"
+            aria-label={S.dateLabel}
             value={dateMode}
             onChange={(e) =>
               setDateMode(e.target.value as "all" | "known" | "unknown")
             }
           >
-            <option value="all">كل التواريخ</option>
-            <option value="known">التواريخ المعروفة</option>
-            <option value="unknown">بلا تاريخ معروف</option>
+            <option value="all">{S.allDates}</option>
+            <option value="known">{S.knownDates}</option>
+            <option value="unknown">{S.unknownDates}</option>
           </select>
         </label>
         <label>
-          من تاريخ
+          {S.fromDate}
           <input
             type="date"
             value={from}
@@ -853,7 +851,7 @@ function DashboardBody({
           />
         </label>
         <label>
-          إلى تاريخ (غير شامل)
+          {S.toDate}
           <input
             type="date"
             value={to}
@@ -862,9 +860,9 @@ function DashboardBody({
           />
         </label>
         <label>
-          عدد التعليقات في الصفحة
+          {S.perPageLabel}
           <select
-            aria-label="عدد التعليقات في الصفحة"
+            aria-label={S.perPageLabel}
             value={limit}
             onChange={(e) => {
               goTo([]);
@@ -879,99 +877,85 @@ function DashboardBody({
           </select>
         </label>
         <div>
-          <button type="submit">تطبيق الفلاتر</button>
+          <button type="submit">{S.applyFilters}</button>
           <button type="button" onClick={reset}>
-            إعادة ضبط الفلاتر
+            {S.resetFilters}
           </button>
         </div>
       </form>
-      <p className="muted">
-        الفترة حسب تاريخ نشر التعليق بتوقيت إسطنبول. التواريخ غير المعروفة تظهر
-        عند عرض كل الفترات.
-      </p>
+      <p className="muted">{S.periodNote}</p>
       {formError && <p role="alert">{formError}</p>}
       {result.isPending && (
         <div role="status" data-testid="loading" className="loading">
-          جارٍ تحميل التعليقات…
+          {S.loadingComments}
         </div>
       )}
       {!result.isPending && result.isFetching && (
         <p role="status" data-testid="updating" className="updating">
-          جارٍ تحديث النتائج…
+          {S.updatingResults}
         </p>
       )}
       {result.isError && (
         <div role="alert" className="notice" data-testid="load-error">
           <p>
             {result.failure?.startsWith("view:")
-              ? "وصلت بياناتك، لكن تعذّر تطبيق الفلاتر عليها."
-              : "تعذر تحميل البيانات. حاول مرة أخرى."}
+              ? S.filtersFailed
+              : S.loadFailed}
           </p>
           {/* Small, and last. It is for the person who has to fix it, not for
               the person reading the report — but it is on the screen, because
               the alternative is fetching the payload by hand to find out what
               a page in front of you already knows. */}
           <p className="muted" data-testid="failure-code">
-            رمز العطل: <code>{result.failure}</code>
+            {S.failureCode} <code>{result.failure}</code>
           </p>
-          <button onClick={() => void result.refetch()}>إعادة المحاولة</button>
+          <button onClick={() => void result.refetch()}>{S.retry}</button>
         </div>
       )}
       {s && (
         <>
           <section className="rp-section" id="rp-summary">
             <header>
-              <h2>الملخص</h2>
+              <h2>{S.secSummary}</h2>
               <p className="rp-sub">
-                الأرقام أدناه تتبع الفلاتر المطبَّقة أعلاه.
+                {S.summaryLead}
                 {s.channel_own_comments > 0 && (
                   <>
                     {" "}
                     <span data-testid="owner-excluded">
-                      وتستبعد {n(s.channel_own_comments)} ردًّا من القناة نفسها:
-                      ردُّ القناة على متابعيها ليس رأي جمهورها، ولا يدخل في أي
-                      مقام هنا. لذلك يقل الإجمالي عمّا يظهر على يوتيوب بهذا
-                      العدد.
+                      {S.ownerExcluded(n(s.channel_own_comments))}
                     </span>
                   </>
                 )}
               </p>
             </header>
-            <div className="rp-grid rp-grid-5" aria-label="المؤشرات">
+            <div className="rp-grid rp-grid-5" aria-label={S.metricsLabel}>
               <article className="rp-card rp-metric">
-                <span className="rp-metric-label">التعليقات والردود</span>
+                <span className="rp-metric-label">{S.metricComments}</span>
                 <strong className="rp-metric-value" data-testid="total">
                   {n(s.total)}
                 </strong>
-                <span className="rp-metric-note">كل ما تطابق مع الفلاتر.</span>
+                <span className="rp-metric-note">{S.metricCommentsNote}</span>
               </article>
               <article className="rp-card rp-metric">
-                <span className="rp-metric-label">المحلَّلة</span>
+                <span className="rp-metric-label">{S.metricAnalysed}</span>
                 <strong className="rp-metric-value">{n(s.analysed)}</strong>
-                <span className="rp-metric-note">
-                  تحمل تصنيفًا صالحًا للتحليل الحالي.
-                </span>
+                <span className="rp-metric-note">{S.metricAnalysedNote}</span>
               </article>
               <article className="rp-card rp-metric">
-                <span className="rp-metric-label">
-                  غير المحلَّلة أو القديمة
-                </span>
+                <span className="rp-metric-label">{S.metricUnanalysed}</span>
                 <strong className="rp-metric-value">{n(s.unanalysed)}</strong>
-                <span className="rp-metric-note">
-                  محفوظة، ولا تدخل في نسب المشاعر.
-                </span>
+                <span className="rp-metric-note">{S.metricUnanalysedNote}</span>
               </article>
               <article className="rp-card rp-metric">
-                <span className="rp-metric-label">الردود</span>
+                <span className="rp-metric-label">{S.metricReplies}</span>
                 <strong className="rp-metric-value" data-testid="replies-count">
                   {n(s.replies)}
                 </strong>
-                <span className="rp-metric-note">
-                  ردود على تعليقات، لا تعليقات أصلية.
-                </span>
+                <span className="rp-metric-note">{S.metricRepliesNote}</span>
               </article>
               <article className="rp-card rp-metric">
-                <span className="rp-metric-label">معلّقون معروفون</span>
+                <span className="rp-metric-label">{S.metricAuthors}</span>
                 <strong className="rp-metric-value">
                   {n(s.unique_authors)}
                 </strong>
@@ -979,7 +963,7 @@ function DashboardBody({
                   {/* Counted by channel id. Rows whose author was purged are
                       not countable as people and are excluded rather than
                       guessed at. */}
-                  محسوبون بمعرّف القناة، لا بالاسم المعروض.
+                  {S.metricAuthorsNote}
                 </span>
               </article>
             </div>
@@ -994,35 +978,43 @@ function DashboardBody({
                   not there. A marker should say something true about what it
                   marks; "3" said only that it came after "2". */}
               <article className="rp-insight">
-                <p className="rp-insight-tag">التحليل</p>
+                <p className="rp-insight-tag">{S.insightAnalysis}</p>
                 <p>
                   {s.total > 0
-                    ? `حُلِّل ${Math.round((s.analysed / s.total) * 100)}٪ من التعليقات المطابقة. الباقي محفوظ بلا تصنيف، ولا يدخل في أي نسبة مشاعر.`
-                    : "لا توجد تعليقات مطابقة، فلا نسبة تحليل يمكن ذكرها."}
+                    ? S.insightAnalysed(
+                        Math.round((s.analysed / s.total) * 100),
+                      )
+                    : S.insightNoMatches}
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">الردود</p>
+                <p className="rp-insight-tag">{S.insightReplies}</p>
                 <p>
                   {s.total > 0
-                    ? `${Math.round((s.replies / s.total) * 100)}٪ منها ردود — أي حوار بين المشاهدين أنفسهم لا خطاب موجَّه إلى القناة.`
-                    : "لا بيانات كافية لقياس نسبة الردود."}
+                    ? S.insightRepliesShare(
+                        Math.round((s.replies / s.total) * 100),
+                      )
+                    : S.insightRepliesNone}
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">تركّز الحديث</p>
+                <p className="rp-insight-tag">{S.insightConcentration}</p>
                 <p>
                   {s.videos.length > 0
-                    ? `أنشط فيديو جمع ${n(s.videos[0].total)} تعليقًا من أصل ${n(s.total)} — أي ${Math.round((s.videos[0].total / s.total) * 100)}٪ من الحديث كله.`
-                    : "لا فيديو ضمن الفلاتر الحالية."}
+                    ? S.insightTopVideo(
+                        n(s.videos[0].total),
+                        n(s.total),
+                        Math.round((s.videos[0].total / s.total) * 100),
+                      )
+                    : S.insightNoVideo}
                 </p>
               </article>
               <article className="rp-insight">
-                <p className="rp-insight-tag">التواريخ</p>
+                <p className="rp-insight-tag">{S.insightDates}</p>
                 <p>
                   {s.unknown_dates > 0
-                    ? `${n(s.unknown_dates)} تعليقًا بلا تاريخ معروف. لا تظهر في رسوم التوقيت، ولم تُوضع في خانة افتراضية.`
-                    : "كل التعليقات المطابقة تحمل تاريخًا معروفًا."}
+                    ? S.insightUndated(n(s.unknown_dates))
+                    : S.insightAllDated}
                 </p>
               </article>
             </div>
@@ -1038,30 +1030,24 @@ function DashboardBody({
             <section className="empty" data-testid="empty-state">
               {s.workspace_total === 0 ? (
                 <>
-                  <h2>لم تصل تعليقات بعد</h2>
-                  <p>
-                    لا توجد تعليقات محفوظة لمساحة العمل هذه. لا علاقة للفلاتر
-                    بذلك — لم يكتمل جمعٌ بعد.
-                  </p>
+                  <h2>{S.emptyNoCommentsTitle}</h2>
+                  <p>{S.emptyNoCommentsLead}</p>
                   <div className="empty-actions">
-                    <a href="/sync">تابع حالة الجمع</a>
-                    <a href="/account">اربط قناة أو اطلب مزامنة</a>
+                    <a href="/sync">{S.emptyFollowCollection}</a>
+                    <a href="/account">{S.emptyConnectOrSync}</a>
                   </div>
                 </>
               ) : (
                 <>
-                  <h2>لا توجد تعليقات مطابقة لهذه الفلاتر</h2>
-                  <p>
-                    {n(s.workspace_total)} تعليقًا محفوظًا في مساحة العمل، ولا
-                    واحد منها يطابق ما اخترته. وسّع الفلاتر أو أعد ضبطها.
-                  </p>
+                  <h2>{S.emptyNoMatchTitle}</h2>
+                  <p>{S.emptyNoMatchLead(n(s.workspace_total))}</p>
                   <div className="empty-actions">
                     {/* Not "إعادة ضبط الفلاتر", which is what the button in
                         the filter bar says. Two controls with one name are one
                         name too few — and from an empty page the useful
                         promise is the result, not the mechanism. */}
                     <button type="button" onClick={reset}>
-                      اعرض كل التعليقات
+                      {S.showAllComments}
                     </button>
                   </div>
                 </>
@@ -1071,11 +1057,8 @@ function DashboardBody({
             <>
               <section className="rp-section" id="rp-videos">
                 <header>
-                  <h2>الفيديوهات</h2>
-                  <p className="rp-sub">
-                    اضغط أي فيديو لتصفية اللوحة كاملة عليه. الأرقام مشتقة من
-                    التعليقات المحفوظة، لا من مؤشرات يوتيوب للفيديو.
-                  </p>
+                  <h2>{S.secVideos}</h2>
+                  <p className="rp-sub">{S.videosLead}</p>
                 </header>
                 <ul className="rp-videos">
                   {s.videos.map((v) => {
@@ -1113,9 +1096,9 @@ function DashboardBody({
                               {videoLabel(v.id, v.title, S)}
                             </span>
                             <span className="rp-video-meta">
-                              <span>{n(v.total)} تعليقًا</span>
-                              <span>{n(v.replies)} ردًّا</span>
-                              <span>{n(v.analysed)} محلَّلًا</span>
+                              <span>{S.countComments(n(v.total))}</span>
+                              <span>{S.countReplies(n(v.replies))}</span>
+                              <span>{S.countAnalysed(n(v.analysed))}</span>
                             </span>
                             {/* Only the segments that hold something. The 2px
                                 gap that keeps two touching fills apart would
@@ -1147,7 +1130,7 @@ function DashboardBody({
                           </span>
                           <span className="rp-video-figure">
                             <strong>{n(v.total)}</strong>
-                            <span>تعليقًا</span>
+                            <span>{S.unitComments}</span>
                           </span>
                         </button>
                       </li>
@@ -1157,15 +1140,12 @@ function DashboardBody({
               </section>
               <section className="rp-section" id="rp-voice">
                 <header>
-                  <h2>صوت الجمهور</h2>
-                  <p className="rp-sub">
-                    المقام: {n(s.analysed)} تعليقًا ذا تصنيف صالح — لا العدد
-                    الكلي. المشاعر المختلطة فئة مستقلة، لا وسط بين طرفين.
-                  </p>
+                  <h2>{S.secVoice}</h2>
+                  <p className="rp-sub">{S.voiceLead(n(s.analysed))}</p>
                 </header>
                 <div className="rp-grid rp-grid-2">
                   <article className="rp-card">
-                    <h3>المشاعر</h3>
+                    <h3>{S.sentimentsTitle}</h3>
                     {s.analysed > 0 ? (
                       <>
                         <div className="rp-chart-donut" aria-hidden="true">
@@ -1223,17 +1203,16 @@ function DashboardBody({
                                     aria-hidden="true"
                                   />
                                   {measurable ? (
-                                    <>
-                                      {labels[key as Label]}: {n(v)} (
-                                      {s.analysed
+                                    S.legendMeasured(
+                                      labels[key as Label],
+                                      n(v),
+                                      s.analysed
                                         ? Math.round((v / s.analysed) * 100)
-                                        : 0}
-                                      ٪)
-                                    </>
+                                        : 0,
+                                    )
                                   ) : (
                                     <span data-testid={`unmeasurable-${key}`}>
-                                      {labels[key as Label]}: لا يقيسه النموذج
-                                      الحالي
+                                      {S.legendUnmeasured(labels[key as Label])}
                                     </span>
                                   )}
                                 </span>
@@ -1244,23 +1223,20 @@ function DashboardBody({
                       </>
                     ) : (
                       <p className="rp-missing">
-                        <strong>لا يوجد تصنيف بعد</strong>
-                        التعليقات محفوظة ولم يُشغَّل عليها نموذج تصنيف، فلا توجد
-                        نسبة مشاعر تُعرض. هذا غياب تحليل، لا حياد جمهور.
+                        <strong>{S.noLabelsStrong}</strong>
+                        {S.noLabelsLead}
                       </p>
                     )}
                   </article>
                   <article className="rp-card">
-                    <h3>الموضوعات</h3>
+                    <h3>{S.topicsTitle}</h3>
                     {/* The reference groups comments into themes with a
                         language model. We have not built that layer, and
                         clustering by keyword would produce topic names nobody
                         chose and a chart that looks like analysis. */}
                     <p className="rp-missing">
-                      <strong>غير متاح بعد</strong>
-                      تصنيف التعليقات إلى موضوعات يحتاج طبقة نموذج لغوي لم تُبنَ
-                      بعد. لن يُعرض هنا رسم مشتق من كلمات مفتاحية ويُقدَّم كأنه
-                      تحليل موضوعي.
+                      <strong>{S.topicsUnavailableStrong}</strong>
+                      {S.topicsUnavailableLead}
                     </p>
                   </article>
                 </div>
@@ -1280,36 +1256,29 @@ function DashboardBody({
                 >
                   <article className="rp-figure" data-tone="negative">
                     <strong>{n(s.sentiments.negative)}</strong>
-                    <p>
-                      تعليقًا سلبيًا — وهي التي تستحق قراءة نصّها لا نسبتها.
-                    </p>
+                    <p>{S.figureNegative}</p>
                   </article>
                   <article className="rp-figure" data-tone="positive">
                     <strong>{n(s.sentiments.positive)}</strong>
-                    <p>تعليقًا إيجابيًا ضمن المحلَّل.</p>
+                    <p>{S.figurePositive}</p>
                   </article>
                   <article className="rp-figure" data-tone="none">
                     <strong>{n(s.unanalysed)}</strong>
-                    <p>بلا تصنيف بعد، ولا تدخل في أي نسبة أعلاه.</p>
+                    <p>{S.figureUnanalysed}</p>
                   </article>
                 </div>
               </section>
               <section className="rp-section" id="rp-timing">
                 <header>
-                  <h2>توقيت التفاعل</h2>
-                  <p className="rp-sub">
-                    متى يصل التعليق. تعليق بتوقيت تقريبي («منذ ٣ أشهر») لا يمكن
-                    وضعه في ساعة، فيُستبعد ويُذكر عدده بدل أن يُسنَد إلى منتصف
-                    الليل.
-                  </p>
+                  <h2>{S.timingTitle}</h2>
+                  <p className="rp-sub">{S.timingLead}</p>
                 </header>
                 <article className="rp-card">
-                  <h3>التعليقات أسبوعيًا</h3>
+                  <h3>{S.weeklyTitle}</h3>
                   {!plottable(weeks, 3) ? (
                     <p className="rp-missing" data-testid="weeks-unplottable">
-                      <strong>لا يكفي لرسم اتجاه</strong>
-                      التعليقات المطابقة تقع في أقل من ثلاثة أسابيع. رسم خط
-                      عبرها كان سيبدو قياسًا لاتجاه، ولا يوجد اتجاه بعد.
+                      <strong>{S.weeklyTooFewStrong}</strong>
+                      {S.weeklyTooFewLead}
                     </p>
                   ) : (
                     <div className="rp-chart rp-chart-tall" aria-hidden="true">
@@ -1333,15 +1302,15 @@ function DashboardBody({
                   )}
                   {plottable(weeks, 3) && (
                     <ChartFigures
-                      caption="التعليقات المطابقة، حسب الأسبوع"
-                      unit="الأسبوع"
+                      caption={S.weeklyCaption}
+                      unit={S.weeklyUnit}
                       buckets={weeks.buckets}
                     />
                   )}
                   <p className="rp-metric-note">
                     {weeks.unplaceable > 0
-                      ? `${n(weeks.unplaceable)} تعليقًا بلا تاريخ صالح لم يدخل هذا الرسم.`
-                      : "كل التعليقات المطابقة دخلت هذا الرسم."}
+                      ? S.weeklyUnplaceable(n(weeks.unplaceable))
+                      : S.weeklyAllPlaced}
                   </p>
                 </article>
                 <div
@@ -1349,12 +1318,11 @@ function DashboardBody({
                   style={{ marginTop: "var(--space-4)" }}
                 >
                   <article className="rp-card">
-                    <h3>حسب ساعة اليوم</h3>
+                    <h3>{S.hourlyTitle}</h3>
                     {!plottable(hours) ? (
                       <p className="rp-missing">
-                        <strong>لا يكفي لرسم توزيع</strong>
-                        ساعة واحدة أو أقل تحمل تعليقًا. أعمدة فارغة عبر اليوم
-                        كانت ستقول إننا قِسنا فوجدنا سكونًا.
+                        <strong>{S.distributionTooFewStrong}</strong>
+                        {S.hourlyTooFewLead}
                       </p>
                     ) : (
                       <div className="rp-chart" aria-hidden="true">
@@ -1375,23 +1343,23 @@ function DashboardBody({
                     )}
                     {plottable(hours) && (
                       <ChartFigures
-                        caption="التعليقات المطابقة، حسب ساعة اليوم"
-                        unit="الساعة"
+                        caption={S.hourlyCaption}
+                        unit={S.hourlyUnit}
                         buckets={hours.buckets}
                       />
                     )}
                     <p className="rp-metric-note" data-testid="hours-excluded">
                       {hours.unplaceable > 0
-                        ? `${n(hours.unplaceable)} تعليقًا بتوقيت أخشن من الساعة، مستبعَد من هذا الرسم.`
-                        : "كل التعليقات المطابقة قابلة للوضع في ساعة."}
+                        ? S.hourlyUnplaceable(n(hours.unplaceable))
+                        : S.hourlyAllPlaced}
                     </p>
                   </article>
                   <article className="rp-card">
-                    <h3>حسب يوم الأسبوع</h3>
+                    <h3>{S.weekdayTitle}</h3>
                     {!plottable(weekdays) ? (
                       <p className="rp-missing">
-                        <strong>لا يكفي لرسم توزيع</strong>
-                        يوم واحد أو أقل يحمل تعليقًا ضمن الفلاتر الحالية.
+                        <strong>{S.distributionTooFewStrong}</strong>
+                        {S.weekdayTooFewLead}
                       </p>
                     ) : (
                       <div className="rp-chart" aria-hidden="true">
@@ -1412,14 +1380,14 @@ function DashboardBody({
                     )}
                     {plottable(weekdays) && (
                       <ChartFigures
-                        caption="التعليقات المطابقة، حسب يوم الأسبوع"
-                        unit="اليوم"
+                        caption={S.weekdayCaption}
+                        unit={S.weekdayUnit}
                         buckets={weekdays.buckets}
                       />
                     )}
-                    <p className="rp-metric-note">اليوم بتوقيت متصفحك.</p>
+                    <p className="rp-metric-note">{S.weekdayNote}</p>
                     <p className="rp-metric-note">
-                      تعليقات بلا تاريخ:{" "}
+                      {S.undatedLabel}{" "}
                       <span data-testid="unknown-dates">{s.unknown_dates}</span>
                     </p>
                   </article>
@@ -1427,12 +1395,8 @@ function DashboardBody({
               </section>
               <section className="rp-section" id="rp-people">
                 <header>
-                  <h2>المعلّقون</h2>
-                  <p className="rp-sub">
-                    من يتحدّث، ومن يجد صدى. الهوية بمعرّف القناة لا بالاسم
-                    المعروض: شخصان قد يتشابه اسمهما، ودمجهما يخترع معلّقًا لا
-                    وجود له.
-                  </p>
+                  <h2>{S.secPeople}</h2>
+                  <p className="rp-sub">{S.peopleLead}</p>
                 </header>
                 <article className="rp-card">
                   <div className="rp-tabs" style={{ marginBottom: "16px" }}>
@@ -1442,7 +1406,7 @@ function DashboardBody({
                       aria-pressed={peopleBy === "comments"}
                       onClick={() => setPeopleBy("comments")}
                     >
-                      الأكثر نشاطًا
+                      {S.mostActive}
                     </button>
                     <button
                       type="button"
@@ -1450,14 +1414,13 @@ function DashboardBody({
                       aria-pressed={peopleBy === "likes"}
                       onClick={() => setPeopleBy("likes")}
                     >
-                      الأكثر تأثيرًا
+                      {S.mostInfluential}
                     </button>
                   </div>
                   {people.ranked.length === 0 ? (
                     <p className="rp-missing">
-                      <strong>لا يوجد معلّق يمكن عدّه</strong>
-                      لا تحمل الصفوف المطابقة اسم كاتب — إمّا لعدم وجود تعليقات،
-                      أو لأن الأسماء حُذفت تحت قاعدة الاحتفاظ.
+                      <strong>{S.noCommenterStrong}</strong>
+                      {S.noCommenterLead}
                     </p>
                   ) : (
                     <ol className="rp-people">
@@ -1470,14 +1433,14 @@ function DashboardBody({
                           <span className="rp-rank">{i + 1}</span>
                           <span className="rp-person-name">{c.name}</span>
                           <span className="rp-person-n">
-                            {n(c.comments)} تعليقًا
+                            {S.countComments(n(c.comments))}
                           </span>
                           <span className="rp-person-likes">
                             {/* Unknown stays unknown: a source that showed no
                                 count is not a source that showed zero. */}
                             {c.likes === null
-                              ? "إعجابات غير معروفة"
-                              : `${n(c.likes)} إعجابًا`}
+                              ? S.likesUnknown
+                              : S.countLikes(n(c.likes))}
                           </span>
                         </li>
                       ))}
@@ -1485,8 +1448,7 @@ function DashboardBody({
                   )}
                   {people.anonymous > 0 && (
                     <p className="rp-metric-note" data-testid="rp-anonymous">
-                      {n(people.anonymous)} تعليقًا كاتبها محذوف تحت قاعدة
-                      الاحتفاظ. لم يُدمج في معلّق واحد، ولا يظهر في الترتيب.
+                      {S.anonymousNote(n(people.anonymous))}
                     </p>
                   )}
                 </article>
@@ -1497,28 +1459,24 @@ function DashboardBody({
                 aria-labelledby="comparison-heading"
               >
                 <header>
-                  <h2 id="comparison-heading">مقارنة الفيديوهات</h2>
+                  <h2 id="comparison-heading">{S.compareTitle}</h2>
                 </header>
                 <p className="muted" data-testid="comparison-scope">
-                  أرقام مشتقة من التعليقات ضمن الفلاتر الحالية فقط. ليست مؤشرات
-                  الفيديو الكلية: لتلك نطاق وتاريخ رصد مستقلان.
+                  {S.compareScope}
                 </p>
                 {s.comparison_truncated && (
-                  <p className="muted">
-                    تُقارَن الفيديوهات الأكثر تعليقًا فقط؛ بقية الفيديوهات ضمن
-                    الفلاتر غير معروضة هنا.
-                  </p>
+                  <p className="muted">{S.compareTruncated}</p>
                 )}
                 <div className="table-wrap">
                   <table>
-                    <caption>مقارنة الفيديوهات ضمن الفلاتر</caption>
+                    <caption>{S.compareCaption}</caption>
                     <thead>
                       <tr>
-                        <th scope="col">الفيديو</th>
-                        <th scope="col">التعليقات</th>
-                        <th scope="col">الردود</th>
-                        <th scope="col">المحللة</th>
-                        <th scope="col">التوزيع</th>
+                        <th scope="col">{S.colVideo}</th>
+                        <th scope="col">{S.colComments}</th>
+                        <th scope="col">{S.colReplies}</th>
+                        <th scope="col">{S.colAnalysed}</th>
+                        <th scope="col">{S.colDistribution}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1530,7 +1488,7 @@ function DashboardBody({
                           <td>{v.analysed}</td>
                           <td>
                             {v.analysed === 0 ? (
-                              <small>لا توجد تعليقات محللة ضمن الفلاتر</small>
+                              <small>{S.noAnalysedInFilters}</small>
                             ) : (
                               <>
                                 {/* A comparison table whose comparison column
@@ -1565,8 +1523,11 @@ function DashboardBody({
                                   {Object.entries(v.sentiments).map(
                                     ([k, n]) => (
                                       <li key={k}>
-                                        {labels[k as Label]} {n} (
-                                        {Math.round((n / v.analysed) * 100)}٪)
+                                        {S.shareItem(
+                                          labels[k as Label],
+                                          n,
+                                          Math.round((n / v.analysed) * 100),
+                                        )}
                                       </li>
                                     ),
                                   )}
@@ -1587,16 +1548,11 @@ function DashboardBody({
                 data-testid="engaged-panel"
               >
                 <header>
-                  <h2 id="engaged-heading">أكثر التعليقات السلبية تفاعلًا</h2>
+                  <h2 id="engaged-heading">{S.engagedTitle}</h2>
                 </header>
-                <p className="muted">
-                  ترتيب حسب الإعجابات ضمن الفلاتر الحالية. الإعجابات لا تُرجِّح
-                  التصنيف، وقلب صاحب القناة ليس مشاعر إيجابية.
-                </p>
+                <p className="muted">{S.engagedLead}</p>
                 {s.most_engaged_negative.length === 0 ? (
-                  <p data-testid="engaged-empty">
-                    لا توجد تعليقات سلبية بإعجابات معروفة ضمن الفلاتر.
-                  </p>
+                  <p data-testid="engaged-empty">{S.engagedEmpty}</p>
                 ) : (
                   /* A heading promising a ranking, over a run of sentences
                      that began with a number. Ranked things want a rank: the
@@ -1611,13 +1567,13 @@ function DashboardBody({
                         <li key={c.id} data-testid={`engaged-${c.id}`}>
                           <span className="engaged-count">
                             <strong>{c.likes_raw ?? c.likes_value}</strong>
-                            <span>إعجابًا</span>
+                            <span>{S.unitLikes}</span>
                           </span>
                           <span className="engaged-body">
                             <span className="engaged-text">
                               {commentText(c, S)}
                             </span>
-                            {c.reviewed && <small>مراجعة بشرية</small>}
+                            {c.reviewed && <small>{S.humanReview}</small>}
                             <span
                               className="engaged-bar"
                               aria-hidden="true"
@@ -1637,14 +1593,15 @@ function DashboardBody({
                 )}
                 {s.negative_ranked > s.most_engaged_negative.length && (
                   <p className="muted" data-testid="engaged-truncated">
-                    تُعرض {s.most_engaged_negative.length} من{" "}
-                    {s.negative_ranked} تعليقًا سلبيًا لها عدد إعجابات معروف.
+                    {S.engagedTruncated(
+                      s.most_engaged_negative.length,
+                      s.negative_ranked,
+                    )}
                   </p>
                 )}
                 {s.negative_unranked > 0 && (
                   <p className="muted" data-testid="engaged-unranked">
-                    {s.negative_unranked} تعليقًا سلبيًا بلا عدد إعجابات معروف،
-                    فلم تدخل الترتيب. عدد غير معروف ليس صفرًا.
+                    {S.engagedUnranked(s.negative_unranked)}
                   </p>
                 )}
               </section>
@@ -1654,11 +1611,8 @@ function DashboardBody({
                 data-testid="comments-table"
               >
                 <header>
-                  <h2>التعليقات</h2>
-                  <p className="rp-sub">
-                    اضغط أي بطاقة لقراءة التعليق كاملًا، والجدول تحتها هو مكان
-                    التصحيح والتصدير والتنقّل بين الصفحات.
-                  </p>
+                  <h2>{S.secComments}</h2>
+                  <p className="rp-sub">{S.commentsLead}</p>
                 </header>
                 <div className="rp-tabs" style={{ marginBottom: "16px" }}>
                   <button
@@ -1667,7 +1621,7 @@ function DashboardBody({
                     aria-pressed={cardTab === "liked"}
                     onClick={() => setCardTab("liked")}
                   >
-                    الأكثر إعجابًا
+                    {S.tabMostLiked}
                   </button>
                   <button
                     type="button"
@@ -1675,7 +1629,7 @@ function DashboardBody({
                     aria-pressed={cardTab === "recent"}
                     onClick={() => setCardTab("recent")}
                   >
-                    الأحدث
+                    {S.tabNewest}
                   </button>
                   <button
                     type="button"
@@ -1683,7 +1637,7 @@ function DashboardBody({
                     aria-pressed={cardTab === "critical"}
                     onClick={() => setCardTab("critical")}
                   >
-                    النقدية
+                    {S.tabCritical}
                   </button>
                 </div>
                 <ul className="rp-comments" data-testid="rp-cards">
@@ -1699,7 +1653,7 @@ function DashboardBody({
                           className="rp-chip"
                           data-label={c.label ?? "none"}
                         >
-                          {c.label ? labels[c.label] : "بلا تصنيف"}
+                          {c.label ? labels[c.label] : S.noLabel}
                           {c.label &&
                             !c.reviewed &&
                             typeof c.prediction?.class_scores?.[c.label] ===
@@ -1709,7 +1663,7 @@ function DashboardBody({
                                   (c.prediction.class_scores[c.label] ?? 0) *
                                     100,
                                 )}
-                                ٪
+                                {lang === "ar" ? "٪" : "%"}
                               </span>
                             )}
                         </span>
@@ -1721,8 +1675,8 @@ function DashboardBody({
                           {/* Unknown likes are said to be unknown. Rendering a
                               zero here would be a number we invented. */}
                           {c.likes_value === null
-                            ? "إعجابات غير معروفة"
-                            : `${n(c.likes_value)} إعجابًا`}
+                            ? S.likesUnknown
+                            : S.countLikes(n(c.likes_value))}
                         </span>
                       </div>
                     </li>
@@ -1734,7 +1688,7 @@ function DashboardBody({
                     data-testid="cursor-notice"
                     className="muted"
                   >
-                    تغيّرت النتائج فأُعيد العرض من الصفحة الأولى.
+                    {S.cursorReset}
                   </p>
                 )}
                 {/* Above the table, not under it.
@@ -1750,29 +1704,25 @@ function DashboardBody({
                     onClick={() => exporting.mutate()}
                     disabled={exporting.isPending}
                   >
-                    تصدير CSV
+                    {S.exportCsv}
                   </button>
-                  <p className="muted">
-                    يصدّر كل التعليقات المطابقة للفلاتر الحالية ({s.total}) وليس
-                    الصفحة المعروضة فقط. تُعطَّل صيغ الجداول في الملف دون تغيير
-                    النص المخزن.
-                  </p>
+                  <p className="muted">{S.exportNote(s.total)}</p>
                   {exporting.isError && (
                     <p role="alert" data-testid="export-error">
-                      تعذر إنشاء ملف التصدير. حاول مرة أخرى.
+                      {S.exportFailed}
                     </p>
                   )}
                 </div>
                 <div className="table-wrap">
                   <table>
-                    <caption>التعليقات ضمن الفلاتر</caption>
+                    <caption>{S.commentsCaption}</caption>
                     <thead>
                       <tr>
-                        <th scope="col">المؤلف</th>
-                        <th scope="col">التعليق</th>
-                        <th scope="col">المشاعر</th>
-                        <th scope="col">التاريخ</th>
-                        <th scope="col">التصحيح</th>
+                        <th scope="col">{S.colAuthor}</th>
+                        <th scope="col">{S.colComment}</th>
+                        <th scope="col">{S.colSentiment}</th>
+                        <th scope="col">{S.colDate}</th>
+                        <th scope="col">{S.colCorrection}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1780,7 +1730,7 @@ function DashboardBody({
                         <tr key={c.id}>
                           <td>
                             {c.author_name ?? S.purgedAuthor}
-                            {c.is_reply && <small>رد</small>}
+                            {c.is_reply && <small>{S.replyTag}</small>}
                           </td>
                           <td>{commentText(c, S)}</td>
                           <td>
@@ -1792,7 +1742,7 @@ function DashboardBody({
                               className="rp-chip"
                               data-label={c.label ?? "none"}
                             >
-                              {c.label ? labels[c.label] : "غير محلل / قديم"}
+                              {c.label ? labels[c.label] : S.unanalysedOrOld}
                               {c.label &&
                                 !c.reviewed &&
                                 typeof c.prediction?.class_scores?.[c.label] ===
@@ -1802,21 +1752,23 @@ function DashboardBody({
                                       (c.prediction.class_scores[c.label] ??
                                         0) * 100,
                                     )}
-                                    ٪
+                                    {lang === "ar" ? "٪" : "%"}
                                   </span>
                                 )}
                             </span>
 
-                            {c.reviewed && <small>مراجعة بشرية</small>}
+                            {c.reviewed && <small>{S.humanReview}</small>}
                           </td>
                           <td>{displayDate(c.published_at, lang)}</td>
                           <td>
                             <button
                               type="button"
                               onClick={(e) => startReview(c, e.currentTarget)}
-                              aria-label={`تصحيح تصنيف تعليق ${c.author_name}`}
+                              aria-label={S.correctLabelFor(
+                                c.author_name ?? S.purgedAuthor,
+                              )}
                             >
-                              تصحيح
+                              {S.correct}
                             </button>
                           </td>
                         </tr>
@@ -1829,28 +1781,27 @@ function DashboardBody({
                     className="review"
                     ref={reviewFormRef}
                     tabIndex={-1}
-                    aria-label="تصحيح التصنيف"
+                    aria-label={S.reviewFormLabel}
                     onSubmit={(e) => {
                       e.preventDefault();
                       review.mutate();
                     }}
                   >
-                    <h3>تصحيح تصنيف تعليق</h3>
+                    <h3>{S.reviewTitle}</h3>
                     <blockquote data-testid="review-text">
                       {commentText(reviewing, S)}
                     </blockquote>
                     <p className="muted">
-                      التصنيف الحالي:{" "}
-                      {reviewing.label ? labels[reviewing.label] : "غير محلل"}.
-                      التصحيح البشري يلغي تنبؤ النموذج لهذا النص، ويسقط تلقائيًا
-                      إذا تغيّر نص التعليق لاحقًا.
+                      {S.reviewCurrent(
+                        reviewing.label
+                          ? labels[reviewing.label]
+                          : S.unanalysed,
+                      )}
                     </p>
                     <div data-testid="review-history">
-                      <h4>سجل المراجعات</h4>
+                      <h4>{S.reviewHistoryTitle}</h4>
                       {reviewing.reviews.length === 0 ? (
-                        <p className="muted">
-                          لا توجد مراجعات سابقة لهذا التعليق.
-                        </p>
+                        <p className="muted">{S.reviewHistoryEmpty}</p>
                       ) : (
                         <ol className="history">
                           {reviewHistory(reviewing).map(
@@ -1859,7 +1810,7 @@ function DashboardBody({
                                 <strong>{labels[r.label]}</strong>
                                 <span>{displayDate(r.created_at, lang)}</span>
                                 <span data-testid="review-by">
-                                  {r.reviewer_id ?? "مراجع غير معروف"}
+                                  {r.reviewer_id ?? S.reviewerUnknown}
                                 </span>
                                 <small data-state={state}>
                                   {S.reviewStateMessages[state]}
@@ -1874,9 +1825,9 @@ function DashboardBody({
                       )}
                     </div>
                     <label>
-                      التصنيف الصحيح
+                      {S.correctLabel}
                       <select
-                        aria-label="التصنيف الصحيح"
+                        aria-label={S.correctLabel}
                         value={verdict}
                         onChange={(e) => setVerdict(e.target.value as Label)}
                       >
@@ -1888,7 +1839,7 @@ function DashboardBody({
                       </select>
                     </label>
                     <label>
-                      سبب التصحيح
+                      {S.correctionReason}
                       <input
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
@@ -1899,13 +1850,13 @@ function DashboardBody({
                     {review.isError && (
                       <p role="alert" data-testid="review-error">
                         {review.error.message === "stale_comment_text"
-                          ? "تغيّر نص التعليق بعد فتح هذه الشاشة. أعد قراءته ثم صحّح التصنيف."
-                          : "تعذر حفظ التصحيح. حاول مرة أخرى."}
+                          ? S.reviewStale
+                          : S.reviewSaveFailed}
                       </p>
                     )}
                     <div>
                       <button type="submit" disabled={review.isPending}>
-                        حفظ التصحيح
+                        {S.saveCorrection}
                       </button>
                       <button
                         type="button"
@@ -1914,28 +1865,30 @@ function DashboardBody({
                           closeReview();
                         }}
                       >
-                        إلغاء
+                        {S.cancel}
                       </button>
                     </div>
                     {!reviewsArePersisted(mode) && (
                       <p className="muted" data-testid="review-scope">
-                        وضع البيانات الاصطناعية: يُحفظ التصحيح في هذه الجلسة فقط
-                        ولا يُرسل إلى أي خادم.
+                        {S.reviewFixtureScope}
                       </p>
                     )}
                   </form>
                 )}
-                <nav className="pager" aria-label="تصفح التعليقات">
+                <nav className="pager" aria-label={S.pagerLabel}>
                   <button
                     type="button"
                     disabled={cursors.length === 0 || result.isFetching}
                     onClick={() => goTo(cursors.slice(0, -1))}
                   >
-                    الصفحة السابقة
+                    {S.previousPage}
                   </button>
                   <p data-testid="page-state" aria-live="polite">
-                    الصفحة {cursors.length + 1} — عرض {s.comments.length} من{" "}
-                    {s.total} تعليقًا ضمن الفلاتر
+                    {S.pageState(
+                      cursors.length + 1,
+                      s.comments.length,
+                      s.total,
+                    )}
                   </p>
                   <button
                     type="button"
@@ -1944,7 +1897,7 @@ function DashboardBody({
                       s.next_cursor && goTo([...cursors, s.next_cursor])
                     }
                   >
-                    الصفحة التالية
+                    {S.nextPage}
                   </button>
                 </nav>
               </section>

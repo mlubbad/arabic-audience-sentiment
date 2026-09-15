@@ -26,11 +26,12 @@ import { supabase } from "./supabase";
 import { carriedSearch } from "./workspaceUrl";
 import {
   applyToDocument,
+  currentLocale,
   DEFAULT_LOCALE,
   direction,
   useLocale,
 } from "./locale";
-import { useStrings, type StringKey } from "./strings";
+import { loadStrings, useStrings, type StringKey } from "./strings";
 import { LanguageSwitch } from "./LanguageSwitch";
 const Dashboard = lazy(() =>
   import("./Dashboard").then((m) => ({ default: m.Dashboard })),
@@ -368,21 +369,25 @@ function NotFound() {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={client}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/account" element={<Account />} />
-            <Route path="/sync" element={<Sync />} />
-            <Route path="/connected" element={<Connected />} />
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
-  </React.StrictMode>,
+// The stored language's strings are in hand before the first render: a reader
+// who chose English does not see Arabic for a frame while it loads.
+void loadStrings(currentLocale()).then(() =>
+  createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <QueryClientProvider client={client}>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/account" element={<Account />} />
+              <Route path="/sync" element={<Sync />} />
+              <Route path="/connected" element={<Connected />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </React.StrictMode>,
+  ),
 );

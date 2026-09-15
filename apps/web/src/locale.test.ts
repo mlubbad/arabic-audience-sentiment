@@ -101,19 +101,49 @@ describe("the two string sets", () => {
   });
 
   it("are each written in their own script, with no Arabic left in the English", () => {
+    // Sentences, code tables and word lists alike; counted sentences are
+    // functions and are exercised where they are used.
+    const leaves = (v: unknown, path: string): [string, string][] =>
+      typeof v === "string"
+        ? [[path, v]]
+        : Array.isArray(v)
+          ? v.flatMap((x, i) => leaves(x, `${path}[${i}]`))
+          : v && typeof v === "object"
+            ? Object.entries(v).flatMap(([k, x]) => leaves(x, `${path}.${k}`))
+            : [];
     for (const key of keys) {
       const a = ar[key];
       const e = en[key];
       expect(typeof e, key).toBe(typeof a);
-      if (typeof a === "string") {
-        expect(a.trim(), key).not.toBe("");
-        if (key !== "switchToOther")
-          expect(e as string, key).not.toMatch(/[\u0600-\u06FF]/);
-        expect((e as string).trim(), key).not.toBe("");
+      const arabic = leaves(a, key);
+      const english = leaves(e, key);
+      expect(
+        english.map(([p]) => p),
+        key,
+      ).toEqual(arabic.map(([p]) => p));
+      for (const [path, text] of arabic) expect(text.trim(), path).not.toBe("");
+      for (const [path, text] of english) {
+        expect(text.trim(), path).not.toBe("");
+        if (path !== "switchToOther")
+          expect(text, path).not.toMatch(/[\u0600-\u06FF]/);
       }
     }
     // The one deliberate exception: the switch names the other language in
     // that language.
     expect(en.switchToOther).toBe("العربية");
+  });
+});
+
+describe("English counts", () => {
+  it("change the noun at one, and only at one", () => {
+    expect(en.pillComments("1")).toBe("1 comment");
+    expect(en.pillComments("2")).toBe("2 comments");
+    expect(en.pillComments("1,234")).toBe("1,234 comments");
+    expect(en.insightUndated("1")).toMatch(/^1 comment has /);
+    expect(en.insightUndated("0")).toMatch(/^0 comments have /);
+    expect(en.dashRead("1", 1)).toBe(
+      "1 comment read across 1 video, with who said them and when.",
+    );
+    expect(en.engagedUnranked(1)).toMatch(/1 negative comment has .* was not/);
   });
 });

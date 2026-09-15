@@ -9,7 +9,7 @@
  * it in either state.
  */
 import { otherLocale, setLocale, useLocale } from "./locale";
-import { useStrings } from "./strings";
+import { loadStrings, useStrings } from "./strings";
 
 export function LanguageSwitch() {
   const locale = useLocale();
@@ -22,7 +22,9 @@ export function LanguageSwitch() {
       lang={other}
       aria-label={S.switchLabel}
       data-testid="language-switch"
-      onClick={() => setLocale(other)}
+      // The other language's strings arrive before the locale flips, so the
+      // page never renders one language's words under the other's `lang`.
+      onClick={() => void loadStrings(other).then(() => setLocale(other))}
     >
       {S.switchToOther}
     </button>

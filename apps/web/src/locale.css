@@ -42,3 +42,17 @@
   border-color: rgba(255, 255, 255, 0.5);
   color: #fff;
 }
+
+/* The phone-width rail is a sheet anchored to the inline end and hidden with
+   a physical `translateX(-100%)` — right for a right-to-left document, where
+   the inline end is the left edge. In English the inline end is the right
+   edge, and the same translate slides the closed sheet INTO the page as a
+   dark band over the content. Same breakpoint as app.css. */
+@media (max-width: 900px) {
+  .app-rail:lang(en) {
+    transform: translateX(100%);
+  }
+  .app-rail.is-open:lang(en) {
+    transform: none;
+  }
+}

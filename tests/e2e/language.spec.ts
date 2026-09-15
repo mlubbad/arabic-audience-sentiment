@@ -83,3 +83,30 @@ test("in English, tracking returns to the Latin labels the Arabic rules had zero
     true,
   );
 });
+
+test("on a phone in English the closed rail sheet is off-screen, and opens on request", async ({
+  page,
+}) => {
+  // The sheet hides with a physical translateX(-100%), right for RTL where
+  // the inline end is the left edge. Mirrored in English; the first English
+  // render at phone width showed the closed sheet as a dark band over the
+  // content, which is what this asserts against.
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/dashboard");
+  await page.getByTestId("language-switch").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  const rail = page.locator("#app-rail");
+  // The sheet slides, so the position is polled until the transition ends.
+  const railX = async () => (await rail.boundingBox())?.x ?? NaN;
+  await expect.poll(railX).toBeGreaterThanOrEqual(375);
+  await page.getByRole("button", { name: "App menu" }).click();
+  const railRight = async () => {
+    const box = await rail.boundingBox();
+    return box ? box.x + box.width : NaN;
+  };
+  await expect.poll(railRight).toBeLessThanOrEqual(375.5);
+  await expect.poll(railX).toBeGreaterThanOrEqual(0);
+  await expect(
+    rail.getByRole("link", { name: "Sources & account" }),
+  ).toBeVisible();
+});

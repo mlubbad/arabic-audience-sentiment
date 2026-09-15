@@ -2,6 +2,12 @@
  *  type error, not a key name on screen. See `ar.ts` for the rules. */
 import type { Strings } from "./ar";
 
+/** English counts. The number arrives already formatted ("1,234"), so the
+ *  test is on the string; one is the only count that changes the noun. */
+const one = (n: string | number) => String(n) === "1";
+const pl = (n: string | number, singular: string, plural: string) =>
+  one(n) ? singular : plural;
+
 export const en: Strings = {
   brand: "Audience Sentiment",
   brandOwner: "by Sky Develop",
@@ -357,7 +363,7 @@ export const en: Strings = {
 
   dsNoRun: "No collection has been recorded for this workspace yet.",
   dsCounted: (comments: string, videos: string) =>
-    `${comments} comments from ${videos} videos`,
+    `${comments} ${pl(comments, "comment", "comments")} from ${videos} ${pl(videos, "video", "videos")}`,
   dsCoverageComplete: (counted: string) =>
     `${counted}. The source was read to its end in the last collection.`,
   dsCoveragePartial: (counted: string) =>
@@ -365,12 +371,13 @@ export const en: Strings = {
   dsNoPreviousRun: "There is no previous collection.",
   dsHealthUnknown: "The collection status is unknown.",
   dsUpdatedUnderHour: "Last updated less than an hour ago.",
-  dsUpdatedHours: (hours: string) => `Last updated ${hours} hours ago.`,
+  dsUpdatedHours: (hours: string) =>
+    `Last updated ${hours} ${pl(hours, "hour", "hours")} ago.`,
   dsFixtureBadge: "Synthetic data",
   dsFixtureScope: "A demo workspace, not connected to any channel",
   dsFixtureReading: "Reading the test data.",
   dsFixtureCoverage: (total: string) =>
-    `${total} comments written for testing. They represent no real audience.`,
+    `${total} ${pl(total, "comment", "comments")} written for testing. They represent no real audience.`,
   dsReviewsPersist: "Corrections are saved.",
   dsReviewsSessionOnly:
     "Corrections stay in this session only and are not sent to any server.",
@@ -398,7 +405,7 @@ export const en: Strings = {
   retry: "Try again",
   opsHealthTitle: "Sync health",
   opsUnclassifiedFailure: "The sync failed for an unclassified reason",
-  opsQueued: (n: number) => `Jobs waiting: ${n}`,
+  opsQueued: (n: number) => `${pl(n, "Job", "Jobs")} waiting: ${n}`,
   opsWorkerLabel: "Collection:",
   opsWorkerConnected: (heartbeat: string) =>
     `running, last sign of life ${heartbeat}`,
@@ -445,4 +452,255 @@ export const en: Strings = {
   opsSyncRequestFailed: "The sync request could not be registered.",
   opsSyncRequestStanding:
     "Your sync request is in. Each channel has one request at a time, and it starts when collection is running.",
+
+  figuresShow: "Show the figures",
+  figuresComments: "Comments",
+  secSummary: "Summary",
+  secVideos: "Videos",
+  secVoice: "Audience voice",
+  secTiming: "Timing",
+  secPeople: "Commenters",
+  secCompare: "Comparison",
+  secEngaged: "Most engaged",
+  secComments: "Comments",
+  dateOrderError: "The start date must come before the end date",
+  chipSearch: (q: string) => `search: “${q}”`,
+  chipVideo: "one video",
+  chipSentiment: (label: string) => `sentiment: ${label}`,
+  chipVideoKind: "video kind",
+  chipCommentType: "comment type",
+  chipRepliesOnly: "replies only",
+  chipCommentsOnly: "comments only",
+  chipReviewedOnly: "reviewed only",
+  chipUnreviewedOnly: "unreviewed only",
+  chipDatedOnly: "with a known date",
+  chipUndatedOnly: "without a known date",
+  chipPeriod: "a set period",
+  noKnownDates: "No known dates",
+  dashEyebrow: "Overview",
+  dashDemoTag: "demo preview",
+  dashTitle: "What does your audience say — and where?",
+  dashRead: (comments: string, videos: number) =>
+    `${comments} ${pl(comments, "comment", "comments")} read across ${videos} ${pl(videos, "video", "videos")}, with who said them and when.`,
+  pillComments: (n: string) => `${n} ${pl(n, "comment", "comments")}`,
+  pillAuthors: (n: string) => `${n} known ${pl(n, "commenter", "commenters")}`,
+  splitOf: (n: string) => `Of ${n} classified ${pl(n, "comment", "comments")}:`,
+  readingStored: "Reading the stored comments…",
+  reportSectionsLabel: "Report sections",
+  filteredLabel: "Filtered:",
+  showAll: "Show all",
+  hideFilters: "Hide filters",
+  showFilters: "Show filters",
+  filtersLabel: "Report filters",
+  searchLabel: "Search comments and authors",
+  videoLabelText: "Video",
+  allVideos: "All videos",
+  sentimentLabel: "Sentiment",
+  allSentiments: "All sentiments",
+  videoKindLabel: "Video kind",
+  allKinds: "All kinds",
+  kindVideo: "Video",
+  kindShort: "Short",
+  kindStream: "Stream",
+  participationLabel: "Participation",
+  commentsAndReplies: "Comments and replies",
+  originalOnly: "Original comments only",
+  repliesOnly: "Replies only",
+  commentTypeLabel: "Comment type",
+  reviewStatusLabel: "Review status",
+  all: "All",
+  reviewedByHuman: "Reviewed by a person",
+  unreviewed: "Not reviewed",
+  dateLabel: "Date",
+  allDates: "All dates",
+  knownDates: "Known dates",
+  unknownDates: "No known date",
+  fromDate: "From date",
+  toDate: "To date (exclusive)",
+  perPageLabel: "Comments per page",
+  applyFilters: "Apply filters",
+  resetFilters: "Reset filters",
+  periodNote:
+    "The period follows the comment's publication date, Istanbul time. Comments with no known date appear when all periods are shown.",
+  loadingComments: "Loading comments…",
+  updatingResults: "Updating results…",
+  filtersFailed:
+    "Your data arrived, but the filters could not be applied to it.",
+  loadFailed: "The data could not be loaded. Try again.",
+  failureCode: "Failure code:",
+  summaryLead: "The figures below follow the filters applied above.",
+  ownerExcluded: (n: string) =>
+    `They exclude ${n} ${pl(n, "reply", "replies")} from the channel itself: the channel replying to its followers is not its audience's opinion, and enters no denominator here. The total is therefore lower than YouTube shows by that number.`,
+  metricsLabel: "Indicators",
+  metricComments: "Comments and replies",
+  metricCommentsNote: "Everything that matched the filters.",
+  metricAnalysed: "Analysed",
+  metricAnalysedNote: "Carry a label valid for the current analysis.",
+  metricUnanalysed: "Unanalysed or outdated",
+  metricUnanalysedNote: "Stored, and not part of the sentiment shares.",
+  metricReplies: "Replies",
+  metricRepliesNote: "Replies to comments, not original comments.",
+  metricAuthors: "Known commenters",
+  metricAuthorsNote: "Counted by channel id, not by display name.",
+  insightAnalysis: "Analysis",
+  insightAnalysed: (pct: number) =>
+    `${pct}% of the matching comments were analysed. The rest are stored without a label and enter no sentiment share.`,
+  insightNoMatches:
+    "No comments match, so there is no analysis share to report.",
+  insightReplies: "Replies",
+  insightRepliesShare: (pct: number) =>
+    `${pct}% of them are replies — conversation among viewers, not speech aimed at the channel.`,
+  insightRepliesNone: "Not enough data to measure the share of replies.",
+  insightConcentration: "Concentration",
+  insightTopVideo: (top: string, total: string, pct: number) =>
+    `The busiest video gathered ${top} of ${total} comments — ${pct}% of all the talk.`,
+  insightNoVideo: "No video within the current filters.",
+  insightDates: "Dates",
+  insightUndated: (n: string) =>
+    `${n} ${pl(n, "comment has", "comments have")} no known date. They do not appear in the timing charts and were not put in a default slot.`,
+  insightAllDated: "Every matching comment has a known date.",
+
+  emptyNoCommentsTitle: "No comments have arrived yet",
+  emptyNoCommentsLead:
+    "There are no stored comments for this workspace. The filters have nothing to do with it — no collection has completed yet.",
+  emptyFollowCollection: "Follow the collection status",
+  emptyConnectOrSync: "Connect a channel or request a sync",
+  emptyNoMatchTitle: "No comments match these filters",
+  emptyNoMatchLead: (total: string) =>
+    `${total} ${pl(total, "comment is", "comments are")} stored in the workspace, and none matches what you chose. Widen the filters or reset them.`,
+  showAllComments: "Show all comments",
+  videosLead:
+    "Click any video to filter the whole dashboard to it. The figures come from the stored comments, not from YouTube's video metrics.",
+  countComments: (n: string) => `${n} ${pl(n, "comment", "comments")}`,
+  countReplies: (n: string) => `${n} ${pl(n, "reply", "replies")}`,
+  countAnalysed: (n: string) => `${n} analysed`,
+  unitComments: "comments",
+  voiceLead: (analysed: string) =>
+    `Denominator: ${analysed} comments with a valid label — not the total. Mixed sentiment is its own class, not a midpoint between two.`,
+  sentimentsTitle: "Sentiment",
+  legendMeasured: (label: string, count: string, pct: number) =>
+    `${label}: ${count} (${pct}%)`,
+  legendUnmeasured: (label: string) =>
+    `${label}: not measured by the current model`,
+  noLabelsStrong: "No labels yet",
+  noLabelsLead:
+    "The comments are stored and no classifier has run on them, so there is no sentiment share to show. This is an absence of analysis, not a neutral audience.",
+  topicsTitle: "Topics",
+  topicsUnavailableStrong: "Not available yet",
+  topicsUnavailableLead:
+    "Sorting comments into topics needs a language-model layer that has not been built. No chart derived from keywords will be shown here and presented as topic analysis.",
+  figureNegative:
+    "negative comments — the ones worth reading in full, not as a share.",
+  figurePositive: "positive comments among those analysed.",
+  figureUnanalysed: "not labelled yet, and part of no share above.",
+  timingTitle: "Engagement timing",
+  timingLead:
+    "When comments arrive. A comment with an approximate time (“3 months ago”) cannot be placed in an hour, so it is left out and counted rather than assigned to midnight.",
+  weeklyTitle: "Comments by week",
+  weeklyTooFewStrong: "Too few to draw a trend",
+  weeklyTooFewLead:
+    "The matching comments fall within fewer than three weeks. A line across them would look like a measured trend, and there is no trend yet.",
+  weeklyCaption: "Matching comments, by week",
+  weeklyUnit: "Week",
+  weeklyUnplaceable: (n: string) =>
+    `${n} ${pl(n, "comment", "comments")} with no valid date ${pl(n, "is", "are")} not in this chart.`,
+  weeklyAllPlaced: "Every matching comment is in this chart.",
+  hourlyTitle: "By hour of day",
+  distributionTooFewStrong: "Too few to draw a distribution",
+  hourlyTooFewLead:
+    "One hour or fewer carries a comment. Empty columns across the day would have said we measured and found silence.",
+  hourlyCaption: "Matching comments, by hour of day",
+  hourlyUnit: "Hour",
+  hourlyUnplaceable: (n: string) =>
+    `${n} ${pl(n, "comment", "comments")} with a time coarser than an hour ${pl(n, "is", "are")} left out of this chart.`,
+  hourlyAllPlaced: "Every matching comment can be placed in an hour.",
+  weekdayTitle: "By day of week",
+  weekdayTooFewLead:
+    "One day or fewer carries a comment within the current filters.",
+  weekdayCaption: "Matching comments, by day of week",
+  weekdayUnit: "Day",
+  weekdayNote: "Day in your browser's time zone.",
+  undatedLabel: "Comments without a date:",
+  peopleLead:
+    "Who speaks, and who is heard. Identity is by channel id, not display name: two people may share a name, and merging them invents a commenter who does not exist.",
+  mostActive: "Most active",
+  mostInfluential: "Most influential",
+  noCommenterStrong: "No commenter can be counted",
+  noCommenterLead:
+    "The matching rows carry no author name — either there are no comments, or the names were removed under the retention rule.",
+  likesUnknown: "likes unknown",
+  countLikes: (n: string) => `${n} ${pl(n, "like", "likes")}`,
+  anonymousNote: (n: string) =>
+    `${n} ${pl(n, "comment has", "comments have")} an author removed under the retention rule. They were not merged into one commenter and do not appear in the ranking.`,
+  compareTitle: "Video comparison",
+  compareScope:
+    "Figures derived from the comments within the current filters only. Not the video's overall metrics: those have their own scope and observation date.",
+  compareTruncated:
+    "Only the most-commented videos are compared; the other videos within the filters are not shown here.",
+  compareCaption: "Video comparison within the filters",
+  colVideo: "Video",
+  colComments: "Comments",
+  colReplies: "Replies",
+  colAnalysed: "Analysed",
+  colDistribution: "Distribution",
+  noAnalysedInFilters: "No analysed comments within the filters",
+  shareItem: (label: string, count: number, pct: number) =>
+    `${label} ${count} (${pct}%)`,
+
+  engagedTitle: "Most engaged negative comments",
+  engagedLead:
+    "Ranked by likes within the current filters. Likes do not weight the label, and a heart from the channel owner is not positive sentiment.",
+  engagedEmpty:
+    "No negative comments with a known like count within the filters.",
+  unitLikes: "likes",
+  humanReview: "human review",
+  engagedTruncated: (shown: number, ranked: number) =>
+    `Showing ${shown} of ${ranked} negative ${pl(ranked, "comment", "comments")} with a known like count.`,
+  engagedUnranked: (n: number) =>
+    `${n} negative ${pl(n, "comment has", "comments have")} no known like count and ${pl(n, "was", "were")} not ranked. Unknown is not zero.`,
+  commentsLead:
+    "Click any card to read the comment in full; the table below it is where corrections, export and paging live.",
+  tabMostLiked: "Most liked",
+  tabNewest: "Newest",
+  tabCritical: "Critical",
+  noLabel: "no label",
+  cursorReset:
+    "The results changed, so the view restarted from the first page.",
+  exportCsv: "Export CSV",
+  exportNote: (total: number) =>
+    `Exports every comment matching the current filters (${total}), not only the page shown. Spreadsheet formulas are neutralised in the file without changing the stored text.`,
+  exportFailed: "The export file could not be created. Try again.",
+  commentsCaption: "Comments within the filters",
+  colAuthor: "Author",
+  colComment: "Comment",
+  colSentiment: "Sentiment",
+  colDate: "Date",
+  colCorrection: "Correction",
+  replyTag: "reply",
+  unanalysedOrOld: "unanalysed / outdated",
+  correctLabelFor: (author: string) =>
+    `Correct the label of the comment by ${author}`,
+  correct: "Correct",
+  reviewFormLabel: "Correct the label",
+  reviewTitle: "Correct a comment's label",
+  reviewCurrent: (label: string) =>
+    `Current label: ${label}. A human correction overrides the model's prediction for this text, and lapses automatically if the comment's text changes later.`,
+  unanalysed: "unanalysed",
+  reviewHistoryTitle: "Review history",
+  reviewHistoryEmpty: "No previous reviews for this comment.",
+  reviewerUnknown: "unknown reviewer",
+  correctLabel: "Correct label",
+  correctionReason: "Reason for the correction",
+  reviewStale:
+    "The comment's text changed after this screen was opened. Read it again, then correct the label.",
+  reviewSaveFailed: "The correction could not be saved. Try again.",
+  saveCorrection: "Save correction",
+  cancel: "Cancel",
+  reviewFixtureScope:
+    "Synthetic data mode: the correction is kept in this session only and is not sent to any server.",
+  pagerLabel: "Browse comments",
+  previousPage: "Previous page",
+  nextPage: "Next page",
+  pageState: (page: number, shown: number, total: number) =>
+    `Page ${page} — showing ${shown} of ${total} ${pl(total, "comment", "comments")} within the filters`,
 };

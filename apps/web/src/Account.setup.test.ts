@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ar } from "./strings/ar";
 import { resetLocale, setLocale } from "./locale";
+import { loadStrings } from "./strings";
 import { WorkspaceCard, type ChannelRow } from "./WorkspaceCard";
 import { setupSteps } from "./setup";
 
@@ -141,7 +142,8 @@ describe("a workspace card", () => {
     ).not.toContain("relink-");
   });
 
-  it("speaks English when the interface does, from the same rows", () => {
+  it("speaks English when the interface does, from the same rows", async () => {
+    await loadStrings("en");
     setLocale("en");
     try {
       const html = render({
