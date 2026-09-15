@@ -1080,3 +1080,13 @@ into the dashboard and asserts the demo comments keep `lang="ar" dir="rtl"` insi
 left-to-right page and the CTA's arrow turns with the text. Seen at 1280px in both
 languages; the Arabic page is unchanged. English chunk 37.6 kB (12.9 gzipped); main
 552.0 kB (161.7 gzipped).
+
+## 2026-09-15 — preview deploy of c895e14
+
+Built from a detached worktree at `c895e14` (the checkout was clean this time; the
+worktree is kept as the habit). Transfer log: 31 files at 226, including
+`static/index-D7tk0koE.js` (552,007 bytes) and `static/en-_fVKwHg5.js` (37,605 bytes,
+now carrying the landing's English); the sweep removed the twelve superseded hashed
+assets — twelve rather than nine because the other session's landing and dashboard
+commits had re-hashed their chunks since the last deploy. The log is the evidence; the
+origin's 401 and Cloudflare's cache are not.
