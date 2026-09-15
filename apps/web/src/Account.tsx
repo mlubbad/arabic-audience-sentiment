@@ -8,11 +8,45 @@ import {
 } from "./authMessages";
 import { beginConnect } from "./connect";
 import { providers, type ProviderId } from "./authProviders";
+import { setupSteps } from "./setup";
+import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
 import "./report.css";
+
+/**
+ * Where a message belongs. Feedback used to be one string for the whole page,
+ * rendered once near the top: press a button inside a workspace card and a
+ * sentence changed somewhere else, above the list, out of the eye's path. A
+ * reader with two workspaces could not tell which one "طلب المزامنة قائم" was
+ * about. So every message and every "working…" carries the place that caused
+ * it, and is rendered there.
+ */
+type Scope = "page" | "auth" | "create" | `ws:${string}`;
+type Note = { at: Scope; text: string };
+
 export function Account() {
   const [session, setSession] = useState<Session | null>(null),
-    [pending, setPending] = useState(!!supabase),
-    [message, setMessage] = useState("");
+    [busy, setBusy] = useState<Scope | null>(supabase ? "page" : null),
+    [note, setNote] = useState<Note | null>(null);
+  const pending = busy !== null;
+  const say = (at: Scope, text: string) => setNote({ at, text });
+  /** What a place has to say for itself: its own note, or that it is working.
+   *  A function, not a nested component: a component declared inside a render
+   *  is a new type every render and remounts its subtree each time. */
+  function feedback(at: Scope) {
+    if (busy === at)
+      return (
+        <p className="account-feedback" role="status">
+          جارٍ تنفيذ الطلب…
+        </p>
+      );
+    if (note?.at === at)
+      return (
+        <p className="account-feedback notice" role="status">
+          {note.text}
+        </p>
+      );
+    return null;
+  }
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [name, setName] = useState("");
@@ -40,13 +74,14 @@ export function Account() {
     if (id === "sso") {
       // Not an OAuth provider: SAML takes a domain and resolves the tenant
       // from it, so it needs its own screen before it can be called at all.
-      setMessage(
+      say(
+        "auth",
         "الدخول الموحَّد يحتاج نطاق مؤسستك — لم تُبنَ هذه الشاشة بعد.",
       );
       return;
     }
-    setPending(true);
-    setMessage("");
+    setBusy("auth");
+    setNote(null);
     void supabase.auth
       .signInWithOAuth({
         provider: id,
@@ -56,8 +91,8 @@ export function Account() {
       })
       .then(({ error }) => {
         if (!error) return; // the browser is leaving; nothing to report
-        setPending(false);
-        setMessage("تعذّر بدء الدخول عبر هذا المزوّد.");
+        setBusy(null);
+        say("auth", "تعذّر بدء الدخول عبر هذا المزوّد.");
       });
   }
   const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>(
@@ -71,22 +106,18 @@ export function Account() {
   const [clients, setClients] = useState<
     { id: string; workspace_id: string }[]
   >([]);
-  const [channels, setChannels] = useState<
-    {
-      workspace_id: string;
-      channel_id: string;
-      status: string;
-      external_channel_id: string;
-    }[]
-  >([]);
+  const [channels, setChannels] = useState<ChannelRow[]>([]);
+  // The newest job per workspace is enough to place it on the three steps.
+  // Row-level security scopes the table to this account's workspaces.
+  const [jobs, setJobs] = useState<JobRow[]>([]);
   useEffect(() => {
     if (!supabase) return;
     let active = true;
     void supabase.auth.getSession().then(({ data, error }) => {
       if (active) {
         setSession(data.session);
-        setPending(false);
-        if (error) setMessage("تعذر قراءة جلسة الحساب");
+        setBusy(null);
+        if (error) say("page", "تعذر قراءة جلسة الحساب");
       }
     });
     const { data } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -109,14 +140,20 @@ export function Account() {
       supabase.from("clients").select("id,workspace_id"),
       supabase
         .from("connection_status")
-        .select("workspace_id,channel_id,status,external_channel_id"),
-    ]).then(([w, c, ch]) => {
+        .select("workspace_id,channel_id,status,external_channel_id,handle"),
+      supabase
+        .from("jobs")
+        .select("workspace_id,status,created_at")
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ]).then(([w, c, ch, j]) => {
       if (!active) return;
       setLoadedWorkspaceUserId(session.user.id);
-      if (w.error) setMessage("تعذر تحميل مساحات العمل");
+      if (w.error) say("page", "تعذر تحميل مساحات العمل");
       else setWorkspaces(w.data ?? []);
       setClients(c.data ?? []);
       setChannels(ch.data ?? []);
+      setJobs(j.data ?? []);
     });
     return () => {
       active = false;
@@ -152,8 +189,8 @@ export function Account() {
   const client = supabase;
   async function auth(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setPending(true);
-    setMessage("");
+    setBusy("auth");
+    setNote(null);
     try {
       const action: AuthAction =
         (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") ===
@@ -164,41 +201,43 @@ export function Account() {
         action === "signup"
           ? await client.auth.signUp({ email, password })
           : await client.auth.signInWithPassword({ email, password });
-      setMessage(
+      say(
+        "auth",
         error
           ? authErrorMessage(error)
           : authSuccessMessage(action, !!data.session),
       );
     } catch {
-      setMessage("تعذر الاتصال بالخدمة. حاول مجدداً.");
+      say("auth", "تعذر الاتصال بالخدمة. حاول مجدداً.");
     } finally {
-      setPending(false);
+      setBusy(null);
     }
   }
   async function createWorkspace(e: FormEvent) {
     e.preventDefault();
-    setPending(true);
+    setBusy("create");
+    setNote(null);
     try {
       const { error } = await client.rpc("create_workspace", {
         workspace_name: name,
       });
       if (error) {
-        setMessage("تعذر إنشاء مساحة العمل");
+        say("create", "تعذر إنشاء مساحة العمل");
         return;
       }
       const { data, error: loadError } = await client
         .from("workspaces")
         .select("id,name");
-      if (loadError) setMessage("تم الإنشاء وتعذر تحديث القائمة");
+      if (loadError) say("create", "تم الإنشاء وتعذر تحديث القائمة");
       else {
         setWorkspaces(data ?? []);
         setName("");
-        setMessage("تم إنشاء مساحة العمل");
+        say("create", "تم إنشاء مساحة العمل");
       }
     } catch {
-      setMessage("تعذر الاتصال بالخدمة");
+      say("create", "تعذر الاتصال بالخدمة");
     } finally {
-      setPending(false);
+      setBusy(null);
     }
   }
   return (
@@ -211,12 +250,7 @@ export function Account() {
           ومراجعة حالة الجمع من مكان واحد.
         </p>
       </header>
-      {pending && <p role="status">جارٍ تنفيذ الطلب…</p>}
-      {message && (
-        <div className="notice" role="status">
-          <p>{message}</p>
-        </div>
-      )}
+      {feedback("page")}
       {!session ? (
         <div className="account-entry">
           {/* Two screens, not one form with two submits.
@@ -252,6 +286,7 @@ export function Account() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </label>
+            {feedback("auth")}
             <button
               name="action"
               value={joining ? "signup" : "signin"}
@@ -295,7 +330,7 @@ export function Account() {
                 className="auth-link"
                 onClick={() => {
                   setJoining(!joining);
-                  setMessage("");
+                  setNote(null);
                 }}
               >
                 {joining ? "تسجيل الدخول" : "أنشئ حسابًا"}
@@ -306,10 +341,12 @@ export function Account() {
             <p className="app-eyebrow">كيف تبدأ؟</p>
             <h2>من قناتك إلى قراءة أوضح.</h2>
             <p>ثلاث خطوات تفصل حسابك عن لوحة تعبّر عما جُمع فعلًا.</p>
+            {/* The same three sentences the owner sees with a state on each,
+                once signed in. Written once in `setup.ts`. */}
             <ol className="account-steps">
-              <li>أنشئ حسابك ومساحة العمل الخاصة بك.</li>
-              <li>اربط قناة يوتيوب بعد موافقتك على الإذن.</li>
-              <li>اطلب الجمع، ثم تابع حالته ونتائجه في اللوحة.</li>
+              {setupSteps.map((step) => (
+                <li key={step.key}>{step.title}</li>
+              ))}
             </ol>
 
             {/* The reassurance panel, and the reason it says none of the
@@ -388,80 +425,71 @@ export function Account() {
                 const workspaceClient = clients.find(
                   (c) => c.workspace_id === w.id,
                 );
-                const channel = channels.find((c) => c.workspace_id === w.id);
+                const scope: Scope = `ws:${w.id}`;
                 return (
-                  <li key={w.id}>
-                    <strong>{w.name}</strong>
-                    {channel ? (
-                      <span data-testid={`channel-${w.id}`}>
-                        {channel.status === "connected"
-                          ? `قناة مرتبطة: ${channel.external_channel_id}`
-                          : `القناة تحتاج إعادة ربط (${channel.status})`}
-                      </span>
-                    ) : (
-                      <span>لا توجد قناة مرتبطة بعد</span>
-                    )}
-                    {/* Shown only when it can actually work: without a client
-                        the server would refuse, and a button that always fails
-                        is worse than no button. */}
-                    {/* Connected: the next thing to do is collect. enqueue_sync
-                        creates the job; a worker picks it up. Both halves are
-                        said plainly below, because a queued job with no worker
-                        looks identical to nothing happening. */}
-                    {channel?.status === "connected" && (
-                      <button
-                        type="button"
-                        disabled={pending}
-                        data-testid={`sync-${w.id}`}
-                        onClick={() => {
-                          setPending(true);
-                          setMessage("");
-                          void client
-                            .rpc("enqueue_sync", {
-                              w: w.id,
-                              c: channel.channel_id,
-                              k: `manual-${Date.now()}`,
-                            })
-                            .then(({ error }) => {
-                              setPending(false);
-                              // Deliberately not "أُضيفت": the server answers a
-                              // repeat request with the job already waiting, so
-                              // claiming a new one was added would be a lie on
-                              // every click after the first.
-                              setMessage(
-                                error
-                                  ? "تعذر تسجيل طلب المزامنة."
-                                  : "طلب المزامنة قائم. لكل قناة طلب واحد في كل مرة، ولن يبدأ حتى يعمل عامل الجمع — التفاصيل في صفحة «حالة المزامنة».",
-                              );
-                            });
-                        }}
-                      >
-                        طلب مزامنة
-                      </button>
-                    )}
-                    {workspaceClient && channel?.status !== "connected" && (
-                      <button
-                        type="button"
-                        disabled={pending}
-                        data-testid={`connect-${w.id}`}
-                        onClick={() => {
-                          setPending(true);
-                          setMessage("");
-                          void beginConnect(w.id, workspaceClient.id).then(
-                            (out) => {
-                              setPending(false);
-                              if (out.kind === "error") setMessage(out.message);
-                              // Google's consent screen is a full navigation, not
-                              // a popup: a popup here is blocked as often as not.
-                              else window.location.assign(out.url);
-                            },
+                  <WorkspaceCard
+                    key={w.id}
+                    workspace={w}
+                    hasClient={!!workspaceClient}
+                    channel={
+                      channels.find((c) => c.workspace_id === w.id) ?? null
+                    }
+                    // Newest first from the query, so the first match is the latest.
+                    latestJob={
+                      jobs.find((j) => j.workspace_id === w.id) ?? null
+                    }
+                    pending={pending}
+                    feedback={feedback(scope)}
+                    onSync={(channel) => {
+                      setBusy(scope);
+                      setNote(null);
+                      void client
+                        .rpc("enqueue_sync", {
+                          w: w.id,
+                          c: channel.channel_id,
+                          k: `manual-${Date.now()}`,
+                        })
+                        .then(({ error }) => {
+                          setBusy(null);
+                          // Deliberately not "أُضيفت": the server answers a
+                          // repeat request with the job already waiting, so
+                          // claiming a new one was added would be a lie on
+                          // every click after the first.
+                          say(
+                            scope,
+                            error
+                              ? "تعذر تسجيل طلب المزامنة."
+                              : "طلب المزامنة قائم. لكل قناة طلب واحد في كل مرة، ولن يبدأ حتى يعمل عامل الجمع — التفاصيل في صفحة «حالة المزامنة».",
                           );
-                        }}
-                      >
-                        ربط قناة يوتيوب
-                      </button>
-                    )}
-                  </li>
+                          // The step list reads the newest job; a request the
+                          // server accepted is one, whether it was created now
+                          // or was already waiting.
+                          if (!error)
+                            setJobs((prev) => [
+                              {
+                                workspace_id: w.id,
+                                status: "queued",
+                                created_at: new Date().toISOString(),
+                              },
+                              ...prev,
+                            ]);
+                        });
+                    }}
+                    onConnect={() => {
+                      if (!workspaceClient) return;
+                      setBusy(scope);
+                      setNote(null);
+                      void beginConnect(w.id, workspaceClient.id).then(
+                        (out) => {
+                          setBusy(null);
+                          if (out.kind === "error") say(scope, out.message);
+                          // Google's consent screen is a full navigation, not a
+                          // popup: a popup here is blocked as often as not.
+                          else window.location.assign(out.url);
+                        },
+                      );
+                    }}
+                  />
                 );
               })}
             </ul>
@@ -479,6 +507,7 @@ export function Account() {
                   onChange={(e) => setName(e.target.value)}
                 />
               </label>
+              {feedback("create")}
               <button disabled={pending}>إنشاء مساحة عمل</button>
             </form>
           </section>

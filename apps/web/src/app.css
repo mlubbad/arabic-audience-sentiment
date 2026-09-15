@@ -625,6 +625,81 @@
 .app-shell .workspace-list li button {
   justify-self: start;
 }
+.app-shell .workspace-list li code {
+  font: 0.82rem var(--font-mono);
+  color: var(--text-2);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+/* The visitor's three steps, inside a workspace card, with a state each.
+   The state word sits where the visitor's list has its number, so the two
+   lists read as the same list — which they are. */
+.app-shell .workspace-list .setup-steps {
+  width: 100%;
+  gap: 0.55rem;
+  margin: 0.2rem 0;
+}
+.app-shell .workspace-list .setup-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.7rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text-3);
+  font-size: 0.88rem;
+}
+.app-shell .workspace-list .setup-steps li::before {
+  content: none;
+}
+.app-shell .workspace-list .setup-steps li small {
+  grid-column: 2;
+  color: var(--text-3);
+  font-size: 0.8rem;
+}
+.app-shell .workspace-list .setup-steps li[data-status="next"] {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.setup-step-state {
+  display: inline-flex;
+  align-items: center;
+  min-width: 5.6rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+  color: var(--text-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+[data-status="done"] > .setup-step-state {
+  background: #e3f3ec;
+  color: var(--color-success);
+}
+[data-status="next"] > .setup-step-state {
+  background: var(--ml-indigo-100);
+  color: var(--ml-indigo);
+}
+[data-status="pending"] > .setup-step-state {
+  background: var(--ml-yellow-100);
+  color: var(--color-warning);
+}
+[data-status="attention"] > .setup-step-state {
+  background: var(--ml-rose-100);
+  color: var(--color-danger);
+}
+/* A message where the action was, not above the page. */
+.account-feedback {
+  width: 100%;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.account-feedback.notice {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+}
 .account-create {
   margin-top: 2rem;
 }
