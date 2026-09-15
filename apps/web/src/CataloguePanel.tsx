@@ -33,7 +33,7 @@ import { supabase } from "./supabase";
 import { displayDate } from "./i18n";
 import { useLocale } from "./locale";
 import { useStrings } from "./strings";
-import { explainCode, type JobRow } from "./jobFeed";
+import { describeJob, explainCode, type JobRow } from "./jobFeed";
 
 const KINDS = ["all", "video", "short", "stream"] as const;
 
@@ -43,6 +43,7 @@ export function Catalogue({
   plan,
   stored,
   jobs,
+  workerConnected,
   onChanged,
 }: {
   mode: "live" | "sanitized_fixture";
@@ -52,6 +53,8 @@ export function Catalogue({
    *  server's definition of "collected", not the dashboard's aggregate. */
   stored: StoredCount[];
   jobs: JobRow[] | null;
+  /** For the discover job's sentence: queued reads differently with no worker. */
+  workerConnected: boolean;
   onChanged: () => void;
 }) {
   const S = useStrings();
@@ -87,6 +90,15 @@ export function Catalogue({
     .map((r) => r.id);
   const est = selectionEstimate(rows, adding, remaining);
   const collecting = (jobs ?? []).some((j) => j.status === "running");
+  // No catalogue yet, but a discover job on the way: say where that job is,
+  // in the attempt log's own words, rather than "no videos" as if nothing
+  // were happening. Live-only — the fixture has no job table.
+  const discovering =
+    (jobs ?? []).find(
+      (j) =>
+        j.type === "discover" &&
+        (j.status === "queued" || j.status === "running"),
+    ) ?? null;
   const dirty = adding.size > 0 || removing.length > 0;
   const kindWord = (k: CatalogueVideo["kind"]) =>
     k === "video"
@@ -254,11 +266,14 @@ export function Catalogue({
             >
               {S.catFit}
             </button>
+            {/* The same guard as the save button: live with no connected
+                channel would call the server to be refused, so the button
+                says so by being off. Fixture mode has no server at all. */}
             <button
               type="button"
               className="rp-tab"
               data-testid="cat-refresh"
-              disabled={busy || mode !== "live"}
+              disabled={busy || mode !== "live" || !read.data?.channelId}
               onClick={refresh}
             >
               {S.catRefresh}
@@ -270,8 +285,22 @@ export function Catalogue({
             </small>
           </div>
 
-          {rows.length === 0 ? (
-            <p className="rp-missing">
+          {rows.length === 0 && discovering ? (
+            (() => {
+              const e = describeJob(discovering, { workerConnected }, S);
+              return (
+                <p
+                  className="rp-missing"
+                  data-testid="cat-discovering"
+                  data-severity={e.severity}
+                >
+                  <strong>{e.headline}</strong>
+                  {e.detail}
+                </p>
+              );
+            })()
+          ) : rows.length === 0 ? (
+            <p className="rp-missing" data-testid="cat-empty">
               <strong>{S.catEmpty}</strong>
             </p>
           ) : shown.length === 0 ? (

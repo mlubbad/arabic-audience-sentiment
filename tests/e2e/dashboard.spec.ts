@@ -1614,7 +1614,23 @@ test("the catalogue narrows by search and kind, and prices a selection live", as
   await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(5);
   await page.getByTestId("cat-search").fill("بث");
   await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(1);
+  // "Select the view" ticks what is shown — the one stream — and nothing else.
+  await page.getByTestId("cat-select-view").click();
+  await expect(page.getByTestId("cat-check-video-3")).toBeChecked();
   await page.getByTestId("cat-search").fill("");
+  await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(5);
+  await expect(page.getByTestId("cat-check-video-4")).not.toBeChecked();
+  await expect(page.getByTestId("cat-check-video-5")).not.toBeChecked();
+  // Clear means clear: the two stored selections come off too, and saving
+  // that would remove them, so the button is live.
+  await page.getByTestId("cat-clear").click();
+  for (const id of ["video-1", "video-2", "video-3", "video-4", "video-5"])
+    await expect(page.getByTestId(`cat-check-${id}`)).not.toBeChecked();
+  await expect(page.getByTestId("cat-save")).toBeEnabled();
+  // Back to what is stored, then narrow by kind.
+  await page.getByTestId("cat-check-video-1").check();
+  await page.getByTestId("cat-check-video-2").check();
+  await expect(page.getByTestId("cat-save")).toBeDisabled();
   await page.getByTestId("cat-kind-short").click();
   await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(1);
   await page.getByTestId("cat-kind-all").click();

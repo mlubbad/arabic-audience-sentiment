@@ -5,6 +5,7 @@ import { describeJob, explainCode, type JobRow } from "./jobFeed";
 
 const row = (over: Partial<JobRow> = {}): JobRow => ({
   id: "j1",
+  type: "collect",
   status: "queued",
   attempt: 0,
   error_code: null,
@@ -137,6 +138,7 @@ describe("one table for one meaning", () => {
     describeJob(
       {
         id: "j",
+        type: "collect",
         status: "failed",
         attempt: 3,
         error_code,
@@ -177,6 +179,7 @@ describe("a code that carries a reason shows the reason", () => {
     describeJob(
       {
         id: "j",
+        type: "collect",
         status: "failed",
         attempt: 3,
         error_code,

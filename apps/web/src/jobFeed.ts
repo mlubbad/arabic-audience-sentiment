@@ -19,6 +19,9 @@ import type { Strings } from "./strings";
 
 export type JobRow = {
   id: string;
+  /** What the job does: `discover` builds the catalogue, `collect` reads a
+   *  selected video's comments; the older kinds are still `sync`/`analyse`. */
+  type: string;
   status:
     | "queued"
     | "running"

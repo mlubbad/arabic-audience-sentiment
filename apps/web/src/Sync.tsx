@@ -216,7 +216,7 @@ function SyncBody({
       });
     void db
       .from("jobs")
-      .select("id,status,attempt,error_code,created_at")
+      .select("id,type,status,attempt,error_code,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(50)
@@ -290,6 +290,7 @@ function SyncBody({
             plan={s?.plan ?? null}
             stored={stored}
             jobs={jobs}
+            workerConnected={connected}
             onChanged={refresh}
           />
           <OperationsPanels
