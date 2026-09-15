@@ -1412,3 +1412,22 @@ see; `cron.job_run_details` in the SQL editor is the evidence).
 ## 2026-09-16 — topic classification smoke call
 
 `workers/python/scripts/gemini_smoke.py` sent one POST request to `generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent` with an Arabic classification prompt, a JSON schema constraint for topic selection, and the configured API key in the `x-goog-api-key` header. Response: **status 403**, reason `API_KEY_SERVICE_BLOCKED`. The error is the API restriction in the Google Cloud console, not a failure of the key or the endpoint; it is the expected outcome for a key whose API access is not yet enabled. The fix is enabling the Generative Language API on the key's restrictions. Live-tested.
+
+## 2026-09-16 — paging, links, the player
+
+`npm run check` exit 0 (unit 331 / 41 files · db 178 / 17 · worker 142 · lint, format,
+types, functions, build, secrets 0); `npm run test:e2e` exit 0, 84 tests (82 + 2). Unit:
+`pageOf` cuts fifty, clamps past both ends and to NaN, gives an empty list one empty page;
+`videoLinks` sends a short to `/shorts/`, everything else to `/watch`, and embeds through
+`youtube-nocookie.com` with autoplay. Browser: 120 routed rows → page 1 of 3 with 50 rows and
+the newest first; a tick on page 1 still counted on page 2; jump to 3 → 20 rows, next
+disabled; "select this page" adds 20, not 120; a search goes back to page 1 of what matches.
+Links: `cat-link-video-2` (a short) → `/shorts/fixture0002`, `video-3` → `/watch?v=…`,
+`target=_blank`, `rel` carries `noopener`; no iframe until a row is opened; opening shows
+the title and an iframe at `youtube-nocookie.com/embed/fixture0003?autoplay=1&rel=0`; Esc
+hides it and removes the iframe; the close button too, with the tick untouched. Seen on the
+dev server at 1280px (one line per row, link beside the title, the dialog with its 16:9
+frame — grey, the fixture ids are not real videos) and 375px (three lines per row, pager,
+sticky bar). `layers.test.ts` holds: the backdrop is `color-mix` over a token, no raw
+colour. Not verified: a real embed playing (needs a real id — the live AJ360 page after the
+next deploy).

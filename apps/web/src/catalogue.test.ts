@@ -46,7 +46,9 @@ vi.mock("./supabase", () => ({ supabase: { from } }));
 import {
   loadCatalogue,
   mergeCatalogue,
+  pageOf,
   storedPerVideo,
+  videoLinks,
   type RawCatalogue,
 } from "./catalogue";
 
@@ -211,6 +213,37 @@ describe("loadCatalogue's live read", () => {
     tableResults.videos = { data: null, error: { message: "boom" } };
     await expect(loadCatalogue("live", "workspace-1")).rejects.toThrow(
       "catalogue_unavailable",
+    );
+  });
+});
+
+describe("pageOf", () => {
+  const rows = Array.from({ length: 120 }, (_, i) => i);
+  it("cuts pages of fifty and clamps to the ends", () => {
+    expect(pageOf(rows, 1)).toMatchObject({ page: 1, pages: 3 });
+    expect(pageOf(rows, 1).rows).toHaveLength(50);
+    expect(pageOf(rows, 3).rows).toEqual(rows.slice(100));
+    expect(pageOf(rows, 9).page).toBe(3);
+    expect(pageOf(rows, 0).page).toBe(1);
+    expect(pageOf(rows, NaN).page).toBe(1);
+  });
+  it("gives an empty list one empty page", () => {
+    expect(pageOf([], 4)).toEqual({ rows: [], page: 1, pages: 1 });
+  });
+});
+
+describe("videoLinks", () => {
+  it("sends a short to its own path and everything else to watch", () => {
+    expect(videoLinks("abcDEF12345", "short").watch).toBe(
+      "https://www.youtube.com/shorts/abcDEF12345",
+    );
+    expect(videoLinks("abcDEF12345", "stream").watch).toBe(
+      "https://www.youtube.com/watch?v=abcDEF12345",
+    );
+  });
+  it("embeds through the privacy-enhanced host with autoplay", () => {
+    expect(videoLinks("abcDEF12345", "video").embed).toBe(
+      "https://www.youtube-nocookie.com/embed/abcDEF12345?autoplay=1&rel=0",
     );
   });
 });

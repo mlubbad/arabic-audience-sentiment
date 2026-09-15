@@ -1615,7 +1615,7 @@ test("the catalogue narrows by search and kind, and prices a selection live", as
   await page.getByTestId("cat-search").fill("بث");
   await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(1);
   // "Select the view" ticks what is shown — the one stream — and nothing else.
-  await page.getByTestId("cat-select-view").click();
+  await page.getByTestId("cat-select-page").click();
   await expect(page.getByTestId("cat-check-video-3")).toBeChecked();
   await page.getByTestId("cat-search").fill("");
   await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(5);
@@ -1714,4 +1714,100 @@ test("at phone width the selection bar stays reachable", async ({ page }) => {
         .filter((v) => v !== "normal" && parseFloat(v) > 0),
     );
   expect(spacing).toEqual([]);
+});
+
+test("the catalogue is paged by fifty, and the selection is not", async ({
+  page,
+}) => {
+  // The pilot channel catalogued 4,456 videos; one list of them is a slow
+  // paint on a phone. 120 here: three pages, the last one short.
+  await page.route("**/fixtures/catalogue.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    fixture.videos = Array.from({ length: 120 }, (_, i) => ({
+      id: `video-${i + 1}`,
+      external_video_id: String(i + 1).padStart(11, "0"),
+      title: `فيديو رقم ${i + 1}`,
+      kind: i % 7 === 0 ? "short" : "video",
+      published_at: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+      thumbnail_url: null,
+      reported_comment_count: 1,
+      comments_state: "open",
+    }));
+    fixture.selections = [];
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/sync?demo=1");
+  const cat = page.getByTestId("catalogue");
+  await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(50);
+  await expect(page.getByTestId("cat-page")).toHaveText("الصفحة 1 من 3");
+  await expect(page.getByTestId("cat-prev")).toBeDisabled();
+  // Newest first: the last video of the run is on the first page.
+  await expect(page.getByTestId("cat-row-video-120")).toBeVisible();
+  // A tick on page one survives a page change and still counts.
+  await page.getByTestId("cat-check-video-120").check();
+  await page.getByTestId("cat-next").click();
+  await expect(page.getByTestId("cat-page")).toHaveText("الصفحة 2 من 3");
+  await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(50);
+  await expect(page.getByTestId("cat-row-video-120")).toHaveCount(0);
+  await expect(page.getByTestId("cat-estimate")).toContainText(
+    "المحدد: 1 فيديو",
+  );
+  await page.getByTestId("cat-jump").fill("3");
+  await expect(page.getByTestId("cat-page")).toHaveText("الصفحة 3 من 3");
+  await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(20);
+  await expect(page.getByTestId("cat-next")).toBeDisabled();
+  // "Select this page" is bounded by the page: 20 more, not 120.
+  await page.getByTestId("cat-select-page").click();
+  await expect(page.getByTestId("cat-estimate")).toContainText(
+    "المحدد: 21 فيديو",
+  );
+  // A search goes back to page one of what matches.
+  await page.getByTestId("cat-search").fill("رقم 11");
+  await expect(page.getByTestId("cat-page")).toHaveText("الصفحة 1 من 1");
+  // 11, 110–119: eleven titles carry "رقم 11".
+  await expect(cat.getByTestId(/^cat-row-/)).toHaveCount(11);
+});
+
+test("each video links to YouTube and plays inside the page", async ({
+  page,
+}) => {
+  await page.goto("/sync?demo=1");
+  // A short goes to its own path; everything else to watch.
+  await expect(page.getByTestId("cat-link-video-2")).toHaveAttribute(
+    "href",
+    "https://www.youtube.com/shorts/fixture0002",
+  );
+  await expect(page.getByTestId("cat-link-video-3")).toHaveAttribute(
+    "href",
+    "https://www.youtube.com/watch?v=fixture0003",
+  );
+  await expect(page.getByTestId("cat-link-video-3")).toHaveAttribute(
+    "target",
+    "_blank",
+  );
+  await expect(page.getByTestId("cat-link-video-3")).toHaveAttribute(
+    "rel",
+    /noopener/,
+  );
+  // Nothing is embedded until a video is opened.
+  await expect(page.getByTestId("cat-preview-frame")).toHaveCount(0);
+  await page.getByTestId("cat-open-video-3").click();
+  const dialog = page.getByTestId("cat-preview");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(
+    "بث اصطناعي ٣",
+  );
+  await expect(page.getByTestId("cat-preview-frame")).toHaveAttribute(
+    "src",
+    "https://www.youtube-nocookie.com/embed/fixture0003?autoplay=1&rel=0",
+  );
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId("cat-preview-frame")).toHaveCount(0);
+  // The close button works too, and the ticks are untouched by watching.
+  await page.getByTestId("cat-check-video-3").check();
+  await page.getByTestId("cat-open-video-3").click();
+  await page.getByTestId("cat-preview-close").click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId("cat-check-video-3")).toBeChecked();
 });

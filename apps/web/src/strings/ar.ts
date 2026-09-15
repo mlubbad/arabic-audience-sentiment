@@ -456,7 +456,16 @@ export const ar = {
   catSortNewest: "الأحدث",
   catSortOldest: "الأقدم",
   catSortMost: "الأكثر تعليقًا",
-  catSelectView: "اختر المعروض",
+  catSelectPage: "اختر هذه الصفحة",
+  catPage: (n: number, of: number) => `الصفحة ${n} من ${of}`,
+  catPrev: "السابقة",
+  catNext: "التالية",
+  catJump: "انتقل إلى صفحة",
+  catOpenYouTube: "فتح في يوتيوب",
+  catPreview: (title: string) => `معاينة: ${title}`,
+  catPreviewHint:
+    "المشاهدة داخل المنصة عبر مشغّل يوتيوب؛ لا يحفظ ملفات تعريف قبل الضغط على تشغيل.",
+  catClose: "إغلاق",
   catClear: "إلغاء الاختيار",
   catFit: "اختر الأحدث بما يناسب الحصة",
   catSelected: (videos: number, upTo: number) =>

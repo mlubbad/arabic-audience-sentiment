@@ -429,3 +429,17 @@ running — a run whose list was fixed when it was claimed — or when nothing w
 all; the panel now says which of four things happened, in both languages. A removal alone
 also reads no plan, so a paused tenant can deselect.
 
+
+## 2026-09-16 — the catalogue turns pages, links out, and plays here
+
+The first live catalogue was 4,456 rows in one list. It is now fifty to a page, client-side
+over the filtered and sorted rows (`pageOf` in `catalogue.ts`), with a pager under the list
+and a jump box past two pages; a search, kind or sort change returns to page one. The
+selection is not paged — a tick survives a page change and the bar counts every one — and
+"اختر المعروض" became "اختر هذه الصفحة", bounded by what is on screen. Each row links to the
+video on YouTube (`/shorts/` for a short, `/watch` otherwise, new tab, `noopener`), and
+pressing the thumbnail or the title opens a dialog with the privacy-enhanced embed
+(`youtube-nocookie.com`, autoplay), the kind and count, the link, and a close; the iframe
+exists only while the dialog is open. Esc and the backdrop close it. Seen at 1280px and
+375px on the dev server; two browser tests (a routed 120-row catalogue for the pager; the
+link targets and the player on the fixture) join the suite.

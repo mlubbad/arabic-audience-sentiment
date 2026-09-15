@@ -463,7 +463,16 @@ export const en: Strings = {
   catSortNewest: "Newest",
   catSortOldest: "Oldest",
   catSortMost: "Most commented",
-  catSelectView: "Choose what shows",
+  catSelectPage: "Select this page",
+  catPage: (n: number, of: number) => `Page ${n} of ${of}`,
+  catPrev: "Previous",
+  catNext: "Next",
+  catJump: "Go to page",
+  catOpenYouTube: "Open on YouTube",
+  catPreview: (title: string) => `Preview: ${title}`,
+  catPreviewHint:
+    "Watched here through YouTube's player; it sets no cookies until you press play.",
+  catClose: "Close",
   catClear: "Clear selection",
   catFit: "Select the newest that fits the quota",
   catSelected: (videos: number, upTo: number) =>

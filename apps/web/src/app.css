@@ -791,7 +791,8 @@
 }
 .app-shell .catalogue .cat-list li {
   display: grid;
-  grid-template-columns: auto 64px minmax(0, 1fr) auto auto auto auto;
+  /* box · thumbnail · title · link · kind · date · count · state */
+  grid-template-columns: auto 64px minmax(0, 1fr) auto auto auto auto auto;
   gap: 0.5rem 0.75rem;
   align-items: center;
   padding: 0.5rem 0.75rem;
@@ -838,6 +839,114 @@
 }
 .app-shell .catalogue .cat-state[data-state="selected"] {
   color: var(--color-success);
+}
+/* The thumbnail and the title are one button: press either to watch here.
+   A button, not a link — nothing navigates. */
+.app-shell .catalogue .cat-open {
+  display: contents;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.app-shell .catalogue .cat-open:hover .cat-title,
+.app-shell .catalogue .cat-open:focus-visible .cat-title {
+  color: var(--link);
+  text-decoration: underline;
+}
+.app-shell .catalogue .cat-open:focus-visible img,
+.app-shell .catalogue .cat-open:focus-visible .cat-thumb {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.app-shell .catalogue .cat-link {
+  color: var(--link);
+  text-decoration: none;
+  font-size: var(--fs-small);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--r-1);
+}
+.app-shell .catalogue .cat-link:hover,
+.app-shell .catalogue .cat-link:focus-visible {
+  background: var(--ml-indigo-50);
+}
+.app-shell .catalogue .cat-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.app-shell .catalogue .cat-pager [data-testid="cat-page"] {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+.app-shell .catalogue .cat-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-inline-start: auto;
+}
+.app-shell .catalogue .cat-jump input {
+  width: 5ch;
+  font-family: var(--font-numeric);
+}
+/* The player: a dialog the width of the page, the frame at 16:9, nothing
+   loaded until it opens. */
+.app-shell .catalogue .cat-preview {
+  width: min(92vw, 960px);
+  max-width: none;
+  padding: 0;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-2);
+  background: var(--bg-card);
+  color: var(--text-1);
+  box-shadow: var(--shadow-2);
+}
+.app-shell .catalogue .cat-preview::backdrop {
+  background: color-mix(in srgb, var(--text-1) 55%, transparent);
+}
+.app-shell .catalogue .cat-preview-body {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+.app-shell .catalogue .cat-preview-body header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.app-shell .catalogue .cat-preview-body h3 {
+  margin: 0;
+  font-size: var(--fs-body);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app-shell .catalogue .cat-preview-body iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--r-1);
+  background: var(--bg-muted);
+}
+.app-shell .catalogue .cat-preview-body footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.app-shell .catalogue .cat-preview-body footer small {
+  flex-basis: 100%;
+  color: var(--text-3);
 }
 /* The estimate is pinned to the bottom of the viewport while the list is on
    screen, so a long catalogue on a phone never puts the price out of reach. */
@@ -1036,8 +1145,14 @@
     display: none;
   }
   .app-shell .catalogue .cat-title {
-    /* Fills the first line beside the box, so nothing else joins it. */
-    flex: 1 1 calc(100% - 2.5rem);
+    /* Fills the first line beside the box and the link, so nothing else
+       joins it. */
+    flex: 1 1 calc(100% - 4.5rem);
+  }
+  .app-shell .catalogue .cat-preview {
+    width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
   }
   .app-shell .catalogue .cat-kind,
   .app-shell .catalogue .cat-date,

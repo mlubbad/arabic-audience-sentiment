@@ -17,7 +17,7 @@
  * to the `.ts` file first — tsc refuses the pair and Vite would import the
  * loader where the component was meant. The export is still `Catalogue`.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   filterCatalogue,
@@ -28,7 +28,13 @@ import {
   type CatalogueVideo,
   type UsageSummary,
 } from "@sentiment/contracts";
-import { loadCatalogue, mergeCatalogue, type StoredCount } from "./catalogue";
+import {
+  loadCatalogue,
+  mergeCatalogue,
+  pageOf,
+  videoLinks,
+  type StoredCount,
+} from "./catalogue";
 import { supabase } from "./supabase";
 import { displayDate } from "./i18n";
 import { useLocale } from "./locale";
@@ -92,11 +98,26 @@ export function Catalogue({
   }, [rows]);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  // The list is cut into pages of fifty: 4,456 rows on one page is a slow
+  // paint on a phone and a scrollbar nobody can use. The selection is not
+  // paged — ticks survive a page change and the bar counts all of them.
+  const [page, setPage] = useState(1);
+  // The video being watched, if any. The player's iframe exists only while
+  // this is set, so a page of thumbnails costs no embeds.
+  const [previewing, setPreviewing] = useState<CatalogueVideo | null>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = dialog.current;
+    if (!d) return;
+    if (previewing && !d.open) d.showModal();
+    if (!previewing && d.open) d.close();
+  }, [previewing]);
 
   const remaining =
     plan?.budgets.find((b) => b.event_type === "comment_analysis")?.remaining ??
     null;
   const shown = filterCatalogue(rows, { search, kind, sort });
+  const paged = pageOf(shown, page);
   const saved = new Map(rows.map((r) => [r.id, r.selected]));
   const adding = new Set([...ticked].filter((id) => !saved.get(id)));
   const removing = rows
@@ -221,7 +242,10 @@ export function Catalogue({
               placeholder={S.catSearch}
               data-testid="cat-search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
             />
             <div
               className="cat-kinds"
@@ -235,7 +259,10 @@ export function Catalogue({
                   className="rp-tab"
                   aria-pressed={kind === k}
                   data-testid={`cat-kind-${k}`}
-                  onClick={() => setKind(k)}
+                  onClick={() => {
+                    setKind(k);
+                    setPage(1);
+                  }}
                 >
                   {k === "all" ? S.catKindAll : kindWord(k)} (
                   {k === "all"
@@ -249,7 +276,10 @@ export function Catalogue({
               aria-label={S.catSortLabel}
               data-testid="cat-sort"
               value={sort}
-              onChange={(e) => setSort(e.target.value as CatalogueSort)}
+              onChange={(e) => {
+                setSort(e.target.value as CatalogueSort);
+                setPage(1);
+              }}
             >
               <option value="newest">{S.catSortNewest}</option>
               <option value="oldest">{S.catSortOldest}</option>
@@ -258,14 +288,14 @@ export function Catalogue({
             <button
               type="button"
               className="rp-tab"
-              data-testid="cat-select-view"
+              data-testid="cat-select-page"
               onClick={() =>
-                shown.forEach(
+                paged.rows.forEach(
                   (r) => r.comments_state !== "disabled" && toggle(r.id, true),
                 )
               }
             >
-              {S.catSelectView}
+              {S.catSelectPage}
             </button>
             <button
               type="button"
@@ -334,7 +364,7 @@ export function Catalogue({
             </p>
           ) : (
             <ul className="cat-list">
-              {shown.map((r) => (
+              {paged.rows.map((r) => (
                 <li
                   key={r.id}
                   data-testid={`cat-row-${r.id}`}
@@ -348,12 +378,30 @@ export function Catalogue({
                     disabled={r.comments_state === "disabled" || busy}
                     onChange={(e) => toggle(r.id, e.target.checked)}
                   />
-                  {r.thumbnail_url ? (
-                    <img src={r.thumbnail_url} alt="" loading="lazy" />
-                  ) : (
-                    <span className="cat-thumb" aria-hidden="true" />
-                  )}
-                  <span className="cat-title">{r.title}</span>
+                  <button
+                    type="button"
+                    className="cat-open"
+                    data-testid={`cat-open-${r.id}`}
+                    aria-label={S.catPreview(r.title)}
+                    onClick={() => setPreviewing(r)}
+                  >
+                    {r.thumbnail_url ? (
+                      <img src={r.thumbnail_url} alt="" loading="lazy" />
+                    ) : (
+                      <span className="cat-thumb" aria-hidden="true" />
+                    )}
+                    <span className="cat-title">{r.title}</span>
+                  </button>
+                  <a
+                    className="cat-link"
+                    data-testid={`cat-link-${r.id}`}
+                    href={videoLinks(r.external_video_id, r.kind).watch}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${S.catOpenYouTube}: ${r.title}`}
+                  >
+                    ↗
+                  </a>
                   <span className="cat-kind">{kindWord(r.kind)}</span>
                   <span className="cat-date">
                     {r.published_at
@@ -382,6 +430,108 @@ export function Catalogue({
               ))}
             </ul>
           )}
+
+          {shown.length > 0 && (
+            <nav
+              className="cat-pager"
+              aria-label={S.catPage(paged.page, paged.pages)}
+              data-testid="cat-pager"
+            >
+              <button
+                type="button"
+                className="rp-tab"
+                data-testid="cat-prev"
+                disabled={paged.page <= 1}
+                onClick={() => setPage(paged.page - 1)}
+              >
+                {S.catPrev}
+              </button>
+              <span data-testid="cat-page">
+                {S.catPage(paged.page, paged.pages)}
+              </span>
+              <button
+                type="button"
+                className="rp-tab"
+                data-testid="cat-next"
+                disabled={paged.page >= paged.pages}
+                onClick={() => setPage(paged.page + 1)}
+              >
+                {S.catNext}
+              </button>
+              {paged.pages > 2 && (
+                <label className="cat-jump">
+                  {S.catJump}
+                  <input
+                    type="number"
+                    min={1}
+                    max={paged.pages}
+                    data-testid="cat-jump"
+                    value={paged.page}
+                    onChange={(e) => setPage(Number(e.target.value))}
+                  />
+                </label>
+              )}
+            </nav>
+          )}
+
+          <dialog
+            ref={dialog}
+            className="cat-preview"
+            data-testid="cat-preview"
+            aria-label={previewing ? S.catPreview(previewing.title) : undefined}
+            onClose={() => setPreviewing(null)}
+            onClick={(e) => {
+              // The backdrop is the dialog element itself; its content is not.
+              if (e.target === e.currentTarget) setPreviewing(null);
+            }}
+          >
+            {previewing && (
+              <div className="cat-preview-body">
+                <header>
+                  <h3>{previewing.title}</h3>
+                  <button
+                    type="button"
+                    className="rp-tab"
+                    data-testid="cat-preview-close"
+                    onClick={() => setPreviewing(null)}
+                  >
+                    {S.catClose}
+                  </button>
+                </header>
+                <iframe
+                  data-testid="cat-preview-frame"
+                  src={
+                    videoLinks(previewing.external_video_id, previewing.kind)
+                      .embed
+                  }
+                  title={previewing.title}
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+                <footer>
+                  <span>
+                    {kindWord(previewing.kind)}
+                    {" · "}
+                    {previewing.reported_comment_count === null
+                      ? S.catCountUnknown
+                      : previewing.reported_comment_count}
+                  </span>
+                  <a
+                    href={
+                      videoLinks(previewing.external_video_id, previewing.kind)
+                        .watch
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {S.catOpenYouTube} ↗
+                  </a>
+                  <small>{S.catPreviewHint}</small>
+                </footer>
+              </div>
+            )}
+          </dialog>
 
           <div
             className="cat-bar"

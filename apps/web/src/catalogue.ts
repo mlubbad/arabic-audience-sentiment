@@ -157,3 +157,30 @@ export async function loadCatalogue(
 ): Promise<CatalogueRead> {
   return mode === "live" ? readLive(workspaceId) : readFixture(signal);
 }
+
+/** A page of a list, clamped: asking past the end gives the last page, and
+ *  an empty list is one empty page rather than none. */
+export const PAGE_SIZE = 50;
+export function pageOf<T>(
+  rows: T[],
+  page: number,
+  size = PAGE_SIZE,
+): { rows: T[]; page: number; pages: number } {
+  const pages = Math.max(1, Math.ceil(rows.length / size));
+  const current = Math.min(Math.max(1, Math.floor(page) || 1), pages);
+  const start = (current - 1) * size;
+  return { rows: rows.slice(start, start + size), page: current, pages };
+}
+
+/** Where a video lives on YouTube, and where it embeds. The privacy-enhanced
+ *  host sets no cookies until the viewer presses play. */
+export function videoLinks(external_video_id: string, kind: string) {
+  const id = encodeURIComponent(external_video_id);
+  return {
+    watch:
+      kind === "short"
+        ? `https://www.youtube.com/shorts/${id}`
+        : `https://www.youtube.com/watch?v=${id}`,
+    embed: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`,
+  };
+}
