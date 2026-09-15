@@ -10,18 +10,36 @@ type TableResult = {
   data: unknown[] | null;
   error: { message: string } | null;
 };
-const { tableResults, from } = vi.hoisted(() => {
+const { tableResults, from, ranges } = vi.hoisted(() => {
   const tableResults: Record<string, TableResult> = {
     videos: { data: [], error: null },
     video_selections: { data: [], error: null },
     connection_status: { data: [], error: null },
   };
+  // `videos` and `video_selections` are read in pages of 1,000 by a stable
+  // key (`.order(key).range(a, b)`); `connection_status` in one `.eq`. The
+  // stand-in slices the table's rows for a range and counts the requests.
+  const ranges: Record<string, number[][]> = {};
   const from = vi.fn((table: string) => ({
     select: () => ({
-      eq: async () => tableResults[table],
+      eq: () => {
+        const result = tableResults[table];
+        const paged = {
+          order: () => ({
+            range: async (a: number, b: number) => {
+              (ranges[table] ??= []).push([a, b]);
+              if (result.error) return result;
+              return { data: (result.data ?? []).slice(a, b + 1), error: null };
+            },
+          }),
+        };
+        // `.eq(...)` is both awaited directly (connection_status) and chained
+        // (the paged reads); a thenable with `order` serves both.
+        return Object.assign(Promise.resolve(result), paged);
+      },
     }),
   }));
-  return { tableResults, from };
+  return { tableResults, from, ranges };
 });
 vi.mock("./supabase", () => ({ supabase: { from } }));
 
@@ -125,6 +143,46 @@ describe("loadCatalogue's live read", () => {
     tableResults.videos = { data: [], error: null };
     tableResults.video_selections = { data: [], error: null };
     tableResults.connection_status = { data: [], error: null };
+    for (const k of Object.keys(ranges)) delete ranges[k];
+  });
+
+  // The pilot channel's first discovery catalogued 4,456 videos; PostgREST
+  // answered a single unpaged read with exactly 1,000 and no error, and the
+  // page would have shown 1,000 as if that were the channel.
+  it("pages the videos past PostgREST's thousand-row cap", async () => {
+    const video = (i: number) => ({
+      id: `v${i}`,
+      external_video_id: String(i).padStart(11, "0"),
+      title: `فيديو ${i}`,
+      kind: "video",
+      published_at: null,
+      thumbnail_url: null,
+      reported_comment_count: 1,
+      comments_state: "open",
+    });
+    tableResults.videos = {
+      data: Array.from({ length: 1456 }, (_, i) => video(i)),
+      error: null,
+    };
+    const read = await loadCatalogue("live", "workspace-1");
+    expect(read.videos).toHaveLength(1456);
+    expect(ranges.videos).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
+    // An exact multiple asks once more and gets an empty page: no row is lost.
+    tableResults.videos = {
+      data: Array.from({ length: 1000 }, (_, i) => video(i)),
+      error: null,
+    };
+    delete ranges.videos;
+    expect((await loadCatalogue("live", "workspace-1")).videos).toHaveLength(
+      1000,
+    );
+    expect(ranges.videos).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
   });
 
   it("resolves when all three reads succeed", async () => {

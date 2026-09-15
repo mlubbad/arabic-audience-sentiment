@@ -93,30 +93,58 @@ async function readFixture(signal?: AbortSignal): Promise<CatalogueRead> {
   return (await r.json()) as CatalogueRead;
 }
 
+/** PostgREST answers at most `max-rows` (1,000 on Supabase) per request and
+ *  says nothing when it stops short. The pilot channel catalogued 4,456 videos
+ *  on its first discovery; a single read showed 1,000 of them and no error. So
+ *  every list is paged by a stable key until a page comes back short. */
+const PAGE = 1000;
+async function readAll<T>(
+  table: string,
+  columns: string,
+  key: string,
+  workspaceId: string,
+): Promise<T[]> {
+  const db = supabase!;
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const page = await db
+      .from(table)
+      .select(columns)
+      .eq("workspace_id", workspaceId)
+      .order(key)
+      .range(from, from + PAGE - 1);
+    if (page.error) throw new Error("catalogue_unavailable");
+    const got = (page.data ?? []) as T[];
+    rows.push(...got);
+    if (got.length < PAGE) return rows;
+  }
+}
+
 async function readLive(workspaceId: string): Promise<CatalogueRead> {
   const db = supabase!;
   const [videos, selections, channel] = await Promise.all([
-    db
-      .from("videos")
-      .select(
-        "id,external_video_id,title,kind,published_at,thumbnail_url,reported_comment_count,comments_state",
-      )
-      .eq("workspace_id", workspaceId),
-    db
-      .from("video_selections")
-      .select("video_id,last_collected_at,last_outcome,next_check_at")
-      .eq("workspace_id", workspaceId),
+    readAll<RawVideo>(
+      "videos",
+      "id,external_video_id,title,kind,published_at,thumbnail_url,reported_comment_count,comments_state",
+      "id",
+      workspaceId,
+    ),
+    readAll<RawSelection>(
+      "video_selections",
+      "video_id,last_collected_at,last_outcome,next_check_at",
+      "video_id",
+      workspaceId,
+    ),
     db
       .from("connection_status")
       .select("channel_id,status,catalogued_at")
       .eq("workspace_id", workspaceId),
   ]);
-  if (videos.error || selections.error || channel.error)
-    throw new Error("catalogue_unavailable");
+  if (channel.error) throw new Error("catalogue_unavailable");
   const connected = (channel.data ?? []).find((c) => c.status === "connected");
   return {
-    videos: (videos.data ?? []) as RawVideo[],
-    selections: (selections.data ?? []) as RawSelection[],
+    videos,
+    selections,
     channelId: connected?.channel_id ?? null,
     cataloguedAt: connected?.catalogued_at ?? null,
   };
