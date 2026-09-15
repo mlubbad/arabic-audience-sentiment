@@ -151,72 +151,70 @@ test("paginates with cursors without changing totals or repeating rows", async (
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 1");
 });
 
-test("a slow response for old filters cannot overwrite newer filters", async ({
+test("a filter change replaces the numbers without ever emptying the screen", async ({
   page,
 }) => {
+  // This used to be a test about a slow response for a filter the reader had
+  // already left, held open with a route interceptor. That race is gone: a
+  // filter change issues no request at all, so there is no late answer that
+  // could arrive and repaint a newer screen.
+  //
+  // What remains worth holding is the property that race was threatening —
+  // that the reader never sees the page go blank between two filters. It is
+  // now true by construction rather than by a placeholder callback, and true
+  // even on a connection that has died, because nothing is being waited on.
   await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
 
-  let release!: () => void;
-  const held = new Promise<void>((r) => {
-    release = r;
-  });
-  let holdNext = false;
-  await page.route("**/fixtures/dashboard.json", async (route) => {
-    if (holdNext) {
-      holdNext = false;
-      await held;
-    }
-    await route.continue();
-  });
+  // Nothing may be served from here on. If a filter change needed the source,
+  // every assertion below would hang rather than quietly pass.
+  await page.route("**/fixtures/dashboard.json", (route) => route.abort());
 
-  // Filter A is slow: one video, 4 rows.
-  holdNext = true;
+  const apply = page.getByRole("button", { name: "تطبيق الفلاتر" });
   await page.getByLabel("الفيديو", { exact: true }).selectOption("video-1");
-  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
-  // The previous screen stays put behind a refresh indicator instead of blanking.
-  await expect(page.getByTestId("updating")).toBeVisible();
-  await expect(page.getByTestId("total")).toHaveText("6");
+  await apply.click();
+  await expect(page.getByTestId("total")).toHaveText("4");
+  await expect(page.getByText("تعذر تحميل البيانات")).toBeHidden();
 
-  // Filter B is applied before A returns, and answers immediately: 2 rows.
   await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
-  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await apply.click();
   await expect(page.getByTestId("total")).toHaveText("2");
 
-  // A now returns. Its result belongs to a filter screen the user has left.
-  release();
-  await page.waitForTimeout(500);
-  await expect(page.getByTestId("total")).toHaveText("2");
+  await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(page.getByText("تعذر تحميل البيانات")).toBeHidden();
 });
 
-test("recovers to page one when the row a cursor points at disappears", async ({
+test("both pages come from one read, so they cannot disagree", async ({
   page,
 }) => {
+  // The previous version of this test shrank the fixture between page one and
+  // page two and checked that the cursor recovered. Paging cannot reach that
+  // state any more: it does not re-read, so the second page is drawn from the
+  // same rows as the first and the two cannot come from different result sets.
+  // The recovery itself still exists for the case that can still produce a
+  // stale cursor — a re-read while the reader is on a later page — and is
+  // tested against deriveSnapshot directly, in data.test.ts.
   await page.goto("/dashboard");
   await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
   ).toHaveCount(5);
 
-  // The dataset shrinks before the next page is requested, so the cursor names a
-  // row that no longer exists. This is the real backend case, not a UI mistake.
-  await page.route("**/fixtures/dashboard.json", async (route) => {
-    const original = await route.fetch();
-    const fixture = await original.json();
-    fixture.comments = fixture.comments.slice(0, 2);
-    await route.fulfill({ json: fixture });
-  });
+  // The source is withdrawn. Paging must be unaffected, because it is a
+  // question about rows that are already here.
+  await page.route("**/fixtures/dashboard.json", (route) => route.abort());
 
   await page.getByRole("button", { name: "الصفحة التالية" }).click();
-  await expect(page.getByTestId("cursor-notice")).toContainText(
-    "أُعيد العرض من الصفحة الأولى",
-  );
+  await expect(page.getByTestId("page-state")).toContainText("الصفحة 2");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(page.getByText("تعذر تحميل البيانات")).toBeHidden();
+
+  await page.getByRole("button", { name: "الصفحة السابقة" }).click();
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 1");
-  await expect(page.getByTestId("total")).toHaveText("2");
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
-  ).toHaveCount(2);
-  // The stack came back with it, so "previous" is not offering a page that is gone.
+  ).toHaveCount(5);
   await expect(
     page.getByRole("button", { name: "الصفحة السابقة" }),
   ).toBeDisabled();
@@ -1525,4 +1523,47 @@ test("the export carries engagement, with unknown left empty not zero", async ({
   expect(row("fixture-2").slice(-2)).toEqual(["48", "48"]);
   // Unknown engagement exports as empty, never as a zero somebody could sum.
   expect(row("fixture-5").slice(-2)).toEqual(["", ""]);
+});
+
+test("filtering does not re-read the source it cannot change", async ({
+  page,
+}) => {
+  // The read takes a workspace and nothing else: `dashboard_snapshot(w)` has
+  // one argument, and every filter on this page is applied afterwards, in the
+  // browser, to the rows it returned. So a filter change cannot make the
+  // request return anything different — and until this test existed, it
+  // re-issued it anyway, because the query was keyed on the whole filter
+  // object rather than on what the request depends on.
+  //
+  // On the fixture that is a local file and invisible. On a real account it is
+  // the entire comment history: 611KB measured on a 376-comment channel, once
+  // per filter change, six of them visible in one operator's network log. Each
+  // is an independent chance to fail, and a failure does not degrade the
+  // screen — it empties it, because every figure, every chart and the video
+  // dropdown itself are read from that one response.
+  let reads = 0;
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    reads++;
+    await route.continue();
+  });
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  const afterLoad = reads;
+  expect(afterLoad).toBeGreaterThan(0);
+
+  const apply = page.getByRole("button", { name: "تطبيق الفلاتر" });
+  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
+  await apply.click();
+  await expect(page.getByTestId("total")).toHaveText("2");
+
+  await page.getByLabel("المشاعر").selectOption("positive");
+  await apply.click();
+  await expect(page.getByTestId("active-filters")).toContainText("المشاعر");
+
+  await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("6");
+
+  // Three filter changes, no further reads. The source is the same bytes for
+  // all of them.
+  expect(reads).toBe(afterLoad);
 });

@@ -23,8 +23,9 @@ import {
 import {
   buildExport,
   type DataMode,
+  deriveSnapshot,
   fixtureWorkspace,
-  loadSnapshot,
+  loadSource,
   reviewsArePersisted,
   configuredMode,
   resolveMode,
@@ -333,26 +334,55 @@ function DashboardBody({
     limit,
     cursor: cursors.at(-1),
   };
-  const result = useQuery({
-    // The mode is part of the key: the same filters mean different rows in
-    // each, and a cached demo page must never be served as somebody's channel.
-    queryKey: ["dashboard", userId, mode, page],
-    queryFn: ({ signal }) => loadSnapshot(mode, page, signal),
-    // Keep the current screen while the next one loads: the spec asks for a full
-    // loading state only before there is anything to show, and a refresh
-    // indicator afterwards. React Query still keys results by filter, so a late
-    // response lands in its own cache entry and never repaints a newer screen.
-    placeholderData: (previous, previousQuery) => {
-      const oldKey = previousQuery?.queryKey;
-      if (!Array.isArray(oldKey)) return undefined;
-      const oldPage = oldKey[3] as Filters | undefined;
-      return oldKey[1] === userId &&
-        oldKey[2] === mode &&
-        oldPage?.workspace_id === workspaceId
-        ? previous
-        : undefined;
-    },
+  // Keyed on exactly what the read depends on, and on nothing else.
+  //
+  // `dashboard_snapshot(w)` takes a workspace. The filters below are applied
+  // afterwards, here, to rows already in memory — so a filter cannot change
+  // what this request returns. The key used to carry the whole filter object
+  // anyway, which made every filter change a fresh 611KB read of the same
+  // bytes, and every one of those an independent chance to fail while nothing
+  // about the data had changed.
+  //
+  // The identity part is load-bearing and stays: user, mode and workspace are
+  // in the key, so one tenant's rows can never be served from another's cache
+  // entry. That was previously enforced by a placeholder callback comparing
+  // old keys against new; it is now a property of the key itself, which cannot
+  // be got wrong by a later edit to a callback.
+  const read = useQuery({
+    queryKey: ["dashboard-source", userId, mode, workspaceId],
+    queryFn: ({ signal }) => loadSource(mode, workspaceId, signal),
   });
+  // Filters are a pure function of a read, so they are computed rather than
+  // fetched. Serialised, because `page` is a fresh object every render and
+  // depending on its identity would recompute the whole snapshot each time.
+  const pageKey = JSON.stringify(page);
+  const derived = useMemo(() => {
+    if (!read.data) return null;
+    try {
+      return {
+        ok: true as const,
+        value: deriveSnapshot(read.data, mode, page),
+      };
+    } catch (error) {
+      // A derivation that throws is a bug in the filters, not a lost read, and
+      // it must not take the page down with it: there is no error boundary
+      // above this, so an uncaught throw here is a blank screen rather than a
+      // notice with a way out.
+      return { ok: false as const, error: error as Error };
+    }
+    // `page` is deliberately absent: `pageKey` is its serialisation, and
+    // listing the object as well would defeat the memo it was serialised for —
+    // `page` is a fresh object on every render.
+  }, [read.data, mode, pageKey]);
+  const result = {
+    data: derived?.ok ? derived.value : undefined,
+    isPending: read.isPending,
+    isFetching: read.isFetching,
+    // A read that failed and a filter that cannot be applied are both "this
+    // screen has no answer", and both are recovered from the same button.
+    isError: read.isError || derived?.ok === false,
+    refetch: read.refetch,
+  };
   // Sticky, because recovery re-requests page one and that response no longer
   // carries the reset flag. The user should still be told why the page moved.
   const [cursorNotice, setCursorNotice] = useState(false);
@@ -412,7 +442,7 @@ function DashboardBody({
       // sentiment denominator and the review filter all move together. Keep
       // the form open until the refreshed read is ready: closing it first
       // allowed an immediate reopen to show the old review history.
-      await client.invalidateQueries({ queryKey: ["dashboard"] });
+      await client.invalidateQueries({ queryKey: ["dashboard-source"] });
       closeReview();
       setReason("");
     },

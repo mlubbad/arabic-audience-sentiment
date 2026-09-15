@@ -235,3 +235,76 @@ describe("the live path reads and writes against the same source", () => {
     expect(reviewsArePersisted("live")).toBe(true);
   });
 });
+
+describe("a cursor outlives the rows it pointed at", () => {
+  // The dashboard holds its cursor in component state and its rows in a cache
+  // entry keyed on the workspace. A re-read — a correction invalidating the
+  // query, a workspace coming back with fewer rows — can therefore land while
+  // the reader is on page two, and name a row that is no longer in the set.
+  //
+  // Previously this was exercised through the browser by shrinking the fixture
+  // between page one and page two. Paging cannot produce it any more, because
+  // paging does not re-read; the state is only reachable through a re-read, so
+  // the guarantee is tested against the derivation that implements it.
+  const ws = "00000000-0000-4000-8000-000000000001";
+
+  it("restarts at page one and says so, rather than showing an empty page", async () => {
+    const { loadSource, deriveSnapshot } = await loadModule();
+    const source = await loadSource("sanitized_fixture", ws);
+    const first = deriveSnapshot(source, "sanitized_fixture", {
+      workspace_id: ws,
+      limit: 2,
+    });
+    const cursor = first.comments.at(-1)!.id;
+
+    // Page two of the set as it was: legitimate, and not a reset.
+    const second = deriveSnapshot(source, "sanitized_fixture", {
+      workspace_id: ws,
+      limit: 2,
+      cursor,
+    });
+    expect(second.cursor_reset).toBe(false);
+    expect(second.comments[0].id).not.toBe(first.comments[0].id);
+
+    // The same cursor against a set that no longer contains it.
+    const shrunk = {
+      ...source,
+      comments: source.comments.filter((c) => c.id !== cursor),
+    };
+    const recovered = deriveSnapshot(shrunk, "sanitized_fixture", {
+      workspace_id: ws,
+      limit: 2,
+      cursor,
+    });
+    expect(recovered.cursor_reset).toBe(true);
+    // Page one of the new set, not an empty page and not a page from the old one.
+    expect(recovered.comments).toHaveLength(2);
+    expect(recovered.comments[0].id).toBe(first.comments[0].id);
+  });
+
+  it("does not report a reset when no cursor was asked for", async () => {
+    const { loadSource, deriveSnapshot } = await loadModule();
+    const source = await loadSource("sanitized_fixture", ws);
+    const view = deriveSnapshot(source, "sanitized_fixture", {
+      workspace_id: ws,
+      limit: 2,
+    });
+    expect(view.cursor_reset).toBe(false);
+  });
+
+  it("derives without reading, so a filter costs no request", async () => {
+    // The reason the whole page was rewritten: the read takes a workspace and
+    // the filters are applied to what it returned. Counting the reads is the
+    // only way to state that as a fact rather than an intention.
+    const { loadSource, deriveSnapshot } = await loadModule();
+    const source = await loadSource("sanitized_fixture", ws);
+    const readsAfterLoad = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls.length;
+    for (const limit of [1, 2, 3, 5]) {
+      deriveSnapshot(source, "sanitized_fixture", { workspace_id: ws, limit });
+    }
+    expect(
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBe(readsAfterLoad);
+  });
+});

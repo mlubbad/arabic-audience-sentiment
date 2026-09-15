@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FixtureSchema, snapshot } from "@sentiment/contracts";
+import { FixtureSchema } from "@sentiment/contracts";
 
 const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -16,8 +16,8 @@ const shared = vi.hoisted(() => ({
     name: string;
     options: { id: string; name: string }[];
   },
-  previous: null as unknown,
-  previousKey: [] as unknown[],
+  /** What React Query would have in cache, addressed exactly as it is. */
+  cache: new Map<string, unknown>(),
 }));
 
 vi.mock("./session", () => ({
@@ -39,34 +39,41 @@ vi.mock("./workspace", async (importOriginal) => {
       shared.forcedPlace ?? real.workspaceState(input),
   };
 });
-vi.mock("./data", () => ({
-  configuredMode: "live",
-  fixtureWorkspace: "00000000-0000-4000-8000-000000000001",
-  resolveMode: ({
-    signedIn,
-    workspace,
-  }: {
-    signedIn: boolean;
-    workspace: string | null;
-  }) => (signedIn && workspace ? "live" : "sanitized_fixture"),
-  reviewsArePersisted: (mode: string) => mode === "live",
-  loadSnapshot: vi.fn(),
-  submitReview: vi.fn(),
-  buildExport: vi.fn(),
-}));
+// The real module, with only the build-time switch forced. `deriveSnapshot`
+// in particular stays real: this test is about which cache entry the component
+// reads, and a hand-written stand-in for the derivation would let a rendering
+// bug pass as an identity guarantee.
+vi.mock("./data", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./data")>();
+  return {
+    ...real,
+    // `configuredMode` is read inside the real module's own closure, so
+    // overriding the export alone would leave `resolveMode` answering
+    // "sanitized_fixture" and this whole file testing the demo path.
+    configuredMode: "live",
+    resolveMode: ({
+      signedIn,
+      workspace,
+    }: {
+      signedIn: boolean;
+      workspace: string | null;
+    }) => (signedIn && workspace ? "live" : "sanitized_fixture"),
+    loadSource: vi.fn(),
+    submitReview: vi.fn(),
+    buildExport: vi.fn(),
+  };
+});
+// React Query, modelled at the only property this test depends on: a query
+// reads the entry its key addresses, and nothing else. That is the whole
+// mechanism now — identity lives in the key rather than in a callback that
+// compares an old key with a new one and can be got wrong by a later edit.
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (options: {
-    placeholderData: (
-      previous: unknown,
-      previousQuery: { queryKey: unknown[] },
-    ) => unknown;
-  }) => ({
-    data: options.placeholderData(shared.previous, {
-      queryKey: shared.previousKey,
-    }),
+  useQuery: (options: { queryKey: unknown[] }) => ({
+    data: shared.cache.get(JSON.stringify(options.queryKey)),
     isPending: false,
     isError: false,
     isFetching: true,
+    refetch: vi.fn(),
   }),
   useMutation: () => ({
     isPending: false,
@@ -87,26 +94,22 @@ const fixture = FixtureSchema.parse(
     ),
   ),
 );
-const commentsA = fixture.comments.map((comment, index) => ({
-  ...comment,
-  workspace_id: A,
-  text_raw: index === 0 ? "TENANT_A_PRIVATE_COMMENT" : comment.text_raw,
-}));
-const base = snapshot(
-  commentsA,
-  { workspace_id: A },
-  fixture.active_analysis_key,
-);
-const previousData = {
-  ...base,
-  comparison: base.videos,
-  comparison_truncated: false,
-  mode: "live",
-  revision: "a",
+/** One tenant's *source* — what a read returns, before any filter. */
+const sourceFor = (workspace: string, marker: string) => ({
+  mode: "live" as const,
+  revision: workspace,
+  active_analysis_key: fixture.active_analysis_key,
+  active_analysis_labels: fixture.active_analysis_labels,
   plan: fixture.plan,
   sync: fixture.sync,
-  cursor_reset: false,
-};
+  comments: fixture.comments.map((comment, index) => ({
+    ...comment,
+    workspace_id: workspace,
+    text_raw: index === 0 ? marker : comment.text_raw,
+  })),
+});
+const key = (user: string, workspace: string) =>
+  JSON.stringify(["dashboard-source", user, "live", workspace]);
 
 describe("dashboard identity boundary", () => {
   beforeEach(() => {
@@ -114,8 +117,22 @@ describe("dashboard identity boundary", () => {
     shared.workspaces = [{ id: B, name: "مساحة ب" }];
     shared.workspacesLoading = false;
     shared.forcedPlace = null;
-    shared.previous = previousData;
-    shared.previousKey = ["dashboard", "live", { workspace_id: A }];
+    shared.cache.clear();
+    // Tenant A's rows are in the cache throughout, addressed to tenant A.
+    shared.cache.set(
+      key("user-a", A),
+      sourceFor(A, "TENANT_A_PRIVATE_COMMENT"),
+    );
+  });
+
+  it("renders a workspace's own comment when the key is its own", () => {
+    // The other three assert an absence, and an absence is worth nothing until
+    // something proves the presence was reachable at all. Without this, a
+    // component that rendered no comments ever would satisfy every one of them.
+    shared.cache.set(key("user-b", B), sourceFor(B, "TENANT_B_OWN_COMMENT"));
+    const html = renderToStaticMarkup(createElement(Dashboard));
+    expect(html).toContain("TENANT_B_OWN_COMMENT");
+    expect(html).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
   it("does not render a previous workspace's comment while the next workspace loads", () => {
@@ -130,8 +147,18 @@ describe("dashboard identity boundary", () => {
     expect(html).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
+  it("does not serve one workspace's rows to another of the same user", () => {
+    // Same person, two workspaces. The workspace is in the key for this
+    // reason: an owner of both must still be shown the one they asked for.
+    shared.cache.set(
+      key("user-b", A),
+      sourceFor(A, "TENANT_A_PRIVATE_COMMENT"),
+    );
+    const html = renderToStaticMarkup(createElement(Dashboard));
+    expect(html).not.toContain("TENANT_A_PRIVATE_COMMENT");
+  });
+
   it("does not offer the fixture as a signed-in creator's data while workspaces load", () => {
-    shared.previous = null;
     shared.workspaces = [];
     shared.workspacesLoading = true;
     const html = renderToStaticMarkup(createElement(Dashboard));
@@ -140,7 +167,6 @@ describe("dashboard identity boundary", () => {
   });
 
   it("keeps workspace switching available after a creator chooses one", () => {
-    shared.previous = null;
     shared.forcedPlace = {
       kind: "ready",
       id: B,

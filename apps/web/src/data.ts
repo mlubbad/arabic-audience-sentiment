@@ -112,7 +112,7 @@ async function readLive(workspace: string) {
  * in live mode the server holds the review log, and replaying local edits over
  * it would show a correction that no longer exists on the server as if it did.
  */
-async function readSource(
+export async function loadSource(
   mode: DataMode,
   workspace: string,
   signal?: AbortSignal,
@@ -122,12 +122,32 @@ async function readSource(
   return { ...fixture, comments: withSessionReviews(fixture.comments) };
 }
 
-export async function loadSnapshot(
+/** Everything one read of the source answers, before any filter is applied. */
+export type Source = Awaited<ReturnType<typeof loadSource>>;
+
+/**
+ * The whole of the dashboard, derived from one read. Pure, and deliberately
+ * separate from the read above.
+ *
+ * Every filter on the dashboard is applied here, in the browser, to rows that
+ * are already in memory — `dashboard_snapshot(w)` takes a workspace and
+ * nothing else. Keeping the two in one function made that impossible to see,
+ * and the page was written as though a filter change needed a new request: it
+ * re-read the entire comment history on every one. On a 376-comment channel
+ * that is 611KB per keystroke-and-apply, returning bytes identical to the ones
+ * already on screen, and each attempt is an independent chance to fail at a
+ * moment when nothing about the data has changed.
+ *
+ * The failure is not graceful, either. Every figure, every chart and the video
+ * dropdown itself read from that one response, so a filter change that loses
+ * its read does not narrow the report — it empties the page, and leaves the
+ * filter bar claiming a video the now-empty dropdown no longer offers.
+ */
+export function deriveSnapshot(
+  source: Source,
   mode: DataMode,
   filters: Filters,
-  signal: AbortSignal,
 ) {
-  const source = await readSource(mode, filters.workspace_id, signal);
   const comments = source.comments;
   const build = (f: Filters, cursor_reset: boolean) => {
     const base = snapshot(
@@ -160,6 +180,16 @@ export async function loadSnapshot(
     // than showing an empty page or a page from a different result set.
     return build({ ...filters, cursor: undefined }, true);
   }
+}
+
+/** Read then derive, for callers that want one workspace's whole answer. */
+export async function loadSnapshot(
+  mode: DataMode,
+  filters: Filters,
+  signal: AbortSignal,
+) {
+  const source = await loadSource(mode, filters.workspace_id, signal);
+  return deriveSnapshot(source, mode, filters);
 }
 
 export async function submitReview(mode: DataMode, raw: CommentReviewInput) {
@@ -200,7 +230,7 @@ export async function submitReview(mode: DataMode, raw: CommentReviewInput) {
  * storage policy checks.
  */
 export async function buildExport(mode: DataMode, filters: Filters) {
-  const source = await readSource(mode, filters.workspace_id);
+  const source = await loadSource(mode, filters.workspace_id);
   const rows = exportRows(source.comments, filters, source.active_analysis_key);
   return {
     rows: rows.length,
