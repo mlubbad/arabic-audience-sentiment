@@ -68,6 +68,18 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 import { Dashboard } from "./Dashboard";
+import { MemoryRouter } from "react-router";
+
+/** The page reads the address bar now (`?ws=`), so it renders inside a
+ *  router. The address is a parameter so a test can open the page by link. */
+const render = (at = "/dashboard") =>
+  renderToStaticMarkup(
+    createElement(
+      MemoryRouter,
+      { initialEntries: [at] },
+      createElement(Dashboard),
+    ),
+  );
 
 const fixture = FixtureSchema.parse(
   JSON.parse(
@@ -87,7 +99,7 @@ describe("a read that cannot be turned into a screen", () => {
     };
     // Rendering at all is half the assertion: an uncaught throw here fails the
     // test by propagating, which is precisely the production symptom.
-    const html = renderToStaticMarkup(createElement(Dashboard));
+    const html = render();
     expect(html).toContain("إعادة المحاولة");
     // And it must say which half failed. A read that arrived and a view that
     // could not be built from it are different problems with different

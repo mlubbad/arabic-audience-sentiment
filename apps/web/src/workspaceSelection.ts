@@ -29,7 +29,13 @@
  *    never select another tenant's workspace. That check is the reason this
  *    file is allowed to remember anything at all.
  */
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { useSearchParams } from "react-router";
+import {
+  reconcileSelection,
+  searchWithWorkspace,
+  workspaceFromSearch,
+} from "./workspaceUrl";
 
 const KEY = "audience.workspace";
 
@@ -105,14 +111,45 @@ export function resetWorkspaceSelection() {
  * The hook the pages use. It returns the same pair `useState` did, so each call
  * site changes by one line — which is the point: the shape stayed, the storage
  * moved up.
+ *
+ * Two places now hold the choice — this store and the address bar's `?ws=` —
+ * and `workspaceUrl.ts` says how they reconcile: the address wins and is
+ * remembered; a remembered choice is written back to the address. This hook
+ * only applies that. A page that owns the address (`route: true`) writes to
+ * it; a reader elsewhere in the shell — the rail's plan card — reads the same
+ * answer without touching the URL, so the account page is not stamped with a
+ * parameter it does not use.
  */
 export function useWorkspaceSelection(
   userId: string | null,
+  options: { route?: boolean } = {},
 ): [string | null, (id: string | null) => void] {
-  const selected = useSyncExternalStore(
+  const stored = useSyncExternalStore(
     subscribe,
     () => selectionFor(userId),
     () => selectionFor(userId),
   );
-  return [selected, (id: string | null) => selectWorkspace(userId, id)];
+  const [params, setParams] = useSearchParams();
+  const inUrl = workspaceFromSearch(params);
+  const { selected, remember, writeUrl } = reconcileSelection({
+    inUrl,
+    stored,
+    signedIn: !!userId,
+  });
+  const route = !!options.route;
+  useEffect(() => {
+    if (remember) selectWorkspace(userId, remember);
+    else if (route && writeUrl)
+      setParams(searchWithWorkspace(params, writeUrl), { replace: true });
+    // `params` is read, not depended on: the effect answers to what the
+    // reconciliation said, and re-running it on every unrelated parameter
+    // change would write the same value back again.
+  }, [userId, remember, writeUrl, route]);
+  return [
+    selected,
+    (id: string | null) => {
+      selectWorkspace(userId, id);
+      if (route) setParams(searchWithWorkspace(params, id), { replace: true });
+    },
+  ];
 }

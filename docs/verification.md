@@ -934,3 +934,18 @@ bundle is the one answering.
 
 Not verified: a real consent round trip. The name is stored only when a channel owner goes
 through Google again, and the one connected channel's owner has not yet.
+
+## 2026-09-15 — the workspace in the address
+
+Gates: lint 0, format 0, types 0, unit 0 (285 tests, 35 files), e2e 0 (74, port 5199, exit
+code from a log file). The two dashboard page tests now render inside a `MemoryRouter`
+because the page reads the address; the identity suite gained a case that opens the page by
+link and one that opens it with a stranger's id.
+
+In a browser, signed out, on the dev build: `/dashboard?ws=abc-123` renders the fixture
+with the parameter intact; the rail's overview and operations links read
+`/dashboard?ws=abc-123` and `/sync?ws=abc-123`, the account link `/account`; following the
+operations link lands on `/sync?ws=abc-123`. Not driven in a browser: the signed-in half —
+a remembered choice being written back to the address, and a choice from the select updating
+it — because the suite has no session. Those paths are the pure `reconcileSelection`, tested
+directly, and the hook is a shell over it.

@@ -16,6 +16,7 @@ import { Landing } from "./Landing";
 import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
 import { supabase } from "./supabase";
+import { carriedSearch } from "./workspaceUrl";
 const Dashboard = lazy(() =>
   import("./Dashboard").then((m) => ({ default: m.Dashboard })),
 );
@@ -149,12 +150,17 @@ function NavIcon({ to }: { to: string }) {
  *  reverse — which is how "مقارنة الفيديوهات" came to be a section of the
  *  report that its own index did not list. */
 const DESTINATIONS = [
-  { to: "/dashboard", label: "نظرة عامة", title: "نظرة عامة" },
-  { to: "/sync", label: "التشغيل", title: "حالة المزامنة" },
+  // `scoped`: the page shows one workspace, so a link to it from the rail
+  // carries the current `?ws=` and the address stays the one to copy on the
+  // way across. The account page lists every workspace and reads no such
+  // parameter; stamping one on it would be a claim the page does not make.
+  { to: "/dashboard", label: "نظرة عامة", title: "نظرة عامة", scoped: true },
+  { to: "/sync", label: "التشغيل", title: "حالة المزامنة", scoped: true },
   {
     to: "/account",
     label: "المصادر والحساب",
     title: "الحساب ومساحات العمل",
+    scoped: false,
   },
 ] as const;
 
@@ -177,7 +183,8 @@ function RailPlan() {
 
 function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const carried = carriedSearch(search);
   useEffect(() => {
     const found = DESTINATIONS.find((d) => d.to === pathname);
     const title =
@@ -235,7 +242,11 @@ function AppLayout() {
               you are — and unlabelled they read as one undifferentiated list. */}
           <p className="app-rail-caption">التنقّل</p>
           {DESTINATIONS.map((d) => (
-            <NavLink key={d.to} to={d.to} onClick={() => setMenuOpen(false)}>
+            <NavLink
+              key={d.to}
+              to={{ pathname: d.to, search: d.scoped ? carried : "" }}
+              onClick={() => setMenuOpen(false)}
+            >
               <span className="app-nav-mark" aria-hidden="true">
                 <NavIcon to={d.to} />
               </span>

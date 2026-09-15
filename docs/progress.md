@@ -241,3 +241,15 @@ by the other session as `0e818c5`.
 Still open from the audit: the selection is not in the URL (item 1's remainder), and the CSS
 layer count (item 7) — the honest measure there is how many rules override the token layer,
 not the line count.
+
+## 2026-09-15 — the address carries the workspace
+
+The remainder of the audit's first finding. `?ws=<id>` on the overview and the operations
+page. `workspaceUrl.ts` holds the rules as pure functions: the address wins and is
+remembered; a remembered choice is written back to the address; an id in the address is a
+claim that `workspaceState` still checks against the account's own list. The hook in
+`workspaceSelection.ts` applies them; the two pages own the address (`route: true`), the
+rail's plan card only reads. The rail's links to the two scoped pages carry the current
+`?ws=`; the link to the account page does not, because that page reads no such parameter.
+Opening `/dashboard?ws=B` renders B; opening it with an id outside the list asks, and does
+not fall back to a guess — both rendered in the identity test inside a `MemoryRouter`.

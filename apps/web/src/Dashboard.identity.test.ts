@@ -85,6 +85,18 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 import { Dashboard } from "./Dashboard";
+import { MemoryRouter } from "react-router";
+
+/** The page reads the address bar now (`?ws=`), so it renders inside a
+ *  router. The address is a parameter so a test can open the page by link. */
+const render = (at = "/dashboard") =>
+  renderToStaticMarkup(
+    createElement(
+      MemoryRouter,
+      { initialEntries: [at] },
+      createElement(Dashboard),
+    ),
+  );
 
 const fixture = FixtureSchema.parse(
   JSON.parse(
@@ -130,20 +142,20 @@ describe("dashboard identity boundary", () => {
     // something proves the presence was reachable at all. Without this, a
     // component that rendered no comments ever would satisfy every one of them.
     shared.cache.set(key("user-b", B), sourceFor(B, "TENANT_B_OWN_COMMENT"));
-    const html = renderToStaticMarkup(createElement(Dashboard));
+    const html = render();
     expect(html).toContain("TENANT_B_OWN_COMMENT");
     expect(html).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
   it("does not render a previous workspace's comment while the next workspace loads", () => {
-    const html = renderToStaticMarkup(createElement(Dashboard));
+    const html = render();
     expect(html).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
   it("does not render a signed-in workspace's comment after sign-out", () => {
     shared.user = "";
     shared.workspaces = [];
-    const html = renderToStaticMarkup(createElement(Dashboard));
+    const html = render();
     expect(html).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
@@ -154,16 +166,38 @@ describe("dashboard identity boundary", () => {
       key("user-b", A),
       sourceFor(A, "TENANT_A_PRIVATE_COMMENT"),
     );
-    const html = renderToStaticMarkup(createElement(Dashboard));
+    const html = render();
     expect(html).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
   it("does not offer the fixture as a signed-in creator's data while workspaces load", () => {
     shared.workspaces = [];
     shared.workspacesLoading = true;
-    const html = renderToStaticMarkup(createElement(Dashboard));
+    const html = render();
     expect(html).toContain("جارٍ تحميل مساحات العمل");
     expect(html).not.toContain("بيانات اصطناعية");
+  });
+
+  it("shows the workspace a link names, and asks when the link names a stranger's", () => {
+    // Same person, two workspaces, nothing remembered. A link to B is a
+    // choice of B: the page opens on it, not on a question.
+    shared.workspaces = [
+      { id: A, name: "مساحة أ" },
+      { id: B, name: "مساحة ب" },
+    ];
+    shared.cache.set(key("user-b", B), sourceFor(B, "TENANT_B_OWN_COMMENT"));
+    const byLink = render(`/dashboard?ws=${B}`);
+    expect(byLink).toContain("TENANT_B_OWN_COMMENT");
+    expect(byLink).not.toContain('data-testid="ws-choose"');
+    // The same link with an id that is not in this account's list: a claim,
+    // not a permission. The page asks. It does not fall back to B either —
+    // a link that named the wrong place is answered with a question, not
+    // with a guess.
+    const stranger = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const forged = render(`/dashboard?ws=${stranger}`);
+    expect(forged).toContain('data-testid="ws-choose"');
+    expect(forged).not.toContain("TENANT_B_OWN_COMMENT");
+    expect(forged).not.toContain("TENANT_A_PRIVATE_COMMENT");
   });
 
   it("keeps workspace switching available after a creator chooses one", () => {
@@ -176,7 +210,7 @@ describe("dashboard identity boundary", () => {
         { id: B, name: "مساحة ب" },
       ],
     };
-    const html = renderToStaticMarkup(createElement(Dashboard));
+    const html = render();
     expect(html).toContain('aria-label="تغيير مساحة العمل"');
     expect(html).toContain("مساحة أ");
     expect(html).toContain("مساحة ب");

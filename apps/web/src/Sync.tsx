@@ -50,7 +50,9 @@ export function Sync() {
   // One selection for the whole product. This was `useState(null)` here
   // and again in the other page; both routes are lazy, so the answer died
   // on every navigation and the question came back.
-  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null);
+  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
+    route: true,
+  });
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,
