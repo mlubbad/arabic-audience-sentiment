@@ -227,3 +227,9 @@ service authorization follow from this setup.
   third-party stylesheet delayed first paint enough to break a browser test, it hands a
   visitor's IP to a third party on every load, and it is one more thing that can be
   unreachable. Only the Arabic and Latin subsets are shipped, at four weights.
+
+2026-09-15 — سلّم الخطط مثبَّت في `docs/pricing.md`: خمس درجات (`free` قمع لمرة واحدة على فيديو
+عام، `starter` 9$/5,000، `pro` 29$/25,000، `business` 99$/100,000، `enterprise` بعرض سعر)
+بوحدة التعليق المحلَّل الموجودة، والموجز المولَّد بوحدة مستقلة تُحسب بالتقرير. مبنيّ على تجربة
+BeyondComments وتسعير Comment Finder وAwario وBrand24 وغياب الأسعار المعلنة عند Lucidya وCrowd
+Analyzer. الدفع الفعلي يبقى مؤجَّلًا؛ الصفوف تُفعَّل يدويًا. `pilot` لا تُمسّ.
