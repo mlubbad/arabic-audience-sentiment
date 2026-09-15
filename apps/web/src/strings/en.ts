@@ -90,7 +90,7 @@ export const en: Strings = {
   stepWorkspace: "Create your account and your workspace.",
   stepChannel: "Connect a YouTube channel after granting permission.",
   stepCollect:
-    "Request a collection, then follow its status and results on the dashboard.",
+    "Choose the videos to collect, then follow their status on the operations page.",
   stepChannelSeeded:
     "The channel is registered without permission yet; connect it to confirm ownership.",
   stepChannelLapsed:
@@ -452,6 +452,55 @@ export const en: Strings = {
   opsSyncRequestFailed: "The sync request could not be registered.",
   opsSyncRequestStanding:
     "Your sync request is in. Each channel has one request at a time, and it starts when collection is running.",
+
+  catTitle: "Videos",
+  catLead:
+    "Choose what is collected and analysed. The count is what YouTube reports, not a promise of what can be fetched.",
+  catRefresh: "Refresh the list",
+  catRefreshed: (when: string) => `The list as of ${when}`,
+  catNeverRefreshed: "The list has not been built yet.",
+  catRequested:
+    "A list build was requested; the result appears once it completes.",
+  catRequestFailed: "Could not request a list build.",
+  catSearch: "Search titles",
+  catKindAll: "All",
+  catKindVideo: "Video",
+  catKindShort: "Short",
+  catKindStream: "Stream",
+  catSortNewest: "Newest",
+  catSortOldest: "Oldest",
+  catSortMost: "Most commented",
+  catSelectView: "Choose what shows",
+  catClear: "Clear selection",
+  catFit: "Select the newest that fits the quota",
+  catSelected: (videos: number, upTo: number) =>
+    `Selected: ${videos} ${pl(videos, "video", "videos")} · up to ${upTo} ${pl(upTo, "comment", "comments")}`,
+  catUnknownCount: (n: number) => `and ${n} with an unknown count`,
+  catRemainingAfter: (n: number) => `${n} would remain`,
+  catExceeds:
+    "The selection exceeds what is left of the quota; clear some of it first.",
+  catNoPlan: "No plan is active, so there is no quota to measure against.",
+  catSave: "Save the selection",
+  catSaving: "Saving…",
+  catSaved: "The selection was saved and collection was requested.",
+  catSavedDeferred:
+    "The selection was saved; collection runs on the next cycle.",
+  catSaveFailed: "Could not save the selection.",
+  catSaveQuota:
+    "The selection was refused: it exceeds what is left of the quota.",
+  catCountUnknown: "—",
+  catLiveNote:
+    "A selected video stays live: its new comments are collected periodically and draw from the quota as they arrive.",
+  catStateUnselected: "Not selected",
+  catStateWaiting: "Waiting to be collected",
+  catStateCollecting: "Collecting now",
+  catStateCollected: (n: number, when: string) => `Collected ${n} on ${when}`,
+  catStateDisabled: "Comments disabled",
+  catStatePartial: "Partial",
+  catEmpty: "No videos in the list yet.",
+  catNoMatch: "No results for that search.",
+  catReadFailed: "The list could not be read.",
+  chooseVideos: "Choose the videos",
 
   figuresShow: "Show the figures",
   figuresComments: "Comments",

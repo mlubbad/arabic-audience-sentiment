@@ -1,0 +1,70 @@
+{
+  "channelId": "00000000-0000-4000-8000-000000000001",
+  "cataloguedAt": "2026-09-14T06:00:00Z",
+  "videos": [
+    {
+      "id": "video-1",
+      "external_video_id": "fixture0001",
+      "title": "فيديو اصطناعي ١",
+      "kind": "video",
+      "published_at": "2026-08-20T10:00:00Z",
+      "thumbnail_url": null,
+      "reported_comment_count": 7,
+      "comments_state": "open"
+    },
+    {
+      "id": "video-2",
+      "external_video_id": "fixture0002",
+      "title": "فيديو اصطناعي ٢",
+      "kind": "short",
+      "published_at": "2026-09-01T10:00:00Z",
+      "thumbnail_url": null,
+      "reported_comment_count": 3,
+      "comments_state": "open"
+    },
+    {
+      "id": "video-3",
+      "external_video_id": "fixture0003",
+      "title": "بث اصطناعي ٣",
+      "kind": "stream",
+      "published_at": "2026-09-05T18:00:00Z",
+      "thumbnail_url": null,
+      "reported_comment_count": 18,
+      "comments_state": "open"
+    },
+    {
+      "id": "video-4",
+      "external_video_id": "fixture0004",
+      "title": "فيديو بلا تعليقات",
+      "kind": "video",
+      "published_at": "2026-09-10T09:00:00Z",
+      "thumbnail_url": null,
+      "reported_comment_count": null,
+      "comments_state": "disabled"
+    },
+    {
+      "id": "video-5",
+      "external_video_id": "fixture0005",
+      "title": "فيديو بعدد غير معروف",
+      "kind": "video",
+      "published_at": null,
+      "thumbnail_url": null,
+      "reported_comment_count": null,
+      "comments_state": "unknown"
+    }
+  ],
+  "selections": [
+    {
+      "video_id": "video-1",
+      "last_collected_at": "2026-09-14T06:10:00Z",
+      "last_outcome": "exhausted",
+      "next_check_at": "2026-09-15T06:10:00Z"
+    },
+    {
+      "video_id": "video-2",
+      "last_collected_at": "2026-09-14T06:12:00Z",
+      "last_outcome": "exhausted",
+      "next_check_at": "2026-09-15T06:12:00Z"
+    }
+  ]
+}
