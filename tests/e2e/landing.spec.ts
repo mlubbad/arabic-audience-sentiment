@@ -81,3 +81,141 @@ test("mobile landing has working navigation, keyboard access, and no page overfl
     1536,
   );
 });
+
+/**
+ * The landing page kept a second design system, and the second one failed.
+ *
+ * This is the surface a visitor meets first, and it was written before the
+ * dashboard's palette was measured — so it carried its own purple, its own
+ * ink, six spellings of "secondary grey", and eight type sizes whose smallest
+ * was 10px. Nothing failed, because every test that guarded this page read
+ * `Landing.tsx` and the system was in `landing.css`.
+ *
+ * These three read what the browser actually computed, which is the only place
+ * a stylesheet's inheritance can be checked.
+ */
+test("every word a visitor can read clears its contrast floor", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.waitForSelector(".lp-donut");
+  const failing = await page.evaluate(() => {
+    const lum = (r: number, g: number, b: number) => {
+      const f = (v: number) => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    const parse = (c: string) => (c.match(/[\d.]+/g) ?? []).map(Number);
+    // The ground a translucent layer sits on, not the layer itself.
+    const groundOf = (el: Element) => {
+      let e: Element | null = el;
+      while (e) {
+        const c = parse(getComputedStyle(e).backgroundColor);
+        if (c.length && (c[3] === undefined || c[3] > 0.9)) return c;
+        e = e.parentElement;
+      }
+      return [255, 255, 255];
+    };
+    const out: { where: string; ratio: number; need: number }[] = [];
+    for (const el of document.querySelectorAll(".landing *")) {
+      // Decoration is exempt, and says so in the markup rather than here: an
+      // element hidden from the accessibility tree carries no words.
+      if (el.closest("[aria-hidden='true']")) continue;
+      const cs = getComputedStyle(el);
+      if (!(el as HTMLElement).offsetParent && cs.position !== "fixed")
+        continue;
+      if (parseFloat(cs.opacity) < 0.5) continue;
+      const hasText = [...el.childNodes].some(
+        (n) => n.nodeType === 3 && (n.textContent ?? "").trim().length > 2,
+      );
+      if (!hasText) continue;
+      const fg = parse(cs.color);
+      const bg = groundOf(el);
+      const a = lum(fg[0], fg[1], fg[2]);
+      const b = lum(bg[0], bg[1], bg[2]);
+      const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      const size = parseFloat(cs.fontSize);
+      const weight = parseInt(cs.fontWeight) || 400;
+      const need = size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5;
+      if (ratio < need)
+        out.push({
+          where: `${el.className || el.tagName} ${size}px ${cs.color}`,
+          ratio: Math.round(ratio * 100) / 100,
+          need,
+        });
+    }
+    return out;
+  });
+  // Six inks failed when this was written — 3.09, 3.47, 3.57, 3.82, 4.03 and
+  // 4.25 — and they were six spellings of the same intent, all now --text-3.
+  expect(failing).toEqual([]);
+});
+
+test("no Arabic on the landing is set below the readable floor", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const tooSmall = await page.evaluate(() => {
+    const out: { where: string; size: number }[] = [];
+    for (const el of document.querySelectorAll(".landing *")) {
+      if (el.closest("[aria-hidden='true']")) continue;
+      const hasArabic = [...el.childNodes].some(
+        (n) => n.nodeType === 3 && /[؀-ۿ]/.test(n.textContent ?? ""),
+      );
+      if (!hasArabic) continue;
+      const size = parseFloat(getComputedStyle(el).fontSize);
+      // 13px. Arabic letters join, and what separates one from the next is
+      // small beside the body of the glyph; this page sets them in a display
+      // face delivered as a .ttf. Ten sizes on this page were below this.
+      if (size < 13) out.push({ where: `${el.className || el.tagName}`, size });
+    }
+    return out;
+  });
+  expect(tooSmall).toEqual([]);
+});
+
+test("the landing teaches the colour language the dashboard speaks", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const token = (name: string) =>
+    page.evaluate(
+      (n) =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue(n)
+          .trim()
+          .toLowerCase(),
+      name,
+    );
+  const asRgb = async (hex: string) =>
+    page.evaluate((h) => {
+      const d = document.createElement("div");
+      d.style.color = h;
+      document.body.append(d);
+      const c = getComputedStyle(d).color;
+      d.remove();
+      return c;
+    }, hex);
+  // The donut was the first thing a visitor learned about this product's
+  // colours, and it taught purple-is-positive against the dashboard's teal.
+  for (const [cls, name] of [
+    ["positive", "--sentiment-positive"],
+    ["negative", "--sentiment-negative"],
+    ["mixed", "--sentiment-mixed"],
+  ] as const) {
+    await expect(page.locator(`.lp-dot.${cls}`).first()).toHaveCSS(
+      "background-color",
+      await asRgb(await token(name)),
+    );
+  }
+  // The neutral dot carries no modifier class — it is the rule's own default,
+  // which is where a stale hex hides longest.
+  await expect(
+    page.locator(".lp-dot:not(.positive):not(.negative):not(.mixed)").first(),
+  ).toHaveCSS(
+    "background-color",
+    await asRgb(await token("--sentiment-neutral")),
+  );
+});

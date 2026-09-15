@@ -372,7 +372,9 @@ export function Landing() {
             </div>
             <div className="lp-workspace-art" aria-hidden="true">
               <div className="lp-workspace-window">
-                <div className="lp-window-dots">● ● ●</div>
+                <div className="lp-window-dots" aria-hidden="true">
+                  ● ● ●
+                </div>
                 <span className="lp-mini-label">
                   {audience === "creator" ? "مساحة قناتك" : "مساحة العميل"}
                 </span>
