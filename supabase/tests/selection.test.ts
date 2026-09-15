@@ -36,7 +36,9 @@ describe("video selections", () => {
     const files = readdirSync("supabase/migrations")
       .filter((f) => f.endsWith(".sql"))
       .sort();
-    const cut = files.indexOf("20260915130000_video_catalogue_and_selections.sql");
+    const cut = files.indexOf(
+      "20260915130000_video_catalogue_and_selections.sql",
+    );
     for (const f of files.slice(0, cut))
       await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
     await db.exec("reset role");
@@ -45,9 +47,18 @@ describe("video selections", () => {
       [OTHER, OUTSIDER, `UC${"b".repeat(22)}`],
     ]) {
       await db.query("insert into auth.users(id) values ($1)", [owner]);
-      await db.query("insert into workspaces(id,name,created_by) values ($1,'w',$2)", [w, owner]);
-      await db.query("insert into memberships values ($1,$2,'workspace_owner')", [w, owner]);
-      await db.query("insert into clients(id,workspace_id,name) values ($1,$1,'c')", [w]);
+      await db.query(
+        "insert into workspaces(id,name,created_by) values ($1,'w',$2)",
+        [w, owner],
+      );
+      await db.query(
+        "insert into memberships values ($1,$2,'workspace_owner')",
+        [w, owner],
+      );
+      await db.query(
+        "insert into clients(id,workspace_id,name) values ($1,$1,'c')",
+        [w],
+      );
       await db.query(
         `insert into channels(id,workspace_id,client_id,external_channel_id,status)
          values ($1,$1,$1,$2,'connected')`,
@@ -71,13 +82,21 @@ describe("video selections", () => {
        values ($1,$2,'c1','نص','نص','h1','second','test')`,
       [W, V1],
     );
-    await db.exec(readFileSync("supabase/migrations/20260915130000_video_catalogue_and_selections.sql", "utf8"));
+    await db.exec(
+      readFileSync(
+        "supabase/migrations/20260915130000_video_catalogue_and_selections.sql",
+        "utf8",
+      ),
+    );
     for (const f of files.slice(cut + 1))
       await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
   });
   it("backfills a live selection for every video that already has comments", async () => {
     await db.exec("reset role");
-    const rows = await db.query<{ video_id: string; last_outcome: string | null }>(
+    const rows = await db.query<{
+      video_id: string;
+      last_outcome: string | null;
+    }>(
       "select video_id, last_outcome from video_selections where workspace_id=$1 order by video_id",
       [W],
     );
@@ -87,11 +106,17 @@ describe("video selections", () => {
       [V1],
     );
     expect(state.rows[0].comments_state).toBe("open");
-    const fresh = await db.query<{ comments_state: string; reported_comment_count: number | null }>(
+    const fresh = await db.query<{
+      comments_state: string;
+      reported_comment_count: number | null;
+    }>(
       "select comments_state, reported_comment_count from videos where id=$1",
       [V2],
     );
-    expect(fresh.rows[0]).toEqual({ comments_state: "unknown", reported_comment_count: null });
+    expect(fresh.rows[0]).toEqual({
+      comments_state: "unknown",
+      reported_comment_count: null,
+    });
   });
 
   it("lets a member read their selections and nobody else's", async () => {
@@ -134,23 +159,36 @@ describe("video selections", () => {
        values ($1,$1,$2,now()-interval '2 hours')`,
       [W, V2],
     );
-    await db.query("update video_selections set next_check_at=now()-interval '1 hour' where video_id=$1", [V1]);
+    await db.query(
+      "update video_selections set next_check_at=now()-interval '1 hour' where video_id=$1",
+      [V1],
+    );
     const due = await db.query<{ d: { video_id: string }[] }>(
       "select private.due_videos($1,$1) as d",
       [W],
     );
     expect(due.rows[0].d.map((v) => v.video_id)).toEqual([V2, V1]);
-    await db.query("update videos set comments_state='disabled' where id=$1", [V2]);
+    await db.query("update videos set comments_state='disabled' where id=$1", [
+      V2,
+    ]);
     const again = await db.query<{ d: { video_id: string }[] }>(
       "select private.due_videos($1,$1) as d",
       [W],
     );
     expect(again.rows[0].d.map((v) => v.video_id)).toEqual([V1]);
-    await db.query("update video_selections set next_check_at=now()+interval '1 day' where video_id=$1", [V1]);
-    const none = await db.query<{ d: unknown[] }>("select private.due_videos($1,$1) as d", [W]);
+    await db.query(
+      "update video_selections set next_check_at=now()+interval '1 day' where video_id=$1",
+      [V1],
+    );
+    const none = await db.query<{ d: unknown[] }>(
+      "select private.due_videos($1,$1) as d",
+      [W],
+    );
     expect(none.rows[0].d).toEqual([]);
     // restore for later tasks
-    await db.query("update videos set comments_state='unknown' where id=$1", [V2]);
+    await db.query("update videos set comments_state='unknown' where id=$1", [
+      V2,
+    ]);
     await db.query("delete from video_selections where video_id=$1", [V2]);
   });
 
@@ -186,10 +224,15 @@ describe("select_videos", () => {
 
   it("refuses a video whose comments are switched off", async () => {
     await db.exec("reset role");
-    await db.query("update videos set comments_state='disabled' where id=$1", [V2]);
+    await db.query("update videos set comments_state='disabled' where id=$1", [
+      V2,
+    ]);
     await expect(call(OWNER, [V2])).rejects.toThrow(/comments_disabled/);
     await db.exec("reset role");
-    await db.query("update videos set comments_state='open', reported_comment_count=40 where id=$1", [V2]);
+    await db.query(
+      "update videos set comments_state='open', reported_comment_count=40 where id=$1",
+      [V2],
+    );
   });
 
   it("refuses a selection the remaining analysis units cannot cover, and writes nothing", async () => {
@@ -204,7 +247,8 @@ describe("select_videos", () => {
     await expect(call(OWNER, [V2])).rejects.toThrow(/quota_exceeded/);
     await db.exec("reset role");
     expect(
-      (await db.query("select 1 from video_selections where video_id=$1", [V2])).rows,
+      (await db.query("select 1 from video_selections where video_id=$1", [V2]))
+        .rows,
     ).toHaveLength(0);
   });
 
@@ -213,7 +257,9 @@ describe("select_videos", () => {
     // V1 reports 25 and already holds 1 comment: 24 to collect. Deselect it
     // first so it is an addition again.
     await db.query("delete from video_selections where video_id=$1", [V1]);
-    await db.query("update videos set reported_comment_count=25 where id=$1", [V1]);
+    await db.query("update videos set reported_comment_count=25 where id=$1", [
+      V1,
+    ]);
     const r = await call(OWNER, [V1]);
     expect(r.rows[0].r.estimate).toBe(24);
     expect(r.rows[0].r.remaining_after).toBe(6);
@@ -222,7 +268,10 @@ describe("select_videos", () => {
 
   it("reports unknown counts apart rather than as zero", async () => {
     await db.exec("reset role");
-    await db.query("update videos set reported_comment_count=null where id=$1", [V2]);
+    await db.query(
+      "update videos set reported_comment_count=null where id=$1",
+      [V2],
+    );
     await db.query("delete from usage_events where workspace_id=$1", [W]);
     const r = await call(OWNER, [V2]);
     expect(r.rows[0].r.estimate).toBe(0);
@@ -245,35 +294,61 @@ describe("select_videos", () => {
     const r = await call(OWNER, [], [V1]);
     expect(r.rows[0].r.queued).toBe(false);
     await db.exec("reset role");
-    expect((await db.query("select 1 from video_selections where video_id=$1", [V1])).rows).toHaveLength(0);
-    expect((await db.query("select 1 from comments where video_id=$1", [V1])).rows).toHaveLength(1);
+    expect(
+      (await db.query("select 1 from video_selections where video_id=$1", [V1]))
+        .rows,
+    ).toHaveLength(0);
+    expect(
+      (await db.query("select 1 from comments where video_id=$1", [V1])).rows,
+    ).toHaveLength(1);
   });
 
   it("swallows the rate limit and says the work is deferred", async () => {
     await db.exec("reset role");
-    await db.query("update jobs set status='succeeded' where workspace_id=$1 and status in ('queued','running')", [W]);
-    await db.query("update plans set min_sync_interval_minutes=60 where key='pilot'");
+    await db.query(
+      "update jobs set status='succeeded' where workspace_id=$1 and status in ('queued','running')",
+      [W],
+    );
+    await db.query(
+      "update plans set min_sync_interval_minutes=60 where key='pilot'",
+    );
     const r = await call(OWNER, [V1]);
     expect(r.rows[0].r.queued).toBe(false);
     expect(r.rows[0].r.deferred).toBe(true);
     await db.exec("reset role");
-    await db.query("update plans set min_sync_interval_minutes=0 where key='pilot'");
+    await db.query(
+      "update plans set min_sync_interval_minutes=0 where key='pilot'",
+    );
   });
 
   it("refuses when the workspace has no active plan", async () => {
     await db.exec("reset role");
-    await db.query("update subscriptions set status='paused' where workspace_id=$1", [W]);
+    await db.query(
+      "update subscriptions set status='paused' where workspace_id=$1",
+      [W],
+    );
     await expect(call(OWNER, [V2], [])).rejects.toThrow(/no_active_plan/);
     await db.exec("reset role");
-    await db.query("update subscriptions set status='active' where workspace_id=$1", [W]);
+    await db.query(
+      "update subscriptions set status='active' where workspace_id=$1",
+      [W],
+    );
   });
 
   it("request_discovery queues one discover per channel", async () => {
     await as(OWNER);
-    const a = await db.query<{ j: string }>("select request_discovery($1,$1) as j", [W]);
-    const b = await db.query<{ j: string }>("select request_discovery($1,$1) as j", [W]);
+    const a = await db.query<{ j: string }>(
+      "select request_discovery($1,$1) as j",
+      [W],
+    );
+    const b = await db.query<{ j: string }>(
+      "select request_discovery($1,$1) as j",
+      [W],
+    );
     expect(a.rows[0].j).toBe(b.rows[0].j);
     await as(OUTSIDER);
-    await expect(db.query("select request_discovery($1,$1)", [W])).rejects.toThrow(/forbidden/);
+    await expect(
+      db.query("select request_discovery($1,$1)", [W]),
+    ).rejects.toThrow(/forbidden/);
   });
 });
