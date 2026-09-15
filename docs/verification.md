@@ -1487,3 +1487,57 @@ minute. Then `launchctl kill KILL` on the running agent: `runs = 2`, a new pid, 
 again 5 s later; the orphaned python child of the killed run logged `worker down (stopped)`
 when launchd reaped it. `pgrep` shows one uv and one python afterwards, no orphan. Not
 verified: a reboot (RunAtLoad) — the plist says so, the day has not.
+
+## 2026-09-16 — topic classification: the live run, blocked; everything else, fixture-tested
+
+**Live-tested:** nothing beyond the smoke call recorded above under "2026-09-16 — topic
+classification smoke call" (`403 API_KEY_SERVICE_BLOCKED` from Google, the key's own API
+restriction, not a key or endpoint failure). The three migrations `20260916010000`,
+`20260916011000` and `20260916012000` have **not** been applied to the live Supabase
+project (no `supabase db push --linked` has been run for them), the `worker` Edge Function
+has **not** been redeployed with the `/worker/topics-due` and `/worker/commit-topics`
+routes `supabase/functions/_shared/worker-gateway.ts` and `worker/index.ts` now carry, and
+no `analyse` job has been claimed or run by any worker against the real project. Per the
+controller's ruling for this task, none of those three actions were taken here: the Gemini
+key is blocked at the API-restriction level (Task 1), and pushing migrations or deploying
+the edge function to the production project is the user's decision, still pending. The
+live-run steps the task brief's Step 3 describes (`supabase db push`, `supabase functions
+deploy worker`, starting the worker with `--topics gemini`, reading back `jobs`,
+`topic_predictions` and the `usage_summary` line, opening the dashboard signed in) were not
+attempted.
+
+**Fixture-tested / unit-tested, everything else in this plan:**
+
+- `npm run check`: **red**, stopped at the `format:check` gate (`prettier --check` exit 1)
+  on four files this task did not write and may not touch —
+  `packages/contracts/src/workerGateway.test.ts`,
+  `supabase/functions/_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`,
+  `supabase/tests/dashboard_topics.test.ts` — already unformatted in the committed tree at
+  `HEAD` (`1b4ed30`) before this task began; `git status` at the start of this task showed
+  nothing pending but the untracked `.screenshots/`. Not this task's to fix: its writable
+  files are `docs/decisions.md`, `docs/progress.md`, `docs/verification.md` and
+  `docs/coordination/ACTIVE.md` only.
+- Every other gate was run individually (the chain that `npm run check` would have run past
+  `format:check`, had it passed) and each is green, matching the counts the task brief
+  expected: `eslint . && worker:lint` (ruff) — pass; `tsc --noEmit` — pass; `deno check` over
+  the edge functions — pass; `vitest run --exclude "supabase/tests/**"` — **343 passed, 42
+  files**; `vitest run supabase/tests` — **198 passed, 20 files**; `uv run pytest` (worker) —
+  **168 passed**, including `tests/test_topics.py` (7), `tests/test_gemini.py` (13) and
+  `tests/test_run_topics.py` (6, the two `blocked`/`no_topic_classifier` and
+  `blocked`/`topic_model_not_active` cases among them); `vite build` — succeeds, 32 files
+  emitted; `node scripts/check-secrets.mjs` — **passes**, 323 source files plus built assets,
+  and finds no `GEMINI_API_KEY` value anywhere tracked (only the variable's name, in
+  `.env.example` and `workers/deploy/README.md`, as documentation).
+- These counts equal what the individual tasks last reported (`npm test` 343, `npm run
+  test:db` 198, `npm run worker:test` 168) — nothing drifted between then and this session's
+  run, only the `format:check` regression is new and it is upstream of this task's scope.
+- `npm run test:e2e -- tests/e2e/dashboard.spec.ts` was not re-run in this task; the count
+  last reported by Task 10 was 73.
+
+Nothing else in the topic-classification feature — the taxonomy, the predictions/reviews
+tables, the adoption trigger, `worker_topics_due`/`worker_commit_topics`, the Gemini
+adapter's schema-constrained enum and its header-only key, the gateway routes, the
+contracts (`effectiveTopic`, the filter, `topic_counts`, the CSV columns, the fixture), or
+the dashboard (card, filter, chip, correction mode, history, Sync job kind and error
+strings, the third budget line) — has been exercised against the live project. All of it is
+covered only by the fixture data and the unit/PGlite suites named above.

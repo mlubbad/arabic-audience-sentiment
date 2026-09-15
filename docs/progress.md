@@ -458,3 +458,63 @@ detaches it at the working checkout's HEAD, syncs, copies the credentials, reins
 plist and bootstraps. What this is: a worker that comes back after its own exit, after a
 kill, and after a login. What it is not: hosted — a sleeping laptop is still a stopped
 worker, and the hosting blocker keeps that half.
+
+## 2026-09-16 — topic classification, the feature as a whole
+
+A comment now has a second dimension besides sentiment: one primary topic, drawn from a
+per-workspace taxonomy of ten seeded defaults (question, religious remark, praise, criticism,
+request, discussion, personal story, humour, promotion, other), classified by Gemini
+(`gemini-2.5-flash`, prompt `p1`) and correctable by a human the same way a sentiment label
+is. Three migrations carry it: `20260916010000_a_comment_has_a_topic.sql` adds
+`workspace_topics` (seeded per workspace, `private.seed_default_topics`), `topic_predictions`
+and `topic_reviews` (append-only, mirroring `submit_comment_review`'s shape via
+`submit_topic_review`), `workspaces.topic_taxonomy_version`/`active_topic_key` and the
+trigger that adopts the first successful classification as the workspace's active model/
+prompt pair, `set_workspace_topics` (untouched by any screen yet), and a `topic_classification`
+metering kind with `plans.topic_units` (pilot `5000`).
+`20260916011000_the_worker_classifies_topics.sql` adds `worker_topics_due` (comment text,
+parent text or an explicit "parent unavailable" note, the taxonomy, and the workspace's
+active model/prompt pair so a worker on the wrong one is told `active: false`) and
+`worker_commit_topics` (upserts over a `failed` verdict only, meters
+`topic_classification` once ever per comment, taxonomy-version-scoped), and extends the tick
+to enqueue `analyse` jobs alongside `collect`. `20260916012000_the_dashboard_reads_topics.sql`
+adds `topics`, `active_topic_key` and per-comment `topic_prediction`/`topic_reviews` to the
+snapshot the dashboard reads.
+
+The worker gained a `topics` package (`workers/python/src/topics/{protocol,deterministic,
+analysis,gemini}.py`): a `TopicClassifier` protocol, a deterministic test double, `classify()`
+turning due rows into the records `worker_commit_topics` accepts, and the Gemini adapter
+itself — the key only in the `x-goog-api-key` header, the response constrained to the
+taxonomy's own keys by a JSON schema enum so the model cannot name a topic nobody chose.
+`server/runner.py` gained `run_topics` and dispatches `run_job` on job type `analyse`,
+finishing `blocked`/`no_topic_classifier` when no classifier is configured and
+`blocked`/`topic_model_not_active` when the configured one is not the workspace's active
+pair — "skipped" was the design's word but not one the job status vocabulary has.
+`server/gateway.py` gained `topics_due`/`commit_topics`; `server/loop.py` gained
+`--topics {none,deterministic-test,gemini}` reading `GEMINI_API_KEY`; `.env.example` and
+`workers/deploy/README.md` document the variable. The edge function's shared gateway
+(`supabase/functions/_shared/worker-gateway.ts`) and `worker/index.ts` route
+`/worker/topics-due` and `/worker/commit-topics`, reading nothing the database does not
+already scope.
+
+`packages/contracts/src/topics.ts` adds `effectiveTopic`, `applyTopicReview` and the
+`UNCLASSIFIED` sentinel (`__unclassified`); the dashboard filter gained a `topics` key and
+`topic_counts`; the CSV export gained `effective_topic, topic_source, classification_key`
+columns; the fixture was updated to carry topic data. On the dashboard: a Topics card (bar
+chart plus an unclassified line, and a not-run state when no taxonomy version has gone
+active yet), a Topic filter beside the existing ones, a per-row chip showing the effective
+topic and a "تصحيح بشري" marker when a human has corrected it, a topic correction mode on
+each row (button text "تعديل الموضوع" — the sentiment correction flow's own wording, reused
+rather than duplicated), a history panel with topic-vs-sentiment dimension labels, a Sync
+job-kind entry for `analyse` and six new Gemini/topic error codes, and a third budget line
+on the operations page for `topic_classification`. `tests/e2e/dashboard.spec.ts` gained an
+appended block for all of this (append-only, per the file's own convention).
+
+Commit range: `0866318`…`1b4ed30` (`git log --oneline 03b6c3f..1b4ed30`). What still waits,
+entirely the user's decision: the three migrations and the edge function's new routes have
+not been applied or deployed to the live Supabase project, and no `analyse` job has run
+against it — the Gemini key on file was refused by Google in Task 1's smoke call
+(`403 API_KEY_SERVICE_BLOCKED`, the API restriction in the Google Cloud console, not a key
+or endpoint failure), so a live run would fail immediately even if deployed. Everything
+above is fixture- and unit-tested only; see `docs/verification.md` for the counts and what
+each gate showed.

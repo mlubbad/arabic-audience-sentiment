@@ -263,3 +263,63 @@ tasks 1–9, `ca86ed3`…`4abfd02`).
 - **The free-tier/public-video funnel is not part of this work.** `plans.free` and the
   `public_unverified` channel state predate this feature and are unchanged by it; selective
   sync applies uniformly to a workspace's one connected channel regardless of plan.
+
+2026-09-16 — Topic classification (`docs/superpowers/specs/2026-09-15-topic-classification-design.md`,
+plan `docs/superpowers/plans/2026-09-15-topic-classification.md`, tasks 1–10,
+`0866318`…`1b4ed30`).
+
+- **Gemini (`gemini-2.5-flash`, prompt `p1`) is the topic layer.** One primary topic per
+  comment, drawn from a per-workspace taxonomy of ten seeded defaults (question, religious
+  remark, praise, criticism, request, discussion, personal story, humour, promotion, other —
+  `private.seed_default_topics`). The model is pinned by id and prompt version in
+  `TopicClassifier.model_id`/`prompt_version`, and a worker whose `model_id`/`prompt_version`
+  is not the workspace's own `active_topic_key`'s pair is told `active: false` by
+  `worker_topics_due` and finishes the job `blocked` with `topic_model_not_active` rather
+  than spending a Gemini call on a verdict that can never become effective — the same
+  reasoning `active_analysis_labels` already applies to sentiment.
+- **What is sent to Google, and what is withheld.** `worker_topics_due` hands the worker the
+  comment's text, its parent's text (or an explicit note that the parent is unavailable, for
+  a reply whose parent was purged), and the workspace's taxonomy (key, name, description) —
+  never the author, any id, or the workspace. `gemini.py` puts the key only in the
+  `x-goog-api-key` header, never in a URL, and constrains the response to the taxonomy's own
+  keys via a JSON schema enum so the model cannot name a topic nobody chose; a response
+  outside that enum is recorded `failed`/`gemini_bad_response`, not guessed and not folded
+  into `other`.
+- **Dedicated tables (`topic_predictions`, `topic_reviews`), not `comment_annotations`.**
+  Topic and sentiment are independent dimensions with independent lifecycles (a taxonomy can
+  be re-versioned; sentiment's label set cannot) and independent metering
+  (`topic_classification` is its own kind, `plans.topic_units`, pilot `5000`); folding both
+  into one polymorphic table would make a taxonomy version bump touch sentiment rows and vice
+  versa. `submit_topic_review` is append-only like `submit_comment_review` and mirrors its
+  shape (originates `human`, records who and when) but writes no `audit_events` row, because
+  `submit_comment_review` does not either — consistency with the existing behaviour over
+  inventing a new one.
+- **An `analyse` job, not a sweep.** Topic classification reuses the same `jobs`/lease/retry
+  machinery as `collect` and sentiment, dispatched in `run_job` by `type='analyse'`, rather
+  than a background sweep with its own scheduling. One job type, one retry story, one place
+  the operations page already knows how to show.
+- **A missing classifier finishes the job `blocked`, not "skipped."** The design's own
+  language called this case "skipped," but the job status vocabulary the schema already
+  enforces has no such state — `blocked` with `error_code = 'no_topic_classifier'` is the
+  closest existing status that is honest about the outcome (the job did not fail, and it did
+  not succeed; it could not run), and extending the vocabulary for one case was rejected as
+  the smaller but wrong-shaped fix.
+- **A retry may overwrite only a `failed` verdict.** `worker_commit_topics` upserts on
+  conflict only when the stored row's status is `failed`; a `succeeded` row is immutable
+  once written, matching how `topic_classification` is metered once ever per comment
+  regardless of how many times it is later reclassified. The same on-conflict-do-nothing
+  defect that lets a sentiment retry silently drop its update exists in the sentiment
+  `commit_batch` — noted here as a known follow-up, not fixed in this feature.
+- **A reply whose parent was purged is still classified.** `worker_topics_due` sends the
+  item with `parent_text: null` and the prompt says explicitly that the parent is
+  unavailable, rather than skipping the reply or sending an empty string that could read as
+  "no parent" versus "empty parent."
+- **Taxonomy-editing UI is deferred.** `set_workspace_topics` exists and is tested at the RPC
+  layer; no screen calls it yet. The ten seeded defaults are the only taxonomy any workspace
+  has today, which is sufficient for the pilot and does not block the classification path
+  landing first.
+- **Existing Arabic strings win over new ones where a browser test already pins the wording.**
+  The row button that opens topic correction reads "تعديل الموضوع" and the chip's human-review
+  marker reads "تصحيح بشري" — the same verb and noun `dashboard.spec.ts` already asserts for
+  the sentiment correction flow — rather than a topic-specific phrase that would read as a
+  second vocabulary for the same action on the same row.

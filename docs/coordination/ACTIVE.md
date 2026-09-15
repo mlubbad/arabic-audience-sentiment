@@ -55,6 +55,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 | `docs/progress.md`, `decisions.md`, `verification.md` | shared, append-only | |
 | `apps/web/src/locale.ts`, `locale.css`, `strings/**`, `LanguageSwitch.tsx`, `tests/e2e/language.spec.ts` | **done** — English language support landed as `f9b2840`…`7478dc0` by the audit-phase-two Claude session; free | 2026-09-15 |
 | UI text in `apps/web/src/**` | **every sentence now lives in `strings/ar.ts` with a typed English twin in `strings/en.ts`.** A new sentence goes there, in both languages, or `tsc` fails. `Landing.tsx` included since `b956c64` — the demo's four comments are the one deliberate Arabic-only text, as data | 2026-09-15 |
+| `workers/python/src/topics/**`, `supabase/migrations/20260916010000`–`012000`, `supabase/functions/_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`, `packages/contracts/src/topics.ts` | **done** — topic classification (tasks 1–10) landed as `0866318`…`1b4ed30`; free, and see the not-yet-live-deployed note below | 2026-09-16 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
@@ -278,3 +279,19 @@ rename is in a commit whose message does not name it. The old timestamp collided
 get. Lesson, the general one: with two writers in one checkout, `git commit` with a
 pathspec (`git commit -- <files>`) or check `git status` for a foreign `RM` before
 committing from the index.
+
+2026-09-16, task 11 of topic classification (records-only): claimed
+`workers/python/src/topics/**`, `supabase/migrations/20260916010000` through `012000` (the
+renamed timestamps `e94f995` already carries, per the entry above), `supabase/functions/
+_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`, `packages/contracts/src/
+{topics,comments,filters,snapshot,csv,fixture,usage}.ts`, `apps/web/src/{Dashboard.tsx,
+data.ts,jobFeed.ts,OperationsPanels.tsx,strings/**,report.css}`, this feature's appended
+block in `tests/e2e/dashboard.spec.ts`, and the fixture JSON — all of it already landed as
+`0866318`…`1b4ed30` before this task began. Nothing of this feature is uncommitted: `git
+status` at the start of this task, and again now, shows only the untracked
+`.screenshots/`. This task wrote only the four docs it is scoped to
+(`docs/decisions.md`, `docs/progress.md`, `docs/verification.md`, this file); it touched no
+migration, worker, gateway, contract or dashboard file. `npm run check` is red on this
+checkout — stopped at `format:check` on four files this task did not write (see
+`docs/verification.md`'s 2026-09-16 topic-classification entry) — which the next writer in
+this area should fix before adding more code on top of it.
