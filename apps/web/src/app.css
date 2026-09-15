@@ -415,7 +415,7 @@
 .app-shell .rp-filters select:focus,
 .app-shell .rp-filters input:focus-visible,
 .app-shell .rp-filters select:focus-visible {
-  border-color: #634ee6;
+  border-color: var(--ml-indigo-500);
   box-shadow: 0 0 0 3px rgba(99, 78, 230, 0.18);
   outline: none;
 }
@@ -446,7 +446,7 @@
   color: var(--ml-indigo);
 }
 .app-shell .rp-filters button[type="button"]:hover {
-  background: #ebe7fd;
+  background: var(--ml-indigo-100);
   border-color: #cbbeff;
 }
 .app-shell .rp-page .notice,
@@ -509,8 +509,8 @@
   overflow: hidden;
   padding: clamp(1.4rem, 3vw, 2.2rem);
   border-radius: var(--r-3);
-  background: linear-gradient(160deg, #efeaff, var(--bg-card) 70%);
-  border: 1px solid #e5ddff;
+  background: linear-gradient(160deg, var(--ml-indigo-50), var(--bg-card) 70%);
+  border: 1px solid var(--ml-indigo-100);
 }
 .account-story::after {
   content: "";
@@ -750,7 +750,7 @@
   height: 3.6rem;
   margin: 0 auto 1rem;
   border-radius: var(--r-3);
-  background: #f0ebff;
+  background: var(--ml-indigo-50);
   color: var(--ml-indigo);
   font-size: 2rem;
   line-height: 1;
@@ -786,7 +786,7 @@
   font-weight: 700;
 }
 .app-state-actions a + a {
-  background: #f0ebff;
+  background: var(--ml-indigo-50);
   color: var(--ml-indigo);
 }
 .app-state .notice {
@@ -839,7 +839,7 @@
     padding: 0.4rem 0.9rem;
     border: 1px solid #ddd7fa;
     border-radius: var(--r-pill);
-    background: #f3f0ff;
+    background: var(--ml-indigo-50);
     color: var(--ml-indigo);
     font-size: 0.84rem;
     font-weight: 700;
@@ -867,7 +867,7 @@
     padding: 0.55rem 1rem;
     border: 1px solid #ded7fd;
     border-radius: var(--r-2);
-    background: #f3f0ff;
+    background: var(--ml-indigo-50);
     color: var(--ml-indigo);
     font-weight: 700;
   }

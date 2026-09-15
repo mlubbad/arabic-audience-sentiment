@@ -45,16 +45,19 @@ for (const f of ["brand.css", "glass.css"])
   for (const m of read(f).matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{3,8})\b/g))
     if (!tokens.has(norm(m[2]))) tokens.set(norm(m[2]), `--${m[1]}`);
 
-/** app.css's raw colours as of 2026-09-15, each with the token it stands
- *  nearest to (ΔE, palette.ts). The work of the audit's third phase is to
- *  empty this list. */
+/** app.css's raw colours, each with the token it stands nearest to (ΔE,
+ *  palette.ts). 34 on 2026-09-15; the work of the audit's third phase is to
+ *  empty this list. Struck so far: the six indigo tints within ΔE 3 whose
+ *  meaning matched the token's — a hover, a focus border, four pale grounds.
+ *  Still here within ΔE 3 and deliberately so: the rail's ground (#100d28,
+ *  #0d0a22) is not `--focus-ring` though it nearly equals it, the warning
+ *  strip's warm off-whites are not `--bg-page`, and the "done" tint is not
+ *  `--bg-muted` — those want tokens of their own, which is the next step. */
 const APP_BACKLOG = new Set([
   "#c4b8ff", // --ml-indigo-300 ΔE 4.4 — rail ink, measured in rail.test.ts
   "#ff5c67", // --ml-rose ΔE 3.0
   "#312e81", // --ml-indigo-800 ΔE 5.0
   "#ded7fd", // --ml-indigo-100 ΔE 3.0
-  "#f0ebff", // --ml-indigo-50 ΔE 2.0
-  "#f3f0ff", // --ml-indigo-50 ΔE 0.6
   "#ffd166", // --ml-yellow ΔE 5.0 — rail kicker
   "#0d0a22", // --focus-ring ΔE 2.5 — rail ground
   "#22203a", // --text-1 ΔE 5.6
@@ -69,14 +72,10 @@ const APP_BACKLOG = new Set([
   "#92400e", // --sentiment-mixed ΔE 5.3 — amber family
   "#78350f", // --color-warning ΔE 10.7 — amber family
   "#ddd5ff", // --ml-indigo-100 ΔE 3.6
-  "#634ee6", // --ml-indigo-500 ΔE 2.8
   "#4338ca", // --ml-indigo ΔE 4.4
   "#4f46e5", // --ml-indigo-500 ΔE 6.2
   "#3730a3", // --ml-indigo ΔE 3.9
-  "#ebe7fd", // --ml-indigo-100 ΔE 1.7
   "#cbbeff", // --ml-indigo-300 ΔE 6.2
-  "#efeaff", // --ml-indigo-50 ΔE 2.3
-  "#e5ddff", // --ml-indigo-100 ΔE 1.3
   "#e3f3ec", // --bg-muted ΔE 2.8 — the "done" step tint
   "#ddd7fa", // --ml-indigo-100 ΔE 3.0
   "#100d28", // --focus-ring ΔE 1.6 — rail ground, measured in rail.test.ts
