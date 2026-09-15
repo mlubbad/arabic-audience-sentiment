@@ -595,7 +595,7 @@ export const ar = {
   emptyNoCommentsTitle: "لم تصل تعليقات بعد",
   emptyNoCommentsLead:
     "لا توجد تعليقات محفوظة لمساحة العمل هذه. لا علاقة للفلاتر بذلك — لم يكتمل جمعٌ بعد.",
-  emptyFollowCollection: "اختر الفيديوهات وتابع الجمع",
+  emptyFollowCollection: "اختر الفيديوهات وتابع حالة الجمع",
   emptyConnectOrSync: "اربط قناة",
   emptyNoMatchTitle: "لا توجد تعليقات مطابقة لهذه الفلاتر",
   emptyNoMatchLead: (total: string) =>

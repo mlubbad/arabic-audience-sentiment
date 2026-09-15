@@ -121,7 +121,12 @@ describe("the rail's collection line", () => {
       expect(html).toContain(`data-key="${key}"`);
       expect(html).toContain(ar.syncMessages[key]);
     }
-    const page = readFileSync(new URL("./Sync.tsx", import.meta.url), "utf8");
+    // The health panel moved out of Sync.tsx into OperationsPanels.tsx when
+    // the catalogue took the top of the page; the read is the same line.
+    const page = readFileSync(
+      new URL("./OperationsPanels.tsx", import.meta.url),
+      "utf8",
+    );
     expect(page).toContain("S.syncMessages[health.key]");
   });
 

@@ -605,7 +605,7 @@ export const en: Strings = {
   emptyNoCommentsTitle: "No comments have arrived yet",
   emptyNoCommentsLead:
     "There are no stored comments for this workspace. The filters have nothing to do with it — no collection has completed yet.",
-  emptyFollowCollection: "Choose the videos and follow the collection",
+  emptyFollowCollection: "Choose the videos and follow the collection status",
   emptyConnectOrSync: "Connect a channel",
   emptyNoMatchTitle: "No comments match these filters",
   emptyNoMatchLead: (total: string) =>
