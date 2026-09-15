@@ -1442,3 +1442,15 @@ byte-identical to the local `dist`; the served Sync chunk carries `cat-pager`,
 `cat-select-page` and `youtube-nocookie.com/embed`. `/sync?demo=1` on the host renders
 the pager ("الصفحة 1 من 1"), the link beside each title, and the same bar. The live AJ360
 page with real ids — 90 pages and a real embed — is the user's to open; not seen from here.
+
+## 2026-09-16 — the player centred and smaller, a play badge on the thumbnail
+
+Seen live by the user on AJ360 first: the dialog opened at the inline start and wide. The
+app's reset zeroes every margin and a `<dialog>` centres itself with `margin: auto`; the
+rule now sets `position: fixed; inset: 0; margin: auto; width: min(88vw, 720px)`. The
+thumbnail sits in a wrapper with a play badge (`.cat-play`, a bordered triangle on a
+translucent `color-mix` of the ink token) at opacity 0, 1 on hover or focus of the row's
+button, 0.85 under `(hover: none)`. Browser test extended: the badge's computed opacity
+0 → 1 on hover; the dialog's left and right margins equal within 4px at 1280px and its
+width ≤ 720. `npm run check` exit 0 · `npm run test:e2e` exit 0 (84). Seen on the dev server:
+badge on hover, dialog centred over the page.

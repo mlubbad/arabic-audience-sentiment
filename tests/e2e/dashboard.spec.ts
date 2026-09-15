@@ -1791,9 +1791,21 @@ test("each video links to YouTube and plays inside the page", async ({
   );
   // Nothing is embedded until a video is opened.
   await expect(page.getByTestId("cat-preview-frame")).toHaveCount(0);
+  // The play badge lives over the thumbnail and shows itself on hover.
+  const play = page.getByTestId("cat-play-video-3");
+  await expect(play).toHaveCSS("opacity", "0");
+  await page.getByTestId("cat-open-video-3").hover();
+  await expect(play).toHaveCSS("opacity", "1");
   await page.getByTestId("cat-open-video-3").click();
   const dialog = page.getByTestId("cat-preview");
   await expect(dialog).toBeVisible();
+  // Centred: the dialog's box sits inside the viewport with equal margins,
+  // not at the inline start where the app's margin reset had put it.
+  const box = await dialog.boundingBox();
+  const width = page.viewportSize()!.width;
+  expect(box).not.toBeNull();
+  expect(Math.abs(box!.x - (width - box!.x - box!.width))).toBeLessThan(4);
+  expect(box!.width).toBeLessThanOrEqual(720);
   await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(
     "بث اصطناعي ٣",
   );

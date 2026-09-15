@@ -857,10 +857,47 @@
   color: var(--link);
   text-decoration: underline;
 }
-.app-shell .catalogue .cat-open:focus-visible img,
-.app-shell .catalogue .cat-open:focus-visible .cat-thumb {
+.app-shell .catalogue .cat-open:focus-visible .cat-thumb-wrap {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+/* The thumbnail is a stage: a play badge appears over it on hover or focus,
+   and stays on a touch screen, where there is no hover to reveal it. */
+.app-shell .catalogue .cat-thumb-wrap {
+  position: relative;
+  display: block;
+  width: 64px;
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+.app-shell .catalogue .cat-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text-1) 35%, transparent);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.app-shell .catalogue .cat-play::before {
+  content: "";
+  width: 0;
+  height: 0;
+  /* A triangle pointing the reading direction's way: play is play. */
+  border-block: 7px solid transparent;
+  border-inline-start: 12px solid var(--ink-on-dark);
+  filter: drop-shadow(
+    0 1px 1px color-mix(in srgb, var(--text-1) 60%, transparent)
+  );
+}
+.app-shell .catalogue .cat-open:hover .cat-play,
+.app-shell .catalogue .cat-open:focus-visible .cat-play {
+  opacity: 1;
+}
+@media (hover: none) {
+  .app-shell .catalogue .cat-play {
+    opacity: 0.85;
+  }
 }
 .app-shell .catalogue .cat-link {
   color: var(--link);
@@ -899,8 +936,15 @@
 /* The player: a dialog the width of the page, the frame at 16:9, nothing
    loaded until it opens. */
 .app-shell .catalogue .cat-preview {
-  width: min(92vw, 960px);
+  /* The app's reset zeroes every margin, and a dialog centres itself with
+     `margin: auto` — without it the box sat at the inline start. */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(88vw, 720px);
   max-width: none;
+  max-height: 90vh;
+  overflow: auto;
   padding: 0;
   border: 1px solid var(--border-2);
   border-radius: var(--r-2);

@@ -385,11 +385,17 @@ export function Catalogue({
                     aria-label={S.catPreview(r.title)}
                     onClick={() => setPreviewing(r)}
                   >
-                    {r.thumbnail_url ? (
-                      <img src={r.thumbnail_url} alt="" loading="lazy" />
-                    ) : (
-                      <span className="cat-thumb" aria-hidden="true" />
-                    )}
+                    <span className="cat-thumb-wrap" aria-hidden="true">
+                      {r.thumbnail_url ? (
+                        <img src={r.thumbnail_url} alt="" loading="lazy" />
+                      ) : (
+                        <span className="cat-thumb" />
+                      )}
+                      <span
+                        className="cat-play"
+                        data-testid={`cat-play-${r.id}`}
+                      />
+                    </span>
                     <span className="cat-title">{r.title}</span>
                   </button>
                   <a
