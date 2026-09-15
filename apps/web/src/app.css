@@ -200,62 +200,51 @@
   z-index: 100;
 }
 
-/* A compact report masthead keeps the first useful figure near the fold. */
+/* A page head, not a hero.
+   `report.css` paints `.rp-hero` as the landing page's pane — indigo
+   gradient, blurred colour washes, white ink — and until now the shell
+   repainted it with a second gradient of its own, so every page inside the
+   tool opened on a marketing block. Inside the shell it is flat and on the
+   page's own ground: what the page is, whose figures these are, and the
+   first useful figure, with nothing between the reader and the panels. */
 .app-shell .rp-page .rp-hero {
   display: block;
-  position: relative;
-  overflow: hidden;
+  position: static;
+  overflow: visible;
   min-height: 0;
   margin: 0 0 1.5rem;
-  padding: clamp(1.6rem, 3.5vw, 2.7rem) clamp(1.5rem, 4vw, 3rem);
-  border-radius: 20px;
-  background: linear-gradient(135deg, #131032 0%, #1c164a 45%, #271c6d 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 16px 36px -12px rgba(19, 16, 50, 0.5),
-    0 1px 2px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem 0 1.25rem;
+  border: 0;
+  border-bottom: 1px solid var(--border-1);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text-1);
 }
 .app-shell .rp-page .rp-hero::after {
-  inset: 0;
-  background:
-    radial-gradient(
-      ellipse at 88% 18%,
-      rgba(253, 230, 118, 0.22),
-      transparent 40%
-    ),
-    radial-gradient(
-      ellipse at 12% 82%,
-      rgba(60, 233, 249, 0.16),
-      transparent 45%
-    ),
-    radial-gradient(
-      circle at 60% 50%,
-      rgba(181, 170, 242, 0.12),
-      transparent 55%
-    );
-  filter: blur(10px);
+  content: none;
 }
 .app-shell .rp-page .rp-hero h1 {
   max-width: 28ch;
-  margin-bottom: 0.5rem;
-  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  margin-bottom: 0.4rem;
+  font-size: clamp(1.5rem, 2.6vw, 2.1rem);
   font-weight: 800;
-  line-height: 1.32;
-  letter-spacing: -0.015em;
-  color: #fff;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--text-1);
 }
 .app-shell .rp-page .rp-hero p {
   max-width: 68ch;
-  font-size: clamp(0.9rem, 1.25vw, 1.02rem);
+  font-size: clamp(0.9rem, 1.2vw, 1rem);
   line-height: 1.8;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-2);
 }
 .app-shell .rp-page .rp-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 0.6rem;
-  color: #ffd166;
+  margin-bottom: 0.45rem;
+  color: var(--ml-indigo);
   font-size: 0.8rem;
   font-weight: 700;
   /* Zero, and deliberately so: `report.css` tracks this eyebrow at 0.16em and
@@ -268,7 +257,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 1.25rem;
+  margin-top: 1rem;
 }
 .app-shell .rp-pill {
   display: inline-flex;
@@ -276,25 +265,24 @@
   gap: 6px;
   padding: 5px 14px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background: var(--bg-muted);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--border-1);
+  color: var(--text-1);
   font-size: 0.8rem;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: background 0.15s ease;
-}
-.app-shell .rp-pill:hover {
-  background: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
 }
 .app-shell .rp-hero-split {
-  margin-top: 1rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-1);
   font-size: 0.88rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-2);
+}
+.app-shell .rp-hero-split strong {
+  color: var(--text-1);
 }
 .app-shell .rp-nav {
   margin-bottom: 1.25rem;
@@ -866,9 +854,6 @@
     display: grid;
     padding: 1.7rem 1rem;
   }
-  .app-shell .rp-page .rp-hero {
-    border-radius: var(--r-3);
-  }
   .app-shell .rp-page form.rp-card.rp-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -912,7 +897,7 @@
     font-size: 1.12rem;
   }
   .app-shell .rp-page .rp-hero h1 {
-    font-size: 1.85rem;
+    font-size: 1.5rem;
   }
   .app-shell .rp-page form.rp-card.rp-filters {
     grid-template-columns: 1fr;

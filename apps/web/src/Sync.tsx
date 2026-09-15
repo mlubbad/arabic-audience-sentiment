@@ -271,9 +271,11 @@ function SyncBody({
           التشغيل {workspaceName ? `· ${workspaceName}` : "· معاينة تجريبية"}
         </p>
         <h1>حالة الجمع والتحليل</h1>
+        {/* The one sentence that orients — this page against the other one.
+            "تابع … من مكان واحد" was a pitch and is gone. */}
         <p>
-          تابع نشاط الجمع، وحدود الخطة، والمحاولات من مكان واحد. ما تراه هنا يصف
-          تشغيل الخدمة؛ تعليقات الجمهور وتفسيرها في لوحة البيانات.
+          ما تراه هنا يصف تشغيل الخدمة؛ تعليقات الجمهور وتفسيرها في لوحة
+          البيانات.
         </p>
       </header>
       {mode === "live" ? (

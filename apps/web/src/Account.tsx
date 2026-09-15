@@ -168,7 +168,7 @@ export function Account() {
         <header className="rp-hero">
           <p className="rp-eyebrow">الحساب</p>
           <h1>الحساب ومساحات العمل</h1>
-          <p>مساحة خاصة لقناتك، من الربط إلى قراءة التعليقات.</p>
+          <p>مساحات عملك، وقنواتها، وحالة إعداد كلٍّ منها.</p>
         </header>
         <div className="account-entry">
           <div className="app-state">
@@ -245,13 +245,14 @@ export function Account() {
   }
   return (
     <div className="rp-page account-page">
+      {/* A page head, not a hero. This used to open with a pitch — "أنشئ
+          مساحة لعملك، ثم اربط قناتك بإذنك…" — on a dark gradient pane, inside
+          the tool, to a reader who had already bought the argument by
+          signing in. The head now says what the page holds. */}
       <header className="rp-hero">
         <p className="rp-eyebrow">الحساب</p>
         <h1>الحساب ومساحات العمل</h1>
-        <p>
-          أنشئ مساحة لعملك، ثم اربط قناتك بإذنك. يمكنك العودة إلى بياناتك
-          ومراجعة حالة الجمع من مكان واحد.
-        </p>
+        <p>مساحات عملك، وقنواتها، وحالة إعداد كلٍّ منها.</p>
       </header>
       {feedback("page")}
       {!session ? (

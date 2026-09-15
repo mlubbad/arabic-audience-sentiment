@@ -589,8 +589,15 @@ function DashboardBody({
       : "لا توجد تواريخ معروفة";
   return (
     <div className="rp-page">
+      {/* A page head, not a hero. Inside the shell this is styled flat, on
+          the page's own ground: the dark gradient pane belongs to the landing
+          page, where a reader is being sold something. The eyebrow names the
+          page as the rail does and the workspace the figures belong to, the
+          way the operations page's already did. */}
       <header className="rp-hero">
-        <p className="rp-eyebrow">تقرير تحليلي · قناة يوتيوب</p>
+        <p className="rp-eyebrow">
+          نظرة عامة {workspaceName ? `· ${workspaceName}` : "· معاينة تجريبية"}
+        </p>
         <h1>ماذا يقول جمهورك — وأين يقوله؟</h1>
         {/* Before the read returns there is no count, and `?? 0` would have
             printed "قراءة 0 تعليقًا" over a page that is still loading —
@@ -598,10 +605,13 @@ function DashboardBody({
             is doing instead, and the figures appear when they exist. */}
         {s ? (
           <>
+            {/* What was read. The claim that used to follow — "كل رقم أدناه
+                محسوب من الصفوف المحفوظة — لا تقدير ولا استقراء" — is a pitch
+                about the method; the provenance strip below says what the
+                data is, which is the checkable version of it. */}
             <p>
               قراءة {n(s.total)} تعليقًا عبر {s.videos.length} فيديو، مع من
-              قالها ومتى. كل رقم أدناه محسوب من الصفوف المحفوظة — لا تقدير ولا
-              استقراء.
+              قالها ومتى.
             </p>
             <div className="rp-pills">
               <span className="rp-pill">{range}</span>
