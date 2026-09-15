@@ -128,6 +128,26 @@ export function WorkspaceCard({
           ربط قناة يوتيوب
         </button>
       )}
+      {/* A channel connected before the callback asked Google for a name has
+          none stored, and a connected channel had no way back through consent
+          — the only button it showed was "collect". Going through consent
+          again is what stores the name (the attach function keeps the grant
+          and fills the blanks), so the way is offered exactly while there is a
+          blank to fill, and named for what it does rather than as a generic
+          "reconnect" a reader would take for a fault. */}
+      {hasClient &&
+        channel?.status === "connected" &&
+        !channel.title &&
+        !channel.handle && (
+          <button
+            type="button"
+            disabled={pending}
+            data-testid={`relink-${workspace.id}`}
+            onClick={onConnect}
+          >
+            إعادة الربط لحفظ اسم القناة
+          </button>
+        )}
       {feedback}
     </li>
   );

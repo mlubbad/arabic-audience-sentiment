@@ -104,6 +104,40 @@ describe("a workspace card", () => {
     for (const step of setupSteps) expect(account).not.toContain(step.title);
   });
 
+  it("offers the way back through consent exactly while no name is stored", () => {
+    // Connected before the callback asked for a name: the only button was
+    // "collect", and there was no way to store the name short of the grant
+    // lapsing on its own.
+    const unnamed = render({
+      channel: { ...connected, handle: null, title: null },
+    });
+    expect(unnamed).toContain(`data-testid="relink-${W1}"`);
+    expect(unnamed).toContain(`data-testid="sync-${W1}"`);
+    // Named, by either name: nothing to fill, no button.
+    expect(render({ channel: connected })).not.toContain("relink-");
+    expect(render({ channel: { ...connected, title: null } })).not.toContain(
+      "relink-",
+    );
+    // Not connected: the ordinary connect button is the way in, not this one.
+    expect(
+      render({
+        channel: {
+          ...connected,
+          status: "reconnect_required",
+          handle: null,
+          title: null,
+        },
+      }),
+    ).not.toContain("relink-");
+    // No client: the server would refuse, so no button that always fails.
+    expect(
+      render({
+        hasClient: false,
+        channel: { ...connected, handle: null, title: null },
+      }),
+    ).not.toContain("relink-");
+  });
+
   it("carries its own feedback inside the card, after its action", () => {
     const html = render({
       channel: connected,
