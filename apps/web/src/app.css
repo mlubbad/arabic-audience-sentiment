@@ -1023,23 +1023,39 @@
   .sync-grid .rp-card {
     min-height: 0;
   }
+  /* One row per video still, but wrapped: the box and the title on the first
+     line, kind · date · count on the next, the state on the last. Seven grid
+     columns at 375px put each datum on its own line, five lines a video. */
   .app-shell .catalogue .cat-list li {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .app-shell .catalogue .cat-list li > :nth-child(n + 4) {
-    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
   }
   .app-shell .catalogue .cat-list img,
   .app-shell .catalogue .cat-thumb {
     display: none;
+  }
+  .app-shell .catalogue .cat-title {
+    /* Fills the first line beside the box, so nothing else joins it. */
+    flex: 1 1 calc(100% - 2.5rem);
   }
   .app-shell .catalogue .cat-kind,
   .app-shell .catalogue .cat-date,
   .app-shell .catalogue .cat-state {
     white-space: normal;
   }
+  .app-shell .catalogue .cat-kind {
+    /* The first datum under the title starts where the title does, past
+       the box, in either direction. */
+    margin-inline-start: 1.75rem;
+  }
   .app-shell .catalogue .cat-count {
     text-align: start;
+    min-width: 0;
+  }
+  .app-shell .catalogue .cat-state {
+    flex-basis: 100%;
+    margin-inline-start: 1.75rem;
   }
   .account-story {
     order: 2;
