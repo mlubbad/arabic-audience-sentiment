@@ -105,4 +105,37 @@ describe("Dialog", () => {
     );
     expect(trigger).toHaveFocus();
   });
+
+  it("as a sheet, marks itself so the stylesheet can anchor it to the inline-start edge", () => {
+    render(
+      <DirectionProvider dir="rtl">
+        <Dialog open>
+          <DialogContent
+            variant="sheet"
+            closeLabel="إغلاق"
+            aria-describedby={undefined}
+          >
+            <DialogTitle>القائمة</DialogTitle>
+          </DialogContent>
+        </Dialog>
+      </DirectionProvider>,
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("data-variant", "sheet");
+    expect(dialog).toHaveClass("ui-dialog-content--sheet");
+  });
+
+  it("defaults to the centred variant", () => {
+    render(
+      <Dialog open>
+        <DialogContent closeLabel="إغلاق" aria-describedby={undefined}>
+          <DialogTitle>عنوان</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByRole("dialog")).toHaveAttribute(
+      "data-variant",
+      "center",
+    );
+  });
 });

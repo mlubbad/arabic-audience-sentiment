@@ -570,3 +570,56 @@
     animation: ui-accordion-up 180ms ease-in;
   }
 }
+
+/* ---- Dialog, sheet variant ---- */
+.ui-dialog-content--sheet {
+  top: 0;
+  left: auto;
+  right: auto;
+  inset-inline-start: 0;
+  transform: none;
+  height: 100dvh;
+  max-height: none;
+  width: min(360px, 88vw);
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+@keyframes ui-sheet-in-ltr {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes ui-sheet-in-rtl {
+  from {
+    translate: 100% 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-dialog-content--sheet[data-state="open"] {
+    animation: ui-sheet-in-ltr 220ms ease-out;
+  }
+  [dir="rtl"] .ui-dialog-content--sheet[data-state="open"] {
+    animation-name: ui-sheet-in-rtl;
+  }
+}
+
+/* ---- Visually hidden, still read ---- */
+.ui-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

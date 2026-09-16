@@ -30,19 +30,28 @@ export interface DialogContentProps
    *  current locale's string rather than this component silently speaking
    *  one language. */
   closeLabel: string;
+  /** `sheet` anchors the panel to the inline-start edge, full height —
+   *  a navigation drawer. `center` is the modal every other caller wants. */
+  variant?: "center" | "sheet";
 }
 
 export function DialogContent({
   className,
   children,
   closeLabel,
+  variant = "center",
   ...props
 }: DialogContentProps) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="ui-dialog-overlay" />
       <DialogPrimitive.Content
-        className={cn("ui-dialog-content", className)}
+        className={cn(
+          "ui-dialog-content",
+          variant === "sheet" && "ui-dialog-content--sheet",
+          className,
+        )}
+        data-variant={variant}
         {...props}
       >
         {children}
