@@ -195,10 +195,24 @@ Before flipping it:
   pseudo-element (the one contrast failure). CLS 0.28 → 0, FCP 3.9 s → 1.8 s, Speed
   Index 7.1 s → 1.9 s, accessibility 96 → 100. What is left is LCP ≈ 4 s under
   simulated slow 4G: the H1 is the LCP element and its final paint is the swap into the
-  display bold. The honest next steps are a metrics-matched fallback face (`size-adjust`
-  and `ascent-override` tuned per platform) so the swap moves nothing and the first
-  paint counts, or `font-display: optional` on the bold — which would show the fallback
-  to a slow first visit, the owner's call. Subsetting the font saves only 12 kB (it is
+  display bold. A metrics-matched fallback was then built at the owner's request (same day):
+  three fallback families in `landing.css`, one per system face a reader's device may
+  have — Noto Naskh Arabic (Android), Geeza Pro (iOS/macOS), Noto Sans Arabic — each
+  named by `local()` and carrying `size-adjust`, `ascent-override` and
+  `descent-override` so this page's own words take the width and baseline they will
+  have in IBM Plex Sans Arabic. The ratios were measured by shaping the hero, the lead
+  and the section headings with HarfBuzz in each face; Geeza's were then corrected by
+  Chrome's own canvas measurement of the adjusted face (the HarfBuzz ratio left the
+  regular 1.7 % wide and the bold 2.3 % narrow), after which the page laid out with the
+  web font blocked and with it loaded agrees to the pixel on the H1, the lead, the CTA
+  and the first section heading (`swap-check.mjs`, 390 px viewport). The Noto pair
+  could not be measured in Chrome on this machine and carries the HarfBuzz ratio.
+  Lighthouse after: mobile 80–95 across runs (the simulation is noisy at this size),
+  CLS 0, FCP 1.7–2.9 s, LCP 2.7–3.9 s with the render delay still the H1's swap render
+  — Chrome reports the swapped paint as the candidate even when it moves nothing. The
+  one lever left for LCP = FCP is `font-display: optional` on the two Arabic faces,
+  which with these fallbacks would change only the typeface, never the layout, on a
+  slow first visit; the owner has not asked for it. Subsetting the font saves only 12 kB (it is
   mostly Arabic glyphs already) and was not done. Field data (CrUX) needs 28 days of
   traffic first. Best practices stays at 79 for reasons outside the page: a third-party
   cookie from Paddle, no source maps shipped, and Chrome's issue panel logging the same.

@@ -2196,3 +2196,22 @@ bold (render delay 3.2–3.6 s of it); options recorded in `docs/seo.md` §6. Be
 Checks after the wave: typecheck 0 errors; web unit tests 66 files / 408 passed; the whole
 browser suite **103 passed** (1.3 m); build with every prerender check green; deployed, and the
 WOFF2 files answer `200 font/woff2` from the host.
+
+## 2026-09-17 — the metrics-matched fallback faces, measured and deployed
+
+At the owner's instruction. Three fallback families in `apps/web/src/landing.css`
+(`Audience Arabic Fallback Naskh` / `Geeza` / `Noto Sans`), each a `local()` face with
+`size-adjust`, `ascent-override`, `descent-override`, `line-gap-override`, listed after
+`"Audience Arabic"` in the landing's stack.
+
+| Step | Actual result |
+| --- | --- |
+| Shaped width of the hero + lead + section headings, HarfBuzz (`uharfbuzz`), Plex over each fallback | Geeza Pro 105.12 % / bold 95.25 %; Noto Naskh Arabic 104.47 % / bold 107.31 %; Noto Sans Arabic 92.89 % / bold 90.83 % (SF Arabic 99.12 %, not usable by `local()` — hidden system face) |
+| `local("Geeza Pro")` | matched nothing in Chromium; the full name ("Geeza Pro Regular") and PostScript name ("GeezaPro") both match — every rule now lists both |
+| Chrome canvas, adjusted Geeza against Plex, same passages | regular 0.978 / 0.989, bold 1.013 / 1.034 → size-adjust corrected to 103.39 % / 97.48 %; after: 0.994, 1.004, 0.990, 1.010 |
+| `swap-check.mjs`: 390 px, web font blocked vs loaded | H1 `[221, 309]` both · lead `[552, 115]` both · CTA `[696, 92]` both · "why" heading `[1461, 109]` both · FAQ title 5606 vs 5581 (one wrap, far below the fold) · document 7311 vs 7286 px |
+| Lighthouse 12 mobile, live host, two runs each | `/`: perf 95 / 80 · LCP 2.7 / 3.9 s · FCP 1.7 / 2.9 s · CLS 0 · SI 1.7 / 4.7 s; `/pricing`: perf 79 / 79 · LCP 4.5 / 4.6 s · CLS 0. The LCP render delay (2.3–4.1 s) is still the H1's swap render |
+| `tests/e2e` landing, seo, pricing | 12 passed; web unit tests 410 passed; build and deploy green |
+
+Not measured: the Noto faces in Chrome on Android — no such device or font here; their
+ratios are HarfBuzz's, uncorrected.

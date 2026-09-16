@@ -21,6 +21,84 @@
   font-weight: 600 900;
   font-display: swap;
 }
+/* The fallback faces, sized to the face they stand in for.
+
+   Until the WOFF2 above arrives the text is set in the system's Arabic face,
+   and when it arrives the swap re-flows every line — that swap was the whole
+   CLS of the landing on a phone (0.28), and the H1's re-render was its LCP.
+   Each rule below names one system face by `local()` — its full name and
+   its PostScript name, since Chrome matches either and "Geeza Pro" alone
+   matched nothing — and scales it so a run
+   of this page's own words takes the same width as in IBM Plex Sans Arabic,
+   with the ascent and descent set to Plex's so the baseline sits where it
+   will after the swap. Measured with HarfBuzz over the hero, the lead and the
+   section headings (docs/seo.md §6): the ratios are the shaped width of
+   that text in Plex over its width in the fallback. Geeza's were then
+   corrected by what Chrome itself measured (canvas, the same passages, the
+   adjusted face against Plex): HarfBuzz's ratio left the regular 1.7% wide
+   and the bold 2.3% narrow. The Noto pair could not be measured in Chrome on
+   this machine and carries the HarfBuzz ratio as is. A face the device does
+   not have fails its `local()` and the browser moves to the next name in the
+   stack, so listing all four costs nothing where only one exists.
+
+   One family name per fallback, not one family with four sources: when
+   several @font-face rules share a family and weight the last one wins
+   outright, and a `local()` that fails does not hand back to the previous
+   rule. */
+@font-face {
+  font-family: "Audience Arabic Fallback Naskh";
+  src: local("Noto Naskh Arabic Regular"), local("NotoNaskhArabic-Regular");
+  font-weight: 400;
+  size-adjust: 104.47%;
+  ascent-override: 103.86%;
+  descent-override: 39.72%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Audience Arabic Fallback Naskh";
+  src: local("Noto Naskh Arabic Bold"), local("NotoNaskhArabic-Bold");
+  font-weight: 600 900;
+  size-adjust: 107.31%;
+  ascent-override: 101.11%;
+  descent-override: 38.67%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Audience Arabic Fallback Geeza";
+  src: local("Geeza Pro Regular"), local("GeezaPro");
+  font-weight: 400;
+  size-adjust: 103.39%;
+  ascent-override: 104.94%;
+  descent-override: 40.14%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Audience Arabic Fallback Geeza";
+  src: local("Geeza Pro Bold"), local("GeezaPro-Bold");
+  font-weight: 600 900;
+  size-adjust: 97.48%;
+  ascent-override: 111.3%;
+  descent-override: 42.57%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Audience Arabic Fallback Noto Sans";
+  src: local("Noto Sans Arabic Regular"), local("NotoSansArabic-Regular");
+  font-weight: 400;
+  size-adjust: 92.89%;
+  ascent-override: 116.81%;
+  descent-override: 44.68%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Audience Arabic Fallback Noto Sans";
+  src: local("Noto Sans Arabic Bold"), local("NotoSansArabic-Bold");
+  font-weight: 600 900;
+  size-adjust: 90.83%;
+  ascent-override: 119.45%;
+  descent-override: 45.69%;
+  line-gap-override: 0%;
+}
 .landing {
   /* -------- what this page no longer defines -------------------------
      It defined a purple of its own, #3b27ba, which is --ml-indigo to the
@@ -54,7 +132,10 @@
 
   color: var(--text-1);
   background: #fff;
-  font-family: "Audience Arabic", Tahoma, sans-serif;
+  font-family:
+    "Audience Arabic", "Audience Arabic Fallback Naskh",
+    "Audience Arabic Fallback Geeza", "Audience Arabic Fallback Noto Sans",
+    Tahoma, sans-serif;
   font-size: var(--lp-t-md);
   line-height: 1.8;
   overflow: clip;
