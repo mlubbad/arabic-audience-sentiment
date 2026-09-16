@@ -40,6 +40,7 @@ export function DeleteWorkspaceDialog({
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [footprint, setFootprint] = useState<Footprint | null>(null);
+  const [footprintError, setFootprintError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -49,10 +50,16 @@ export function DeleteWorkspaceDialog({
     if (!open || !supabase) return;
     let live = true;
     setFootprint(null);
+    setFootprintError(null);
     void supabase
       .rpc("admin_workspace_footprint", { w: workspace.id })
-      .then(({ data }) => {
-        if (live && data) setFootprint(data as Footprint);
+      .then(({ data, error }) => {
+        if (!live) return;
+        if (error) {
+          setFootprintError(adminErrorMessage(error, S));
+          return;
+        }
+        if (data) setFootprint(data as Footprint);
       });
     return () => {
       live = false;
@@ -92,6 +99,7 @@ export function DeleteWorkspaceDialog({
         if (!next) {
           setTyped("");
           setFailure(null);
+          setFootprintError(null);
         }
       }}
     >
@@ -116,7 +124,9 @@ export function DeleteWorkspaceDialog({
           autoComplete="off"
           onChange={(e) => setTyped(e.target.value)}
         />
-        {failure && <p role="alert">{failure}</p>}
+        {(failure || footprintError) && (
+          <p role="alert">{failure ?? footprintError}</p>
+        )}
         <div className="admin-delete-actions">
           <DialogClose asChild>
             <Button variant="secondary" disabled={busy}>
@@ -125,7 +135,7 @@ export function DeleteWorkspaceDialog({
           </DialogClose>
           <Button
             variant="danger"
-            disabled={!matches || busy}
+            disabled={!matches || busy || !footprint}
             onClick={confirm}
           >
             {S.adminDeleteConfirm}

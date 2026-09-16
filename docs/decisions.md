@@ -604,3 +604,20 @@ That is why the account page (Task 2) offers no retire door to an admin at all. 
 "admin identity" concern the entry above raises is real but is guarded elsewhere: by
 `last_workspace` on both retire and delete, and by `billing_root` on delete. Recorded from
 the migration's own header comment and the spec (`2026-09-17-workspace-delete-design.md`).
+
+A second correction, same entry: the "recorded on the admin's own home" guarantee, given
+above as "the owner-cannot-retire rule having no delete equivalent needed", is garbled and
+names the wrong mechanism. The real guarantee is evaluation order: `delete_workspace`
+computes `my_home := private.owner_plan_workspace(me)` *after* every `delete` in the
+function has already run, so `my_home` can never resolve to the workspace just removed —
+that row is gone from `public.workspaces` by the time the lookup happens, and
+`owner_plan_workspace` only ever returns a workspace that still exists.
+
+Two deferred recommendations from the same review, recorded rather than acted on: (1) a
+workspace with a running job is not refused — a stuck job would otherwise block deletion
+forever, and the worker already fails closed when the workspace it was working on has
+vanished out from under it, so refusing on a live job trades a real, permanent problem for
+one already handled; (2) `private.billing_events` rows for the deleted workspace are
+detached (`workspace_id` set to `null`) rather than deleted — the column is nullable, and
+the webhook trail is what a chargeback dispute needs to read after the workspace itself is
+gone (see the dated correction in `docs/progress.md` for the fix and its test).

@@ -968,3 +968,18 @@ on success. 12 new strings in both `strings/ar.ts` and `strings/en.ts`; 7 jsdom 
 **The migration has not been pushed to the live Supabase project.** This plan does not push
 it — that is the operator's decision, recorded pending in `docs/coordination/ACTIVE.md`.
 `npm run check` and verification detail are in `docs/verification.md`.
+
+## 2026-09-17 — correction: why the platform owner cannot retire, and the right test count
+
+The 2026-09-17 entry above misstates `owner_cannot_retire`'s reason and the PGlite count it
+added. The real reason, from the migration's own comment: the platform owner has nobody to
+hand a workspace to but themself — `retire_workspace`'s guard is `me = keeper` where
+`keeper := private.platform_owner()`, so it fires for every workspace the owner holds, not
+because retiring would leave the platform without an admin home (the platform owner is not
+going anywhere; retiring just relocates one workspace's membership to them, which is a
+no-op when they are already both ends of it). And the count was 5 new cases, not 6 —
+297 → 302, as `npm run test:db`'s own tally at the time confirms.
+
+A same-day fix wave (`.superpowers/sdd/2026-09-17-workspace-delete/final-fix-report.md`)
+added one further case — a client workspace whose billing root is on Paddle is deletable,
+only the root itself is refused — bringing the total to 303/303.

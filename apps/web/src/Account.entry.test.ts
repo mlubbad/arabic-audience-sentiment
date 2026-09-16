@@ -9,7 +9,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const shared = vi.hoisted(() => ({ providers: "" }));
+const shared = vi.hoisted(() => ({ providers: "", isAdmin: false }));
 
 vi.mock("./supabase", () => ({
   supabase: {
@@ -25,7 +25,7 @@ vi.mock("./supabase", () => ({
 }));
 
 vi.mock("./adminAccess", () => ({
-  useIsPlatformAdmin: () => ({ data: false }),
+  useIsPlatformAdmin: () => ({ data: shared.isAdmin, isPending: false }),
 }));
 
 /** The component reads `window.location.search`, and a server render has no
@@ -46,6 +46,7 @@ async function render() {
 beforeEach(() => {
   vi.resetModules();
   shared.providers = "";
+  shared.isAdmin = false;
   atUrl("");
 });
 
@@ -108,6 +109,16 @@ describe("the sign-in surface", () => {
     const signup = await render();
     expect(count(signup, "إنشاء حساب جديد")).toBe(1);
     expect(count(signup, "تسجيل الدخول")).toBe(1);
+  });
+
+  it("offers no retire door to a platform admin", async () => {
+    // This suite never resolves a session (the mocked getSession always
+    // returns null), so the workspace list itself never renders here either
+    // way; this guards the isPending-aware `mayRetire` gate in Account.tsx
+    // against a regression that would show it once one exists.
+    shared.isAdmin = true;
+    const html = await render();
+    expect(html).not.toContain("إنهاء المساحة");
   });
 
   it("claims nothing it cannot show", async () => {

@@ -70,6 +70,30 @@ describe("DeleteWorkspaceDialog", () => {
     });
   });
 
+  it("a failed footprint count is said in the dialog, and confirm stays disabled even once the name matches", async () => {
+    shared.rpc.mockImplementation(async (fn) =>
+      fn === "admin_workspace_footprint"
+        ? {
+            data: null,
+            error: { code: "PGRST202", message: "no such function" },
+          }
+        : { data: null, error: null },
+    );
+    await open();
+    await screen.findByRole("dialog");
+    // "Counting…" never resolves into a number; the alert says so instead.
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      ar.adminFailed("PGRST202"),
+    );
+    const confirm = screen.getByRole("button", { name: ar.adminDeleteConfirm });
+    expect(confirm).toBeDisabled();
+    await userEvent.type(
+      screen.getByLabelText(ar.adminDeleteTypeName("عميل للتسليم 1")),
+      "عميل للتسليم 1",
+    );
+    expect(confirm).toBeDisabled();
+  });
+
   it("confirm stays disabled until the name is typed back exactly", async () => {
     await open();
     await screen.findByRole("dialog");

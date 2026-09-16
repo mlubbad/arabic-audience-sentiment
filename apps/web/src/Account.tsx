@@ -66,7 +66,10 @@ export function Account() {
   // A platform admin has nobody to hand a workspace to but themself, so the
   // retire door is not offered; retire_workspace refuses them too.
   const access = useIsPlatformAdmin(session);
-  const mayRetire = access.data !== true;
+  // While the query is pending, access.data is still its initial undefined —
+  // `!== true` reads that as "not an admin" and the retire door would flash
+  // for an admin reader before the answer comes back.
+  const mayRetire = !access.isPending && access.data !== true;
 
   /**
    * Hand off to a provider.
