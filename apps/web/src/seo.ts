@@ -206,20 +206,15 @@ export function offersFrom(catalogue: readonly Plan[], locale: Locale) {
     .map((p) => ({
       "@type": "Offer",
       name: locale === "ar" ? p.title_ar : p.title_en,
+      // The monthly price; the yearly figure is the same plan on a different
+      // term, not a second product. Only `price` and `priceCurrency`: a
+      // `UnitPriceSpecification` carrying the term and the tax flag was what
+      // schema.org describes, and what Google's Rich Results Test reported
+      // as "invalid object type" on 2026-09-17 for every offer — so the term
+      // and "before tax" stay in the page's own words, where the test found
+      // the four offers valid.
       price: (p.price_monthly_cents / 100).toFixed(2),
       priceCurrency: "USD",
-      // Per month; the yearly figure is the same plan on a different term,
-      // not a second product.
-      priceSpecification: {
-        "@type": "UnitPriceSpecification",
-        price: (p.price_monthly_cents / 100).toFixed(2),
-        priceCurrency: "USD",
-        // Tax-external, as the pricing page says: Paddle adds the buyer's tax.
-        valueAddedTaxIncluded: false,
-        billingDuration: 1,
-        billingIncrement: 1,
-        unitCode: "MON",
-      },
       availability: "https://schema.org/InStock",
       url: absolute(publicPath("pricing", locale)),
     }));

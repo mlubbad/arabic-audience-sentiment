@@ -88,8 +88,10 @@ holds exactly one of each (checked in `tests/e2e/seo.spec.ts`).
 - JSON-LD `@graph`: `Organization` (Sky Develop), `WebSite`, `WebPage`, and
   - landing: `SoftwareApplication` (category, features) + `FAQPage` with every
     question on the page, in order
-  - pricing: `SoftwareApplication` with one `Offer` per self-serve plan — monthly USD
-    price, `valueAddedTaxIncluded: false`, `unitCode: MON` — from the catalogue
+  - pricing: `SoftwareApplication` with one `Offer` per self-serve plan — the monthly
+    USD `price` and `priceCurrency` — from the catalogue. (A `UnitPriceSpecification`
+    naming the month and "before tax" was Google's "invalid object type" in the Rich
+    Results Test; the page's own words carry both.)
   - legal: `WebPage.dateModified` from the document's date
 
 `dist/sitemap.xml` lists the eight addresses with their `xhtml:link` alternates.

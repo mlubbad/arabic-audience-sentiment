@@ -151,7 +151,7 @@ describe("the landing", () => {
 });
 
 describe("the pricing page", () => {
-  it("offers exactly the self-serve plans, per month, tax-external, in the page's language", () => {
+  it("offers exactly the self-serve plans, at the monthly price, in the page's language", () => {
     const offers = offersFrom(fixtureCatalogue, "en");
     expect(offers.map((o) => o.name)).toEqual([
       "Free",
@@ -167,8 +167,8 @@ describe("the pricing page", () => {
     ]);
     for (const o of offers) {
       expect(o.priceCurrency).toBe("USD");
-      expect(o.priceSpecification.valueAddedTaxIncluded).toBe(false);
-      expect(o.priceSpecification.unitCode).toBe("MON");
+      // Google's test refused a priceSpecification here; none is written.
+      expect("priceSpecification" in o).toBe(false);
     }
     expect(offersFrom(fixtureCatalogue, "ar").map((o) => o.name)).toEqual([
       "مجاني",

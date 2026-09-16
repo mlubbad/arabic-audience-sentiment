@@ -2150,3 +2150,17 @@ The owner purged the Cloudflare cache; fetched again from outside: `/robots.txt`
 `Sitemap: https://app.sky-develop.net/sitemap.xml`), `cf-cache-status: MISS`. All three
 indexing signals now agree on the live host. Left to the owner: submit the sitemap in Search
 Console.
+
+## 2026-09-17 — Search Console and the Rich Results Test
+
+The owner submitted `https://app.sky-develop.net/sitemap.xml` in Search Console (property
+`sky-develop.net`): "Sitemap processed successfully", last read 9/17/26, 8 discovered pages.
+
+Google's Rich Results Test, run from the browser pane against the live pages:
+
+| Page | Result |
+| --- | --- |
+| `/` | crawled 00:53:57; **Software Apps: 1 valid item** («مشاعر الجمهور»); two optional fields flagged: `aggregateRating` (no ratings exist — not written) and `offers` (the landing carries no catalogue; the pricing page does). `FAQPage` is not listed: since 2023 Google shows FAQ rich results only for government and health sites, so the tool does not report it — the data is still valid JSON-LD and read by the page's own FAQ |
+| `/pricing`, first run | Software Apps valid; 5 non-critical: `aggregateRating`, and **"Invalid object type for field priceSpecification"** on each of the four offers |
+| Fix | `offersFrom` no longer writes a `UnitPriceSpecification`; each offer carries `name`, `price`, `priceCurrency`, `availability`, `url`. `seo.test.ts` asserts none is written. Built and deployed |
+| `/en/pricing`, after the fix | crawled 00:57:36; Software Apps valid; **1 non-critical** (`aggregateRating`, optional) |
