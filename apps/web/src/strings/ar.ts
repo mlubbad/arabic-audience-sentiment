@@ -205,6 +205,7 @@ export const ar = {
   pricingFaqPack:
     "حزمة 10,000 تعليق بـ 5$ تُضاف فوق حصة خطتك، صالحة لنهاية الفترة وشهر بعدها.",
   checkoutUnavailable: "الدفع غير متاح بعد",
+  portalNoCustomer: "لا يوجد اشتراك عبر Paddle لهذه المساحة بعد",
   pricingLoading: "جارٍ قراءة الخطط…",
   pricingUnavailable: "تعذّرت قراءة الخطط. حدّث الصفحة لإعادة المحاولة.",
   pricingFaqTax:

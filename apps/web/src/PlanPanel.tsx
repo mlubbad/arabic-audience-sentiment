@@ -95,7 +95,13 @@ export function PlanPanel({
             workspaceId,
           });
     call
-      .catch(() => setNotice(S.checkoutUnavailable))
+      .catch((error: unknown) =>
+        setNotice(
+          (error as Error)?.message === "no_paddle_customer"
+            ? S.portalNoCustomer
+            : S.checkoutUnavailable,
+        ),
+      )
       .finally(() => setPending(null));
   };
   const door = (action: PlanAction) => {

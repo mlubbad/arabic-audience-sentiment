@@ -199,6 +199,7 @@ export const en: Strings = {
   pricingFaqPack:
     "A 10,000-comment pack for $5 adds on top of your plan's allowance, valid through the end of the period plus a month after.",
   checkoutUnavailable: "Checkout is not available yet",
+  portalNoCustomer: "This workspace has no Paddle subscription yet",
   pricingLoading: "Reading the plans…",
   pricingUnavailable:
     "The plans could not be read. Refresh the page to try again.",

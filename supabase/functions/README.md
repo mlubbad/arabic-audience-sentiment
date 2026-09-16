@@ -49,13 +49,34 @@ price it does not sell. Every decided outcome (`applied`, `duplicate`, `stale`, 
 `ignored`) is a 200 so Paddle stops retrying; a database error is a 500 with a code and no
 message, and Paddle retries it.
 
+## Customer portal
+
+`billing-portal/index.ts` opens Paddle's hosted portal for the signed-in owner of a
+workspace — manage, cancel, change card, all on Paddle's own page rather than anything
+built here. It runs as the caller, not as the service: the anon key plus the caller's
+`authorization` header, the same pattern `oauth-start` uses, so `public.billing_customer_ref`
+(`security definer` SQL added in `20260917051000`, owner role only) is what decides whether
+this caller may see a Paddle customer id — a `workspace_id` in the body is never trusted on
+its own. The pure decision lives in `_shared/billing-portal.ts` (tested without a project in
+`supabase/tests/billing_portal.test.ts`): a Paddle customer id becomes a call to
+`POST /customers/{id}/portal-sessions`, answering that URL; no customer id on the root is a
+404 `no_paddle_customer`, told apart from every other failure so the caller can show its own
+sentence instead of a generic one; a driver or Paddle error is a 502 `portal_unavailable`
+carrying no message, because either can quote a connection string or a key.
+
+Unlike the webhook, `billing-portal` is deployed WITH the gateway's JWT check — the caller
+here is a signed-in user with a Supabase token, not Paddle with an HMAC — so it carries no
+`verify_jwt = false` entry in `config.toml` and no `--no-verify-jwt` on deploy. As with the
+webhook's secret, an unset `PADDLE_API_KEY` is refused as a misconfiguration, 500
+`not_configured`, before the database or Paddle is touched.
+
 Secrets, set with `supabase secrets set` and never written in this repository:
 
 | Secret | Read by | What it is |
 | --- | --- | --- |
 | `PADDLE_WEBHOOK_SECRET` | `paddle-webhook` | The notification destination's secret key, from Paddle's dashboard |
-| `PADDLE_API_KEY` | checkout and portal functions (C4/C5) | A Paddle API key, server side only |
-| `PADDLE_ENV` | checkout and portal functions (C4/C5) | `sandbox` or `production`, choosing the Paddle base URL |
+| `PADDLE_API_KEY` | `billing-portal` (checkout is client-side Paddle.js and reads no server secret) | A Paddle API key, server side only |
+| `PADDLE_ENV` | `billing-portal` | `sandbox` or `production`, choosing the Paddle base URL |
 
 Paddle sends no Supabase JWT, so the function is deployed without the gateway's JWT check —
 `supabase config.toml` carries `[functions.paddle-webhook] verify_jwt = false` for the local

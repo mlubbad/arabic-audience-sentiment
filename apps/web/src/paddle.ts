@@ -10,10 +10,18 @@
  * whose subscription an event is; without one there is nothing to bill and
  * the overlay never opens.
  *
- * Every refusal is one error, `checkout_unavailable`: the callers
+ * Every checkout refusal is one error, `checkout_unavailable`: the callers
  * (`PricingPage`, `PlanPanel`) show it as `S.checkoutUnavailable`, and the
  * reason — no script, no token, no price id yet, no workspace — is not a
- * reader's to act on. `openPortal` stays a stub until C5.
+ * reader's to act on.
+ *
+ * The portal is a server round trip instead, to the `billing-portal`
+ * function: it decides who may see a Paddle customer id
+ * (`billing_customer_ref`, owner only), so this side only carries the
+ * caller's own token there and follows the URL it answers with. Its one
+ * distinguishable refusal is `no_paddle_customer` — a workspace never billed
+ * through Paddle — which `PlanPanel` shows as its own sentence; anything else
+ * collapses to `checkout_unavailable`, same as checkout.
  *
  * The only Paddle value the bundle carries is the client-side token
  * (`VITE_PADDLE_CLIENT_TOKEN`), which Paddle designs to be public; the API
@@ -136,11 +144,39 @@ export async function openCheckout(req: CheckoutRequest): Promise<void> {
   );
 }
 
+/** Opens Paddle's hosted portal for the workspace's own subscription. The
+ *  function decides who may see a customer id (`billing_customer_ref`, owner
+ *  only); this side only carries the caller's token there and follows the
+ *  URL it answers with. A workspace never billed through Paddle answers
+ *  `no_paddle_customer`, which the caller shows as its own sentence rather
+ *  than the generic `checkout_unavailable`. */
 export async function openPortal(
   session: Session,
   workspaceId: string,
-): Promise<never> {
-  void session;
-  void workspaceId;
-  throw new Error("checkout_unavailable");
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/billing-portal`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ workspace_id: workspaceId }),
+      },
+    );
+  } catch {
+    throw unavailable();
+  }
+  const body = (await response.json().catch(() => ({}))) as {
+    url?: string;
+    code?: string;
+  };
+  if (response.status === 404 && body.code === "no_paddle_customer")
+    throw new Error("no_paddle_customer");
+  if (!response.ok || typeof body.url !== "string") throw unavailable();
+  window.location.assign(body.url);
 }
