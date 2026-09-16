@@ -1757,3 +1757,12 @@ carries `52120bd`: 100 comments per Gemini request and `thinkingBudget: 0`. It c
 `topics=gemini`; the change is measured (docs/decisions.md) and takes effect on the next
 analyse job. Live-tested: the restart line and the checkout's `CHUNK = 100` /
 `thinkingConfig` lines, read from the service's own checkout.
+
+## 2026-09-16 — the stuck collect ends the way it should
+
+`79fc8161`, twelve reclaims by morning under the old handler, was claimed a thirteenth
+time by the service running `93f27be` after the analyse job released the worker, and
+finished `blocked: quota_exceeded` at its first refused batch — the checkpoint kept, no
+further reclaim, no thrash. The tick afterwards answers `collect: 0`: the hour's backoff
+after a blocked job holds, and the pilot's units stay spent until 2026-12-01 or a plan
+change.
