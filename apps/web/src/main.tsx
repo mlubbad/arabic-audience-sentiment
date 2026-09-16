@@ -43,6 +43,11 @@ const Sync = lazy(() => import("./Sync").then((m) => ({ default: m.Sync })));
 const Account = lazy(() =>
   import("./Account").then((m) => ({ default: m.Account })),
 );
+// `PricingPage`, not `Pricing`: `pricing.ts` (the words) already exists, and
+// on a case-insensitive filesystem `./Pricing` resolves to it.
+const Pricing = lazy(() =>
+  import("./PricingPage").then((m) => ({ default: m.Pricing })),
+);
 const client = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
@@ -378,6 +383,15 @@ void loadStrings(currentLocale()).then(() =>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
+            {/* Beside the landing, not inside the shell: read signed out. */}
+            <Route
+              path="/pricing"
+              element={
+                <Suspense fallback={null}>
+                  <Pricing />
+                </Suspense>
+              }
+            />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/account" element={<Account />} />

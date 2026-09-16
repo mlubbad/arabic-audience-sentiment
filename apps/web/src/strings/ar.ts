@@ -176,6 +176,7 @@ export const ar = {
   pricingLimitMembers: "الأعضاء",
   pricingLimitWorkspaces: "مساحات العمل (العملاء)",
   pricingLimitLive: (hours: string) => `فحص حيّ كل ${hours} س`,
+  pricingPriceQuoted: "حسب الاتفاق",
   pricingUnlimited: "بلا حدود",
   pricingFaqTitle: "أسئلة شائعة",
   pricingFaqNoDouble:
@@ -183,6 +184,9 @@ export const ar = {
   pricingFaqHardStop: "عند بلوغ الحد يتوقف التحليل؛ لا فاتورة مفاجئة.",
   pricingFaqPack:
     "حزمة 10,000 تعليق بـ 5$ تُضاف فوق حصة خطتك، صالحة لنهاية الفترة وشهر بعدها.",
+  checkoutUnavailable: "الدفع غير متاح بعد",
+  pricingLoading: "جارٍ قراءة الخطط…",
+  pricingUnavailable: "تعذّرت قراءة الخطط. حدّث الصفحة لإعادة المحاولة.",
   pricingFaqTax:
     "الأسعار بالدولار قبل الضريبة؛ تُحصَّل ضريبة بلدك عند الدفع عبر Paddle، بائعنا القانوني.",
 
@@ -827,6 +831,7 @@ export const ar = {
   lpNavWhy: "لماذا مشاعر الجمهور؟",
   lpNavExperience: "شاهد التجربة",
   lpNavFaq: "أسئلة شائعة",
+  navPricing: "الأسعار",
   lpOpenAccount: "فتح الحساب",
   lpHeroEyebrow: "تعليقات يوتيوب. رؤية أوضح.",
   lpHeroLine1: "وراء كل تعليق،",

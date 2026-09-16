@@ -2,6 +2,7 @@ import {
   CommentReviewInputSchema,
   FixtureSchema,
   LiveSnapshotSchema,
+  PlanCatalogueSchema,
   TopicReviewInputSchema,
   applyReview,
   applyTopicReview,
@@ -24,6 +25,100 @@ import { supabase } from "./supabase";
 export const fixtureReviewer = "مراجع محلي (جلسة اختبار)";
 
 export const fixtureWorkspace = "00000000-0000-4000-8000-000000000001";
+
+/**
+ * What `plan_catalogue()` answers, for a build with no server to ask: the six
+ * non-internal rows of `supabase/migrations/20260917010000_plans_v2.sql`, in
+ * their sort order, with the same numbers. Parsed through the contract so a
+ * row that the live function would refuse is refused here too. Kept here, not
+ * in the dashboard fixture file — that file is one workspace's snapshot and
+ * the catalogue is not the workspace's; the pricing page reads it signed out.
+ */
+const limits = (
+  analysis_units: number,
+  topic_units: number,
+  insight_reports: number,
+  channels: number,
+  members: number,
+  workspaces: number,
+  live_interval_minutes: number,
+) => ({
+  analysis_units,
+  topic_units,
+  insight_reports,
+  channels,
+  members,
+  workspaces,
+  live_interval_minutes,
+});
+export const fixtureCatalogue = PlanCatalogueSchema.parse([
+  {
+    key: "free",
+    segment: "individual",
+    title_ar: "مجاني",
+    title_en: "Free",
+    price_monthly_cents: 0,
+    price_yearly_cents: 0,
+    self_serve: true,
+    provider_prices: {},
+    limits: limits(100, 100, 1, 0, 1, 1, 0),
+  },
+  {
+    key: "creator",
+    segment: "individual",
+    title_ar: "منشئ",
+    title_en: "Creator",
+    price_monthly_cents: 1200,
+    price_yearly_cents: 12000,
+    self_serve: true,
+    provider_prices: {},
+    limits: limits(10000, 4000, 10, 1, 1, 1, 1440),
+  },
+  {
+    key: "creator_plus",
+    segment: "individual",
+    title_ar: "منشئ بلس",
+    title_en: "Creator Plus",
+    price_monthly_cents: 2900,
+    price_yearly_cents: 28800,
+    self_serve: true,
+    provider_prices: {},
+    limits: limits(30000, 12000, 50, 2, 2, 1, 720),
+  },
+  {
+    key: "agency",
+    segment: "business",
+    title_ar: "وكالة",
+    title_en: "Agency",
+    price_monthly_cents: 9900,
+    price_yearly_cents: 94800,
+    self_serve: true,
+    provider_prices: {},
+    limits: limits(150000, 60000, 200, 10, 10, 5, 360),
+  },
+  {
+    key: "media",
+    segment: "business",
+    title_ar: "ميديا",
+    title_en: "Media",
+    price_monthly_cents: 24900,
+    price_yearly_cents: 238800,
+    self_serve: false,
+    provider_prices: {},
+    limits: limits(500000, 200000, 600, 30, 25, 15, 120),
+  },
+  {
+    key: "enterprise",
+    segment: "business",
+    title_ar: "مؤسسات",
+    title_en: "Enterprise",
+    price_monthly_cents: 0,
+    price_yearly_cents: 0,
+    self_serve: false,
+    provider_prices: {},
+    limits: limits(1000000, 400000, 2000, 100, 100, 50, 60),
+  },
+]);
 
 // A channel can have hundreds of videos; comparing all of them is neither
 // usable nor cheap. The busiest few are compared and the rest declared.

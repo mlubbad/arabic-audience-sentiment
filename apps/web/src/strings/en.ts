@@ -173,6 +173,7 @@ export const en: Strings = {
   pricingLimitMembers: "Members",
   pricingLimitWorkspaces: "Workspaces (clients)",
   pricingLimitLive: (hours: string) => `Live check every ${hours}h`,
+  pricingPriceQuoted: "Custom",
   pricingUnlimited: "Unlimited",
   pricingFaqTitle: "Frequently asked questions",
   pricingFaqNoDouble:
@@ -180,6 +181,10 @@ export const en: Strings = {
   pricingFaqHardStop: "Analysis stops at the limit; no surprise bill.",
   pricingFaqPack:
     "A 10,000-comment pack for $5 adds on top of your plan's allowance, valid through the end of the period plus a month after.",
+  checkoutUnavailable: "Checkout is not available yet",
+  pricingLoading: "Reading the plans…",
+  pricingUnavailable:
+    "The plans could not be read. Refresh the page to try again.",
   pricingFaqTax:
     "Prices in US dollars are before tax; your country's tax is collected at checkout via Paddle, our merchant of record.",
 
@@ -834,6 +839,7 @@ export const en: Strings = {
   lpNavWhy: "Why Audience Sentiment?",
   lpNavExperience: "See the demo",
   lpNavFaq: "FAQ",
+  navPricing: "Pricing",
   lpOpenAccount: "Open the account",
   lpHeroEyebrow: "YouTube comments. A clearer view.",
   lpHeroLine1: "Behind every comment,",

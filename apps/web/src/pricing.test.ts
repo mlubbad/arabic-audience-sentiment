@@ -67,6 +67,26 @@ describe("pricing rows", () => {
     expect(rows[0].cta.kind).toBe("free");
     expect(rows[1].cta.kind).toBe("contact");
   });
+  it("a plan with no price and no self-serve is quoted, not free", () => {
+    const [row] = pricingRows(
+      [
+        plan({
+          key: "enterprise",
+          price_monthly_cents: 0,
+          price_yearly_cents: 0,
+          self_serve: false,
+        }),
+      ],
+      "individual",
+      "year",
+      "ar",
+      ar,
+    );
+    expect(row.cta.kind).toBe("contact");
+    expect(row.price).toBe(ar.pricingPriceQuoted);
+    expect(row.perLabel).toBe("");
+    expect(row.yearlyNote).toBeNull();
+  });
   it("a self-serve paid plan checks out; the current plan wins over checkout and free", () => {
     const [checkoutRow] = pricingRows(
       [plan({})],

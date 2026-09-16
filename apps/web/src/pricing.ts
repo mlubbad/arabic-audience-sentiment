@@ -28,6 +28,10 @@ const ANCHOR: Record<string, string> = {
   business: "agency",
 };
 
+/** Where a plan that is not self-serve sends a reader — one address, so the
+ *  page and any card that asks to be contacted cannot name two. */
+export const contactEmail = "engmlubbad@gmail.com";
+
 export const formatUsd = (cents: number) =>
   `$${Math.round(cents / 100).toLocaleString("en-US")}`;
 
@@ -46,21 +50,24 @@ export function pricingRows(
     .map((p) => {
       const monthly =
         interval === "year" ? p.price_yearly_cents / 12 : p.price_monthly_cents;
+      // Not self-serve comes before free: enterprise carries no price in the
+      // catalogue (0), and a zero that is not for sale is "ask", not "free".
       const cta =
         p.key === currentKey
           ? { kind: "current" as const, label: S.pricingCtaCurrent }
-          : p.price_monthly_cents === 0
-            ? { kind: "free" as const, label: S.pricingCtaFree }
-            : p.self_serve
-              ? { kind: "checkout" as const, label: S.pricingCtaStart }
-              : { kind: "contact" as const, label: S.pricingCtaContact };
+          : !p.self_serve
+            ? { kind: "contact" as const, label: S.pricingCtaContact }
+            : p.price_monthly_cents === 0
+              ? { kind: "free" as const, label: S.pricingCtaFree }
+              : { kind: "checkout" as const, label: S.pricingCtaStart };
+      const quoted = !p.self_serve && p.price_monthly_cents === 0;
       return {
         key: p.key,
         title: locale === "ar" ? p.title_ar : p.title_en,
-        price: formatUsd(monthly),
-        perLabel: S.pricingPerMonth,
+        price: quoted ? S.pricingPriceQuoted : formatUsd(monthly),
+        perLabel: quoted ? "" : S.pricingPerMonth,
         yearlyNote:
-          interval === "year" && p.price_yearly_cents > 0
+          !quoted && interval === "year" && p.price_yearly_cents > 0
             ? S.pricingPerMonthBilledYearly(formatUsd(p.price_yearly_cents))
             : null,
         anchor: ANCHOR[segment] === p.key,
