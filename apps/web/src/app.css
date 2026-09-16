@@ -1645,6 +1645,7 @@
   color: rgba(255, 255, 255, 0.7);
   font-size: 12.5px;
   max-width: 100%;
+  display: inline;
 }
 .app-shell .app-rail .app-session button,
 .app-shell .app-rail a.app-session-in {
@@ -1664,6 +1665,10 @@
   background: rgba(255, 255, 255, 0.16);
   border-color: rgba(255, 255, 255, 0.4);
   transform: translateY(-1px);
+}
+.app-shell .app-rail .app-session button:focus-visible,
+.app-shell .app-rail a.app-session-in:focus-visible {
+  outline-color: var(--focus-halo);
 }
 .app-shell:has(.app-rail) > .app-main {
   grid-area: main;

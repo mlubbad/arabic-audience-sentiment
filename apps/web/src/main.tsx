@@ -298,7 +298,13 @@ function AppLayout() {
         ref={railRef}
         className={menuOpen ? "app-rail is-open" : "app-rail"}
         onKeyDown={(e) => {
-          if (e.key === "Escape" && menuOpen) {
+          // A popup opened from the rail (the session menu, the workspace
+          // listbox) handles its own Escape: Radix dismisses it and marks
+          // the event defaultPrevented on a document-capture listener, and
+          // the synthetic event still bubbles here through the React tree
+          // even though the popup is portaled to <body>. One Escape must
+          // close one layer, not both.
+          if (e.key === "Escape" && menuOpen && !e.defaultPrevented) {
             setMenuOpen(false);
             menuRef.current?.focus();
           }
