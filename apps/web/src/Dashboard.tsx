@@ -15,6 +15,7 @@ import {
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 import "./report.css";
 import { byHour, byWeek, byWeekday, commenters, plottable } from "./analytics";
+import { pageSlice } from "./videoPaging";
 import {
   UNCLASSIFIED,
   type Filters,
@@ -130,6 +131,10 @@ function ChartFigures({
     </details>
   );
 }
+
+/** Video cards per page of the videos section. The same size as the comments
+ *  pager's default, so the two lists turn at the same rhythm. */
+const VIDEOS_PER_PAGE = 25;
 
 /** The report's sections, in the order the page lays them out. One list, so a
  *  section cannot be added to the page and forgotten in its index — which is
@@ -283,6 +288,11 @@ function DashboardBody({
   // for the filtered set it was produced from.
   const [cursors, setCursors] = useState<string[]>([]);
   const [limit, setLimit] = useState(25);
+  // The videos section's own page, 0-based. It is a slice of a list already
+  // in memory, not a cursor, so it is not part of `page` below and does not
+  // reach the read. Cleared with the cursors: a page into a filtered list is
+  // only meaningful for the list it was turned in.
+  const [videoPage, setVideoPage] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(
     () =>
       typeof window === "undefined" ||
@@ -536,6 +546,7 @@ function DashboardBody({
     setFormError("");
     setCursorNotice(false);
     setCursors([]);
+    setVideoPage(0);
     setFilters(filtersFrom(over));
   }
   function apply(e: FormEvent) {
@@ -557,6 +568,7 @@ function DashboardBody({
     setReviewStatus("all");
     setCursorNotice(false);
     setCursors([]);
+    setVideoPage(0);
     setLimit(25);
     setFilters(defaults);
   }
@@ -596,6 +608,16 @@ function DashboardBody({
   const [cardTab, setCardTab] = useState<"liked" | "recent" | "critical">(
     "liked",
   );
+  // The videos on screen: 25 of the filtered list, busiest first. The index
+  // is clamped inside pageSlice, so a filter that shrinks the list under a
+  // reader on page four shows the last page that still exists, not a blank.
+  const videoSlice = pageSlice(s?.videos ?? [], videoPage, VIDEOS_PER_PAGE);
+  function turnVideoPage(next: number) {
+    setVideoPage(next);
+    document
+      .getElementById("rp-videos")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   const cards = useMemo(() => {
     const list = [...rows];
     if (cardTab === "critical")
@@ -1145,7 +1167,7 @@ function DashboardBody({
                   <p className="rp-sub">{S.videosLead}</p>
                 </header>
                 <ul className="rp-videos">
-                  {s.videos.map((v) => {
+                  {videoSlice.items.map((v) => {
                     const known =
                       v.sentiments.positive +
                       v.sentiments.negative +
@@ -1221,6 +1243,38 @@ function DashboardBody({
                     );
                   })}
                 </ul>
+                {/* Only when there is a second page. A pager reading "1 of 1"
+                    under five cards is furniture; under 194 it is the way in.
+                    Moving a page scrolls the section's head back into view:
+                    the reader pressed a button at the foot of the old page and
+                    would otherwise be left looking at the foot of the new one. */}
+                {videoSlice.pages > 1 && (
+                  <nav className="pager" aria-label={S.videosPagerLabel}>
+                    <button
+                      type="button"
+                      disabled={videoSlice.page === 0}
+                      onClick={() => turnVideoPage(videoSlice.page - 1)}
+                    >
+                      {S.previousPage}
+                    </button>
+                    <p data-testid="video-page-state" aria-live="polite">
+                      {S.videosPageState(
+                        videoSlice.page + 1,
+                        videoSlice.pages,
+                        videoSlice.from,
+                        videoSlice.to,
+                        s.videos.length,
+                      )}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={videoSlice.page >= videoSlice.pages - 1}
+                      onClick={() => turnVideoPage(videoSlice.page + 1)}
+                    >
+                      {S.nextPage}
+                    </button>
+                  </nav>
+                )}
               </section>
               <section className="rp-section" id="rp-voice">
                 <header>

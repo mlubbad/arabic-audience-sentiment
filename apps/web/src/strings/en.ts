@@ -787,6 +787,15 @@ export const en: Strings = {
   nextPage: "Next page",
   pageState: (page: number, shown: number, total: number) =>
     `Page ${page} — showing ${shown} of ${total} ${pl(total, "comment", "comments")} within the filters`,
+  videosPagerLabel: "Browse videos",
+  videosPageState: (
+    page: number,
+    pages: number,
+    from: number,
+    to: number,
+    total: number,
+  ) =>
+    `Page ${page} of ${pages} — showing ${from}–${to} of ${total} ${pl(total, "video", "videos")}`,
 
   lpTitle: "Audience Sentiment — understand what lies behind YouTube comments",
   lpMenuLabel: "Main menu",

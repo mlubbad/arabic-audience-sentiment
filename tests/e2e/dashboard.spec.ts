@@ -1929,3 +1929,101 @@ test("a workspace whose topics were never run shows the not-run text and no topi
     0,
   );
 });
+
+// ---- the videos section pages its list, 25 cards at a time ----
+
+test("the videos section pages at 25 and a filter change returns to page one", async ({
+  page,
+}) => {
+  // The fixture has two videos, which is why a 194-video channel shipped as
+  // one unbroken wall of cards. Clone the fixture's comments across 30
+  // videos so there is a second page to reach; each clone keeps a distinct
+  // id so nothing is deduplicated away.
+  await page.route("**/fixtures/dashboard.json", async (route) => {
+    const response = await route.fetch();
+    const fixture = await response.json();
+    const seed = fixture.comments as {
+      id: string;
+      video_id: string;
+      video_title: string | null;
+      parent_comment_id: string | null;
+    }[];
+    fixture.comments = Array.from({ length: 30 }, (_, i) =>
+      seed.map((comment) => ({
+        ...comment,
+        id: `${comment.id}-clone-${i}`,
+        parent_comment_id: comment.parent_comment_id
+          ? `${comment.parent_comment_id}-clone-${i}`
+          : null,
+        video_id: `paged-video-${i + 1}`,
+        video_title: `فيديو مستنسخ ${i + 1}`,
+      })),
+    ).flat();
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("180");
+
+  const videos = page.locator("#rp-videos");
+  const cards = videos.getByTestId(/^rp-video-/);
+  const pager = videos.getByRole("navigation", { name: "تصفح الفيديوهات" });
+  const next = pager.getByRole("button", { name: "الصفحة التالية" });
+  const previous = pager.getByRole("button", { name: "الصفحة السابقة" });
+
+  await expect(cards).toHaveCount(25);
+  await expect(page.getByTestId("video-page-state")).toHaveText(
+    "الصفحة 1 من 2 — عرض 1–25 من 30 فيديو",
+  );
+  await expect(previous).toBeDisabled();
+
+  await next.click();
+  await expect(cards).toHaveCount(5);
+  await expect(page.getByTestId("video-page-state")).toHaveText(
+    "الصفحة 2 من 2 — عرض 26–30 من 30 فيديو",
+  );
+  await expect(next).toBeDisabled();
+  // The two pages are disjoint: every one of the 30 appears exactly once.
+  await previous.click();
+  const first = await cards.evaluateAll((els) =>
+    els.map((el) => el.getAttribute("data-testid")),
+  );
+  await next.click();
+  const second = await cards.evaluateAll((els) =>
+    els.map((el) => el.getAttribute("data-testid")),
+  );
+  expect(new Set([...first, ...second]).size).toBe(30);
+
+  // Paging the videos is a reading aid: the figures above do not move.
+  await expect(page.getByTestId("total")).toHaveText("180");
+
+  // A filter applied from page two lands on page one of the narrowed list —
+  // even when the narrowed list still has two pages, so the clamp alone
+  // would have left the reader on page two of a list they had not read.
+  await page.getByLabel("المشاعر").selectOption("positive");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("30");
+  await expect(page.getByTestId("video-page-state")).toHaveText(
+    "الصفحة 1 من 2 — عرض 1–25 من 30 فيديو",
+  );
+
+  // And the pager goes when one page holds everything that is left.
+  await page
+    .getByLabel("الفيديو", { exact: true })
+    .selectOption("paged-video-7");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("1");
+  await expect(cards).toHaveCount(1);
+  await expect(pager).toHaveCount(0);
+});
+
+test("the videos section shows no pager while one page holds every video", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(
+    page
+      .locator("#rp-videos")
+      .getByRole("navigation", { name: "تصفح الفيديوهات" }),
+  ).toHaveCount(0);
+});

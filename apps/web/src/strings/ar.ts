@@ -778,6 +778,15 @@ export const ar = {
   nextPage: "الصفحة التالية",
   pageState: (page: number, shown: number, total: number) =>
     `الصفحة ${page} — عرض ${shown} من ${total} تعليقًا ضمن الفلاتر`,
+  // The videos section pages its own list, in memory, 25 cards at a time.
+  videosPagerLabel: "تصفح الفيديوهات",
+  videosPageState: (
+    page: number,
+    pages: number,
+    from: number,
+    to: number,
+    total: number,
+  ) => `الصفحة ${page} من ${pages} — عرض ${from}–${to} من ${total} فيديو`,
 
   // ---- the landing page (Landing.tsx) ----
   lpTitle: "مشاعر الجمهور — افهم ما وراء تعليقات يوتيوب",

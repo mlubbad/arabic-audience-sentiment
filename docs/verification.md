@@ -1630,3 +1630,32 @@ exit 0; `eslint` and `prettier --check` clean on the new test.
 Not live-tested: the migration is not applied to the linked project. The three topic
 migrations ahead of it went live earlier today (the deploy entry above), so it is now the
 one migration the live project lacks; it is listed in `docs/coordination/ACTIVE.md`.
+
+## 2026-09-16 — the videos section turns pages: unit, e2e, mutation-checked
+
+`apps/web/src/videoPaging.test.ts`, six tests. Seen red first (module absent), then
+6 passed. Mutations applied to `videoPaging.ts`, each run and the file restored from a
+scratchpad copy (`diff` empty):
+
+| Mutation | Test that went red |
+| --- | --- |
+| Drop the upper clamp (`Math.max(page, 0)` alone) | "clamps a page index past the end to the last page" |
+| `Math.max(0, …)` for the page count | "is one empty page for an empty list, not zero pages" |
+| `from: start + 1` unconditionally | the empty-list test — `from` read 1 of nothing |
+
+`tests/e2e/dashboard.spec.ts`, two blocks appended. The first rewrites the fixture route
+into 30 videos of 6 comments (180 total), asserts 25 cards and "الصفحة 1 من 2 — عرض 1–25
+من 30 فيديو", turns to page two (5 cards, next disabled), proves the two pages are
+disjoint (30 distinct test ids), that the totals do not move, that a sentiment filter
+applied from page two lands on **page one** of a list that still has two pages, and that
+the pager disappears when one video is left. The second asserts the untouched fixture
+shows no pager. Mutation: removing `setVideoPage(0)` from `applyFilters` turned the first
+red with "الصفحة 2 من 2 — عرض 26–30" where page 1 was expected — the clamp alone would
+not have caught it, which is why the test filters to a list that keeps both pages.
+
+Gates at this head: `npm run check` exit 0 (unit 350 passed / 43 files, PGlite 207 / 21,
+worker 175, build clean, secret scan clean); `npm run test:e2e` **90 passed** (88 before)
+at load average 5.3. Screenshot of page two taken with a throwaway Playwright script
+against `web-dev-5176` with the same 30-video route rewrite; not committed.
+
+Not live-tested: the built front end has not been redeployed with this change.

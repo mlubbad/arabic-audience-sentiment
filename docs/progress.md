@@ -623,3 +623,22 @@ four were seen red against the unfixed function before the migration was written
 row still `failed`, the channel still unadopted — and all four pass after it. `npm run
 test:db`: **207 passed, 21 files** (202 before). Mutation and gate results are in
 `docs/verification.md`.
+
+## 2026-09-16 — the videos section turns pages
+
+The dashboard's videos section rendered every video the filters admit in one list. The
+fixture has two, the pilot channel has enough to make the section a wall of cards, and
+the user asked for 25 a page (`https://app.sky-develop.net/dashboard?ws=…`).
+
+`s.videos` is built in memory by the snapshot from the filtered rows, so paging is a
+slice, not a request: `apps/web/src/videoPaging.ts` (`pageSlice`, clamped so a filter that
+shrinks the list under a reader on page four lands on the last page that still exists),
+a `videoPage` state in `Dashboard.tsx` that `applyFilters` and `reset` clear alongside
+the comments cursors, and a `.pager` nav under the list — the comments pager's markup and
+CSS — rendered only when there is a second page. Turning a page scrolls `#rp-videos`
+back into view. Two new strings in `strings/ar.ts` and `strings/en.ts`
+(`videosPagerLabel`, `videosPageState`); the buttons reuse `previousPage`/`nextPage`.
+
+Tests: `videoPaging.test.ts` (six, mutation-checked) and two e2e blocks appended to
+`tests/e2e/dashboard.spec.ts` that clone the fixture across 30 videos. Results in
+`docs/verification.md`.
