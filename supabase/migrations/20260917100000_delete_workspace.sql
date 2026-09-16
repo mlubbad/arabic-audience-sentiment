@@ -86,9 +86,11 @@ grant execute on function public.admin_workspace_footprint(uuid) to authenticate
 -- them — and it is neither quiet (recorded on the admin's home, below) nor a
 -- rewrite. So the guard yields to exactly that act and nothing else: a DELETE
 -- of a row whose workspace is the one delete_workspace is deleting right now,
--- known through a transaction-local setting only that function sets. UPDATEs
--- are still always refused. Replaced whole, from the current one-line body in
--- 20260912185902_foundation.sql.
+-- known through a transaction-local setting that delete_workspace sets; a
+-- service-role session could set it by hand, which is the same trust the
+-- service key already carries — no tenant role can, since none holds DELETE
+-- on these tables. UPDATEs are still always refused. Replaced whole, from
+-- the current one-line body in 20260912185902_foundation.sql.
 create or replace function private.reject_review_mutation() returns trigger
 language plpgsql set search_path='' as $$
 begin
@@ -113,7 +115,7 @@ declare me uuid; my_home uuid; begin
     raise exception 'last_workspace' using errcode='55000'; end if;
   if exists (select 1 from public.subscriptions s where s.billing_workspace_id = w and s.workspace_id <> w) then
     raise exception 'billing_root' using errcode='55000'; end if;
-  if exists (select 1 from public.subscriptions s where s.workspace_id = w and s.provider = 'paddle' and s.status = 'active') then
+  if exists (select 1 from public.subscriptions s where s.workspace_id = w and s.provider = 'paddle' and s.status in ('active','past_due')) then
     raise exception 'paddle_subscription_active' using errcode='55000'; end if;
 
   -- Opens the append-only guard for this workspace's rows, this transaction only.

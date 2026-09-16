@@ -247,13 +247,31 @@ describe("workspace lifecycle", () => {
 
   it("delete_workspace refuses a billing root, an active Paddle subscription, and the admin's last workspace", async () => {
     // A billing root: 'client one' was retired earlier in this file and now
-    // bills under the admin's home.
+    // bills under the admin's home. The admin owns more than one workspace
+    // at this point, so the refusal is billing_root, not last_workspace.
     const adminHome = await home(ADMIN);
     await as(ADMIN);
     await expect(
       db.query("select delete_workspace($1)", [adminHome]),
-    ).rejects.toThrow(/billing_root|last_workspace/);
+    ).rejects.toThrow(/billing_root/);
     await db.exec("reset role");
+    // Nothing moved: the admin's home, its membership, and its subscription
+    // are all still there.
+    const adminHomeStill = await db.query<{ n: number }>(
+      "select count(*) n from workspaces where id=$1",
+      [adminHome],
+    );
+    expect(adminHomeStill.rows[0].n).toBe(1);
+    const adminHomeMembers = await db.query<{ n: number }>(
+      "select count(*) n from memberships where workspace_id=$1",
+      [adminHome],
+    );
+    expect(adminHomeMembers.rows[0].n).toBe(1);
+    const adminHomeSub = await db.query<{ n: number }>(
+      "select count(*) n from subscriptions where workspace_id=$1",
+      [adminHome],
+    );
+    expect(adminHomeSub.rows[0].n).toBe(1);
 
     // A workspace Paddle is billing.
     await as(OWNER);
@@ -278,6 +296,35 @@ describe("workspace lifecycle", () => {
       [paid],
     );
     expect(still.rows[0].n).toBe(1);
+
+    // A card in dunning is still a live Paddle subscription; deleting under
+    // it would leave the customer billed for nothing.
+    await db.query(
+      "update subscriptions set status='past_due' where workspace_id=$1",
+      [paid],
+    );
+    await as(ADMIN);
+    await expect(db.query("select delete_workspace($1)", [paid])).rejects.toThrow(
+      /paddle_subscription_active/,
+    );
+    await db.exec("reset role");
+
+    // The admin's own last workspace: a second admin who owns only their
+    // bootstrap workspace.
+    await db.query("insert into private.platform_admins(user_id) values ($1)", [
+      OTHER,
+    ]);
+    await as(OTHER);
+    const otherHome = await home(OTHER);
+    await expect(
+      db.query("select delete_workspace($1)", [otherHome]),
+    ).rejects.toThrow(/last_workspace/);
+    await db.exec("reset role");
+    const otherHomeStill = await db.query<{ n: number }>(
+      "select count(*) n from workspaces where id=$1",
+      [otherHome],
+    );
+    expect(otherHomeStill.rows[0].n).toBe(1);
   });
 
   it("delete_workspace removes every row of one workspace, no row of another, and records the act on the admin's home", async () => {
@@ -425,5 +472,14 @@ describe("workspace lifecycle", () => {
       db.query("delete from audit_events where workspace_id=$1", [g]),
     ).rejects.toThrow(/append_only/);
     await db.query("select set_config('app.deleting_workspace','',false)");
+    // The other leg: even with the GUC set for THIS workspace, a tenant role
+    // holds no DELETE grant on audit_events at all — the grant check fails
+    // before the trigger is ever consulted.
+    await as(OWNER);
+    await db.query("select set_config('app.deleting_workspace',$1,false)", [g]);
+    await expect(
+      db.query("delete from audit_events where workspace_id=$1", [g]),
+    ).rejects.toThrow(/permission denied/);
+    await db.exec("reset role");
   });
 });
