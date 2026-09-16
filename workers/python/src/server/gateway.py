@@ -233,6 +233,19 @@ class ControlPlane:
              "video_id": video_id, "outcome": outcome, "error_code": error_code},
         )
 
+    def video_counts(self, lease: dict[str, Any], counts: dict[str, int | None]) -> dict[str, Any]:
+        """Hand the server the counts read for one unit; it answers what is still to read.
+
+        None travels as null, never dropped: it is an answer — the source did
+        not say — and the server keeps that video due. A refusal (including
+        an older gateway's 404) is the caller's to fall back from.
+        """
+        data = self._post("/worker/video-counts", {
+            "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+            "payload": [{"external_video_id": v, "comment_count": n} for v, n in counts.items()],
+        })
+        return data or {}
+
     def tick(self) -> dict[str, Any] | None:
         """Ask the server to enqueue whatever is due for this credential's workspace."""
         return self._post("/worker/tick")

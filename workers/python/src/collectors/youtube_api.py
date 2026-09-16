@@ -146,6 +146,38 @@ class YouTubeAPI:
             if done:
                 return
 
+    def comment_counts(self, video_ids: list[str]) -> dict[str, int | None]:
+        """The source's commentCount for each video, fifty ids per unit.
+
+        The live check's cheap question: videos.list(part=statistics) answers
+        fifty videos for one quota unit, where reading one video costs one
+        unit per page whether or not anything was written. None is the source
+        declining to say — comments switched off, or a video it did not list
+        — and never a count of zero. Any failure is one named code, retryable:
+        the caller's answer to it is to read every due video as before, and
+        a wrong count must never stand in for that.
+        """
+        for vid in video_ids:
+            if not re.fullmatch(r"[A-Za-z0-9_-]{11}", vid):
+                raise ValueError("invalid_video_id")
+        counts: dict[str, int | None] = {vid: None for vid in video_ids}
+        ids = list(counts)
+        for start in range(0, len(ids), 50):
+            chunk = ids[start:start + 50]
+            try:
+                data = self._get("videos", {"part": "statistics", "id": ",".join(chunk)})
+            except CollectionError:
+                raise CollectionError("statistics_lookup_failed", retryable=True) from None
+            for item in data["items"]:
+                try:
+                    vid = item["id"]
+                    raw = (item.get("statistics") or {}).get("commentCount")
+                    if vid in counts:
+                        counts[vid] = None if raw is None else int(raw)
+                except (KeyError, TypeError, ValueError, AttributeError):
+                    raise CollectionError("statistics_lookup_failed", retryable=True) from None
+        return counts
+
     _TABS = (("video", "LF"), ("short", "SH"), ("stream", "LV"))
     _DURATION = re.compile(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
 

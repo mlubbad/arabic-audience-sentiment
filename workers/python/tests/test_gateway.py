@@ -109,3 +109,38 @@ def test_a_full_run_claims_commits_and_finishes_explicitly():
     control.commit_batch(lease, "abcdefghijk", "حلقة", Batch([comment()], None, "exhausted"))
     control.finish(lease, "exhausted")
     assert [c.rsplit("/", 1)[-1] for c in calls] == ["claim", "heartbeat", "commit-batch", "finish"]
+
+
+def test_video_counts_posts_each_count_under_the_lease_and_returns_the_answer():
+    seen = {}
+
+    def handler(request):
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"read": ["abcdefghijk"], "unchanged": 1, "updated": 2})
+
+    lease = {"job_id": "j", "lease_token": "t"}
+    answer = plane(handler).video_counts(lease, {"abcdefghijk": 3, "bcdefghijkl": None})
+    assert seen["path"].endswith("/worker/video-counts")
+    assert seen["body"]["job_id"] == "j" and seen["body"]["lease_token"] == "t"
+    # A dict of id -> count on this side; the server's list shape on the
+    # wire, with None carried as null rather than dropped: a null is an
+    # answer ("the source did not say"), and the server keeps that video due.
+    assert seen["body"]["payload"] == [
+        {"external_video_id": "abcdefghijk", "comment_count": 3},
+        {"external_video_id": "bcdefghijkl", "comment_count": None},
+    ]
+    assert "workspace_id" not in seen["body"]
+    assert answer == {"read": ["abcdefghijk"], "unchanged": 1, "updated": 2}
+
+
+def test_video_counts_refusals_stay_refusals():
+    lease = {"job_id": "j", "lease_token": "t"}
+    with pytest.raises(ControlPlaneError) as raised:
+        plane(lambda r: httpx.Response(400, json={"code": "invalid_counts"})).video_counts(lease, {})
+    assert raised.value.code == "invalid_counts" and raised.value.retryable is False
+    # An older gateway without the route: still an error the caller can fall
+    # back from, never an empty "read" list that would read nothing.
+    with pytest.raises(ControlPlaneError) as raised:
+        plane(lambda r: httpx.Response(404, json={"code": "not_found"})).video_counts(lease, {})
+    assert raised.value.code == "not_found"

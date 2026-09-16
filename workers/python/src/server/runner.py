@@ -6,6 +6,7 @@ resumes from the checkpoint the server is holding, so an interrupted worker
 picks up where it stopped rather than starting the video again.
 """
 import hashlib
+import time
 
 from collectors.protocol import CollectionError
 from topics.analysis import classify
@@ -17,6 +18,44 @@ from .gateway import ControlPlane, ControlPlaneError, LeaseLost
 # Outcomes a worker may declare. Anything else is reported as a failure rather
 # than guessed at.
 _DECLARABLE = {"partial", "exhausted", "blocked", "failed"}
+
+
+def _log(message: str) -> None:
+    # Unbuffered and timestamped: the service log is read while it runs.
+    print(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}", flush=True)
+
+
+def _still_to_read(control: ControlPlane, collector, lease: dict, videos: list[dict]) -> list[dict]:
+    """The due list narrowed to the videos whose comment count moved.
+
+    One videos.list(part=statistics) call answers fifty counts for one quota
+    unit; reading a video costs one unit per page whether or not anything
+    was written. The server compares each count with the one at the video's
+    last exhausted read and defers the unchanged ones. Any failure of this
+    step — the source, the gateway, an older gateway without the route —
+    degrades to the old behaviour: every due video is read. It never fails
+    the job and never narrows the list on its own. A collector that cannot
+    answer the question (the fixture ones) is the old behaviour too.
+    """
+    if not videos or not hasattr(collector, "comment_counts"):
+        return videos
+    try:
+        counts = collector.comment_counts([v["external_video_id"] for v in videos])
+        answer = control.video_counts(lease, counts)
+    except LeaseLost:
+        # Someone else holds the job; reading on would write over their result.
+        raise
+    except (CollectionError, ControlPlaneError) as exc:
+        _log(f"comment counts unavailable ({exc.code}), reading every due video")
+        return videos
+    read = answer.get("read")
+    if not isinstance(read, list):
+        _log("comment counts answered without a read list, reading every due video")
+        return videos
+    wanted = {v for v in read if isinstance(v, str)}
+    kept = [v for v in videos if v["external_video_id"] in wanted]
+    _log(f"comment counts: {len(videos) - len(kept)} unchanged, {len(kept)} to read")
+    return kept
 
 
 def _resume_cursor(lease: dict) -> str | None:
@@ -200,6 +239,7 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     outcome = "exhausted"
 
     try:
+        videos = _still_to_read(control, collector, lease, videos)
         for video in videos:
             vid = video["external_video_id"]
             if vid in done:

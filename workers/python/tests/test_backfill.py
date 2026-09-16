@@ -233,3 +233,142 @@ def test_a_transient_control_plane_failure_still_escapes():
                          httpx.Client(transport=httpx.MockTransport(handler)))
     with pytest.raises(ControlPlaneError):
         run_backfill(plane, lambda token: collector)
+
+
+class Counting(Plan):
+    """A collector that can also answer the cheap question."""
+
+    def __init__(self, pages, counts=None, fail=None):
+        super().__init__(pages)
+        self.counts, self.fail, self.count_calls = counts or {}, fail, []
+
+    def comment_counts(self, video_ids):
+        self.count_calls.append(list(video_ids))
+        if self.fail is not None:
+            raise self.fail
+        return {v: self.counts.get(v) for v in video_ids}
+
+
+def drive_counts(collector, videos, counts_response=None, counts_status=200):
+    """Run a backfill whose control plane answers /worker/video-counts as told."""
+    sent = {"counts": [], "commits": [], "video_finished": [], "finish": None, "error_code": None}
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        body = json.loads(request.content) if request.content else {}
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j1", "lease_token": "t1", "type": "collect", "checkpoint": None,
+                "access_token": "ya29.ok", "videos": videos})
+        if path == "video-counts":
+            sent["counts"].append(body["payload"])
+            return httpx.Response(counts_status, json=counts_response if counts_response is not None else {})
+        if path == "commit-batch":
+            sent["commits"].append(body["payload"]["external_video_id"])
+        if path == "video-finished":
+            sent["video_finished"].append((body["video_id"], body["outcome"], body["error_code"]))
+        if path == "finish":
+            sent["finish"], sent["error_code"] = body["outcome"], body["error_code"]
+        return httpx.Response(200, json={})
+
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    worked = run_backfill(plane, lambda token: collector)
+    return worked, sent
+
+
+THREE = [{"video_id": "u1", "external_video_id": "v1", "title": "١"},
+         {"video_id": "u2", "external_video_id": "v2", "title": "٢"},
+         {"video_id": "u3", "external_video_id": "v3", "title": "٣"}]
+PAGES = {"v1": [Batch([comment("c1", "v1")], None, "exhausted")],
+         "v2": [Batch([comment("c2", "v2")], None, "exhausted")],
+         "v3": [Batch([comment("c3", "v3")], None, "exhausted")]}
+
+
+def test_the_counts_are_asked_first_and_only_what_the_server_says_is_read():
+    collector = Counting(PAGES, counts={"v1": 10, "v2": 21, "v3": None})
+    worked, sent = drive_counts(collector, THREE,
+                                counts_response={"read": ["v3", "v2"], "unchanged": 1, "updated": 3})
+    assert worked is True
+    # One question for all three, before any video is read.
+    assert collector.count_calls == [["v1", "v2", "v3"]]
+    assert sent["counts"] == [[
+        {"external_video_id": "v1", "comment_count": 10},
+        {"external_video_id": "v2", "comment_count": 21},
+        {"external_video_id": "v3", "comment_count": None},
+    ]]
+    # v1 was unchanged: never asked of the source, never finished by this run.
+    # The lease's order is kept, not the server's answer order.
+    assert [v for v, _ in collector.asked] == ["v2", "v3"]
+    assert sent["commits"] == ["v2", "v3"]
+    assert sent["video_finished"] == [("u2", "exhausted", None), ("u3", "exhausted", None)]
+    assert sent["finish"] == "succeeded"
+
+
+def test_every_video_unchanged_is_a_run_that_read_nothing_and_succeeded():
+    collector = Counting(PAGES, counts={"v1": 10, "v2": 20, "v3": 30})
+    worked, sent = drive_counts(collector, THREE,
+                                counts_response={"read": [], "unchanged": 3, "updated": 3})
+    assert worked is True
+    assert collector.asked == [] and sent["commits"] == []
+    assert sent["finish"] == "succeeded"
+
+
+def test_a_failed_count_lookup_falls_back_to_reading_every_due_video():
+    # The optimisation degrades to the old behaviour; it never fails the job
+    # and never narrows the list on its own.
+    collector = Counting(PAGES, fail=CollectionError("statistics_lookup_failed", retryable=True))
+    worked, sent = drive_counts(collector, THREE)
+    assert worked is True
+    assert sent["counts"] == []
+    assert [v for v, _ in collector.asked] == ["v1", "v2", "v3"]
+    assert sent["finish"] == "succeeded"
+
+
+@pytest.mark.parametrize("status,body", [
+    (404, {"code": "not_found"}),
+    (400, {"code": "invalid_counts"}),
+    (503, {"code": "control_plane_error"}),
+])
+def test_a_control_plane_that_cannot_take_the_counts_falls_back_too(status, body):
+    # An older gateway (404), a refused payload (400) or an outage (503) on
+    # the counts step: every due video is read, as before this step existed.
+    collector = Counting(PAGES, counts={"v1": 10, "v2": 20, "v3": 30})
+    worked, sent = drive_counts(collector, THREE, counts_response=body, counts_status=status)
+    assert worked is True
+    assert len(sent["counts"]) == 1
+    assert [v for v, _ in collector.asked] == ["v1", "v2", "v3"]
+    assert sent["finish"] == "succeeded"
+
+
+def test_an_answer_without_a_read_list_is_not_an_instruction_to_read_nothing():
+    collector = Counting(PAGES, counts={"v1": 10, "v2": 20, "v3": 30})
+    worked, sent = drive_counts(collector, THREE, counts_response={"unchanged": 0})
+    assert [v for v, _ in collector.asked] == ["v1", "v2", "v3"]
+    assert sent["finish"] == "succeeded"
+
+
+def test_a_collector_without_counts_reads_every_due_video_as_before():
+    collector = Plan(PAGES)
+    worked, sent = drive_counts(collector, THREE)
+    assert sent["counts"] == []
+    assert [v for v, _ in collector.asked] == ["v1", "v2", "v3"]
+    assert sent["finish"] == "succeeded"
+
+
+def test_an_empty_due_list_asks_no_counts():
+    collector = Counting(PAGES)
+    worked, sent = drive_counts(collector, [])
+    assert collector.count_calls == [] and sent["counts"] == []
+    assert sent["finish"] == "succeeded"
+
+
+def test_a_lost_lease_on_the_counts_step_still_escapes():
+    # Someone else holds the job. That is not a counts failure to fall back
+    # from: reading on would write over their result.
+    from server.gateway import LeaseLost
+
+    collector = Counting(PAGES, counts={"v1": 10})
+    with pytest.raises(LeaseLost):
+        drive_counts(collector, THREE, counts_response={"code": "lease_lost"}, counts_status=409)
+    assert collector.asked == []

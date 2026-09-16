@@ -119,3 +119,59 @@ def test_a_refusal_with_no_reason_is_still_handled():
     with pytest.raises(CollectionError) as caught:
         list(YouTubeAPI("key", client).batches("abcdefghijk", None))
     assert caught.value.code == "source_access_denied"
+
+
+def test_comment_counts_asks_statistics_fifty_at_a_time_and_never_invents_a_number():
+    # One unit answers fifty counts. A video the source did not list, and one
+    # it listed without a commentCount (comments off), are both None: unknown
+    # is never zero, and never "the same as last time".
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        ids = request.url.params["id"].split(",")
+        items = [{"id": v, "statistics": {"commentCount": str(i)}} for i, v in enumerate(ids)]
+        # The second id in every chunk has comments switched off; the last id
+        # of the whole request is dropped from the answer altogether.
+        items[1]["statistics"] = {"viewCount": "5"}
+        items = [i for i in items if i["id"] != "v0000000059"]
+        return httpx.Response(200, json={"items": items})
+
+    ids = [f"v{n:010d}" for n in range(60)]
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        counts = YouTubeAPI(None, client, access_token="ya29.token").comment_counts(ids)
+    assert len(seen) == 2
+    assert [len(r.url.params["id"].split(",")) for r in seen] == [50, 10]
+    assert all(r.url.params["part"] == "statistics" for r in seen)
+    assert all(r.url.path.endswith("/videos") for r in seen)
+    assert all(r.headers["authorization"] == "Bearer ya29.token" for r in seen)
+    assert set(counts) == set(ids)
+    assert counts["v0000000000"] == 0 and counts["v0000000002"] == 2
+    assert counts["v0000000001"] is None and counts["v0000000051"] is None
+    assert counts["v0000000059"] is None
+    assert counts["v0000000052"] == 2
+
+
+def test_comment_counts_of_nothing_asks_nothing():
+    seen = []
+    with _responding(200, {"items": []}, seen) as client:
+        assert YouTubeAPI("fixture-key", client).comment_counts([]) == {}
+    assert seen == []
+
+
+@pytest.mark.parametrize("status", [500, 503, 404])
+def test_comment_counts_failure_is_retryable_and_named(status):
+    # The caller falls back to reading every due video; it must be able to
+    # tell this failure from a refusal of the read itself.
+    with _responding(status, {"error": {}}) as client:
+        with pytest.raises(CollectionError) as raised:
+            YouTubeAPI("fixture-key", client).comment_counts(["abcdefghijk"])
+    assert raised.value.code == "statistics_lookup_failed"
+    assert raised.value.retryable is True
+    assert "fixture-key" not in str(raised.value)
+
+
+def test_comment_counts_refuses_an_id_it_would_not_read():
+    with _responding(200, {"items": []}) as client:
+        with pytest.raises(ValueError):
+            YouTubeAPI("fixture-key", client).comment_counts(["https://internal"])
