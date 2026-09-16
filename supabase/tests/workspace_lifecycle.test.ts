@@ -287,9 +287,9 @@ describe("workspace lifecycle", () => {
       [paid],
     );
     await as(ADMIN);
-    await expect(db.query("select delete_workspace($1)", [paid])).rejects.toThrow(
-      /paddle_subscription_active/,
-    );
+    await expect(
+      db.query("select delete_workspace($1)", [paid]),
+    ).rejects.toThrow(/paddle_subscription_active/);
     await db.exec("reset role");
     const still = await db.query<{ n: number }>(
       "select count(*) n from workspaces where id=$1",
@@ -304,9 +304,9 @@ describe("workspace lifecycle", () => {
       [paid],
     );
     await as(ADMIN);
-    await expect(db.query("select delete_workspace($1)", [paid])).rejects.toThrow(
-      /paddle_subscription_active/,
-    );
+    await expect(
+      db.query("select delete_workspace($1)", [paid]),
+    ).rejects.toThrow(/paddle_subscription_active/);
     await db.exec("reset role");
 
     // The admin's own last workspace: a second admin who owns only their
@@ -417,10 +417,9 @@ describe("workspace lifecycle", () => {
     expect(before.comments).toBe(1);
 
     await as(ADMIN);
-    const fp = await db.query<{ admin_workspace_footprint: Record<string, number> }>(
-      "select admin_workspace_footprint($1)",
-      [d],
-    );
+    const fp = await db.query<{
+      admin_workspace_footprint: Record<string, number>;
+    }>("select admin_workspace_footprint($1)", [d]);
     expect(fp.rows[0].admin_workspace_footprint).toEqual({
       channels: 1,
       videos: 1,
@@ -435,7 +434,11 @@ describe("workspace lifecycle", () => {
     for (const t of tables) expect(await count(t, d), t).toBe(0);
     for (const t of tables) expect(await count(t, n), t).toBe(before[t]);
     const adminHome = await home(ADMIN);
-    const a = await db.query<{ action: string; target_id: string; actor_id: string }>(
+    const a = await db.query<{
+      action: string;
+      target_id: string;
+      actor_id: string;
+    }>(
       "select action,target_id,actor_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
       [adminHome],
     );
@@ -464,10 +467,15 @@ describe("workspace lifecycle", () => {
       db.query("delete from audit_events where workspace_id=$1", [g]),
     ).rejects.toThrow(/append_only/);
     await expect(
-      db.query("update audit_events set action='edited' where workspace_id=$1", [g]),
+      db.query(
+        "update audit_events set action='edited' where workspace_id=$1",
+        [g],
+      ),
     ).rejects.toThrow(/append_only/);
     // Setting the GUC by hand for a DIFFERENT workspace does not open this one.
-    await db.query("select set_config('app.deleting_workspace',$1,false)", [await home(OWNER)]);
+    await db.query("select set_config('app.deleting_workspace',$1,false)", [
+      await home(OWNER),
+    ]);
     await expect(
       db.query("delete from audit_events where workspace_id=$1", [g]),
     ).rejects.toThrow(/append_only/);
