@@ -47,7 +47,8 @@ lives apart from it. A component test for the new menu needs the component impor
 extracting it is the same move the rail's own state already made, for the same reason. Behaviour:
 signed out, unchanged (`<Link to="/account">`). Signed in: `DropdownMenu` (Phase 0's Task-11
 primitive) whose trigger is the reader's email (or `S.yourAccount` if the provider gave none —
-today's fallback, kept), with two items — `S.railAccountLink` (new string, both languages) linking
+today's fallback, kept), with two items — `S.yourAccount` («حسابك», an existing key reused rather
+than a near-duplicate added, per this codebase's "one sentence in one place" rule) linking
 to `/account`, and the existing sign-out action, still guarded by the same `busy`/`failed` state
 and the same `role="alert"` failure message. The trigger keeps the rail's own ink: it renders
 `asChild` over the existing `.app-session-who`-styled element, not as a `ui-btn` — a light button
@@ -67,10 +68,14 @@ showing the same `S.choosePlaceholder` string. Same dark-plane rule as the sessi
 whether by a rail-scoped override or a `className` pass-through, but the listbox itself (portaled)
 wears `ui/`'s light styling.
 
-**Mobile menu focus (`AppLayout`, `main.tsx`)** — unchanged behaviour, newly verified: opening the
-rail on a narrow viewport should move focus into it, and closing it (via a destination link, or the
-menu button itself) should return focus to the toggle. This is already the kind of thing Phase 0
-found un-verified defaults break silently; this phase adds the e2e assertion, not new behaviour.
+**Mobile menu focus (`AppLayout`, `main.tsx`)** — a small behaviour addition, not just a check
+(checked at plan time: today the toggle only flips an `is-open` class; focus goes nowhere, and a
+sheet that opens under the pointer but not under the keyboard is the exact defect class Phase 0
+hunted). On a narrow viewport, opening the rail moves focus to its first link; `Escape` closes it
+and returns focus to the toggle; closing via the toggle itself leaves focus on the toggle, which
+it already does since the toggle was what was activated. Closing via a destination link navigates,
+and page-level focus after navigation is a different, later concern — not this phase's. One
+Playwright assertion covers open→focus-in and Escape→focus-back.
 
 ## Out of scope
 
@@ -100,6 +105,7 @@ already warns against for the primitives themselves, and applies the same way to
   workspace's id — the same shape as `AdminPage.test.tsx`. The single-workspace `<strong>` case,
   the "only one switch" source scan, and every `CollectionState` case stay in the static file
   untouched — nothing about them changes.
-- Mobile menu focus: one Playwright assertion in `tests/e2e/app-shell.spec.ts` (already the home
-  for this file's shell-level tests, per Phase 0's Task 17) — narrow viewport, open the menu,
-  assert focus moved into `#app-rail`, close it, assert focus returned to the toggle button.
+- Mobile menu focus: one Playwright test in `tests/e2e/app-shell.spec.ts` (already the home for
+  shell-level tests) — narrow viewport, open the menu, assert `document.activeElement` is inside
+  `#app-rail`, press `Escape`, assert the menu's `aria-expanded` is `"false"` and focus is on the
+  toggle button.
