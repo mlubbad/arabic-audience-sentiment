@@ -1743,3 +1743,17 @@ a verdict yet; this is what the model said, not what is true.
 Collect `79fc8161` is still `running` with 12 reclaims and a lapsed lease: the worker ran
 the analyse job first, and the next claim will reach it with `93f27be`'s handler and end
 it `blocked: quota_exceeded`.
+
+## 2026-09-16 — the 160 are the channel's own voice; the service runs the cheaper request
+
+Correction to the entry above: the 160 stored comments without a verdict were not missed —
+they are the 160 comments whose `author_channel_id` is the channel's own, which the due list
+excludes on purpose (the channel talking to its audience is not the audience). Audience
+comments 4,839, verdicts 4,839, units charged 4,839: coverage is exact, and the next tick
+will find nothing due. `active_topic_key` adopted `topics:v1+gemini-3.6-flash+p1`.
+
+At 11:03:53 local the service was moved to `28b6b50` (`worker-service-update.sh`), which
+carries `52120bd`: 100 comments per Gemini request and `thinkingBudget: 0`. It came up
+`topics=gemini`; the change is measured (docs/decisions.md) and takes effect on the next
+analyse job. Live-tested: the restart line and the checkout's `CHUNK = 100` /
+`thinkingConfig` lines, read from the service's own checkout.
