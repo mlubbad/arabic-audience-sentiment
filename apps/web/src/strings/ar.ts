@@ -588,6 +588,9 @@ export const ar = {
   catStateCollected: (n: number, when: string) => `جُمع ${n} في ${when}`,
   catStateDisabled: "تعليقات معطّلة",
   catStatePartial: "جزئي",
+  // The live check found the comment count where the last read left it:
+  // up to date, not a stoppage.
+  catStateUnchanged: "لم يتغير منذ آخر قراءة",
   catEmpty: "لا فيديوهات في القائمة بعد.",
   catNoMatch: "لا نتائج لهذا البحث.",
   catReadFailed: "تعذّرت قراءة القائمة.",

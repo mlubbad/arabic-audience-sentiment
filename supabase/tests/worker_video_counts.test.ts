@@ -292,7 +292,7 @@ describe("the live check by comment count", () => {
     });
   });
 
-  it("(d) a selection read before the count existed stays due until read again", async () => {
+  it("(d2) a selection read before the count existed stays due until read again", async () => {
     // Every selection that existed before this migration is exactly this:
     // last_outcome 'exhausted', last_seen_comment_count null. Its count
     // cannot be "the same"; it is read once more and then compared.

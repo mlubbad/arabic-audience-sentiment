@@ -9,7 +9,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ar } from "./strings/ar";
-import type { JobRow } from "./jobFeed";
+import { en } from "./strings/en";
+import { explainCode, type JobRow } from "./jobFeed";
 
 const shared = vi.hoisted(() => ({
   query: { data: undefined as unknown, isPending: false, isError: false },
@@ -123,5 +124,59 @@ describe("what the panel says after a save", () => {
     // A removal alone: saved, and nothing about collection.
     expect(savedFeedback(r({}), ar)).toBe(ar.catSavedRemoved);
     expect(ar.catSavedRemoved).not.toContain("الجمع");
+  });
+});
+
+describe("what a selected video's state cell says", () => {
+  // The live check defers a video whose comment count has not moved since
+  // its last read and records 'unchanged'. That is a read that is up to
+  // date, not a failure; the cell must not file it under "partial".
+  const video = (id: string) => ({
+    id,
+    external_video_id: "a".repeat(11),
+    title: id,
+    kind: "video",
+    published_at: null,
+    thumbnail_url: null,
+    reported_comment_count: 12,
+    comments_state: "open",
+  });
+  const selection = (video_id: string, last_outcome: string | null) => ({
+    video_id,
+    last_collected_at: "2026-09-16T10:00:00Z",
+    last_outcome,
+    next_check_at: null,
+  });
+  const cell = (last_outcome: string | null) => {
+    shared.query.data = {
+      videos: [video("v1")],
+      selections: [selection("v1", last_outcome)],
+      channelId: "ch1",
+      cataloguedAt: "2026-09-16T00:00:00Z",
+    };
+    const html = render({ stored: [{ id: "v1", total: 12 }] });
+    return html.match(/data-testid="cat-state-v1"[^>]*>([^<]*)</)?.[1] ?? "";
+  };
+
+  it("reads an unchanged video as healthy, in its own words", () => {
+    expect(cell("unchanged")).toBe(ar.catStateUnchanged);
+    expect(cell("unchanged")).not.toContain(ar.catStatePartial);
+    expect(cell("unchanged")).not.toContain("unchanged");
+    // The exhausted read, for comparison: collected, with its date.
+    expect(cell("exhausted")).toContain("12");
+    expect(cell("exhausted")).not.toContain(ar.catStatePartial);
+    // A read that stopped early is still the problem it was.
+    expect(cell("partial")).toContain(ar.catStatePartial);
+    expect(cell("source_rate_limited")).toContain(ar.catStatePartial);
+  });
+
+  it("has the sentence in both languages, short and without the code", () => {
+    for (const S of [ar, en]) {
+      expect(S.catStateUnchanged.length).toBeLessThan(40);
+      expect(S.catStateUnchanged).not.toContain("unchanged");
+      // Reached through the code table too, should a path still hand the
+      // outcome to it.
+      expect(explainCode("unchanged", S)).toBe(S.catStateUnchanged);
+    }
   });
 });

@@ -85,6 +85,11 @@ function explain(code: string, S: Strings): string | null {
     }
     case "no_video_to_collect":
       return S.jobNoVideo;
+    // A selection outcome, not a job's: the live check deferred the video
+    // because its comment count had not moved. Healthy, and said so should
+    // any path still hand the outcome to this table.
+    case "unchanged":
+      return S.catStateUnchanged;
     case "channel_not_connected":
       return S.jobChannelNotConnected;
     case "credential_expired":

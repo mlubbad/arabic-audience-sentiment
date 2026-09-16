@@ -593,6 +593,7 @@ export const en: Strings = {
   catStateCollected: (n: number, when: string) => `Collected ${n} on ${when}`,
   catStateDisabled: "Comments disabled",
   catStatePartial: "Partial",
+  catStateUnchanged: "Unchanged since the last read",
   catEmpty: "No videos in the list yet.",
   catNoMatch: "No results for that search.",
   catReadFailed: "The list could not be read.",

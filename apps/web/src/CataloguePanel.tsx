@@ -204,6 +204,11 @@ export function Catalogue({
   const state = (r: CatalogueVideo) => {
     if (r.comments_state === "disabled") return S.catStateDisabled;
     if (!r.selected) return S.catStateUnselected;
+    // The live check compared the source's comment count with the one the
+    // last read ended at and found it the same: the read is up to date. It
+    // is a healthy state, and filing it under "partial" would make a video
+    // nothing happened to look like one a read failed on.
+    if (r.last_outcome === "unchanged") return S.catStateUnchanged;
     if (r.last_outcome && r.last_outcome !== "exhausted")
       return `${S.catStatePartial} · ${explainCode(r.last_outcome, S) ?? r.last_outcome}`;
     if (r.last_collected_at)
