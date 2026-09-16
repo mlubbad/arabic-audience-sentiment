@@ -1710,3 +1710,16 @@ classifier: gemini-3.6-flash`. The first `analyse` job before that update finish
 `blocked: no_topic_classifier` (the worker had no key yet), the backoff held it an hour,
 and the next one is running as this is written. Web deploy of `93f27be` from this session:
 32 files at 226, served `index-DFEGkI-B.js` byte-identical to the local build.
+
+## 2026-09-16 — `20260916020000` is on the live project
+
+`npx supabase migration list --linked` from this checkout, after `supabase login`, lists
+`20260916020000` with a remote timestamp, the last of 47 with no local-only row; three
+consecutive `npx supabase db push --linked` runs by the user answered "Remote database is up
+to date". It was applied by the user's earlier push that `b3cb15e` records as "the three topic
+migrations" — the primary checkout had fast-forwarded to `be45415` before that push, so the
+CLI took all four. Not read back: the live `commit_batch` body and the
+`adopt_first_analysis_on_update` trigger — `supabase db dump --linked` needs Docker, which was
+not running. The claim that the live function carries the `where ... status = 'failed'` clause
+rests on the migration table and on `db push` applying a file and recording it in one
+transaction, not on inspection. No retry has yet exercised it against real data.
