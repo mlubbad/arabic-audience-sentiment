@@ -36,3 +36,24 @@ export type PlanLimits = z.infer<typeof PlanLimitsSchema>;
 export function planLimits(plan: Plan | null | undefined): PlanLimits | null {
   return plan ? plan.limits : null;
 }
+
+/** A pack as addon_catalogue() returns it (20260917051000): a one-time grant
+ *  of `units` of `kind`, priced in cents, with the provider's price id under
+ *  `provider_prices.pack` once the sync script has written it. */
+export const AddonSchema = z
+  .object({
+    key: z.string().min(1),
+    kind: z.enum([
+      "comment_analysis",
+      "historical_backfill",
+      "topic_classification",
+    ]),
+    units: z.number().int().positive(),
+    price_cents: z.number().int().nonnegative(),
+    provider_prices: z.record(z.string()).default({}),
+  })
+  .strict();
+
+export const AddonCatalogueSchema = z.array(AddonSchema);
+
+export type Addon = z.infer<typeof AddonSchema>;

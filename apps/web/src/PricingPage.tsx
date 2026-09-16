@@ -21,7 +21,8 @@ import { usePlanCatalogue } from "./planCatalogue";
 import { applyToDocument, direction, useLocale } from "./locale";
 import { useStrings } from "./strings";
 import { contactEmail, pricingRows, type PricingRow } from "./pricing";
-import { useSession } from "./session";
+import { useSession, useWorkspaces } from "./session";
+import { usePlanUsage } from "./planUsage";
 import { openCheckout } from "./paddle";
 
 type Segment = "individual" | "business";
@@ -32,6 +33,12 @@ export function Pricing() {
   const locale = useLocale();
   const navigate = useNavigate();
   const { session } = useSession();
+  // Signed in, the checkout needs the workspace the reader chose — the same
+  // choice the rail card and the account's plan panel follow — and the plan
+  // it already holds marks its own card as current. Signed out, both hooks
+  // answer nothing and cost nothing.
+  const { workspaces } = useWorkspaces(session);
+  const { workspaceId, plan } = usePlanUsage(session, workspaces);
   const [segment, setSegment] = useState<Segment>("individual");
   const [yearly, setYearly] = useState(false);
   // What a card has to say after its button was pressed, by plan key. Only
@@ -40,7 +47,14 @@ export function Pricing() {
   // Shared with the admin page's select: one key, one read.
   const catalogue = usePlanCatalogue();
   const interval = yearly ? "year" : "month";
-  const rows = pricingRows(catalogue.data ?? [], segment, interval, locale, S);
+  const rows = pricingRows(
+    catalogue.data ?? [],
+    segment,
+    interval,
+    locale,
+    S,
+    plan.data?.plan_key ?? null,
+  );
   useLayoutEffect(() => {
     applyToDocument(locale);
   }, [locale]);
@@ -57,16 +71,17 @@ export function Pricing() {
       window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(row.title)}`;
       return;
     }
-    // Starting free and starting a paid plan signed out both begin at the
-    // account: the first because that is where a plan is activated, the
-    // second because a checkout needs to know who is buying.
-    if (row.cta.kind === "free" || !session) {
+    // Starting free, starting a paid plan signed out, and starting one with
+    // no workspace chosen all begin at the account: the first because that
+    // is where a plan is activated, the others because a checkout needs to
+    // know who is buying and which workspace is bought for.
+    if (row.cta.kind === "free" || !session || !workspaceId) {
       void navigate("/account");
       return;
     }
     setNotice((n) => ({ ...n, [row.key]: "" }));
-    openCheckout({ planKey: row.key, interval, session }).catch(() =>
-      setNotice((n) => ({ ...n, [row.key]: S.checkoutUnavailable })),
+    openCheckout({ planKey: row.key, interval, session, workspaceId }).catch(
+      () => setNotice((n) => ({ ...n, [row.key]: S.checkoutUnavailable })),
     );
   };
 

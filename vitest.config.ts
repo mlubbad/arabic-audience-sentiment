@@ -5,6 +5,7 @@ export default defineConfig({
       "packages/**/*.test.ts",
       "apps/**/*.test.ts",
       "supabase/tests/**/*.test.ts",
+      "scripts/**/*.test.ts",
     ],
     testTimeout: 30000,
     hookTimeout: 30000,

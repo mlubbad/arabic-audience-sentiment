@@ -12,6 +12,10 @@ const forbidden = [
   /\bAIza[0-9A-Za-z_-]{35}\b/,
   /\b(?:sb_secret_|ghp_)[A-Za-z0-9_-]{20,}\b/,
   /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/,
+  // Paddle's API key and webhook secret. The client-side token
+  // (test_... / live_... + alphanumerics) is public by design and not listed.
+  /\bpdl_(?:sdbx_|live_)?apikey_[A-Za-z0-9_]{20,}\b/,
+  /\bpdl_ntf(?:set|_)[A-Za-z0-9_]{10,}\b/,
 ];
 const violations = [];
 for (const file of files) {
@@ -22,7 +26,7 @@ for (const file of files) {
   if (forbidden.some((pattern) => pattern.test(content))) violations.push(file);
   if (
     file.startsWith("apps/web/src/") &&
-    /SUPABASE_SERVICE_ROLE_KEY|GOOGLE_CLIENT_SECRET|WORKER_CREDENTIAL|TOKEN_ENCRYPTION_KEY/.test(
+    /SUPABASE_SERVICE_ROLE_KEY|GOOGLE_CLIENT_SECRET|WORKER_CREDENTIAL|TOKEN_ENCRYPTION_KEY|PADDLE_API_KEY|PADDLE_WEBHOOK_SECRET/.test(
       content,
     )
   )
