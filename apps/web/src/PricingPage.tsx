@@ -4,8 +4,9 @@
  * Prices are never written here. In live mode they come from
  * `plan_catalogue()`, which is granted to `anon` for exactly this page; in
  * fixture mode from `fixtureCatalogue`, the same six rows the migration
- * inserts. `pricingRows` turns a row into the words a card says — which one
- * is the anchor, what the button does — so this file only lays them out.
+ * inserts (`planCatalogue.ts`). `pricingRows` turns a row into the words a
+ * card says — which one is the anchor, what the button does — so this file
+ * only lays them out.
  *
  * Outside the app shell on purpose: a reader deciding whether to sign in has
  * no workspace, no rail and no session, and the page must read the same to
@@ -13,13 +14,10 @@
  */
 import { useLayoutEffect, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useQuery } from "@tanstack/react-query";
-import { PlanCatalogueSchema } from "@sentiment/contracts";
 import "./landing.css";
 import { BrandMark } from "./BrandMark";
 import { LanguageSwitch } from "./LanguageSwitch";
-import { supabase } from "./supabase";
-import { configuredMode, fixtureCatalogue } from "./data";
+import { usePlanCatalogue } from "./planCatalogue";
 import { applyToDocument, direction, useLocale } from "./locale";
 import { useStrings } from "./strings";
 import { contactEmail, pricingRows, type PricingRow } from "./pricing";
@@ -28,14 +26,6 @@ import { openCheckout } from "./paddle";
 
 type Segment = "individual" | "business";
 const SEGMENTS: readonly Segment[] = ["individual", "business"];
-
-async function readCatalogue() {
-  if (configuredMode !== "live" || !supabase) return fixtureCatalogue;
-  const { data, error } = await supabase.rpc("plan_catalogue");
-  // The reason is not surfaced: a PostgREST error can carry the request URL.
-  if (error) throw new Error("catalogue_unavailable");
-  return PlanCatalogueSchema.parse(data);
-}
 
 export function Pricing() {
   const S = useStrings();
@@ -47,10 +37,8 @@ export function Pricing() {
   // What a card has to say after its button was pressed, by plan key. Only
   // the checkout path can fail, and it fails as a sentence under the card.
   const [notice, setNotice] = useState<Record<string, string>>({});
-  const catalogue = useQuery({
-    queryKey: ["catalogue"],
-    queryFn: readCatalogue,
-  });
+  // Shared with the admin page's select: one key, one read.
+  const catalogue = usePlanCatalogue();
   const interval = yearly ? "year" : "month";
   const rows = pricingRows(catalogue.data ?? [], segment, interval, locale, S);
   useLayoutEffect(() => {

@@ -15,6 +15,7 @@ export * from "./topics";
 export * from "./jobs";
 export * from "./plans";
 export * from "./usage";
+export * from "./admin";
 export * from "./sync";
 export * from "./fixture";
 export * from "./snapshot";

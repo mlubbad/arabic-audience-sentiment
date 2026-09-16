@@ -28,6 +28,7 @@ export const en: Strings = {
   navOverview: "Overview",
   navOperations: "Operations",
   navAccount: "Sources & account",
+  navAdmin: "Admin",
   titleOverview: "Overview",
   titleOperations: "Sync status",
   titleAccount: "Account & workspaces",
@@ -203,6 +204,27 @@ export const en: Strings = {
     "The plans could not be read. Refresh the page to try again.",
   pricingFaqTax:
     "Prices in US dollars are before tax; your country's tax is collected at checkout via Paddle, our merchant of record.",
+
+  adminEyebrow: "Operator",
+  adminTitle: "Platform admin",
+  adminLead:
+    "Every workspace and its plan, and the two hand levers: set a plan, grant a pack.",
+  adminForbidden: "This page is for platform operators only.",
+  adminLoading: "Reading the workspaces…",
+  adminEmpty: "No workspaces yet.",
+  adminNoPlan: "No plan",
+  adminPlan: "Plan",
+  adminStatus: "Status",
+  adminPeriodEnd: "Period end",
+  adminProvider: "Provider",
+  adminMonths: "Months",
+  adminNote: "Note",
+  adminKind: "Kind",
+  adminUnits: "Units",
+  adminSetPlan: "Set plan",
+  adminGrantPack: "Grant pack",
+  adminDone: "Applied.",
+  adminFailed: (code: string) => `Could not apply: ${code}`,
 
   working: "Working…",
   ssoNeedsDomain:

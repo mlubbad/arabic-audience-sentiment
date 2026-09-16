@@ -22,6 +22,7 @@ import "./locale.css";
 import { Landing } from "./Landing";
 import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
+import { useIsPlatformAdmin } from "./adminAccess";
 import { supabase } from "./supabase";
 import { carriedSearch } from "./workspaceUrl";
 import {
@@ -47,6 +48,10 @@ const Account = lazy(() =>
 // on a case-insensitive filesystem `./Pricing` resolves to it.
 const Pricing = lazy(() =>
   import("./PricingPage").then((m) => ({ default: m.Pricing })),
+);
+// `AdminPage`, not `Admin`, for the same reason: `adminWords.ts` is beside it.
+const AdminPage = lazy(() =>
+  import("./AdminPage").then((m) => ({ default: m.AdminPage })),
 );
 const client = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
@@ -130,6 +135,25 @@ function NavIcon({ to }: { to: string }) {
       </svg>
     );
   }
+  if (to === "/admin") {
+    return (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="8" cy="15" r="4" />
+        <path d="M10.85 12.15 19 4" />
+        <path d="M18 5l2 2" />
+        <path d="M15 8l2 2" />
+      </svg>
+    );
+  }
   if (to === "/sync") {
     return (
       <svg
@@ -196,11 +220,22 @@ const DESTINATIONS = [
     title: "titleAccount",
     scoped: false,
   },
+  // `admin`: listed only for a platform admin, which `is_platform_admin()`
+  // decides on the server. The page itself refuses everyone else, so the
+  // link's absence is a courtesy, not the gate.
+  {
+    to: "/admin",
+    label: "navAdmin",
+    title: "adminTitle",
+    scoped: false,
+    admin: true,
+  },
 ] as const satisfies readonly {
   to: string;
   label: StringKey;
   title: StringKey;
   scoped: boolean;
+  admin?: boolean;
 }[];
 
 /** Loaded only once there is a session to have a plan for: the card reads the
@@ -240,6 +275,12 @@ function AppLayout() {
   const carried = carriedSearch(search);
   const locale = useLocale();
   const S = useStrings();
+  // Signed out, nothing is asked; signed in, one query the admin page shares.
+  const { session } = useSession();
+  const access = useIsPlatformAdmin(session);
+  const destinations = DESTINATIONS.filter(
+    (d) => !("admin" in d) || access.data === true,
+  );
   // The language lands on <html> before paint, where CSS `:lang()` and the
   // bidi algorithm read it. The shell is the only surface that speaks two
   // languages: the landing page is Arabic and stays so, which is why leaving
@@ -311,7 +352,7 @@ function AppLayout() {
               kinds of thing — where you are, what your plan has left, and who
               you are — and unlabelled they read as one undifferentiated list. */}
           <p className="app-rail-caption">{S.navCaption}</p>
-          {DESTINATIONS.map((d) => (
+          {destinations.map((d) => (
             <NavLink
               key={d.to}
               to={{ pathname: d.to, search: d.scoped ? carried : "" }}
@@ -397,6 +438,7 @@ void loadStrings(currentLocale()).then(() =>
               <Route path="/account" element={<Account />} />
               <Route path="/sync" element={<Sync />} />
               <Route path="/connected" element={<Connected />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>

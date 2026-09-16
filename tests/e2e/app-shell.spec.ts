@@ -128,3 +128,23 @@ test("on a phone the menu button is above the content, not past the end of it", 
   // claim: a control you have to go looking for is not navigation.
   expect(menuBox.y).toBeLessThan(812);
 });
+
+test("the admin door is not listed for a reader who is not an admin, and refuses them", async ({
+  page,
+}) => {
+  // The rail lists `/admin` only when `is_platform_admin()` says so, which a
+  // signed-out reader is never asked. The page behind it refuses on its own:
+  // the link's absence is a courtesy, the page and the database are the gate.
+  await page.goto("/dashboard");
+  const nav = page.getByRole("navigation", { name: "التنقل الرئيسي" });
+  await expect(nav.getByRole("link")).toHaveCount(3);
+  await expect(nav.getByRole("link", { name: "الإدارة" })).toHaveCount(0);
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "إدارة المنصة",
+  );
+  await expect(page.getByTestId("admin-forbidden")).toHaveText(
+    "هذه الصفحة لمشغّلي المنصة فقط.",
+  );
+  await expect(page.getByTestId("admin-workspaces")).toHaveCount(0);
+});

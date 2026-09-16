@@ -38,6 +38,8 @@ export const ar = {
   navOverview: "نظرة عامة",
   navOperations: "التشغيل",
   navAccount: "المصادر والحساب",
+  /** Shown only to a platform admin; the page's own title is `adminTitle`. */
+  navAdmin: "الإدارة",
   titleOverview: "نظرة عامة",
   titleOperations: "حالة المزامنة",
   titleAccount: "الحساب ومساحات العمل",
@@ -207,6 +209,30 @@ export const ar = {
   pricingUnavailable: "تعذّرت قراءة الخطط. حدّث الصفحة لإعادة المحاولة.",
   pricingFaqTax:
     "الأسعار بالدولار قبل الضريبة؛ تُحصَّل ضريبة بلدك عند الدفع عبر Paddle، بائعنا القانوني.",
+
+  // ---- the admin page (adminWords.ts, AdminPage.tsx) ----
+  // The operator's own screen. `adminTitle` is the page head and the document
+  // title both; the h1 and the tab say one thing.
+  adminEyebrow: "المشغّل",
+  adminTitle: "إدارة المنصة",
+  adminLead:
+    "كل مساحة عمل وخطتها، وذراعا التفعيل اليدوي: تعيين خطة، ومنح حزمة.",
+  adminForbidden: "هذه الصفحة لمشغّلي المنصة فقط.",
+  adminLoading: "جارٍ قراءة مساحات العمل…",
+  adminEmpty: "لا مساحات عمل بعد.",
+  adminNoPlan: "لا خطة",
+  adminPlan: "الخطة",
+  adminStatus: "الحالة",
+  adminPeriodEnd: "نهاية الفترة",
+  adminProvider: "المزوّد",
+  adminMonths: "الأشهر",
+  adminNote: "ملاحظة",
+  adminKind: "النوع",
+  adminUnits: "الوحدات",
+  adminSetPlan: "تعيين الخطة",
+  adminGrantPack: "منح حزمة",
+  adminDone: "تم التنفيذ.",
+  adminFailed: (code: string) => `تعذّر التنفيذ: ${code}`,
 
   // ---- the account page (Account.tsx) ----
   working: "جارٍ تنفيذ الطلب…",
