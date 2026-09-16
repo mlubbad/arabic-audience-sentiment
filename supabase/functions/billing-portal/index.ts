@@ -26,10 +26,13 @@ import { corsHeaders, parseOrigins, preflight } from "../_shared/cors.ts";
 const env = (name: string) => Deno.env.get(name) ?? "";
 const allowed = parseOrigins(Deno.env.get("ALLOWED_ORIGINS"));
 
+// Sandbox by design unless explicitly told otherwise — the same default
+// `scripts/paddle-sync-lib.mjs` and `apps/web/src/paddle.ts` use, so an unset
+// or misspelled PADDLE_ENV never lands a real card against production.
 const paddleBase = () =>
-  env("PADDLE_ENV") === "sandbox"
-    ? "https://sandbox-api.paddle.com"
-    : "https://api.paddle.com";
+  env("PADDLE_ENV") === "live"
+    ? "https://api.paddle.com"
+    : "https://sandbox-api.paddle.com";
 
 Deno.serve(async (request) => {
   // The browser asks before it sends; answering this is the difference
@@ -83,7 +86,7 @@ Deno.serve(async (request) => {
   const paddle: PortalPaddle = {
     createPortalSession: async (customerId) => {
       const response = await fetch(
-        `${paddleBase()}/customers/${customerId}/portal-sessions`,
+        `${paddleBase()}/customers/${encodeURIComponent(customerId)}/portal-sessions`,
         {
           method: "POST",
           headers: {

@@ -6,7 +6,7 @@
  * deployed project and without a Paddle account — the same shape as
  * paddle.ts and worker-gateway.ts.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { portalUrlFor } from "../functions/_shared/billing-portal.ts";
 
 describe("billing portal", () => {
@@ -39,6 +39,17 @@ describe("billing portal", () => {
       { createPortalSession: async () => "x" },
     );
     expect(r).toEqual({ status: 403, body: { code: "forbidden" } });
+  });
+
+  it("a malformed customer ref is treated as no customer, and Paddle is never called", async () => {
+    const createPortalSession = vi.fn(async () => "https://portal/x");
+    const r = await portalUrlFor(
+      "w1",
+      { customerRefFor: async () => "../x?y" },
+      { createPortalSession },
+    );
+    expect(r).toEqual({ status: 404, body: { code: "no_paddle_customer" } });
+    expect(createPortalSession).not.toHaveBeenCalled();
   });
 
   it("any other db failure is a 502 that carries no message", async () => {

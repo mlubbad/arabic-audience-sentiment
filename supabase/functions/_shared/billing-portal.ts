@@ -17,8 +17,8 @@
 
 /** The one read this handler needs: the ROOT's Paddle customer id for a
  *  workspace, or null when that root has never been billed through Paddle. A
- *  throw whose `message` or `code` is `"forbidden"` is the ownership check
- *  failing; any other throw is treated as unavailable, not diagnosed. */
+ *  throw whose `message` is `"forbidden"` is the ownership check failing;
+ *  any other throw is treated as unavailable, not diagnosed. */
 export interface PortalDb {
   customerRefFor(workspaceId: string): Promise<string | null>;
 }
@@ -35,10 +35,16 @@ export type PortalOutcome =
   | { status: 404; body: { code: "no_paddle_customer" } }
   | { status: 502; body: { code: "portal_unavailable" } };
 
-const isForbidden = (error: unknown): boolean => {
-  const e = error as { message?: unknown; code?: unknown } | undefined;
-  return e?.message === "forbidden" || e?.code === "forbidden";
-};
+// The entry throws with `message` set to the SQL error's own text ("forbidden"
+// for the ownership check); nothing here constructs a `.code`, so only
+// `message` is ever checked — the shape a real caller can actually produce.
+const isForbidden = (error: unknown): boolean =>
+  (error as { message?: unknown } | undefined)?.message === "forbidden";
+
+// Paddle's own customer id shape. A ref that fails this was never going to
+// be a usable customer — checked here, before it is put anywhere near a URL
+// or a Paddle call, rather than trusted because the database returned it.
+const CUSTOMER_REF = /^ctm_[A-Za-z0-9]+$/;
 
 export async function portalUrlFor(
   workspaceId: string,
@@ -53,7 +59,8 @@ export async function portalUrlFor(
     // A driver error can quote the connection string; it never reaches the caller.
     return { status: 502, body: { code: "portal_unavailable" } };
   }
-  if (!customerId) return { status: 404, body: { code: "no_paddle_customer" } };
+  if (!customerId || !CUSTOMER_REF.test(customerId))
+    return { status: 404, body: { code: "no_paddle_customer" } };
 
   try {
     const url = await paddle.createPortalSession(customerId);
