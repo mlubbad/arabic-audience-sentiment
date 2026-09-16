@@ -63,9 +63,16 @@ create function private.apply_billing_event(
   provider_ref text, customer_ref text, payload jsonb) returns text
 language plpgsql security definer set search_path='' as $$
 declare root uuid; last_seen timestamptz; begin
+  root := coalesce(private.billing_root(w), w);
+  -- Paddle retries and out-of-order deliveries can overlap: two webhooks for
+  -- one root, each in its own transaction, would both pass the duplicate and
+  -- staleness reads below and the last to commit would win regardless of
+  -- chronology. The lock serialises one root's events for the rest of this
+  -- transaction, so a duplicate arriving beside its original waits and then
+  -- reads 'duplicate', and an older event waits and then reads 'stale'.
+  perform pg_advisory_xact_lock(hashtextextended(root::text, 0));
   if exists (select 1 from private.billing_events e where e.event_id = apply_billing_event.event_id) then
     return 'duplicate'; end if;
-  root := coalesce(private.billing_root(w), w);
   select max(e.occurred_at) into last_seen from private.billing_events e
    where e.workspace_id = root and e.outcome = 'applied' and e.event_type like 'subscription.%';
   if last_seen is not null and occurred_at < last_seen then
@@ -104,14 +111,19 @@ revoke all on function private.apply_billing_event(text,text,timestamptz,uuid,te
 -- still grants once; the event_id check keeps the audit row single too.
 create function private.apply_pack_event(event_id text, occurred_at timestamptz, w uuid, kind text, units int, provider_ref text, payload jsonb) returns text
 language plpgsql security definer set search_path='' as $$
-begin
+declare root uuid; begin
+  root := coalesce(private.billing_root(w), w);
+  -- Same lock as apply_billing_event, for the same reason: a retried pack
+  -- delivery beside its original must read 'duplicate', not grant and audit
+  -- twice. grant_units is unique on (source, provider_ref) regardless.
+  perform pg_advisory_xact_lock(hashtextextended(root::text, 0));
   if exists (select 1 from private.billing_events e where e.event_id = apply_pack_event.event_id) then
     return 'duplicate'; end if;
   perform private.grant_units(w, kind, units, 'paddle', provider_ref);
   insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
   values (w, null, 'pack_paddle', 'usage_grant', kind || ':' || units);
   insert into private.billing_events(event_id, event_type, occurred_at, workspace_id, applied_at, outcome, payload)
-  values (event_id, 'transaction.completed', occurred_at, coalesce(private.billing_root(w), w), now(), 'applied', payload);
+  values (event_id, 'transaction.completed', occurred_at, root, now(), 'applied', payload);
   return 'applied';
 end $$;
 revoke all on function private.apply_pack_event(text,timestamptz,uuid,text,int,text,jsonb) from public, anon, authenticated;

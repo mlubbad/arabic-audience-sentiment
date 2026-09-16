@@ -3,6 +3,14 @@
  * Every webhook lands once, by event_id; an older event never moves a
  * subscription backwards; a pack grants once; seven days past due drops to
  * free; a price id resolves to a plan and interval, or to a pack.
+ *
+ * Concurrency: apply_billing_event and apply_pack_event take
+ * pg_advisory_xact_lock on the billing root before their duplicate and
+ * staleness reads, so two overlapping deliveries for one root serialise.
+ * PGlite is a single connection and cannot run two transactions at once, so
+ * that guarantee is verified by reading the migration, not by a concurrent
+ * test; what the tests below prove is that the functions behave the same
+ * with the lock in place.
  */
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
@@ -321,6 +329,18 @@ describe("billing events", () => {
     await expect(db.query("select private.billing_sweep()")).rejects.toThrow(
       /permission denied/,
     );
+    await expect(
+      db.query(
+        `select private.apply_billing_event('evt_t','subscription.updated',now(),$1,'creator','month',now(),now()+interval '30 days','active',false,'sub_1','ctm_1','{}')`,
+        [W],
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      db.query(
+        `select private.apply_pack_event('evt_t',now(),$1,'comment_analysis',10000,'txn_t','{}')`,
+        [W],
+      ),
+    ).rejects.toThrow(/permission denied/);
     await expect(
       db.query("select private.plan_key_for_price('pri_y')"),
     ).rejects.toThrow(/permission denied/);
