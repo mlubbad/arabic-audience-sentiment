@@ -5,6 +5,7 @@ const budget = (used: number, allowance: number) => ({
   event_type: "comment_analysis" as const,
   used,
   allowance,
+  granted: 0,
   remaining: Math.max(allowance - used, 0),
 });
 
@@ -23,6 +24,40 @@ describe("plan usage", () => {
     expect(budgetState(budget(0, 0))).toBe("exhausted");
     // An over-spend recorded by an older period must not read as healthy.
     expect(budgetState({ ...budget(0, 0), used: 3 })).toBe("exhausted");
+  });
+
+  it("an unlimited budget is always ok", () => {
+    expect(
+      budgetState({
+        event_type: "comment_analysis",
+        used: 999999,
+        allowance: -1,
+        granted: 0,
+        remaining: -1,
+      }),
+    ).toBe("ok");
+    // -1 on one side alone is a miscount, not a ceiling.
+    const summary = {
+      plan_key: "owner",
+      status: "active" as const,
+      period_start: "2026-09-01T00:00:00Z",
+      period_end: "2026-10-01T00:00:00Z",
+      budgets: [{ ...budget(0, -1), remaining: -1 }],
+    };
+    expect(UsageSummarySchema.safeParse(summary).success).toBe(true);
+    expect(
+      UsageSummarySchema.safeParse({
+        ...summary,
+        budgets: [{ ...budget(0, -1), remaining: 0 }],
+      }).success,
+    ).toBe(false);
+    // A row from before packs existed parses with nothing granted.
+    const older: Partial<ReturnType<typeof budget>> = budget(2, 5);
+    delete older.granted;
+    expect(
+      UsageSummarySchema.parse({ ...summary, budgets: [older] }).budgets[0]
+        .granted,
+    ).toBe(0);
   });
 
   it("rejects a summary whose remaining does not follow from used and allowance", () => {

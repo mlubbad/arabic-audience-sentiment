@@ -605,6 +605,7 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
           event_type: string;
           used: number;
           allowance: number;
+          granted: number;
           remaining: number;
         }[];
       }
@@ -614,18 +615,21 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
         event_type: "comment_analysis",
         used: 2,
         allowance: 5,
+        granted: 0,
         remaining: 3,
       },
       {
         event_type: "historical_backfill",
         used: 0,
         allowance: 2,
+        granted: 0,
         remaining: 2,
       },
       {
         event_type: "topic_classification",
         used: 0,
         allowance: 0,
+        granted: 0,
         remaining: 0,
       },
     ]);
