@@ -589,3 +589,10 @@ is handed over wherever it sorts. While there: a workspace with no active plan (
 outside its period) is now told `blocked: 'quota_exceeded'` with *no* rows, free ones
 included, because `reserve_usage` would refuse every record at commit; a plan with nothing
 left still hands the free rows over.
+
+2026-09-16, later: the topic layer is on the live project — edge function, the three
+migrations, and the preview build (`1c9c4eb`) — in the recorded order. The dashboard now shows
+"لم يُشغَّل تصنيف الموضوعات بعد" until a classifier runs; the first `analyse` job was blocked
+`no_topic_classifier`, as designed. Remaining to see topics: lift the key's API restriction in
+the Google Cloud console, export `GEMINI_API_KEY` from `scripts/worker-service.sh`, restart the
+service. `docs/verification.md` has the byte-level checks.

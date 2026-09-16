@@ -1572,3 +1572,23 @@ Still not live-tested: nothing in this wave touched the live project. The three 
 remain unapplied, the edge function undeployed with its topic routes, and the Gemini key
 still refused by Google (see the entry above). The quota cap, the `blocked` answer and the
 deploy-order guard are PGlite- and unit-tested only.
+
+## 2026-09-16 — the topic layer deployed to the live project, from this session
+
+Order followed as `workers/deploy/README.md` records it: the worker service was already at
+`1c9c4eb` (running `topics=none`); then `supabase functions deploy worker` (routes
+`/worker/topics-due`, `/worker/commit-topics`); then `supabase db push --linked` applied
+`20260916010000`, `20260916011000`, `20260916012000` — `migration list --linked` shows all
+three remote; then `npm run build && npm run deploy:preview`. Verified at the origin
+(`--resolve app.sky-develop.net:80:91.204.209.217`, not through the CDN):
+`index-BTvGX5MB.js` and `Dashboard-tiYHLWNT.js` byte-identical to the local `dist`, the
+twelve superseded assets swept, the served index names the new bundle, the old
+"غير متاح بعد" string is gone from the shipped chunks.
+
+Read back from the live project: `workspace_topics` holds ten rows in each of the five
+workspaces; the first tick after the push enqueued one `analyse` job and the worker finished it
+`blocked` / `no_topic_classifier` at 05:57Z — the designed outcome for a worker with no
+classifier. No topic has been classified live: the Gemini key is still refused
+(`API_KEY_SERVICE_BLOCKED`) and `scripts/worker-service.sh` does not export `GEMINI_API_KEY`.
+Live-tested: the deploy, the seeding, the tick, the blocked job. Fixture-tested: everything
+else in the feature, as the entries above record.
