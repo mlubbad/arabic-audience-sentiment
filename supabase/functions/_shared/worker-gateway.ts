@@ -67,6 +67,19 @@ export interface WorkerDb {
     outcome: string,
     errorCode: string | null,
   ): Promise<void>;
+  /**
+   * The comment counts a collect run read for one quota unit, before it
+   * reads any video. The server defers every selected video whose count has
+   * not moved since its last exhausted read and answers with what is still
+   * to read. Optional: a gateway without it answers 404 and the worker reads
+   * every due video as before.
+   */
+  videoCounts?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    payload: unknown,
+  ): Promise<unknown>;
   /** The rows an analyse job should classify, under the key the server assigns. */
   topicsDue(
     credentialHash: string,
@@ -98,6 +111,7 @@ const STATUS: Record<string, number> = {
   batch_too_large: 400,
   invalid_outcome: 400,
   invalid_catalogue: 400,
+  invalid_counts: 400,
   invalid_video: 400,
   invalid_job_type: 400,
   // A workspace with no plan, or one outside its period, is a decision about
@@ -215,6 +229,7 @@ export async function handleWorkerRequest(
       "/worker/finish",
       "/worker/commit-catalogue",
       "/worker/video-finished",
+      ...(db.videoCounts ? ["/worker/video-counts"] : []),
       "/worker/topics-due",
       "/worker/commit-topics",
     ];
@@ -272,6 +287,15 @@ export async function handleWorkerRequest(
         str(body, "error_code"),
       );
       return json(200, {});
+    }
+    if (path.endsWith("/worker/video-counts") && db.videoCounts) {
+      // An array is the only shape the handler can judge; the items are the
+      // database's to refuse, whole, as invalid_counts.
+      if (!Array.isArray(body.payload)) return refuse("invalid_counts");
+      return json(
+        200,
+        await db.videoCounts(credential, job, lease, body.payload),
+      );
     }
     if (path.endsWith("/worker/topics-due")) {
       const model = str(body, "model_id");

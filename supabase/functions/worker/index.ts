@@ -166,6 +166,16 @@ Deno.serve((request) =>
       });
       if (error) failed(error);
     },
+    videoCounts: async (hash, j, t, payload) => {
+      const { data, error } = await db.rpc("svc_worker_video_counts", {
+        credential_hash: hash,
+        j,
+        t,
+        payload,
+      });
+      if (error) failed(error);
+      return data;
+    },
     topicsDue: async (hash, j, t, modelId, promptVersion, maxRows) => {
       const { data, error } = await db.rpc("svc_worker_topics_due", {
         credential_hash: hash,
