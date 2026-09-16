@@ -218,11 +218,12 @@ Pending, from selective video sync, all the user's decisions and none of them ta
   $$select private.schedule_all()$$)` — until then, the worker's own idle-loop `tick()` is
   the only thing that would run `schedule_due_work`, and only while a worker process is up.
 - Added 2026-09-16, same queue: `supabase/migrations/20260916020000_a_failed_verdict_is_retried.sql`
-  (`a630713`) — `commit_batch`'s prediction insert now updates a stored row only when it is
-  `failed`, plus `adopt_first_analysis_on_update`. It sorts after the topic migrations
-  `20260916010000`–`012000` and is pushed with or after them; needs no function redeploy
-  (the edge function's commit route is unchanged). PGlite- and mutation-tested only; see
-  `docs/verification.md`'s entry of that date.
+  (`eaac5c6`) — `commit_batch`'s prediction insert now updates a stored row only when it is
+  `failed`, plus `adopt_first_analysis_on_update`. The topic migrations `20260916010000`–
+  `012000` ahead of it went live in `e6fb48a`, so this is now the one migration behind the
+  live project; it needs no function redeploy (the edge function's commit route is
+  unchanged). PGlite- and mutation-tested only; see `docs/verification.md`'s entry of that
+  date.
 
 Until these happen, no discovery or collection has run against the real channel and
 the catalogue has never been seen signed in — see `docs/verification.md`'s "Not verified"

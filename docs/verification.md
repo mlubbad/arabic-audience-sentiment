@@ -1627,6 +1627,6 @@ from a scratchpad copy (`diff` empty) — never `git checkout`:
 Gates at this head: `npm run test:db` **207 passed, 21 files** (202 before); `tsc --noEmit`
 exit 0; `eslint` and `prettier --check` clean on the new test.
 
-Not live-tested: the migration is not applied to the linked project. It joins the queue
-of unapplied migrations listed in `docs/coordination/ACTIVE.md`, and should be pushed
-after `20260916010000`–`012000` since it follows them in order.
+Not live-tested: the migration is not applied to the linked project. The three topic
+migrations ahead of it went live earlier today (the deploy entry above), so it is now the
+one migration the live project lacks; it is listed in `docs/coordination/ACTIVE.md`.
