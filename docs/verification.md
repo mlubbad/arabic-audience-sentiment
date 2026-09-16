@@ -1674,3 +1674,8 @@ chunks, the CSS, `Dashboard-DjCNa2EG.js`, `report-gTalQbOi.css` and
 Not verified from here: the signed-in dashboard for workspace `d0c3b9fc-…` in a browser
 (no session in this environment). The pager appears only for a workspace whose filtered
 list exceeds 25 videos; the user's screenshot shows such a workspace.
+
+Seen live, 2026-09-16: the user opened the signed-in dashboard for workspace
+`d0c3b9fc-…` on `app.sky-develop.net` and reported the videos pager showing. That closes
+the "not verified from here" line above for the pager itself; the figures on the page
+are the workspace's own and were not compared from this side.
