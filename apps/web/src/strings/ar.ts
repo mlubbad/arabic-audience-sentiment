@@ -987,6 +987,14 @@ export const ar = {
   lpFooterAccount: "الحساب",
   lpFooterVersion: "مشاعر الجمهور · نسخة أولية",
   lpFooterPreview: "معاينة خاصة — ليست إطلاقًا عامًا",
+  /** The legal documents: the link text is each page's own title, so the
+   *  footer, the browser tab and the heading agree on what the page is. */
+  legalNavLabel: "الصفحات القانونية",
+  legalPrivacy: "سياسة الخصوصية",
+  legalTerms: "شروط الاستخدام",
+  legalThirdParty: "الخدمات والبرمجيات الخارجية",
+  legalUpdated: "آخر تحديث",
+  legalContents: "محتويات الصفحة",
   /** Direction-dependent glyphs: "onward" points the way the text runs. */
   arrowForward: "←",
   arrowUpForward: "↖",

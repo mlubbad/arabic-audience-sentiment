@@ -17,6 +17,7 @@ import { Link, useNavigate } from "react-router";
 import "./landing.css";
 import { BrandMark } from "./BrandMark";
 import { LanguageSwitch } from "./LanguageSwitch";
+import { LegalLinks } from "./LegalLinks";
 import { usePlanCatalogue } from "./planCatalogue";
 import { applyToDocument, direction, useLocale } from "./locale";
 import { useStrings } from "./strings";
@@ -227,6 +228,21 @@ export function Pricing() {
           <p>{S.pricingFaqTax}</p>
         </section>
       </main>
+      {/* The page a checkout opens from carries the terms, the privacy
+          policy and the refund terms it is bought under — Paddle checks. */}
+      <footer className="lp-footer">
+        <div>
+          <Link className="lp-brand" to="/">
+            <BrandMark /> {S.brand}.
+          </Link>
+          <p>{S.lpFooterTagline}</p>
+        </div>
+        <LegalLinks className="lp-legal" />
+        <div className="lp-footer-bottom">
+          <span>{S.lpFooterVersion}</span>
+          <span>{S.lpFooterPreview}</span>
+        </div>
+      </footer>
     </div>
   );
 }

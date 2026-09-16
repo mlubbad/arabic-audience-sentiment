@@ -935,6 +935,20 @@
   font-size: var(--lp-t-sm);
   gap: 25px;
 }
+/* The legal links: a row of their own across the foot, above the rule.
+   Not folded into the footer nav — that one is three product links; these
+   are three documents, and a reviewer at Google or Paddle scans for them by
+   name. `.lp-footer nav` is `justify-content: end`, so this row is placed
+   explicitly and reads from the text's start like a sentence. */
+.lp-footer .lp-legal {
+  grid-column: 1/-1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: start;
+  gap: 8px 25px;
+  font-size: var(--lp-t-sm);
+  color: var(--text-2);
+}
 .lp-footer-bottom {
   grid-column: 1/-1;
   display: flex;
@@ -1495,6 +1509,106 @@
 .pricing-faq p {
   color: var(--text-2);
   font-size: var(--lp-t-md);
+}
+/* A legal document: one measure, read top to bottom.
+   The landing's own type scale, on a 720px measure — the width a paragraph of
+   terms stays readable at; wider and the eye loses the line on the way back. */
+.legal {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 55px 24px 95px;
+  color: var(--text-1);
+}
+.legal-head h1 {
+  font-size: clamp(32px, 4vw, 46px);
+  letter-spacing: -1px;
+  line-height: 1.15;
+  margin-bottom: 10px;
+}
+.legal-head {
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e9e5ee;
+}
+.legal-updated {
+  font-size: var(--lp-t-sm);
+  color: var(--text-3);
+  margin-bottom: 18px;
+}
+.legal-lead {
+  font-size: var(--lp-t-lg);
+  color: var(--text-2);
+  line-height: 1.75;
+}
+.legal-contents {
+  /* style.css makes every nav a flex row; this one is a labelled list. */
+  display: grid;
+  gap: 10px;
+  margin: 34px 0 44px;
+  padding: 20px 24px;
+  border: 1px solid #e9e5ee;
+  border-radius: 16px;
+  background: #faf9fc;
+  font-size: var(--lp-t-sm);
+}
+.legal-contents p {
+  font-weight: 700;
+  color: var(--text-2);
+}
+.legal-contents ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 20px;
+  padding-inline-start: 20px;
+  margin: 0;
+}
+.legal-contents a:hover {
+  color: var(--ml-indigo);
+}
+.legal section {
+  padding: 26px 0;
+  border-top: 1px solid #e9e5ee;
+  /* A heading jumped to from the contents lands under the sticky header. */
+  scroll-margin-top: 90px;
+}
+.legal section h2 {
+  font-size: 22px;
+  letter-spacing: 0;
+  margin-bottom: 12px;
+}
+.legal section p,
+.legal section li {
+  font-size: var(--lp-t-md);
+  line-height: 1.85;
+  color: var(--text-2);
+}
+.legal section p + p,
+.legal section p + ul {
+  margin-top: 12px;
+}
+.legal section ul {
+  display: grid;
+  gap: 8px;
+  padding-inline-start: 22px;
+  list-style: disc;
+}
+.legal section li p {
+  display: inline;
+}
+.legal section a {
+  color: var(--ml-indigo);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.legal-page .lp-header-cta {
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .legal {
+    padding: 35px 20px 65px;
+  }
+  .legal-contents ol {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 1000px) {
   .pricing-cards {

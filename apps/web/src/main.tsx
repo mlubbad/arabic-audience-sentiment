@@ -34,6 +34,8 @@ import {
 } from "./locale";
 import { loadStrings, useStrings, type StringKey } from "./strings";
 import { LanguageSwitch } from "./LanguageSwitch";
+import { LegalLinks } from "./LegalLinks";
+import { LEGAL_PATHS } from "./legal/types";
 const Dashboard = lazy(() =>
   import("./Dashboard").then((m) => ({ default: m.Dashboard })),
 );
@@ -52,6 +54,11 @@ const Pricing = lazy(() =>
 // `AdminPage`, not `Admin`, for the same reason: `adminWords.ts` is beside it.
 const AdminPage = lazy(() =>
   import("./AdminPage").then((m) => ({ default: m.AdminPage })),
+);
+// The three legal documents share one page; the address decides which. The
+// documents themselves load with it, not with the shell.
+const LegalPage = lazy(() =>
+  import("./LegalPage").then((m) => ({ default: m.LegalPage })),
 );
 const client = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
@@ -392,6 +399,7 @@ function AppLayout() {
           <span>{S.footerTagline}</span>
         </div>
         <p>{S.footerNote}</p>
+        <LegalLinks className="app-legal" />
       </footer>
     </div>
   );
@@ -430,6 +438,32 @@ void loadStrings(currentLocale()).then(() =>
               element={
                 <Suspense fallback={null}>
                   <Pricing />
+                </Suspense>
+              }
+            />
+            {/* Read signed out too — by the reader deciding, and by the
+                reviewer at Google or Paddle following the footer link. */}
+            <Route
+              path={LEGAL_PATHS.privacy}
+              element={
+                <Suspense fallback={null}>
+                  <LegalPage doc="privacy" />
+                </Suspense>
+              }
+            />
+            <Route
+              path={LEGAL_PATHS.terms}
+              element={
+                <Suspense fallback={null}>
+                  <LegalPage doc="terms" />
+                </Suspense>
+              }
+            />
+            <Route
+              path={LEGAL_PATHS.thirdParty}
+              element={
+                <Suspense fallback={null}>
+                  <LegalPage doc="thirdParty" />
                 </Suspense>
               }
             />

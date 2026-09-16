@@ -196,6 +196,22 @@
   max-width: 30rem;
   margin: 0;
 }
+/* The legal links, in the footer's own small size — not the brand's. */
+.app-footer .app-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+}
+.app-footer .app-legal a {
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--ink-on-dark-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.app-footer .app-legal a:hover {
+  color: white;
+}
 .app-skip:focus {
   z-index: 100;
 }

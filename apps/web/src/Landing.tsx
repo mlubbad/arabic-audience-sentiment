@@ -6,6 +6,7 @@ import { BrandMark } from "./BrandMark";
 import { applyToDocument, direction, useLocale } from "./locale";
 import { useStrings } from "./strings";
 import { LanguageSwitch } from "./LanguageSwitch";
+import { LegalLinks } from "./LegalLinks";
 
 /* The demo's four comments. Their labels come from the shared strings rather
    than being written again here: a visitor who learns a word on this page
@@ -489,6 +490,9 @@ export function Landing() {
           <Link to="/account">{S.lpFooterAccount}</Link>
           <a href="#questions">{S.lpNavFaq}</a>
         </nav>
+        {/* Where a reviewer at Google or Paddle looks for them, and where a
+            visitor expects them: the foot of the page, by their own titles. */}
+        <LegalLinks className="lp-legal" />
         <div className="lp-footer-bottom">
           <span>{S.lpFooterVersion}</span>
           <span>{S.lpFooterPreview}</span>
