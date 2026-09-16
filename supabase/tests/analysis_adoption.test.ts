@@ -140,20 +140,28 @@ describe("the first successful analysis becomes the channel's active one", () =>
     await db.query("delete from plans where key='free'");
     const user = "10000000-0000-4000-8000-0000000000aa";
     await db.query("insert into auth.users(id) values ($1)", [user]);
-    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
-      user,
-    ]);
-    await db.exec("set role authenticated");
+    // Signing up made the personal workspace, with no subscription row.
     const made = await db.query<{ id: string }>(
-      "select public.create_workspace('بلا خطة معرّفة') as id",
+      "select id from workspaces where created_by=$1",
+      [user],
     );
-    expect(made.rows[0].id).toBeTruthy();
-    await db.exec("reset role");
+    expect(made.rows).toHaveLength(1);
     const subs = await db.query(
       "select 1 from subscriptions where workspace_id=$1",
       [made.rows[0].id],
     );
     expect(subs.rows).toHaveLength(0);
+    // Unentitled means unentitled: a further workspace is a plan limit, and
+    // with no plan the limit is refused rather than read as "no ceiling"
+    // (private.plan_limit, 20260917060000).
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      user,
+    ]);
+    await db.exec("set role authenticated");
+    await expect(
+      db.query("select public.create_workspace('بلا خطة معرّفة')"),
+    ).rejects.toThrow(/no_active_plan/);
+    await db.exec("reset role");
     // Put the seed back for the cases that follow.
     await db.query(
       "insert into plans(key,segment,title_ar,title_en,self_serve,sort_order,analysis_units,backfill_units,topic_units,insight_reports,channels_limit,members_limit,workspaces_limit) values ('free','individual','مجاني','Free',true,10,100,0,100,1,0,1,1)",

@@ -2,7 +2,9 @@
  * Paddle is the seller of record; this database is the entitlement of record.
  * Every webhook lands once, by event_id; an older event never moves a
  * subscription backwards; a pack grants once; seven days past due drops to
- * free; a price id resolves to a plan and interval, or to a pack.
+ * free; a cancel or a pause drops to free at once (20260917060000), and a
+ * subscription for a root already live on another is a conflict that moves
+ * nothing; a price id resolves to a plan and interval, or to a pack.
  *
  * Concurrency: apply_billing_event and apply_pack_event take
  * pg_advisory_xact_lock on the billing root before their duplicate and
@@ -178,6 +180,161 @@ describe("billing events", () => {
       [W],
     );
     expect(again.rows[0].apply_billing_event).toBe("duplicate");
+  });
+
+  it("a second Paddle subscription for a root already live on one is a conflict", async () => {
+    // The workspace in a webhook is custom_data the browser minted: a checkout
+    // for a root that already pays through sub_1 must not replace it.
+    const r = await db.query<{ apply_billing_event: string }>(
+      `select private.apply_billing_event('evt_other','subscription.activated',now(),$1,'agency','month',
+         now(), now()+interval '30 days','active',false,'sub_2','ctm_2','{}'::jsonb)`,
+      [W],
+    );
+    expect(r.rows[0].apply_billing_event).toBe("conflict");
+    const s = await db.query<{ plan_key: string; provider_ref: string }>(
+      "select plan_key,provider_ref from subscriptions where workspace_id=$1",
+      [W],
+    );
+    expect(s.rows[0]).toEqual({
+      plan_key: "creator_plus",
+      provider_ref: "sub_1",
+    });
+    const e = await db.query<{ outcome: string; workspace_id: string }>(
+      "select outcome,workspace_id from private.billing_events where event_id='evt_other'",
+    );
+    expect(e.rows[0]).toEqual({ outcome: "conflict", workspace_id: W });
+    // Recorded once, so its replay is a duplicate; and no audit row was written.
+    const again = await db.query<{ apply_billing_event: string }>(
+      `select private.apply_billing_event('evt_other','subscription.activated',now(),$1,'agency','month',
+         now(), now()+interval '30 days','active',false,'sub_2','ctm_2','{}'::jsonb)`,
+      [W],
+    );
+    expect(again.rows[0].apply_billing_event).toBe("duplicate");
+    const a = await db.query<{ target_id: string }>(
+      "select target_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
+      [W],
+    );
+    expect(a.rows[0].target_id).not.toBe("agency");
+  });
+
+  const freeShape = {
+    plan_key: "free",
+    status: "active",
+    provider: null,
+    provider_ref: null,
+    provider_customer_ref: null,
+    billing_interval: null,
+    cancel_at_period_end: false,
+  };
+  const shape = async (id: string) =>
+    (
+      await db.query<typeof freeShape>(
+        "select plan_key,status,provider,provider_ref,provider_customer_ref,billing_interval,cancel_at_period_end from subscriptions where workspace_id=$1",
+        [id],
+      )
+    ).rows[0];
+
+  it("a cancel drops root and clients to free", async () => {
+    const r = await db.query<{ apply_billing_event: string }>(
+      `select private.apply_billing_event('evt_cancel','subscription.canceled',now(),$1,'creator_plus','month',
+         now(), now()+interval '30 days','cancelled',false,'sub_1','ctm_1','{}'::jsonb)`,
+      [W],
+    );
+    expect(r.rows[0].apply_billing_event).toBe("applied");
+    expect(await shape(W)).toEqual(freeShape);
+    expect(await shape(CLIENT)).toEqual(freeShape);
+    // The free period is open-ended, and the client still binds to the root.
+    const p = await db.query<{ open: boolean; bound: string }>(
+      `select s.period_end > now() + interval '99 years' as open,
+              (select billing_workspace_id from subscriptions where workspace_id=$2) as bound
+         from subscriptions s where s.workspace_id=$1`,
+      [W, CLIENT],
+    );
+    expect(p.rows[0]).toEqual({ open: true, bound: W });
+    const a = await db.query<{ action: string; target_id: string }>(
+      "select action,target_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
+      [W],
+    );
+    expect(a.rows[0]).toEqual({
+      action: "plan_paddle_canceled",
+      target_id: "free",
+    });
+    const e = await db.query<{ outcome: string }>(
+      "select outcome from private.billing_events where event_id='evt_cancel'",
+    );
+    expect(e.rows[0].outcome).toBe("applied");
+    // The free hundred is spendable: the meter and both gates answer.
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select private.analysis_remaining($1) as n",
+          [W],
+        )
+      ).rows[0].n,
+    ).toBe(100);
+    expect(
+      (
+        await db.query<{ r: string[] }>(
+          "select private.reserve_usage($1,'comment_analysis',$2) as r",
+          [CLIENT, ["after-cancel"]],
+        )
+      ).rows[0].r,
+    ).toEqual(["after-cancel"]);
+  });
+
+  it("a pause drops to free; a later activated re-applies the plan", async () => {
+    // Back on a paid plan first: a fresh subscription, no conflict since the
+    // root is on free with no provider.
+    expect(
+      (
+        await db.query<{ apply_billing_event: string }>(
+          `select private.apply_billing_event('evt_re','subscription.activated',now(),$1,'creator','month',
+             now(), now()+interval '30 days','active',false,'sub_3','ctm_1','{}'::jsonb)`,
+          [W],
+        )
+      ).rows[0].apply_billing_event,
+    ).toBe("applied");
+    expect(await shape(W)).toMatchObject({
+      plan_key: "creator",
+      provider_ref: "sub_3",
+    });
+    expect(
+      (
+        await db.query<{ apply_billing_event: string }>(
+          `select private.apply_billing_event('evt_pause','subscription.paused',now(),$1,'creator','month',
+             now(), now()+interval '30 days','paused',false,'sub_3','ctm_1','{}'::jsonb)`,
+          [W],
+        )
+      ).rows[0].apply_billing_event,
+    ).toBe("applied");
+    expect(await shape(W)).toEqual(freeShape);
+    expect(await shape(CLIENT)).toEqual(freeShape);
+    const a = await db.query<{ action: string; target_id: string }>(
+      "select action,target_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
+      [W],
+    );
+    expect(a.rows[0]).toEqual({
+      action: "plan_paddle_paused",
+      target_id: "free",
+    });
+    expect(
+      (
+        await db.query<{ apply_billing_event: string }>(
+          `select private.apply_billing_event('evt_resume','subscription.activated',now()+interval '1 second',$1,'creator','month',
+             now(), now()+interval '30 days','active',false,'sub_3','ctm_1','{}'::jsonb)`,
+          [W],
+        )
+      ).rows[0].apply_billing_event,
+    ).toBe("applied");
+    for (const id of [W, CLIENT])
+      expect(await shape(id)).toMatchObject({
+        plan_key: "creator",
+        status: "active",
+        provider: "paddle",
+        provider_ref: "sub_3",
+        provider_customer_ref: "ctm_1",
+        billing_interval: "month",
+      });
   });
 
   it("a pack event grants units once", async () => {

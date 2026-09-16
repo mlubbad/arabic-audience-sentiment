@@ -61,6 +61,15 @@ describe("youtube connection", () => {
       "insert into clients(id,workspace_id,name) values ($1,$1,'A'),($2,$2,'B')",
       [A, B],
     );
+    // A workspace with no subscription row has no plan, and since
+    // 20260917060000 plan_limit refuses it rather than answering "no ceiling";
+    // these two are about the connection, not the ladder, so they get the
+    // plan without one.
+    await db.query(
+      `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
+       values ($1,'owner','active',now(),now()+interval '100 years'),($2,'owner','active',now(),now()+interval '100 years')`,
+      [A, B],
+    );
   });
   afterAll(async () => {
     await db?.close();

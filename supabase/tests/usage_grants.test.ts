@@ -252,6 +252,57 @@ describe("the pre-check gates agree with the meter", () => {
     );
   });
 
+  it("carry a past-due subscription seven days past its period, and the meter agrees", async () => {
+    // The grace is the code's, not Paddle's period: three days past the end
+    // all three still answer; eight days past, all three refuse — the same
+    // moment billing_sweep would have dropped the row to free.
+    // The period moves as a whole (period_end must follow period_start),
+    // so the spend keyed on the old period_start no longer counts: the plan's
+    // 10,000 and the pack's 10,000 are both unspent on the new one.
+    const before = (
+      await db.query<{ period_start: string }>(
+        "select period_start from subscriptions where workspace_id=$1",
+        [W],
+      )
+    ).rows[0].period_start;
+    await db.query(
+      "update subscriptions set status='past_due', period_start=now()-interval '33 days', period_end=now()-interval '3 days' where workspace_id=$1",
+      [W],
+    );
+    expect(await analysisRemaining(W)).toBe(20000);
+    expect(await topicRemaining(W)).toBe(5000);
+    expect(await reserve(W, ["grace-0"])).toBe(1);
+    expect(await analysisRemaining(W)).toBe(19999);
+    await db.query(
+      "update subscriptions set period_end=now()-interval '8 days' where workspace_id=$1",
+      [W],
+    );
+    await expect(
+      db.query("select private.analysis_remaining($1)", [W]),
+    ).rejects.toThrow(/no_active_plan/);
+    expect(await topicRemaining(W)).toBeNull();
+    await expect(
+      db.query("select private.reserve_usage($1,'comment_analysis',$2)", [
+        W,
+        ["grace-1"],
+      ]),
+    ).rejects.toThrow(/plan_inactive/);
+    // An active subscription past its period is closed at once: no grace.
+    await db.query(
+      "update subscriptions set status='active', period_end=now()-interval '1 minute' where workspace_id=$1",
+      [W],
+    );
+    await expect(
+      db.query("select private.analysis_remaining($1)", [W]),
+    ).rejects.toThrow(/no_active_plan/);
+    await db.query(
+      "update subscriptions set status='active', period_start=$2, period_end=now()+interval '29 days' where workspace_id=$1",
+      [W, before],
+    );
+    await db.query("delete from usage_events where event_key='grace-0'");
+    expect(await analysisRemaining(W)).toBe(10000);
+  });
+
   it("answer the largest int for a plan without a ceiling", async () => {
     await db.query(
       "update subscriptions set plan_key='owner' where workspace_id=$1",

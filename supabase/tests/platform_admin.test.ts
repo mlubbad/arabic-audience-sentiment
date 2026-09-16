@@ -239,3 +239,155 @@ describe("platform admin", () => {
     expect(Number(rootCount.rows[0].count)).toBe(1);
   });
 });
+
+describe("set_workspace_plan over a Paddle subscription", () => {
+  // USER's home is on creator_plus / admin after the propagation test, with
+  // two clients billing through it. Put the root on Paddle by hand, as a
+  // webhook would have left it.
+  let home: string;
+  let clientA: string;
+  beforeAll(async () => {
+    await db.exec("reset role");
+    home = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where created_by=$1 order by created_at asc limit 1",
+        [USER],
+      )
+    ).rows[0].id;
+    clientA = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where name=$1",
+        ["client a"],
+      )
+    ).rows[0].id;
+    await db.query(
+      `update subscriptions set plan_key='creator', status='active', provider='paddle', provider_ref='sub_live',
+         provider_customer_ref='ctm_live', billing_interval='month', cancel_at_period_end=true,
+         period_start=now()-interval '1 day', period_end=now()+interval '29 days'
+       where workspace_id=$1 or billing_workspace_id=$1`,
+      [home],
+    );
+  });
+
+  it("refuses without override, on the root and through a client alike", async () => {
+    await as(ADMIN);
+    await expect(
+      db.query("select set_workspace_plan($1,'agency',1,'by hand')", [home]),
+    ).rejects.toThrow(/paddle_subscription_active/);
+    await expect(
+      db.query("select set_workspace_plan($1,'agency',1,'by hand',false)", [
+        clientA,
+      ]),
+    ).rejects.toThrow(/paddle_subscription_active/);
+    await db.exec("reset role");
+    const s = await db.query<{ plan_key: string; provider_ref: string }>(
+      "select plan_key,provider_ref from subscriptions where workspace_id=$1",
+      [home],
+    );
+    expect(s.rows[0]).toEqual({
+      plan_key: "creator",
+      provider_ref: "sub_live",
+    });
+    // past_due is live too.
+    await db.query(
+      "update subscriptions set status='past_due' where workspace_id=$1",
+      [home],
+    );
+    await as(ADMIN);
+    await expect(
+      db.query("select set_workspace_plan($1,'agency',1,'by hand')", [home]),
+    ).rejects.toThrow(/paddle_subscription_active/);
+  });
+
+  it("with override changes the plan and period but keeps the Paddle link, and audits plan:note", async () => {
+    await as(ADMIN);
+    const r = await db.query<{
+      set_workspace_plan: {
+        plan_key: string;
+        status: string;
+        provider: string;
+      };
+    }>("select set_workspace_plan($1,'agency',2,'goodwill',true)", [clientA]);
+    expect(r.rows[0].set_workspace_plan).toMatchObject({
+      plan_key: "agency",
+      status: "active",
+      provider: "paddle",
+    });
+    await db.exec("reset role");
+    const rows = await db.query<{
+      workspace_id: string;
+      plan_key: string;
+      status: string;
+      provider: string;
+      provider_ref: string;
+      provider_customer_ref: string;
+      billing_interval: string;
+      cancel_at_period_end: boolean;
+      months: number;
+    }>(
+      `select workspace_id, plan_key, status, provider, provider_ref, provider_customer_ref, billing_interval,
+              cancel_at_period_end,
+              round(extract(epoch from (period_end - period_start)) / 86400)::int as months
+         from subscriptions where workspace_id=$1 or billing_workspace_id=$1`,
+      [home],
+    );
+    expect(rows.rows).toHaveLength(3);
+    for (const row of rows.rows)
+      expect(row).toMatchObject({
+        plan_key: "agency",
+        status: "active",
+        provider: "paddle",
+        provider_ref: "sub_live",
+        provider_customer_ref: "ctm_live",
+        billing_interval: "month",
+        cancel_at_period_end: true,
+      });
+    // Two months, give or take a day of month length.
+    expect(rows.rows[0].months).toBeGreaterThanOrEqual(59);
+    expect(rows.rows[0].months).toBeLessThanOrEqual(62);
+    const audit = await db.query<{ action: string; target_id: string }>(
+      "select action,target_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
+      [clientA],
+    );
+    expect(audit.rows[0]).toEqual({
+      action: "plan_set",
+      target_id: "agency:goodwill",
+    });
+  });
+
+  it("a root not on Paddle behaves as before, override or not", async () => {
+    await db.exec("reset role");
+    await db.query(
+      "update subscriptions set provider='admin', provider_ref='old' where workspace_id=$1 or billing_workspace_id=$1",
+      [home],
+    );
+    await as(ADMIN);
+    await db.query("select set_workspace_plan($1,'creator',1,'note 9',true)", [
+      home,
+    ]);
+    await db.exec("reset role");
+    const s = await db.query<{
+      plan_key: string;
+      provider: string;
+      provider_ref: string;
+    }>(
+      "select plan_key,provider,provider_ref from subscriptions where workspace_id=$1",
+      [home],
+    );
+    expect(s.rows[0]).toEqual({
+      plan_key: "creator",
+      provider: "admin",
+      provider_ref: "note 9",
+    });
+    const audit = await db.query<{ target_id: string }>(
+      "select target_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
+      [home],
+    );
+    expect(audit.rows[0].target_id).toBe("creator");
+    // The four-argument form is gone: one signature, so PostgREST never sees two candidates.
+    const sigs = await db.query<{ n: number }>(
+      "select count(*)::int as n from pg_proc where proname='set_workspace_plan'",
+    );
+    expect(sigs.rows[0].n).toBe(1);
+  });
+});

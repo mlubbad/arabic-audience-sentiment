@@ -95,7 +95,23 @@ describe("plans v2", () => {
     ).rejects.toThrow(/plans_limits_finite_unless_internal/);
   });
 
-  it("a personal workspace on creator cannot create a second workspace", async () => {
+  it("the workspace limit counts clients: the individual plans allow none", async () => {
+    const r = await db.query<{ key: string; workspaces_limit: number | null }>(
+      "select key,workspaces_limit from plans order by sort_order",
+    );
+    expect(r.rows.map((p) => [p.key, p.workspaces_limit])).toEqual([
+      ["free", 0],
+      ["creator", 0],
+      ["creator_plus", 0],
+      ["agency", 5],
+      ["media", 15],
+      ["enterprise", 50],
+      ["owner", null],
+      ["pilot", 1],
+    ]);
+  });
+
+  it("a personal workspace on creator is the home and no client: the first is refused", async () => {
     // The trigger gave OWNER a personal workspace on the default plan; move it to creator.
     await db.exec("reset role");
     await db.query(
@@ -108,18 +124,25 @@ describe("plans v2", () => {
     );
   });
 
-  it("a workspace on agency can create up to five", async () => {
+  it("a workspace on agency can create five clients beside the home; the sixth is refused", async () => {
     await db.exec("reset role");
     await db.query(
       "update subscriptions set plan_key='agency' where workspace_id=(select id from workspaces where created_by=$1)",
       [OWNER],
     );
     await as(OWNER);
-    for (let i = 0; i < 4; i++)
+    for (let i = 0; i < 5; i++)
       await db.query("select create_workspace($1)", [`client ${i}`]);
     await expect(db.query("select create_workspace('sixth')")).rejects.toThrow(
       /workspace_limit_reached/,
     );
+    await db.exec("reset role");
+    const owned = await db.query<{ n: number }>(
+      "select count(*)::int as n from workspaces where created_by=$1",
+      [OWNER],
+    );
+    // The home and five clients.
+    expect(owned.rows[0].n).toBe(6);
   });
 
   it("a client workspace bills through its owner's home workspace", async () => {
@@ -156,6 +179,67 @@ describe("plans v2", () => {
       [client.rows[0].id],
     );
     expect(limit.rows[0].channels).toBe(10);
+  });
+
+  it("plan_limit refuses a root with no live subscription rather than answering null", async () => {
+    await db.exec("reset role");
+    const home = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where created_by=$1 order by created_at asc limit 1",
+        [OWNER],
+      )
+    ).rows[0].id;
+    // A live plan's own null limit is still null: that is "no ceiling".
+    await db.query(
+      "update subscriptions set plan_key='owner' where workspace_id=$1",
+      [home],
+    );
+    expect(
+      (
+        await db.query<{ v: number | null }>(
+          "select private.plan_limit($1,'channels') as v",
+          [home],
+        )
+      ).rows[0].v,
+    ).toBeNull();
+    await db.query(
+      "update subscriptions set plan_key='agency' where workspace_id=$1",
+      [home],
+    );
+    for (const status of ["cancelled", "paused"]) {
+      await db.query(
+        "update subscriptions set status=$2 where workspace_id=$1",
+        [home, status],
+      );
+      await expect(
+        db.query("select private.plan_limit($1,'channels')", [home]),
+      ).rejects.toThrow(/no_active_plan/);
+      // Through a client of that root too.
+      const client = (
+        await db.query<{ id: string }>(
+          "select id from workspaces where name='client 0'",
+        )
+      ).rows[0].id;
+      await expect(
+        db.query("select private.plan_limit($1,'workspaces')", [client]),
+      ).rejects.toThrow(/no_active_plan/);
+    }
+    await db.query(
+      "update subscriptions set status='past_due' where workspace_id=$1",
+      [home],
+    );
+    expect(
+      (
+        await db.query<{ v: number }>(
+          "select private.plan_limit($1,'channels') as v",
+          [home],
+        )
+      ).rows[0].v,
+    ).toBe(10);
+    await db.query(
+      "update subscriptions set status='active' where workspace_id=$1",
+      [home],
+    );
   });
 
   it("past_due is an accepted subscription status", async () => {
