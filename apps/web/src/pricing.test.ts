@@ -67,6 +67,42 @@ describe("pricing rows", () => {
     expect(rows[0].cta.kind).toBe("free");
     expect(rows[1].cta.kind).toBe("contact");
   });
+  it("a self-serve paid plan checks out; the current plan wins over checkout and free", () => {
+    const [checkoutRow] = pricingRows(
+      [plan({})],
+      "individual",
+      "month",
+      "ar",
+      ar,
+    );
+    expect(checkoutRow.cta).toEqual({
+      kind: "checkout",
+      label: ar.pricingCtaStart,
+    });
+
+    const [currentRow] = pricingRows(
+      [plan({})],
+      "individual",
+      "month",
+      "ar",
+      ar,
+      "creator",
+    );
+    expect(currentRow.cta).toEqual({
+      kind: "current",
+      label: ar.pricingCtaCurrent,
+    });
+
+    const [currentOverFreeRow] = pricingRows(
+      [plan({ key: "free", price_monthly_cents: 0 })],
+      "individual",
+      "month",
+      "ar",
+      ar,
+      "free",
+    );
+    expect(currentOverFreeRow.cta.kind).toBe("current");
+  });
   it("-1 reads as unlimited", () => {
     const [row] = pricingRows(
       [plan({ limits: { ...plan({}).limits, channels: -1 } })],
