@@ -1940,4 +1940,11 @@ buyer-terms anchor present; the language switch turns the document English with
 `lang="en"` and `dir="ltr"`. Seen on the dev server at 800, 1280 and 375 wide: the title
 block, contents grid and sections in Arabic and English, the legal row in the landing and
 app-shell footers. Not deployed; `/privacy-policy` on app.sky-develop.net answers only
-after the next `deploy:preview`.
+after the next `deploy:preview` — done below.
+
+Deployed 2026-09-16 via `npm run deploy:preview` after a fresh build: 40 files answered
+`226`, 15 stale chunks swept, `static/LegalPage-wfCIIXpK.js` (51,504 bytes) on the host.
+Probed with the preview's basic-auth credentials: `/privacy-policy`, `/terms` and
+`/third-party` each `200`, `index.html` referencing the new `index-BgcIGqtG.js`; without
+credentials each answers `401` — the host is still password-protected, so a reviewer at
+Google or Paddle cannot open the link until that password is lifted from these routes.
