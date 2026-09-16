@@ -168,30 +168,17 @@
   color: var(--ml-indigo);
   margin-inline-start: -8px;
 }
+/* The mark is one SVG (BrandMark.tsx). This used to redraw it here with its
+   own rose, #ff5c67 — not the brand's --ml-rose — so a visitor saw one rose
+   on the landing and another inside the product. Now it only sizes the SVG
+   and sets the indigo the `currentColor` bars take. */
 .lp-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  width: 29px;
-  height: 28px;
-  transform: rotate(-10deg);
-}
-.lp-mark i {
-  background: var(--ml-indigo);
-  width: 5px;
-  border-radius: 4px;
-  height: 14px;
-}
-.lp-mark i:nth-child(2) {
-  height: 25px;
-}
-.lp-mark i:nth-child(3) {
-  height: 19px;
-}
-.lp-mark i:nth-child(4) {
-  height: 10px;
-  background: #ff5c67;
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  color: var(--ml-indigo);
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 .lp-nav {
   display: flex;
@@ -896,6 +883,11 @@
 }
 .lp-final-cta > .lp-mark {
   margin-bottom: 20px;
+  width: 44px;
+  height: 44px;
+  /* Solid indigo on the dark closing section read as a shadow of itself.
+     The light indigo is what the rail already uses on its dark plane. */
+  color: var(--ml-indigo-300);
 }
 .lp-final-cta h2 {
   font-size: clamp(38px, 4.5vw, 57px);

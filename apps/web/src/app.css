@@ -85,33 +85,16 @@
   color: var(--ml-indigo);
 }
 /* The four-bar brand mark. Shared between landing and app shell. */
+/* The mark is one SVG (BrandMark.tsx) — its bars and their rose are drawn
+   there, once. This rule only sizes it and sets the indigo the three
+   `currentColor` bars take; it draws nothing. */
 .lp-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  width: 29px;
-  height: 28px;
-  transform: rotate(-10deg);
-  flex-shrink: 0;
-}
-.lp-mark i {
-  background: var(--ml-indigo);
-  width: 5px;
-  border-radius: 4px;
-  height: 14px;
   display: inline-block;
-  transition: transform 0.2s ease;
-}
-.lp-mark i:nth-child(2) {
-  height: 25px;
-}
-.lp-mark i:nth-child(3) {
-  height: 19px;
-}
-.lp-mark i:nth-child(4) {
-  height: 10px;
-  background: var(--ml-rose);
+  width: 30px;
+  height: 30px;
+  color: var(--ml-indigo);
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 /* The navigation's only styling now lives with the rail. What was here was
    the top bar's: a centred pill row, laid out with `align-items: center`.
@@ -1388,21 +1371,13 @@
 .app-rail .app-brand:hover {
   opacity: 0.85;
 }
-.app-rail .lp-mark i {
-  background: linear-gradient(
-    180deg,
-    var(--ml-indigo-300) 0%,
-    var(--ml-indigo-500) 100%
-  );
-  box-shadow: 0 0 8px rgba(181, 170, 242, 0.35);
-}
-.app-rail .lp-mark i:nth-child(4) {
-  background: linear-gradient(
-    180deg,
-    var(--ml-rose-300) 0%,
-    var(--ml-rose) 100%
-  );
-  box-shadow: 0 0 8px rgba(255, 92, 103, 0.45);
+/* On the dark plane the indigo bars lift to the lighter indigo the rail's
+   own ink uses, and the whole mark carries a soft glow. The rose bar is not
+   restyled: it is the one part of the mark that must read the same on every
+   surface, and it comes from the token inside the SVG. */
+.app-rail .lp-mark {
+  color: var(--ml-indigo-300);
+  filter: drop-shadow(0 0 6px rgba(181, 170, 242, 0.45));
 }
 .app-rail .app-brand span {
   display: flex;
