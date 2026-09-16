@@ -97,6 +97,33 @@ and its own generated `robots.txt` — not this origin. Requested directly again
 So the deployment is done and the hostname is not yet wired to it. That is a Cloudflare-side
 DNS change, outside the DirectAdmin account and outside what this project can reach.
 
+## The host's timing varies from one request to the next
+
+Measured 2026-09-17 while tuning the landing's fonts (`docs/verification.md`, the
+`font-display: optional` entry): the same build, fetched by the same Lighthouse from the
+same machine minutes apart, painted its first content at 0.7 s on one run and at 2.2 s on
+the next; a third pair read 0.55 s and 2.4 s. Nothing in the page changed between runs.
+The variance is the path — the shared DirectAdmin origin behind Cloudflare, whose
+`cf-cache-status` reads `DYNAMIC` for HTML (`no-cache` from `.htaccess`) so every page
+request reaches the origin — and it is larger than any single front-end change measured
+that day, which is why a one-run Lighthouse score against this host is not evidence of
+anything.
+
+What to do with that:
+
+- Compare builds under control, not against the host: `.cache/scratch/paint-ab.mjs`
+  serves two `dist` copies locally and drives a throttled phone over both, cold, several
+  runs each. That is how `swap` and `optional` were shown to be identical.
+- Read Lighthouse's **observed** FCP/LCP (`audits.metrics`) beside its simulated ones; the
+  simulated LCP for this page is Lantern's estimate of fonts in the critical path, and every
+  trace so far has the H1 painting at first paint.
+- The number that settles page speed here is field data: Core Web Vitals in Search Console
+  (CrUX) once the pages have 28 days of traffic. Until then, treat lab numbers from this
+  host as a range, and quote the range.
+- If the range itself becomes the problem, the fix is on the hosting side — a host whose
+  origin answers evenly, or an edge cache for the prerendered HTML with a purge on deploy
+  (this project has no purge credential today) — not in the bundle.
+
 ## Not deployed
 
 No Edge Function, no worker, no live data path. The Supabase project holds the schema and
