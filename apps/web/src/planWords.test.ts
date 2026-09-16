@@ -7,6 +7,9 @@ const plan = (used: number, allowance = 1000) => ({
   status: "active" as const,
   period_start: "2026-09-01T00:00:00Z",
   period_end: "2026-10-01T00:00:00Z",
+  cancel_at_period_end: false,
+  billing_interval: null,
+  provider: null,
   budgets: [
     {
       event_type: "comment_analysis" as const,

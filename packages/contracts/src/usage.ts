@@ -1,6 +1,7 @@
 /** Plan limits and metering as shown to a workspace. */
 import { z } from "zod";
 import { timestamp } from "./primitives";
+import { PlanSchema } from "./plans";
 
 export const BudgetSchema = z
   .object({
@@ -27,10 +28,18 @@ export const BudgetSchema = z
 export const UsageSummarySchema = z
   .object({
     plan_key: z.string().min(1),
-    status: z.enum(["active", "paused", "cancelled"]),
+    status: z.enum(["active", "past_due", "paused", "cancelled"]),
     period_start: timestamp,
     period_end: timestamp,
     budgets: z.array(BudgetSchema).min(1),
+    /** Set once cancellation is scheduled; the plan still runs to period_end. */
+    cancel_at_period_end: z.boolean().default(false),
+    /** Null before any paid interval has been chosen (e.g. free, or admin-set). */
+    billing_interval: z.enum(["month", "year"]).nullable().default(null),
+    /** Null when the plan was set by an admin rather than a payment provider. */
+    provider: z.string().nullable().default(null),
+    /** The plan's own row: title, prices and limits. Absent for a legacy read. */
+    plan: PlanSchema.optional(),
   })
   .strict();
 export type UsageSummary = z.infer<typeof UsageSummarySchema>;
