@@ -154,12 +154,15 @@ export const en: Strings = {
 
   planPanelTitle: "Your plan",
   planStatusPastDue: "Payment is overdue",
+  planStatusEnding: "Will not renew",
   planRenews: (date: string) => `Renews on ${date}`,
   planPastDue: (date: string) =>
     `The payment could not be collected. The plan stays until ${date}, then the workspace moves to the free plan.`,
   planEndsOn: (date: string) =>
     `Renewal is cancelled; the plan ends on ${date}.`,
   planUsedOf: (used: string, allowance: string) => `${used} of ${allowance}`,
+  planUsedUnlimited: (used: string, unlimited: string) =>
+    `${used} used · ${unlimited.toLowerCase()}`,
   planUpgrade: "Upgrade the plan",
   planManage: "Manage the subscription",
   planTopup: "Add 10,000 comments",

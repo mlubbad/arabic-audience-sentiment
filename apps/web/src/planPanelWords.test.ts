@@ -49,6 +49,7 @@ describe("plan panel words", () => {
     expect(w.rows[0]).toMatchObject({
       used: "2,500",
       allowance: "10,000",
+      line: ar.planUsedOf("2,500", "10,000"),
       tone: "ok",
     });
   });
@@ -67,6 +68,20 @@ describe("plan panel words", () => {
   it("past_due names the day the plan drops", () => {
     const w = planPanelWords(summary({ status: "past_due" }), ar, "ar");
     expect(w.notice).toBe(ar.planPastDue("2026-10-08"));
+  });
+  it("a cancelled renewal states its date once, under a short status", () => {
+    const w = planPanelWords(summary({ cancel_at_period_end: true }), ar, "ar");
+    expect(w.statusLine).toBe(ar.planStatusEnding);
+    expect(w.statusLine).not.toContain("2026-10-01");
+    expect(w.notice).toBe(ar.planEndsOn("2026-10-01"));
+    // Past due outranks the cancellation: the sooner day is the one that matters.
+    const due = planPanelWords(
+      summary({ cancel_at_period_end: true, status: "past_due" }),
+      ar,
+      "ar",
+    );
+    expect(due.statusLine).toBe(ar.planStatusPastDue);
+    expect(due.notice).toBe(ar.planPastDue("2026-10-08"));
   });
   it("owner is unlimited and has no actions", () => {
     const w = planPanelWords(
@@ -89,6 +104,8 @@ describe("plan panel words", () => {
     );
     // One sentence, one key: the pricing page's "unlimited" is this one too.
     expect(w.rows[0].allowance).toBe(ar.pricingUnlimited);
+    expect(w.rows[0].line).toBe(ar.planUsedUnlimited("1", ar.pricingUnlimited));
+    expect(w.rows[0].line).not.toContain("من");
     expect(w.actions).toEqual([]);
   });
 });

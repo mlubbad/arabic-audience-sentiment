@@ -1,27 +1,24 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { useQuery } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
-import { UsageSummarySchema, type Budget } from "@sentiment/contracts";
-import { useWorkspaceSelection } from "./workspaceSelection";
-import { workspaceState } from "./workspace";
-import { configuredMode, fixtureWorkspace } from "./data";
+import type { Budget } from "@sentiment/contracts";
+import { configuredMode } from "./data";
+import { usePlanUsage } from "./planUsage";
 import { planPanelWords, type PlanAction } from "./planPanelWords";
 import { openCheckout, openPortal } from "./paddle";
 import { contactEmail } from "./pricing";
 import { useLocale } from "./locale";
 import { useStrings } from "./strings";
-import { supabase } from "./supabase";
 
 /** The plan as the account page shows it: title, renewal, every budget
  *  against its ceiling, what is about to happen to it, and the doors that
  *  are open. The rail card carries one figure so a reader can start work;
  *  this is where the plan is managed, so it carries all of them.
  *
- *  It reads `usage_summary` with the rail card's query — same key, so the
- *  two share one cache entry — for the workspace the reader chose, the same
- *  choice the dashboard and the operations page follow. The session and the
- *  workspace list come from the page, which already holds both. */
+ *  It reads `usage_summary` through the rail card's hook — one query, one
+ *  cache entry — for the workspace the reader chose, the same choice the
+ *  dashboard and the operations page follow. The session and the workspace
+ *  list come from the page, which already holds both. */
 export function PlanPanel({
   session,
   workspaces,
@@ -33,29 +30,13 @@ export function PlanPanel({
 }) {
   const S = useStrings();
   const locale = useLocale();
-  const [chosen] = useWorkspaceSelection(session.user.id);
-  const place = workspaceState({
-    mode: configuredMode,
-    fixtureWorkspace,
-    signedIn: true,
-    workspaces,
-    selectedId: chosen,
-  });
-  const workspaceId = place.kind === "ready" ? place.id : null;
-  const plan = useQuery({
-    queryKey: ["plan", session.user.id, workspaceId],
-    enabled: !!supabase && !!workspaceId,
-    queryFn: async () => {
-      const { data, error } = await supabase!.rpc("usage_summary", {
-        w: workspaceId,
-      });
-      if (error) throw new Error("plan_unavailable");
-      return UsageSummarySchema.nullable().parse(data);
-    },
-  });
+  const { place, workspaceId, plan } = usePlanUsage(session, workspaces);
   // What the last pressed door had to say: checkout and the portal both
   // fail as a sentence under the buttons, never as a crash.
   const [notice, setNotice] = useState<string | null>(null);
+  // Which door is open and not yet answered. A second press while the first
+  // is in flight would open two checkouts, so the buttons wait.
+  const [pending, setPending] = useState<"manage" | "topup" | null>(null);
   if (configuredMode !== "live") return null;
 
   const heading = (
@@ -71,7 +52,7 @@ export function PlanPanel({
   const shell = (body: ReactNode) => (
     <section
       className="rp-section"
-      data-testid="plan-panel"
+      data-testid="account-plan-panel"
       aria-labelledby="plan-panel-heading"
     >
       {heading}
@@ -101,8 +82,9 @@ export function PlanPanel({
   const budgets: Budget[] = summary?.budgets ?? [];
 
   const press = (action: "manage" | "topup") => {
-    if (!workspaceId) return;
+    if (!workspaceId || pending) return;
     setNotice(null);
+    setPending(action);
     const call =
       action === "manage"
         ? openPortal(session, workspaceId)
@@ -112,7 +94,9 @@ export function PlanPanel({
             session,
             workspaceId,
           });
-    call.catch(() => setNotice(S.checkoutUnavailable));
+    call
+      .catch(() => setNotice(S.checkoutUnavailable))
+      .finally(() => setPending(null));
   };
   const door = (action: PlanAction) => {
     switch (action) {
@@ -139,6 +123,7 @@ export function PlanPanel({
             key={action}
             type="button"
             data-action={action}
+            disabled={pending !== null}
             onClick={() => press(action)}
           >
             {action === "manage" ? S.planManage : S.planTopup}
@@ -169,13 +154,7 @@ export function PlanPanel({
             return (
               <li key={b.event_type} data-testid={`plan-${b.event_type}`}>
                 <strong>{row.label}</strong>
-                {/* "1 of unlimited" is not a sentence: with no ceiling the
-                    row says what was used and that nothing caps it. */}
-                <span>
-                  {finite
-                    ? S.planUsedOf(row.used, row.allowance)
-                    : `${row.used} · ${row.allowance}`}
-                </span>
+                <span>{row.line}</span>
                 {finite && (
                   <>
                     <progress

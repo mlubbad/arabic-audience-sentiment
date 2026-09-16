@@ -158,11 +158,15 @@ export const ar = {
   // "بلا حدود" for a -1 ceiling is `pricingUnlimited`: one sentence, one key.
   planPanelTitle: "خطتك",
   planStatusPastDue: "الدفع متأخر",
+  planStatusEnding: "لا يتجدد",
   planRenews: (date: string) => `تتجدد في ${date}`,
   planPastDue: (date: string) =>
     `تعذّر تحصيل الدفعة. تبقى الخطة حتى ${date} ثم تنتقل المساحة إلى الخطة المجانية.`,
   planEndsOn: (date: string) => `أُلغي التجديد؛ تنتهي الخطة في ${date}.`,
   planUsedOf: (used: string, allowance: string) => `${used} من ${allowance}`,
+  /** The second word is `pricingUnlimited`, passed in so it is written once. */
+  planUsedUnlimited: (used: string, unlimited: string) =>
+    `${used} مستخدمة · ${unlimited}`,
   planUpgrade: "ترقية الخطة",
   planManage: "إدارة الاشتراك",
   planTopup: "إضافة 10,000 تعليق",

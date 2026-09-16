@@ -32,6 +32,8 @@ export type PlanPanelRow = {
   label: string;
   used: string;
   allowance: string;
+  /** The one sentence the row prints: used of allowance, or used and no ceiling. */
+  line: string;
   tone: "ok" | "warning" | "critical" | "exhausted";
 };
 
@@ -80,7 +82,10 @@ export function planPanelWords(
           : S.budgetBackfill,
     used: n(b.used),
     allowance: n(b.allowance),
-    tone: unlimited(b) ? ("ok" as const) : budgetState(b),
+    line: unlimited(b)
+      ? S.planUsedUnlimited(n(b.used), S.pricingUnlimited)
+      : S.planUsedOf(n(b.used), n(b.allowance)),
+    tone: budgetState(b),
   }));
   const actions: PlanAction[] = [];
   if (p.segment !== "internal") {
@@ -97,10 +102,14 @@ export function planPanelWords(
         : null;
   return {
     title: locale === "ar" ? p.title_ar : p.title_en,
+    // The status line is the short state; the notice below it carries the
+    // date, so a cancelled renewal is not "renews on X" over "ends on X".
     statusLine:
       summary.status === "past_due"
         ? S.planStatusPastDue
-        : S.planRenews(isoDay(summary.period_end)),
+        : summary.cancel_at_period_end
+          ? S.planStatusEnding
+          : S.planRenews(isoDay(summary.period_end)),
     rows,
     actions,
     notice,
