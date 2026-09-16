@@ -359,7 +359,7 @@ describe("worker to database, through the real handler", () => {
     const due = await post("/worker/topics-due", {
       job_id: lease.job_id,
       lease_token: lease.lease_token,
-      model_id: "gemini-2.5-flash",
+      model_id: "gemini-3.6-flash",
       prompt_version: "p1",
       max_rows: 200,
     });
@@ -384,7 +384,7 @@ describe("worker to database, through the real handler", () => {
       "rows",
       "taxonomy",
     ]);
-    expect(list.classification_key).toBe("topics:v1+gemini-2.5-flash+p1");
+    expect(list.classification_key).toBe("topics:v1+gemini-3.6-flash+p1");
     expect(list.active).toBe(true);
     expect(list.taxonomy.map((t) => t.key)).toContain("question");
     const rows = Object.fromEntries(
@@ -428,7 +428,7 @@ describe("worker to database, through the real handler", () => {
       status: "succeeded",
       topic_key: "question",
       confidence: 0.9,
-      model_id: "gemini-2.5-flash",
+      model_id: "gemini-3.6-flash",
       prompt_version: "p1",
       error_code: null,
       ...verdict,
@@ -492,7 +492,7 @@ describe("worker to database, through the real handler", () => {
       await post("/worker/topics-due", {
         job_id: lease.job_id,
         lease_token: lease.lease_token,
-        model_id: "gemini-2.5-flash",
+        model_id: "gemini-3.6-flash",
         prompt_version: "p1",
         max_rows: 200,
       })

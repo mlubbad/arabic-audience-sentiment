@@ -6,7 +6,7 @@ import { exportRows, snapshot } from "./snapshot";
 import { CSV_COLUMNS, toCsv } from "./csv";
 
 const W = "00000000-0000-4000-8000-000000000001";
-const KEY = "topics:v1+gemini-2.5-flash+p1";
+const KEY = "topics:v1+gemini-3.6-flash+p1";
 const base = (over: Partial<Comment> = {}): Comment =>
   CommentSchema.parse({
     id: "c1",
@@ -40,7 +40,7 @@ const pred = (topic_key: string, over: Record<string, unknown> = {}) => ({
   confidence: 0.8,
   content_hash: "h1",
   classification_key: KEY,
-  model_id: "gemini-2.5-flash",
+  model_id: "gemini-3.6-flash",
   prompt_version: "p1",
   predicted_at: "2026-09-15T10:00:00Z",
   error_code: null,

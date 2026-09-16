@@ -48,7 +48,7 @@ class GeminiTopicClassifier:
     prompt_version = PROMPT_VERSION
 
     def __init__(self, api_key: str, client: httpx.Client,
-                 model_id: str = "gemini-2.5-flash", sleep=time.sleep):
+                 model_id: str = "gemini-3.6-flash", sleep=time.sleep):
         if not api_key:
             raise ValueError("missing_gemini_api_key")
         self.model_id = model_id

@@ -12,8 +12,8 @@ const W = "00000000-0000-4000-8000-000000000001";
 const OWNER = "10000000-0000-4000-8000-000000000001";
 const CRED = "worker-credential";
 const HASH = createHash("sha256").update(CRED).digest("hex");
-const MODEL = "gemini-2.5-flash";
-const KEY = "topics:v1+gemini-2.5-flash+p1";
+const MODEL = "gemini-3.6-flash";
+const KEY = "topics:v1+gemini-3.6-flash+p1";
 let db: PGlite;
 let job: { id: string; lease_token: string };
 
@@ -263,7 +263,7 @@ describe("the worker classifies topics", () => {
     );
     await db.query(
       `insert into topic_predictions(workspace_id,comment_id,content_hash,classification_key,status,model_id,prompt_version,error_code)
-      select $1,id,'h-c2',$2,'failed','gemini-2.5-flash','p1','gemini_unavailable' from comments where external_comment_id='c2'`,
+      select $1,id,'h-c2',$2,'failed','gemini-3.6-flash','p1','gemini_unavailable' from comments where external_comment_id='c2'`,
       [W, KEY],
     );
     expect((await due()).rows.map((r) => r.external_comment_id).sort()).toEqual(
@@ -516,7 +516,7 @@ describe("the worker classifies topics", () => {
 
   it("says quota_exceeded, with no rows, when all that is pending would cost and nothing remains", async () => {
     await service();
-    const K2 = "topics:v2+gemini-2.5-flash+p1";
+    const K2 = "topics:v2+gemini-3.6-flash+p1";
     // The free rows answered under the new version; only c6 and c7 remain.
     expect(
       await commit("b10", [

@@ -167,7 +167,7 @@ describe("worker gateway", () => {
       post("/worker/topics-due", {
         job_id: "j1",
         lease_token: "t1",
-        model_id: "gemini-2.5-flash",
+        model_id: "gemini-3.6-flash",
         prompt_version: "p1",
         max_rows: 50,
         workspace_id: "ignored",
@@ -179,7 +179,7 @@ describe("worker gateway", () => {
       HASHED,
       "j1",
       "t1",
-      "gemini-2.5-flash",
+      "gemini-3.6-flash",
       "p1",
       50,
     );
@@ -238,7 +238,7 @@ describe("worker gateway", () => {
     const base = {
       job_id: "j1",
       lease_token: "t1",
-      model_id: "gemini-2.5-flash",
+      model_id: "gemini-3.6-flash",
       prompt_version: "p1",
     };
     for (const max_rows of [0, -1, 2.5, "50", null, NaN, true]) {
@@ -259,7 +259,7 @@ describe("worker gateway", () => {
       HASHED,
       "j1",
       "t1",
-      "gemini-2.5-flash",
+      "gemini-3.6-flash",
       "p1",
       200,
     );

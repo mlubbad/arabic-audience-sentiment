@@ -38,7 +38,7 @@ def test_the_key_travels_in_a_header_and_never_in_the_url():
     [req] = fake.requests
     assert "secret-key" not in str(req.url)
     assert req.headers["x-goog-api-key"] == "secret-key"
-    assert req.url.path.endswith("/models/gemini-2.5-flash:generateContent")
+    assert req.url.path.endswith("/models/gemini-3.6-flash:generateContent")
 
 
 def test_the_request_constrains_the_answer_to_the_taxonomy():

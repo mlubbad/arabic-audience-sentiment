@@ -6,7 +6,7 @@ import sys
 
 import httpx
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-3.6-flash"
 BODY = {
     "contents": [{"role": "user", "parts": [{"text":
         "صنّف هذا التعليق إلى موضوع واحد من: question, praise, other.\n"

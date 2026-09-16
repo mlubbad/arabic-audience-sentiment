@@ -79,8 +79,8 @@
         "topic_key": "praise",
         "confidence": 0.93,
         "content_hash": "b5317fe30321847f7449651b37220e00dd44159f8fa7025d6a0eb8a8e90a4bb9",
-        "classification_key": "topics:v1+gemini-2.5-flash+p1",
-        "model_id": "gemini-2.5-flash",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
         "predicted_at": "2026-09-10T08:00:00Z",
         "error_code": null
@@ -135,8 +135,8 @@
         "topic_key": "request",
         "confidence": 0.88,
         "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
-        "classification_key": "topics:v1+gemini-2.5-flash+p1",
-        "model_id": "gemini-2.5-flash",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
         "predicted_at": "2026-09-10T08:00:00Z",
         "error_code": null
@@ -200,8 +200,8 @@
         "topic_key": "discussion",
         "confidence": 0.64,
         "content_hash": "caccab19907a993a2eae2d88e4aa69035b9c05b3efffb53b44463206db23ac31",
-        "classification_key": "topics:v1+gemini-2.5-flash+p1",
-        "model_id": "gemini-2.5-flash",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
         "predicted_at": "2026-09-10T08:00:00Z",
         "error_code": null
@@ -265,8 +265,8 @@
         "topic_key": "criticism",
         "confidence": 0.71,
         "content_hash": "ccf076ad06fa200caf79e70d5393b1c4a59717b634d74fb50258f2e230d8ef23",
-        "classification_key": "topics:v1+gemini-2.5-flash+p1",
-        "model_id": "gemini-2.5-flash",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
         "predicted_at": "2026-09-10T08:00:00Z",
         "error_code": null
@@ -361,8 +361,8 @@
         "topic_key": "praise",
         "confidence": 0.9,
         "content_hash": "old-text-hash",
-        "classification_key": "topics:v1+gemini-2.5-flash+p1",
-        "model_id": "gemini-2.5-flash",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
         "predicted_at": "2026-09-10T08:00:00Z",
         "error_code": null
@@ -489,5 +489,5 @@
       "retired": false
     }
   ],
-  "active_topic_key": "topics:v1+gemini-2.5-flash+p1"
+  "active_topic_key": "topics:v1+gemini-3.6-flash+p1"
 }

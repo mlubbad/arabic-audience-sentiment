@@ -28,7 +28,7 @@ Decisions taken with the user:
   append-only human corrections.
 - **Replies are classified with their parent's text as context.** A reply of "آمين" alone is
   unclassifiable; with its parent it is not.
-- **The model is pinned** (`gemini-2.5-flash`) and named in the classification key, so a
+- **The model is pinned** (`gemini-3.6-flash`) and named in the classification key, so a
   model change is a new key, as a sentiment model change is.
 
 Decisions made in design, not asked:

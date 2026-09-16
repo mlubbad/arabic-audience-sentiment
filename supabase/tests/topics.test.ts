@@ -16,7 +16,7 @@ const OWNER = "10000000-0000-4000-8000-000000000001";
 const STRANGER = "10000000-0000-4000-8000-000000000002";
 const C1 = "aaaaaaaa-0000-4000-8000-000000000001";
 const C2 = "aaaaaaaa-0000-4000-8000-000000000002";
-const KEY = "topics:v1+gemini-2.5-flash+p1";
+const KEY = "topics:v1+gemini-3.6-flash+p1";
 let db: PGlite;
 
 const as = async (id: string) => {
@@ -38,7 +38,7 @@ const predict = (
   db.query(
     `insert into topic_predictions(workspace_id,comment_id,content_hash,classification_key,
        status,topic_key,confidence,model_id,prompt_version)
-     values ($1,$2,$3,$4,$5,$6,0.9,'gemini-2.5-flash','p1')`,
+     values ($1,$2,$3,$4,$5,$6,0.9,'gemini-3.6-flash','p1')`,
     [W, comment, hash, key, status, topic],
   );
 

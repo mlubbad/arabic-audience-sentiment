@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const W = "00000000-0000-4000-8000-000000000001";
 const OWNER = "10000000-0000-4000-8000-000000000001";
 const C1 = "aaaaaaaa-0000-4000-8000-000000000001";
-const KEY = "topics:v1+gemini-2.5-flash+p1";
+const KEY = "topics:v1+gemini-3.6-flash+p1";
 let db: PGlite;
 
 const as = async (id: string) => {
@@ -101,8 +101,8 @@ describe("the dashboard reads topics", () => {
     // correctly ignored, which is itself part of what this test means to cover.
     await db.query(
       `insert into topic_predictions(workspace_id,comment_id,content_hash,classification_key,status,topic_key,confidence,model_id,prompt_version)
-       values ($1,$2,'h0',$3,'succeeded','praise',0.5,'gemini-2.5-flash','p1'),
-              ($1,$2,'h1',$3,'succeeded','question',0.9,'gemini-2.5-flash','p1')`,
+       values ($1,$2,'h0',$3,'succeeded','praise',0.5,'gemini-3.6-flash','p1'),
+              ($1,$2,'h1',$3,'succeeded','question',0.9,'gemini-3.6-flash','p1')`,
       [W, C1, KEY],
     );
     await db.query(

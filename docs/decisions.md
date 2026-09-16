@@ -268,7 +268,7 @@ tasks 1–9, `ca86ed3`…`4abfd02`).
 plan `docs/superpowers/plans/2026-09-15-topic-classification.md`, tasks 1–10,
 `0866318`…`1b4ed30`).
 
-- **Gemini (`gemini-2.5-flash`, prompt `p1`) is the topic layer.** One primary topic per
+- **Gemini (`gemini-3.6-flash`, prompt `p1`) is the topic layer.** One primary topic per
   comment, drawn from a per-workspace taxonomy of ten seeded defaults (question, religious
   remark, praise, criticism, request, discussion, personal story, humour, promotion, other —
   `private.seed_default_topics`). The model is pinned by id and prompt version in
@@ -324,3 +324,9 @@ plan `docs/superpowers/plans/2026-09-15-topic-classification.md`, tasks 1–10,
   marker reads "تصحيح بشري" — the same verb and noun `dashboard.spec.ts` already asserts for
   the sentiment correction flow — rather than a topic-specific phrase that would read as a
   second vocabulary for the same action on the same row.
+
+2026-09-16, later — **the pinned topic model is `gemini-3.6-flash`, not `gemini-2.5-flash`.**
+The first working key answered a 2.5 request with 404 "no longer available to new users; use
+gemini-3.6-flash". The pin lives in one place (`workers/python/src/topics/gemini.py`); the
+classification key changes with it (`topics:v1+gemini-3.6-flash+p1`), which is what the key is
+for. Nothing was classified under 2.5 anywhere, so nothing is orphaned.

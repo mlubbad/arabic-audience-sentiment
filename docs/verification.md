@@ -1592,3 +1592,17 @@ classifier. No topic has been classified live: the Gemini key is still refused
 (`API_KEY_SERVICE_BLOCKED`) and `scripts/worker-service.sh` does not export `GEMINI_API_KEY`.
 Live-tested: the deploy, the seeding, the tick, the blocked job. Fixture-tested: everything
 else in the feature, as the entries above record.
+
+## 2026-09-16 — a second Gemini key: authenticates, model accepted, credits depleted
+
+The user supplied a second AI Studio auth key (project 272573239614). Live-tested from the
+worker checkout with `x-goog-api-key`: `gemini-2.5-flash` → 404 "no longer available to new
+users; use gemini-3.6-flash" (so the pin moved, see `docs/decisions.md`); `gemini-3.6-flash`
+and `gemini-3.5-flash-lite` → 429 with the message "Your prepayment credits are depleted.
+Please go to AI Studio … to manage your project and billing." The adapter reported every item
+`failed / gemini_rate_limited`, as designed. So: authentication and the model are right; the
+remaining blocker is prepaid credit on the AI Studio project. (An earlier attempt with the key
+read off a screenshot failed 401 on every auth style — a misread `I`/`l`; the pasted key was
+correct.) The key is in the gitignored `.env.local`; `scripts/worker-service.sh` now exports
+`GEMINI_API_KEY` when set. The service was NOT restarted: with credits at zero every analyse
+job would end `partial / gemini_rate_limited` on the hour.
