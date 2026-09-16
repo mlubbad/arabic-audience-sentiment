@@ -202,3 +202,71 @@ describe("one allowance per billing root", () => {
     expect(await reserve(C, keysFrom("x", 500))).toBe(0);
   });
 });
+
+describe("the pre-check gates agree with the meter", () => {
+  // Video selection and the worker's topic due-list ask these helpers before
+  // reserve_usage is reached; a figure that differs from the meter's refuses
+  // what a pack paid for or lets a paused ledger through.
+  const analysisRemaining = async (w: string) =>
+    (
+      await db.query<{ n: number }>(
+        "select private.analysis_remaining($1) as n",
+        [w],
+      )
+    ).rows[0].n;
+  const topicRemaining = async (w: string) =>
+    (
+      await db.query<{ n: number | null }>(
+        "select private.topic_units_remaining($1) as n",
+        [w],
+      )
+    ).rows[0].n;
+
+  it("count a pack after the plan's units are spent", async () => {
+    // W spent its 10,000 in the test above; a pack of 10,000 reopens the gate.
+    await db.exec("reset role");
+    expect(await analysisRemaining(W)).toBe(0);
+    await db.query(
+      "select private.grant_units($1,'comment_analysis',10000,'paddle','txn_3')",
+      [W],
+    );
+    expect(await analysisRemaining(W)).toBe(10000);
+    expect(await topicRemaining(W)).toBe(4000);
+    await db.query(
+      "select private.grant_units($1,'topic_classification',1000,'admin','manual_1')",
+      [W],
+    );
+    expect(await topicRemaining(W)).toBe(5000);
+  });
+
+  it("still answer while a payment is being retried", async () => {
+    await db.query(
+      "update subscriptions set status='past_due' where workspace_id=$1",
+      [W],
+    );
+    expect(await analysisRemaining(W)).toBe(10000);
+    expect(await topicRemaining(W)).toBe(5000);
+    await db.query(
+      "update subscriptions set status='active' where workspace_id=$1",
+      [W],
+    );
+  });
+
+  it("answer the largest int for a plan without a ceiling", async () => {
+    await db.query(
+      "update subscriptions set plan_key='owner' where workspace_id=$1",
+      [W],
+    );
+    expect(await analysisRemaining(W)).toBe(2147483647);
+    expect(await topicRemaining(W)).toBe(2147483647);
+    await db.query(
+      "update subscriptions set plan_key='creator' where workspace_id=$1",
+      [W],
+    );
+  });
+
+  it("answer the client workspace with its root's figure", async () => {
+    expect(await analysisRemaining(C)).toBe(await analysisRemaining(W));
+    expect(await topicRemaining(C)).toBe(await topicRemaining(W));
+  });
+});

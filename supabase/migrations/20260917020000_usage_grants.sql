@@ -111,6 +111,7 @@ language sql immutable set search_path='' as $$
    'granted', granted, 'used',used,
    'remaining', case when allowance is null then -1 else greatest(allowance+granted-used,0) end);
 $$;
+revoke all on function private.budget_entry(text,int,int,int) from public, anon, authenticated;
 
 -- usage_summary_impl, rebuilt from 20260916010000: the membership check stays
 -- on the workspace asked about, the plan and period come from its billing
@@ -129,4 +130,38 @@ declare sub record; begin
  private.budget_entry('comment_analysis',sub.analysis_units,private.used_units(w,'comment_analysis',sub.period_start),private.granted_units(w,'comment_analysis')),
  private.budget_entry('historical_backfill',sub.backfill_units,private.used_units(w,'historical_backfill',sub.period_start),private.granted_units(w,'historical_backfill')),
  private.budget_entry('topic_classification',sub.topic_units,private.used_units(w,'topic_classification',sub.period_start),private.granted_units(w,'topic_classification'))));
+end $$;
+
+-- The two pre-check gates, rebuilt from 20260915131000 and 20260916011000 so
+-- they answer the same figure reserve_usage will enforce: the root's plan,
+-- past_due still counted, packs added, spend summed across the root. Without
+-- this a tenant who bought a pack was refused at video selection with
+-- quota_exceeded, and a past_due one met no_active_plan at the gate while the
+-- worker went on metering. A null plan allowance (owner) answers the largest
+-- int rather than null or -1: both callers subtract from and compare against
+-- the figure, and 2147483647 keeps that arithmetic meaning "no ceiling" with
+-- select_videos_impl and worker_topics_due unchanged.
+create or replace function private.analysis_remaining(w uuid) returns integer
+language plpgsql stable security definer set search_path='' as $$
+declare sub record; begin
+  select s.period_start, pl.analysis_units into sub
+    from public.subscriptions s join public.plans pl on pl.key = s.plan_key
+   where s.workspace_id = private.billing_root(w) and s.status in ('active','past_due');
+  if not found then raise exception 'no_active_plan' using errcode='53400'; end if;
+  if sub.analysis_units is null then return 2147483647; end if;
+  return greatest(0, sub.analysis_units + private.granted_units(w, 'comment_analysis')
+                     - private.used_units(w, 'comment_analysis', sub.period_start));
+end $$;
+
+create or replace function private.topic_units_remaining(w uuid) returns int
+language plpgsql stable security invoker set search_path='' as $$
+declare sub record; begin
+  select s.period_start, pl.topic_units into sub
+    from public.subscriptions s join public.plans pl on pl.key = s.plan_key
+   where s.workspace_id = private.billing_root(w) and s.status in ('active','past_due')
+     and now() >= s.period_start and now() < s.period_end;
+  if not found then return null; end if;
+  if sub.topic_units is null then return 2147483647; end if;
+  return greatest(0, sub.topic_units + private.granted_units(w, 'topic_classification')
+                     - private.used_units(w, 'topic_classification', sub.period_start));
 end $$;
