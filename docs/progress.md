@@ -717,3 +717,44 @@ catalogue and both functions are on the live project (see `docs/verification.md`
 keys are not set; `PADDLE_ENV=sandbox` everywhere, and switching is a separate approval.
 Open: the webhook secret, the client token, the sandbox walk-through, and the final
 whole-branch review.
+
+## 2026-09-16 — plans v2 / Paddle: the sandbox walked, a real payment, the final review's fix wave
+
+What closed after the previous entry: the webhook secret and the client token were set on the
+project and in the bundle; the sandbox was walked end to end against the deployed functions
+(every webhook outcome, the pack, the stale event, past-due, the sweep, the portal); and a
+real sandbox payment on the pricing page moved the root and its client together, its cancel
+came back on its own, and the owner plan was restored through the admin RPC — all in
+`docs/verification.md`.
+
+The final whole-branch review found nine things, fixed in three commits (`a8e18c5`, `758edca`,
+and this one). One migration, `20260917060000_cancel_drops_to_free.sql`, rebuilds each function
+from its latest definition: a `subscription.canceled` or `.paused` webhook writes the free plan
+to the root and every client row instead of a status the gates refuse (the customer could not
+spend even the free hundred); `private.subscription_open` carries the seven-day past-due grace
+for the meter and both gates, which had disagreed on the period; `plan_limit` raises
+`no_active_plan` instead of answering null — which now means "no ceiling" — for a root with no
+live plan; a subscription event naming a Paddle subscription other than the one the root is live
+on is recorded as `conflict` and moves nothing; `set_workspace_plan` refuses over a live Paddle
+subscription unless `override` is passed and then keeps the link; and the workspace limit counts
+client workspaces, the home left out (the individual rows go to 0 clients). The pricing page
+sends a workspace already on Paddle to the portal rather than a second checkout; the admin page
+has the override checkbox and its sentence; every synced price is `tax_mode: "external"`, and a
+found price without it is PATCHed — the first real invoice had shown both lines tax-inclusive.
+`docs/decisions.md` carries each decision, including Ruling 17 (Paddle.js without SRI, accepted).
+
+Results: `npm run test:db` 279 passed across 29 files; `npm test` 412 across 49; `scripts` 23;
+Playwright `pricing` + `app-shell` 8; `npm run check` green (the run is in the fix report under
+`.superpowers/sdd/2026-09-16-plans-and-paddle-billing/final-fix-report.md`).
+
+What remains before live keys are set:
+1. **Server-minted checkout** — the transaction created by an edge function from the caller's
+   session, so `custom_data.workspace_id` is never the browser's word (the `conflict` outcome is
+   the guard until then; `docs/decisions.md`).
+2. **The tax-mode PATCH run against the sandbox** by the controller (`node --env-file=.env.local
+   scripts/paddle-sync-prices.mjs`), so the seven existing prices read `external`; then one more
+   sandbox payment to see an invoice with tax on top.
+3. **The `pilot` rename** with bilingual titles shown by locale, and the rail card printing the
+   plan's title rather than its key.
+4. The `20260917060000` migration itself is not on the live project yet: `supabase db push`
+   after the controller's review, then the admin page's override against the live owner rows.

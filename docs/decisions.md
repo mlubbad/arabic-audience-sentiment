@@ -431,3 +431,69 @@ union OSS before the first dollar; Paddle, as merchant of record, becomes the se
 record instead and absorbs those registrations at a fee (~5% + 0.50$) that is not higher
 than Stripe UK's own effective rate on a Gulf card settling in dollars (~5.25% + 0.20£, once
 the currency-conversion surcharge is counted).
+
+## 2026-09-16 — the final review of plans v2 / Paddle: what was decided in the fix wave
+
+Nine findings from the whole-branch review; the code is in `20260917060000_cancel_drops_to_free.sql`,
+`pricing.ts` / `PricingPage.tsx` / `AdminPage.tsx`, and `scripts/paddle-sync-lib.mjs`.
+
+**A cancelled or paused subscription is the free plan, not a row that says so.** `apply_billing_event`
+had stored Paddle's `canceled` / `paused` as `status`, and every gate then refused the row — `reserve_usage`
+with `plan_inactive`, `analysis_remaining` with `no_active_plan` — while the sweep looked only at
+`past_due`: the customer who cancelled could not spend even the free hundred. The spec is «النزول إلى
+free بلا حذف» (`docs/pricing.md`), so the webhook now writes what the sweep writes: `free / active`, no
+provider, an open-ended period, on the root and every client row, audited `plan_paddle_canceled` /
+`plan_paddle_paused` with target `free`. A later `activated` re-applies the plan. Neither status persists
+on a row any more; the column still admits them so an old row is not a migration error.
+
+**The seven-day grace is code, not Paddle's period.** `private.subscription_open(s)` is the one answer to
+"may this subscription spend": active inside its period, or past-due for seven days past `period_end`.
+`reserve_usage`, `analysis_remaining` and `topic_units_remaining` ask it; before, the meter refused at
+`period_end` while the selection gate never looked at the period, so a past-due tenant passed selection
+and met `plan_inactive` in the worker. The number is the one recorded on 2026-09-16 and the one
+`billing_sweep` enforces from the other side.
+
+**`plan_limit` refuses rather than answering null.** Null now means a live plan's own "no ceiling"
+(owner), so a root with no active or past-due subscription must not read as unlimited channels and
+workspaces: it raises `no_active_plan`. A workspace with no subscription row at all is refused the same
+way — unentitled means unentitled, and `reserve_usage` already said so.
+
+**The workspace limit counts client workspaces.** The card says "workspaces (clients): 5" and the
+individual ladder says one workspace; the count in `create_workspace_impl` had included the home, so
+`agency` got four clients. The home is not a client (`owned - 1 >= allowed`), and the column is the
+number of clients: the individual rows go to 0 and the `>= 1` check to `>= 0`. `pilot` keeps its default
+of 1 until it is renamed away.
+
+**A second Paddle subscription for a live root is `conflict`.** `custom_data.workspace_id` is minted by
+the browser at checkout; the webhook trusts it. The cheap guard now: an event whose `provider_ref` is not
+the one the root is live on (`provider = 'paddle'`, active or past-due) is recorded with outcome
+`conflict` and moves nothing; the webhook answers 200 on any decided outcome so Paddle stops retrying.
+**Pre-live requirement:** the checkout transaction is minted on the server (an edge function that reads
+the caller's session, checks ownership of the workspace, and creates the Paddle transaction with
+`custom_data` it wrote itself), so the workspace in a webhook is never a value a browser chose. Until
+then, live keys are not set.
+
+**Ruling 17 — Paddle.js has no SRI.** `https://cdn.paddle.com/paddle/v2/paddle.js` (in `index.html`) is
+an unversioned URL by Paddle's design — their docs mandate it and they ship fixes under it — so a
+subresource-integrity hash cannot be pinned without breaking on their next release. Accepted as-is: it is
+the same exposure every Paddle merchant carries, and no secret reaches the page (the client token is
+public by design).
+
+**Prices exclude tax: `tax_mode: "external"` on every synced price.** The first real sandbox invoice
+showed both lines treated as tax-inclusive — the $12 was $10 plus $2 withheld. The sync creates every
+price with `tax_mode: "external"` and PATCHes a found price that lacks it (counted under "updated");
+the controller re-runs the sync so the seven existing sandbox prices take the mode. The decision itself
+("price before tax, tax on top") is unchanged.
+
+**`set_workspace_plan` keeps a Paddle link.** Over a root Paddle is billing it refuses with
+`paddle_subscription_active` unless called with `override = true`; with it, the plan and period change
+but `provider`, `provider_ref` and `provider_customer_ref` stay, so the portal and the next webhook still
+find the subscription Paddle keeps charging, and the note lands in the audit row (`plan:note`) rather
+than over the `provider_ref`. The admin page has the checkbox and the sentence. The four-argument
+signature is dropped: with a default on the fifth, PostgREST would see two candidates for a four-field
+call.
+
+**A workspace already on Paddle changes plan in Paddle's portal.** The pricing page had offered a second
+checkout for every other paid card; a second checkout is a second subscription. When `usage_summary`
+says `provider = 'paddle'`, every paid self-serve card that is not the current one opens the portal
+(`openPortal`, the plan panel's "manage"), with the same two refusals.

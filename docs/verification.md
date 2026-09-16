@@ -1879,10 +1879,17 @@ test')` ran as his user id over `db query` — the same RPC the admin page calls
 rows read `owner / admin / active` again, the client still bound to the root.
 
 Two things the invoice shows for the pricing decisions:
-1. Paddle displayed the pack **inclusive** of tax ($5.00 = 4.17 + 0.83) while the
-   subscription price was **exclusive** ($10 + $2 tax = $12). The decision recorded on
-   2026-09-16 is "price excludes tax, tax on top" — the pack price's tax mode in Paddle's
-   catalogue needs to match the subscription prices' (dashboard: Catalog → Prices → tax
-   mode "account setting", account setting "prices exclude tax"). Left to the user.
+1. **Both lines were tax-inclusive.** The pack read "$5.00 inc. VAT" (4.17 + 0.83), and
+   the subscription's $12.00 was $10.00 plus $2.00 *withheld* — Paddle treated the table's
+   $12 as the price including tax and took the tax out of it, so the seller received $10
+   before Paddle's fee, not $12. (An earlier reading of this invoice as "$10 exclusive plus
+   $2 on top" was wrong: the price in the table is $12, and $12 is what was charged.) The
+   decision recorded on 2026-09-16 is "price excludes tax, tax on top", and the sandbox's
+   first sync had created every price with Paddle's default tax mode (the account setting,
+   which is inclusive). The fix is in code, not the dashboard: `scripts/paddle-sync-lib.mjs`
+   creates every price with `tax_mode: "external"` and PATCHes a found price that lacks it
+   (commit `758edca`, tests in `paddle-sync-lib.test.ts`). The sync against the sandbox is
+   re-run by the controller after that commit, so the seven existing prices take the mode;
+   the fix session itself made no Paddle call.
 2. Paddle withheld 20% tax for a customer it placed in Turkey, and its fee was 5% + $0.50
    ($1.10 on $12) — the rate the consultation assumed.
