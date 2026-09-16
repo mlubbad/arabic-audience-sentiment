@@ -1893,3 +1893,13 @@ Two things the invoice shows for the pricing decisions:
    the fix session itself made no Paddle call.
 2. Paddle withheld 20% tax for a customer it placed in Turkey, and its fee was 5% + $0.50
    ($1.10 on $12) — the rate the consultation assumed.
+
+## 2026-09-16 — the fix wave reaches the live project
+
+`npx supabase db push --linked` applied `20260917060000_cancel_drops_to_free.sql` alone
+(dry run listed only it). The owner's row read `owner / admin / active` afterwards.
+`scripts/paddle-sync-prices.mjs` then reported `0 created, 11 updated (… 7 tax modes
+fixed)` and, on the next run, `0 tax modes fixed`; `GET /prices/pri_01m2n5f8qdb48jc797fcwk4f92`
+answers `tax_mode: external`, amount 500 — the pack and the six subscription prices now
+sell at the listed price with tax on top. The preview was rebuilt and redeployed with the
+pricing page's "manage" rule for a Paddle subscriber.
