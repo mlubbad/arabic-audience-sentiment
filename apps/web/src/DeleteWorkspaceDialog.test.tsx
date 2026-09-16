@@ -101,6 +101,40 @@ describe("DeleteWorkspaceDialog", () => {
     });
   });
 
+  it("cannot be dismissed while the delete is in flight", async () => {
+    let settle!: (v: { data: null; error: null }) => void;
+    shared.rpc.mockImplementation((fn) =>
+      fn === "admin_workspace_footprint"
+        ? Promise.resolve({ data: footprint, error: null })
+        : new Promise((resolve) => {
+            settle = resolve;
+          }),
+    );
+    const onDeleted = await open();
+    await screen.findByRole("dialog");
+    await userEvent.type(
+      screen.getByLabelText(ar.adminDeleteTypeName("عميل للتسليم 1")),
+      "عميل للتسليم 1",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: ar.adminDeleteConfirm }),
+    );
+    // In flight: Escape and the corner close do nothing.
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: ar.adminDeleteClose }),
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(onDeleted).not.toHaveBeenCalled();
+    // Settled: now it closes and reports, exactly once.
+    settle({ data: null, error: null });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(onDeleted).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ["billing_root", ar.adminDeleteBillingRoot],
     ["last_workspace", ar.adminDeleteLast],

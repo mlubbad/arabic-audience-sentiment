@@ -84,6 +84,10 @@ export function DeleteWorkspaceDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        // A delete in flight cannot be backed out of — the row is already
+        // going. Escape, the overlay and the corner ✕ all route through here,
+        // so refusing the close while busy covers every way out at once.
+        if (!next && busy) return;
         setOpen(next);
         if (!next) {
           setTyped("");
