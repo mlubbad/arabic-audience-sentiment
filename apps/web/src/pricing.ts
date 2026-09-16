@@ -36,7 +36,7 @@ const ANCHOR: Record<string, string> = {
 
 /** Where a plan that is not self-serve sends a reader — one address, so the
  *  page and any card that asks to be contacted cannot name two. */
-export const contactEmail = "engmlubbad@gmail.com";
+export const contactEmail = "info@sky-develop.net";
 
 export const formatUsd = (cents: number) =>
   `$${Math.round(cents / 100).toLocaleString("en-US")}`;
