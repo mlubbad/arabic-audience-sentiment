@@ -356,3 +356,32 @@
   color: var(--text-3);
   cursor: not-allowed;
 }
+
+.ui-tabs-list {
+  display: inline-flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-1);
+}
+.ui-tabs-trigger {
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.ui-tabs-trigger[data-state="active"] {
+  color: var(--ml-indigo);
+  border-bottom-color: var(--ml-indigo);
+  font-weight: 600;
+}
+.ui-tabs-trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.ui-tabs-content:focus-visible {
+  outline: none;
+}
