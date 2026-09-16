@@ -21,6 +21,12 @@ import { Link } from "react-router";
 import { useSession } from "./session";
 import { supabase } from "./supabase";
 import { useStrings } from "./strings";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/DropdownMenu";
 
 export function SessionControl() {
   const { session, loading } = useSession();
@@ -36,28 +42,42 @@ export function SessionControl() {
         {S.signIn}
       </Link>
     );
+  const who = session.user.email ?? S.yourAccount;
   return (
     <div className="app-session">
-      <span className="app-session-who" title={session.user.email ?? undefined}>
-        {session.user.email ?? S.yourAccount}
-      </span>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => {
-          if (!supabase) return;
-          setBusy(true);
-          setFailed(false);
-          void supabase.auth.signOut().then(({ error }) => {
-            setBusy(false);
-            // Said, not swallowed: a sign-out that quietly failed leaves the
-            // reader believing they have left a shared screen.
-            if (error) setFailed(true);
-          });
-        }}
-      >
-        {busy ? S.signingOut : S.signOut}
-      </button>
+      <DropdownMenu>
+        {/* A plain button, deliberately: app.css already paints any button
+            inside .app-rail .app-session as the rail's translucent pill in
+            --ink-on-dark. The light ui-btn box belongs on cards, not here.
+            The menu itself portals to <body> and wears ui/'s light panel. */}
+        <DropdownMenuTrigger asChild>
+          <button type="button" title={session.user.email ?? undefined}>
+            <span className="app-session-who">{who}</span>
+            <span aria-hidden="true">▾</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link to="/account">{S.yourAccount}</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={busy}
+            onSelect={() => {
+              if (!supabase) return;
+              setBusy(true);
+              setFailed(false);
+              void supabase.auth.signOut().then(({ error }) => {
+                setBusy(false);
+                // Said, not swallowed: a sign-out that quietly failed leaves
+                // the reader believing they have left a shared screen.
+                if (error) setFailed(true);
+              });
+            }}
+          >
+            {busy ? S.signingOut : S.signOut}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       {failed && (
         <span role="alert" className="app-session-error">
           {S.signOutFailed}
