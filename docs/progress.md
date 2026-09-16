@@ -806,3 +806,14 @@ two units and read nothing (`docs/verification.md`). This is what makes `agency`
 `media` live intervals affordable in YouTube quota (`docs/pricing-consultation-2026-09-16.md`
 §5.1). `docs/youtube-quota-extension.md` holds the quota-extension application, ready to
 submit once the legal pages are public.
+
+## 2026-09-16 — three doors on a workspace card
+
+Disconnect the channel (two presses; revokes the grant and cancels queued work through the
+existing `oauth_disconnect`), rename (`rename_workspace`, owner-only, audited), and retire
+(`retire_workspace`): not a deletion — at the owner's instruction nothing collected is ever
+dropped. Retiring removes every member, revokes the leaving owner's Google grant, cancels
+pending jobs, and moves the workspace under the platform owner's root with `retired_from`
+and `retired_at` recorded; a person's last workspace cannot be retired. Actual deletion of
+personal data stays the request-by-email path the privacy policy states. Live-walked on
+the preview (`docs/verification.md`).

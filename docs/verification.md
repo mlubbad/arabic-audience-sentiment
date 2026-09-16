@@ -1975,3 +1975,22 @@ The dashboard's catalogue shows a deferred video as up to date («لم يتغي�
 not as a partial read (`88a918b`). Not yet exercised live: a count that moved on the second
 pass (the channel had no new comment in the seventeen minutes between passes), and a
 `videos.list` refusal falling back to reading everything — both fixture-tested.
+
+## 2026-09-16 — a workspace can be renamed, its channel disconnected, and itself handed over
+
+`20260917090000_rename_and_retire_a_workspace.sql` pushed alone; preview redeployed. On the
+preview as the pilot-plan probe `connect-probe-1789332387@` (English locale): the card shows
+"Rename", "Connect a YouTube channel" and "Retire workspace". Rename through the form →
+"The name is changed." and the card reads «مساحة الاختبار». Retire on the only workspace →
+the question ("Your access to this workspace ends, its channel is disconnected, and
+everything collected in it passes to the service operator — nothing is deleted…"), then
+"Your last workspace cannot be retired; create another first." A second workspace «عميل
+للتسليم» created, then retired: it left the probe's list; in the database it reads
+`created_by` = the platform owner, members = the platform owner as `workspace_owner` only,
+plan `owner` under the owner's root `d0c3b9fc…`, `retired_from` = the probe,
+`retired_at` set, last audit `workspace_retired`. Rows untouched.
+
+The disconnect door was rendered (card unit test, 9/9) and its RPC `oauth_disconnect`
+predates this change; not pressed live — the only connected channel is the owner's own,
+and disconnecting it would stop the pilot's reads. `docs/youtube-quota-extension.md` §4's
+first item is closed.
