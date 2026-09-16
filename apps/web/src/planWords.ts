@@ -12,7 +12,11 @@
  * that is the limit a collection runs into; the backfill budget stays on the
  * operations page with the rest of the detail.
  */
-import { budgetState, type UsageSummary } from "@sentiment/contracts";
+import {
+  budgetState,
+  unlimited,
+  type UsageSummary,
+} from "@sentiment/contracts";
 import type { Strings } from "./strings";
 
 export type PlanCardWords = {
@@ -73,8 +77,11 @@ export function planCardWords(
   return {
     kicker,
     title: S.planTitle(plan.plan_key),
-    note:
-      tone === "exhausted"
+    // A -1 ceiling is not there: "يتبقى -1 من -1" would be a number where
+    // the truth is that there is nothing to count down.
+    note: unlimited(analysis)
+      ? `${name}: ${S.pricingUnlimited}`
+      : tone === "exhausted"
         ? S.planExhausted(name, n(analysis.allowance))
         : S.planRemaining(name, n(analysis.remaining), n(analysis.allowance)),
     tone,

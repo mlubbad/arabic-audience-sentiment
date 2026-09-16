@@ -152,6 +152,19 @@ export const en: Strings = {
   budgetBackfill: "Historical backfill",
   budgetTopics: "Topic classification",
 
+  planPanelTitle: "Your plan",
+  planStatusPastDue: "Payment is overdue",
+  planRenews: (date: string) => `Renews on ${date}`,
+  planPastDue: (date: string) =>
+    `The payment could not be collected. The plan stays until ${date}, then the workspace moves to the free plan.`,
+  planEndsOn: (date: string) =>
+    `Renewal is cancelled; the plan ends on ${date}.`,
+  planUsedOf: (used: string, allowance: string) => `${used} of ${allowance}`,
+  planUpgrade: "Upgrade the plan",
+  planManage: "Manage the subscription",
+  planTopup: "Add 10,000 comments",
+  planContact: "Contact sales",
+
   pricingTitle: "Pricing",
   pricingLead:
     "Prices in US dollars, no complexity: monthly, or yearly for roughly two months off.",

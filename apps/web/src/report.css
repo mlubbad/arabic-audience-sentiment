@@ -994,14 +994,17 @@
 
 /* The empty page is a page like any other: it says which of the two empties
    this is, and carries the control that resolves it. */
-.rp-page .empty-actions {
+.rp-page .empty-actions,
+.rp-page .plan-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
   margin-top: var(--space-4);
 }
 .rp-page .empty-actions a,
-.rp-page .empty-actions button {
+.rp-page .empty-actions button,
+.rp-page .plan-actions a,
+.rp-page .plan-actions button {
   display: inline-flex;
   align-items: center;
   min-height: 40px;
@@ -1017,7 +1020,9 @@
   cursor: pointer;
 }
 .rp-page .empty-actions a:first-child,
-.rp-page .empty-actions button:first-child {
+.rp-page .empty-actions button:first-child,
+.rp-page .plan-actions a:first-child,
+.rp-page .plan-actions button:first-child {
   background: var(--ml-indigo);
   border-color: var(--ml-indigo);
   color: var(--ink-on-dark);

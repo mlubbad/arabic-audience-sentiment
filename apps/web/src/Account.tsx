@@ -11,6 +11,7 @@ import { useStrings } from "./strings";
 import { providers, type ProviderId } from "./authProviders";
 import { setupSteps } from "./setup";
 import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
+import { PlanPanel } from "./PlanPanel";
 import "./report.css";
 
 /**
@@ -392,6 +393,14 @@ export function Account() {
           <div className="account-toolbar">
             <p>{S.insideAccount}</p>
           </div>
+          {/* The plan before the workspaces: what the chosen workspace may
+              do, and the doors to change it. It reads the same session and
+              list this page already holds. */}
+          <PlanPanel
+            session={session}
+            workspaces={workspaces}
+            loading={loadedWorkspaceUserId !== session.user.id}
+          />
           <section className="rp-section">
             <header>
               <h2>{S.workspacesTitle}</h2>

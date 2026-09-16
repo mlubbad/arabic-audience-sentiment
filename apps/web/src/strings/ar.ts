@@ -154,6 +154,20 @@ export const ar = {
   budgetBackfill: "استيراد تاريخي",
   budgetTopics: "تصنيف الموضوعات",
 
+  // ---- the account's plan panel (planPanelWords.ts) ----
+  // "بلا حدود" for a -1 ceiling is `pricingUnlimited`: one sentence, one key.
+  planPanelTitle: "خطتك",
+  planStatusPastDue: "الدفع متأخر",
+  planRenews: (date: string) => `تتجدد في ${date}`,
+  planPastDue: (date: string) =>
+    `تعذّر تحصيل الدفعة. تبقى الخطة حتى ${date} ثم تنتقل المساحة إلى الخطة المجانية.`,
+  planEndsOn: (date: string) => `أُلغي التجديد؛ تنتهي الخطة في ${date}.`,
+  planUsedOf: (used: string, allowance: string) => `${used} من ${allowance}`,
+  planUpgrade: "ترقية الخطة",
+  planManage: "إدارة الاشتراك",
+  planTopup: "إضافة 10,000 تعليق",
+  planContact: "تواصل مع المبيعات",
+
   // ---- the pricing page (pricing.ts) ----
   pricingTitle: "الأسعار",
   pricingLead:

@@ -69,6 +69,15 @@ describe("the rail's plan card", () => {
     expect(none.tone).toBe("none");
   });
 
+  it("says an internal plan has no ceiling, not a negative one", () => {
+    const owner = plan(1, -1);
+    owner.budgets[0].remaining = -1;
+    const w = planCardWords({ ...base, plan: owner }, ar);
+    expect(w.note).toBe(`تحليل التعليقات: ${ar.pricingUnlimited}`);
+    expect(w.note).not.toContain("-1");
+    expect(w.tone).toBe("ok");
+  });
+
   it("asks for a workspace before it claims a figure for one", () => {
     const w = planCardWords(
       { ...base, workspaceName: null, choosing: true, plan: plan(0) },
