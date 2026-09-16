@@ -134,6 +134,42 @@ describe("pricing rows", () => {
     );
     expect(currentOverFreeRow.cta.kind).toBe("current");
   });
+  it("a workspace already on Paddle manages instead of checking out again", () => {
+    const rows = pricingRows(
+      [
+        plan({ key: "free", price_monthly_cents: 0 }),
+        plan({}),
+        plan({ key: "creator_plus", price_monthly_cents: 2900 }),
+        plan({ key: "media", self_serve: false }),
+      ],
+      "individual",
+      "month",
+      "ar",
+      ar,
+      "creator",
+      "paddle",
+    );
+    expect(rows.map((r) => [r.key, r.cta.kind])).toEqual([
+      ["free", "free"],
+      ["creator", "current"],
+      ["creator_plus", "manage"],
+      ["media", "contact"],
+    ]);
+    expect(rows[2].cta.label).toBe(ar.planManage);
+    // A plan set by hand, or no plan at all, still checks out.
+    for (const provider of ["admin", null]) {
+      const [row] = pricingRows(
+        [plan({ key: "creator_plus", price_monthly_cents: 2900 })],
+        "individual",
+        "month",
+        "ar",
+        ar,
+        "creator",
+        provider,
+      );
+      expect(row.cta.kind).toBe("checkout");
+    }
+  });
   it("-1 reads as unlimited", () => {
     const [row] = pricingRows(
       [plan({ limits: { ...plan({}).limits, channels: -1 } })],

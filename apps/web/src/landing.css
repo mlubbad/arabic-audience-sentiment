@@ -1459,12 +1459,14 @@
   background: var(--ml-indigo-50);
 }
 .pricing-card[data-anchor] .pricing-cta,
-.pricing-card .pricing-cta[data-kind="checkout"] {
+.pricing-card .pricing-cta[data-kind="checkout"],
+.pricing-card .pricing-cta[data-kind="manage"] {
   background: var(--ml-indigo);
   color: var(--ink-on-dark);
 }
 .pricing-card[data-anchor] .pricing-cta:hover,
-.pricing-card .pricing-cta[data-kind="checkout"]:hover {
+.pricing-card .pricing-cta[data-kind="checkout"]:hover,
+.pricing-card .pricing-cta[data-kind="manage"]:hover {
   background: var(--ml-indigo-800);
 }
 .pricing-card .pricing-cta[data-kind="current"] {

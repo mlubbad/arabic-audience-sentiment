@@ -244,6 +244,7 @@ describe("Paddle bodies", () => {
       name: "Creator — yearly",
       description: "Creator — yearly",
       unit_price: { amount: "12000", currency_code: "USD" },
+      tax_mode: "external",
       billing_cycle: { interval: "year", frequency: 1 },
       quantity: { minimum: 1, maximum: 1 },
       custom_data: { plan_key: "creator", interval: "year" },
@@ -263,6 +264,7 @@ describe("Paddle bodies", () => {
     expect(body).toMatchObject({
       product_id: "pro_p",
       unit_price: { amount: "500", currency_code: "USD" },
+      tax_mode: "external",
       custom_data: { plan_key: "pack_10k", interval: "pack" },
     });
   });
@@ -294,7 +296,20 @@ describe("summary", () => {
         drift: 0,
       }),
     ).toBe(
-      "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 0 drifted)",
+      "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 0 tax modes fixed; 0 drifted)",
+    );
+  });
+  it("counts a corrected tax mode as an update", () => {
+    expect(
+      summary({
+        productsCreated: 0,
+        pricesCreated: 0,
+        rowsWritten: 4,
+        drift: 0,
+        taxModeFixed: 7,
+      }),
+    ).toBe(
+      "0 created, 11 updated (0 products, 0 prices created; 4 rows written; 7 tax modes fixed; 0 drifted)",
     );
   });
 });
@@ -407,6 +422,7 @@ function fakeWorld() {
     custom_data: Record<string, string>;
     billing_cycle?: unknown;
     unit_price: { amount: string };
+    tax_mode?: string;
   }[] = [];
   const calls: string[] = [];
   let n = 0;
@@ -445,6 +461,12 @@ function fakeWorld() {
         prices.push(p);
         return json({ data: p }, 201);
       }
+      if (method === "PATCH" && u.pathname.startsWith("/prices/")) {
+        const p = prices.find((x) => x.id === u.pathname.slice(8));
+        if (!p) return json({ error: { code: "not_found" } }, 404);
+        Object.assign(p, body);
+        return json({ data: p });
+      }
       return json({ error: { code: "not_found" } }, 404);
     }
     if (method === "GET" && u.pathname === "/rest/v1/plans")
@@ -482,8 +504,10 @@ describe("run", () => {
     const world = fakeWorld();
     const first = await world.runOnce();
     expect(first.result.line).toBe(
-      "11 created, 4 updated (4 products, 7 prices created; 4 rows written; 0 drifted)",
+      "11 created, 4 updated (4 products, 7 prices created; 4 rows written; 0 tax modes fixed; 0 drifted)",
     );
+    // Every price created excludes tax.
+    expect(world.prices.every((p) => p.tax_mode === "external")).toBe(true);
     expect(world.products.map((p) => p.custom_data.plan_key)).toEqual([
       "creator",
       "creator_plus",
@@ -504,9 +528,12 @@ describe("run", () => {
 
     const second = await world.runOnce();
     expect(second.result.line).toBe(
-      "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 0 drifted)",
+      "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 0 tax modes fixed; 0 drifted)",
     );
     expect(second.calls.filter((c) => c.startsWith("POST"))).toEqual([]);
+    expect(second.calls.filter((c) => c.startsWith("PATCH sandbox"))).toEqual(
+      [],
+    );
     // Every list was paginated: seven prices are four pages of two.
     expect(
       second.calls.filter((c) => c === "GET sandbox-api.paddle.com/prices"),
@@ -518,7 +545,7 @@ describe("run", () => {
     const world = fakeWorld();
     const { result, calls } = await world.runOnce(true);
     expect(result.line).toBe(
-      "0 created, 0 updated (0 products, 0 prices created; 0 rows written; 0 drifted)",
+      "0 created, 0 updated (0 products, 0 prices created; 0 rows written; 0 tax modes fixed; 0 drifted)",
     );
     expect(calls.every((c) => c.startsWith("GET"))).toBe(true);
     expect(world.products).toEqual([]);
@@ -534,7 +561,7 @@ describe("run", () => {
     const { result, calls } = await world.runOnce();
     expect(result.drift).toBe(1);
     expect(result.line).toBe(
-      "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 1 drifted)",
+      "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 0 tax modes fixed; 1 drifted)",
     );
     expect(calls.filter((c) => c.startsWith("POST"))).toEqual([]);
     expect(
@@ -544,5 +571,33 @@ describe("run", () => {
           p.custom_data.interval === "month",
       )!.unit_price.amount,
     ).toBe("1200");
+  });
+  it("sets tax_mode external on a found price that lacks it, once, and counts it under updated", async () => {
+    const world = fakeWorld();
+    await world.runOnce();
+    // As the sandbox's first run left them: the mode was the account's.
+    for (const p of world.prices) delete p.tax_mode;
+    world.prices[0].tax_mode = "account_setting";
+    const dry = await world.runOnce(true);
+    expect(dry.result.taxModeFixed).toBe(0);
+    expect(dry.calls.every((c) => c.startsWith("GET"))).toBe(true);
+    expect(world.prices.filter((p) => p.tax_mode === "external")).toEqual([]);
+    const { result, calls } = await world.runOnce();
+    expect(result.taxModeFixed).toBe(7);
+    expect(result.line).toBe(
+      "0 created, 11 updated (0 products, 0 prices created; 4 rows written; 7 tax modes fixed; 0 drifted)",
+    );
+    expect(calls.filter((c) => c.startsWith("PATCH sandbox"))).toHaveLength(7);
+    expect(world.prices.every((p) => p.tax_mode === "external")).toBe(true);
+    // The amounts were not touched.
+    expect(
+      world.prices.find((p) => p.custom_data.plan_key === "pack_10k")!
+        .unit_price.amount,
+    ).toBe("500");
+    const again = await world.runOnce();
+    expect(again.result.taxModeFixed).toBe(0);
+    expect(again.calls.filter((c) => c.startsWith("PATCH sandbox"))).toEqual(
+      [],
+    );
   });
 });

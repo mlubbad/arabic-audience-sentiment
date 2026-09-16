@@ -15,6 +15,12 @@
  * subscribers on it is not something a sync script should change under them.
  * The person reading the report decides.
  *
+ * Every price is `tax_mode: "external"` — the table's figure is the price
+ * before tax and Paddle adds the buyer's tax on top (docs/decisions.md,
+ * 2026-09-16). A price found without it is PATCHed to it: the sandbox's first
+ * run left the mode to the account setting, and the first real payment showed
+ * both invoice lines treated as tax-inclusive.
+ *
  * The calls live here too, with `fetch` injected, so the whole run — both
  * pages of a Paddle list, a refused request, the second run that creates
  * nothing — is driven by the test against an in-memory Paddle and Supabase.
@@ -25,6 +31,8 @@
 /** @typedef {{ plan_key: string, interval: "month" | "year" | "pack", amount: string, description: string }} Price */
 
 const CURRENCY = "USD";
+/** Prices exclude tax; Paddle adds the buyer's on top. */
+export const TAX_MODE = "external";
 
 /** The products wanted: one per self-serve plan priced above zero (free has
  *  nothing to sell, media and enterprise are sold by hand, internal rows are
@@ -137,6 +145,7 @@ export function priceBody(price, productId) {
     name: price.description,
     description: price.description,
     unit_price: { amount: price.amount, currency_code: CURRENCY },
+    tax_mode: TAX_MODE,
     quantity: { minimum: 1, maximum: 1 },
     custom_data: { plan_key: price.plan_key, interval: price.interval },
   };
@@ -152,15 +161,19 @@ export function providerPrices(prices, planKey) {
   return out;
 }
 
-/** One line a person reads at the end: "0 created, N updated" on a clean rerun. */
+/** One line a person reads at the end: "0 created, N updated" on a clean
+ *  rerun. "Updated" counts the rows written and the prices whose tax mode
+ *  was corrected. */
 export function summary({
   productsCreated,
   pricesCreated,
   rowsWritten,
   drift,
+  taxModeFixed = 0,
 }) {
   const created = productsCreated + pricesCreated;
-  return `${created} created, ${rowsWritten} updated (${productsCreated} products, ${pricesCreated} prices created; ${rowsWritten} rows written; ${drift} drifted)`;
+  const updated = rowsWritten + taxModeFixed;
+  return `${created} created, ${updated} updated (${productsCreated} products, ${pricesCreated} prices created; ${rowsWritten} rows written; ${taxModeFixed} tax modes fixed; ${drift} drifted)`;
 }
 
 /** Where Paddle answers for an environment. */
@@ -295,6 +308,25 @@ export async function run({
     warn(
       `drift: ${priceKey(d.desired)} is ${d.have} in Paddle, ${d.want} in the table — id written, price left as is`,
     );
+  // A found price keeps its amount (drift above) but not a wrong tax mode:
+  // that is not a figure a subscriber agreed to, it is how the figure is read.
+  let taxModeFixed = 0;
+  for (const f of prices.found) {
+    if (f.existing.tax_mode === TAX_MODE) continue;
+    if (dryRun) {
+      log(
+        `would set tax_mode ${TAX_MODE} on ${priceKey(f.desired)} (${f.existing.id}, now ${f.existing.tax_mode ?? "unset"})`,
+      );
+      continue;
+    }
+    await paddle.call("PATCH", `/prices/${f.existing.id}`, {
+      tax_mode: TAX_MODE,
+    });
+    taxModeFixed += 1;
+    log(
+      `set tax_mode ${TAX_MODE} on ${priceKey(f.desired)} → ${f.existing.id}`,
+    );
+  }
   for (const p of prices.create) {
     const pid = productId.get(p.plan_key);
     if (dryRun || !pid) {
@@ -334,6 +366,7 @@ export async function run({
     pricesCreated: dryRun ? 0 : prices.create.length,
     rowsWritten,
     drift: prices.drift.length,
+    taxModeFixed,
   };
   return { ...counts, line: summary(counts) };
 }

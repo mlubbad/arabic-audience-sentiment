@@ -739,6 +739,15 @@
   width: 100%;
   min-width: 0;
 }
+/* The override checkbox sits beside its words, not above them. */
+.admin-form .admin-check {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.4rem;
+}
+.admin-form .admin-check input {
+  width: auto;
+}
 .admin-form button {
   justify-self: start;
 }

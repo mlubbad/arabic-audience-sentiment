@@ -97,6 +97,16 @@ describe("admin errors", () => {
       adminErrorMessage({ message: "no_active_plan", code: "42501" }, ar),
     ).toBe(ar.adminFailed("no_active_plan"));
   });
+  it("a live Paddle subscription is its own sentence, asking for override", () => {
+    expect(
+      adminErrorMessage(
+        { message: "paddle_subscription_active", code: "55000" },
+        ar,
+      ),
+    ).toBe(ar.adminPaddleActive);
+    expect(ar.adminPaddleActive).toContain("Paddle");
+    expect(ar.adminOverride).toContain("Paddle");
+  });
   it("anything else shows its code, never its text", () => {
     const out = adminErrorMessage(
       {

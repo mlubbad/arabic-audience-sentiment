@@ -232,6 +232,8 @@ export const ar = {
   adminUnits: "الوحدات",
   adminSetPlan: "تعيين الخطة",
   adminGrantPack: "منح حزمة",
+  adminOverride: "تجاوز اشتراك Paddle النشط",
+  adminPaddleActive: "المساحة على اشتراك Paddle نشط؛ فعّل التجاوز لتغييره",
   adminDone: "تم التنفيذ.",
   adminFailed: (code: string) => `تعذّر التنفيذ: ${code}`,
 

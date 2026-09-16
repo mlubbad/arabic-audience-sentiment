@@ -29,7 +29,9 @@ export const fixtureWorkspace = "00000000-0000-4000-8000-000000000001";
 /**
  * What `plan_catalogue()` answers, for a build with no server to ask: the six
  * non-internal rows of `supabase/migrations/20260917010000_plans_v2.sql`, in
- * their sort order, with the same numbers. Parsed through the contract so a
+ * their sort order, with the same numbers (the yearly figures as corrected in
+ * 20260917052000, the workspace limit as the count of client workspaces from
+ * 20260917060000: none for an individual plan). Parsed through the contract so a
  * row that the live function would refuse is refused here too. Kept here, not
  * in the dashboard fixture file — that file is one workspace's snapshot and
  * the catalogue is not the workspace's; the pricing page reads it signed out.
@@ -61,7 +63,7 @@ export const fixtureCatalogue = PlanCatalogueSchema.parse([
     price_yearly_cents: 0,
     self_serve: true,
     provider_prices: {},
-    limits: limits(100, 100, 1, 0, 1, 1, 0),
+    limits: limits(100, 100, 1, 0, 1, 0, 0),
   },
   {
     key: "creator",
@@ -72,7 +74,7 @@ export const fixtureCatalogue = PlanCatalogueSchema.parse([
     price_yearly_cents: 12000,
     self_serve: true,
     provider_prices: {},
-    limits: limits(10000, 4000, 10, 1, 1, 1, 1440),
+    limits: limits(10000, 4000, 10, 1, 1, 0, 1440),
   },
   {
     key: "creator_plus",
@@ -83,7 +85,7 @@ export const fixtureCatalogue = PlanCatalogueSchema.parse([
     price_yearly_cents: 28800,
     self_serve: true,
     provider_prices: {},
-    limits: limits(30000, 12000, 50, 2, 2, 1, 720),
+    limits: limits(30000, 12000, 50, 2, 2, 0, 720),
   },
   {
     key: "agency",

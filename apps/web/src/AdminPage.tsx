@@ -170,6 +170,9 @@ function WorkspaceRow({
     (w.plan_key && keys.includes(w.plan_key) ? w.plan_key : (keys[0] ?? ""));
   const [months, setMonths] = useState("1");
   const [planNote, setPlanNote] = useState("");
+  // Off by default: over a root Paddle is billing, set_workspace_plan refuses
+  // unless told to override, and even then keeps the Paddle link.
+  const [override, setOverride] = useState(false);
   const [kind, setKind] = useState<PackKind>(PACK_KINDS[0]);
   const [units, setUnits] = useState("10000");
   const [packNote, setPackNote] = useState("");
@@ -191,12 +194,14 @@ function WorkspaceRow({
       plan: string;
       months: number;
       note: string;
+      override: boolean;
     }) => {
       const { error } = await supabase!.rpc("set_workspace_plan", {
         w: w.id,
         plan: input.plan,
         months: input.months,
         note: input.note || null,
+        override: input.override,
       });
       if (error) throw error;
     },
@@ -238,7 +243,12 @@ function WorkspaceRow({
     const m = adminMonths(months);
     if (pending || !plan || m === null) return;
     setNote(null);
-    setPlanCall.mutate({ plan, months: m, note: planNote.trim() });
+    setPlanCall.mutate({
+      plan,
+      months: m,
+      note: planNote.trim(),
+      override,
+    });
   }
   function submitPack(e: FormEvent) {
     e.preventDefault();
@@ -304,6 +314,15 @@ function WorkspaceRow({
               disabled={pending}
               onChange={(e) => setPlanNote(e.target.value)}
             />
+          </label>
+          <label className="admin-check">
+            <input
+              type="checkbox"
+              checked={override}
+              disabled={pending}
+              onChange={(e) => setOverride(e.target.checked)}
+            />
+            {S.adminOverride}
           </label>
           <button
             type="submit"

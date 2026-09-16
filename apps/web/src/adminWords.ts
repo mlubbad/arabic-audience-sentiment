@@ -9,10 +9,11 @@
  * a refusal.
  *
  * Refusals follow `authMessages.ts`: only a code this application raises on
- * purpose is printed by name. `forbidden` gets its own sentence; the two
- * argument refusals (`unknown_plan`, `invalid_months`) are named inside a
- * generic one; anything else shows PostgREST's code and never its text,
- * which can quote the request URL, and the URL carries a key.
+ * purpose is printed by name. `forbidden` and `paddle_subscription_active`
+ * get their own sentences; the two argument refusals (`unknown_plan`,
+ * `invalid_months`) are named inside a generic one; anything else shows
+ * PostgREST's code and never its text, which can quote the request URL, and
+ * the URL carries a key.
  */
 import type { AdminWorkspace } from "@sentiment/contracts";
 import type { Strings } from "./strings";
@@ -86,6 +87,8 @@ const KNOWN = new Set(["unknown_plan", "invalid_months", "no_active_plan"]);
 export function adminErrorMessage(error: unknown, S: Strings): string {
   const e = (error ?? {}) as { message?: unknown; code?: unknown };
   if (e.message === "forbidden") return S.adminForbidden;
+  // set_workspace_plan over a root Paddle is billing, without override.
+  if (e.message === "paddle_subscription_active") return S.adminPaddleActive;
   const code =
     typeof e.message === "string" && KNOWN.has(e.message)
       ? e.message

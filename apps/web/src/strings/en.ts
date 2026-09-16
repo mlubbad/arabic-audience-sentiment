@@ -224,6 +224,9 @@ export const en: Strings = {
   adminUnits: "Units",
   adminSetPlan: "Set plan",
   adminGrantPack: "Grant pack",
+  adminOverride: "Override the active Paddle subscription",
+  adminPaddleActive:
+    "This workspace has an active Paddle subscription; enable override to change it",
   adminDone: "Applied.",
   adminFailed: (code: string) => `Could not apply: ${code}`,
 

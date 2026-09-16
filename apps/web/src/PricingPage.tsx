@@ -23,7 +23,7 @@ import { useStrings } from "./strings";
 import { contactEmail, pricingRows, type PricingRow } from "./pricing";
 import { useSession, useWorkspaces } from "./session";
 import { usePlanUsage } from "./planUsage";
-import { openCheckout } from "./paddle";
+import { openCheckout, openPortal } from "./paddle";
 
 type Segment = "individual" | "business";
 const SEGMENTS: readonly Segment[] = ["individual", "business"];
@@ -35,8 +35,9 @@ export function Pricing() {
   const { session } = useSession();
   // Signed in, the checkout needs the workspace the reader chose — the same
   // choice the rail card and the account's plan panel follow — and the plan
-  // it already holds marks its own card as current. Signed out, both hooks
-  // answer nothing and cost nothing.
+  // it already holds marks its own card as current; if that plan is paid
+  // through Paddle, the other paid cards open Paddle's portal rather than a
+  // second checkout. Signed out, both hooks answer nothing and cost nothing.
   const { workspaces } = useWorkspaces(session);
   const { workspaceId, plan } = usePlanUsage(session, workspaces);
   const [segment, setSegment] = useState<Segment>("individual");
@@ -54,6 +55,7 @@ export function Pricing() {
     locale,
     S,
     plan.data?.plan_key ?? null,
+    plan.data?.provider ?? null,
   );
   useLayoutEffect(() => {
     applyToDocument(locale);
@@ -80,8 +82,20 @@ export function Pricing() {
       return;
     }
     setNotice((n) => ({ ...n, [row.key]: "" }));
-    openCheckout({ planKey: row.key, interval, session, workspaceId }).catch(
-      () => setNotice((n) => ({ ...n, [row.key]: S.checkoutUnavailable })),
+    // A workspace already on Paddle changes plan in Paddle's portal, the
+    // same door as the plan panel's "manage", with the same two refusals.
+    const call =
+      row.cta.kind === "manage"
+        ? openPortal(session, workspaceId)
+        : openCheckout({ planKey: row.key, interval, session, workspaceId });
+    call.catch((error: unknown) =>
+      setNotice((n) => ({
+        ...n,
+        [row.key]:
+          (error as Error)?.message === "no_paddle_customer"
+            ? S.portalNoCustomer
+            : S.checkoutUnavailable,
+      })),
     );
   };
 

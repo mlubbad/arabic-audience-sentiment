@@ -4,8 +4,11 @@
  * this module only turns a `Plan` row and the reader's segment/interval into
  * the words and CTA a card shows: which row is the anchor, whether the price
  * is per month or an equivalent billed yearly, whether the button starts a
- * checkout, asks to contact sales, starts free, or marks the current plan,
- * and each limit rendered as a number or as "unlimited" for a `-1` ceiling.
+ * checkout, asks to contact sales, starts free, marks the current plan, or —
+ * for a workspace already paying through Paddle — sends the reader to
+ * Paddle's portal to change plan there, so a second checkout never opens a
+ * second subscription beside the first; and each limit rendered as a number
+ * or as "unlimited" for a `-1` ceiling.
  */
 import type { Plan } from "@sentiment/contracts";
 import type { Strings } from "./strings";
@@ -17,7 +20,10 @@ export type PricingRow = {
   perLabel: string;
   yearlyNote: string | null;
   anchor: boolean;
-  cta: { kind: "checkout" | "contact" | "free" | "current"; label: string };
+  cta: {
+    kind: "checkout" | "contact" | "free" | "current" | "manage";
+    label: string;
+  };
   limits: { label: string; value: string }[];
 };
 
@@ -42,6 +48,7 @@ export function pricingRows(
   locale: "ar" | "en",
   S: Strings,
   currentKey: string | null = null,
+  currentProvider: string | null = null,
 ): PricingRow[] {
   const n = (v: number) =>
     v === -1 ? S.pricingUnlimited : v.toLocaleString("en-US");
@@ -52,14 +59,20 @@ export function pricingRows(
         interval === "year" ? p.price_yearly_cents / 12 : p.price_monthly_cents;
       // Not self-serve comes before free: enterprise carries no price in the
       // catalogue (0), and a zero that is not for sale is "ask", not "free".
+      // A paid self-serve row for a workspace already on Paddle is managed,
+      // not bought again: Paddle's portal changes the plan on the one
+      // subscription, where a second checkout would open a second one.
+      const paid = p.self_serve && p.price_monthly_cents > 0;
       const cta =
         p.key === currentKey
           ? { kind: "current" as const, label: S.pricingCtaCurrent }
           : !p.self_serve
             ? { kind: "contact" as const, label: S.pricingCtaContact }
-            : p.price_monthly_cents === 0
-              ? { kind: "free" as const, label: S.pricingCtaFree }
-              : { kind: "checkout" as const, label: S.pricingCtaStart };
+            : paid && currentProvider === "paddle"
+              ? { kind: "manage" as const, label: S.planManage }
+              : p.price_monthly_cents === 0
+                ? { kind: "free" as const, label: S.pricingCtaFree }
+                : { kind: "checkout" as const, label: S.pricingCtaStart };
       const quoted = !p.self_serve && p.price_monthly_cents === 0;
       return {
         key: p.key,
