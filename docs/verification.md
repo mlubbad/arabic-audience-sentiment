@@ -1809,3 +1809,48 @@ $2,388 سنويًا»; `media` and `enterprise` read «تواصل معنا», `e
 Not yet verified live: a checkout (needs `VITE_PADDLE_CLIENT_TOKEN` and the domain approved
 in Paddle), a webhook delivery (needs `PADDLE_WEBHOOK_SECRET`), the portal session, the
 account page's plan panel and the admin page as the signed-in owner (his session, not ours).
+
+## 2026-09-16 — the sandbox walk: webhook, pack, cancel, stale, past_due, sweep, portal
+
+Secrets on the project after the user created the notification destination:
+`PADDLE_API_KEY`, `PADDLE_ENV=sandbox`, `PADDLE_WEBHOOK_SECRET`. The web bundle carries
+`VITE_PADDLE_CLIENT_TOKEN` (public by design) and `VITE_PADDLE_ENV=sandbox`.
+
+Against the deployed `paddle-webhook`, each body signed with the real secret
+(`HMAC-SHA256(secret, ts:body)`, `Paddle-Signature: ts=…;h1=…`) for the probe workspace
+`18e093a5…` (owner `connect-probe-1789332349@`):
+
+| sent | answered | live row afterwards |
+| --- | --- | --- |
+| `subscription.activated`, price `creator:month` | `{"outcome":"applied"}` 200 | `pilot → creator`, `provider=paddle`, `sub_walk_001`, `ctm_walk_001`, `month` |
+| the same event again | `duplicate` 200 | unchanged |
+| the same signature, body with `active→paused` | `bad_signature` 401 | unchanged |
+| `transaction.completed`, price `pack_10k:pack` | `applied` 200 | `usage_grants`: 10,000 `comment_analysis`, `txn_walk_002` |
+| `transaction.completed`, a subscription price | `ignored` 200 | unchanged |
+| `subscription.updated`, `scheduled_change.action=cancel` | `applied` 200 | `cancel_at_period_end=true` |
+| `subscription.updated` dated 2026-09-15 (older) | `stale` 200 | unchanged |
+| `subscription.past_due` | `applied` 200 | `status=past_due` |
+
+Audit rows in order: `plan_paddle_activated`, `pack_paddle comment_analysis:10000`,
+`plan_paddle_updated`, `plan_paddle_past_due`. Then, over `supabase db query`, the row's
+`period_end` set to eight days ago and `select private.billing_sweep()` → the row reads
+`free / active / provider null / open-ended`, last audit `plan_dropped`.
+
+`billing-portal`, called with a session minted for the probe owner (admin
+`generate_link` + `verify`) after a sandbox customer `ctm_01m2n7c7…` was created over the
+API and written to `provider_customer_ref`: own workspace → 200 with a
+`sandbox-customer-portal.paddle.com/cpl_…` URL; the owner's workspace `d0c3b9fc…` → 403
+`forbidden`.
+
+The account page, signed in as the probe in the preview browser: plan panel reads «مجاني»,
+analysis `0 من 10,100` — the free plan's 100 plus the pack's 10,000 — with «ترقية الخطة»
+and «إضافة 10,000 تعليق». Pressing the pack button ran the app's own path: Paddle.js
+initialised in **sandbox**, the overlay iframe came from `sandbox-buy.paddle.com`, and
+Paddle's overlay then showed its generic "Something went wrong" with no request logged by
+the page. Paddle's checkout refuses like this when the account's **Checkout settings**
+(default payment link / website approval for `app.sky-develop.net`) are not set — a
+dashboard step, not code. Left open; see progress.md.
+
+Two things the walk showed for the rail card and the panel: the card prints the plan key
+(`خطة free`) rather than the title, and an open-ended free plan reads «تتجدد في 2126-09-16».
+Both go with the `pilot` rename the user asked for.
