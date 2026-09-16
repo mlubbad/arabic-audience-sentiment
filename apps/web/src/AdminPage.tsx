@@ -42,6 +42,13 @@ import {
   type PackKind,
 } from "./adminWords";
 import { useStrings } from "./strings";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/Select";
 import "./report.css";
 
 async function readWorkspaces() {
@@ -286,17 +293,22 @@ function WorkspaceRow({
         <form className="admin-form" onSubmit={submitPlan}>
           <label>
             {S.adminPlan}
-            <select
+            <Select
               value={plan}
               disabled={pending || keys.length === 0}
-              onChange={(e) => setChosenPlan(e.target.value)}
+              onValueChange={(value) => setChosenPlan(value)}
             >
-              {options.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger aria-label={S.adminPlanPicker}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((o) => (
+                  <SelectItem key={o.key} value={o.key}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label>
             {S.adminMonths}

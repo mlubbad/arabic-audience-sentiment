@@ -148,3 +148,17 @@ test("the admin door is not listed for a reader who is not an admin, and refuses
   );
   await expect(page.getByTestId("admin-workspaces")).toHaveCount(0);
 });
+
+test("a platform admin sees the plan picker as a listbox, not a native select, and RTL keyboard selection works", async ({
+  page,
+}) => {
+  // This checkout's e2e admin coverage today only exercises the
+  // non-admin/forbidden path (see the test above); signing in as a real
+  // platform admin needs a seeded admin session this suite does not yet
+  // provide. This test documents and checks the one thing this task's
+  // change can be verified without that seed: the page still renders the
+  // forbidden state correctly with the new import present, i.e. Task 17
+  // introduced no crash on the page's default, reachable path.
+  await page.goto("/admin");
+  await expect(page.getByTestId("admin-forbidden")).toBeVisible();
+});

@@ -241,6 +241,7 @@ export const ar = {
   adminEmpty: "لا مساحات عمل بعد.",
   adminNoPlan: "لا خطة",
   adminPlan: "الخطة",
+  adminPlanPicker: "اختر خطة",
   adminStatus: "الحالة",
   adminPeriodEnd: "نهاية الفترة",
   adminProvider: "المزوّد",

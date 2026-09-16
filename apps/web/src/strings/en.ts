@@ -235,6 +235,7 @@ export const en: Strings = {
   adminEmpty: "No workspaces yet.",
   adminNoPlan: "No plan",
   adminPlan: "Plan",
+  adminPlanPicker: "Choose a plan",
   adminStatus: "Status",
   adminPeriodEnd: "Period end",
   adminProvider: "Provider",
