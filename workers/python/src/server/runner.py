@@ -253,6 +253,17 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
         control.finish(
             lease, exc.outcome if exc.outcome in _DECLARABLE else "blocked", exc.code
         )
+    except ControlPlaneError as exc:
+        # A refusal is a verdict on the job, not a blip: the plan is spent, the
+        # batch was malformed, the workspace has no plan. Letting it escape
+        # left the lease to lapse and the job to be reclaimed and refused again
+        # — twenty times on the night the pilot's units ran out. The job ends
+        # blocked with the server's own code and its checkpoint intact; the
+        # scheduler's backoff decides when to try again. A 5xx is still the
+        # server's problem and still escapes.
+        if exc.retryable:
+            raise
+        control.finish(lease, "blocked", exc.code)
     return True
 
 

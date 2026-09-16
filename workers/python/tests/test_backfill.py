@@ -7,9 +7,10 @@ still spend the entire quota proving it.
 import json
 
 import httpx
+import pytest
 
 from collectors.protocol import Batch, CollectionError, RawComment
-from server.gateway import ControlPlane
+from server.gateway import ControlPlane, ControlPlaneError
 from server.runner import run_backfill
 
 
@@ -182,3 +183,53 @@ def test_a_disabled_video_is_reported_and_skipped_not_the_whole_run():
     assert run_backfill(plane, lambda token: collector) is True
     assert sent["video_finished"] == [("u-off", "blocked", "comments_disabled"), ("u-on", "exhausted", None)]
     assert sent["finish"] == "succeeded"
+
+
+def test_a_plan_refusal_ends_the_job_blocked_rather_than_dropping_the_lease():
+    """The night of 2026-09-15: the pilot's analysis units ran out mid-run,
+    commit_batch answered 429 quota_exceeded, the runner let it escape, the
+    lease lapsed, the job was reclaimed and refused again — twenty times."""
+    sent = {"finish": None, "error_code": None, "commits": 0}
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j", "lease_token": "t", "type": "collect", "checkpoint": None,
+                "access_token": "tok",
+                "videos": [{"video_id": "u1", "external_video_id": "v1", "title": None}]})
+        if path == "commit-batch":
+            sent["commits"] += 1
+            return httpx.Response(429, json={"code": "quota_exceeded"})
+        if path == "finish":
+            body = json.loads(request.content)
+            sent["finish"], sent["error_code"] = body["outcome"], body["error_code"]
+        return httpx.Response(200, json={})
+
+    collector = Plan({"v1": [Batch([comment("c1")], None, "exhausted")]})
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    assert run_backfill(plane, lambda token: collector) is True
+    assert sent["commits"] == 1
+    assert (sent["finish"], sent["error_code"]) == ("blocked", "quota_exceeded")
+
+
+def test_a_transient_control_plane_failure_still_escapes():
+    """A 5xx is the server's problem, not a verdict on the job: the lease is
+    left to lapse and the next claim retries, as before."""
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j", "lease_token": "t", "type": "collect", "checkpoint": None,
+                "access_token": "tok",
+                "videos": [{"video_id": "u1", "external_video_id": "v1", "title": None}]})
+        if path == "commit-batch":
+            return httpx.Response(503, json={"code": "control_plane_error"})
+        return httpx.Response(200, json={})
+
+    collector = Plan({"v1": [Batch([comment("c1")], None, "exhausted")]})
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(ControlPlaneError):
+        run_backfill(plane, lambda token: collector)
