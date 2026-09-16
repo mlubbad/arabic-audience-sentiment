@@ -1260,7 +1260,7 @@ export function ProductWindow({
   display: inline-grid;
   place-items: center;
   font-weight: 700;
-  color: var(--fg-on-brand);
+  color: var(--ink-on-dark);
   background: var(--sentiment-neutral);
 }
 .pw-avatar.positive {
@@ -1290,7 +1290,7 @@ export function ProductWindow({
   }
 }
 ```
-Confirm `--ml-indigo-50` and `--fg-on-brand` exist in `brand.css` (they do at the time of writing: `grep -n "ml-indigo-50\|fg-on-brand" apps/web/src/brand.css`).
+Confirm `--ml-indigo-50` and `--ink-on-dark` exist in `brand.css` (they do at the time of writing: `grep -n "ml-indigo-50\|ink-on-dark" apps/web/src/brand.css`).
 
 - [ ] **Step 6: Run** `npx vitest run apps/web/src/landing/ProductWindow.test.tsx` → 3 PASS. `npm run typecheck` clean.
 
@@ -1560,7 +1560,7 @@ export function Hero({ locale }: { locale: Locale }) {
   margin: 0;
 }
 .lp-youtube {
-  color: var(--fg-on-brand);
+  color: var(--ink-on-dark);
   background: var(--ml-rose);
   font: 10px var(--font-latin);
   padding: 3px 7px;
