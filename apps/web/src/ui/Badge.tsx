@@ -11,6 +11,7 @@ const badge = cva("ui-badge", {
       positive: "ui-badge--positive",
       negative: "ui-badge--negative",
       "sentiment-mixed": "ui-badge--sentiment-mixed",
+      "sentiment-neutral": "ui-badge--sentiment-neutral",
     },
   },
   defaultVariants: { tone: "neutral" },

@@ -156,6 +156,10 @@
   background: color-mix(in srgb, var(--sentiment-mixed) 14%, white);
   color: var(--sentiment-mixed);
 }
+.ui-badge--sentiment-neutral {
+  background: color-mix(in srgb, var(--sentiment-neutral) 14%, white);
+  color: var(--sentiment-neutral);
+}
 
 .ui-input,
 .ui-textarea {
@@ -257,13 +261,16 @@
   font-size: var(--fs-small);
   box-shadow: var(--shadow-2);
   max-width: 260px;
-  z-index: 50;
+  z-index: 62;
 }
 
+/* Stacking order, low to high: dialog (60-61) < tooltip (62) < popover/dropdown/select (65) < toast
+   (70) — so anything opened from inside a Dialog (a Select in a form, a DropdownMenu's menu) renders
+   above it, and a Toast is always visible above everything else. */
 .ui-dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(14, 10, 46, 0.45);
+  background: color-mix(in srgb, var(--fg-1) 45%, transparent);
   z-index: 60;
 }
 .ui-dialog-content {
@@ -323,7 +330,7 @@
   border-radius: var(--radius-2);
   box-shadow: var(--shadow-2);
   padding: var(--space-4);
-  z-index: 55;
+  z-index: 65;
   max-width: 320px;
 }
 .ui-popover-content:focus-visible {
@@ -337,7 +344,7 @@
   box-shadow: var(--shadow-2);
   padding: var(--space-2);
   min-width: 180px;
-  z-index: 55;
+  z-index: 65;
 }
 .ui-dropdown-item {
   display: flex;
@@ -413,7 +420,7 @@
   border: 1px solid var(--border-1);
   border-radius: var(--radius-2);
   box-shadow: var(--shadow-2);
-  z-index: 55;
+  z-index: 65;
   overflow: hidden;
 }
 .ui-select-item {

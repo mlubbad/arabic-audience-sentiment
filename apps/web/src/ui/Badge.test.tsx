@@ -24,6 +24,7 @@ describe("Badge", () => {
     ["positive", "--sentiment-positive"],
     ["negative", "--sentiment-negative"],
     ["sentiment-mixed", "--sentiment-mixed"],
+    ["sentiment-neutral", "--sentiment-neutral"],
   ] as const)(
     "the %s tone's CSS reads brand.css's %s token, not a re-typed value",
     (tone, token) => {
