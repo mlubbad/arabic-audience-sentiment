@@ -6,9 +6,9 @@ each tells a search engine and a share card. Implemented 2026-09-17 on the owner
 explicit request for a full on-page review with content rewritten to be found as
 well as read, on top of the `/en` addresses and the prerender it needed.
 
-Status in one line: **everything a crawler needs is built and verified, and the site
-is still `noindex`.** Opening it to search is one build flag, and it is the owner's
-call — see "Going live" at the end.
+Status in one line: **built, verified, and open to search since 2026-09-17** — the owner
+set `VITE_SITE_PUBLIC=true` and deployed; see "Going live" at the end for what was
+checked and the one thing (a cached `robots.txt` at the edge) that was still catching up.
 
 ---
 
@@ -158,10 +158,15 @@ Before flipping it:
 1. **Decide the origin.** `VITE_SITE_URL` defaults to `https://app.sky-develop.net`; if
    the public face moves to another host, set it, because the canonical, the
    alternates, the share URL and the sitemap all carry it.
-2. **Check what Cloudflare serves at `/robots.txt`.** `docs/deployment.md` records that
-   Cloudflare Managed Content replaces ours with its own (1836 bytes, AI crawlers only).
-   Until that is turned off in the Cloudflare dashboard, the built `robots.txt` — open
-   or closed — is not what a crawler reads. The meta and the header still hold.
+2. **Check what Cloudflare serves at `/robots.txt`.** Two things have gone wrong here.
+   `docs/deployment.md` recorded Cloudflare Managed Content replacing ours with its own
+   (1836 bytes, AI crawlers only); on 2026-09-17 ours was served instead. Then, on the
+   deploy that opened it, the edge kept serving the closed 26-byte copy from cache
+   (`cf-cache-status: HIT`, `cache-control: max-age=14400` — a zone rule overriding the
+   origin's `no-cache`, which `.htaccess` now sends for `.txt` and `.xml`). This repo has
+   no purge credential: purge `https://app.sky-develop.net/robots.txt` in the Cloudflare
+   dashboard, or wait out the TTL, and fetch it again from outside before submitting the
+   sitemap. The meta and the header are per-page and were correct at once.
 3. Build with the flag, deploy, and fetch `/`, `/en`, `/pricing` and `/robots.txt` from
    outside: `curl -sI` for the absence of `X-Robots-Tag`, `curl -s | grep robots` for
    the meta.

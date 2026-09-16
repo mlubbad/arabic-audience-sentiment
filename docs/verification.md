@@ -2130,3 +2130,21 @@ WebP hero and the share image; twenty stale hashed assets removed (`gone`).
 | `/landing/audience-growth-original.webp` | `200`, `image/webp`, 29,194 bytes |
 | `/landing/og-audience-sentiment.jpg` | `200`, `image/jpeg`, 71,179 bytes |
 | Chromium via Playwright against the live host, `pageerror` + console errors | `/`, `/en`, `/pricing`, `/en/pricing`, `/terms`, `/en/privacy-policy`, `/dashboard`: **0 errors each** — the production bundle hydrates every prerendered page |
+
+## 2026-09-17 — indexing turned on and deployed, at the owner's instruction
+
+`VITE_SITE_URL` and `VITE_SITE_PUBLIC=true` added to `apps/web/.env.local`; `npm run build`
+(`robots.txt (public)`, `dist/.htaccess` without `X-Robots-Tag`, `index.html` → `index, follow`,
+`app.html` → `noindex, nofollow`); `npm run deploy:preview`.
+
+| Probe (`curl`, from outside) | Actual result |
+| --- | --- |
+| `/`, `/en`, `/pricing`, `/en/pricing`, `/terms` | no `x-robots-tag` header; `<meta name="robots" content="index, follow">` |
+| `/dashboard` | `noindex, nofollow` (app.html) |
+| `/sitemap.xml` | the new file, `cache-control: no-cache`, `cf-cache-status: DYNAMIC` |
+| `/robots.txt` | **stale**: the closed 26-byte copy, `cf-cache-status: HIT`, `cache-control: max-age=14400`; a `HEAD` got a `MISS` with the new 188-byte length, a `GET` still the old body. Cloudflare's zone rule overrides the origin's cache headers for `.txt` and the edge holds the old copy; no purge credential here |
+| Fix shipped | `.htaccess` `no-cache` rule now covers `.txt` and `.xml` as well as `.html` and `.json` (`htaccess.test.ts` still green); redeployed. Prevents the next such hold, does not clear this one |
+
+Left to the owner: purge `https://app.sky-develop.net/robots.txt` in the Cloudflare dashboard
+(or wait for the TTL), confirm it reads `Allow: /` with the `Sitemap:` line, then submit the
+sitemap in Search Console.

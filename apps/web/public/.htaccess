@@ -53,7 +53,11 @@
     Header set Cache-Control "public, max-age=31536000, immutable" \
       "expr=%{REQUEST_STATUS} == 200"
   </FilesMatch>
-  <FilesMatch "\.(html|json)$">
+  # .txt and .xml too: robots.txt and sitemap.xml are the two files whose
+  # meaning changes on the day the flag flips, and without a header here the
+  # edge cached the closed robots.txt and served it after the open one was
+  # deployed (2026-09-17, `cf-cache-status: HIT`, no purge credential).
+  <FilesMatch "\.(html|json|txt|xml)$">
     Header set Cache-Control "no-store"
     Header set Cache-Control "no-cache" "expr=%{REQUEST_STATUS} == 200"
   </FilesMatch>
