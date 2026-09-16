@@ -7,7 +7,10 @@ describe("cn: merges classNames the way Tailwind utility conflicts need", () => 
   });
 
   it("drops falsy values", () => {
-    expect(cn("ui-btn", false && "ui-btn--primary", undefined, null)).toBe(
+    // A condition that is off, as a call site writes it — held in a variable
+    // so the linter does not read `false && …` as a mistake.
+    const primary = false as boolean;
+    expect(cn("ui-btn", primary && "ui-btn--primary", undefined, null)).toBe(
       "ui-btn",
     );
   });
