@@ -461,3 +461,23 @@
   margin: 0;
   font-size: var(--fs-small);
 }
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+}
+.ui-table th,
+.ui-table td {
+  text-align: start;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-1);
+}
+.ui-table thead th {
+  color: var(--text-2);
+  font-weight: 600;
+  font-size: var(--fs-small);
+}
+.ui-table tbody tr:hover {
+  background: var(--bg-muted);
+}
