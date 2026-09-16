@@ -316,3 +316,16 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+.ui-popover-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-4);
+  z-index: 55;
+  max-width: 320px;
+}
+.ui-popover-content:focus-visible {
+  outline: none;
+}
