@@ -5,4 +5,7 @@
 -- pricing ladder's `pro` row is 25,000 (docs/pricing.md); the pilot takes that
 -- figure while it remains the only plan the live project has. A data change,
 -- shipped as a migration so the suite replays it and the number is on record.
-update public.plans set analysis_units = 25000 where key = 'pilot';
+--
+-- Topic units the same way: the first classification of the channel spent
+-- 4,839 of 5,000 in one run; the ladder's `pro` figure is 10,000.
+update public.plans set analysis_units = 25000, topic_units = 10000 where key = 'pilot';
