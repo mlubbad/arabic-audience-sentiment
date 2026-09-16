@@ -118,12 +118,14 @@ async function priceIdForRequest(req: CheckoutRequest) {
 
 export async function openCheckout(req: CheckoutRequest): Promise<void> {
   // The workspace is resolved before anything is fetched: a checkout with
-  // nobody to bill would be an event the webhook records as unmapped.
+  // nobody to bill would be an event the webhook records as unmapped. Then
+  // Paddle.js, before the catalogue: a deployment without the script or the
+  // token fails at once, not after a round trip.
   const workspaceId = req.workspaceId ?? null;
   if (!workspaceId) throw unavailable();
+  await initPaddle();
   const priceId = await priceIdForRequest(req);
   if (!priceId) throw unavailable();
-  await initPaddle();
   window.Paddle!.Checkout.open(
     checkoutItems(
       priceId,

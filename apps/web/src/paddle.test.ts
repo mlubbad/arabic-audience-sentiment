@@ -83,6 +83,20 @@ describe("initPaddle", () => {
     await expect(initPaddle()).rejects.toThrow("checkout_unavailable");
     expect(paddle.Initialize).not.toHaveBeenCalled();
   });
+  it("is asked by openCheckout before the catalogue, so a missing token fails at once", async () => {
+    const paddle = fakePaddle();
+    vi.stubEnv("VITE_PADDLE_CLIENT_TOKEN", "");
+    await expect(
+      openCheckout({
+        planKey: "pack_10k",
+        interval: "month",
+        session,
+        workspaceId: "w1",
+      }),
+    ).rejects.toThrow("checkout_unavailable");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(paddle.Checkout.open).not.toHaveBeenCalled();
+  });
   it("sets the environment and initialises once", async () => {
     const paddle = fakePaddle();
     vi.stubEnv("VITE_PADDLE_CLIENT_TOKEN", "test_abc");

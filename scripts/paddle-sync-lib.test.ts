@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   desiredPrices,
   diff,
+  paddleBase,
+  paddleClient,
   planProducts,
   priceBody,
   productBody,
   providerPrices,
+  run,
   summary,
 } from "./paddle-sync-lib.mjs";
 
@@ -293,5 +296,253 @@ describe("summary", () => {
     ).toBe(
       "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 0 drifted)",
     );
+  });
+});
+
+// --- The calls, against a fetch that never leaves the process. ---
+
+type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status });
+
+describe("paddleClient", () => {
+  it("follows meta.pagination.next while has_more and returns every page's items in order", async () => {
+    const seen: string[] = [];
+    const fetch: Fetch = async (url, init) => {
+      seen.push(url);
+      expect(init?.headers).toMatchObject({
+        Authorization: "Bearer k",
+        "Paddle-Version": "1",
+      });
+      if (url === "https://sandbox-api.paddle.com/products?status=active")
+        return json({
+          data: [{ id: "pro_1" }, { id: "pro_2" }],
+          meta: {
+            pagination: {
+              has_more: true,
+              next: "https://sandbox-api.paddle.com/products?status=active&after=pro_2",
+            },
+          },
+        });
+      if (url.endsWith("after=pro_2"))
+        return json({
+          data: [{ id: "pro_3" }],
+          meta: { pagination: { has_more: false, next: null } },
+        });
+      throw new Error(`unexpected ${url}`);
+    };
+    const paddle = paddleClient({
+      fetch,
+      base: paddleBase("sandbox"),
+      key: "k",
+    });
+    const all = await paddle.all("/products?status=active");
+    expect(all.map((p) => p.id)).toEqual(["pro_1", "pro_2", "pro_3"]);
+    expect(seen).toHaveLength(2);
+  });
+  it("stops after one page when has_more is false, even if next is set", async () => {
+    const fetch: Fetch = async () =>
+      json({
+        data: [{ id: "pri_1" }],
+        meta: { pagination: { has_more: false, next: "https://x/never" } },
+      });
+    const paddle = paddleClient({ fetch, base: paddleBase("live"), key: "k" });
+    expect(await paddle.all("/prices")).toEqual([{ id: "pri_1" }]);
+  });
+  it("names the HTTP status when the error body is not JSON, and never the key", async () => {
+    const fetch: Fetch = async () =>
+      new Response("<html>bad gateway</html>", { status: 502 });
+    const paddle = paddleClient({
+      fetch,
+      base: paddleBase("sandbox"),
+      key: "secret_k",
+    });
+    await expect(paddle.call("GET", "/products")).rejects.toThrow(
+      "Paddle GET /products → 502: no detail",
+    );
+    await expect(paddle.call("GET", "/products")).rejects.not.toThrow(
+      "secret_k",
+    );
+  });
+  it("names Paddle's detail when the error body carries one", async () => {
+    const fetch: Fetch = async () =>
+      json(
+        {
+          error: {
+            code: "validation",
+            detail: "unit_price.amount is required",
+          },
+        },
+        400,
+      );
+    const paddle = paddleClient({
+      fetch,
+      base: paddleBase("sandbox"),
+      key: "k",
+    });
+    await expect(paddle.call("POST", "/prices", {})).rejects.toThrow(
+      "Paddle POST /prices → 400: unit_price.amount is required",
+    );
+  });
+  it("uses the live host for live and the sandbox host otherwise", () => {
+    expect(paddleBase("live")).toBe("https://api.paddle.com");
+    expect(paddleBase("sandbox")).toBe("https://sandbox-api.paddle.com");
+  });
+});
+
+/** An in-memory Paddle and Supabase: two-item pages so a run must paginate,
+ *  the same auth checks the real ones make, and the tables as rows. */
+function fakeWorld() {
+  const plansRows = plans.map((p) => ({
+    ...p,
+    provider_prices: {} as Record<string, string>,
+  }));
+  const addonRows = addons.map((a) => ({
+    ...a,
+    provider_prices: {} as Record<string, string>,
+  }));
+  const products: { id: string; custom_data: Record<string, string> }[] = [];
+  const prices: {
+    id: string;
+    custom_data: Record<string, string>;
+    billing_cycle?: unknown;
+    unit_price: { amount: string };
+  }[] = [];
+  const calls: string[] = [];
+  let n = 0;
+  const fetch: Fetch = async (url, init = {}) => {
+    const u = new URL(url);
+    const method = init.method ?? "GET";
+    const headers = init.headers as Record<string, string>;
+    calls.push(`${method} ${u.host}${u.pathname}`);
+    const isPaddle = u.host.endsWith("paddle.com");
+    const key = isPaddle ? "pdl_fake" : "svc_fake";
+    if (headers.Authorization !== `Bearer ${key}`)
+      return json({ error: { code: "forbidden" } }, 403);
+    if (isPaddle) {
+      if (headers["Paddle-Version"] !== "1")
+        return json({ error: { code: "version" } }, 400);
+      const page = (all: { id: string }[]) => {
+        const after = u.searchParams.get("after");
+        const start = after ? all.findIndex((x) => x.id === after) + 1 : 0;
+        const data = all.slice(start, start + 2);
+        const has_more = start + 2 < all.length;
+        const next = has_more
+          ? `https://sandbox-api.paddle.com${u.pathname}?status=active&per_page=200&after=${data[data.length - 1].id}`
+          : null;
+        return json({ data, meta: { pagination: { has_more, next } } });
+      };
+      if (method === "GET" && u.pathname === "/products") return page(products);
+      if (method === "GET" && u.pathname === "/prices") return page(prices);
+      const body = JSON.parse(String(init.body));
+      if (method === "POST" && u.pathname === "/products") {
+        const p = { id: `pro_${++n}`, ...body };
+        products.push(p);
+        return json({ data: p }, 201);
+      }
+      if (method === "POST" && u.pathname === "/prices") {
+        const p = { id: `pri_${++n}`, ...body };
+        prices.push(p);
+        return json({ data: p }, 201);
+      }
+      return json({ error: { code: "not_found" } }, 404);
+    }
+    if (method === "GET" && u.pathname === "/rest/v1/plans")
+      return json(plansRows);
+    if (method === "GET" && u.pathname === "/rest/v1/addon_prices")
+      return json(addonRows);
+    if (method === "PATCH") {
+      if (headers.Prefer !== "return=minimal")
+        return new Response("prefer", { status: 400 });
+      const key = (u.searchParams.get("key") ?? "").replace("eq.", "");
+      const table = u.pathname.endsWith("/plans") ? plansRows : addonRows;
+      const row = table.find((r) => r.key === key);
+      if (!row) return new Response("no row", { status: 404 });
+      row.provider_prices = JSON.parse(String(init.body)).provider_prices;
+      return new Response(null, { status: 204 });
+    }
+    return new Response("nope", { status: 404 });
+  };
+  const runOnce = (dryRun = false) => {
+    const before = calls.length;
+    return run({
+      fetch,
+      paddleEnv: "sandbox",
+      apiKey: "pdl_fake",
+      supabaseUrl: "https://fake.supabase.local/",
+      serviceKey: "svc_fake",
+      dryRun,
+    }).then((result) => ({ result, calls: calls.slice(before) }));
+  };
+  return { plansRows, addonRows, products, prices, runOnce };
+}
+
+describe("run", () => {
+  it("creates every product and price once, then a second run creates nothing and reports 0 created, 4 updated", async () => {
+    const world = fakeWorld();
+    const first = await world.runOnce();
+    expect(first.result.line).toBe(
+      "11 created, 4 updated (4 products, 7 prices created; 4 rows written; 0 drifted)",
+    );
+    expect(world.products.map((p) => p.custom_data.plan_key)).toEqual([
+      "creator",
+      "creator_plus",
+      "agency",
+      "pack_10k",
+    ]);
+    expect(world.prices).toHaveLength(7);
+    expect(
+      world.prices.filter((p) => !p.billing_cycle).map((p) => p.custom_data),
+    ).toEqual([{ plan_key: "pack_10k", interval: "pack" }]);
+    const ids = (k: string) =>
+      world.plansRows.find((p) => p.key === k)!.provider_prices;
+    expect(Object.keys(ids("creator")).sort()).toEqual(["month", "year"]);
+    expect(Object.keys(ids("agency")).sort()).toEqual(["month", "year"]);
+    expect(ids("free")).toEqual({});
+    expect(ids("media")).toEqual({});
+    expect(Object.keys(world.addonRows[0].provider_prices)).toEqual(["pack"]);
+
+    const second = await world.runOnce();
+    expect(second.result.line).toBe(
+      "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 0 drifted)",
+    );
+    expect(second.calls.filter((c) => c.startsWith("POST"))).toEqual([]);
+    // Every list was paginated: seven prices are four pages of two.
+    expect(
+      second.calls.filter((c) => c === "GET sandbox-api.paddle.com/prices"),
+    ).toHaveLength(4);
+    expect(world.products).toHaveLength(4);
+    expect(world.prices).toHaveLength(7);
+  });
+  it("in a dry run reads both sides and writes nothing anywhere", async () => {
+    const world = fakeWorld();
+    const { result, calls } = await world.runOnce(true);
+    expect(result.line).toBe(
+      "0 created, 0 updated (0 products, 0 prices created; 0 rows written; 0 drifted)",
+    );
+    expect(calls.every((c) => c.startsWith("GET"))).toBe(true);
+    expect(world.products).toEqual([]);
+    expect(
+      world.plansRows.find((p) => p.key === "creator")!.provider_prices,
+    ).toEqual({});
+  });
+  it("reports drift on a rerun after the table's price changed, and still writes the id", async () => {
+    const world = fakeWorld();
+    await world.runOnce();
+    world.plansRows.find((p) => p.key === "creator")!.price_monthly_cents =
+      1500;
+    const { result, calls } = await world.runOnce();
+    expect(result.drift).toBe(1);
+    expect(result.line).toBe(
+      "0 created, 4 updated (0 products, 0 prices created; 4 rows written; 1 drifted)",
+    );
+    expect(calls.filter((c) => c.startsWith("POST"))).toEqual([]);
+    expect(
+      world.prices.find(
+        (p) =>
+          p.custom_data.plan_key === "creator" &&
+          p.custom_data.interval === "month",
+      )!.unit_price.amount,
+    ).toBe("1200");
   });
 });
