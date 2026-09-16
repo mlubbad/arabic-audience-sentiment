@@ -149,7 +149,7 @@ test("the admin door is not listed for a reader who is not an admin, and refuses
   await expect(page.getByTestId("admin-workspaces")).toHaveCount(0);
 });
 
-test("a platform admin sees the plan picker as a listbox, not a native select, and RTL keyboard selection works", async ({
+test("the admin route still renders its forbidden state after Task 17's Select wiring (no admin-session fixture exists in this repo to test the picker itself)", async ({
   page,
 }) => {
   // This checkout's e2e admin coverage today only exercises the
