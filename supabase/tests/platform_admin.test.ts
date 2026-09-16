@@ -154,4 +154,88 @@ describe("platform admin", () => {
     );
     expect(a.rows[0].grant_pack).toBe(b.rows[0].grant_pack);
   });
+
+  it("activating a client workspace's plan propagates to the root and every sibling", async () => {
+    // USER's home is on agency (test 2) with a workspace limit of 5, so two
+    // clients fit. Both start out billing through home, per
+    // create_workspace_impl copying the home row.
+    await as(USER);
+    await db.query("select create_workspace('client a')");
+    await db.query("select create_workspace('client b')");
+
+    await db.exec("reset role");
+    const home = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where created_by=$1 order by created_at asc limit 1",
+        [USER],
+      )
+    ).rows[0].id;
+    const clientA = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where name=$1",
+        ["client a"],
+      )
+    ).rows[0].id;
+
+    // The admin activates a plan on the CLIENT workspace, not the root.
+    await as(ADMIN);
+    await db.query(
+      "select set_workspace_plan($1,'creator_plus',2,'propagate')",
+      [clientA],
+    );
+
+    await db.exec("reset role");
+
+    // (a) the home's own subscription row carries the new terms.
+    const homeSub = (
+      await db.query<{
+        plan_key: string;
+        provider: string;
+        provider_ref: string;
+        period_end: string;
+      }>(
+        "select plan_key, provider, provider_ref, period_end from subscriptions where workspace_id=$1",
+        [home],
+      )
+    ).rows[0];
+    expect(homeSub).toMatchObject({
+      plan_key: "creator_plus",
+      provider: "admin",
+      provider_ref: "propagate",
+    });
+
+    // (b) client b, never named in the call, followed the root it bills
+    // through and still points at it.
+    const clientBSub = (
+      await db.query<{
+        plan_key: string;
+        provider_ref: string;
+        period_end: string;
+        billing_workspace_id: string;
+      }>(
+        "select s.plan_key, s.provider_ref, s.period_end, s.billing_workspace_id from workspaces w join subscriptions s on s.workspace_id=w.id where w.name=$1",
+        ["client b"],
+      )
+    ).rows[0];
+    expect(clientBSub).toEqual({
+      plan_key: "creator_plus",
+      provider_ref: "propagate",
+      period_end: homeSub.period_end,
+      billing_workspace_id: home,
+    });
+
+    // (c) exactly one audit row, on the workspace actually named in the call.
+    const audit = await db.query<{ action: string; workspace_id: string }>(
+      "select action, workspace_id from audit_events where workspace_id=$1",
+      [clientA],
+    );
+    expect(audit.rows).toEqual([{ action: "plan_set", workspace_id: clientA }]);
+
+    // (d) the propagation update never created a second row for the root.
+    const rootCount = await db.query<{ count: string }>(
+      "select count(*) from subscriptions where workspace_id=$1",
+      [home],
+    );
+    expect(Number(rootCount.rows[0].count)).toBe(1);
+  });
 });
