@@ -91,6 +91,8 @@ export function adminErrorMessage(error: unknown, S: Strings): string {
   if (e.message === "forbidden") return S.adminForbidden;
   // set_workspace_plan over a root Paddle is billing, without override.
   if (e.message === "paddle_subscription_active") return S.adminPaddleActive;
+  if (e.message === "billing_root") return S.adminDeleteBillingRoot;
+  if (e.message === "last_workspace") return S.adminDeleteLast;
   const code =
     typeof e.message === "string" && KNOWN.has(e.message)
       ? e.message

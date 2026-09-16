@@ -42,6 +42,7 @@ import {
   type PackKind,
 } from "./adminWords";
 import { useStrings } from "./strings";
+import { DeleteWorkspaceDialog } from "./DeleteWorkspaceDialog";
 import {
   Select,
   SelectContent,
@@ -139,6 +140,7 @@ export function AdminPage() {
                 <th scope="col">{S.adminProvider}</th>
                 <th scope="col">{S.adminSetPlan}</th>
                 <th scope="col">{S.adminGrantPack}</th>
+                <th scope="col">{S.adminDelete}</th>
               </tr>
             </thead>
             <tbody>
@@ -398,6 +400,14 @@ function WorkspaceRow({
           </button>
           {feedback("pack")}
         </form>
+      </td>
+      <td>
+        <DeleteWorkspaceDialog
+          workspace={{ id: w.id, name: row.name }}
+          onDeleted={() =>
+            void queryClient.invalidateQueries({ queryKey: ["admin"] })
+          }
+        />
       </td>
     </tr>
   );

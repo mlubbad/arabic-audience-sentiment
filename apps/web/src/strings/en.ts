@@ -252,6 +252,30 @@ export const en: Strings = {
   adminUnits: "Units",
   adminSetPlan: "Set plan",
   adminGrantPack: "Grant pack",
+  adminDelete: "Delete permanently",
+  adminDeleteTitle: (name: string) => `Delete “${name}” permanently`,
+  adminDeleteLead:
+    "This is a real deletion and cannot be undone: the channel, its comments, labels, reviews and history are all erased. Nothing can be recovered.",
+  adminDeleteFootprint: (n: {
+    channels: number;
+    videos: number;
+    comments: number;
+    predictions: number;
+    reviews: number;
+    members: number;
+  }) =>
+    `${n.channels} channels · ${n.videos} videos · ${n.comments} comments · ${n.predictions} labels · ${n.reviews} reviews · ${n.members} members`,
+  adminDeleteFootprintReading: "Counting what will be deleted…",
+  adminDeleteTypeName: (name: string) =>
+    `Type the workspace name “${name}” to confirm`,
+  adminDeleteConfirm: "Delete permanently",
+  adminDeleteCancel: "Cancel",
+  adminDeleteClose: "Close",
+  adminDeleteDone: (name: string) => `“${name}” was permanently deleted.`,
+  adminDeleteBillingRoot:
+    "Other workspaces bill under this one; it cannot be deleted while it is a billing root.",
+  adminDeleteLast:
+    "Your last workspace cannot be deleted; create another first.",
   adminOverride: "Override the active Paddle subscription",
   adminPaddleActive:
     "This workspace has an active Paddle subscription; enable override to change it",

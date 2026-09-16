@@ -261,6 +261,29 @@ export const ar = {
   adminUnits: "الوحدات",
   adminSetPlan: "تعيين الخطة",
   adminGrantPack: "منح حزمة",
+  adminDelete: "حذف نهائي",
+  adminDeleteTitle: (name: string) => `حذف «${name}» نهائيًا`,
+  adminDeleteLead:
+    "هذا حذف حقيقي لا رجعة فيه: القناة وتعليقاتها وتصنيفاتها ومراجعاتها وسجلّها كلها تُمحى. لا يمكن استرجاعها.",
+  adminDeleteFootprint: (n: {
+    channels: number;
+    videos: number;
+    comments: number;
+    predictions: number;
+    reviews: number;
+    members: number;
+  }) =>
+    `${n.channels} قناة · ${n.videos} فيديو · ${n.comments} تعليق · ${n.predictions} تصنيف · ${n.reviews} مراجعة · ${n.members} عضو`,
+  adminDeleteFootprintReading: "جارٍ عدّ ما سيُحذف…",
+  adminDeleteTypeName: (name: string) =>
+    `اكتب اسم المساحة «${name}» لتأكيد الحذف`,
+  adminDeleteConfirm: "احذف نهائيًا",
+  adminDeleteCancel: "إلغاء",
+  adminDeleteClose: "إغلاق",
+  adminDeleteDone: (name: string) => `حُذفت «${name}» نهائيًا.`,
+  adminDeleteBillingRoot:
+    "مساحات أخرى تُفوتر تحت هذه المساحة؛ لا يمكن حذفها ما دامت جذرًا للفوترة.",
+  adminDeleteLast: "لا يمكن حذف آخر مساحة لك؛ أنشئ أخرى أولًا.",
   adminOverride: "تجاوز اشتراك Paddle النشط",
   adminPaddleActive: "المساحة على اشتراك Paddle نشط؛ فعّل التجاوز لتغييره",
   adminDone: "تم التنفيذ.",
