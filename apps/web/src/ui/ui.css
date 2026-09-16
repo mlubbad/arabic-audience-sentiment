@@ -112,3 +112,47 @@
     background-position: -200% 0;
   }
 }
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: 999px;
+  padding: 2px var(--space-3);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ui-badge--neutral {
+  background: var(--bg-muted);
+  color: var(--text-2);
+}
+.ui-badge--success {
+  background: var(--success-100);
+  color: var(--color-success);
+}
+.ui-badge--warning {
+  background: var(--warning-bg);
+  color: var(--color-warning);
+}
+.ui-badge--danger {
+  background: var(--ml-rose-100);
+  color: var(--color-danger);
+}
+
+/* The sentiment scale: one source, brand.css's --sentiment-* tokens, never a
+   value re-typed here. See docs/coordination/ACTIVE.md on why this is the
+   dominant bug shape in this codebase. */
+.ui-badge--positive {
+  background: color-mix(in srgb, var(--sentiment-positive) 14%, white);
+  color: var(--sentiment-positive);
+}
+.ui-badge--negative {
+  background: color-mix(in srgb, var(--sentiment-negative) 14%, white);
+  color: var(--sentiment-negative);
+}
+.ui-badge--sentiment-mixed {
+  background: color-mix(in srgb, var(--sentiment-mixed) 14%, white);
+  color: var(--sentiment-mixed);
+}
