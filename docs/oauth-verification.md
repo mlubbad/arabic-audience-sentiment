@@ -122,6 +122,15 @@ matching what the reviewer's checklist looks for at each second:
 Upload as **unlisted** (not private — Google's reviewer must be able to open the link
 without signing in as you), and paste that link into the verification form.
 
+**Recorded, 2026-09-16:** https://youtu.be/tqQV--DhFU0 (2:00, Unlisted). Two earlier
+attempts (`youtu.be/wruKZHTg26I`, 47s; `youtu.be/3z25LhO0eWA`, 28s) were preliminary tests,
+too short to cover the script, and are not this video. Spot-checked via YouTube's own
+scrub-thumbnail previews (no audio check possible from this session): 0:29 shows the
+app itself, 1:30 shows Google's real consent screen ("…supabase.co wants access to your
+Google Account"), 1:50 shows the `/sync` catalogue — the three screens a reviewer checks
+first. Narration content was not verified; the owner reviewed it with sound before
+approving.
+
 ## 3. What happens after submission
 
 - Google typically responds in days to a few weeks; may ask follow-up questions by email
@@ -153,11 +162,11 @@ expected and must be shown in the video" — exactly what §2's script already d
 - Data Access: `youtube.readonly` and `youtube.force-ssl` declared under "Your sensitive
   scopes"; the 990-character justification (§1) pasted into "How will the scopes be
   used?".
+- Demo video: recorded and uploaded (§2) — https://youtu.be/tqQV--DhFU0.
 
 ## 4. Status
 
-**In progress.** Branding, domain ownership and the scope declaration are done; the
-justification text is drafted (§1) and ready to paste. The one remaining field is the
-demo video's YouTube link — needs the owner's own screen recording per §2's script,
-uploaded unlisted, then pasted into "Demo video: how will the scopes be used?" before
-Save becomes available on the Data Access page.
+**Ready to submit.** Branding, domain ownership, the scope declaration, the justification
+text and the demo video are all done. What's left is pasting the video link into the
+Data Access page's "Demo video" field and pressing Save — the owner's own action, since
+it is a live edit on the Google Auth Platform console.
