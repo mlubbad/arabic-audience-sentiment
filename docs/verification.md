@@ -2164,3 +2164,35 @@ Google's Rich Results Test, run from the browser pane against the live pages:
 | `/pricing`, first run | Software Apps valid; 5 non-critical: `aggregateRating`, and **"Invalid object type for field priceSpecification"** on each of the four offers |
 | Fix | `offersFrom` no longer writes a `UnitPriceSpecification`; each offer carries `name`, `price`, `priceCurrency`, `availability`, `url`. `seo.test.ts` asserts none is written. Built and deployed |
 | `/en/pricing`, after the fix | crawled 00:57:36; Software Apps valid; **1 non-critical** (`aggregateRating`, optional) |
+
+## 2026-09-17 — Core Web Vitals on the live host, and the fix wave they asked for
+
+PageSpeed Insights' keyless API answered `429` (daily quota, shared project), so Lighthouse
+12 was run locally (`npx lighthouse@12`, Chrome 141, `--headless=new`, default simulated
+throttling; `--preset=desktop` for the desktop rows) against the deployed pages.
+
+| Page, form | Before | After |
+| --- | --- | --- |
+| `/` mobile | perf 57 · LCP 4.2 s · FCP 3.9 s · **CLS 0.279** · SI 7.1 s · a11y 96 | perf **86** · LCP 4.1 s · FCP 1.8 s · CLS 0 · SI 1.9 s · a11y 100 |
+| `/en` mobile | perf 67 · LCP 5.3 s · FCP 4.6 s · CLS 0 · SI 5.3 s | perf 84 · LCP 3.8 s · FCP 2.5 s · CLS 0 · SI 3.2 s |
+| `/pricing` mobile | perf 72 · LCP 4.6 s · FCP 3.9 s · SI 5.3 s | perf 77 · LCP 4.7 s · FCP 3.2 s · SI 3.3 s (measured before the low-priority bundle change) |
+| `/`, `/en`, `/pricing` desktop | perf 98 / 96 / 98 · LCP 0.9–1.1 s · CLS ≤ 0.04 | not re-run |
+| SEO / best practices | 100 / 79 on every page | 100 / 79 |
+
+What Lighthouse named, and what was changed for each:
+
+| Finding | Change |
+| --- | --- |
+| `cdn.paddle.com/paddle/v2/paddle.js` render-blocking, est. 926 ms | `defer` on the script in `index.html`; checkout reads `window.Paddle` at click time |
+| Layout shift on `section.lp-hero`, CLS 0.279 — the H1 swapping into the display bold after first paint | `arabic-regular.woff2` / `arabic-bold.woff2` (67,828 / 69,436 bytes; TTF kept as fallback) listed first in `landing.css`; the prerender preloads both on Arabic pages and `readex-latin-700/400` on English ones; checked per page by the prerender |
+| Bundle (218 kB) fetched at High priority on a page whose words are already in the HTML | `fetchpriority="low"` on the module script of prerendered pages only (`app.html` untouched) |
+| `color-contrast` on `.lp-hero-word` (1.14:1, decorative, `aria-hidden`) | the word is drawn by `::after { content: attr(data-word) }` — no text node |
+| `label-content-name-mismatch` on the language switch (`aria-label` in one language over a word in the other) | `aria-label` removed; the visible word is the name; `switchLabel` deleted from both string files |
+
+Left as measured: LCP ≈ 4 s on simulated slow 4G is the H1's swap into the 69 kB display
+bold (render delay 3.2–3.6 s of it); options recorded in `docs/seo.md` §6. Best practices
+79: Paddle's third-party cookie, no source maps, the matching DevTools issue.
+
+Checks after the wave: typecheck 0 errors; web unit tests 66 files / 408 passed; the whole
+browser suite **103 passed** (1.3 m); build with every prerender check green; deployed, and the
+WOFF2 files answer `200 font/woff2` from the host.

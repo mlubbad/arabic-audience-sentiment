@@ -197,9 +197,11 @@ export function Landing({ locale }: { locale: Locale }) {
               </div>
             </div>
           </div>
-          <div className="lp-hero-word" aria-hidden="true">
-            {S.lpHeroWord}
-          </div>
+          <div
+            className="lp-hero-word"
+            aria-hidden="true"
+            data-word={S.lpHeroWord}
+          />
         </section>
         <div className="lp-value-strip">
           <span>{S.lpValue1}</span>

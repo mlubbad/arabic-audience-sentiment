@@ -185,8 +185,23 @@ Before flipping it:
   the site is indexed.
 - **A blog or guides** for the informational long tail («كيف أحلل تعليقات يوتيوب»):
   worth doing once the product is public; the FAQ carries the first answers.
-- **Core Web Vitals on the live host**: the hero is 29 kB and preloaded, the fonts are
-  self-hosted, but LCP/CLS on the CDN were not measured from here.
+- **Core Web Vitals on the live host** — measured 2026-09-17 with Lighthouse 12 against
+  the deployed pages (the PageSpeed API's keyless quota was exhausted; the same engine
+  locally, Chrome 141, default mobile simulation). Desktop was 96–98 from the start.
+  Mobile, the landing: 57 → **86** after four changes — Paddle.js `defer` (it was a
+  render-blocking third-party script on every page), the Arabic display fonts as WOFF2
+  (69 kB against 89 kB over the wire) preloaded from the prerendered head, the bundle
+  fetched at low priority on prerendered pages, and the decorative hero word drawn by a
+  pseudo-element (the one contrast failure). CLS 0.28 → 0, FCP 3.9 s → 1.8 s, Speed
+  Index 7.1 s → 1.9 s, accessibility 96 → 100. What is left is LCP ≈ 4 s under
+  simulated slow 4G: the H1 is the LCP element and its final paint is the swap into the
+  display bold. The honest next steps are a metrics-matched fallback face (`size-adjust`
+  and `ascent-override` tuned per platform) so the swap moves nothing and the first
+  paint counts, or `font-display: optional` on the bold — which would show the fallback
+  to a slow first visit, the owner's call. Subsetting the font saves only 12 kB (it is
+  mostly Arabic glyphs already) and was not done. Field data (CrUX) needs 28 days of
+  traffic first. Best practices stays at 79 for reasons outside the page: a third-party
+  cookie from Paddle, no source maps shipped, and Chrome's issue panel logging the same.
 - **`/en` for the product itself**: the shell's language stays a preference; its
   routes are not indexed, so they need no second address.
 

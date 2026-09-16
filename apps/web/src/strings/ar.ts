@@ -62,7 +62,6 @@ export const ar = {
   signOutFailed: "تعذّر تسجيل الخروج",
   /** The switch names the other language, in that language. */
   switchToOther: "English",
-  switchLabel: "تغيير لغة الواجهة",
 
   // ---- signing in and up (authMessages.ts, authProviders.ts) ----
   authInvalidCredentials:

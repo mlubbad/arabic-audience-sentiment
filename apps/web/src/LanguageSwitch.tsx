@@ -5,8 +5,10 @@
  * reader, "العربية" to an English one — because a reader who cannot read the
  * current language needs the button to be legible to them, not to us. The
  * control carries its own `lang` so a screen reader pronounces the word in
- * the language it is written in, and a stable accessible name so a test can
- * find it in either state.
+ * the language it is written in. Its visible word is its accessible name —
+ * an `aria-label` in the current language over a word in the other one was
+ * a label/name mismatch (WCAG 2.5.3, flagged by Lighthouse 2026-09-17); a test
+ * finds it by its test id.
  *
  * On a public page it is a link, not a button: the other language is another
  * address (`publicPaths.ts`), and a link is what a crawler follows to find
@@ -40,7 +42,6 @@ export function LanguageSwitch({
         to={to}
         hrefLang={other}
         lang={other}
-        aria-label={S.switchLabel}
         data-testid="language-switch"
         onClick={(event) => {
           if (
@@ -67,7 +68,6 @@ export function LanguageSwitch({
       type="button"
       className="app-lang"
       lang={other}
-      aria-label={S.switchLabel}
       data-testid="language-switch"
       // The other language's strings arrive before the locale flips, so the
       // page never renders one language's words under the other's `lang`.

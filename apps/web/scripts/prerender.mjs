@@ -116,9 +116,32 @@ for (const route of PUBLIC_ROUTES) {
   // text — so the file can carry the spelling a validator expects.
   const head = rendered.head.replace(/\bhrefLang=/g, "hreflang=");
   const dir = locale === "ar" ? "rtl" : "ltr";
+  // The fonts the first paint needs, asked for with the HTML rather than
+  // after the stylesheet has arrived and been parsed: the Arabic display
+  // face on Arabic pages, the Latin one on English. A heading that paints in
+  // the fallback and then swaps moves everything under it — the 0.28 CLS
+  // Lighthouse measured on the Arabic landing on a phone (2026-09-17).
+  const fonts =
+    locale === "ar"
+      ? ["/landing/arabic-bold.woff2", "/landing/arabic-regular.woff2"]
+      : ["/fonts/readex-latin-700.woff2", "/fonts/readex-latin-400.woff2"];
+  const preload = fonts
+    .map(
+      (href) =>
+        `<link rel="preload" as="font" type="font/woff2" href="${href}" crossorigin/>`,
+    )
+    .join("");
   let page = original
     .replace(/<html[^>]*>/, `<html lang="${locale}" dir="${dir}">`)
-    .replace("</head>", `${head}</head>`)
+    .replace("</head>", `${preload}${head}</head>`)
+    // On a prerendered page the bundle is for later — the words are already
+    // in the HTML — so it yields the connection to the stylesheet and the
+    // fonts the first paint waits on. `app.html` keeps the default: there the
+    // bundle is everything.
+    .replace(
+      /<script type="module" crossorigin src=/,
+      '<script type="module" crossorigin fetchpriority="low" src=',
+    )
     .replace('<div id="root"></div>', `<div id="root">${html}</div>`);
   if (route.page === "pricing")
     page = page.replace(
@@ -199,6 +222,7 @@ for (const { path, locale, page: kind, file } of written) {
   const at = (msg) => failures.push(`${path}: ${msg}`);
   const doc = readFileSync(file, "utf8");
   if (!doc.includes(`<html lang="${locale}"`)) at(`html lang is not ${locale}`);
+  if (!/rel="preload" as="font"/.test(doc)) at("no font preload");
   if (!/<h1[\s>]/.test(doc)) at("no <h1>");
   if (!doc.includes(`<link rel="canonical" href="${SITE_URL}${path}"`))
     at("canonical missing or wrong");

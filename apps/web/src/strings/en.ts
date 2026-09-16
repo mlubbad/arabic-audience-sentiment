@@ -50,7 +50,6 @@ export const en: Strings = {
   signingOut: "Signing out…",
   signOutFailed: "Could not sign out",
   switchToOther: "العربية",
-  switchLabel: "Change interface language",
 
   authInvalidCredentials:
     "The email or password is incorrect, or there is no account for this email. To create one, choose “Create account”.",
