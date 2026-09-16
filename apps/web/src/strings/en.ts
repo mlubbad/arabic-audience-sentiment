@@ -839,7 +839,6 @@ export const en: Strings = {
   lpNavWhy: "Why Audience Sentiment?",
   lpNavExperience: "See the demo",
   lpNavFaq: "FAQ",
-  navPricing: "Pricing",
   lpOpenAccount: "Open the account",
   lpHeroEyebrow: "YouTube comments. A clearer view.",
   lpHeroLine1: "Behind every comment,",

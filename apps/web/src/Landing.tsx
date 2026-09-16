@@ -128,7 +128,8 @@ export function Landing() {
           <a href="#questions" onClick={() => setMenuOpen(false)}>
             {S.lpNavFaq}
           </a>
-          <Link to="/pricing">{S.navPricing}</Link>
+          {/* The page's own title is the link's text: one sentence, one key. */}
+          <Link to="/pricing">{S.pricingTitle}</Link>
         </nav>
         <Link className="lp-header-cta" to="/account">
           {S.lpOpenAccount} <span aria-hidden="true">{S.arrowUpForward}</span>

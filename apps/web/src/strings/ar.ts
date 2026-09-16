@@ -831,7 +831,6 @@ export const ar = {
   lpNavWhy: "لماذا مشاعر الجمهور؟",
   lpNavExperience: "شاهد التجربة",
   lpNavFaq: "أسئلة شائعة",
-  navPricing: "الأسعار",
   lpOpenAccount: "فتح الحساب",
   lpHeroEyebrow: "تعليقات يوتيوب. رؤية أوضح.",
   lpHeroLine1: "وراء كل تعليق،",

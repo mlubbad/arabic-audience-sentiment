@@ -87,6 +87,17 @@ describe("pricing rows", () => {
     expect(row.perLabel).toBe("");
     expect(row.yearlyNote).toBeNull();
   });
+  it("the current plan wins over contact too", () => {
+    const [row] = pricingRows(
+      [plan({ key: "media", self_serve: false })],
+      "individual",
+      "month",
+      "ar",
+      ar,
+      "media",
+    );
+    expect(row.cta).toEqual({ kind: "current", label: ar.pricingCtaCurrent });
+  });
   it("a self-serve paid plan checks out; the current plan wins over checkout and free", () => {
     const [checkoutRow] = pricingRows(
       [plan({})],
