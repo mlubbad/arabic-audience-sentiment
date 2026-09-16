@@ -426,3 +426,38 @@
 .ui-select-item[data-highlighted] {
   background: var(--bg-muted);
 }
+
+.ui-toast-viewport {
+  position: fixed;
+  bottom: var(--space-5);
+  /* Logical, not left/right: the viewport sits at the reading-end corner in
+     both directions, matching where this app's other transient chrome
+     (the announcement bar's language switch) already sits. */
+  inset-inline-end: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 320px;
+  max-width: calc(100vw - var(--space-6));
+  z-index: 70;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ui-toast-root {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-3);
+  padding: var(--space-4);
+}
+.ui-toast-title {
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0 0 var(--space-1);
+}
+.ui-toast-description {
+  color: var(--text-2);
+  margin: 0;
+  font-size: var(--fs-small);
+}

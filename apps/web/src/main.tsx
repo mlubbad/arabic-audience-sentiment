@@ -26,6 +26,7 @@ import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
 import { useIsPlatformAdmin } from "./adminAccess";
 import { supabase } from "./supabase";
+import { ToastHost } from "./ui/Toast";
 import { carriedSearch } from "./workspaceUrl";
 import {
   applyToDocument,
@@ -473,6 +474,7 @@ void loadStrings(currentLocale()).then(() =>
             </Route>
           </Routes>
         </BrowserRouter>
+        <ToastHost />
       </QueryClientProvider>
     </React.StrictMode>,
   ),
