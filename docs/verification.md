@@ -1659,3 +1659,18 @@ at load average 5.3. Screenshot of page two taken with a throwaway Playwright sc
 against `web-dev-5176` with the same 30-video route rewrite; not committed.
 
 Not live-tested: the built front end has not been redeployed with this change.
+
+## 2026-09-16 — preview deploy of 348895c (the videos pager)
+
+`npm run build` (Dashboard chunk `Dashboard-DjCNa2EG.js`, entry `index-DFEGkI-B.js`),
+then `npm run deploy:preview`: 28 files uploaded, every transfer answered 226, and the
+twelve hashed assets of the previous build removed by the sweep. Fetched back over
+basic auth and compared with the local `dist` byte for byte: `index.html`, both entry
+chunks, the CSS, `Dashboard-DjCNa2EG.js`, `report-gTalQbOi.css` and
+`fixtures/dashboard.json` — all identical. The served Dashboard chunk contains
+`video-page-state` and the served entry contains "تصفح الفيديوهات", so what
+`app.sky-develop.net` serves is the pager build.
+
+Not verified from here: the signed-in dashboard for workspace `d0c3b9fc-…` in a browser
+(no session in this environment). The pager appears only for a workspace whose filtered
+list exceeds 25 videos; the user's screenshot shows such a workspace.
