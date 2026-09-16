@@ -2,7 +2,16 @@
    decompression on the device), the TTF kept as the fallback and the OFL
    original. The prerender preloads the two WOFF2 files on Arabic pages: the
    H1 is set in the bold, and a swap after first paint moved it — CLS 0.28
-   on mobile before, measured with Lighthouse on 2026-09-17. */
+   on mobile before, measured with Lighthouse on 2026-09-17.
+
+   `swap`, and `optional` was tried the same day (2026-09-17). Measured
+   A/B on a throttled phone (slow 4G, 4× CPU, cold cache, four runs each,
+   `paint-ab.mjs`): FCP = LCP ≈ 2.4 s, CLS 0, the H1 in the web face, for
+   both — identical. The preloaded face is in hand at first paint either
+   way, and with the fallbacks below sized to it a swap would move nothing.
+   The later "LCP" Lighthouse reports is its simulator's estimate; every
+   trace shows observed FCP = observed LCP. `optional` would only take the
+   web face away from a slow first visit for no gain, so `swap` stays. */
 @font-face {
   font-family: "Audience Arabic";
   src:

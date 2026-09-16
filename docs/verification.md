@@ -2215,3 +2215,24 @@ At the owner's instruction. Three fallback families in `apps/web/src/landing.css
 
 Not measured: the Noto faces in Chrome on Android — no such device or font here; their
 ratios are HarfBuzz's, uncorrected.
+
+## 2026-09-17 — `font-display: optional`, tried at the owner's instruction, measured, and not kept
+
+Deployed with `optional` on the two Arabic faces, then measured; then put back to `swap`
+and deployed again. What decided it:
+
+| Measurement | swap | optional |
+| --- | --- | --- |
+| Lighthouse 12 mobile, live host (simulated) | perf 73–95 · sim LCP 2.8–4.5 s · CLS 0 | perf 74–79 · sim LCP 4.0–4.4 s · CLS 0 |
+| The same traces, **observed** FCP / LCP | 697 / 697 ms and 2249 / 2249 ms (two runs — the host varies that much) | 2398 / 2398 and 2329 / 2329 ms |
+| A/B under control (`.cache/scratch/paint-ab.mjs`: both builds served locally, CDP slow-4G 1.6 Mbps / 150 ms, 4× CPU, cache disabled, 390 px phone, 4 cold runs each) | FCP = LCP 2372–2408 ms · CLS 0 · H1 in the web face | FCP = LCP 2360–2428 ms · CLS 0 · H1 in the web face |
+
+The two are indistinguishable. In every trace the H1 is the LCP element and paints at
+first paint (observed FCP = observed LCP); the later LCP Lighthouse prints is Lantern's
+estimate of a page whose fonts sit in its critical path, not a second paint. `optional`
+therefore had nothing to shorten, and on a visit where the preload lost the race it would
+keep the page in the fallback face for good. `swap` is deployed.
+
+The variance to know about: the live host answers the same build with an observed first
+paint of 0.7 s on one run and 2.2 s on the next. Field data (CrUX) is what settles that,
+and needs traffic.
