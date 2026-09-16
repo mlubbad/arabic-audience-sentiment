@@ -1425,6 +1425,7 @@ import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useDirection } from "@radix-ui/react-direction";
 import {
   Dialog,
   DialogClose,
@@ -1434,6 +1435,17 @@ import {
   DialogTrigger,
 } from "./Dialog";
 import { Button } from "./Button";
+
+/** Reports the `Direction` context it actually reads, from inside whatever
+ *  rendered it — used only by the RTL test below. Radix's `useDirection()`
+ *  falls back to `"ltr"` silently when no context is found (it never
+ *  throws), so a test that only checks "did the dialog still open" would
+ *  pass identically whether or not `DirectionProvider`'s value survived the
+ *  `Portal`. This probe checks the value itself, not a proxy for it. */
+function DirectionProbe() {
+  const dir = useDirection();
+  return <span data-testid="dir-probe">{dir}</span>;
+}
 
 function ExampleDialog() {
   return (
@@ -1445,6 +1457,7 @@ function ExampleDialog() {
         <DialogTitle>تأكيد منح الحزمة</DialogTitle>
         <DialogDescription>لا يمكن التراجع عن هذا الإجراء.</DialogDescription>
         <button type="button">أول عنصر قابل للتركيز</button>
+        <DirectionProbe />
         <DialogClose asChild>
           <Button variant="secondary">إلغاء</Button>
         </DialogClose>
@@ -1494,7 +1507,7 @@ describe("Dialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("under Direction=rtl, still opens through its Portal, traps focus, and Escape still closes it", async () => {
+  it("under DirectionProvider dir=rtl: useDirection() inside the Portal's content reports \"rtl\", not the silent \"ltr\" fallback, and the mechanics (focus trap, Escape close, focus return) still work", async () => {
     render(
       <DirectionProvider dir="rtl">
         <ExampleDialog />
@@ -1504,6 +1517,7 @@ describe("Dialog", () => {
     await userEvent.click(trigger);
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    expect(screen.getByTestId("dir-probe")).toHaveTextContent("rtl");
     await userEvent.keyboard("{Escape}");
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
@@ -1638,9 +1652,16 @@ import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { DirectionProvider } from "@radix-ui/react-direction";
+import { DirectionProvider, useDirection } from "@radix-ui/react-direction";
 import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
 import { Button } from "./Button";
+
+/** See Dialog.test.tsx's DirectionProbe for why this checks useDirection()
+ *  itself rather than only whether the popover still opens. */
+function DirectionProbe() {
+  const dir = useDirection();
+  return <span data-testid="dir-probe">{dir}</span>;
+}
 
 function ExamplePopover() {
   return (
@@ -1648,7 +1669,10 @@ function ExamplePopover() {
       <PopoverTrigger asChild>
         <Button>خيارات العمود</Button>
       </PopoverTrigger>
-      <PopoverContent>محتوى القائمة</PopoverContent>
+      <PopoverContent>
+        محتوى القائمة
+        <DirectionProbe />
+      </PopoverContent>
     </Popover>
   );
 }
@@ -1681,7 +1705,7 @@ describe("Popover", () => {
     );
   });
 
-  it("under Direction=rtl, still opens through its Portal and Escape still closes it", async () => {
+  it("under DirectionProvider dir=rtl: useDirection() inside the Portal's content reports \"rtl\", and the popover still opens/closes correctly", async () => {
     render(
       <DirectionProvider dir="rtl">
         <ExamplePopover />
@@ -1690,6 +1714,7 @@ describe("Popover", () => {
     const trigger = screen.getByRole("button", { name: "خيارات العمود" });
     await userEvent.click(trigger);
     expect(await screen.findByText("محتوى القائمة")).toBeVisible();
+    expect(screen.getByTestId("dir-probe")).toHaveTextContent("rtl");
     await userEvent.keyboard("{Escape}");
     await waitFor(() =>
       expect(screen.queryByText("محتوى القائمة")).not.toBeInTheDocument(),
@@ -1799,7 +1824,7 @@ import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { DirectionProvider } from "@radix-ui/react-direction";
+import { DirectionProvider, useDirection } from "@radix-ui/react-direction";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1808,6 +1833,14 @@ import {
 } from "./DropdownMenu";
 import { Button } from "./Button";
 
+/** See Dialog.test.tsx's DirectionProbe for why this checks useDirection()
+ *  itself. A plain non-interactive element, not a DropdownMenuItem — it
+ *  must not join the roving-tabindex order the ArrowDown test below checks. */
+function DirectionProbe() {
+  const dir = useDirection();
+  return <div data-testid="dir-probe">{dir}</div>;
+}
+
 function ExampleMenu() {
   return (
     <DropdownMenu>
@@ -1815,6 +1848,7 @@ function ExampleMenu() {
         <Button>إجراءات</Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
+        <DirectionProbe />
         <DropdownMenuItem>تصدير CSV</DropdownMenuItem>
         <DropdownMenuItem>تصحيح التصنيف</DropdownMenuItem>
         <DropdownMenuItem disabled>حذف</DropdownMenuItem>
@@ -1854,7 +1888,7 @@ describe("DropdownMenu", () => {
     expect(trigger).toHaveFocus();
   });
 
-  it("under a Direction=rtl context, still opens and navigates — the Portal-context check from Tooltip, repeated for a menu with real keyboard nav", async () => {
+  it("under DirectionProvider dir=rtl: useDirection() inside the Portal's content reports \"rtl\", and ArrowDown still navigates the (direction-independent) roving tabindex", async () => {
     render(
       <DirectionProvider dir="rtl">
         <ExampleMenu />
@@ -1862,13 +1896,14 @@ describe("DropdownMenu", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "إجراءات" }));
     await screen.findByRole("menu");
+    expect(screen.getByTestId("dir-probe")).toHaveTextContent("rtl");
     await userEvent.keyboard("{ArrowDown}");
     expect(screen.getByRole("menuitem", { name: "تصدير CSV" })).toHaveFocus();
   });
 });
 ```
 
-The third and fourth tests are the ones worth reading closely: Radix's `DropdownMenu` roving tabindex moves by `ArrowDown`/`ArrowUp` regardless of `dir` (menus open top-to-bottom in both directions; `dir` changes horizontal submenu placement, which this component doesn't use). What `dir` changes here is *whether the component still functions at all* inside a flipped `Direction` context reached through a `Portal` — the same context-survival question `Tooltip`'s second test asked, now against a component with real roving-tabindex state to lose if the context broke.
+The fourth test is worth reading closely: Radix's `DropdownMenu` roving tabindex moves by `ArrowDown`/`ArrowUp` regardless of `dir` (menus open top-to-bottom in both directions; `dir` changes horizontal submenu placement, which this component doesn't use) — so `ArrowDown` still landing on the first item proves nothing RTL-specific on its own, which is why the test also asserts the `DirectionProbe`'s own reading of `useDirection()`. Radix's `useDirection()` falls back to `"ltr"` silently with no context (it never throws), so the probe is what actually proves `DirectionProvider`'s value survived the `Portal` this menu renders through — not a smoke check that the menu merely still opened.
 
 - [ ] **Step 3: Run it to see it fail**
 
@@ -2155,8 +2190,19 @@ import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { DirectionProvider } from "@radix-ui/react-direction";
+import { DirectionProvider, useDirection } from "@radix-ui/react-direction";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./Select";
+
+/** See Dialog.test.tsx's DirectionProbe for why this checks useDirection()
+ *  itself. A plain element among the items, not a SelectItem, so it can't
+ *  be picked and doesn't shift which option ArrowDown/Enter select. Only
+ *  mounted while the listbox is open (SelectContent renders through a
+ *  Portal that Radix keeps unmounted until then), which is exactly when the
+ *  RTL test needs to read it. */
+function DirectionProbe() {
+  const dir = useDirection();
+  return <div data-testid="dir-probe">{dir}</div>;
+}
 
 function ExampleSelect({
   onValueChange,
@@ -2169,6 +2215,7 @@ function ExampleSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
+        <DirectionProbe />
         <SelectItem value="founding_partner">شريك مؤسِّس</SelectItem>
         <SelectItem value="growth">نمو</SelectItem>
         <SelectItem value="scale">توسّع</SelectItem>
@@ -2194,7 +2241,7 @@ describe("Select", () => {
     expect(onValueChange).toHaveBeenCalledWith("growth");
   });
 
-  it("under Direction=rtl, still opens and ArrowDown still moves to the next option (vertical nav is direction-independent, and this is the check that Portal + RTL doesn't silently break it)", async () => {
+  it("under DirectionProvider dir=rtl: useDirection() inside the Portal's content reports \"rtl\", and ArrowDown still moves to the next (direction-independent) option", async () => {
     const onValueChange = vi.fn();
     render(
       <DirectionProvider dir="rtl">
@@ -2203,6 +2250,7 @@ describe("Select", () => {
     );
     await userEvent.click(screen.getByRole("combobox", { name: "الخطة" }));
     await screen.findByRole("listbox");
+    expect(screen.getByTestId("dir-probe")).toHaveTextContent("rtl");
     await userEvent.keyboard("{ArrowDown}");
     await userEvent.keyboard("{Enter}");
     expect(onValueChange).toHaveBeenCalledWith("growth");
