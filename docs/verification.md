@@ -1854,3 +1854,35 @@ dashboard step, not code. Left open; see progress.md.
 Two things the walk showed for the rail card and the panel: the card prints the plan key
 (`خطة free`) rather than the title, and an open-ended free plan reads «تتجدد في 2126-09-16».
 Both go with the `pilot` rename the user asked for.
+
+## 2026-09-16 — a real sandbox payment, end to end
+
+After the user set Paddle's checkout settings (default payment link, website approval),
+the account page's «إضافة 10,000 تعليق» opened Paddle's overlay in sandbox for the probe
+user: "Analysis pack — 10,000 comments, $5.00 inc. VAT" with PayPal offered beside the
+card form. Cards are the user's to type, not ours; he then paid from **his own** account
+on the pricing page instead — `txn_01m2n8077f6c9164dn3pym8b86`, Creator monthly, $12.00
+(Paddle's invoice: $10.00 + 20% tax withheld $2.00, Paddle fee $1.10, net $8.90).
+
+Paddle delivered `subscription.created` (`evt_01m2n8197g3spyc2b2yn8bpwzc`) and
+`subscription.activated` (`evt_01m2n8197g6t2bkb657fsdejq0`) to the deployed webhook, both
+`applied`, `custom_data.workspace_id` = his personal workspace `d0c3b9fc…`. The root row
+**and** its client «قناة يوتيوب» (`bf3f7333…`, `billing_workspace_id` = root) moved together
+to `creator / paddle / sub_01m2n8191adpkmm5cgq3ps8fj8 / ctm_01m2n8075nekv5qfzw4tm74n7e`
+— the root propagation, live, unprompted.
+
+Because that replaced his `owner` plan (correctly: a paid subscription is the truth), the
+subscription was cancelled over the sandbox API (`effective_from: immediately`);
+Paddle's `subscription.canceled` arrived within seconds and both rows read `cancelled`.
+Then `public.set_workspace_plan('d0c3b9fc…','owner',1200,'owner restore after sandbox
+test')` ran as his user id over `db query` — the same RPC the admin page calls — and both
+rows read `owner / admin / active` again, the client still bound to the root.
+
+Two things the invoice shows for the pricing decisions:
+1. Paddle displayed the pack **inclusive** of tax ($5.00 = 4.17 + 0.83) while the
+   subscription price was **exclusive** ($10 + $2 tax = $12). The decision recorded on
+   2026-09-16 is "price excludes tax, tax on top" — the pack price's tax mode in Paddle's
+   catalogue needs to match the subscription prices' (dashboard: Catalog → Prices → tax
+   mode "account setting", account setting "prices exclude tax"). Left to the user.
+2. Paddle withheld 20% tax for a customer it placed in Turkey, and its fee was 5% + $0.50
+   ($1.10 on $12) — the rate the consultation assumed.
