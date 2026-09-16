@@ -1917,3 +1917,27 @@ prints a plan key any more (`planTitle` is gone from both locales); the admin se
 offers titles from `admin_plan_catalogue()`. An open-ended plan (a period ending more than
 fifty years out) reads «بلا تاريخ انتهاء» — unit-tested; the probe's period is a real
 ninety days, so its date is the true one.
+
+## 2026-09-16 — the legal pages
+
+Unit (`apps/web/src/legal/legal.test.ts`, `LegalPage.test.ts`): the Arabic and English
+documents have the same section ids, paragraph and bullet counts and the same links in the
+same order; every link is https; both privacy policies link policies.google.com/privacy,
+youtube.com/t/terms and myaccount.google.com/permissions; both name `youtube.readonly`,
+`youtube.force-ssl` and thirty days; no document contains a personal name or mailbox; a
+server render of each document carries its title, `<time dateTime>`, one `<section id>` per
+contents entry and an anchor with `rel="noopener noreferrer"` for each inline link; the
+three footers mount `<LegalLinks`; `main.tsx` serves each `LEGAL_PATHS` entry. `npm test`
+425 passed, `test:db` 291, `worker:test` 177, build green, secrets scan green. Prettier:
+this branch's files pass; the untracked `supabase/tests/worker_video_counts.test.ts`
+(not this work's) fails `format:check`.
+
+Browser (`tests/e2e/legal.spec.ts`, 3 new; the whole suite 96 passed in 1.4m): the landing
+footer's «سياسة الخصوصية» opens `/privacy-policy` with the right `<h1>` and document
+title; the Google and YouTube anchors carry the required hrefs; the contents link scrolls
+`#retention` into view; `/terms` and `/third-party` are served and cross-linked, the Paddle
+buyer-terms anchor present; the language switch turns the document English with
+`lang="en"` and `dir="ltr"`. Seen on the dev server at 800, 1280 and 375 wide: the title
+block, contents grid and sections in Arabic and English, the legal row in the landing and
+app-shell footers. Not deployed; `/privacy-policy` on app.sky-develop.net answers only
+after the next `deploy:preview`.

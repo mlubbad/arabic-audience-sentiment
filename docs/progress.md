@@ -767,3 +767,21 @@ the admin select all show `title_ar`/`title_en` by the reader's locale — the a
 through a new admin-only `admin_plan_catalogue()` that includes the internal plans. The
 `planTitle` string and `INTERNAL_PLAN_KEYS` are gone. A plan granted for a century says
 «بلا تاريخ انتهاء» instead of a renewal year. Applied live and seen on the preview.
+
+## 2026-09-16 — the legal pages: privacy policy, terms, third-party services
+
+Three documents at `/privacy-policy`, `/terms` and `/third-party`, in both languages,
+outside the app shell like `/pricing`, linked by title from the landing footer, the pricing
+footer, the app-shell footer and each other (`LegalLinks`, one component). The text lives
+in `apps/web/src/legal/{ar,en}.ts` — not in `strings/`, whose `Loosen` admits no nesting
+and whose bundle every visitor carries — and is held to the code it describes: the two
+scopes `oauth-start` asks for, the thirty-day `purge_comment_text`, classification on our
+own servers with no model provider, Paddle as merchant of record with tax-external prices,
+the seven-day past-due grace, cancel dropping to free. The privacy policy carries what
+YouTube API Services requires of a client (Google Privacy Policy, YouTube ToS, the revoke
+page, the Limited Use sentence); the terms carry the cancellation and refund terms Paddle
+checks for; the third-party page names YouTube/Google, Paddle, Supabase, Cloudflare, the
+Hugging Face checkpoints and the MIT/Apache/OFL libraries. The "who we are" line is Sky
+Develop and its site — no person's name or mailbox, at the owner's instruction. Section ids
+match across languages (tested), inline links are `[label](https://…)` only. Not yet
+deployed.
