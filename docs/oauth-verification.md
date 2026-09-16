@@ -7,11 +7,13 @@ verification. This is a **different process** from the YouTube API quota-and-aud
 already submitted (`docs/youtube-quota-extension.md`) — same underlying facts, different
 Google form, and it can be submitted independently of that request's outcome.
 
-Where to submit: from Google Cloud Console → **APIs & Services → OAuth consent screen** →
-the **"Verification Status"** panel (or **"Prepare for verification"** if the app has never
-been submitted) → follow its own form. It reuses the branding already set (App name,
-logo, homepage, privacy policy, authorized domains) — confirm those are saved before
-starting (`docs/oauth-connect-flow.md` §4 confirms the app name is set as of 2026-09-16).
+Where to submit — confirmed against the live console on 2026-09-16 (the UI is now called
+**"Google Auth Platform"**, not "OAuth consent screen"): **Branding** (app name, logo,
+homepage, privacy policy, terms, authorized domains — all set 2026-09-16) → **Data
+Access** (declare the two scopes under "Add or remove scopes", write the justification,
+paste the demo video link, Save) → **Verification Center** (tracks status; this is what
+turned from "not required" to "Approval required" once the scopes were declared under
+Data Access).
 
 **Not required for this app:** the paid third-party security assessment (CASA). That
 applies to *restricted* scopes (full Gmail, full Drive, full Calendar, etc.). Both scopes
@@ -29,7 +31,28 @@ second scope exists only to unblock the first — see below.
 - `https://www.googleapis.com/auth/youtube.readonly`
 - `https://www.googleapis.com/auth/youtube.force-ssl`
 
-**How is this scope used? Why do you need it?**
+**How is this scope used? Why do you need it?** — Google's actual "Data Access" box on
+2026-09-16 caps this at **1000 characters** and shares one box across both sensitive
+scopes (they are requested together). The exact text pasted there:
+
+```
+Audience Sentiment is a read-only YouTube audience-monitoring tool. A signed-in channel
+owner authorizes their own channel once via this OAuth flow. youtube.readonly lists the
+owner's videos (channels.list, playlistItems.list, videos.list) so they can choose which
+to monitor. commentThreads.list on the owner's own videos is refused with
+insufficientPermissions under youtube.readonly alone; no narrower scope exists for
+reading comments as the channel owner, so youtube.force-ssl is also requested, though the
+app never calls any write, update, delete, insert, or rate endpoint. force-ssl is used
+only to read comments and replies (commentThreads.list, comments.list) on videos the
+owner selected, to classify sentiment and topic with our own model. Comment text is
+purged 30 days after collection; metadata refreshes at every check. Users revoke access
+in-app or at myaccount.google.com/permissions, stopping all reads immediately. No data is
+sold, shared, or aggregated across channels.
+```
+(990 of 1000 characters.) The longer version below is the fuller record, kept for
+`docs/youtube-quota-extension.md`-style reference and for any follow-up email — not what
+was pasted into the form's box.
+
 ```
 This is a read-only, single-purpose audience-monitoring application for YouTube channel
 owners. A signed-in channel owner authorizes the application once, through this OAuth
@@ -109,7 +132,32 @@ without signing in as you), and paste that link into the verification form.
   consent screen shows "Audience Sentiment wants access…" instead of the Supabase domain,
   with no further code or configuration change needed.
 
+## 2b. On recording against a live app
+
+Google's own Data Access page warns: "If your app is already public, do not deploy
+unverified scopes to your production traffic" and suggests a staging environment or a
+separate test project instead. That warning is for a scope not yet shipped. Here,
+`youtube.force-ssl` has been live in production since the connection flow was built —
+there is no unshipped version to isolate. The same page states the fallback explicitly:
+record against the real app, and the "Google hasn't verified this app" screen "is
+expected and must be shown in the video" — exactly what §2's script already does.
+
+## 3b. Confirmed live, 2026-09-16
+
+- Branding: App name "SentimentAnalysis" set; logo uploaded (the four-bar mark,
+  `docs/oauth-verification-assets/audience-sentiment-logo.png`); homepage, privacy
+  policy and terms of service links set to `app.sky-develop.net`; `sky-develop.net`
+  added to Authorized domains.
+- Domain ownership: `sky-develop.net` verified in Google Search Console as a Domain
+  property, under the same Google account.
+- Data Access: `youtube.readonly` and `youtube.force-ssl` declared under "Your sensitive
+  scopes"; the 990-character justification (§1) pasted into "How will the scopes be
+  used?".
+
 ## 4. Status
 
-Not yet submitted. This document contains everything except the demo video, which needs a
-screen recording from the owner's own Google session.
+**In progress.** Branding, domain ownership and the scope declaration are done; the
+justification text is drafted (§1) and ready to paste. The one remaining field is the
+demo video's YouTube link — needs the owner's own screen recording per §2's script,
+uploaded unlisted, then pasted into "Demo video: how will the scopes be used?" before
+Save becomes available on the Data Access page.
