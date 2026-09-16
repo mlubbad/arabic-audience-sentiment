@@ -844,3 +844,17 @@ the implicit label association the native `<select>` got for free from the wrapp
 `tests/e2e/app-shell.spec.ts` gained one appended block confirming `/admin` still renders its
 signed-out forbidden state with the new import present. `npm run check` is green end-to-end
 (`docs/verification.md`). Landed as `f94cd90`.
+
+## 2026-09-16 — the preview password is gone; the site is public
+
+At the owner's explicit instruction, `.htaccess` no longer carries Basic Auth. It used to
+gate everything but the landing, `/pricing` and the two legal documents behind
+`AuthType Basic` / `AuthUserFile .htpasswd_app`; that block (and the `SetEnvIf`/
+`RequireAny` split built for it) is removed entirely, so `/dashboard`, `/account`, `/sync`,
+`/admin`, `/connected` and the fixtures answer without a challenge like everything else did
+already. The status-guarded cache-control rule stays — it now guards a 404 the same way it
+used to guard the 401 that caused the 2026-09-15 outage, and nothing about removing the
+password removes that risk. `X-Robots-Tag: noindex, nofollow` is unchanged: the site is
+open to anyone with the link, not indexed by a search engine. `htaccess.test.ts` now
+asserts the file carries no `AuthType`, `AuthUserFile`, `Require`, `SetEnvIf` or
+`.htpasswd` reference at all, rather than asserting the password is kept.

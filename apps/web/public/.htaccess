@@ -1,38 +1,14 @@
-# Apache configuration for the private preview deployment.
+# Apache configuration for the deployed front end.
 #
 # Kept in public/ so every build carries it. Writing it straight into dist/
-# meant the next build silently dropped it — and with it the password on a
-# deployment whose whole premise is that it is not published openly.
+# meant the next build silently dropped it.
 #
-# The password itself is not here. It lives in .htpasswd_app one level above
-# the document root, which is why that file cannot be served.
-AuthType Basic
-AuthName "Sentiment MVP - private preview"
-AuthUserFile /home/u101542/domains/app.sky-develop.net/.htpasswd_app
-
-# The public face is open; the product behind it keeps the password.
-#
-# A reviewer at Google (the YouTube API audit) or Paddle follows the footer
-# link to the privacy policy and must land on the page, not on a challenge.
-# So the landing, the pricing page and the two legal documents answer to
-# anyone, and so do the files those pages are made of: the hashed bundle,
-# the fonts and the landing art. Every other address — the dashboard, the
-# account, the fixtures, the operations page — still asks for the password.
-#
-# The routes are matched on the request URI, before the rewrite below turns
-# them into /index.html. That rewrite is an internal redirect, and Apache
-# hands the redirected request the first one's variables under a REDIRECT_
-# prefix; the second `Require env` reads that copy. /index.html is not made
-# public by name on purpose: a protected route is rewritten to the same file,
-# and only the route it came from decides whether it was allowed.
-SetEnvIf Request_URI "^/(pricing|privacy-policy|terms)?/?$" public
-SetEnvIf Request_URI "^/(static|fonts|landing)/" public
-SetEnvIf Request_URI "^/robots\.txt$" public
-<RequireAny>
-  Require env public
-  Require env REDIRECT_public
-  Require valid-user
-</RequireAny>
+# 2026-09-16: the password is gone at the owner's explicit instruction — the
+# site is out of "private preview" and every route answers without one now.
+# The Basic Auth block this file used to carry named a credential file that
+# lives one level above the document root, out of FTP's reach; removing that
+# block from here is the whole of what "removing the password" means from
+# this repo — there was never a second lever to pull.
 
 # Single-page app: an unknown path is the router's business, not the
 # filesystem's. Without this, refreshing on /account is a 404.
@@ -47,30 +23,17 @@ SetEnvIf Request_URI "^/robots\.txt$" public
 
 <IfModule mod_headers.c>
   # The bundle carries a content hash in its name, so it can be cached hard —
-  # but only when there is a bundle to cache. Without the status guard this
-  # rule also stamped `immutable` on the 401 challenge page, because the
-  # challenge is served *for* the requested filename and matches on it.
-  #
-  # Cloudflare then did exactly what it was told. On 2026-09-15 a single
-  # unauthenticated request to each hashed asset pinned a 401 at the edge for a
-  # year: `cf-cache-status: HIT`, served in place of the JavaScript even to a
-  # request carrying valid credentials, and immune to a revalidating
-  # `Cache-Control: no-cache`. The app loaded its index.html and then nothing.
-  # Any crawler, or any browser that asks for an asset before the password is
-  # entered, does the same thing — this did not need an operator to trigger it.
-  #
-  # `immutable` is a promise that the body will never change. An error page
-  # about a file is not that file, so it must never carry the promise.
-  # An `expr` condition is only evaluated on a successful response here. That
-  # was measured, three times, against the deployed host: a rule carrying one
-  # is simply absent from the 401, whether it is written `set` or `always set`,
-  # `== 200`, `!= 200` or `-ge 400`. So a condition can withhold a header from
-  # an error. It can never add one to it.
-  #
-  # Which decides the shape of everything below: the refusal is unconditional
-  # and comes first, and the promise is the exception layered on top of it. Not
-  # a style choice — it is the only order in which both halves can be delivered
-  # by a server that will not evaluate a condition when things go wrong.
+  # but only when there is a bundle to cache. A request for a name that no
+  # longer exists (a deploy in flight, a stale link) 404s, and this file used
+  # to stamp `immutable` on that too, because `Header set` applies to the
+  # response for the requested filename regardless of its status. On
+  # 2026-09-15 the same shape of bug did this to a 401 challenge and pinned
+  # it at Cloudflare's edge for a year, immune to revalidation. There is no
+  # 401 left to repeat that story, but a 404 still can, so the guard stays:
+  # the refusal is unconditional and first, the promise is the exception on
+  # top of it, and it only fires when `expr=%{REQUEST_STATUS} == 200` —
+  # `Header always set` with an `expr`, or a `>=` comparison, never evaluates
+  # on this host; both were tried and measured.
   <FilesMatch "\.(js|css)$">
     Header set Cache-Control "no-store"
     Header set Cache-Control "public, max-age=31536000, immutable" \

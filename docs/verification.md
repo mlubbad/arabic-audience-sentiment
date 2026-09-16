@@ -2044,3 +2044,18 @@ client correctly); worth fixing before a real user reads that screen.
 
 Outcome: pending Google's review. The stated turnaround is weeks, with possible follow-up
 questions; `docs/youtube-quota-extension.md` §2's answers cover what those are likely to ask.
+
+## 2026-09-16 — the password removed, probed from outside
+
+`apps/web/src/htaccess.test.ts`: 5 passed — the cache-status-guard tests unchanged, the
+old "keeps the password" assertion replaced with one that the shipped file names no
+`AuthType`, `AuthUserFile`, `Require`, `SetEnvIf` or `.htpasswd` reference anywhere,
+comments included. `npm test` 481 passed, lint/typecheck/format:check/build/secrets green.
+
+Deployed via `npm run deploy:preview`: 40 files `226`, `.htaccess` 2,420 bytes, 20 stale
+hashed chunks swept. Probed **without credentials**: `/`, `/pricing`, `/privacy-policy`,
+`/terms`, `/dashboard`, `/account`, `/sync`, `/admin`, `/connected`,
+`/fixtures/dashboard.json`, `/fixtures/catalogue.json`, `/index.html` and `/robots.txt`
+each `200`, no `WWW-Authenticate` header on any of them; `/.htaccess` still `403` —
+Apache refuses to serve the file itself, unrelated to Basic Auth, unchanged from before.
+The whole app is now reachable by anyone with the URL.
