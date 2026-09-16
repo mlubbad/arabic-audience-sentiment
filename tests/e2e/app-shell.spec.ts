@@ -162,3 +162,25 @@ test("the admin route still renders its forbidden state after Task 17's Select w
   await page.goto("/admin");
   await expect(page.getByTestId("admin-forbidden")).toBeVisible();
 });
+
+test("the mobile menu takes focus when it opens and gives it back on Escape", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/account");
+  const menu = page.getByRole("button", { name: "قائمة التطبيق" });
+  await menu.click();
+  await expect(menu).toHaveAttribute("aria-expanded", "true");
+  // Focus is inside the rail — its first link — not left on the toggle or
+  // nowhere. A sheet the keyboard is not in is a sheet the keyboard cannot use.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.activeElement?.closest("#app-rail") !== null,
+      ),
+    )
+    .toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveAttribute("aria-expanded", "false");
+  await expect(menu).toBeFocused();
+});

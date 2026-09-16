@@ -3,6 +3,7 @@ import React, {
   Suspense,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 import { createRoot } from "react-dom/client";
@@ -223,6 +224,15 @@ function RailState({ part }: { part: "workspace" | "collection" | "plan" }) {
 
 function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const railRef = useRef<HTMLElement>(null);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  // On a phone the rail opens as a sheet. Put the keyboard in it when it
+  // opens — its first link — so it is a sheet the keyboard can use; on a
+  // wide viewport the toggle is display:none and this never fires.
+  useEffect(() => {
+    if (menuOpen)
+      railRef.current?.querySelector<HTMLElement>("a, button")?.focus();
+  }, [menuOpen]);
   const { pathname, search } = useLocation();
   const carried = carriedSearch(search);
   const locale = useLocale();
@@ -275,6 +285,7 @@ function AppLayout() {
       <button
         className="app-menu"
         type="button"
+        ref={menuRef}
         aria-label={S.menuLabel}
         aria-expanded={menuOpen}
         aria-controls="app-rail"
@@ -284,7 +295,14 @@ function AppLayout() {
       </button>
       <aside
         id="app-rail"
+        ref={railRef}
         className={menuOpen ? "app-rail is-open" : "app-rail"}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && menuOpen) {
+            setMenuOpen(false);
+            menuRef.current?.focus();
+          }
+        }}
       >
         <Link className="app-brand" to="/" aria-label={S.brandHomeLabel}>
           <BrandMark />
