@@ -1954,3 +1954,24 @@ public mark through `REDIRECT_public` as the file says it does, and a protected 
 rewritten to the same `index.html` is still refused. `htaccess.test.ts` 8 passed against
 the shipped file. The host still sends `X-Robots-Tag: noindex, nofollow` on every answer:
 open to a reviewer who has the link, not to a search engine.
+
+## 2026-09-16 — the live check reads only what moved, on the real channel
+
+`20260917080000_live_check_by_comment_count.sql` pushed alone; `functions deploy worker`;
+`scripts/worker-service-update.sh` moved the launchd service to `88a918b` (log: "worker up,
+model=camelbert-da, tenants=2, topics=gemini").
+
+The owner's channel `b7de589f…` holds 789 selections, all read yesterday on the 24-hour
+interval. One hundred of the exhausted ones were set due by hand (`next_check_at = now()`),
+because none carried `last_seen_comment_count` yet:
+
+| pass | worker log | what it cost |
+| --- | --- | --- |
+| first | `comment counts: 0 unchanged, 100 to read` | 2 `videos.list` units + the reads — every selection was unseen, so every one was read; afterwards 100 rows carry `last_seen_comment_count` |
+| second (the same 100 set due again) | `comment counts: 100 unchanged, 0 to read` | **2 `videos.list` units, no `commentThreads` call**; 100 rows read `last_outcome = 'unchanged'`, `next_check_at` moved a `live_interval` ahead; the collect job `succeeded` |
+
+The pass before this change would have paged `commentThreads` for all 100 (≥ 100 units).
+The dashboard's catalogue shows a deferred video as up to date («لم يتغير منذ آخر قراءة»),
+not as a partial read (`88a918b`). Not yet exercised live: a count that moved on the second
+pass (the channel had no new comment in the seventeen minutes between passes), and a
+`videos.list` refusal falling back to reading everything — both fixture-tested.

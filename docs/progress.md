@@ -794,3 +794,15 @@ links are `[label](https://…)` only.
 the second `Require env` reads. `/index.html` is deliberately not public by name, so
 `/dashboard`, `/account`, `/sync`, `/admin` and `/fixtures/*` still challenge. Held by
 `htaccess.test.ts`, which runs the file's own patterns against both lists.
+
+## 2026-09-16 — the live check compares comment counts before it reads
+
+`worker_video_counts` on the server, `/worker/video-counts` on the gateway,
+`comment_counts` on the YouTube adapter and a counts step at the head of the worker's
+collection loop: fifty videos' `statistics.commentCount` for one unit, and only the videos
+whose count moved since their last exhausted read are paged. A failure of that step reads
+everything as before. Live on the owner's channel: the second pass over 100 videos cost
+two units and read nothing (`docs/verification.md`). This is what makes `agency` and
+`media` live intervals affordable in YouTube quota (`docs/pricing-consultation-2026-09-16.md`
+§5.1). `docs/youtube-quota-extension.md` holds the quota-extension application, ready to
+submit once the legal pages are public.
