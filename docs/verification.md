@@ -2059,3 +2059,26 @@ hashed chunks swept. Probed **without credentials**: `/`, `/pricing`, `/privacy-
 each `200`, no `WWW-Authenticate` header on any of them; `/.htaccess` still `403` —
 Apache refuses to serve the file itself, unrelated to Basic Auth, unchanged from before.
 The whole app is now reachable by anyone with the URL.
+
+## 2026-09-16 — Task 5 (app-shell plan): full check and the whole browser suite, both clean
+
+`npm run check` exited 0: lint (`eslint . && worker:lint`) clean, `format:check` clean,
+`typecheck` (`tsc --noEmit`) clean, `check:functions` clean, unit tests 72 files / 492 tests
+passed (including the new `SessionControl.test.tsx` and `RailState.test.tsx`), db tests
+(`vitest run supabase/tests`) 31 files / 297 tests passed, worker tests (`pytest`) 195 passed,
+`vite build` succeeded (297 modules transformed, largest chunk `index-Beba_wQP.js` at 699.68 kB
+raw / 210.51 kB gzip — the existing chunk-size warning, unrelated to this plan), and
+`check:secrets` passed on 455 source files plus built assets.
+
+`npm run test:e2e > /tmp/e2e.log 2>&1; echo "exit=$?"` — port 4173 confirmed free before the
+run — exited 0: 98/98 passed in 1.4m, 6 workers, no retries, nothing flaked. `tests/e2e/
+app-shell.spec.ts` ran whole, 8/8: the two tests this plan appended (`the mobile menu takes
+focus when it opens and gives it back on Escape`, plus the earlier `the operations page…`
+Task 17 block) both green alongside the six that predate this plan. No re-run needed — the
+single run held clean the first time, so the `docs/coordination/ACTIVE.md` contention
+allowance did not come up.
+
+`git status --short` after both runs showed only `docs/oauth-verification.md` modified
+(the other concurrent session's uncommitted edit, left untouched per this task's brief) and
+the untracked `.screenshots/` directory (unrelated to this plan); nothing from this plan's
+four commits (`0bb18b6`, `d97e009`, `b87abef`, `3ea6d17`) was left uncommitted.

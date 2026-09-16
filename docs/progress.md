@@ -870,3 +870,30 @@ root" — it was mounted only around the signed-in shell (`AppLayout`) until the
 caught it; it now wraps the true root (`main.tsx`'s `DirectionRoot`, alongside `ToastHost`), so every route —
 including the signed-out landing, pricing and legal pages — gets Direction context too. Caught by the plan's
 own final review.
+
+## 2026-09-16 — the app-shell plan lands: the rail's two controls move to `ui/`, and the mobile menu learns to hold focus
+
+`docs/superpowers/plans/2026-09-16-app-shell.md`'s five tasks are done. `SessionControl`
+(`0bb18b6`) came out of `main.tsx` into its own `apps/web/src/SessionControl.tsx`, purely a
+move so it could be tested in isolation — `main.tsx` lost 60 lines, the component gained a
+file. `d97e009` then rebuilt it on `ui/DropdownMenu`: the reader's email above an account
+link and a sign-out item, the trigger a plain `button` so `app.css`'s existing rail-pill rule
+still dresses it with no new selector needed; `SessionControl.test.tsx` carries 7 jsdom tests
+against the new shape. `b87abef` moved `RailState.tsx`'s `WorkspaceSwitch` off a native
+`<select>` onto `ui/Select`, re-targeting `app.css`'s `.app-rail-workspace select` rule to
+`.ui-select-trigger` with its declarations kept verbatim and a `--focus-halo` focus ring
+added; the two static-option test cases that lived in `RailState.test.ts` moved to a new
+`RailState.test.tsx` (3 jsdom tests) since `ui/Select` needs a DOM, while `RailState.test.ts`
+keeps its single-workspace, source-scan and `CollectionState` cases. `3ea6d17` closed the
+plan: the inner app's mobile menu now moves focus to the rail's first link when it opens and,
+on `Escape`, closes and returns focus to the toggle that opened it — `main.tsx` gained an
+effect and a keydown handler, `tests/e2e/app-shell.spec.ts` gained one appended block, whole
+file 8/8.
+
+Deliberately left alone, per the plan: the rail's structure, `DESTINATIONS`, the
+announcement bar, `LanguageSwitch`, `CollectionState`/the plan card, and tooltips on
+icon-only nav items (pitched during planning, dropped — nothing icon-only actually needed
+one). `npm run check` (lint, format:check, typecheck, check:functions, unit tests 72 files/
+492 tests, db tests 31 files/297 tests, worker tests 195, build, check:secrets) and the whole
+Playwright suite (98/98, including the whole `app-shell.spec.ts` file at 8/8) are both green
+post-merge (`docs/verification.md`).
