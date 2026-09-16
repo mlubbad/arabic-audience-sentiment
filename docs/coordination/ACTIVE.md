@@ -11,9 +11,12 @@ than nothing.
 
 ## The one that loses work
 
-**There is no git remote.** `git remote -v` is empty. Every commit exists on one
-disk, in one checkout, with no copy anywhere. As of writing that is 11 commits
-made today.
+**There is a git remote since 2026-09-16:** `origin` is the private GitHub repository
+`mlubbad/arabic-audience-sentiment`, created and first pushed that day at `b3cb15e`
+(250 commits). Not `mlubbad/sentimentanalysis` — that is an unrelated public repository
+from 2024 and must never receive this code. Before that day every commit existed on one
+disk only, which is the situation the rules below were written for; a commit is still
+only safe once it is pushed, so push after committing.
 
 So:
 
@@ -26,8 +29,8 @@ So:
   after mutating a file is to check it out, and the natural instinct is wrong.
   Back the file up, mutate, restore from the backup.
 - **Commit early.** An uncommitted change is the only kind that can vanish.
-- Ask the user before adding a remote or pushing. It is the right fix and it is
-  their decision, not ours.
+- Push to `origin` after committing; ask the user before adding any other remote
+  or changing the repository's visibility.
 
 ## Who is writing
 
