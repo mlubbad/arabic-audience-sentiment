@@ -27,10 +27,6 @@ export type AdminRow = {
   provider: string;
 };
 
-/** The internal plans, which the catalogue leaves out on purpose: the owner's
- *  own workspaces and a pilot handed to someone before they pay. */
-export const INTERNAL_PLAN_KEYS = ["owner", "pilot"] as const;
-
 /** The two kinds of units a pack can carry. */
 export const PACK_KINDS = ["comment_analysis", "topic_classification"] as const;
 export type PackKind = (typeof PACK_KINDS)[number];
@@ -52,11 +48,17 @@ export function adminRows(list: AdminWorkspace[], S: Strings): AdminRow[] {
   }));
 }
 
-/** The catalogue's keys in its order, then the internal ones, each once. */
-export function adminPlanKeys(catalogue: { key: string }[]): string[] {
-  const keys = catalogue.map((p) => p.key);
-  for (const k of INTERNAL_PLAN_KEYS) if (!keys.includes(k)) keys.push(k);
-  return keys;
+/** Every plan the admin may set, named in the reader's language and keyed by
+ *  the key the RPC takes. The rows come from `admin_plan_catalogue()`, which
+ *  lists internal plans too — the public catalogue never does. */
+export function adminPlanOptions(
+  plans: { key: string; title_ar: string; title_en: string }[],
+  locale: "ar" | "en",
+): { key: string; label: string }[] {
+  return plans.map((p) => ({
+    key: p.key,
+    label: locale === "ar" ? p.title_ar : p.title_en,
+  }));
 }
 
 /** A whole number of months in the range `set_workspace_plan` accepts, or

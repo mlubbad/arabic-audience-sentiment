@@ -27,11 +27,12 @@ import {
 import { supabase } from "./supabase";
 import { useSession } from "./session";
 import { useIsPlatformAdmin } from "./adminAccess";
-import { usePlanCatalogue } from "./planCatalogue";
+import { useAdminPlanCatalogue } from "./planCatalogue";
+import { useLocale } from "./locale";
 import {
   adminErrorMessage,
   adminMonths,
-  adminPlanKeys,
+  adminPlanOptions,
   adminRows,
   adminUnits,
   MONTHS_MAX,
@@ -53,6 +54,7 @@ async function readWorkspaces() {
 
 export function AdminPage() {
   const S = useStrings();
+  const locale = useLocale();
   const { session, loading } = useSession();
   const access = useIsPlatformAdmin(session);
   const admin = access.data === true;
@@ -61,7 +63,7 @@ export function AdminPage() {
     queryFn: readWorkspaces,
     enabled: admin,
   });
-  const catalogue = usePlanCatalogue(admin);
+  const catalogue = useAdminPlanCatalogue(admin);
 
   const shell = (body: ReactNode) => (
     <div className="rp-page admin-page">
@@ -109,7 +111,8 @@ export function AdminPage() {
     );
 
   const rows = adminRows(list.data, S);
-  const keys = adminPlanKeys(catalogue.data ?? []);
+  const options = adminPlanOptions(catalogue.data ?? [], locale);
+  const keys = options.map((o) => o.key);
   return shell(
     <section className="rp-section" aria-labelledby="admin-table-heading">
       <header>
@@ -138,6 +141,7 @@ export function AdminPage() {
                   workspace={w}
                   row={rows[i]}
                   keys={keys}
+                  options={options}
                 />
               ))}
             </tbody>
@@ -154,10 +158,12 @@ function WorkspaceRow({
   workspace: w,
   row,
   keys,
+  options,
 }: {
   workspace: AdminWorkspace;
   row: AdminRow;
   keys: string[];
+  options: { key: string; label: string }[];
 }) {
   const S = useStrings();
   const queryClient = useQueryClient();
@@ -285,9 +291,9 @@ function WorkspaceRow({
               disabled={pending || keys.length === 0}
               onChange={(e) => setChosenPlan(e.target.value)}
             >
-              {keys.map((k) => (
-                <option key={k} value={k}>
-                  {k}
+              {options.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
                 </option>
               ))}
             </select>

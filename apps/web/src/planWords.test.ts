@@ -36,11 +36,47 @@ const base = {
   plan: null,
 };
 
+const titled = (used: number) => ({
+  ...plan(used),
+  plan: {
+    key: "pilot",
+    segment: "internal" as const,
+    title_ar: "شريك مؤسِّس",
+    title_en: "Founding Partner",
+    price_monthly_cents: 0,
+    price_yearly_cents: 0,
+    self_serve: false,
+    provider_prices: {},
+    limits: {
+      analysis_units: 25000,
+      topic_units: 10000,
+      insight_reports: 0,
+      channels: 3,
+      members: 5,
+      workspaces: 1,
+      live_interval_minutes: 1440,
+    },
+  },
+});
+
 describe("the rail's plan card", () => {
+  it("names the plan by its title in the reader's language, never by its key", () => {
+    expect(planCardWords({ ...base, plan: titled(0) }, ar, "ar").title).toBe(
+      "شريك مؤسِّس",
+    );
+    expect(planCardWords({ ...base, plan: titled(0) }, ar, "en").title).toBe(
+      "Founding Partner",
+    );
+    // A summary without a plan block (an older shape) still says something.
+    expect(planCardWords({ ...base, plan: plan(0) }, ar, "ar").title).toBe(
+      "pilot",
+    );
+  });
+
   it("carries the number, not a signpost to it", () => {
-    const w = planCardWords({ ...base, plan: plan(250) }, ar);
+    const w = planCardWords({ ...base, plan: plan(250) }, ar, "ar");
     expect(w.kicker).toBe("قناة الأخبار");
-    expect(w.title).toBe("خطة pilot");
+    expect(w.title).toBe("pilot");
     expect(w.note).toBe("تحليل التعليقات: يتبقى 750 من 1,000");
     expect(w.tone).toBe("ok");
     // The words that used to stand in for the figure are gone.
@@ -48,23 +84,23 @@ describe("the rail's plan card", () => {
   });
 
   it("takes its colour from the same thresholds the operations page uses", () => {
-    expect(planCardWords({ ...base, plan: plan(700) }, ar).tone).toBe(
+    expect(planCardWords({ ...base, plan: plan(700) }, ar, "ar").tone).toBe(
       "warning",
     );
-    expect(planCardWords({ ...base, plan: plan(850) }, ar).tone).toBe(
+    expect(planCardWords({ ...base, plan: plan(850) }, ar, "ar").tone).toBe(
       "critical",
     );
-    const out = planCardWords({ ...base, plan: plan(1000) }, ar);
+    const out = planCardWords({ ...base, plan: plan(1000) }, ar, "ar");
     expect(out.tone).toBe("exhausted");
     expect(out.note).toContain("نفد الحد");
   });
 
   it("does not read a failed read, or no plan, as a limit reached", () => {
-    const failed = planCardWords({ ...base, failed: true }, ar);
+    const failed = planCardWords({ ...base, failed: true }, ar, "ar");
     expect(failed.title).toBe("تعذّرت قراءة الخطة");
     expect(failed.note).toContain("لا يعني ذلك نفاد الحد");
     expect(failed.tone).toBe("none");
-    const none = planCardWords(base, ar);
+    const none = planCardWords(base, ar, "ar");
     expect(none.title).toBe("لا خطة مفعّلة");
     expect(none.tone).toBe("none");
   });
@@ -72,7 +108,7 @@ describe("the rail's plan card", () => {
   it("says an internal plan has no ceiling, not a negative one", () => {
     const owner = plan(1, -1);
     owner.budgets[0].remaining = -1;
-    const w = planCardWords({ ...base, plan: owner }, ar);
+    const w = planCardWords({ ...base, plan: owner }, ar, "ar");
     expect(w.note).toBe(`تحليل التعليقات: ${ar.pricingUnlimited}`);
     expect(w.note).not.toContain("-1");
     expect(w.tone).toBe("ok");
@@ -82,6 +118,7 @@ describe("the rail's plan card", () => {
     const w = planCardWords(
       { ...base, workspaceName: null, choosing: true, plan: plan(0) },
       ar,
+      "ar",
     );
     expect(w.kicker).toBe("لم تُختر مساحة عمل");
     expect(w.note).not.toContain("يتبقى");

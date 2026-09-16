@@ -88,4 +88,52 @@ describe("plan catalogue", () => {
     });
     expect(r.rows[0].usage_summary.provider).toBeNull();
   });
+
+  it("the pilot row is titled Founding Partner in both languages", async () => {
+    await db.exec("reset role");
+    const r = await db.query<{ title_ar: string; title_en: string }>(
+      "select title_ar, title_en from plans where key='pilot'",
+    );
+    expect(r.rows[0]).toEqual({
+      title_ar: "شريك مؤسِّس",
+      title_en: "Founding Partner",
+    });
+  });
+
+  it("admin_plan_catalogue lists every plan, internal ones included, for an admin only", async () => {
+    await db.exec("reset role");
+    await db.query("insert into private.platform_admins(user_id) values ($1)", [
+      OWNER,
+    ]);
+    await as(OWNER);
+    const r = await db.query<{
+      admin_plan_catalogue: { key: string; title_en: string }[];
+    }>("select admin_plan_catalogue()");
+    const keys = r.rows[0].admin_plan_catalogue.map((p) => p.key);
+    expect(keys).toEqual([
+      "free",
+      "creator",
+      "creator_plus",
+      "agency",
+      "media",
+      "enterprise",
+      "owner",
+      "pilot",
+    ]);
+    expect(
+      r.rows[0].admin_plan_catalogue.find((p) => p.key === "pilot")!.title_en,
+    ).toBe("Founding Partner");
+    await db.exec("reset role");
+    await db.query("delete from private.platform_admins where user_id=$1", [
+      OWNER,
+    ]);
+    await as(OWNER);
+    await expect(db.query("select admin_plan_catalogue()")).rejects.toThrow(
+      /forbidden/,
+    );
+    await db.exec("reset role; set role anon");
+    await expect(db.query("select admin_plan_catalogue()")).rejects.toThrow(
+      /permission denied|forbidden/,
+    );
+  });
 });

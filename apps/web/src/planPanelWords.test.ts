@@ -83,6 +83,20 @@ describe("plan panel words", () => {
     expect(due.statusLine).toBe(ar.planStatusPastDue);
     expect(due.notice).toBe(ar.planPastDue("2026-10-08"));
   });
+  it("an open-ended plan says it has no end date instead of a year a century away", () => {
+    const w = planPanelWords(
+      summary({
+        provider: null,
+        plan_key: "free",
+        period_end: "2126-09-16T00:00:00Z",
+      }),
+      ar,
+      "ar",
+    );
+    expect(w.statusLine).toBe(ar.planOpenEnded);
+    expect(w.notice).toBeNull();
+  });
+
   it("owner is unlimited and has no actions", () => {
     const w = planPanelWords(
       summary({

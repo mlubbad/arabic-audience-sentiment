@@ -38,6 +38,7 @@ export function planCardWords(
     plan: UsageSummary | null;
   },
   S: Strings,
+  locale: "ar" | "en",
 ): PlanCardWords {
   const { workspaceName, choosing, loading, failed, plan } = input;
   if (choosing)
@@ -76,7 +77,13 @@ export function planCardWords(
       : S.budgetBackfill;
   return {
     kicker,
-    title: S.planTitle(plan.plan_key),
+    // The reader sees the plan's name in their language; the key is an
+    // identifier and only stands in when a summary carries no plan block.
+    title: plan.plan
+      ? locale === "ar"
+        ? plan.plan.title_ar
+        : plan.plan.title_en
+      : plan.plan_key,
     // A -1 ceiling is not there: "يتبقى -1 من -1" would be a number where
     // the truth is that there is nothing to count down.
     note: unlimited(analysis)

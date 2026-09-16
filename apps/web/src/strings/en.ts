@@ -144,7 +144,6 @@ export const en: Strings = {
     "That does not mean the limit is reached. Refresh the page to try again.",
   planNoneTitle: "No active plan",
   planNoneNote: "The operator activates plans manually at this stage.",
-  planTitle: (key: string) => `${key} plan`,
   planExhausted: (name: string, allowance: string) =>
     `${name}: limit reached (${allowance})`,
   planRemaining: (name: string, remaining: string, allowance: string) =>
@@ -156,6 +155,7 @@ export const en: Strings = {
   planPanelTitle: "Your plan",
   planStatusPastDue: "Payment is overdue",
   planStatusEnding: "Will not renew",
+  planOpenEnded: "No end date",
   planRenews: (date: string) => `Renews on ${date}`,
   planPastDue: (date: string) =>
     `The payment could not be collected. The plan stays until ${date}, then the workspace moves to the free plan.`,

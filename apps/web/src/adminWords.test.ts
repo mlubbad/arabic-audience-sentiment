@@ -3,7 +3,7 @@ import { ar } from "./strings/ar";
 import {
   adminErrorMessage,
   adminMonths,
-  adminPlanKeys,
+  adminPlanOptions,
   adminRows,
   adminUnits,
 } from "./adminWords";
@@ -58,10 +58,16 @@ describe("admin rows", () => {
 });
 
 describe("admin plan keys", () => {
-  it("the catalogue's keys, then the two internal ones, written once", () => {
-    expect(
-      adminPlanKeys([{ key: "free" }, { key: "creator" }, { key: "owner" }]),
-    ).toEqual(["free", "creator", "owner", "pilot"]);
+  it("plan options carry the title in the reader's language, keyed by the key", () => {
+    const rows = [
+      { key: "free", title_ar: "مجاني", title_en: "Free" },
+      { key: "pilot", title_ar: "شريك مؤسِّس", title_en: "Founding Partner" },
+    ];
+    expect(adminPlanOptions(rows, "ar")).toEqual([
+      { key: "free", label: "مجاني" },
+      { key: "pilot", label: "شريك مؤسِّس" },
+    ]);
+    expect(adminPlanOptions(rows, "en")[1].label).toBe("Founding Partner");
   });
 });
 

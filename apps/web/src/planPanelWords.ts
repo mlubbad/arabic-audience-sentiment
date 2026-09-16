@@ -51,6 +51,11 @@ export const PAST_DUE_GRACE_DAYS = 7;
 const DAY_MS = 86_400_000;
 
 /** `YYYY-MM-DD` of an ISO instant, moved by whole days. */
+/** A period that ends more than fifty years out is not a renewal to name — the
+ *  free plan and the owner's are granted for a century. */
+export const openEnded = (iso: string) =>
+  new Date(iso).getTime() - Date.now() > 50 * 365 * 86400000;
+
 export const isoDay = (iso: string, plusDays = 0) =>
   new Date(new Date(iso).getTime() + plusDays * DAY_MS)
     .toISOString()
@@ -109,7 +114,9 @@ export function planPanelWords(
         ? S.planStatusPastDue
         : summary.cancel_at_period_end
           ? S.planStatusEnding
-          : S.planRenews(isoDay(summary.period_end)),
+          : openEnded(summary.period_end)
+            ? S.planOpenEnded
+            : S.planRenews(isoDay(summary.period_end)),
     rows,
     actions,
     notice,

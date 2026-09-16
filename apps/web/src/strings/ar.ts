@@ -147,7 +147,6 @@ export const ar = {
   planFailedNote: "لا يعني ذلك نفاد الحد. حدّث الصفحة لإعادة المحاولة.",
   planNoneTitle: "لا خطة مفعّلة",
   planNoneNote: "يفعّل المشغّل الخطة يدويًا في هذه المرحلة.",
-  planTitle: (key: string) => `خطة ${key}`,
   planExhausted: (name: string, allowance: string) =>
     `${name}: نفد الحد (${allowance})`,
   planRemaining: (name: string, remaining: string, allowance: string) =>
@@ -161,6 +160,7 @@ export const ar = {
   planPanelTitle: "خطتك",
   planStatusPastDue: "الدفع متأخر",
   planStatusEnding: "لا يتجدد",
+  planOpenEnded: "بلا تاريخ انتهاء",
   planRenews: (date: string) => `تتجدد في ${date}`,
   planPastDue: (date: string) =>
     `تعذّر تحصيل الدفعة. تبقى الخطة حتى ${date} ثم تنتقل المساحة إلى الخطة المجانية.`,

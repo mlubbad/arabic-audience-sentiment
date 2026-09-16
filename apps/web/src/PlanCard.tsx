@@ -4,6 +4,7 @@ import { configuredMode } from "./data";
 import { usePlanUsage } from "./planUsage";
 import { planCardWords } from "./planWords";
 import { useStrings } from "./strings";
+import { useLocale } from "./locale";
 
 /** What the plan has left, where it is true: on every screen.
  *  It used to live inside the operations page, which meant the one number a
@@ -22,6 +23,7 @@ export function PlanCard() {
   } = useWorkspaces(session);
   const { place, workspaceId, plan } = usePlanUsage(session, workspaces);
   const S = useStrings();
+  const locale = useLocale();
   if (!session || configuredMode !== "live") return null;
   const words = planCardWords(
     {
@@ -32,6 +34,7 @@ export function PlanCard() {
       plan: plan.data ?? null,
     },
     S,
+    locale,
   );
   return (
     <Link className="app-plan" to="/sync" data-tone={words.tone}>
