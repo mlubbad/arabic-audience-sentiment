@@ -2022,3 +2022,25 @@ plan picker, is still a native `<select>`; `WorkspaceRow`'s `plan`/`setChosenPla
 `pending`/`keys` are unchanged. Not verified live (no seeded platform-admin e2e session
 exists in this checkout yet): the appended `app-shell.spec.ts` block only confirms `/admin`
 still renders its signed-out forbidden state with the new `ui/Select` import present.
+
+## 2026-09-16 — the YouTube API quota extension request is submitted
+
+The user filled and submitted the YouTube API Services quota-and-audit form (Project #1)
+with the answers prepared in this session: organization "self", country Türkiye, category
+Analytics and Business Intelligence, API client "Audience Sentiment" at
+`https://app.sky-develop.net`, privacy/terms URLs live and password-free, five read-only
+endpoints checked (`channels.list`, `playlistItems.list`, `videos.list`,
+`commentThreads.list`, `comments.list`), requested quota 50,000 units/day with the
+justification text from `docs/youtube-quota-extension.md` §2. Attachments: the architecture
+and user-flow diagrams, the supporting-materials PDF, and `evidence-project-1.pdf` (the
+in-app screens plus the two Google-hosted ones the owner captured — the account chooser and
+`myaccount.google.com/connections` showing `SentimentAnalysis` under linked apps).
+
+One finding from the owner's own capture, worth acting on separately: the OAuth consent
+screen shows the raw Supabase auth domain (`ykqugctewsqvevhyqtbi.supabase.co`) as the
+requesting party, not "Audience Sentiment" — the OAuth consent screen's app name in Google
+Cloud Console was never set. Cosmetic for this submission (the form's own answers name the
+client correctly); worth fixing before a real user reads that screen.
+
+Outcome: pending Google's review. The stated turnaround is weeks, with possible follow-up
+questions; `docs/youtube-quota-extension.md` §2's answers cover what those are likely to ask.
