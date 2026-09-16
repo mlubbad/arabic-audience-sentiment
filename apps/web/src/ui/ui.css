@@ -248,3 +248,14 @@
 [dir="rtl"] .ui-switch[data-state="checked"] .ui-switch-thumb {
   transform: translateX(-18px);
 }
+
+.ui-tooltip-content {
+  background: var(--fg-1);
+  color: var(--ink-on-dark);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-1);
+  font-size: var(--fs-small);
+  box-shadow: var(--shadow-2);
+  max-width: 260px;
+  z-index: 50;
+}
