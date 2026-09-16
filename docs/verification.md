@@ -1679,3 +1679,34 @@ Seen live, 2026-09-16: the user opened the signed-in dashboard for workspace
 `d0c3b9fc-…` on `app.sky-develop.net` and reported the videos pager showing. That closes
 the "not verified from here" line above for the pager itself; the figures on the page
 are the workspace's own and were not compared from this side.
+
+## 2026-09-16 — the night the pilot's units ran out, and what it proved
+
+At 21:31Z the user selected videos on the live page until the estimate met the remainder:
+**789 selections, 5,002 reported comments** over them against a 5,000-unit plan with 412
+used — the "fit newest" shortcut doing its job. The service collected through the night:
+**771** selections carry a `last_collected_at` after that hour, `comments` holds 4,999 rows
+for the workspace and `usage_events` 4,999 `comment_analysis` events — one unit short of the
+plan, i.e. the estimate (YouTube's counts) and the metered truth agreed to within three
+comments over 771 videos. The hard stop is honest.
+
+What was not honest was the worker's answer to the refusal. Once `commit_batch` said
+`quota_exceeded` (429), `_backfill` let the `ControlPlaneError` escape, `serve` logged
+"control plane refused: quota_exceeded" and moved on, the lease lapsed five minutes later,
+the job was reclaimed and refused again: `lease_thrashing:20` on `7d981e11`, then a fresh
+collect `79fc8161` reclaimed twelve times by morning, and thirteen `worker up` lines in the
+service log (each idle exit, then restart, then the same refusal). Fixed in `93f27be`: a
+non-retryable refusal ends the job `blocked` with the server's own code and its checkpoint
+kept — `test_a_plan_refusal_ends_the_job_blocked_rather_than_dropping_the_lease` was red
+(the error escaped) and is green; a 503 still escapes and is asserted to. The service was
+updated to it. `_analyse` (the topics session's) has the same shape and was not touched
+here.
+
+Also today, pushed by the user: the three topic migrations (`db push --dry-run` now says
+"Remote database is up to date"), the `worker` Edge Function at version 11
+(`/worker/topics-due` answers 400 to a malformed body, not 404), and `GEMINI_API_KEY` in
+`.env.local`; after `worker-service-update.sh` the log reads `topics=gemini` and `topic
+classifier: gemini-3.6-flash`. The first `analyse` job before that update finished
+`blocked: no_topic_classifier` (the worker had no key yet), the backoff held it an hour,
+and the next one is running as this is written. Web deploy of `93f27be` from this session:
+32 files at 226, served `index-DFEGkI-B.js` byte-identical to the local build.
