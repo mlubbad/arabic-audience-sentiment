@@ -817,3 +817,30 @@ pending jobs, and moves the workspace under the platform owner's root with `reti
 and `retired_at` recorded; a person's last workspace cannot be retired. Actual deletion of
 personal data stays the request-by-email path the privacy policy states. Live-walked on
 the preview (`docs/verification.md`).
+
+## 2026-09-16 — the ui/ component layer, and its first real user
+
+`docs/superpowers/plans/2026-09-16-ui-foundation.md`'s seventeen tasks are done. Sixteen
+headless components now live under `apps/web/src/ui/` — Dialog, Tabs, Tooltip, Popover,
+DropdownMenu, Select, Switch, Checkbox, RadioGroup, Slider, Progress, Accordion,
+Collapsible, Separator, Toast and Table among them — each with its own unit tests, built on
+Radix primitives wrapped for this app's own styling and Arabic-first RTL. `DirectionProvider`
+wires `dir="rtl"`/`dir="ltr"` from the existing locale store down through every Radix
+primitive that reads ambient direction, mounted once at the app root, so a component
+written against the layer needs no per-instance direction prop.
+
+Task 17 is the payoff: `AdminPage.tsx`'s plan picker inside `WorkspaceRow` — a real,
+already-shipped `<select>` feeding the `set_workspace_plan` mutation — now renders through
+`Select`/`SelectTrigger`/`SelectValue`/`SelectContent`/`SelectItem` from Task 13, proving the
+component layer against a real interaction and a real mutation before any later phase builds
+on it. The pack-kind `<select>` two lines below, and every other page's native controls,
+are untouched — one swap, not a sweep; `WorkspaceRow`'s state (`plan`, `setChosenPlan`,
+`options`, `pending`, `keys`) is unchanged, only the rendered control moved. A new string,
+`adminPlanPicker` (`"اختر خطة"` / `"Choose a plan"`), is the trigger's `aria-label`, replacing
+the implicit label association the native `<select>` got for free from the wrapping
+`<label>` — Radix's trigger is a `button`, not a form control a `<label>` associates with.
+`apps/web/src/AdminPage.test.tsx` proves the picker shape directly against `ui/Select`
+(self-contained — it does not stand up `AdminPage`'s Supabase/react-query data layer), and
+`tests/e2e/app-shell.spec.ts` gained one appended block confirming `/admin` still renders its
+signed-out forbidden state with the new import present. `npm run check` is green end-to-end
+(`docs/verification.md`). Landed as `f94cd90`.

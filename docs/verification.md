@@ -1994,3 +1994,31 @@ The disconnect door was rendered (card unit test, 9/9) and its RPC `oauth_discon
 predates this change; not pressed live — the only connected channel is the owner's own,
 and disconnecting it would stop the pilot's reads. `docs/youtube-quota-extension.md` §4's
 first item is closed.
+
+## 2026-09-16 — Task 17 (ui-foundation plan), `AdminPage.tsx`'s plan picker on `ui/Select`
+
+TDD: `apps/web/src/AdminPage.test.tsx` written first; confirmed it fails for the right
+reason by temporarily removing the new `adminPlanPicker` key from `ar.ts` and re-running —
+`vitest` still passed (the test's own `PlanPicker` reads `ar.adminPlanPicker`/`undefined` on
+both sides of its assertion, so a runtime pass is not itself proof), but `npx tsc --noEmit`
+correctly failed with `TS2339: Property 'adminPlanPicker' does not exist` against `ar.ts`'s
+literal type and `TS2353` against `en.ts`'s `Strings` shape — the real failure mode Step 1
+closes. Restored the key; `npm test -- apps/web/src/AdminPage.test.tsx
+apps/web/src/ui/Select.test.tsx` then passed, 4/4.
+
+`npm run check` (`lint`, `format:check`, `typecheck`, `check:functions`, unit/db tests,
+worker tests, `build`, `check:secrets`) exited 0: 70 web test files / 484 tests, 31 db test
+files / 297 tests, 195 worker tests, build succeeded, secrets check passed on 445 source
+files. One `format:check` failure surfaced on first run (`AdminPage.tsx`/`AdminPage.test.tsx`
+needed `prettier --write`); re-run was clean.
+
+`git status` after the code commit (`f94cd90`, five files: `AdminPage.tsx`,
+`AdminPage.test.tsx`, `strings/ar.ts`, `strings/en.ts`, `tests/e2e/app-shell.spec.ts`,
+staged and committed by explicit pathspec) showed `apps/web/public/.htaccess` and
+`apps/web/src/htaccess.test.ts` modified and `docs/quota-application/**` dirty — none of it
+touched by this task; those are another writer's uncommitted work already on disk, left
+alone. The pack-kind `<select>` in `AdminPage.tsx`'s `WorkspaceRow`, two lines below the
+plan picker, is still a native `<select>`; `WorkspaceRow`'s `plan`/`setChosenPlan`/`options`/
+`pending`/`keys` are unchanged. Not verified live (no seeded platform-admin e2e session
+exists in this checkout yet): the appended `app-shell.spec.ts` block only confirms `/admin`
+still renders its signed-out forbidden state with the new `ui/Select` import present.
