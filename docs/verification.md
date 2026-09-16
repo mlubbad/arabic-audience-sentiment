@@ -1723,3 +1723,23 @@ CLI took all four. Not read back: the live `commit_batch` body and the
 not running. The claim that the live function carries the `where ... status = 'failed'` clause
 rests on the migration table and on `db push` applying a file and recording it in one
 transaction, not on inspection. No retry has yet exercised it against real data.
+
+## 2026-09-16 — the first topic classification of a real channel
+
+`analyse` job `a58307f0` on AJ360, claimed 06:51:51Z by the service on the new pair with
+`topics=gemini` (`gemini-3.6-flash`), finished `succeeded` at 08:01:54Z — seventy minutes,
+one lease re-claim after a transient `network_failure` at 07:23Z (retryable, escaped by
+design, the job resumed where the server said it was). `coverage_summary {topics_stored:
+4839}`; `topic_predictions` holds 4,839 rows for the workspace, every one `succeeded`, and
+`usage_events` 4,839 `topic_classification` units — one per verdict, of the pilot's 5,000.
+The 160 stored comments without a verdict are the ones the run did not reach or the
+classifier did not answer; the next `analyse` (the tick, after the backoff) takes them.
+
+The channel's audience, by the first verdicts (share of 4,839): discussion 26.9% ·
+religious 22.3% · criticism 18.4% · praise 14.7% · question 6.2% · humour 4.5% · other 3.4%
+· personal 2.0% · request 1.5% · promotion 0.1%. Median confidence 0.92. No human has read
+a verdict yet; this is what the model said, not what is true.
+
+Collect `79fc8161` is still `running` with 12 reclaims and a lapsed lease: the worker ran
+the analyse job first, and the next claim will reach it with `93f27be`'s handler and end
+it `blocked: quota_exceeded`.
