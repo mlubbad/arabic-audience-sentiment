@@ -181,3 +181,70 @@
   min-height: 6rem;
   resize: vertical;
 }
+
+.ui-checkbox-row,
+.ui-switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  color: var(--text-1);
+}
+
+.ui-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ui-checkbox[data-state="checked"] {
+  background: var(--ml-indigo);
+  border-color: var(--ml-indigo);
+}
+.ui-checkbox:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.ui-checkbox-indicator {
+  color: var(--ink-on-dark);
+}
+
+.ui-switch {
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--border-2);
+  position: relative;
+  border: none;
+}
+.ui-switch[data-state="checked"] {
+  background: var(--ml-indigo);
+}
+.ui-switch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.ui-switch-thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--ink-on-dark);
+  transform: translateX(2px);
+  transition: transform 0.15s ease;
+}
+.ui-switch[data-state="checked"] .ui-switch-thumb {
+  transform: translateX(18px);
+}
+/* Radix flips the geometry it computes for RTL, but a translateX written by
+   hand here would not — so the checked thumb's offset is mirrored
+   explicitly for the one case Radix's own positioning doesn't reach: a
+   plain CSS transform on a part this component styles itself. */
+[dir="rtl"] .ui-switch[data-state="checked"] .ui-switch-thumb {
+  transform: translateX(-18px);
+}
