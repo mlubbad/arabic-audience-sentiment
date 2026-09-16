@@ -591,3 +591,16 @@ these three tables, so the GUC being set opens nothing from a client session —
 is not the access control, the missing grant is; a test in
 `supabase/tests/workspace_lifecycle.test.ts` proves that leg explicitly rather than leaving
 it as an inference from the grants.
+
+## 2026-09-17 — correcting the reason recorded above for `owner_cannot_retire`
+
+The entry above gives the wrong reason. `retire_workspace` does not protect "the one
+workspace where audit rows land"; it refuses the platform owner on *every* workspace they
+hold (the check is `me = platform_owner()`), because retiring hands a workspace to the
+platform owner — and when the caller is the platform owner, that is a transfer to
+themself: the membership is deleted and re-inserted for the same person, nothing moves, and
+the account page then reports «انتهت المساحة وانتقلت إلى مشغّل الخدمة», which is false.
+That is why the account page (Task 2) offers no retire door to an admin at all. The
+"admin identity" concern the entry above raises is real but is guarded elsewhere: by
+`last_workspace` on both retire and delete, and by `billing_root` on delete. Recorded from
+the migration's own header comment and the spec (`2026-09-17-workspace-delete-design.md`).
