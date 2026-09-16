@@ -124,18 +124,18 @@ def test_a_round_with_no_final_verdict_ends_the_job_after_one_round():
     assert plane.finished == ("partial", "gemini_unavailable")
 
 
-def test_a_due_list_is_committed_in_slices_of_twenty_five():
+def test_a_due_list_is_committed_in_slices_of_one_hundred():
     # One Gemini chunk, one commit: a failure late in the list does not
     # discard the verdicts already paid for earlier in it.
-    plane = Plane(due=[[row(i) for i in range(30)], []])
+    plane = Plane(due=[[row(i) for i in range(130)], []])
     run_job(plane.plane(), None, classifier=DeterministicTestClassifier())
-    assert [len(c["records"]) for c in plane.committed] == [25, 5]
+    assert [len(c["records"]) for c in plane.committed] == [100, 30]
     assert plane.committed[0]["records"][0]["external_comment_id"] == "c0"
-    assert plane.committed[1]["records"][0]["external_comment_id"] == "c25"
-    first = ",".join(sorted(f"c{i}" for i in range(25)))
+    assert plane.committed[1]["records"][0]["external_comment_id"] == "c100"
+    first = ",".join(sorted(f"c{i}" for i in range(100)))
     assert plane.committed[0]["batch_key"] == hashlib.sha256(f"t1:1:0:{first}".encode()).hexdigest()[:32]
-    second = ",".join(sorted(f"c{i}" for i in range(25, 30)))
-    assert plane.committed[1]["batch_key"] == hashlib.sha256(f"t1:1:25:{second}".encode()).hexdigest()[:32]
+    second = ",".join(sorted(f"c{i}" for i in range(100, 130)))
+    assert plane.committed[1]["batch_key"] == hashlib.sha256(f"t1:1:100:{second}".encode()).hexdigest()[:32]
     # A heartbeat before every slice, not only before the round.
     assert plane.calls.count("heartbeat") >= 2
     assert plane.finished == ("succeeded", None)

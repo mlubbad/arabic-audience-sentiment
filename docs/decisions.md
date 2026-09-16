@@ -358,3 +358,13 @@ for. Nothing was classified under 2.5 anywhere, so nothing is orphaned.
   that produced verdicts, some failed. Narrowing this migration to the conflict clause keeps
   the diff reviewable; if run status should reflect per-verdict failure that is its own
   decision.
+
+2026-09-16, later — **Gemini requests carry 100 comments and no chain of thought; the
+prompt version stays `p1`.** Measured on the live key against `gemini-3.6-flash` with the
+real prompt: 25 comments per request cost 2,305 tokens (891 prompt, 964 "thoughts", 450
+output — 92 a comment); with `thinkingBudget: 0` and 100 comments per request, 5,398 tokens
+for 100 (54 a comment), the same verdicts, valid JSON every time. For a 5,000-comment
+workspace that is 50 requests and ~270k tokens instead of 200 and ~460k. The version is not
+bumped: the instructions and the taxonomy the model reads are the same text, and bumping it
+would mark 5,000 fresh verdicts stale and spend the tokens again. A change to the prompt
+text itself is a new version. Decided with the user.

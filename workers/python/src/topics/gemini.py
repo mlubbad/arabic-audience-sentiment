@@ -17,8 +17,15 @@ import httpx
 
 from .protocol import TopicError, TopicItem, TopicVerdict
 
+# Unchanged at p1 when thinking was switched off and the chunk grew to 100
+# (2026-09-16): the instructions and the taxonomy the model reads are the
+# same text, and measured verdicts on the same comments did not move. Recorded
+# in docs/decisions.md; a change to the prompt text itself is a new version.
 PROMPT_VERSION = "p1"
-CHUNK = 25
+# Measured on gemini-3.6-flash: the fixed prefix (instructions + taxonomy) is
+# ~350 tokens and is paid on every request, so 25 comments per request spent
+# 40% of the prompt on it; 100 per request costs 54 tokens a comment against 92.
+CHUNK = 100
 _RETRIES = 2
 _BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -75,6 +82,11 @@ class GeminiTopicClassifier:
                     "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT")],
             "generationConfig": {
                 "temperature": 0,
+                # Choosing one key from a list needs no chain of thought, and
+                # the model's reasoning tokens were the largest line on the
+                # bill: 964 of 2,305 per 25 comments, with the same verdicts
+                # without them.
+                "thinkingConfig": {"thinkingBudget": 0},
                 "responseMimeType": "application/json",
                 "responseSchema": {
                     "type": "ARRAY",

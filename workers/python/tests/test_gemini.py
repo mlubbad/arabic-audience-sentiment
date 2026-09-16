@@ -47,6 +47,9 @@ def test_the_request_constrains_the_answer_to_the_taxonomy():
     body = json.loads(fake.requests[0].content)
     cfg = body["generationConfig"]
     assert cfg["temperature"] == 0
+    # No chain of thought for a pick-from-a-list: the reasoning tokens were the
+    # largest cost per request and changed no verdict.
+    assert cfg["thinkingConfig"] == {"thinkingBudget": 0}
     assert cfg["responseMimeType"] == "application/json"
     assert cfg["responseSchema"]["items"]["properties"]["topic_key"]["enum"] == ["question", "praise"]
     assert "نص 0" in body["contents"][0]["parts"][0]["text"]

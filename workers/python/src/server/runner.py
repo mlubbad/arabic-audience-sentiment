@@ -281,8 +281,9 @@ def run_backfill(control: ControlPlane, build_collector, analyzer=None) -> bool:
 _TOPIC_ROUNDS = 50
 # Rows classified and committed together. One Gemini chunk, one commit: a
 # failure late in a due list does not discard the verdicts already paid for
-# earlier in it, and a retry re-sends one chunk, not two hundred rows.
-_TOPIC_SLICE = 25
+# earlier in it, and a retry re-sends one chunk, not two hundred rows. Sized
+# to the adapter's CHUNK so one slice is one request.
+_TOPIC_SLICE = 100
 _FINAL = {"succeeded", "skipped", "unsupported"}
 
 
