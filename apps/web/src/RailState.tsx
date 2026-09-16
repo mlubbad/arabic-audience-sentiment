@@ -28,6 +28,13 @@ import { workspaceState } from "./workspace";
 import { configuredMode, fixtureWorkspace, loadSource } from "./data";
 import { syncHealth } from "./syncHealth";
 import { useStrings } from "./strings";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/Select";
 
 /** The pages that show one workspace, and so own `?ws=` in their address. */
 const SCOPED = new Set(["/dashboard", "/sync"]);
@@ -54,20 +61,26 @@ export function WorkspaceSwitch() {
     <div className="app-rail-workspace" data-testid="rail-workspace">
       <p className="app-rail-caption">{S.railWorkspaceCaption}</p>
       {options.length > 1 ? (
-        <select
-          aria-label={S.changeWorkspace}
+        <Select
           value={place.kind === "ready" ? place.id : ""}
-          onChange={(e) => setChosen(e.target.value || null)}
+          onValueChange={(id) => setChosen(id || null)}
         >
-          {place.kind === "choose" && (
-            <option value="">{S.choosePlaceholder}</option>
-          )}
-          {options.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </select>
+          {/* aria-label moves from the native element to the trigger: it is
+              a button, not a form control a wrapping label would associate
+              with. The "choose" state is value="" plus a placeholder — Radix
+              reserves the empty value for exactly that, and forbids it on an
+              item, so there is no placeholder option to render. */}
+          <SelectTrigger aria-label={S.changeWorkspace}>
+            <SelectValue placeholder={S.choosePlaceholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       ) : (
         <strong className="app-rail-workspace-name">
           {place.kind === "ready" ? place.name : S.railWorkspaceNone}

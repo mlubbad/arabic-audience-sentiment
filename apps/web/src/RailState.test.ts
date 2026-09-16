@@ -67,22 +67,11 @@ beforeEach(() => {
 });
 
 describe("the rail's workspace", () => {
-  it("offers the choice when there is one, and names the workspace when there is not", () => {
-    selectWorkspace("owner", B);
-    const two = render(WorkspaceSwitch);
-    expect(two).toContain(`aria-label="${ar.changeWorkspace}"`);
-    expect(two).toContain(`<option value="${B}" selected="">قناة ب`);
+  it("names the workspace, with no switch, when there is only one", () => {
     shared.workspaces = [{ id: A, name: "قناة أ" }];
     const one = render(WorkspaceSwitch);
-    expect(one).not.toContain("<select");
+    expect(one).not.toContain('role="combobox"');
     expect(one).toContain("قناة أ");
-  });
-
-  it("asks from the rail when nothing is chosen, with an empty option first", () => {
-    const html = render(WorkspaceSwitch);
-    expect(html).toContain(
-      `<option value="" selected="">${ar.choosePlaceholder}</option>`,
-    );
   });
 
   it("is the only switch: neither page keeps its own", () => {

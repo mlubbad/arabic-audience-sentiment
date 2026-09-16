@@ -1516,7 +1516,12 @@
   color: var(--ink-on-dark);
   font-size: 0.95rem;
 }
-.app-shell .app-rail-workspace select {
+/* The switch is a ui/Select now. Its trigger sits on the rail's dark plane,
+   so it takes the plane's ink here rather than ui.css's light card box; the
+   listbox itself portals to <body> and keeps ui/'s styling. The ring is the
+   light halo brand.css keeps for dark planes — ui.css's default ring is
+   near-black and would vanish here. */
+.app-shell .app-rail-workspace .ui-select-trigger {
   width: calc(100% - 24px);
   margin: 0 12px;
   min-height: 40px;
@@ -1526,6 +1531,9 @@
   background: rgba(255, 255, 255, 0.06);
   color: var(--ink-on-dark);
   font-size: 0.9rem;
+}
+.app-shell .app-rail-workspace .ui-select-trigger:focus-visible {
+  outline-color: var(--focus-halo);
 }
 .app-rail-collection {
   display: grid;
