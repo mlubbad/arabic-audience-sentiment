@@ -13,13 +13,11 @@
  * them as to an owner comparing the next step up.
  */
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-import "./landing.css";
-import { BrandMark } from "./BrandMark";
-import { LanguageSwitch } from "./LanguageSwitch";
-import { LegalLinks } from "./LegalLinks";
+import { useNavigate } from "react-router";
+import "./pricing.css";
+import { PublicShell } from "./public/PublicShell";
 import { usePlanCatalogue } from "./planCatalogue";
-import { direction, otherLocale, type Locale } from "./locale";
+import { type Locale } from "./locale";
 import { useStrings } from "./strings";
 import { publicPath } from "./publicPaths";
 import { pricingSeo } from "./seo";
@@ -97,157 +95,120 @@ export function Pricing({ locale }: { locale: Locale }) {
   };
 
   return (
-    <div className="landing pricing-page" dir={direction(locale)}>
+    <PublicShell
+      locale={locale}
+      page="pricing"
+      pageClassName="pricing-page"
+      mainId="pricing-content"
+      mainClassName="pricing"
+      links={[
+        { href: home, label: S.backHome, kind: "route" },
+        { href: `${home}#questions`, label: S.lpNavFaq, kind: "anchor" },
+        { href: "/dashboard", label: S.lpFooterDashboard, kind: "route" },
+      ]}
+    >
       {/* The offers in the structured data are the rows the cards show —
           nothing priced here that the catalogue did not say. */}
       <PageHead seo={pricingSeo(locale, S, catalogue.data ?? [])} />
-      <a className="lp-skip" href="#pricing-content">
-        {S.skipToContent}
-      </a>
-      {/* The same band as the landing: the language switch is white ink and
-          needs the dark plane it was drawn for. */}
-      <div className="lp-announcement">
-        {S.announcementLead} <span>{S.announcementTag}</span>
-        <LanguageSwitch
-          locale={locale}
-          to={publicPath("pricing", otherLocale(locale))}
-        />
+      <div className="lp-section-heading">
+        <h1>{S.pricingHeading}</h1>
+        <p className="pricing-lead">{S.pricingLead}</p>
       </div>
-      <header className="lp-header">
-        <Link className="lp-brand" to={home} aria-label={S.brandHomeLabel}>
-          <BrandMark /> {S.brand}
-          <span className="lp-brand-dot">.</span>
-        </Link>
-        <nav className="lp-nav" aria-label={S.lpNavLabel}>
-          <Link to={home}>{S.backHome}</Link>
-          {/* A plain anchor: the questions are a section of the landing,
-              and a hash on a client-side navigation scrolls nowhere. */}
-          <a href={`${home}#questions`}>{S.lpNavFaq}</a>
-          <Link to="/dashboard">{S.lpFooterDashboard}</Link>
-        </nav>
-        <Link className="lp-header-cta" to="/account">
-          {S.lpOpenAccount} <span aria-hidden="true">{S.arrowUpForward}</span>
-        </Link>
-      </header>
-      <main id="pricing-content" className="pricing">
-        <div className="lp-section-heading">
-          <h1>{S.pricingHeading}</h1>
-          <p className="pricing-lead">{S.pricingLead}</p>
+      <div className="pricing-controls">
+        <div
+          role="tablist"
+          className="pricing-segments"
+          aria-label={S.pricingTitle}
+        >
+          {SEGMENTS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={segment === s}
+              onClick={() => setSegment(s)}
+            >
+              {s === "individual"
+                ? S.pricingSegmentIndividual
+                : S.pricingSegmentBusiness}
+            </button>
+          ))}
         </div>
-        <div className="pricing-controls">
-          <div
-            role="tablist"
-            className="pricing-segments"
-            aria-label={S.pricingTitle}
+        <div className="pricing-interval">
+          <span aria-hidden="true">{S.pricingMonthly}</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={yearly}
+            aria-label={S.pricingYearly}
+            onClick={() => setYearly((v) => !v)}
           >
-            {SEGMENTS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                role="tab"
-                aria-selected={segment === s}
-                onClick={() => setSegment(s)}
-              >
-                {s === "individual"
-                  ? S.pricingSegmentIndividual
-                  : S.pricingSegmentBusiness}
-              </button>
-            ))}
-          </div>
-          <div className="pricing-interval">
-            <span aria-hidden="true">{S.pricingMonthly}</span>
+            <span className="pricing-knob" aria-hidden="true" />
+          </button>
+          <span aria-hidden="true">{S.pricingYearly}</span>
+        </div>
+      </div>
+      {catalogue.isPending && (
+        <p className="pricing-state" role="status">
+          {S.pricingLoading}
+        </p>
+      )}
+      {catalogue.isError && (
+        <p className="pricing-state" role="alert">
+          {S.pricingUnavailable}
+        </p>
+      )}
+      <section className="pricing-cards" aria-live="polite">
+        {rows.map((r) => (
+          <article
+            key={r.key}
+            className="pricing-card"
+            data-anchor={r.anchor || undefined}
+            aria-labelledby={`plan-${r.key}`}
+          >
+            {r.anchor && (
+              <span className="pricing-anchor">{S.pricingMostChosen}</span>
+            )}
+            <h2 id={`plan-${r.key}`}>{r.title}</h2>
+            <p className="pricing-price" data-quoted={!r.perLabel || undefined}>
+              <strong>{r.price}</strong>
+              {r.perLabel && <span>{r.perLabel}</span>}
+            </p>
+            {r.yearlyNote && (
+              <p className="pricing-yearly-note">{r.yearlyNote}</p>
+            )}
+            <ul className="pricing-limits">
+              {r.limits.map((l) => (
+                <li key={l.label}>
+                  <span>{l.label}</span>
+                  {l.value && <strong>{l.value}</strong>}
+                </li>
+              ))}
+            </ul>
             <button
               type="button"
-              role="switch"
-              aria-checked={yearly}
-              aria-label={S.pricingYearly}
-              onClick={() => setYearly((v) => !v)}
+              className="pricing-cta"
+              data-kind={r.cta.kind}
+              disabled={r.cta.kind === "current"}
+              onClick={() => act(r)}
             >
-              <span className="pricing-knob" aria-hidden="true" />
+              {r.cta.label}
             </button>
-            <span aria-hidden="true">{S.pricingYearly}</span>
-          </div>
-        </div>
-        {catalogue.isPending && (
-          <p className="pricing-state" role="status">
-            {S.pricingLoading}
-          </p>
-        )}
-        {catalogue.isError && (
-          <p className="pricing-state" role="alert">
-            {S.pricingUnavailable}
-          </p>
-        )}
-        <section className="pricing-cards" aria-live="polite">
-          {rows.map((r) => (
-            <article
-              key={r.key}
-              className="pricing-card"
-              data-anchor={r.anchor || undefined}
-              aria-labelledby={`plan-${r.key}`}
-            >
-              {r.anchor && (
-                <span className="pricing-anchor">{S.pricingMostChosen}</span>
-              )}
-              <h2 id={`plan-${r.key}`}>{r.title}</h2>
-              <p
-                className="pricing-price"
-                data-quoted={!r.perLabel || undefined}
-              >
-                <strong>{r.price}</strong>
-                {r.perLabel && <span>{r.perLabel}</span>}
+            {notice[r.key] && (
+              <p className="pricing-notice" role="status">
+                {notice[r.key]}
               </p>
-              {r.yearlyNote && (
-                <p className="pricing-yearly-note">{r.yearlyNote}</p>
-              )}
-              <ul className="pricing-limits">
-                {r.limits.map((l) => (
-                  <li key={l.label}>
-                    <span>{l.label}</span>
-                    {l.value && <strong>{l.value}</strong>}
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                className="pricing-cta"
-                data-kind={r.cta.kind}
-                disabled={r.cta.kind === "current"}
-                onClick={() => act(r)}
-              >
-                {r.cta.label}
-              </button>
-              {notice[r.key] && (
-                <p className="pricing-notice" role="status">
-                  {notice[r.key]}
-                </p>
-              )}
-            </article>
-          ))}
-        </section>
-        <section className="pricing-faq" aria-labelledby="pricing-faq-title">
-          <h2 id="pricing-faq-title">{S.pricingFaqTitle}</h2>
-          <p>{S.pricingFaqNoDouble}</p>
-          <p>{S.pricingFaqHardStop}</p>
-          <p>{S.pricingFaqPack}</p>
-          <p>{S.pricingFaqTax}</p>
-        </section>
-      </main>
-      {/* The page a checkout opens from carries the terms, the privacy
-          policy and the refund terms it is bought under — Paddle checks. */}
-      <footer className="lp-footer">
-        <div>
-          <Link className="lp-brand" to={home}>
-            <BrandMark /> {S.brand}.
-          </Link>
-          <p>{S.lpFooterTagline}</p>
-        </div>
-        <LegalLinks className="lp-legal" locale={locale} />
-        <div className="lp-footer-bottom">
-          <span>{S.lpFooterVersion}</span>
-          <span>{S.lpFooterPreview}</span>
-        </div>
-      </footer>
-    </div>
+            )}
+          </article>
+        ))}
+      </section>
+      <section className="pricing-faq" aria-labelledby="pricing-faq-title">
+        <h2 id="pricing-faq-title">{S.pricingFaqTitle}</h2>
+        <p>{S.pricingFaqNoDouble}</p>
+        <p>{S.pricingFaqHardStop}</p>
+        <p>{S.pricingFaqPack}</p>
+        <p>{S.pricingFaqTax}</p>
+      </section>
+    </PublicShell>
   );
 }

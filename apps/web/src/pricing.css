@@ -1,0 +1,292 @@
+/* Moved verbatim from landing.css on 2026-09-17; the pricing body is redesigned in phase 5, not here. */
+.lp-section-heading {
+  text-align: center;
+  max-width: 670px;
+  margin: 0 auto 44px;
+}
+.lp-section-heading .lp-eyebrow {
+  margin-bottom: 12px;
+}
+.lp-section-heading p {
+  color: #777180;
+  margin-top: 18px;
+  font-size: var(--lp-t-md);
+}
+@media (max-width: 650px) {
+  .lp-section-heading {
+    margin-bottom: 28px;
+  }
+  .lp-section-heading p {
+    font-size: var(--lp-t-sm);
+  }
+}
+/* ---- the pricing page ----------------------------------------------------
+   Wears the landing's face and header so a reader crossing from the landing
+   stays on one surface. Every colour below is a token from brand.css or
+   glass.css: this block is written after the 2026-09-15 audit and adds no
+   raw value to the ninety-five this file still carries above. */
+.pricing {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 55px 40px 95px;
+}
+.pricing-page .lp-header-cta {
+  white-space: nowrap;
+}
+.pricing .lp-section-heading h1 {
+  /* The landing's h1 is a hero; this one is a page title. */
+  font-size: clamp(34px, 4vw, 52px);
+  letter-spacing: -1px;
+  margin-bottom: 14px;
+}
+.pricing-lead {
+  color: var(--text-3);
+  font-size: var(--lp-t-lg);
+}
+.pricing-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 18px 36px;
+  margin: 0 0 36px;
+}
+.pricing-segments {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-pill);
+}
+.pricing-segments button {
+  background: transparent;
+  border: 0;
+  color: var(--text-2);
+  border-radius: var(--r-pill);
+  padding: 7px 22px;
+  font-size: var(--lp-t-sm);
+  font-weight: 700;
+}
+.pricing-segments button[aria-selected="true"] {
+  background: var(--bg-card);
+  color: var(--ml-indigo);
+  box-shadow: var(--shadow-1);
+}
+.pricing-interval {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--lp-t-sm);
+  font-weight: 700;
+  color: var(--text-2);
+}
+.pricing-interval button {
+  position: relative;
+  width: 50px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+  transition: background 0.2s;
+}
+.pricing-interval button[aria-checked="true"] {
+  background: var(--ml-indigo);
+  border-color: var(--ml-indigo);
+}
+.pricing-knob {
+  position: absolute;
+  top: 3px;
+  inset-inline-start: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.2s;
+}
+.pricing-interval button[aria-checked="true"] .pricing-knob {
+  /* Travels toward the inline end, so it mirrors with the page. */
+  transform: translateX(22px);
+}
+[dir="rtl"] .pricing-interval button[aria-checked="true"] .pricing-knob {
+  transform: translateX(-22px);
+}
+.pricing-state {
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--lp-t-sm);
+  margin-bottom: 24px;
+}
+.pricing-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.pricing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 30px 26px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-1);
+}
+.pricing-card[data-anchor] {
+  border-color: var(--ml-indigo-300);
+  box-shadow: var(--shadow-2);
+}
+.pricing-anchor {
+  position: absolute;
+  top: -14px;
+  inset-inline-start: 26px;
+  background: var(--ml-indigo);
+  color: var(--ink-on-dark);
+  font-size: var(--lp-t-xs);
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: var(--r-pill);
+}
+.pricing-card h2 {
+  font-size: 24px;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+.pricing-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.pricing-price strong {
+  /* Figures keep their own face and their own direction. */
+  font-family: var(--font-numeric);
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.pricing-price span {
+  color: var(--text-3);
+  font-size: var(--lp-t-sm);
+}
+.pricing-price[data-quoted] strong {
+  /* A sentence, not a figure: the page's face, the page's direction. */
+  font-family: inherit;
+  font-size: 26px;
+  letter-spacing: 0;
+  direction: inherit;
+  padding: 7px 0;
+}
+.pricing-yearly-note {
+  color: var(--text-3);
+  font-size: var(--lp-t-xs);
+  margin-top: -8px;
+}
+.pricing-limits {
+  list-style: none;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border-1);
+  display: grid;
+  gap: 8px;
+  font-size: var(--lp-t-sm);
+}
+.pricing-limits li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-2);
+}
+.pricing-limits strong {
+  font-family: var(--font-numeric);
+  color: var(--text-1);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.pricing-card .pricing-cta {
+  margin-top: auto;
+  padding: 12px 20px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--ml-indigo);
+  background: var(--bg-card);
+  color: var(--ml-indigo);
+  font-weight: 700;
+  font-size: var(--lp-t-md);
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.pricing-card .pricing-cta:hover {
+  background: var(--ml-indigo-50);
+}
+.pricing-card[data-anchor] .pricing-cta,
+.pricing-card .pricing-cta[data-kind="checkout"],
+.pricing-card .pricing-cta[data-kind="manage"] {
+  background: var(--ml-indigo);
+  color: var(--ink-on-dark);
+}
+.pricing-card[data-anchor] .pricing-cta:hover,
+.pricing-card .pricing-cta[data-kind="checkout"]:hover,
+.pricing-card .pricing-cta[data-kind="manage"]:hover {
+  background: var(--ml-indigo-800);
+}
+.pricing-card .pricing-cta[data-kind="current"] {
+  cursor: default;
+  border-color: var(--border-2);
+  color: var(--text-3);
+  background: var(--bg-muted);
+}
+.pricing-notice {
+  color: var(--color-warning);
+  font-size: var(--lp-t-sm);
+  text-align: center;
+}
+/* Two classes: `.landing section` zeroes margins at (0,1,1). */
+.pricing .pricing-faq {
+  max-width: 720px;
+  margin: 80px auto 0;
+  display: grid;
+  gap: 12px;
+}
+.pricing-faq h2 {
+  font-size: 26px;
+  letter-spacing: 0;
+  margin-bottom: 6px;
+}
+.pricing-faq p {
+  color: var(--text-2);
+  font-size: var(--lp-t-md);
+}
+@media (max-width: 1000px) {
+  .pricing-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .pricing {
+    padding: 35px 20px 65px;
+  }
+  .pricing-cards {
+    grid-template-columns: 1fr;
+  }
+  .pricing-card[data-anchor] {
+    order: -1;
+  }
+}
+@media (max-width: 650px) {
+  /* The landing hides its nav behind a menu button this page does not have;
+     two links fit on a line, so they stay. */
+  .pricing-page .lp-nav {
+    display: flex;
+    gap: 14px;
+  }
+  .pricing-page .lp-header-cta {
+    display: inline-block;
+  }
+}
