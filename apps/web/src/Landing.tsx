@@ -1,12 +1,15 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import "./landing.css";
 import { SENTIMENT } from "./chartTheme";
 import { BrandMark } from "./BrandMark";
-import { applyToDocument, direction, useLocale } from "./locale";
+import { direction, otherLocale, type Locale } from "./locale";
 import { useStrings } from "./strings";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { LegalLinks } from "./LegalLinks";
+import { publicPath } from "./publicPaths";
+import { homeSeo } from "./seo";
+import { PageHead, usePublicLocale } from "./PageHead";
 
 /* The demo's four comments. Their labels come from the shared strings rather
    than being written again here: a visitor who learns a word on this page
@@ -45,12 +48,13 @@ const numerals = {
   en: new Intl.NumberFormat("en"),
 };
 
-export function Landing() {
+/** `locale` comes from the route — `/` is Arabic and `/en` is English — not
+ *  from the stored preference; see `publicPaths.ts`. */
+export function Landing({ locale }: { locale: Locale }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useState("all");
   const [audience, setAudience] = useState<"creator" | "agency">("creator");
-  const locale = useLocale();
-  const S = useStrings();
+  const S = useStrings(locale);
   const labels = S.labels;
   const numeral = numerals[locale];
   const audiences = {
@@ -80,29 +84,26 @@ export function Landing() {
   }));
   const pct = (v: number) =>
     `${numeral.format(v)}${locale === "ar" ? "٪" : "%"}`;
-  // The language on the document, before paint, for as long as this page is
-  // mounted — the shell does the same for itself.
-  useLayoutEffect(() => {
-    applyToDocument(locale);
-  }, [locale]);
-  useEffect(() => {
-    const previous = document.title;
-    document.title = S.lpTitle;
-    return () => {
-      document.title = previous;
-    };
-  }, [S]);
+  // The language on the document and in the store, for as long as this
+  // page is mounted — the shell does the same for itself.
+  usePublicLocale(locale);
+  const home = publicPath("home", locale);
+  const pricing = publicPath("pricing", locale);
   return (
     <div className="landing" dir={direction(locale)}>
+      <PageHead seo={homeSeo(locale, S)} />
       <a className="lp-skip" href="#landing-content">
         {S.skipToContent}
       </a>
       <div className="lp-announcement">
         {S.announcementLead} <span>{S.announcementTag}</span>
-        <LanguageSwitch />
+        <LanguageSwitch
+          locale={locale}
+          to={publicPath("home", otherLocale(locale))}
+        />
       </div>
       <header className="lp-header">
-        <Link className="lp-brand" to="/" aria-label={S.brandHomeLabel}>
+        <Link className="lp-brand" to={home} aria-label={S.brandHomeLabel}>
           <BrandMark /> {S.brand}
           <span className="lp-brand-dot">.</span>
         </Link>
@@ -130,7 +131,7 @@ export function Landing() {
             {S.lpNavFaq}
           </a>
           {/* The page's own title is the link's text: one sentence, one key. */}
-          <Link to="/pricing">{S.pricingTitle}</Link>
+          <Link to={pricing}>{S.pricingTitle}</Link>
         </nav>
         <Link className="lp-header-cta" to="/account">
           {S.lpOpenAccount} <span aria-hidden="true">{S.arrowUpForward}</span>
@@ -165,13 +166,18 @@ export function Landing() {
             </div>
             <p className="lp-caption">{S.lpHeroCaption}</p>
           </div>
-          <div className="lp-hero-art" aria-label={S.lpHeroArtLabel}>
+          <div className="lp-hero-art">
             <div className="lp-art-halo" />
+            {/* WebP, 29 kB, where the PNG it was encoded from was 1.19 MB —
+                the largest thing on the page by forty times, on the request
+                the browser is told to make first. Same pixels, same box. The
+                alt is the picture's own sentence: it is the one image a
+                search engine can read off this page, and a share card's. */}
             <img
-              src="/landing/audience-growth-original.png"
+              src="/landing/audience-growth-original.webp"
               width="1536"
               height="1024"
-              alt=""
+              alt={S.lpHeroAlt}
               fetchPriority="high"
             />
             <div className="lp-floating lp-floating-top">
@@ -480,19 +486,20 @@ export function Landing() {
       </main>
       <footer className="lp-footer">
         <div>
-          <Link className="lp-brand" to="/">
+          <Link className="lp-brand" to={home}>
             <BrandMark /> {S.brand}.
           </Link>
           <p>{S.lpFooterTagline}</p>
         </div>
         <nav aria-label={S.lpFooterNavLabel}>
+          <Link to={pricing}>{S.pricingTitle}</Link>
           <Link to="/dashboard">{S.lpFooterDashboard}</Link>
           <Link to="/account">{S.lpFooterAccount}</Link>
           <a href="#questions">{S.lpNavFaq}</a>
         </nav>
         {/* Where a reviewer at Google or Paddle looks for them, and where a
             visitor expects them: the foot of the page, by their own titles. */}
-        <LegalLinks className="lp-legal" />
+        <LegalLinks className="lp-legal" locale={locale} />
         <div className="lp-footer-bottom">
           <span>{S.lpFooterVersion}</span>
           <span>{S.lpFooterPreview}</span>

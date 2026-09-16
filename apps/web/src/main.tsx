@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
 import {
   BrowserRouter,
   Routes,
@@ -33,12 +33,14 @@ import {
   currentLocale,
   DEFAULT_LOCALE,
   direction,
+  setLocale,
   useLocale,
 } from "./locale";
 import { loadStrings, useStrings, type StringKey } from "./strings";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { LegalLinks } from "./LegalLinks";
-import { LEGAL_PATHS } from "./legal/types";
+import { publicPath, resolvePublicPath } from "./publicPaths";
+import { publicRoutes } from "./publicRoutes";
 import { SessionControl } from "./SessionControl";
 const Dashboard = lazy(() =>
   import("./Dashboard").then((m) => ({ default: m.Dashboard })),
@@ -263,6 +265,10 @@ function AppLayout() {
   }, [pathname, S]);
   return (
     <div className="app-shell" dir={direction(locale)}>
+      {/* The product is never indexed, whatever the public pages say. The
+          static HTML the shell boots from (`app.html`) carries the same
+          directive; this is the one that reaches a crawler running React. */}
+      <meta name="robots" content="noindex, nofollow" />
       <a className="skip app-skip" href="#content">
         {S.skipToContent}
       </a>
@@ -310,7 +316,11 @@ function AppLayout() {
           }
         }}
       >
-        <Link className="app-brand" to="/" aria-label={S.brandHomeLabel}>
+        <Link
+          className="app-brand"
+          to={publicPath("home", locale)}
+          aria-label={S.brandHomeLabel}
+        >
           <BrandMark />
           <span>
             <b>
@@ -364,7 +374,7 @@ function AppLayout() {
       </main>
       <footer className="app-footer">
         <div>
-          <Link to="/">{S.brand}.</Link>
+          <Link to={publicPath("home", locale)}>{S.brand}.</Link>
           <span>{S.footerTagline}</span>
         </div>
         <p>{S.footerNote}</p>
@@ -387,7 +397,7 @@ function NotFound() {
       <p>{S.notFoundLead}</p>
       <div className="app-state-actions">
         <Link to="/dashboard">{S.openDashboard}</Link>
-        <Link to="/">{S.backHome}</Link>
+        <Link to={publicPath("home", locale)}>{S.backHome}</Link>
       </div>
     </div>
   );
@@ -404,56 +414,50 @@ function DirectionRoot({ children }: { children: React.ReactNode }) {
   );
 }
 
-// The stored language's strings are in hand before the first render: a reader
-// who chose English does not see Arabic for a frame while it loads.
-void loadStrings(currentLocale()).then(() =>
-  createRoot(document.getElementById("root")!).render(
-    <React.StrictMode>
-      <QueryClientProvider client={client}>
-        <DirectionRoot>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              {/* Beside the landing, not inside the shell: read signed out. */}
-              <Route
-                path="/pricing"
-                element={
-                  <Suspense fallback={null}>
-                    <Pricing />
-                  </Suspense>
-                }
-              />
-              {/* Read signed out too — by the reader deciding, and by the
-                  reviewer at Google or Paddle following the footer link. */}
-              <Route
-                path={LEGAL_PATHS.privacy}
-                element={
-                  <Suspense fallback={null}>
-                    <LegalPage doc="privacy" />
-                  </Suspense>
-                }
-              />
-              <Route
-                path={LEGAL_PATHS.terms}
-                element={
-                  <Suspense fallback={null}>
-                    <LegalPage doc="terms" />
-                  </Suspense>
-                }
-              />
-              <Route element={<AppLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/account" element={<Account />} />
-                <Route path="/sync" element={<Sync />} />
-                <Route path="/connected" element={<Connected />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
-          <ToastHost />
-        </DirectionRoot>
-      </QueryClientProvider>
-    </React.StrictMode>,
-  ),
+/** Everything under the router, for either way of mounting it. */
+const app = (
+  <React.StrictMode>
+    <QueryClientProvider client={client}>
+      <DirectionRoot>
+        <BrowserRouter>
+          <Routes>
+            {/* The public pages, beside the landing and not inside the
+                shell: read signed out, in the language their address names,
+                and served prerendered — see publicPaths.ts. The pricing and
+                legal pages load on demand. */}
+            {publicRoutes({ Landing, Pricing, LegalPage }, (element) => (
+              <Suspense fallback={null}>{element}</Suspense>
+            ))}
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/account" element={<Account />} />
+              <Route path="/sync" element={<Sync />} />
+              <Route path="/connected" element={<Connected />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+        <ToastHost />
+      </DirectionRoot>
+    </QueryClientProvider>
+  </React.StrictMode>
 );
+
+// A public address names its own language, and that language is the one
+// the reader is about to read — so it becomes the stored preference before
+// the first render, and the product opens in it afterwards. Anywhere else
+// the stored preference stands. Either way the strings are in hand before
+// the first render: a reader who chose English does not see Arabic for a
+// frame while it loads.
+const hit = resolvePublicPath(window.location.pathname);
+const initial = hit ? hit.locale : currentLocale();
+void loadStrings(initial).then(() => {
+  if (hit) setLocale(hit.locale);
+  const root = document.getElementById("root")!;
+  // A prerendered public page arrives with its markup in place and is
+  // hydrated; the shell's fallback document (`app.html`) arrives empty and
+  // is rendered from nothing. Same tree either way.
+  if (root.hasChildNodes()) hydrateRoot(root, app);
+  else createRoot(root).render(app);
+});

@@ -5,7 +5,7 @@ test("landing demo filters illustrative comments and connects to the real dashbo
 }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "وراء كل تعليق",
+    "افهم مشاعر جمهورك",
   );
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   const demo = page.locator(".lp-demo-frame");

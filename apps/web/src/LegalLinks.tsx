@@ -6,15 +6,27 @@
  * mounts this and has the same links as the rest.
  */
 import { Link } from "react-router";
-import { LEGAL_PATHS } from "./legal/types";
+import { useLocale, type Locale } from "./locale";
+import { publicPath } from "./publicPaths";
 import { useStrings } from "./strings";
 
-export function LegalLinks({ className }: { className?: string }) {
-  const S = useStrings();
+export function LegalLinks({
+  className,
+  locale: given,
+}: {
+  className?: string;
+  /** A public page passes the locale its address names; the shell's footer
+   *  reads the stored preference. Either way the link goes to the document
+   *  in the language the reader is reading. */
+  locale?: Locale;
+}) {
+  const stored = useLocale();
+  const locale = given ?? stored;
+  const S = useStrings(locale);
   return (
     <nav className={className} aria-label={S.legalNavLabel}>
-      <Link to={LEGAL_PATHS.privacy}>{S.legalPrivacy}</Link>
-      <Link to={LEGAL_PATHS.terms}>{S.legalTerms}</Link>
+      <Link to={publicPath("privacy", locale)}>{S.legalPrivacy}</Link>
+      <Link to={publicPath("terms", locale)}>{S.legalTerms}</Link>
     </nav>
   );
 }

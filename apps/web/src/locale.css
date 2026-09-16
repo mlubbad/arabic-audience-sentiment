@@ -37,6 +37,13 @@
 .app-lang:lang(ar) {
   font-family: var(--font-body);
 }
+/* On a public page the switch is a link to the same page in the other
+   language (LanguageSwitch.tsx); it keeps the button's shape. */
+a.app-lang {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
 .app-lang:hover,
 .app-lang:focus-visible {
   border-color: rgba(255, 255, 255, 0.5);

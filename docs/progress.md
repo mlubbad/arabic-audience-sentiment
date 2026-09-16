@@ -897,3 +897,45 @@ one). `npm run check` (lint, format:check, typecheck, check:functions, unit test
 492 tests, db tests 31 files/297 tests, worker tests 195, build, check:secrets) and the whole
 Playwright suite (98/98, including the whole `app-shell.spec.ts` file at 8/8) are both green
 post-merge (`docs/verification.md`).
+
+## 2026-09-17 — on-page SEO for the public face: `/en` addresses, prerender, metadata, and the copy rewritten to be found
+
+On the owner's explicit request for a full on-page review of the landing page and its
+attachments. The whole account is `docs/seo.md`; this is the record of what landed.
+
+- **Every public page has two addresses.** `/`, `/pricing`, `/privacy-policy`, `/terms` in
+  Arabic; the same under `/en` in English (`publicPaths.ts`, one table both renderers read).
+  The address decides the language — `Landing`, `Pricing` and `LegalPage` take `locale` from
+  the route and read `useStrings(locale)` — and reading a page sets the stored preference, so
+  the product opens in the language the reader was reading. On a public page the language
+  switch is a link to the twin address, with the other language's strings fetched before it
+  moves. Every link to a two-language page goes through `publicPath`, swept by test.
+- **Every public page renders its own head** (`PageHead.tsx` from `seo.ts`): title,
+  description, robots, canonical, `hreflang` × 3, Open Graph, Twitter, JSON-LD
+  (`Organization`, `WebSite`, `WebPage`, `SoftwareApplication`; `FAQPage` on the landing;
+  `Offer` per self-serve plan on the pricing page from the catalogue rows). `index.html`
+  carries none of these any more.
+- **The public pages are prerendered.** `npm run build` now ends in `scripts/prerender.mjs`:
+  a Vite SSR bundle of `entry-prerender.tsx` renders the eight addresses into
+  `dist/<path>/index.html`, writes `sitemap.xml` and `robots.txt`, keeps the empty template
+  as `dist/app.html` for the shell's routes, and checks every output before exiting 0.
+  `main.tsx` hydrates when the root has markup. Three real mismatches were found with the
+  development React bundle and fixed (locale before render, the lazy page's `Suspense`
+  boundary, the `ToastHost` sibling); the eight pages and the shell's fallback now hydrate
+  clean. The pricing page is rendered with the catalogue read at build time and embeds it
+  for hydration. `.htaccess` serves `<path>/index.html` for `/<path>` without a redirect and
+  falls back to `app.html`.
+- **One flag for indexing.** `VITE_SITE_PUBLIC=true` turns the robots meta, `robots.txt` and
+  the `X-Robots-Tag` header together at build time; the site stays `noindex` until the owner
+  sets it. `VITE_SITE_URL` is the origin every absolute address carries.
+- **The copy, both languages.** Rewritten around a keyword map (`docs/seo.md` §2): the
+  search phrase in the title, the description, the H1, the section headings and the FAQ
+  title, once each and in sentences. Eight FAQ entries where there were four. No accuracy
+  figure, no customer count, no price outside the catalogue — `seo.test.ts` sweeps for all
+  three. The pricing page's H1 says what is priced.
+- **Images.** The hero is the same picture as a 29 kB WebP (the 1.19 MB PNG stays in
+  `public/landing/` as the provenance original, unreferenced) with a descriptive alt; a
+  1200×630 JPEG share image is cropped from it.
+- Tests: `seo.test.ts`, `publicPaths.test.ts`, `prerender.test.ts`, `LegalPage.test.ts`
+  (routes), `tests/e2e/seo.spec.ts`; the landing, pricing and language browser tests follow
+  the new copy and addresses. Results in `docs/verification.md`.

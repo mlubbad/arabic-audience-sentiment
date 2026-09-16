@@ -12,15 +12,18 @@
  * no workspace, no rail and no session, and the page must read the same to
  * them as to an owner comparing the next step up.
  */
-import { useLayoutEffect, useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import "./landing.css";
 import { BrandMark } from "./BrandMark";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { LegalLinks } from "./LegalLinks";
 import { usePlanCatalogue } from "./planCatalogue";
-import { applyToDocument, direction, useLocale } from "./locale";
+import { direction, otherLocale, type Locale } from "./locale";
 import { useStrings } from "./strings";
+import { publicPath } from "./publicPaths";
+import { pricingSeo } from "./seo";
+import { PageHead, usePublicLocale } from "./PageHead";
 import { contactEmail, pricingRows, type PricingRow } from "./pricing";
 import { useSession, useWorkspaces } from "./session";
 import { usePlanUsage } from "./planUsage";
@@ -29,9 +32,10 @@ import { openCheckout, openPortal } from "./paddle";
 type Segment = "individual" | "business";
 const SEGMENTS: readonly Segment[] = ["individual", "business"];
 
-export function Pricing() {
-  const S = useStrings();
-  const locale = useLocale();
+/** `locale` comes from the route — `/pricing` is Arabic, `/en/pricing`
+ *  English — not from the stored preference; see `publicPaths.ts`. */
+export function Pricing({ locale }: { locale: Locale }) {
+  const S = useStrings(locale);
   const navigate = useNavigate();
   const { session } = useSession();
   // Signed in, the checkout needs the workspace the reader chose — the same
@@ -58,16 +62,8 @@ export function Pricing() {
     plan.data?.plan_key ?? null,
     plan.data?.provider ?? null,
   );
-  useLayoutEffect(() => {
-    applyToDocument(locale);
-  }, [locale]);
-  useEffect(() => {
-    const previous = document.title;
-    document.title = `${S.pricingTitle} — ${S.brand}`;
-    return () => {
-      document.title = previous;
-    };
-  }, [S]);
+  usePublicLocale(locale);
+  const home = publicPath("home", locale);
 
   const act = (row: PricingRow) => {
     if (row.cta.kind === "contact") {
@@ -102,6 +98,9 @@ export function Pricing() {
 
   return (
     <div className="landing pricing-page" dir={direction(locale)}>
+      {/* The offers in the structured data are the rows the cards show —
+          nothing priced here that the catalogue did not say. */}
+      <PageHead seo={pricingSeo(locale, S, catalogue.data ?? [])} />
       <a className="lp-skip" href="#pricing-content">
         {S.skipToContent}
       </a>
@@ -109,15 +108,21 @@ export function Pricing() {
           needs the dark plane it was drawn for. */}
       <div className="lp-announcement">
         {S.announcementLead} <span>{S.announcementTag}</span>
-        <LanguageSwitch />
+        <LanguageSwitch
+          locale={locale}
+          to={publicPath("pricing", otherLocale(locale))}
+        />
       </div>
       <header className="lp-header">
-        <Link className="lp-brand" to="/" aria-label={S.brandHomeLabel}>
+        <Link className="lp-brand" to={home} aria-label={S.brandHomeLabel}>
           <BrandMark /> {S.brand}
           <span className="lp-brand-dot">.</span>
         </Link>
         <nav className="lp-nav" aria-label={S.lpNavLabel}>
-          <Link to="/">{S.backHome}</Link>
+          <Link to={home}>{S.backHome}</Link>
+          {/* A plain anchor: the questions are a section of the landing,
+              and a hash on a client-side navigation scrolls nowhere. */}
+          <a href={`${home}#questions`}>{S.lpNavFaq}</a>
           <Link to="/dashboard">{S.lpFooterDashboard}</Link>
         </nav>
         <Link className="lp-header-cta" to="/account">
@@ -126,7 +131,7 @@ export function Pricing() {
       </header>
       <main id="pricing-content" className="pricing">
         <div className="lp-section-heading">
-          <h1>{S.pricingTitle}</h1>
+          <h1>{S.pricingHeading}</h1>
           <p className="pricing-lead">{S.pricingLead}</p>
         </div>
         <div className="pricing-controls">
@@ -232,12 +237,12 @@ export function Pricing() {
           policy and the refund terms it is bought under — Paddle checks. */}
       <footer className="lp-footer">
         <div>
-          <Link className="lp-brand" to="/">
+          <Link className="lp-brand" to={home}>
             <BrandMark /> {S.brand}.
           </Link>
           <p>{S.lpFooterTagline}</p>
         </div>
-        <LegalLinks className="lp-legal" />
+        <LegalLinks className="lp-legal" locale={locale} />
         <div className="lp-footer-bottom">
           <span>{S.lpFooterVersion}</span>
           <span>{S.lpFooterPreview}</span>

@@ -10,15 +10,17 @@
  * table in main.tsx is the only place that maps an address to a document,
  * and `LEGAL_PATHS` is what every link reads, so the two cannot disagree.
  */
-import { useEffect, useLayoutEffect } from "react";
 import { Link } from "react-router";
 import "./landing.css";
 import { BrandMark } from "./BrandMark";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { LegalLinks } from "./LegalLinks";
-import { applyToDocument, direction, useLocale } from "./locale";
+import { direction, otherLocale, useLocale, type Locale } from "./locale";
 import { useStrings } from "./strings";
 import { inline, legalFor, type LegalKey } from "./legal";
+import { publicPath } from "./publicPaths";
+import { legalSeo } from "./seo";
+import { PageHead, usePublicLocale } from "./PageHead";
 
 function Paragraph({ text }: { text: string }) {
   return (
@@ -36,9 +38,18 @@ function Paragraph({ text }: { text: string }) {
   );
 }
 
-export function LegalPage({ doc: key }: { doc: LegalKey }) {
-  const S = useStrings();
-  const locale = useLocale();
+export function LegalPage({
+  doc: key,
+  locale: given,
+}: {
+  doc: LegalKey;
+  /** Named by the route (`/terms` is Arabic, `/en/terms` English); the
+   *  stored preference only when rendered without one, as a test does. */
+  locale?: Locale;
+}) {
+  const stored = useLocale();
+  const locale = given ?? stored;
+  const S = useStrings(locale);
   const doc = legalFor(locale)[key];
   // The date in the reader's language and digits — the landing uses
   // Arabic-Indic digits on the Arabic page, and so does this one.
@@ -46,33 +57,29 @@ export function LegalPage({ doc: key }: { doc: LegalKey }) {
     locale === "ar" ? "ar-u-nu-arab" : "en",
     { dateStyle: "long", timeZone: "UTC" },
   ).format(new Date(doc.updated));
-  useLayoutEffect(() => {
-    applyToDocument(locale);
-  }, [locale]);
-  useEffect(() => {
-    const previous = document.title;
-    document.title = `${doc.title} — ${S.brand}`;
-    return () => {
-      document.title = previous;
-    };
-  }, [doc.title, S.brand]);
+  usePublicLocale(locale);
+  const home = publicPath("home", locale);
   return (
     <div className="landing legal-page" dir={direction(locale)}>
+      <PageHead seo={legalSeo(key, locale, S)} />
       <a className="lp-skip" href="#legal-content">
         {S.skipToContent}
       </a>
       <div className="lp-announcement">
         {S.announcementLead} <span>{S.announcementTag}</span>
-        <LanguageSwitch />
+        <LanguageSwitch
+          locale={locale}
+          to={publicPath(key, otherLocale(locale))}
+        />
       </div>
       <header className="lp-header">
-        <Link className="lp-brand" to="/" aria-label={S.brandHomeLabel}>
+        <Link className="lp-brand" to={home} aria-label={S.brandHomeLabel}>
           <BrandMark /> {S.brand}
           <span className="lp-brand-dot">.</span>
         </Link>
         <nav className="lp-nav" aria-label={S.lpNavLabel}>
-          <Link to="/">{S.backHome}</Link>
-          <Link to="/pricing">{S.pricingTitle}</Link>
+          <Link to={home}>{S.backHome}</Link>
+          <Link to={publicPath("pricing", locale)}>{S.pricingTitle}</Link>
         </nav>
         <Link className="lp-header-cta" to="/account">
           {S.lpOpenAccount} <span aria-hidden="true">{S.arrowUpForward}</span>
@@ -85,7 +92,14 @@ export function LegalPage({ doc: key }: { doc: LegalKey }) {
           <div className="legal-head">
             <h1 id="legal-title">{doc.title}</h1>
             <p className="legal-updated">
-              {S.legalUpdated}: <time dateTime={doc.updated}>{updated}</time>
+              {/* Formatted by ICU on the server and in the browser, whose
+                  versions may differ by a joiner; the date is data the
+                  page carries in `dateTime`, so a mismatch is not worth a
+                  re-render. */}
+              {S.legalUpdated}:{" "}
+              <time dateTime={doc.updated} suppressHydrationWarning>
+                {updated}
+              </time>
             </p>
             <p className="legal-lead">{doc.lead}</p>
           </div>
@@ -120,12 +134,12 @@ export function LegalPage({ doc: key }: { doc: LegalKey }) {
       </main>
       <footer className="lp-footer">
         <div>
-          <Link className="lp-brand" to="/">
+          <Link className="lp-brand" to={home}>
             <BrandMark /> {S.brand}.
           </Link>
           <p>{S.lpFooterTagline}</p>
         </div>
-        <LegalLinks className="lp-legal" />
+        <LegalLinks className="lp-legal" locale={locale} />
         <div className="lp-footer-bottom">
           <span>{S.lpFooterVersion}</span>
           <span>{S.lpFooterPreview}</span>

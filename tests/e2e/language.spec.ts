@@ -56,13 +56,23 @@ test("the landing follows the choice, and a choice made there reaches the shell"
   await expect(
     page.getByRole("link", { name: "استكشف اللوحة" }).first(),
   ).toBeVisible();
+  // On a public page the switch is a link to the same page in the other
+  // language: English has its own address, which is what a search engine
+  // and a shared link need (publicPaths.ts).
+  await expect(page.getByTestId("language-switch")).toHaveAttribute(
+    "href",
+    "/en",
+  );
   await page.getByTestId("language-switch").click();
+  await expect(page).toHaveURL(/\/en$/);
   await expect(html).toHaveAttribute("lang", "en");
   await expect(html).toHaveAttribute("dir", "ltr");
   await expect(page.locator(".landing")).toHaveAttribute("dir", "ltr");
   await expect(page).toHaveTitle(/Audience Sentiment/);
   // The arrow points the way the text now runs.
-  const cta = page.getByRole("link", { name: "Explore the dashboard" }).first();
+  const cta = page
+    .getByRole("link", { name: "Explore the demo dashboard" })
+    .first();
   await expect(cta).toBeVisible();
   // The demo comments are the data the product reads, and stay Arabic —
   // shaped right-to-left inside a left-to-right page.

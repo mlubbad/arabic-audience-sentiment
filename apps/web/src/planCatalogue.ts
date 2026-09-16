@@ -8,9 +8,31 @@
  * its own key.
  */
 import { useQuery } from "@tanstack/react-query";
-import { PlanCatalogueSchema } from "@sentiment/contracts";
+import { PlanCatalogueSchema, type Plan } from "@sentiment/contracts";
 import { supabase } from "./supabase";
 import { configuredMode, fixtureCatalogue } from "./data";
+
+/** Where a prerendered pricing page carries the rows it was rendered with.
+ *  `scripts/prerender.mjs` writes them as `<script type="application/json">`
+ *  under this id, and the first read below takes them as the query's initial
+ *  data — so the hydrated page shows the cards the static HTML showed, with
+ *  no "reading the plans…" between, and then asks the server for the current
+ *  rows as it always did. Marked stale from the start (`initialDataUpdatedAt:
+ *  0`), so that refetch is not skipped. */
+export const EMBEDDED_CATALOGUE_ID = "plan-catalogue";
+
+export function embeddedCatalogue(): Plan[] | undefined {
+  const text = globalThis.document?.getElementById(
+    EMBEDDED_CATALOGUE_ID,
+  )?.textContent;
+  if (!text) return undefined;
+  try {
+    return PlanCatalogueSchema.parse(JSON.parse(text));
+  } catch {
+    // Not the catalogue: the page renders as if nothing was embedded.
+    return undefined;
+  }
+}
 
 export async function readCatalogue() {
   if (configuredMode !== "live" || !supabase) return fixtureCatalogue;
@@ -22,7 +44,13 @@ export async function readCatalogue() {
 
 /** `enabled` lets a page that may turn a reader away not ask on their behalf. */
 export function usePlanCatalogue(enabled = true) {
-  return useQuery({ queryKey: ["catalogue"], queryFn: readCatalogue, enabled });
+  return useQuery({
+    queryKey: ["catalogue"],
+    queryFn: readCatalogue,
+    enabled,
+    initialData: embeddedCatalogue,
+    initialDataUpdatedAt: 0,
+  });
 }
 
 /** Every plan, internal ones included, for the admin page's select. The RPC

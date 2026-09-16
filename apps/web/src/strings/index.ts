@@ -47,18 +47,29 @@ export function stringsFor(locale: Locale): Strings {
   return loaded[locale] ?? ar;
 }
 
+/** Whether `stringsFor(locale)` would answer with that locale's own set. A
+ *  public page asked for in English through its address checks this before
+ *  its first render, so it never paints Arabic under `lang="en"`. */
+export const hasStrings = (locale: Locale): boolean => locale in loaded;
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
 /** The current locale's strings. `S.signIn`, `S.commentsRead(n)` — typed,
- *  so a key that does not exist is a compile error at the call site. */
-export function useStrings(): Strings {
-  const locale = useLocale();
+ *  so a key that does not exist is a compile error at the call site.
+ *
+ *  A public page passes the locale its address names rather than reading the
+ *  stored preference: `/en` is English whatever the reader chose last time,
+ *  and the two must not disagree for the frame it takes the store to catch
+ *  up (`usePublicLocale` in `PageHead.tsx` does the catching up). */
+export function useStrings(locale?: Locale): Strings {
+  const stored = useLocale();
+  const wanted = locale ?? stored;
   return useSyncExternalStore(
     subscribe,
-    () => stringsFor(locale),
-    () => stringsFor(locale),
+    () => stringsFor(wanted),
+    () => stringsFor(wanted),
   );
 }

@@ -15,8 +15,12 @@ braces, and the belt is missing. Worth knowing before anyone relaxes the passwor
 
 ## What is deployed
 
-The built front end only: `index.html`, one hashed JS bundle, one hashed CSS file, the
-sanitized fixture, `robots.txt`, and `.htaccess`. No server code, no worker, no secrets —
+The built front end only: the prerendered public pages (`index.html` for `/`, and
+`<path>/index.html` for `/en`, `/pricing`, `/en/pricing`, the two legal documents and their
+`/en` twins), `app.html` (the empty template the shell's routes fall back to), the hashed JS
+and CSS, the sanitized fixture, `sitemap.xml`, `robots.txt`, and `.htaccess`. Since
+2026-09-17; `docs/seo.md` §4 says how the prerender works and §5 what `VITE_SITE_PUBLIC`
+changes in this list. No server code, no worker, no secrets —
 `check-secrets` runs inside the deploy script and refuses to ship a bundle carrying one.
 
 The bundle embeds the Supabase project URL and the **publishable** key. Both are public by

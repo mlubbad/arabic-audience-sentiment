@@ -12,6 +12,7 @@ import { StaticRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { LegalPage } from "./LegalPage";
 import { legalAr, LEGAL_KEYS, LEGAL_PATHS } from "./legal";
+import { PUBLIC_ROUTES, publicPath } from "./publicPaths";
 import { ar } from "./strings/ar";
 
 const render = (doc: (typeof LEGAL_KEYS)[number]) =>
@@ -64,11 +65,18 @@ describe("the footers", () => {
       expect(footer, file).toContain("<LegalLinks");
     }
   });
-  it("serve each document at the address the links use", () => {
+  it("serve each document at the address the links use, in both languages", () => {
+    // The routes are the one table in publicPaths.ts, mounted by main.tsx
+    // through publicRoutes(); the links read the same table. So the check is
+    // that the table names each document at LEGAL_PATHS, and the shell
+    // mounts the table rather than writing a route of its own.
     const routes = src("main.tsx");
+    expect(routes).toContain("publicRoutes({ Landing, Pricing, LegalPage }");
+    expect(routes).not.toMatch(/path=\{LEGAL_PATHS/);
     for (const key of LEGAL_KEYS) {
-      expect(routes).toContain(`path={LEGAL_PATHS.${key}}`);
-      expect(routes).toContain(`<LegalPage doc="${key}" />`);
+      expect(publicPath(key, "ar")).toBe(LEGAL_PATHS[key]);
+      expect(publicPath(key, "en")).toBe(`/en${LEGAL_PATHS[key]}`);
+      expect(PUBLIC_ROUTES.filter((r) => r.page === key)).toHaveLength(2);
     }
   });
 });

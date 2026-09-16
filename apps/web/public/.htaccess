@@ -10,15 +10,29 @@
 # block from here is the whole of what "removing the password" means from
 # this repo — there was never a second lever to pull.
 
-# Single-page app: an unknown path is the router's business, not the
-# filesystem's. Without this, refreshing on /account is a 404.
+# Two kinds of address, in this order.
+#
+# A public page — the landing, /pricing, the legal documents, each also
+# under /en — is prerendered by scripts/prerender.mjs into <path>/index.html
+# (the landing into index.html itself). The first rule serves that file for
+# `/pricing` and `/pricing/` alike, as an internal rewrite: left to mod_dir, a
+# request for the directory without its slash is answered with a 301 to the
+# slashed form, and the canonical address of every page here has no slash.
+#
+# Everything else that is not a file or a directory is the router's business,
+# not the filesystem's, and gets app.html — the same template with an empty
+# root, which the shell renders from nothing. Not index.html: that is the
+# prerendered landing now, and a shell route hydrating against the landing's
+# markup would throw the markup away and render twice.
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+  RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
+  RewriteRule ^(.+?)/?$ /$1/index.html [L]
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
-  RewriteRule . /index.html [L]
+  RewriteRule . /app.html [L]
 </IfModule>
 
 <IfModule mod_headers.c>
@@ -46,5 +60,10 @@
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "no-referrer"
+  # The site-wide refusal to be indexed. scripts/prerender.mjs removes this
+  # one line from the built copy when VITE_SITE_PUBLIC=true — the same flag
+  # that opens robots.txt and turns every public page's robots meta to
+  # "index, follow" — so the three signals cannot disagree. Until then a
+  # crawler is told twice, by the page and by the header, and the header wins.
   Header always set X-Robots-Tag "noindex, nofollow"
 </IfModule>

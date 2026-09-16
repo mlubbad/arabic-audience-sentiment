@@ -497,3 +497,43 @@ call.
 checkout for every other paid card; a second checkout is a second subscription. When `usage_summary`
 says `provider = 'paddle'`, every paid self-serve card that is not the current one opens the portal
 (`openPortal`, the plan panel's "manage"), with the same two refusals.
+
+## 2026-09-17 — the public face: the address decides the language, and the pages are prerendered
+
+**A public page's URL names its language.** The interface language was a browser
+preference only, so `/` was one document that rendered in whichever of two languages
+`localStorage` held — nothing a search engine could index as English or a reader could
+share as English. Now `/en`, `/en/pricing`, `/en/privacy-policy` and `/en/terms` are the
+English pages and the bare paths are Arabic; the route passes `locale` to the page, the page
+reads its strings by it, and `usePublicLocale` writes it to the document and the stored
+preference. Inside the product the preference still rules and there is no `/en`: those
+routes are `noindex` and have no reason for a second address. The alternative — keep one
+address and a `?lang=` or cookie — was rejected because `hreflang` needs one URL per
+language and a crawler carries no cookie.
+
+**The public pages are prerendered at build time, not server-rendered.** The host is static
+files behind Apache and Cloudflare; the pages are four, in two languages, and change only
+with a deploy. A build-time render into `dist/<path>/index.html` gives a crawler and a share
+card the whole page with no runtime, and the browser hydrates the same tree. The pricing page
+is the one with data: it is rendered with the catalogue read from the configured project at
+build time (the fixture if the read fails, said aloud) and embeds the rows so hydration
+starts from them and then refetches — so the static HTML's prices are the deploy's, not a
+guess, and never a literal in source.
+
+**The shell's fallback is `app.html`, not `index.html`.** The prerendered landing now
+occupies `index.html`; a shell route hydrating against it would discard the markup and render
+twice with a console error. `.htaccess` sends every non-file, non-directory, non-prerendered
+path to the empty template instead.
+
+**Indexing is one build flag, off by default.** `VITE_SITE_PUBLIC=true` flips the robots
+meta, `robots.txt` and the `X-Robots-Tag` header together; nothing else touches them. The
+site has been open to anyone with the link since 2026-09-16 and is now fully described to a
+crawler, and it stays `noindex` until the owner decides — that decision is not made in a
+commit. `docs/seo.md` §5 lists what to check first, including that Cloudflare currently
+serves its own `robots.txt` in place of ours.
+
+**The copy says the search phrase once per place, and still claims nothing the beta cannot
+back.** `seo.test.ts` holds both: the phrase is in the title, description, H1 and FAQ title
+in each language; no accuracy figure, no customer count and no dollar amount appear in the
+landing's copy. The prices belong to the catalogue and the structured data reads them from
+it.

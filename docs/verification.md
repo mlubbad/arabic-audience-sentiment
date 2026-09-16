@@ -2082,3 +2082,32 @@ allowance did not come up.
 (the other concurrent session's uncommitted edit, left untouched per this task's brief) and
 the untracked `.screenshots/` directory (unrelated to this plan); nothing from this plan's
 four commits (`0bb18b6`, `d97e009`, `b87abef`, `3ea6d17`) was left uncommitted.
+
+## 2026-09-17 — on-page SEO: `/en`, prerender, metadata, copy — checks and the whole browser suite
+
+Node 22.14.0, on `main` at the commit that carries this entry. Another session was working
+in the same checkout on the workspace-deletion migration; its uncommitted
+`supabase/tests/workspace_lifecycle.test.ts` fails `format:check`, so `npm run check` was
+run as its parts, with the format check scoped to the files this work touched.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npm run lint` (eslint + ruff) | clean |
+| `prettier --check 'apps/web/src/**/*.{ts,tsx,css}' 'apps/web/scripts/*.mjs' 'tests/e2e/*.ts' '*.json'` | all matched files formatted |
+| `npm run typecheck` | 0 errors |
+| `npm run check:functions` | clean |
+| `npm test` | 75 files, 512 passed (before `prerender.test.ts`: +5, all passing) |
+| `npm run test:db` | 31 files, 302 passed |
+| `npm run worker:test` | 195 passed |
+| `npm run build` | `prerender: catalogue read at build time, 6 plans` · `8 pages, sitemap, robots.txt (noindex)`; every per-page check passed |
+| `VITE_SITE_PUBLIC=true npm run build` | `robots.txt (public)`: `Allow: /`, product routes disallowed, `Sitemap:` line; `dist/.htaccess` carries no `X-Robots-Tag`; `index.html` and `en/pricing/index.html` say `index, follow`; `app.html` still says `noindex, nofollow`. Rebuilt without the flag afterwards: `Disallow: /`, header present, meta `noindex` |
+| `npm run check:secrets` | passed (479 source files, plus built assets) |
+| `E2E_PORT=5399 npx playwright test` | **103 passed** (1.4 m), including the new `seo.spec.ts` (5) and the updated landing, pricing and language specs |
+| Hydration, development React bundle (`NODE_ENV=development vite build --mode development --minify false`, prerender, Chromium via Playwright over a static server that mirrors `.htaccess`) | `/`, `/en`, `/pricing`, `/en/pricing`, `/privacy-policy`, `/en/privacy-policy`, `/terms`, `/en/terms`, `/dashboard`, `/account`: **0 errors each**. Before the fixes: React #418 on every page (missing `ToastHost` sibling), then on the six lazy pages (missing `Suspense` boundary) |
+| Production bundle in the browser pane, `/en/pricing` after hydration | one `<title>`, one description, one canonical, three alternates, one JSON-LD; four offers (`Free 0.00`, `Creator 12.00`, `Creator Plus 29.00`, `Agency 99.00`); switch `href="/pricing"`, brand `href="/en"`, legal links `/en/…`; `localStorage.audience.locale = "en"` |
+| Production bundle, `/` → click the switch | URL `/en`, `lang="en"`, canonical `…/en`, one `<title>`, English H1 |
+| `dist/index.html` head | title, description, robots, canonical, `hreflang` ar/en/x-default (lower-case attribute), OG and Twitter tags, `<link rel="preload" as="image">` for the WebP hero (React's own); JSON-LD in the body with `Organization`, `WebSite`, `SoftwareApplication`, `WebPage`, `FAQPage` (8 questions) |
+| Hero image | `audience-growth-original.webp` 29,194 bytes (PNG: 1,191,081), 1536×1024; share image `og-audience-sentiment.jpg` 71,179 bytes, 1200×630 |
+
+Not verified here: the deployed host (no deploy was made in this work — the owner decides
+deploys), Cloudflare's `robots.txt` override, and Core Web Vitals on the CDN.

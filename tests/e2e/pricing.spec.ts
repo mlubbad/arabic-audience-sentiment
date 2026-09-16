@@ -9,7 +9,7 @@ test("the pricing page shows two segments and a yearly switch", async ({
 }) => {
   await page.goto("/pricing");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "الأسعار",
+    "أسعار تحليل تعليقات يوتيوب",
   );
   await expect(page.getByRole("heading", { name: "منشئ بلس" })).toBeVisible();
   const business = page.getByRole("tab", { name: "وكالات ومؤسسات" });
