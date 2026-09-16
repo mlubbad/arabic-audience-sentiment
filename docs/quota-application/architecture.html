@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Audience Sentiment — architecture</title>
+<style>
+  body{margin:0;background:#fff;font-family:"Helvetica Neue",Arial,sans-serif;color:#1c1b2e}
+  .page{width:1600px;height:900px;position:relative;padding:36px 48px;box-sizing:border-box}
+  h1{margin:0 0 4px;font-size:30px}
+  .sub{margin:0 0 22px;color:#5b5a72;font-size:17px}
+  .box{position:absolute;border:2px solid #3b27ba;border-radius:14px;padding:14px 16px;background:#f7f6ff;box-sizing:border-box}
+  .box h2{margin:0 0 6px;font-size:19px;color:#3b27ba}
+  .box p,.box li{margin:0;font-size:14.5px;line-height:1.45}
+  .box ul{margin:4px 0 0 18px;padding:0}
+  .ext{border-color:#b3261e;background:#fff5f4}.ext h2{color:#b3261e}
+  .svc{border-color:#0b6e4f;background:#f1faf6}.svc h2{color:#0b6e4f}
+  svg{position:absolute;left:0;top:0;pointer-events:none}
+  .lbl{font-size:13.5px;fill:#33324a}
+  .foot{position:absolute;left:48px;bottom:26px;font-size:13px;color:#5b5a72}
+  code{font-family:Menlo,monospace;font-size:13px;background:#ecebf5;padding:0 4px;border-radius:4px}
+</style></head><body><div class="page">
+<h1>Audience Sentiment (مشاعر الجمهور) — system architecture</h1>
+<p class="sub">Read-only use of YouTube Data API v3 on channels their owners connect through Google OAuth. No write endpoint is ever called.</p>
+
+<div class="box" style="left:48px;top:120px;width:300px;height:250px">
+  <h2>1 · Channel owner's browser</h2>
+  <p>React app (Arabic/English), <code>app.sky-develop.net</code></p>
+  <ul>
+    <li>Signs in (Supabase Auth)</li>
+    <li>Connects <b>their own</b> channel via Google consent</li>
+    <li>Chooses which videos to monitor</li>
+    <li>Reads dashboards, exports CSV</li>
+    <li>Can disconnect the channel or retire the workspace</li>
+  </ul>
+</div>
+
+<div class="box svc" style="left:430px;top:100px;width:420px;height:320px">
+  <h2>2 · Control plane — Supabase (EU)</h2>
+  <ul>
+    <li><b>Postgres</b> with row-level security: every table keyed by workspace; tenants cannot read each other</li>
+    <li><b>Edge functions</b>: <code>oauth-start</code>, <code>oauth-callback</code> (tokens sealed AES-GCM at rest), <code>worker</code> gateway, billing webhook</li>
+    <li>Scheduler: decides <i>which</i> videos are due; the worker cannot widen the list</li>
+    <li>Metering: one unit per comment, charged once ever; plan limits enforced in SQL</li>
+    <li>Retention: comment <b>text purged 30 days</b> after collection (daily job); metadata refreshed on every check</li>
+  </ul>
+</div>
+
+<div class="box svc" style="left:930px;top:100px;width:330px;height:320px">
+  <h2>3 · Worker (our server)</h2>
+  <ul>
+    <li>Receives a <b>one-hour access token</b> per job — never the refresh token</li>
+    <li>Reads YouTube for the due videos only</li>
+    <li>Sentiment: Arabic BERT model (CAMeLBERT-DA), on our own CPU</li>
+    <li>Topics: LLM classification of comment text</li>
+    <li>Writes results back through the gateway; idempotent batches</li>
+  </ul>
+</div>
+
+<div class="box ext" style="left:1320px;top:100px;width:232px;height:320px">
+  <h2>4 · YouTube Data API v3</h2>
+  <p><b>Read only</b></p>
+  <ul>
+    <li><code>channels.list</code> (mine)</li>
+    <li><code>playlistItems.list</code></li>
+    <li><code>videos.list</code></li>
+    <li><code>commentThreads.list</code></li>
+    <li><code>comments.list</code></li>
+  </ul>
+  <p style="margin-top:8px">Scopes: <code>youtube.readonly</code>, <code>youtube.force-ssl</code> (required to read comments as the owner)</p>
+</div>
+
+<div class="box" style="left:48px;top:470px;width:300px;height:190px">
+  <h2>Google consent</h2>
+  <p>Ownership is decided by <code>channels.list(mine=true)</code> on the granted token — never by a typed URL. Revocation (<code>invalid_grant</code>) stops all reads at once.</p>
+</div>
+
+<div class="box" style="left:430px;top:470px;width:420px;height:190px">
+  <h2>Quota discipline (per scheduled check)</h2>
+  <p>① <code>videos.list(part=statistics)</code>, 50 videos per unit → ② only videos whose <b>commentCount moved</b> are paged with <code>commentThreads.list</code> → ③ everything else is deferred to the next interval. Measured live: a second pass over 100 videos cost 2 units and read nothing.</p>
+</div>
+
+<div class="box ext" style="left:930px;top:470px;width:330px;height:190px">
+  <h2>Paddle (merchant of record)</h2>
+  <p>Subscriptions and tax. Card data never touches this system; entitlements arrive by signed webhook.</p>
+</div>
+
+<div class="box" style="left:1320px;top:470px;width:232px;height:190px">
+  <h2>What is stored</h2>
+  <p>Video metadata &amp; counts; comment id, author channel id, date, likes, text (30 days); our own labels. Never sold, never aggregated across users.</p>
+</div>
+
+<svg width="1600" height="900">
+  <defs><marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#33324a"/></marker></defs>
+  <line x1="350" y1="230" x2="428" y2="230" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <text x="352" y="220" class="lbl">HTTPS · RLS</text>
+  <line x1="852" y1="230" x2="928" y2="230" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <text x="854" y="220" class="lbl">due list</text>
+  <line x1="928" y1="290" x2="852" y2="290" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <text x="854" y="312" class="lbl">batches</text>
+  <line x1="1262" y1="260" x2="1318" y2="260" stroke="#b3261e" stroke-width="2" marker-end="url(#a)"/>
+  <text x="1262" y="250" class="lbl">GET only</text>
+  <line x1="198" y1="372" x2="198" y2="468" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="640" y1="422" x2="640" y2="468" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+</svg>
+<p class="foot">Audience Sentiment · sky-develop.net · prepared 2026-09-16 for the YouTube API Services quota extension request. Every statement here is backed by the application's source and its live verification log.</p>
+</div></body></html>

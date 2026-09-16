@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Audience Sentiment — user flow</title>
+<style>
+  body{margin:0;background:#fff;font-family:"Helvetica Neue",Arial,sans-serif;color:#1c1b2e}
+  .page{width:1600px;height:900px;position:relative;padding:36px 48px;box-sizing:border-box}
+  h1{margin:0 0 4px;font-size:30px}.sub{margin:0 0 18px;color:#5b5a72;font-size:17px}
+  .step{position:absolute;width:236px;height:236px;border:2px solid #3b27ba;border-radius:14px;background:#f7f6ff;padding:12px 14px;box-sizing:border-box}
+  .step .n{display:inline-block;width:28px;height:28px;border-radius:50%;background:#3b27ba;color:#fff;text-align:center;line-height:28px;font-weight:700;margin-bottom:6px}
+  .step h2{margin:0 0 6px;font-size:17px}
+  .step p{margin:0;font-size:13.5px;line-height:1.4}
+  .step .api{margin-top:8px;font-family:Menlo,monospace;font-size:12px;color:#b3261e;line-height:1.5}
+  .out{border-color:#0b6e4f;background:#f1faf6}
+  svg{position:absolute;left:0;top:0;pointer-events:none}
+  .row2{position:absolute;left:48px;top:640px;width:1504px;border:2px dashed #5b5a72;border-radius:14px;padding:12px 16px;box-sizing:border-box;font-size:14px;line-height:1.5}
+  .foot{position:absolute;left:48px;bottom:22px;font-size:13px;color:#5b5a72}
+</style></head><body><div class="page">
+<h1>Audience Sentiment — user flow and where each YouTube API call happens</h1>
+<p class="sub">Units are YouTube Data API quota units. A channel is read only after its owner's consent, and only the videos the owner selected.</p>
+
+<div class="step" style="left:48px;top:110px"><span class="n">1</span><h2>Sign up · workspace</h2><p>Email sign-in. A personal workspace is created; an agency adds one per client. Free plan by default.</p><p class="api">no YouTube call</p></div>
+<div class="step" style="left:308px;top:110px"><span class="n">2</span><h2>Connect own channel</h2><p>Google consent screen (<i>youtube.readonly</i>, <i>youtube.force-ssl</i>). The token's own channel becomes the workspace's channel.</p><p class="api">channels.list(mine=true) · 1 unit</p></div>
+<div class="step" style="left:568px;top:110px"><span class="n">3</span><h2>Catalogue</h2><p>The channel's uploads are listed with their reported comment counts so the owner can choose.</p><p class="api">playlistItems.list · 1 / 50 videos<br>videos.list · 1 / 50 videos</p></div>
+<div class="step" style="left:828px;top:110px"><span class="n">4</span><h2>Select videos vs plan</h2><p>The owner picks videos; the server refuses a selection beyond the plan's comment allowance. Nothing is read yet.</p><p class="api">no YouTube call</p></div>
+<div class="step" style="left:1088px;top:110px"><span class="n">5</span><h2>Scheduled read</h2><p>Per plan interval: counts first, then comments only for videos whose count moved.</p><p class="api">videos.list(statistics) · 1 / 50<br>commentThreads.list · 1 / 100 comments<br>comments.list · replies</p></div>
+<div class="step out" style="left:1348px;top:110px"><span class="n">6</span><h2>Dashboard</h2><p>Sentiment and topic trends, video comparison, the comments themselves with our labels, CSV export. YouTube data is shown as YouTube's, our analysis as ours.</p><p class="api">no YouTube call</p></div>
+
+<svg width="1600" height="900">
+  <defs><marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#33324a"/></marker></defs>
+  <line x1="286" y1="228" x2="306" y2="228" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="546" y1="228" x2="566" y2="228" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="806" y1="228" x2="826" y2="228" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="1066" y1="228" x2="1086" y2="228" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="1326" y1="228" x2="1346" y2="228" stroke="#33324a" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M1206,348 C1206,420 1206,420 1206,420" stroke="#33324a" stroke-width="2" fill="none" marker-end="url(#a)"/>
+</svg>
+
+<div class="step" style="left:1088px;top:400px;height:200px"><h2>↻ Every interval</h2><p>Creator: daily · Agency: every 6 h · Media: every 2 h. Unchanged videos are deferred without a comment read. Measured live on a 789-video channel: second pass over 100 videos = 2 units, 0 reads.</p></div>
+<div class="step out" style="left:48px;top:400px;width:496px;height:200px"><h2>Leaving</h2><p><b>Disconnect channel</b> (two presses): the grant is revoked, scheduled work cancelled, nothing else read. <b>Retire workspace</b>: the owner's access ends and the workspace passes to the operator. <b>Revoke at Google</b> (myaccount.google.com/permissions): the next call fails with <i>invalid_grant</i> and the channel is marked for reconnection immediately. <b>Deletion</b> of personal data: on request by email, within 7 days.</p></div>
+<div class="step" style="left:568px;top:400px;width:496px;height:200px"><h2>Data lifecycle</h2><p>Comment <b>text</b> is purged 30 days after collection by a daily job; ids, dates and counts are refreshed at every check; our own labels are kept for the owner's history. Each workspace's rows are isolated by row-level security. No data is sold, shared with other users, or aggregated across channels.</p></div>
+
+<div class="row2"><b>Why the default 10,000 units/day is not enough:</b> the quota is per Google project, not per user. Onboarding one large Arabic channel (≈4,500 videos, ≈170,000 comments) costs ≈1,900 units once; two or three onboardings in a day reach the ceiling and every other customer's scheduled read fails until midnight Pacific. Steady state at 100 subscribers is ≈600–1,500 units/day. Requested: <b>50,000 units/day</b>.</div>
+<p class="foot">Audience Sentiment · sky-develop.net · 2026-09-16</p>
+</div></body></html>

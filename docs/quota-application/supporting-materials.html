@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Audience Sentiment — supporting materials for the YouTube API quota request</title>
+<style>
+  @page{size:A4;margin:18mm 16mm}
+  body{font-family:"Helvetica Neue",Arial,sans-serif;color:#1c1b2e;font-size:11.5pt;line-height:1.45;margin:0}
+  h1{font-size:22pt;margin:0 0 4pt}h2{font-size:15pt;margin:18pt 0 6pt;color:#3b27ba;border-bottom:1px solid #d9d7ee;padding-bottom:3pt}
+  .sub{color:#5b5a72;margin:0 0 10pt}
+  table{border-collapse:collapse;width:100%;margin:6pt 0 10pt;font-size:10.5pt}
+  th,td{border:1px solid #cfcde3;padding:4pt 6pt;text-align:left;vertical-align:top}
+  th{background:#f0eefb}
+  code{font-family:Menlo,monospace;font-size:10pt;background:#ecebf5;padding:0 3px;border-radius:3px}
+  .ok{color:#0b6e4f;font-weight:700}
+  .page-break{page-break-before:always}
+  .small{font-size:10pt;color:#5b5a72}
+</style></head><body>
+<h1>Audience Sentiment (مشاعر الجمهور)</h1>
+<p class="sub">Supporting materials for the YouTube API Services quota extension request · API client: <b>Audience Sentiment</b> · <a href="https://app.sky-develop.net">https://app.sky-develop.net</a> · prepared 2026-09-16</p>
+
+<h2>1. What the application is</h2>
+<p>An Arabic-first audience-monitoring service for YouTube creators, marketing agencies and media companies in the Arabic-speaking market. A channel owner connects <b>their own channel</b> through Google OAuth; the service catalogues the channel's uploads, reads comments and replies on the videos the owner selects, classifies each comment's sentiment with an Arabic-dialect model run on our own server and its topic, and shows the owner trends over time, comparisons between videos, and the underlying comments. It is <b>read-only</b>: no write endpoint of the YouTube Data API is called, and no channel is read except through its owner's authorization.</p>
+<p><b>Independent value to the YouTube ecosystem:</b> Arabic is the largest language without a working comment-sentiment tool; existing tools are English-first and mis-classify dialectal Arabic. Creators and agencies in the region currently read thousands of comments by hand or not at all. The service gives them a measured, honestly-labelled view of how their audience reacts — with YouTube's data shown as YouTube's, and our analysis shown as ours.</p>
+
+<h2>2. Endpoints, scopes and quota cost</h2>
+<table>
+<tr><th>Endpoint</th><th>When</th><th>Cost</th><th>Why</th></tr>
+<tr><td><code>channels.list</code> (<code>mine=true</code>)</td><td>once, at connection</td><td>1 unit</td><td>identifies the channel the token belongs to — ownership is never taken from a typed URL</td></tr>
+<tr><td><code>playlistItems.list</code></td><td>catalogue discovery, per plan interval</td><td>1 per 50 videos</td><td>lists the uploads playlist</td></tr>
+<tr><td><code>videos.list</code> (<code>snippet,statistics,contentDetails</code>)</td><td>discovery; and <code>statistics</code> only at every scheduled check</td><td>1 per 50 videos</td><td>titles, dates, reported comment counts; change detection before any comment read</td></tr>
+<tr><td><code>commentThreads.list</code></td><td>only for selected videos whose comment count moved</td><td>1 per 100 comments</td><td>the comments themselves</td></tr>
+<tr><td><code>comments.list</code></td><td>replies of read threads</td><td>1 per page</td><td>reply coverage</td></tr>
+</table>
+<p><b>Scopes:</b> <code>https://www.googleapis.com/auth/youtube.readonly</code> and <code>https://www.googleapis.com/auth/youtube.force-ssl</code>. Reading <code>commentThreads.list</code> on the owner's own videos with <code>youtube.readonly</code> alone is refused with <code>insufficientPermissions</code>; Google offers no narrower scope that permits reading comments as the owner, so <code>force-ssl</code> is requested although the application performs no write. This is documented in the application's source (<code>supabase/functions/oauth-start/index.ts</code>).</p>
+
+<h2>3. Measured usage (live project, 2026-09-15/16)</h2>
+<table>
+<tr><th>Operation</th><th>Measured</th></tr>
+<tr><td>Discovery of a 4,456-video channel (2,194 videos, 2,253 shorts, 9 streams)</td><td>≈ 12 units in 78 seconds</td></tr>
+<tr><td>Scheduled check, first pass over 100 selected videos (no stored count yet)</td><td>2 <code>videos.list</code> units + the comment pages</td></tr>
+<tr><td>Scheduled check, second pass over the same 100 videos (nothing changed)</td><td class="ok">2 units, zero <code>commentThreads.list</code> calls — "100 unchanged, 0 to read"</td></tr>
+</table>
+
+<h2>4. Expected traffic and why 10,000 units/day is insufficient</h2>
+<table>
+<tr><th>Load</th><th>Units</th></tr>
+<tr><td>Connect + discover a large channel (≈4,500 videos)</td><td>≈ 180 once</td></tr>
+<tr><td>First read of a large channel (≈170,000 comments)</td><td>≈ 1,700 once</td></tr>
+<tr><td>Daily scheduled checks, one creator (20 selected videos, daily)</td><td>1 + new comments</td></tr>
+<tr><td>Daily scheduled checks, one agency (10 channels × 20 videos × 4 checks)</td><td>≈ 16 + new comments</td></tr>
+<tr><td>Steady state at 100 subscribers</td><td>≈ 600 – 1,500 / day</td></tr>
+<tr><td>Peak day: five large onboardings + steady state</td><td>≈ 12,000</td></tr>
+</table>
+<p>The quota is per Google Cloud project, not per user. A single day with two or three large-channel onboardings reaches 10,000 units and blocks every other customer's scheduled read until midnight Pacific. <b>Requested: 50,000 units/day</b> — headroom for onboarding days at 300 subscribers without failing anyone's scheduled reads. Change detection (§3) keeps steady-state usage low regardless of the number of channels.</p>
+
+<h2 class="page-break">5. Data handling</h2>
+<table>
+<tr><th>Data</th><th>Stored</th><th>Retention</th></tr>
+<tr><td>Google account e-mail</td><td>yes (sign-in identity)</td><td>until the account is deleted on request</td></tr>
+<tr><td>OAuth tokens</td><td>encrypted at rest (AES-GCM; key held only by the server). The worker receives a one-hour access token per job and never the refresh token</td><td>until disconnected or revoked</td></tr>
+<tr><td>Video metadata (id, title, published date, reported counts)</td><td>yes</td><td>refreshed at every check</td></tr>
+<tr><td>Comment metadata (id, author channel id, published date, like count)</td><td>yes</td><td>refreshed at every check</td></tr>
+<tr><td>Comment text</td><td>yes</td><td><b>purged automatically 30 days after collection</b> (daily job <code>purge_comment_text</code>)</td></tr>
+<tr><td>Our own labels (sentiment, topic)</td><td>yes — derived data</td><td>kept for the owner's history; clearly labelled as ours</td></tr>
+</table>
+<ul>
+  <li>Each workspace's rows are isolated by Postgres row-level security; tenants cannot read each other, verified by tests against direct requests.</li>
+  <li>No data is sold, shared with other users, or aggregated across channels.</li>
+  <li><b>Revocation:</b> the user can disconnect the channel in the application (two-step confirmation), or revoke at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>; an <code>invalid_grant</code> answer marks the connection revoked and cancels pending work immediately.</li>
+  <li><b>Deletion:</b> on request by e-mail; completed within 7 days.</li>
+  <li>The privacy policy (<a href="https://app.sky-develop.net/privacy-policy">/privacy-policy</a>) and terms (<a href="https://app.sky-develop.net/terms">/terms</a>) link the YouTube Terms of Service and the Google Privacy Policy and state the above.</li>
+</ul>
+
+<h2>6. Compliance statements</h2>
+<ul>
+  <li>The application name does not contain "YouTube".</li>
+  <li>YouTube data is displayed alongside our own analysis, each clearly labelled; the service does not replace YouTube's own metrics.</li>
+  <li>Authorized data is not stored beyond 30 days without being refreshed (comment text purged; metadata refreshed each check).</li>
+  <li>No write, rating, commenting or moderation action is performed through the API.</li>
+  <li>A user may withdraw access at any time; the withdrawal takes effect at the next scheduled check.</li>
+</ul>
+
+<h2>7. Contact</h2>
+<p>Mohammed Lubbad · engmlubbad@gmail.com · <a href="https://sky-develop.net">sky-develop.net</a></p>
+<p class="small">Attachments: architecture-diagram.png, user-flow-diagram.png, privacy-policy-page.png (browser screenshot with address bar).</p>
+</body></html>
