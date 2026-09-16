@@ -858,3 +858,15 @@ password removes that risk. `X-Robots-Tag: noindex, nofollow` is unchanged: the 
 open to anyone with the link, not indexed by a search engine. `htaccess.test.ts` now
 asserts the file carries no `AuthType`, `AuthUserFile`, `Require`, `SetEnvIf` or
 `.htpasswd` reference at all, rather than asserting the password is kept.
+
+## 2026-09-16 — correcting the ui/ component layer's own record
+
+The entry above this one, dated the same day, names the wrong sixteen components: RadioGroup, Slider,
+Progress, Accordion, Collapsible and Separator were never built — the spec (`docs/superpowers/specs/
+2026-09-16-ui-foundation-design.md`) explicitly defers all six. The sixteen that were actually built are
+Button, Card, Skeleton, Badge, Input, Textarea, Checkbox, Switch, Tooltip, Dialog, Popover, DropdownMenu,
+Tabs, Select, Toast and Table. The same entry also said `DirectionProvider` was "mounted once at the app
+root" — it was mounted only around the signed-in shell (`AppLayout`) until the final whole-branch review
+caught it; it now wraps the true root (`main.tsx`'s `DirectionRoot`, alongside `ToastHost`), so every route —
+including the signed-out landing, pricing and legal pages — gets Direction context too. Caught by the plan's
+own final review.
