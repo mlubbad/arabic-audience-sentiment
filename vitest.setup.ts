@@ -3,11 +3,13 @@ import { afterEach, beforeAll } from "vitest";
 
 // Polyfills for jsdom's missing methods (needed for Radix Select)
 beforeAll(() => {
-  if (!HTMLElement.prototype.hasPointerCapture) {
-    HTMLElement.prototype.hasPointerCapture = () => false;
-  }
-  if (!HTMLElement.prototype.scrollIntoView) {
-    HTMLElement.prototype.scrollIntoView = () => {};
+  if (typeof HTMLElement !== "undefined") {
+    if (!HTMLElement.prototype.hasPointerCapture) {
+      HTMLElement.prototype.hasPointerCapture = () => false;
+    }
+    if (!HTMLElement.prototype.scrollIntoView) {
+      HTMLElement.prototype.scrollIntoView = () => {};
+    }
   }
 });
 
