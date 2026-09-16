@@ -642,3 +642,63 @@ back into view. Two new strings in `strings/ar.ts` and `strings/en.ts`
 Tests: `videoPaging.test.ts` (six, mutation-checked) and two e2e blocks appended to
 `tests/e2e/dashboard.spec.ts` that clone the fixture across 30 videos. Results in
 `docs/verification.md`.
+
+## 2026-09-16 — plans v2 in the database (Part A)
+
+The single hand-activated `pilot` plan is replaced by a seven-row ladder, all in
+`public.plans`, four migrations landing Part A of `docs/superpowers/plans/
+2026-09-16-plans-and-paddle-billing.md`:
+
+`supabase/migrations/20260917010000_plans_v2.sql` adds `segment`, `price_monthly_cents`,
+`price_yearly_cents`, `workspaces_limit`, `insight_reports`, `internal`, `self_serve`,
+`sort_order`, `provider_prices`, `title_ar`/`title_en` to `plans`, and inserts `free`,
+`creator`, `creator_plus`, `agency`, `media`, `enterprise`, `owner` — the last with every
+limit `null` and `internal = true`, guarded by a check that only an internal plan may spell
+its limits that way. `pilot` is kept, not dropped, and re-marked `internal`/`segment =
+'internal'` so it drops out of the public catalogue without disturbing its one subscriber.
+`subscriptions.status` gains `past_due`; `subscriptions.billing_workspace_id` plus
+`private.billing_root(w)` let a client workspace's every limit read (`plan_limit`,
+`create_workspace_impl`'s new workspace-limit check, `register_channel_impl`'s channel
+count) resolve through the workspace that actually pays. New workspaces default to `free`,
+not `pilot`.
+
+`supabase/migrations/20260917020000_usage_grants.sql` adds the `usage_grants` table (one
+pack = extra units on the same budget, valid to `period_end + 30 days`, idempotent on
+`(source, provider_ref)`) and rebuilds `reserve_usage`, `used_units`, and
+`usage_summary_impl` to sum across every workspace billing through the same root and to
+add what packs granted on top of the plan's own allowance.
+
+`supabase/migrations/20260917030000_platform_admin.sql` adds `private.platform_admins` (a
+row in a private table, not a role claim), `public.is_platform_admin()`, and the three
+admin-gated RPCs: `set_workspace_plan` (writes the billing root, propagates to every
+workspace copying its subscription from that root, one `audit_events` row per call),
+`admin_workspaces` (a listing, no screen reads it yet), and `grant_pack` (a manual top-up
+through the same `private.grant_units` a Paddle webhook will use later, so a gifted pack and
+a bought one are the same row shape).
+
+`supabase/migrations/20260917040000_plan_catalogue.sql` adds `public.plan_catalogue()` —
+signed-out readable, filters out every `internal` row — and extends `usage_summary` with
+`plan`, `provider`, `billing_interval`, `cancel_at_period_end` so the account page can name
+the subscription's plan and payment state, once something reads it.
+
+The gates that answer the meter's own figure (`analysis_remaining`, `topic_units_remaining`)
+were fixed in a follow-up commit (`aaf6422`) after review found they disagreed with
+`reserve_usage` on three points: which plan a `past_due` subscription reads, whether granted
+packs count, and how "no ceiling" is spelled for arithmetic — `null` can't be subtracted
+from, so `owner` answers `2147483647` (`int4` max) there while the same fact is `-1` in the
+`packages/contracts` zod schemas and `null` in the `plans` row itself. A second review round
+(`d9be4b1`) added the test the first review flagged as missing: `set_workspace_plan` called
+on a client workspace, proving it writes the root once and every copy follows, not five
+separate audit rows.
+
+Everything above is PGlite-tested, nothing live-tested: `npm run test:db` — **236 tests
+passed across 25 files**. **The live Supabase project has not received these four
+migrations.** No platform admin row exists anywhere yet, live or fixture. Applying them to
+the live project and seeding the first admin (`engmlubbad@gmail.com`) is deferred by the
+controller to a separate step; this entry covers Part A's database work only.
+
+Parts B (pricing page, account plan panel, `/admin` screen, all reading `plan_catalogue()`
+and `usage_summary` client-side) and C (Paddle checkout, webhook truth, customer portal,
+sandbox-to-live gate) are not started. `docs/pricing.md` was rewritten to the v2 ladder in
+this same session; `docs/decisions.md` carries the six pricing/payment decisions and the
+tax reasoning for choosing Paddle over Stripe direct.

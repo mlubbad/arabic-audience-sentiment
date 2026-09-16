@@ -368,3 +368,66 @@ workspace that is 50 requests and ~270k tokens instead of 200 and ~460k. The ver
 bumped: the instructions and the taxonomy the model reads are the same text, and bumping it
 would mark 5,000 fresh verdicts stale and spend the tokens again. A change to the prompt
 text itself is a new version. Decided with the user.
+
+## 2026-09-16 — سلّم الخطط v2 والدفع عبر Paddle
+
+Six open questions from `docs/pricing-v2-draft.md` §6, answered in
+`docs/pricing-consultation-2026-09-16.md` §7 and carried into
+`supabase/migrations/20260917010000_plans_v2.sql`:
+
+1. **Individual prices are 12$/29$**, not the 9$/29$ the old `pricing.md` had. At a ~10%
+   payment burden and a flat 0.30$ fee, 9$ nets to about 8$; 12$ leaves margin that survives
+   Gemini with thinking on (64% vs 52%), and no subscription competitor sits at 9$
+   (Comment Finder's 9.9$ is a one-time credit, not a subscription; vidIQ starts at 19$).
+2. **`media` is published, not self-serve.** Its row exists (`self_serve = false`) so it
+   anchors `agency` as the middle choice on the pricing page, but its button reads "contact
+   us" until change-detection lands in the live check — a `media` subscriber's two-hour,
+   thirty-channel check alone would burn ~72% of the project's daily YouTube quota today.
+3. **One add-on pack in v1: +10,000 comments for 5$**, one size, no ladder of packs. A hard
+   stop with no way out loses the subscriber at the moment of highest intent (an agency
+   hitting its ceiling mid-month); the pack is cheap to build because it spends the same
+   `analysis_units` `reserve_usage` already reserves, not a parallel credit system.
+4. **USD only, no approximate SAR/AED display.** An approximate conversion creates disputes
+   the moment a card statement disagrees with the displayed number, and real SAR pricing
+   (mada) only makes sense once Tap/Moyasar are in place with a Gulf entity.
+5. **Upgrade Supabase to Small before the first paying subscriber, not after.** Micro
+   already "runs low on resources" against one pilot channel; the cheapest place to measure
+   `commit_batch` under load is now, between analysis jobs, not the week billing goes live.
+6. **Paddle first**, reversing the same day's earlier "Stripe first" call — see the tax
+   reasoning below.
+
+**Root billing, not per-workspace billing.** A client workspace carries no allowance of its
+own; its `subscriptions` row points at `billing_workspace_id`, and every meter
+(`private.billing_root`, `reserve_usage`, `used_units`, `analysis_remaining`,
+`topic_units_remaining`, the channel-limit count in `register_channel_impl`) reads through
+that root. The alternative — a fresh allowance per workspace — would let one `agency`
+subscriber multiply their 150,000-comment plan by five just by opening five client
+workspaces; one allowance per paying subscriber, shared across every workspace that
+subscriber bills through, is the only shape that matches "one plan per customer."
+
+**Owner has no ceiling, encoded three ways on purpose, not one.** `plans.analysis_units`
+(and the other limit columns) are `null` for the `owner` row — Postgres's own "no value,"
+guarded by a check that only an `internal` plan may spell it that way. The zod contract in
+`packages/contracts/src/plans.ts` and `usage.ts` cannot carry `null` through a `.min()`
+schema cleanly, so it reports `-1` for "no ceiling" instead. The SQL gates that do arithmetic
+against the allowance — `analysis_remaining`, `topic_units_remaining` — cannot subtract from
+`null` either, so they return `2147483647` (`int4` max) there, which keeps `remaining - used`
+and `used >= allowance` comparisons meaningful without a `null`-check at every call site.
+Three representations for one fact, each chosen for what that layer can express cleanly.
+
+**`past_due` carries a 7-day grace, enforced in Part C.** The column and status value exist
+today (`subscriptions.status` accepts `past_due`, and every plan-limit read in
+20260917020000 still counts a `past_due` subscription as active), but the sweep that drops a
+subscription to `free` after seven unpaid days is not built — Paddle is not wired yet, so
+nothing can go `past_due` for real. Recorded now so Part C builds the sweep to this number
+rather than picking one when the webhook lands.
+
+**Tax reasoning (`docs/pricing-consultation-2026-09-16.md` §5.3, §7.2):** the operating
+entity sells through a UK-registered Stripe account while the seller of record is resident
+in Türkiye, and sells B2C into Saudi Arabia, the UAE and the EU — three jurisdictions that
+each require VAT registration from the first sale to a non-resident seller, with no
+threshold. Stripe direct would mean registering with ZATCA, the UAE FTA and the EU's non-
+union OSS before the first dollar; Paddle, as merchant of record, becomes the seller of
+record instead and absorbs those registrations at a fee (~5% + 0.50$) that is not higher
+than Stripe UK's own effective rate on a Gulf card settling in dollars (~5.25% + 0.20£, once
+the currency-conversion surcharge is counted).
