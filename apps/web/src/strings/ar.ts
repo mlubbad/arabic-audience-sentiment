@@ -154,6 +154,38 @@ export const ar = {
   budgetBackfill: "استيراد تاريخي",
   budgetTopics: "تصنيف الموضوعات",
 
+  // ---- the pricing page (pricing.ts) ----
+  pricingTitle: "الأسعار",
+  pricingLead:
+    "أسعار بالدولار، بلا تعقيد: شهريًا، أو سنويًا بخصم شهرين تقريبًا.",
+  pricingSegmentIndividual: "أفراد ومؤثرون",
+  pricingSegmentBusiness: "وكالات ومؤسسات",
+  pricingMonthly: "شهري",
+  pricingYearly: "سنوي",
+  pricingPerMonth: "شهريًا",
+  pricingPerMonthBilledYearly: (total: string) => `تُدفع ${total} سنويًا`,
+  pricingMostChosen: "الأكثر اختيارًا",
+  pricingCtaStart: "ابدأ الآن",
+  pricingCtaContact: "تواصل معنا",
+  pricingCtaFree: "ابدأ مجانًا",
+  pricingCtaCurrent: "خطتك الحالية",
+  pricingLimitComments: "تعليقات محلَّلة/شهر",
+  pricingLimitTopics: "مواضيع/شهر",
+  pricingLimitReports: "تقارير/شهر",
+  pricingLimitChannels: "القنوات",
+  pricingLimitMembers: "الأعضاء",
+  pricingLimitWorkspaces: "مساحات العمل (العملاء)",
+  pricingLimitLive: (hours: string) => `فحص حيّ كل ${hours} س`,
+  pricingUnlimited: "بلا حدود",
+  pricingFaqTitle: "أسئلة شائعة",
+  pricingFaqNoDouble:
+    "الفيديو الحيّ لا يكلّف مرتين: التعليقات الجديدة فقط تُحسب.",
+  pricingFaqHardStop: "عند بلوغ الحد يتوقف التحليل؛ لا فاتورة مفاجئة.",
+  pricingFaqPack:
+    "حزمة 10,000 تعليق بـ 5$ تُضاف فوق حصة خطتك، صالحة لنهاية الفترة وشهر بعدها.",
+  pricingFaqTax:
+    "الأسعار بالدولار قبل الضريبة؛ تُحصَّل ضريبة بلدك عند الدفع عبر Paddle، بائعنا القانوني.",
+
   // ---- the account page (Account.tsx) ----
   working: "جارٍ تنفيذ الطلب…",
   ssoNeedsDomain:

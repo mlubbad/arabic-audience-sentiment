@@ -152,6 +152,37 @@ export const en: Strings = {
   budgetBackfill: "Historical backfill",
   budgetTopics: "Topic classification",
 
+  pricingTitle: "Pricing",
+  pricingLead:
+    "Prices in US dollars, no complexity: monthly, or yearly for roughly two months off.",
+  pricingSegmentIndividual: "Individuals & creators",
+  pricingSegmentBusiness: "Agencies & businesses",
+  pricingMonthly: "Monthly",
+  pricingYearly: "Yearly",
+  pricingPerMonth: "per month",
+  pricingPerMonthBilledYearly: (total: string) => `billed ${total} yearly`,
+  pricingMostChosen: "Most chosen",
+  pricingCtaStart: "Start now",
+  pricingCtaContact: "Contact us",
+  pricingCtaFree: "Start free",
+  pricingCtaCurrent: "Your current plan",
+  pricingLimitComments: "Analyzed comments/month",
+  pricingLimitTopics: "Topics/month",
+  pricingLimitReports: "Reports/month",
+  pricingLimitChannels: "Channels",
+  pricingLimitMembers: "Members",
+  pricingLimitWorkspaces: "Workspaces (clients)",
+  pricingLimitLive: (hours: string) => `Live check every ${hours}h`,
+  pricingUnlimited: "Unlimited",
+  pricingFaqTitle: "Frequently asked questions",
+  pricingFaqNoDouble:
+    "Live video doesn't cost twice: only new comments are counted.",
+  pricingFaqHardStop: "Analysis stops at the limit; no surprise bill.",
+  pricingFaqPack:
+    "A 10,000-comment pack for $5 adds on top of your plan's allowance, valid through the end of the period plus a month after.",
+  pricingFaqTax:
+    "Prices in US dollars are before tax; your country's tax is collected at checkout via Paddle, our merchant of record.",
+
   working: "Working…",
   ssoNeedsDomain:
     "Single sign-on needs your organisation's domain — that screen is not built yet.",
