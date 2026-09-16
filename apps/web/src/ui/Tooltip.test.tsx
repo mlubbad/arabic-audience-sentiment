@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, beforeAll } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { DirectionProvider } from "@radix-ui/react-direction";
+import { DirectionProvider, useDirection } from "@radix-ui/react-direction";
 import { Tooltip } from "./Tooltip";
 import { Button } from "./Button";
 
@@ -15,6 +15,11 @@ beforeAll(() => {
     disconnect() {}
   };
 });
+
+function DirectionProbe() {
+  const dir = useDirection();
+  return <span data-testid="dir-probe">{dir}</span>;
+}
 
 describe("Tooltip", () => {
   it("shows its content on focus and hides it on blur", async () => {
@@ -32,21 +37,17 @@ describe("Tooltip", () => {
     );
   });
 
-  it("reads RTL direction through the Portal from Direction context, not just the tree it's declared in", async () => {
+  it("useDirection() inside the Portal's content reports the wrapping DirectionProvider's value, not the silent 'ltr' fallback", async () => {
     render(
       <DirectionProvider dir="rtl">
-        <Tooltip content="نص">
+        <Tooltip content={<DirectionProbe />}>
           <Button>زر</Button>
         </Tooltip>
       </DirectionProvider>,
     );
     await userEvent.tab();
-    const content = await screen.findByText("نص");
-    // Radix's Content sets data-side/data-align relative to dir; asserting
-    // the portaled node exists and is reachable from the same test as the
-    // rtl Direction wrapper is the check — a context break would either
-    // throw during Radix's positioning math or fail to render the content
-    // at all, both of which this catches.
-    expect(content).toBeVisible();
+    // Radix's useDirection() defaults to "ltr" with no context — if DirectionProvider's
+    // context did not survive the Portal, this would read "ltr" here despite the rtl wrap.
+    expect(await screen.findByTestId("dir-probe")).toHaveTextContent("rtl");
   });
 });
