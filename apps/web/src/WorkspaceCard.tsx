@@ -36,6 +36,12 @@ export function WorkspaceCard({
   pending,
   feedback,
   onConnect,
+  confirmingDisconnect = false,
+  onDisconnect,
+  renaming = false,
+  onRename,
+  confirmingRetire = false,
+  onRetire,
 }: {
   workspace: { id: string; name: string };
   /** A workspace cannot be connected without the client it owns. */
@@ -46,12 +52,69 @@ export function WorkspaceCard({
   /** What this card has to say for itself — its own note, or that it is working. */
   feedback: ReactNode;
   onConnect: () => void;
+  /** The first press only asks; the page holds that state per card. */
+  confirmingDisconnect?: boolean;
+  /** `ask` opens the question, `confirm` disconnects, `keep` closes it. */
+  onDisconnect?: (step: "ask" | "confirm" | "keep") => void;
+  /** The rename form is open; the page holds that per card. */
+  renaming?: boolean;
+  /** `open` shows the form, `cancel` closes it, `save` carries the new name. */
+  onRename?: (step: "open" | "cancel" | "save", name?: string) => void;
+  confirmingRetire?: boolean;
+  onRetire?: (step: "ask" | "confirm" | "keep") => void;
 }) {
   const S = useStrings();
   const steps = setupProgress({ channel, latestJob }, S);
   return (
     <li>
-      <strong>{workspace.name}</strong>
+      {/* The name, and the way to change it: the form opens in the name's
+          place with the current name already in it, so the reader edits
+          rather than retypes. */}
+      {renaming ? (
+        <form
+          className="rename-form"
+          data-testid={`rename-form-${workspace.id}`}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const field = e.currentTarget.elements.namedItem("name");
+            onRename?.("save", (field as HTMLInputElement | null)?.value ?? "");
+          }}
+        >
+          <label>
+            {S.workspaceNameLabel}
+            <input
+              name="name"
+              required
+              maxLength={120}
+              defaultValue={workspace.name}
+              autoFocus
+            />
+          </label>
+          <button type="submit" disabled={pending}>
+            {S.renameSave}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onRename?.("cancel")}
+          >
+            {S.renameCancel}
+          </button>
+        </form>
+      ) : (
+        <strong>
+          {workspace.name}{" "}
+          <button
+            type="button"
+            className="link-button"
+            disabled={pending}
+            data-testid={`rename-${workspace.id}`}
+            onClick={() => onRename?.("open")}
+          >
+            {S.renameWorkspace}
+          </button>
+        </strong>
+      )}
       {/* The channel by its name where one is known: the title it shows,
           else its @handle. The id is what YouTube calls it — `UC…`, 24 opaque
           characters — and printing it as though it were the channel's name
@@ -125,6 +188,83 @@ export function WorkspaceCard({
             {S.relinkForName}
           </button>
         )}
+      {/* The way out, offered only while there is a grant to withdraw. Two
+          presses on purpose: disconnecting stops every scheduled read and
+          revokes the stored grant, and a single button beside "choose videos"
+          would be pressed by mistake. What YouTube's audit asks for is that a
+          user can withdraw access from inside the application; this is it. */}
+      {channel?.status === "connected" &&
+        (confirmingDisconnect ? (
+          <span
+            className="disconnect-confirm"
+            role="group"
+            aria-label={S.disconnectChannel}
+          >
+            <span>{S.disconnectConfirm}</span>
+            <button
+              type="button"
+              disabled={pending}
+              data-testid={`disconnect-confirm-${workspace.id}`}
+              onClick={() => onDisconnect?.("confirm")}
+            >
+              {S.disconnectChannel}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => onDisconnect?.("keep")}
+            >
+              {S.disconnectKeep}
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="link-button"
+            disabled={pending}
+            data-testid={`disconnect-${workspace.id}`}
+            onClick={() => onDisconnect?.("ask")}
+          >
+            {S.disconnectChannel}
+          </button>
+        ))}
+      {/* Handing the workspace over. Not a deletion, and the sentence says so:
+          what was collected stays, under the operator, and the reader's access
+          ends. Two presses, like the disconnect above it. */}
+      {confirmingRetire ? (
+        <span
+          className="disconnect-confirm"
+          role="group"
+          aria-label={S.retireWorkspace}
+        >
+          <span>{S.retireConfirm}</span>
+          <button
+            type="button"
+            disabled={pending}
+            data-testid={`retire-confirm-${workspace.id}`}
+            onClick={() => onRetire?.("confirm")}
+          >
+            {S.retireWorkspace}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onRetire?.("keep")}
+          >
+            {S.retireKeep}
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="link-button link-button-danger"
+          disabled={pending}
+          data-testid={`retire-${workspace.id}`}
+          onClick={() => onRetire?.("ask")}
+        >
+          {S.retireWorkspace}
+        </button>
+      )}
       {feedback}
     </li>
   );

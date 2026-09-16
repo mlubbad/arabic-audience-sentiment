@@ -241,6 +241,36 @@ small {
   color: var(--text-3);
   font-size: var(--fs-small);
 }
+/* The quiet doors on a card — rename, disconnect, retire — read as links, not
+   as the card's one action, which stays a real button. */
+.workspace-list .link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-3);
+  font-size: var(--fs-small);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.workspace-list .link-button-danger {
+  color: var(--color-danger);
+}
+/* A question and its two answers, on one line where the width allows. */
+.workspace-list .disconnect-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-2);
+}
+.workspace-list .rename-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+}
 
 .budgets progress {
   width: 100%;

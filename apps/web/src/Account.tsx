@@ -128,6 +128,16 @@ export function Account() {
       data.subscription.unsubscribe();
     };
   }, []);
+  // Bumped after an action that changed the rows — a rename, a disconnect, a
+  // hand-over — so the one loader below reads them again rather than each
+  // action patching state by hand.
+  const [reloads, setReloads] = useState(0);
+  // Which card holds an open question or form. One at a time: the page has
+  // one reader, and two open confirmations would be two ways to press wrong.
+  const [asking, setAsking] = useState<{
+    ws: string;
+    what: "disconnect" | "rename" | "retire";
+  } | null>(null);
   useEffect(() => {
     if (!supabase || !session) {
       setWorkspaces([]);
@@ -161,7 +171,7 @@ export function Account() {
     return () => {
       active = false;
     };
-  }, [session]);
+  }, [session, reloads]);
   if (!supabase)
     return (
       <div className="rp-page account-page">
@@ -437,6 +447,93 @@ export function Account() {
                     }
                     pending={pending}
                     feedback={feedback(scope)}
+                    confirmingDisconnect={
+                      asking?.ws === w.id && asking.what === "disconnect"
+                    }
+                    onDisconnect={(step) => {
+                      const channel = channels.find(
+                        (c) => c.workspace_id === w.id,
+                      );
+                      if (step !== "confirm") {
+                        setAsking(
+                          step === "ask"
+                            ? { ws: w.id, what: "disconnect" }
+                            : null,
+                        );
+                        return;
+                      }
+                      if (!channel) return;
+                      setBusy(scope);
+                      setNote(null);
+                      void client
+                        .rpc("oauth_disconnect", {
+                          w: w.id,
+                          channel: channel.channel_id,
+                        })
+                        .then(({ error }) => {
+                          setBusy(null);
+                          setAsking(null);
+                          say(
+                            scope,
+                            error ? S.disconnectFailed : S.disconnectDone,
+                          );
+                          if (!error) setReloads((n) => n + 1);
+                        });
+                    }}
+                    renaming={asking?.ws === w.id && asking.what === "rename"}
+                    onRename={(step, name) => {
+                      if (step !== "save") {
+                        setAsking(
+                          step === "open" ? { ws: w.id, what: "rename" } : null,
+                        );
+                        return;
+                      }
+                      setBusy(scope);
+                      setNote(null);
+                      void client
+                        .rpc("rename_workspace", {
+                          w: w.id,
+                          new_name: name ?? "",
+                        })
+                        .then(({ error }) => {
+                          setBusy(null);
+                          setAsking(null);
+                          say(scope, error ? S.renameFailed : S.renameDone);
+                          if (!error) setReloads((n) => n + 1);
+                        });
+                    }}
+                    confirmingRetire={
+                      asking?.ws === w.id && asking.what === "retire"
+                    }
+                    onRetire={(step) => {
+                      if (step !== "confirm") {
+                        setAsking(
+                          step === "ask" ? { ws: w.id, what: "retire" } : null,
+                        );
+                        return;
+                      }
+                      setBusy(scope);
+                      setNote(null);
+                      void client
+                        .rpc("retire_workspace", { w: w.id })
+                        .then(({ error }) => {
+                          setBusy(null);
+                          setAsking(null);
+                          if (error) {
+                            say(
+                              scope,
+                              /last_workspace/.test(error.message)
+                                ? S.retireLast
+                                : S.retireFailed,
+                            );
+                            return;
+                          }
+                          // The workspace is no longer the reader's; the list
+                          // reloads without it, so the sentence goes to the page.
+                          say("page", S.retireDone);
+                          setReloads((n) => n + 1);
+                        });
+                    }}
                     onConnect={() => {
                       if (!workspaceClient) return;
                       setBusy(scope);

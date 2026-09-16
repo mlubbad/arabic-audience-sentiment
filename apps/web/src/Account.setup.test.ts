@@ -162,6 +162,49 @@ describe("a workspace card", () => {
     }
   });
 
+  it("offers to disconnect exactly while a channel is connected, and asks first", () => {
+    // Connected: the way out sits beside the way to the catalogue, and it is
+    // a two-step door — the first press asks, the second disconnects.
+    const ask = render({ channel: connected });
+    expect(ask).toContain(`data-testid="disconnect-${W1}"`);
+    expect(ask).toContain(ar.disconnectChannel);
+    expect(ask).not.toContain(ar.disconnectConfirm);
+    const confirming = render({
+      channel: connected,
+      confirmingDisconnect: true,
+    });
+    expect(confirming).toContain(ar.disconnectConfirm);
+    expect(confirming).toContain(ar.disconnectKeep);
+    // Anything but connected: nothing to disconnect.
+    expect(
+      render({ channel: { ...connected, status: "disconnected" } }),
+    ).not.toContain("disconnect-");
+    expect(
+      render({ channel: { ...connected, status: "reconnect_required" } }),
+    ).not.toContain("disconnect-");
+    expect(render({ channel: null })).not.toContain("disconnect-");
+  });
+
+  it("offers to rename, and to retire — the retire door asks first and says what stays", () => {
+    const card = render({ channel: connected });
+    expect(card).toContain(`data-testid="rename-${W1}"`);
+    expect(card).toContain(ar.renameWorkspace);
+    expect(card).toContain(`data-testid="retire-${W1}"`);
+    expect(card).toContain(ar.retireWorkspace);
+    expect(card).not.toContain(ar.retireConfirm);
+    const asking = render({ channel: connected, confirmingRetire: true });
+    expect(asking).toContain(ar.retireConfirm);
+    expect(asking).toContain(`data-testid="retire-confirm-${W1}"`);
+    // Renaming is a form with the current name in it.
+    const renaming = render({ channel: connected, renaming: true });
+    expect(renaming).toContain(`data-testid="rename-form-${W1}"`);
+    expect(renaming).toContain('value="قناة الأخبار"');
+    // Retiring is not offered while the door is only for owners; the card
+    // does not know roles, so the page decides — but it is offered without a
+    // channel too: a workspace with nothing connected can still be handed over.
+    expect(render({ channel: null })).toContain(`data-testid="retire-${W1}"`);
+  });
+
   it("carries its own feedback inside the card, after its action", () => {
     // `sync-<id>` is the catalogue link now, not a request button; the note
     // still belongs after it, inside the card.

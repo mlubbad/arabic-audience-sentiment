@@ -112,6 +112,26 @@ export const en: Strings = {
     `The channel needs reconnecting (${status}): `,
   channelIdLabel: "ID",
   channelNone: "No channel connected yet",
+  disconnectChannel: "Disconnect channel",
+  disconnectConfirm:
+    "Collection stops and access to the channel is revoked. What was collected stays. Disconnect it?",
+  disconnectKeep: "Keep it connected",
+  disconnectDone:
+    "The channel is disconnected; nothing is read until it is linked again.",
+  disconnectFailed: "The channel could not be disconnected.",
+  renameWorkspace: "Rename",
+  renameSave: "Save name",
+  renameCancel: "Cancel",
+  renameDone: "The name is changed.",
+  renameFailed: "The name could not be changed.",
+  retireWorkspace: "Retire workspace",
+  retireConfirm:
+    "Your access to this workspace ends, its channel is disconnected, and everything collected in it passes to the service operator — nothing is deleted. To have your data deleted, email us. Retire it?",
+  retireKeep: "Keep it",
+  retireDone:
+    "The workspace is retired and now belongs to the service operator.",
+  retireLast: "Your last workspace cannot be retired; create another first.",
+  retireFailed: "The workspace could not be retired.",
   connectChannel: "Connect a YouTube channel",
   relinkForName: "Reconnect to store the channel's name",
 
