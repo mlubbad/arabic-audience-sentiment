@@ -404,9 +404,12 @@ function WorkspaceRow({
       <td>
         <DeleteWorkspaceDialog
           workspace={{ id: w.id, name: row.name }}
-          onDeleted={() =>
-            void queryClient.invalidateQueries({ queryKey: ["admin"] })
-          }
+          onDeleted={() => {
+            void queryClient.invalidateQueries({ queryKey: ["admin"] });
+            // The rail's switch reads the same rows; without this the
+            // deleted workspace stays in it until the tab reloads.
+            void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+          }}
         />
       </td>
     </tr>

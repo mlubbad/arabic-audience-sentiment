@@ -983,3 +983,18 @@ no-op when they are already both ends of it). And the count was 5 new cases, not
 A same-day fix wave (`.superpowers/sdd/2026-09-17-workspace-delete/final-fix-report.md`)
 added one further case — a client workspace whose billing root is on Paddle is deletable,
 only the root itself is refused — bringing the total to 303/303.
+
+## 2026-09-17 — the workspace list is one query, so a delete reaches the rail
+
+Deleting a workspace on the admin page left it in the rail's workspace switch until the
+tab reloaded. `useWorkspaces` (`session.ts`) held a private `useState` copy per reader — the
+rail, the dashboard, the plan card, the pricing page — and nothing could invalidate a
+`useState`. The same gap hid behind rename and retire on the account page: the card
+changed, the switch did not.
+
+`useWorkspaces` now reads through react-query under `["workspaces", userId]`
+(`workspacesKey`), same return shape as before, so no consumer changed. `AdminPage`'s delete
+and `Account`'s create / rename / retire invalidate the `["workspaces"]` prefix. `session.test.ts`
+and `Account.entry.test.ts` render under a `QueryClientProvider`; unit 8 files / 43 tests for
+the touched readers, typecheck and lint clean. Not walked in a signed-in browser (no seeded
+admin fixture yet — the standing gap).

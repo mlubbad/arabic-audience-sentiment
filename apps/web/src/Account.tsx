@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import {
   authErrorMessage,
@@ -140,6 +141,14 @@ export function Account() {
   // hand-over — so the one loader below reads them again rather than each
   // action patching state by hand.
   const [reloads, setReloads] = useState(0);
+  const queryClient = useQueryClient();
+  // The rail's switch and the dashboard read the list through
+  // `useWorkspaces`, under this key; a bump here without an invalidation
+  // there would rename a card and leave the switch on the old name.
+  const workspacesChanged = () => {
+    setReloads((n) => n + 1);
+    void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+  };
   // Which card holds an open question or form. One at a time: the page has
   // one reader, and two open confirmations would be two ways to press wrong.
   const [asking, setAsking] = useState<{
@@ -249,6 +258,7 @@ export function Account() {
       if (loadError) say("create", S.createWorkspaceListFailed);
       else {
         setWorkspaces(data ?? []);
+        void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
         setName("");
         say("create", S.createWorkspaceDone);
       }
@@ -507,7 +517,7 @@ export function Account() {
                           setBusy(null);
                           setAsking(null);
                           say(scope, error ? S.renameFailed : S.renameDone);
-                          if (!error) setReloads((n) => n + 1);
+                          if (!error) workspacesChanged();
                         });
                     }}
                     confirmingRetire={
@@ -543,7 +553,7 @@ export function Account() {
                                 // The workspace is no longer the reader's; the list
                                 // reloads without it, so the sentence goes to the page.
                                 say("page", S.retireDone);
-                                setReloads((n) => n + 1);
+                                workspacesChanged();
                               });
                           }
                         : undefined

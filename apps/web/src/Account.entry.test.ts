@@ -7,6 +7,7 @@
  */
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const shared = vi.hoisted(() => ({ providers: "", isAdmin: false }));
@@ -37,10 +38,18 @@ const atUrl = (search: string) =>
   });
 atUrl("");
 
+// The page holds a QueryClient for the workspace-list invalidations; the
+// static render never fires them, so an empty client is enough.
 async function render() {
   vi.stubEnv("VITE_AUTH_PROVIDERS", shared.providers);
   const { Account } = await import("./Account");
-  return renderToStaticMarkup(createElement(Account));
+  return renderToStaticMarkup(
+    createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(Account),
+    ),
+  );
 }
 
 beforeEach(() => {
