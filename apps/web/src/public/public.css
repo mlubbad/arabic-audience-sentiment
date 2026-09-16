@@ -274,13 +274,6 @@
     font-size: var(--lp-t-lg);
   }
   .landing .lp-menu {
-    display: block;
-    color: #655a79;
-    background: #f5f2fc;
-    border: 0;
-    padding: 5px 10px;
-    font-size: var(--lp-t-xs);
-    border-radius: 6px;
     margin-inline-start: auto;
   }
   .lp-header-cta {
