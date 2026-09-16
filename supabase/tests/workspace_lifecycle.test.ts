@@ -210,4 +210,220 @@ describe("workspace lifecycle", () => {
       /last_workspace/,
     );
   });
+
+  it("the platform owner cannot retire a workspace to themself", async () => {
+    await as(ADMIN);
+    await db.query("select create_workspace('owner spare')");
+    await db.exec("reset role");
+    const w = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where name='owner spare'",
+      )
+    ).rows[0].id;
+    await as(ADMIN);
+    await expect(db.query("select retire_workspace($1)", [w])).rejects.toThrow(
+      /owner_cannot_retire/,
+    );
+    await db.exec("reset role");
+    // Nothing moved: still the admin's, still a member.
+    const m = await db.query<{ user_id: string }>(
+      "select user_id from memberships where workspace_id=$1",
+      [w],
+    );
+    expect(m.rows).toEqual([{ user_id: ADMIN }]);
+  });
+
+  it("delete_workspace is the operator's door only", async () => {
+    const w = await home(OWNER);
+    await as(OWNER);
+    await expect(db.query("select delete_workspace($1)", [w])).rejects.toThrow(
+      /forbidden/,
+    );
+    await expect(
+      db.query("select admin_workspace_footprint($1)", [w]),
+    ).rejects.toThrow(/forbidden/);
+    await db.exec("reset role");
+  });
+
+  it("delete_workspace refuses a billing root, an active Paddle subscription, and the admin's last workspace", async () => {
+    // A billing root: 'client one' was retired earlier in this file and now
+    // bills under the admin's home.
+    const adminHome = await home(ADMIN);
+    await as(ADMIN);
+    await expect(
+      db.query("select delete_workspace($1)", [adminHome]),
+    ).rejects.toThrow(/billing_root|last_workspace/);
+    await db.exec("reset role");
+
+    // A workspace Paddle is billing.
+    await as(OWNER);
+    await db.query("select create_workspace('paid')");
+    await db.exec("reset role");
+    const paid = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where name='paid'",
+      )
+    ).rows[0].id;
+    await db.query(
+      "update subscriptions set provider='paddle', provider_ref='sub_1', status='active' where workspace_id=$1",
+      [paid],
+    );
+    await as(ADMIN);
+    await expect(db.query("select delete_workspace($1)", [paid])).rejects.toThrow(
+      /paddle_subscription_active/,
+    );
+    await db.exec("reset role");
+    const still = await db.query<{ n: number }>(
+      "select count(*) n from workspaces where id=$1",
+      [paid],
+    );
+    expect(still.rows[0].n).toBe(1);
+  });
+
+  it("delete_workspace removes every row of one workspace, no row of another, and records the act on the admin's home", async () => {
+    // Build a full workspace: channel, grant, video, two comments, a run, a
+    // prediction, a review, a job, a usage grant, a topic.
+    await as(OWNER);
+    await db.query("select create_workspace('doomed')");
+    await db.query("select create_workspace('neighbour')");
+    await db.exec("reset role");
+    const id = async (name: string) =>
+      (
+        await db.query<{ id: string }>(
+          "select id from workspaces where name=$1",
+          [name],
+        )
+      ).rows[0].id;
+    const d = await id("doomed");
+    const n = await id("neighbour");
+    for (const w of [d, n]) {
+      // Each workspace's claim must be a distinct external channel: the
+      // unique index only allows one connected claim per external id.
+      const externalChannelId = "UC" + w.replace(/-/g, "").slice(0, 22);
+      await db.query(
+        `insert into channels(id,workspace_id,client_id,external_channel_id,status)
+         values ($1,$1,(select id from clients where workspace_id=$1),$2,'connected')`,
+        [w, externalChannelId],
+      );
+      await db.query(
+        `insert into private.oauth_connections(workspace_id,channel_id,connected_by,encrypted_tokens,key_version,granted_scopes,status)
+         values ($1,$1,$2,'\\x00','v1','{}','active')`,
+        [w, OWNER],
+      );
+      await db.query(
+        `insert into videos(id,workspace_id,channel_id,external_video_id,title) values ($1,$1,$1,'vvvvvvvvvvv','v')`,
+        [w],
+      );
+      await db.query(
+        `insert into comments(id,workspace_id,video_id,external_comment_id,text_raw,text_plain,
+          content_hash,timestamp_precision,source,author_name,likes_raw,likes_value,published_at)
+         values (gen_random_uuid(),$1,$1,'c1','نص','نص','h1','second',
+                 'youtube_data_api_public','مؤلف','1',1,'2026-09-01T09:00:00Z')`,
+        [w],
+      );
+      await db.query(
+        `insert into analysis_runs(id,workspace_id,model_id,revision_sha,preprocessing_version,parameters,status)
+         values ($1,$1,'m','rev','v1','{}','succeeded')`,
+        [w],
+      );
+      await db.query(
+        `insert into sentiment_predictions(workspace_id,comment_id,content_hash,analysis_run_id,analysis_key,status,label,class_scores)
+         select $1, c.id, 'h1', $1, 'm@rev+v1+p', 'succeeded', 'positive', '{"positive":0.9}'
+           from comments c where c.workspace_id=$1`,
+        [w],
+      );
+      await db.query(
+        `insert into jobs(workspace_id,channel_id,type,dedupe_key,status) values ($1,$1,'collect','k','queued')`,
+        [w],
+      );
+      await db.query(
+        `insert into audit_events(workspace_id,actor_id,action,target_type,target_id) values ($1,$2,'seeded','test','x')`,
+        [w, OWNER],
+      );
+    }
+    const tables = [
+      "channels",
+      "private.oauth_connections",
+      "videos",
+      "comments",
+      "analysis_runs",
+      "sentiment_predictions",
+      "jobs",
+      "audit_events",
+      "memberships",
+      "subscriptions",
+      "clients",
+      "workspaces",
+    ];
+    const count = async (t: string, w: string) =>
+      Number(
+        (
+          await db.query<{ n: string }>(
+            `select count(*) n from ${t} where ${t === "workspaces" ? "id" : "workspace_id"}=$1`,
+            [w],
+          )
+        ).rows[0].n,
+      );
+    const before = Object.fromEntries(
+      await Promise.all(tables.map(async (t) => [t, await count(t, n)])),
+    );
+    expect(before.comments).toBe(1);
+
+    await as(ADMIN);
+    const fp = await db.query<{ admin_workspace_footprint: Record<string, number> }>(
+      "select admin_workspace_footprint($1)",
+      [d],
+    );
+    expect(fp.rows[0].admin_workspace_footprint).toEqual({
+      channels: 1,
+      videos: 1,
+      comments: 1,
+      predictions: 1,
+      reviews: 0,
+      members: 1,
+    });
+    await db.query("select delete_workspace($1)", [d]);
+    await db.exec("reset role");
+
+    for (const t of tables) expect(await count(t, d), t).toBe(0);
+    for (const t of tables) expect(await count(t, n), t).toBe(before[t]);
+    const adminHome = await home(ADMIN);
+    const a = await db.query<{ action: string; target_id: string; actor_id: string }>(
+      "select action,target_id,actor_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
+      [adminHome],
+    );
+    expect(a.rows[0]).toEqual({
+      action: "workspace_deleted",
+      target_id: d,
+      actor_id: ADMIN,
+    });
+  });
+
+  it("the append-only guard yields only to delete_workspace, for only that workspace", async () => {
+    await as(OWNER);
+    await db.query("select create_workspace('guarded')");
+    await db.exec("reset role");
+    const g = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where name='guarded'",
+      )
+    ).rows[0].id;
+    await db.query(
+      `insert into audit_events(workspace_id,actor_id,action,target_type,target_id) values ($1,$2,'seeded','test','x')`,
+      [g, OWNER],
+    );
+    // Outside delete_workspace, even the superuser session cannot delete or update an audit row.
+    await expect(
+      db.query("delete from audit_events where workspace_id=$1", [g]),
+    ).rejects.toThrow(/append_only/);
+    await expect(
+      db.query("update audit_events set action='edited' where workspace_id=$1", [g]),
+    ).rejects.toThrow(/append_only/);
+    // Setting the GUC by hand for a DIFFERENT workspace does not open this one.
+    await db.query("select set_config('app.deleting_workspace',$1,false)", [await home(OWNER)]);
+    await expect(
+      db.query("delete from audit_events where workspace_id=$1", [g]),
+    ).rejects.toThrow(/append_only/);
+    await db.query("select set_config('app.deleting_workspace','',false)");
+  });
 });
