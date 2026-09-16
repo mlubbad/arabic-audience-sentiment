@@ -90,6 +90,10 @@ describe("video selections", () => {
     );
     for (const f of files.slice(cut + 1))
       await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
+    // The arithmetic below assumes the pilot's original 5,000 analysis units;
+    // the live row was raised to 25,000 on 2026-09-16 (20260916100000), so
+    // the figure is pinned here rather than read from whatever the plan says.
+    await db.query("update plans set analysis_units=5000 where key='pilot'");
   });
   it("backfills a live selection for every video that already has comments", async () => {
     await db.exec("reset role");
