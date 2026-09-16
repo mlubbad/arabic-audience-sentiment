@@ -226,6 +226,9 @@ Pending, from selective video sync, all the user's decisions and none of them ta
   checkout was already past the merge). The live function body was not read back — `db dump`
   needs Docker, which was not running — so the evidence is the migration table plus the
   push's atomicity; `docs/verification.md`'s entry of that date says the same.
+- `supabase db push --linked` for `supabase/migrations/20260917100000_delete_workspace.sql`
+  (workspace-delete plan) — `retire_workspace`'s new refusal of the platform owner and the
+  new `delete_workspace`/`admin_workspace_footprint` functions are not on the live project.
 
 Until these happen, no discovery or collection has run against the real channel and
 the catalogue has never been seen signed in — see `docs/verification.md`'s "Not verified"

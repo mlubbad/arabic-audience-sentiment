@@ -537,3 +537,57 @@ back.** `seo.test.ts` holds both: the phrase is in the title, description, H1 an
 in each language; no accuracy figure, no customer count and no dollar amount appear in the
 landing's copy. The prices belong to the catalogue and the structured data reads them from
 it.
+
+## 2026-09-17 — retire refuses the platform owner; delete is a separate, admin-only door
+
+**`retire_workspace` now refuses the platform owner's own workspace**
+(`owner_cannot_retire`). Retiring was already how a workspace stopped existing; the platform
+admin's own workspace is where `workspace_deleted` audit rows land for every *other*
+deletion (see below), and it is the one home a signed-in admin always has. Retiring it would
+leave the platform without an admin identity to act from. This is a narrower rule than "the
+owner can't retire anything" — it blocks exactly the one workspace whose absence would be
+unrecoverable from inside the product.
+
+**A real, admin-only `delete_workspace(w)` exists alongside retire, with three refusals:**
+
+- `last_workspace` — refused because a member with no workspace at all has nowhere in the
+  product to land; retire already carries this same refusal for the same reason, and delete
+  cannot be looser than retire.
+- `billing_root` — refused because other workspaces under the same billing relationship
+  point at this one as the root; deleting it would orphan their billing state rather than
+  their rows.
+- `paddle_subscription_active` — refused when the workspace's Paddle subscription is
+  `active` or `past_due`. A `past_due` subscription is still Paddle's to collect against or
+  cancel; deleting the workspace out from under it would delete the audit trail a chargeback
+  or dunning dispute needs, not just stop charging it. Both statuses are refused for the same
+  reason retire's Paddle guard exists: the plan/billing state is not this product's alone to
+  discard.
+
+Beyond the three refusals, `delete_workspace` is restricted to the platform admin — no
+tenant role can call it, and no tenant role holds `DELETE` on the 27 tables it touches, so
+the refusals are not the only thing standing between a member and this RPC.
+
+**The deletion is recorded on the admin's own home workspace, not the one being deleted.**
+`workspace_deleted`'s audit row has to outlive the delete, and the deleted workspace's own
+`audit_events` rows are exactly what leaves with it — recording there would delete the
+record of the deletion in the same transaction that makes it. The admin's home workspace is
+the one home guaranteed not to be the one just removed (guaranteed by the owner-cannot-retire
+rule above having no delete equivalent needed: the admin's home is never eligible to be the
+argument to `delete_workspace` and be deleted along with its own audit row).
+
+**Ruling made mid-task: the append-only trigger on `comment_reviews`, `topic_reviews` and
+`audit_events` yields to the delete via a transaction-local setting, not a bypass.** All
+three tables carry `private.reject_review_mutation` (`foundation.sql`), which refused every
+delete unconditionally — that is the point of an append-only audit trail. Disabling the
+trigger for the deletion would have meant either dropping and recreating it (a window where
+nothing enforces append-only) or a session-level `session_replication_role` change (which
+would silently also disable every other trigger for the rest of the session, not just this
+one delete). Instead `delete_workspace` sets a transaction-local GUC,
+`app.deleting_workspace = <id>`, and the trigger body was replaced to add exactly one
+exception: it now yields to a `DELETE` of a row whose `workspace_id` equals that setting.
+`UPDATE` is still refused unconditionally, with no exception — the audit trail can be
+retired wholesale with its workspace, but never edited. No tenant role holds `DELETE` on
+these three tables, so the GUC being set opens nothing from a client session — the GUC alone
+is not the access control, the missing grant is; a test in
+`supabase/tests/workspace_lifecycle.test.ts` proves that leg explicitly rather than leaving
+it as an inference from the grants.

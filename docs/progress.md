@@ -939,3 +939,32 @@ attachments. The whole account is `docs/seo.md`; this is the record of what land
 - Tests: `seo.test.ts`, `publicPaths.test.ts`, `prerender.test.ts`, `LegalPage.test.ts`
   (routes), `tests/e2e/seo.spec.ts`; the landing, pricing and language browser tests follow
   the new copy and addresses. Results in `docs/verification.md`.
+
+## 2026-09-17 — a workspace can be deleted, not only retired
+
+`docs/superpowers/plans/2026-09-17-workspace-delete.md`, tasks 1-3.
+
+`7b89510` (fix `1fc0a82`, prettier reflow `1a826b5`): migration
+`supabase/migrations/20260917100000_delete_workspace.sql`. `retire_workspace` now refuses
+the platform owner's own workspace (`owner_cannot_retire`) — retiring it would leave the
+platform without an admin home. New `admin_workspace_footprint(w)` counts what a delete
+would take with it; new `delete_workspace(w)` is admin-only and refuses `last_workspace`,
+`billing_root`, and a Paddle subscription that is `active` or `past_due`
+(`paddle_subscription_active`), then deletes across 27 tables leaves-first in one
+transaction and records `workspace_deleted` on the admin's own home workspace, not the one
+just removed. 6 new PGlite cases in `supabase/tests/workspace_lifecycle.test.ts`;
+`npm run test:db` 302/302 at the time.
+
+`50f78c1`: `Account.tsx` reads `useIsPlatformAdmin` and passes no `onRetire` to
+`WorkspaceCard` when the viewer is the platform admin, so the retire door does not render
+for a workspace that cannot be retired anyway. `Account.entry.test.ts` gained the hook mock.
+
+`4ca5ea2` (fix `777499d`): `DeleteWorkspaceDialog.tsx` — a third lever, «حذف نهائي», on the
+admin table. It is the app's first real `ui/Dialog`: shows the footprint the RPC would take,
+requires the workspace's own name typed back before the delete button enables, refuses to be
+dismissed while the RPC is in flight (the fix), maps each refusal to a sentence, and toasts
+on success. 12 new strings in both `strings/ar.ts` and `strings/en.ts`; 7 jsdom tests.
+
+**The migration has not been pushed to the live Supabase project.** This plan does not push
+it — that is the operator's decision, recorded pending in `docs/coordination/ACTIVE.md`.
+`npm run check` and verification detail are in `docs/verification.md`.
