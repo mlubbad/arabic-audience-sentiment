@@ -1,0 +1,81 @@
+/* apps/web/src/ui — a headless component layer styled against brand.css's
+   existing, measured tokens. No colour, spacing or radius value is invented
+   here; every one is a var() onto brand.css. See
+   docs/superpowers/specs/2026-09-16-ui-foundation-design.md. */
+
+/* A figure wears the numeric face; brand.css documents why. Any component
+   below that renders a count applies this class to that span, never to the
+   sentence around it. */
+.ui-num {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-2);
+  border: 1px solid transparent;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.ui-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.ui-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.ui-btn--sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-small);
+}
+.ui-btn--md {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-body);
+}
+.ui-btn--lg {
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--fs-body);
+}
+
+.ui-btn--primary {
+  background: var(--ml-indigo);
+  color: var(--ink-on-dark);
+}
+.ui-btn--primary:hover:not(:disabled) {
+  background: var(--ml-indigo-800);
+}
+
+.ui-btn--secondary {
+  background: var(--bg-card);
+  color: var(--text-1);
+  border-color: var(--border-2);
+}
+.ui-btn--secondary:hover:not(:disabled) {
+  background: var(--bg-muted);
+}
+
+.ui-btn--ghost {
+  background: transparent;
+  color: var(--text-1);
+}
+.ui-btn--ghost:hover:not(:disabled) {
+  background: var(--bg-muted);
+}
+
+.ui-btn--danger {
+  background: var(--color-danger);
+  color: var(--ink-on-dark);
+}
+.ui-btn--danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}

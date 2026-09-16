@@ -20,6 +20,7 @@ import { DirectionProvider } from "@radix-ui/react-direction";
 import "./style.css";
 import "./app.css";
 import "./locale.css";
+import "./ui/ui.css";
 import { Landing } from "./Landing";
 import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
