@@ -55,7 +55,7 @@ const Pricing = lazy(() =>
 const AdminPage = lazy(() =>
   import("./AdminPage").then((m) => ({ default: m.AdminPage })),
 );
-// The three legal documents share one page; the address decides which. The
+// The legal documents share one page; the address decides which. The
 // documents themselves load with it, not with the shell.
 const LegalPage = lazy(() =>
   import("./LegalPage").then((m) => ({ default: m.LegalPage })),
@@ -456,14 +456,6 @@ void loadStrings(currentLocale()).then(() =>
               element={
                 <Suspense fallback={null}>
                   <LegalPage doc="terms" />
-                </Suspense>
-              }
-            />
-            <Route
-              path={LEGAL_PATHS.thirdParty}
-              element={
-                <Suspense fallback={null}>
-                  <LegalPage doc="thirdParty" />
                 </Suspense>
               }
             />

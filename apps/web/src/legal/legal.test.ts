@@ -1,4 +1,4 @@
-/** The three documents, held to what they claim.
+/** The documents, held to what they claim.
  *
  * Two kinds of check. Parity: an English reader is bound by the same text as
  * an Arabic one, section for section and link for link — a section or a link
@@ -88,9 +88,9 @@ describe("the legal documents", () => {
       expect(privacy).toContain("youtube.force-ssl");
       expect(privacy).toMatch(/ثلاثين يومًا|thirty days/);
       // Nobody's name or personal mailbox: the contact is the company site.
-      expect(
-        text(set.privacy) + text(set.terms) + text(set.thirdParty),
-      ).not.toMatch(/@gmail\.com|لُبّد|Lubbad/);
+      expect(text(set.privacy) + text(set.terms)).not.toMatch(
+        /@gmail\.com|لُبّد|Lubbad/,
+      );
     }
     // The page a document is linked at is the page it is served at.
     expect(LEGAL_PATHS.privacy).toBe("/privacy-policy");

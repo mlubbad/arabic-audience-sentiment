@@ -47,10 +47,9 @@ describe("a legal page", () => {
     expect(html).not.toMatch(/\]\(https?:/);
   });
 
-  it("links the other two documents from its own foot", () => {
+  it("links the other document from its own foot", () => {
     const html = render("terms");
     expect(html).toContain(`href="${LEGAL_PATHS.privacy}"`);
-    expect(html).toContain(`href="${LEGAL_PATHS.thirdParty}"`);
     expect(html).toContain(ar.legalPrivacy);
   });
 });

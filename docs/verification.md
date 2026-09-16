@@ -1928,23 +1928,29 @@ youtube.com/t/terms and myaccount.google.com/permissions; both name `youtube.rea
 server render of each document carries its title, `<time dateTime>`, one `<section id>` per
 contents entry and an anchor with `rel="noopener noreferrer"` for each inline link; the
 three footers mount `<LegalLinks`; `main.tsx` serves each `LEGAL_PATHS` entry. `npm test`
-425 passed, `test:db` 291, `worker:test` 177, build green, secrets scan green. Prettier:
+430 passed, `test:db` 291, `worker:test` 177, build green, secrets scan green. Prettier:
 this branch's files pass; the untracked `supabase/tests/worker_video_counts.test.ts`
 (not this work's) fails `format:check`.
 
-Browser (`tests/e2e/legal.spec.ts`, 3 new; the whole suite 96 passed in 1.4m): the landing
-footer's «سياسة الخصوصية» opens `/privacy-policy` with the right `<h1>` and document
-title; the Google and YouTube anchors carry the required hrefs; the contents link scrolls
-`#retention` into view; `/terms` and `/third-party` are served and cross-linked, the Paddle
-buyer-terms anchor present; the language switch turns the document English with
+Browser (`tests/e2e/legal.spec.ts`; the whole suite 96 passed in 1.4m before the page
+count settled at two, then legal + landing + pricing 10 passed): the landing footer's
+«سياسة الخصوصية» opens `/privacy-policy` with the right `<h1>` and document title; the
+Google and YouTube anchors carry the required hrefs; the contents link scrolls `#retention`
+into view; `/terms` opens from the footer, carries the Paddle buyer-terms anchor and links
+back to the privacy policy; the language switch turns the document English with
 `lang="en"` and `dir="ltr"`. Seen on the dev server at 800, 1280 and 375 wide: the title
 block, contents grid and sections in Arabic and English, the legal row in the landing and
-app-shell footers. Not deployed; `/privacy-policy` on app.sky-develop.net answers only
-after the next `deploy:preview` — done below.
+app-shell footers.
 
-Deployed 2026-09-16 via `npm run deploy:preview` after a fresh build: 40 files answered
-`226`, 15 stale chunks swept, `static/LegalPage-wfCIIXpK.js` (51,504 bytes) on the host.
-Probed with the preview's basic-auth credentials: `/privacy-policy`, `/terms` and
-`/third-party` each `200`, `index.html` referencing the new `index-BgcIGqtG.js`; without
-credentials each answers `401` — the host is still password-protected, so a reviewer at
-Google or Paddle cannot open the link until that password is lifted from these routes.
+## 2026-09-16 — the public face is open, probed from outside
+
+`npm run deploy:preview` after a fresh build: 40 files `226`, `.htaccess` 4,386 bytes on
+the host. Probed **without credentials** through Cloudflare: `/`, `/pricing`,
+`/privacy-policy`, `/terms`, `/static/index-Ca5U9bEO.js`, `/static/LegalPage-Bz25wQ9k.js`,
+`/fonts/readex.css`, `/landing/audience-growth-original.png` and `/robots.txt` each `200`;
+`/dashboard`, `/account`, `/sync`, `/admin`, `/fixtures/dashboard.json` and `/index.html`
+each `401` with the Basic challenge; `/.htaccess` `403`. So the SPA rewrite carries the
+public mark through `REDIRECT_public` as the file says it does, and a protected route
+rewritten to the same `index.html` is still refused. `htaccess.test.ts` 8 passed against
+the shipped file. The host still sends `X-Robots-Tag: noindex, nofollow` on every answer:
+open to a reviewer who has the link, not to a search engine.

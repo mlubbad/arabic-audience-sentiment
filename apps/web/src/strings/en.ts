@@ -997,7 +997,6 @@ export const en: Strings = {
   legalNavLabel: "Legal pages",
   legalPrivacy: "Privacy Policy",
   legalTerms: "Terms of Service",
-  legalThirdParty: "Third-party services and software",
   legalUpdated: "Last updated",
   legalContents: "On this page",
   arrowForward: "→",

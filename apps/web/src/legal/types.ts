@@ -27,7 +27,7 @@ export type LegalDocument = {
   sections: readonly LegalSection[];
 };
 
-export type LegalKey = "privacy" | "terms" | "thirdParty";
+export type LegalKey = "privacy" | "terms";
 export type LegalSet = Readonly<Record<LegalKey, LegalDocument>>;
 
 /** Where each document lives. The landing footer, the app footer and the
@@ -36,11 +36,6 @@ export type LegalSet = Readonly<Record<LegalKey, LegalDocument>>;
 export const LEGAL_PATHS: Readonly<Record<LegalKey, string>> = {
   privacy: "/privacy-policy",
   terms: "/terms",
-  thirdParty: "/third-party",
 };
 
-export const LEGAL_KEYS: readonly LegalKey[] = [
-  "privacy",
-  "terms",
-  "thirdParty",
-];
+export const LEGAL_KEYS: readonly LegalKey[] = ["privacy", "terms"];

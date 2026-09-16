@@ -9,7 +9,30 @@
 AuthType Basic
 AuthName "Sentiment MVP - private preview"
 AuthUserFile /home/u101542/domains/app.sky-develop.net/.htpasswd_app
-Require valid-user
+
+# The public face is open; the product behind it keeps the password.
+#
+# A reviewer at Google (the YouTube API audit) or Paddle follows the footer
+# link to the privacy policy and must land on the page, not on a challenge.
+# So the landing, the pricing page and the two legal documents answer to
+# anyone, and so do the files those pages are made of: the hashed bundle,
+# the fonts and the landing art. Every other address — the dashboard, the
+# account, the fixtures, the operations page — still asks for the password.
+#
+# The routes are matched on the request URI, before the rewrite below turns
+# them into /index.html. That rewrite is an internal redirect, and Apache
+# hands the redirected request the first one's variables under a REDIRECT_
+# prefix; the second `Require env` reads that copy. /index.html is not made
+# public by name on purpose: a protected route is rewritten to the same file,
+# and only the route it came from decides whether it was allowed.
+SetEnvIf Request_URI "^/(pricing|privacy-policy|terms)?/?$" public
+SetEnvIf Request_URI "^/(static|fonts|landing)/" public
+SetEnvIf Request_URI "^/robots\.txt$" public
+<RequireAny>
+  Require env public
+  Require env REDIRECT_public
+  Require valid-user
+</RequireAny>
 
 # Single-page app: an unknown path is the router's business, not the
 # filesystem's. Without this, refreshing on /account is a 404.

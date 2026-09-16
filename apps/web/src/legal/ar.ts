@@ -1,4 +1,4 @@
-/** The three legal documents, in Arabic — the text the product is bound by.
+/** The legal documents, in Arabic — the text the product is bound by.
  *
  * Every claim here is a claim about the code. The thirty days is
  * `private.purge_comment_text` (migration 20260913235500); the two scopes are
@@ -20,7 +20,6 @@ const YOUTUBE_API_TERMS =
 const PADDLE_BUYER_TERMS = "https://www.paddle.com/legal/checkout-buyer-terms";
 const PADDLE_PRIVACY = "https://www.paddle.com/legal/privacy";
 const SUPABASE_PRIVACY = "https://supabase.com/privacy";
-const SUPABASE_TERMS = "https://supabase.com/terms";
 const CLOUDFLARE_PRIVACY = "https://www.cloudflare.com/privacypolicy/";
 const SKY_DEVELOP = "https://sky-develop.net";
 const UPDATED = "2026-09-16";
@@ -43,7 +42,7 @@ export const legalAr: LegalSet = {
         id: "scope",
         heading: "نطاق هذه السياسة",
         paragraphs: [
-          "تنطبق هذه السياسة على موقع الخدمة وتطبيقها ولوحاتها وواجهاتها البرمجية. ولا تنطبق على المواقع والخدمات التي نضع لها روابط أو نعتمد عليها، مثل Google وYouTube وPaddle؛ لكلٍّ منها سياستها الخاصة، وقد جمعناها في صفحة [الخدمات والبرمجيات الخارجية](https://app.sky-develop.net/third-party).",
+          "تنطبق هذه السياسة على موقع الخدمة وتطبيقها ولوحاتها وواجهاتها البرمجية. ولا تنطبق على المواقع والخدمات التي نضع لها روابط أو نعتمد عليها، مثل Google وYouTube وPaddle؛ لكلٍّ منها سياستها الخاصة، ونضع روابطها في قسم «مع من نشارك البيانات» أدناه.",
           "الخدمة في مرحلة معاينة خاصة. بعض الصفحات تعرض بيانات اصطناعية موضّحة بوضوح، وهذه ليست بيانات شخصية لأحد.",
         ],
       },
@@ -101,10 +100,10 @@ export const legalAr: LegalSet = {
           "لا نبيع بياناتك ولا نؤجّرها. نشاركها فقط مع مزوّدين نعتمد عليهم لتشغيل الخدمة، وكلٌّ منهم يعالجها لحسابنا وبقدر ما يلزم:",
         ],
         bullets: [
-          "Supabase: قاعدة البيانات والمصادقة والدوال الخلفية التي تشغّل الخدمة.",
-          "Paddle: الدفع والفوترة والضرائب؛ وهو البائع المسجّل الذي تشتري منه الخطة.",
-          "Google / YouTube: مصدر بيانات قناتك، ومزوّد تسجيل الدخول.",
-          "Cloudflare ومزوّد الاستضافة: تسليم صفحات الموقع وحمايتها.",
+          `Supabase: قاعدة البيانات والمصادقة والدوال الخلفية التي تشغّل الخدمة ([سياسة خصوصية Supabase](${SUPABASE_PRIVACY})).`,
+          `Paddle: الدفع والفوترة والضرائب؛ وهو البائع المسجّل الذي تشتري منه الخطة ([سياسة خصوصية Paddle](${PADDLE_PRIVACY})).`,
+          `Google / YouTube: مصدر بيانات قناتك، ومزوّد تسجيل الدخول ([سياسة خصوصية Google](${GOOGLE_PRIVACY})).`,
+          `Cloudflare ومزوّد الاستضافة: تسليم صفحات الموقع وحمايتها ([سياسة خصوصية Cloudflare](${CLOUDFLARE_PRIVACY})).`,
           "ونشارك البيانات مع جهة رسمية إذا ألزمنا القانون بذلك، أو لحماية حقوقنا أو سلامة المستخدمين.",
         ],
       },
@@ -112,7 +111,7 @@ export const legalAr: LegalSet = {
         id: "transfer",
         heading: "النقل الدولي",
         paragraphs: [
-          "يعمل المزوّدون المذكورون على خوادم في دول مختلفة، فقد تُخزَّن بياناتك أو تُعالَج خارج بلد إقامتك. نختار مزوّدين يوفّرون ضمانات تعاقدية وتقنية لحماية البيانات، وتفاصيل كل مزوّد في صفحة الخدمات الخارجية.",
+          "يعمل المزوّدون المذكورون على خوادم في دول مختلفة، فقد تُخزَّن بياناتك أو تُعالَج خارج بلد إقامتك. نختار مزوّدين يوفّرون ضمانات تعاقدية وتقنية لحماية البيانات، وسياسة كل مزوّد مذكورة في القسم السابق.",
         ],
       },
       {
@@ -262,76 +261,6 @@ export const legalAr: LegalSet = {
         heading: "التواصل",
         paragraphs: [
           `لأي سؤال عن هذه الشروط تواصل معنا عبر القنوات المنشورة على موقع [Sky Develop](${SKY_DEVELOP}).`,
-        ],
-      },
-    ],
-  },
-
-  thirdParty: {
-    title: "الخدمات والبرمجيات الخارجية",
-    updated: UPDATED,
-    lead: "تعتمد «مشاعر الجمهور» على خدمات وبرمجيات من أطراف أخرى. هذه الصفحة تسمّيها، وتقول ما الذي يفعله كلٌّ منها بالضبط، وتشير إلى الشروط والسياسات التي تحكمه.",
-    sections: [
-      {
-        id: "youtube",
-        heading: "خدمات YouTube API وحساب Google",
-        paragraphs: [
-          "مصدر بيانات قناتك. نربط القناة عبر Google OAuth بصلاحيتي القراءة فقط (youtube.readonly وyoutube.force-ssl) ونقرأ عبر YouTube Data API بيانات القناة والفيديوهات والتعليقات العامة. ويمكن أيضًا تسجيل الدخول إلى الخدمة بحساب Google.",
-          `باستخدامك للخدمة فأنت توافق على [شروط خدمة YouTube](${YOUTUBE_TERMS})، وتنطبق [سياسة خصوصية Google](${GOOGLE_PRIVACY}) على ما يعالجه Google. نلتزم بـ[شروط خدمات YouTube API](${YOUTUBE_API_TERMS}) وبـ[سياسة بيانات المستخدم لخدمات Google API](${GOOGLE_USER_DATA_POLICY}) ومتطلبات الاستخدام المحدود فيها.`,
-          `لسحب صلاحية الخدمة من حسابك: [صفحة الأذونات في حساب Google](${GOOGLE_PERMISSIONS}).`,
-        ],
-      },
-      {
-        id: "paddle",
-        heading: "Paddle",
-        paragraphs: [
-          `البائع المسجّل (Merchant of Record) لكل خطة مدفوعة: يعرض نافذة الدفع، ويعالج البطاقة، ويحصّل الضرائب، ويصدر الفواتير، ويدير التجديد والإلغاء والاسترداد. لا تصلنا بيانات بطاقتك. تحكم عملية الشراء [شروط الشراء لدى Paddle](${PADDLE_BUYER_TERMS}) و[سياسة خصوصية Paddle](${PADDLE_PRIVACY}). يُحمَّل سكربت Paddle.js في صفحات الخدمة لفتح نافذة الدفع.`,
-        ],
-      },
-      {
-        id: "supabase",
-        heading: "Supabase",
-        paragraphs: [
-          `البنية الخلفية للخدمة: قاعدة بيانات Postgres، والمصادقة (تسجيل الدخول والجلسات)، والدوال الخلفية التي تتوسط بين الواجهة وعامل الجمع. بياناتك تُخزَّن في مشروع نديره على بنية Supabase. انظر [سياسة خصوصية Supabase](${SUPABASE_PRIVACY}) و[شروطها](${SUPABASE_TERMS}).`,
-        ],
-      },
-      {
-        id: "cloudflare",
-        heading: "Cloudflare ومزوّد الاستضافة",
-        paragraphs: [
-          `تُقدَّم صفحات الموقع من خادم استضافة خلف شبكة Cloudflare التي توفّر التشفير والتخزين المؤقت والحماية من الإساءة، وقد تسجّل عنوان IP لهذا الغرض. انظر [سياسة خصوصية Cloudflare](${CLOUDFLARE_PRIVACY}).`,
-        ],
-      },
-      {
-        id: "models",
-        heading: "نماذج التصنيف مفتوحة المصدر",
-        paragraphs: [
-          "يصنَّف نص التعليق بنماذج لغوية عربية مدرَّبة مسبقًا تعمل على خوادمنا عبر مكتبة Hugging Face Transformers وPyTorch. لا يُرسل أي تعليق إلى خدمة ذكاء اصطناعي خارجية. النماذج المستخدمة أو المرشّحة، بتراخيصها كما تنشرها صفحاتها:",
-        ],
-        bullets: [
-          "CAMeLBERT Sentiment (CAMeL Lab، جامعة نيويورك أبوظبي): [camelbert-da-sentiment](https://huggingface.co/CAMeL-Lab/bert-base-arabic-camelbert-da-sentiment)، [camelbert-mix-sentiment](https://huggingface.co/CAMeL-Lab/bert-base-arabic-camelbert-mix-sentiment)، [camelbert-msa-sentiment](https://huggingface.co/CAMeL-Lab/bert-base-arabic-camelbert-msa-sentiment).",
-          "MARBERT (UBC-NLP) والنماذج المشتقة منه للمشاعر: [marbert-arabic-tweet-sentiment-stable](https://huggingface.co/3liel/marbert-arabic-tweet-sentiment-stable).",
-          "[Hugging Face Transformers](https://github.com/huggingface/transformers) (رخصة Apache 2.0) و[PyTorch](https://github.com/pytorch/pytorch) (رخصة BSD).",
-        ],
-      },
-      {
-        id: "libraries",
-        heading: "المكتبات مفتوحة المصدر",
-        paragraphs: [
-          "الواجهة مبنية ببرمجيات مفتوحة المصدر نشكر أصحابها، وأبرزها بتراخيصها:",
-        ],
-        bullets: [
-          "[React](https://react.dev) و[React Router](https://reactrouter.com) و[TanStack Query](https://tanstack.com/query) — رخصة MIT.",
-          "[Chart.js](https://www.chartjs.org) و[react-chartjs-2](https://react-chartjs-2.js.org) — رخصة MIT.",
-          "[Vite](https://vite.dev) و[Tailwind CSS](https://tailwindcss.com) و[supabase-js](https://github.com/supabase/supabase-js) — رخصة MIT.",
-          "خط Readex Pro — رخصة SIL Open Font License، مستضاف على خوادمنا لا من Google Fonts، فلا يُرسل عنوانك إلى طرف ثالث لتحميله.",
-        ],
-      },
-      {
-        id: "changes",
-        heading: "التغييرات على هذه القائمة",
-        paragraphs: [
-          "حين نضيف مزوّدًا أو نستغني عن آخر نحدّث هذه الصفحة وتاريخها. التغيير الذي يمس بياناتك الشخصية يُعامل كتغيير في سياسة الخصوصية.",
         ],
       },
     ],

@@ -110,7 +110,79 @@ describe("the preview host's cache policy", () => {
   it("keeps the password on the deployment", () => {
     // The same file carries the only thing making this preview private. A
     // rewrite of it for cache reasons must not quietly drop that.
-    expect(source).toMatch(/^Require valid-user$/m);
+    expect(source).toMatch(/^\s*Require valid-user$/m);
     expect(source).toMatch(/^AuthType Basic$/m);
+  });
+});
+
+/** The `SetEnvIf Request_URI` patterns that mark a request public. */
+const publicPatterns = [
+  ...source.matchAll(/^SetEnvIf\s+Request_URI\s+"([^"]+)"\s+public\s*$/gm),
+].map((m) => new RegExp(m[1]));
+const isPublic = (uri: string) => publicPatterns.some((re) => re.test(uri));
+
+describe("the preview host's public face", () => {
+  it("opens the landing, the pricing page and the legal documents", () => {
+    // A reviewer at Google or Paddle follows the landing footer to the privacy
+    // policy; a 401 there is a refused application, not a private preview.
+    for (const uri of [
+      "/",
+      "/pricing",
+      "/privacy-policy",
+      "/terms",
+      "/terms/",
+    ]) {
+      expect(isPublic(uri), uri).toBe(true);
+    }
+    // And the files those pages are built from.
+    for (const uri of [
+      "/static/index-BgcIGqtG.js",
+      "/static/LegalPage-wfCIIXpK.js",
+      "/fonts/readex.css",
+      "/landing/audience-growth-original.png",
+      "/robots.txt",
+    ]) {
+      expect(isPublic(uri), uri).toBe(true);
+    }
+  });
+
+  it("keeps the product itself behind the password", () => {
+    for (const uri of [
+      "/dashboard",
+      "/dashboard?ws=abc",
+      "/account",
+      "/sync",
+      "/admin",
+      "/connected",
+      "/fixtures/dashboard.json",
+      "/fixtures/catalogue.json",
+      "/index.html",
+      "/pricing-internal",
+      "/termsx",
+      "/.htaccess",
+    ]) {
+      expect(isPublic(uri), uri).toBe(false);
+    }
+  });
+
+  it("lets the public routes through the rewrite to index.html", () => {
+    // Per-directory rewriting is an internal redirect; the redirected request
+    // carries the first request's variables under REDIRECT_. Without the
+    // second line a public route would be allowed, rewritten, and refused.
+    const any = source.match(/<RequireAny>([\s\S]*?)<\/RequireAny>/);
+    expect(any).not.toBeNull();
+    const lines = any![1]
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    expect(lines).toEqual([
+      "Require env public",
+      "Require env REDIRECT_public",
+      "Require valid-user",
+    ]);
+    // Nothing else in the file authorises: a stray top-level Require would
+    // either widen the door or, ANDed by default, close it entirely.
+    const outside = source.replace(/<RequireAny>[\s\S]*?<\/RequireAny>/, "");
+    expect(outside).not.toMatch(/^\s*Require\b/m);
   });
 });

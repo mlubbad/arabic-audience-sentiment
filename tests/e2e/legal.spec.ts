@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-// Signed out, no backend: the three documents must open from the landing
+// Signed out, no backend: the two documents must open from the landing
 // footer and read whole, because that is how a reviewer at Google or Paddle
 // reaches them — and how a visitor deciding whether to grant a scope does.
 test("the privacy policy opens from the landing footer and reads whole", async ({
@@ -56,20 +56,18 @@ test("the terms page is reached from the landing nav and carries the two YouTube
   await expect(
     page.getByRole("link", { name: "سياسة خصوصية Google" }).first(),
   ).toHaveAttribute("href", "https://policies.google.com/privacy");
-  await page
-    .getByRole("navigation", { name: "الصفحات القانونية" })
-    .getByRole("link", { name: "الخدمات والبرمجيات الخارجية" })
-    .click();
-  await expect(page).toHaveURL(/\/third-party$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "الخدمات والبرمجيات الخارجية",
-  );
   await expect(
     page.getByRole("link", { name: "شروط الشراء لدى Paddle" }),
   ).toHaveAttribute(
     "href",
     "https://www.paddle.com/legal/checkout-buyer-terms",
   );
+  // And back to the other document from its own foot.
+  await page
+    .getByRole("navigation", { name: "الصفحات القانونية" })
+    .getByRole("link", { name: "سياسة الخصوصية" })
+    .click();
+  await expect(page).toHaveURL(/\/privacy-policy$/);
 });
 
 test("the documents follow the interface language", async ({ page }) => {

@@ -995,7 +995,6 @@ export const ar = {
   legalNavLabel: "الصفحات القانونية",
   legalPrivacy: "سياسة الخصوصية",
   legalTerms: "شروط الاستخدام",
-  legalThirdParty: "الخدمات والبرمجيات الخارجية",
   legalUpdated: "آخر تحديث",
   legalContents: "محتويات الصفحة",
   /** Direction-dependent glyphs: "onward" points the way the text runs. */

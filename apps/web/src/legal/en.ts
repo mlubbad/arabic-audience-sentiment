@@ -1,4 +1,4 @@
-/** The same three documents in English. Section ids match `ar.ts` one for
+/** The same documents in English. Section ids match `ar.ts` one for
  *  one — `legal.test.ts` holds the two to that — so an English reader is
  *  bound by the same text as an Arabic one, and a section added to one
  *  language without the other fails a test rather than a reader. */
@@ -14,7 +14,6 @@ const YOUTUBE_API_TERMS =
 const PADDLE_BUYER_TERMS = "https://www.paddle.com/legal/checkout-buyer-terms";
 const PADDLE_PRIVACY = "https://www.paddle.com/legal/privacy";
 const SUPABASE_PRIVACY = "https://supabase.com/privacy";
-const SUPABASE_TERMS = "https://supabase.com/terms";
 const CLOUDFLARE_PRIVACY = "https://www.cloudflare.com/privacypolicy/";
 const SKY_DEVELOP = "https://sky-develop.net";
 const UPDATED = "2026-09-16";
@@ -37,7 +36,7 @@ export const legalEn: LegalSet = {
         id: "scope",
         heading: "What this policy covers",
         paragraphs: [
-          "This policy applies to the service's website, application, dashboards and APIs. It does not apply to the sites and services we link to or depend on, such as Google, YouTube and Paddle; each has its own policy, and we have gathered them on the [Third-party services and software](https://app.sky-develop.net/third-party) page.",
+          "This policy applies to the service's website, application, dashboards and APIs. It does not apply to the sites and services we link to or depend on, such as Google, YouTube and Paddle; each has its own policy, linked in the “Who we share it with” section below.",
           "The service is in a private preview. Some pages show clearly marked synthetic data, which is nobody's personal data.",
         ],
       },
@@ -97,10 +96,10 @@ export const legalEn: LegalSet = {
           "We do not sell or rent your data. We share it only with providers we depend on to run the service, each processing it on our behalf and only as far as needed:",
         ],
         bullets: [
-          "Supabase: the database, authentication and backend functions that run the service.",
-          "Paddle: payment, invoicing and tax; the merchant of record you buy the plan from.",
-          "Google / YouTube: the source of your channel's data, and a sign-in provider.",
-          "Cloudflare and the hosting provider: delivering and protecting the site's pages.",
+          `Supabase: the database, authentication and backend functions that run the service ([Supabase privacy policy](${SUPABASE_PRIVACY})).`,
+          `Paddle: payment, invoicing and tax; the merchant of record you buy the plan from ([Paddle privacy policy](${PADDLE_PRIVACY})).`,
+          `Google / YouTube: the source of your channel's data, and a sign-in provider ([Google Privacy Policy](${GOOGLE_PRIVACY})).`,
+          `Cloudflare and the hosting provider: delivering and protecting the site's pages ([Cloudflare privacy policy](${CLOUDFLARE_PRIVACY})).`,
           "We also share data with an authority where the law obliges us to, or to protect our rights or the safety of users.",
         ],
       },
@@ -108,7 +107,7 @@ export const legalEn: LegalSet = {
         id: "transfer",
         heading: "International transfers",
         paragraphs: [
-          "The providers named above run servers in different countries, so your data may be stored or processed outside the country you live in. We choose providers that offer contractual and technical safeguards, and each provider's details are on the third-party services page.",
+          "The providers named above run servers in different countries, so your data may be stored or processed outside the country you live in. We choose providers that offer contractual and technical safeguards, and each provider's policy is linked in the previous section.",
         ],
       },
       {
@@ -258,76 +257,6 @@ export const legalEn: LegalSet = {
         heading: "Contact",
         paragraphs: [
           `For any question about these terms, contact us through the channels published on the [Sky Develop](${SKY_DEVELOP}) website.`,
-        ],
-      },
-    ],
-  },
-
-  thirdParty: {
-    title: "Third-party services and software",
-    updated: UPDATED,
-    lead: "Audience Sentiment depends on services and software from other parties. This page names them, says exactly what each one does, and points to the terms and policies that govern it.",
-    sections: [
-      {
-        id: "youtube",
-        heading: "YouTube API Services and Google Account",
-        paragraphs: [
-          "The source of your channel's data. We connect the channel through Google OAuth with two read-only permissions (youtube.readonly and youtube.force-ssl) and read channel, video and public comment data through the YouTube Data API. You can also sign in to the service with a Google account.",
-          `By using the service you agree to the [YouTube Terms of Service](${YOUTUBE_TERMS}), and the [Google Privacy Policy](${GOOGLE_PRIVACY}) applies to what Google processes. We comply with the [YouTube API Services Terms of Service](${YOUTUBE_API_TERMS}) and the [Google API Services User Data Policy](${GOOGLE_USER_DATA_POLICY}), including its Limited Use requirements.`,
-          `To revoke the service's access to your account: [the permissions page of your Google Account](${GOOGLE_PERMISSIONS}).`,
-        ],
-      },
-      {
-        id: "paddle",
-        heading: "Paddle",
-        paragraphs: [
-          `The merchant of record for every paid plan: it shows the checkout, processes the card, collects tax, issues invoices, and manages renewal, cancellation and refunds. Your card details never reach us. The purchase is governed by the [Paddle checkout buyer terms](${PADDLE_BUYER_TERMS}) and the [Paddle privacy policy](${PADDLE_PRIVACY}). The Paddle.js script is loaded on the service's pages to open the checkout.`,
-        ],
-      },
-      {
-        id: "supabase",
-        heading: "Supabase",
-        paragraphs: [
-          `The service's backend: the Postgres database, authentication (sign-in and sessions), and the backend functions between the interface and the collection worker. Your data is stored in a project we run on Supabase's infrastructure. See the [Supabase privacy policy](${SUPABASE_PRIVACY}) and [terms](${SUPABASE_TERMS}).`,
-        ],
-      },
-      {
-        id: "cloudflare",
-        heading: "Cloudflare and the hosting provider",
-        paragraphs: [
-          `The site's pages are served from a hosting server behind the Cloudflare network, which provides encryption, caching and protection against abuse, and may log IP addresses for that purpose. See the [Cloudflare privacy policy](${CLOUDFLARE_PRIVACY}).`,
-        ],
-      },
-      {
-        id: "models",
-        heading: "Open-source classification models",
-        paragraphs: [
-          "Comment text is classified by pre-trained Arabic language models running on our own servers through the Hugging Face Transformers library and PyTorch. No comment is sent to an external AI service. The models in use or under evaluation, with the licences their pages publish:",
-        ],
-        bullets: [
-          "CAMeLBERT Sentiment (CAMeL Lab, New York University Abu Dhabi): [camelbert-da-sentiment](https://huggingface.co/CAMeL-Lab/bert-base-arabic-camelbert-da-sentiment), [camelbert-mix-sentiment](https://huggingface.co/CAMeL-Lab/bert-base-arabic-camelbert-mix-sentiment), [camelbert-msa-sentiment](https://huggingface.co/CAMeL-Lab/bert-base-arabic-camelbert-msa-sentiment).",
-          "MARBERT (UBC-NLP) and sentiment models derived from it: [marbert-arabic-tweet-sentiment-stable](https://huggingface.co/3liel/marbert-arabic-tweet-sentiment-stable).",
-          "[Hugging Face Transformers](https://github.com/huggingface/transformers) (Apache 2.0 licence) and [PyTorch](https://github.com/pytorch/pytorch) (BSD licence).",
-        ],
-      },
-      {
-        id: "libraries",
-        heading: "Open-source libraries",
-        paragraphs: [
-          "The interface is built with open-source software whose authors we thank; the main ones, with their licences:",
-        ],
-        bullets: [
-          "[React](https://react.dev), [React Router](https://reactrouter.com) and [TanStack Query](https://tanstack.com/query) — MIT licence.",
-          "[Chart.js](https://www.chartjs.org) and [react-chartjs-2](https://react-chartjs-2.js.org) — MIT licence.",
-          "[Vite](https://vite.dev), [Tailwind CSS](https://tailwindcss.com) and [supabase-js](https://github.com/supabase/supabase-js) — MIT licence.",
-          "The Readex Pro typeface — SIL Open Font License, served from our own servers rather than Google Fonts, so your address is not sent to a third party to load it.",
-        ],
-      },
-      {
-        id: "changes",
-        heading: "Changes to this list",
-        paragraphs: [
-          "When we add a provider or drop one we update this page and its date. A change that touches your personal data is treated as a change to the privacy policy.",
         ],
       },
     ],
