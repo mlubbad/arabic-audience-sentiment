@@ -1766,3 +1766,46 @@ finished `blocked: quota_exceeded` at its first refused batch — the checkpoint
 further reclaim, no thrash. The tick afterwards answers `collect: 0`: the hour's backoff
 after a blocked job holds, and the pilot's units stay spent until 2026-12-01 or a plan
 change.
+
+## 2026-09-16 — plans v2 and the Paddle sandbox reach the live project
+
+Applied by the user's "طبّق", from this checkout, `npx supabase db push --linked` after a
+dry run listed exactly six files: `20260917020000_usage_grants`, `20260917030000_platform_admin`,
+`20260917040000_plan_catalogue`, `20260917050000_billing_events`, `20260917051000_billing_rpc_surface`,
+`20260917052000_yearly_prices_follow_the_spec`. `20260917010000_plans_v2` was already on the
+remote (pushed by another session before the yearly figure was checked), which is why the
+correction is its own file and the applied file was restored to what the remote holds.
+
+Read back over REST with the service key: `plans` carries the eight rows; `plan_catalogue()`
+as **anon** returns six (`free, creator, creator_plus, agency, media, enterprise`) with yearly
+cents `12000/28800/94800/238800`; `addon_catalogue()` returns `pack_10k` at 500 cents;
+`billing_apply_pack` as anon answers `42501 permission denied`.
+
+Seeded over `supabase db query` (not a migration — data, not schema): one row in
+`private.platform_admins` (engmlubbad@gmail.com); the owner's personal workspace
+`d0c3b9fc…` on `owner` for a hundred years, `provider='admin'`; his second workspace
+`bf3f7333…` on the same plan with `billing_workspace_id` = the personal one; one
+`plan_set` audit row. The three probe workspaces stay on `pilot`.
+
+Paddle sandbox: the API key answered `GET /products` → 200 with an empty catalogue.
+`node --env-file=.env.local scripts/paddle-sync-prices.mjs` created 4 products and 7
+prices (`pro_01m2n5f7…`, `pri_01m2n5f7…` … `pri_01m2n5f8qdb48jc797fcwk4f92` for the
+pack) and wrote their ids into `plans.provider_prices` / `addon_prices.provider_prices`;
+the second run reported `0 created, 4 updated (0 products, 0 prices created)` — nothing
+duplicated.
+
+Edge functions: `supabase secrets set` from `supabase/functions/.env` added `PADDLE_API_KEY`
+and `PADDLE_ENV=sandbox`; `functions deploy paddle-webhook --no-verify-jwt` and
+`functions deploy billing-portal` both finished. Probed: webhook `GET` → 405, `POST` without a
+signature → 500 `not_configured` (the webhook secret is not set yet — Paddle's notification
+destination needs the deployed URL first); portal `POST` without a bearer → 401.
+
+Preview: `npm run build` with `VITE_PADDLE_ENV=sandbox` (no client token yet) and
+`npm run deploy:preview`. In the browser at `/pricing` behind basic auth: both segments
+render from the live catalogue; the yearly switch shows `$79`/`$199` with «تُدفع $948 /
+$2,388 سنويًا»; `media` and `enterprise` read «تواصل معنا», `enterprise` prices «حسب
+الاتفاق»; the anchor badge sits on `agency`. Screenshots in `.screenshots/` (untracked).
+
+Not yet verified live: a checkout (needs `VITE_PADDLE_CLIENT_TOKEN` and the domain approved
+in Paddle), a webhook delivery (needs `PADDLE_WEBHOOK_SECRET`), the portal session, the
+account page's plan panel and the admin page as the signed-in owner (his session, not ours).

@@ -702,3 +702,18 @@ and `usage_summary` client-side) and C (Paddle checkout, webhook truth, customer
 sandbox-to-live gate) are not started. `docs/pricing.md` was rewritten to the v2 ladder in
 this same session; `docs/decisions.md` carries the six pricing/payment decisions and the
 tax reasoning for choosing Paddle over Stripe direct.
+
+## 2026-09-16 — Parts B and C: pricing page, plan panel, admin page, Paddle sandbox
+
+The web app gained `/pricing` (two segments, yearly switch, anchor, contact CTAs for
+`media`/`enterprise`), a plan panel on the account page (limits, renewal, past-due and
+cancellation notices, upgrade / manage / top-up / contact), and `/admin` for platform
+admins (every workspace, set plan, grant pack). Billing: `billing_events` applied once per
+event under a per-root advisory lock and never backwards; a seven-day past-due sweep to
+`free` on pg_cron; the `paddle-webhook` and `billing-portal` functions; a price-sync script
+that writes Paddle's ids into the tables and creates nothing twice; checkout through
+Paddle.js with the workspace in `custom_data`. Six migrations, the admin seed, the sandbox
+catalogue and both functions are on the live project (see `docs/verification.md`). Live
+keys are not set; `PADDLE_ENV=sandbox` everywhere, and switching is a separate approval.
+Open: the webhook secret, the client token, the sandbox walk-through, and the final
+whole-branch review.
