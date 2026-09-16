@@ -216,23 +216,41 @@ describe("a workspace card", () => {
   });
 
   it("offers to rename, and to retire — the retire door asks first and says what stays", () => {
-    const card = render({ channel: connected });
+    const card = render({ channel: connected, onRetire: () => {} });
     expect(card).toContain(`data-testid="rename-${W1}"`);
     expect(card).toContain(ar.renameWorkspace);
     expect(card).toContain(`data-testid="retire-${W1}"`);
     expect(card).toContain(ar.retireWorkspace);
     expect(card).not.toContain(ar.retireConfirm);
-    const asking = render({ channel: connected, confirmingRetire: true });
+    const asking = render({
+      channel: connected,
+      confirmingRetire: true,
+      onRetire: () => {},
+    });
     expect(asking).toContain(ar.retireConfirm);
     expect(asking).toContain(`data-testid="retire-confirm-${W1}"`);
     // Renaming is a form with the current name in it.
-    const renaming = render({ channel: connected, renaming: true });
+    const renaming = render({
+      channel: connected,
+      renaming: true,
+      onRetire: () => {},
+    });
     expect(renaming).toContain(`data-testid="rename-form-${W1}"`);
     expect(renaming).toContain('value="قناة الأخبار"');
     // Retiring is not offered while the door is only for owners; the card
     // does not know roles, so the page decides — but it is offered without a
     // channel too: a workspace with nothing connected can still be handed over.
-    expect(render({ channel: null })).toContain(`data-testid="retire-${W1}"`);
+    expect(render({ channel: null, onRetire: () => {} })).toContain(
+      `data-testid="retire-${W1}"`,
+    );
+  });
+
+  it("offers no retire door at all when the caller may not retire", () => {
+    const card = render({ onRetire: undefined });
+    expect(card).not.toContain(`data-testid="retire-${W1}"`);
+    expect(card).not.toContain(ar.retireWorkspace);
+    // Rename is unaffected.
+    expect(card).toContain(ar.renameWorkspace);
   });
 
   it("carries its own feedback inside the card, after its action", () => {

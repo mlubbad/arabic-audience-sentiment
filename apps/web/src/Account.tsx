@@ -12,6 +12,7 @@ import { providers, type ProviderId } from "./authProviders";
 import { setupSteps } from "./setup";
 import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
 import { PlanPanel } from "./PlanPanel";
+import { useIsPlatformAdmin } from "./adminAccess";
 import "./report.css";
 
 /**
@@ -62,6 +63,10 @@ export function Account() {
       new URLSearchParams(window.location.search).has("signup"),
   );
   const authProviders = providers(import.meta.env.VITE_AUTH_PROVIDERS, S);
+  // A platform admin has nobody to hand a workspace to but themself, so the
+  // retire door is not offered; retire_workspace refuses them too.
+  const access = useIsPlatformAdmin(session);
+  const mayRetire = access.data !== true;
 
   /**
    * Hand off to a provider.
@@ -505,35 +510,41 @@ export function Account() {
                     confirmingRetire={
                       asking?.ws === w.id && asking.what === "retire"
                     }
-                    onRetire={(step) => {
-                      if (step !== "confirm") {
-                        setAsking(
-                          step === "ask" ? { ws: w.id, what: "retire" } : null,
-                        );
-                        return;
-                      }
-                      setBusy(scope);
-                      setNote(null);
-                      void client
-                        .rpc("retire_workspace", { w: w.id })
-                        .then(({ error }) => {
-                          setBusy(null);
-                          setAsking(null);
-                          if (error) {
-                            say(
-                              scope,
-                              /last_workspace/.test(error.message)
-                                ? S.retireLast
-                                : S.retireFailed,
-                            );
-                            return;
+                    onRetire={
+                      mayRetire
+                        ? (step) => {
+                            if (step !== "confirm") {
+                              setAsking(
+                                step === "ask"
+                                  ? { ws: w.id, what: "retire" }
+                                  : null,
+                              );
+                              return;
+                            }
+                            setBusy(scope);
+                            setNote(null);
+                            void client
+                              .rpc("retire_workspace", { w: w.id })
+                              .then(({ error }) => {
+                                setBusy(null);
+                                setAsking(null);
+                                if (error) {
+                                  say(
+                                    scope,
+                                    /last_workspace/.test(error.message)
+                                      ? S.retireLast
+                                      : S.retireFailed,
+                                  );
+                                  return;
+                                }
+                                // The workspace is no longer the reader's; the list
+                                // reloads without it, so the sentence goes to the page.
+                                say("page", S.retireDone);
+                                setReloads((n) => n + 1);
+                              });
                           }
-                          // The workspace is no longer the reader's; the list
-                          // reloads without it, so the sentence goes to the page.
-                          say("page", S.retireDone);
-                          setReloads((n) => n + 1);
-                        });
-                    }}
+                        : undefined
+                    }
                     confirmingConnect={
                       asking?.ws === w.id && asking.what === "connect"
                     }

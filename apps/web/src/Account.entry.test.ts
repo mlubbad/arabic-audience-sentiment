@@ -24,6 +24,10 @@ vi.mock("./supabase", () => ({
   },
 }));
 
+vi.mock("./adminAccess", () => ({
+  useIsPlatformAdmin: () => ({ data: false }),
+}));
+
 /** The component reads `window.location.search`, and a server render has no
  *  `window` at all — so stubbing `location` alone left the signup screen
  *  unreachable and the test silently rendered the login screen twice. */

@@ -262,10 +262,10 @@ export function WorkspaceCard({
             {S.disconnectChannel}
           </button>
         ))}
-      {/* Handing the workspace over. Not a deletion, and the sentence says so:
-          what was collected stays, under the operator, and the reader's access
-          ends. Two presses, like the disconnect above it. */}
-      {confirmingRetire ? (
+      {/* No handler, no door: the account page passes none to a platform
+          admin, who has nobody to hand a workspace to but themself. The
+          server refuses too (owner_cannot_retire); this is the courtesy. */}
+      {!onRetire ? null : confirmingRetire ? (
         <span
           className="disconnect-confirm"
           role="group"
