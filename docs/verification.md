@@ -2111,3 +2111,22 @@ run as its parts, with the format check scoped to the files this work touched.
 
 Not verified here: the deployed host (no deploy was made in this work — the owner decides
 deploys), Cloudflare's `robots.txt` override, and Core Web Vitals on the CDN.
+
+## 2026-09-17 — the SEO build deployed to the preview, probed from outside
+
+`npm run build` then `npm run deploy:preview` at `50b0f99` (HEAD `50f78c1`, the same
+front end). Transfer log: every file `226`, including the new `app.html`, `sitemap.xml`,
+`en/index.html`, `en/pricing/index.html`, `pricing/index.html`, the two legal pairs, the
+WebP hero and the share image; twenty stale hashed assets removed (`gone`).
+
+| Probe (`curl`, no session) | Actual result |
+| --- | --- |
+| `/`, `/en`, `/pricing`, `/en/pricing`, `/terms`, `/en/privacy-policy` | `200`; `<html lang>` matches the address; each carries its own `<title>`, an `<h1>`, `noindex, nofollow` and its canonical |
+| `/pricing/` (trailing slash) | `200`, same document, canonical `…/pricing` — no `301` from mod_dir |
+| `/dashboard`, `/account` | `200`, 921 bytes: `app.html`, empty root, `noindex` |
+| `/robots.txt` | `200`, **26 bytes — our file**, not the 1836-byte Cloudflare one `deployment.md` recorded; worth re-checking on the day the flag flips |
+| `/sitemap.xml` | `200`, 2954 bytes |
+| `/en/pricing` headers | `x-robots-tag: noindex, nofollow`, `cache-control: no-cache`, `cf-cache-status: DYNAMIC` |
+| `/landing/audience-growth-original.webp` | `200`, `image/webp`, 29,194 bytes |
+| `/landing/og-audience-sentiment.jpg` | `200`, `image/jpeg`, 71,179 bytes |
+| Chromium via Playwright against the live host, `pageerror` + console errors | `/`, `/en`, `/pricing`, `/en/pricing`, `/terms`, `/en/privacy-policy`, `/dashboard`: **0 errors each** — the production bundle hydrates every prerendered page |
