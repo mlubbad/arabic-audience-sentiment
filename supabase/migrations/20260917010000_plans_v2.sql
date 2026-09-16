@@ -25,7 +25,7 @@ alter table public.plans
   alter column channels_limit drop not null,
   alter column members_limit drop not null;
 
--- The ladder. Prices in USD cents; yearly is ten months for twelve.
+-- The ladder. Prices in USD cents; yearly equals 10/24/79/199 a month (docs/pricing-v2-draft.md §2).
 insert into public.plans
   (key, segment, title_ar, title_en, price_monthly_cents, price_yearly_cents, self_serve, sort_order,
    analysis_units, backfill_units, topic_units, insight_reports,
@@ -36,11 +36,11 @@ values
       100,     0,      100,    1,    0,  1,  1,  0,    0,    0),
   ('creator',     'individual', 'منشئ',    'Creator',      1200,  12000, true,  20,
       10000,   40000,  4000,   10,   1,  1,  1,  60,   1440, 1440),
-  ('creator_plus','individual', 'منشئ بلس','Creator Plus', 2900,  29000, true,  30,
+  ('creator_plus','individual', 'منشئ بلس','Creator Plus', 2900,  28800, true,  30,
       30000,   120000, 12000,  50,   2,  2,  1,  30,   720,  1440),
-  ('agency',      'business',   'وكالة',   'Agency',       9900,  99000, true,  40,
+  ('agency',      'business',   'وكالة',   'Agency',       9900,  94800, true,  40,
       150000,  600000, 60000,  200,  10, 10, 5,  15,   360,  720),
-  ('media',       'business',   'ميديا',   'Media',        24900, 249000,false, 50,
+  ('media',       'business',   'ميديا',   'Media',        24900, 238800,false, 50,
       500000,  2000000,200000, 600,  30, 25, 15, 10,   120,  360),
   ('enterprise',  'business',   'مؤسسات',  'Enterprise',   0,     0,     false, 60,
       1000000, 4000000,400000, 2000, 100,100,50, 5,    60,   360),
