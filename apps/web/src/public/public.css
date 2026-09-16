@@ -1,0 +1,349 @@
+/* WOFF2 first (68 kB where the TTF travels at 89 kB even gzipped, and no
+   decompression on the device), the TTF kept as the fallback and the OFL
+   original. The prerender preloads the two WOFF2 files on Arabic pages: the
+   H1 is set in the bold, and a swap after first paint moved it — CLS 0.28
+   on mobile before, measured with Lighthouse on 2026-09-17.
+
+   `swap`, and `optional` was tried the same day (2026-09-17). Measured
+   A/B on a throttled phone (slow 4G, 4× CPU, cold cache, four runs each,
+   `paint-ab.mjs`): FCP = LCP ≈ 2.4 s, CLS 0, the H1 in the web face, for
+   both — identical. The preloaded face is in hand at first paint either
+   way, and with the fallbacks below sized to it a swap would move nothing.
+   The later "LCP" Lighthouse reports is its simulator's estimate; every
+   trace shows observed FCP = observed LCP. `optional` would only take the
+   web face away from a slow first visit for no gain, so `swap` stays. */
+@font-face {
+  font-family: "Audience Arabic";
+  src:
+    url("/landing/arabic-regular.woff2") format("woff2"),
+    url("/landing/arabic-regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Audience Arabic";
+  src:
+    url("/landing/arabic-bold.woff2") format("woff2"),
+    url("/landing/arabic-bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600 900;
+  font-display: swap;
+}
+.landing {
+  /* -------- what this page no longer defines -------------------------
+     It defined a purple of its own, #3b27ba, which is --ml-indigo to the
+     byte: one value under two names, with nothing to say when they drift.
+     And an ink of its own, #22203a, beside --text-1's #14113a — near
+     enough to look like the same decision and far enough to be a second
+     one. Both are gone. The page takes its ink, its accent and its
+     sentiment scale from `brand.css` now, which is where the product's are
+     measured.
+
+     --lp-dark is the one value that stays, because it is the one this page
+     alone uses: the dark band behind the closing section. A shared token
+     with a single caller is not a system, it is a longer name. */
+  --lp-dark: #25223f;
+
+  /* -------- the type scale -------------------------------------------
+     Eight sizes ran down this page — 10, 11, 12, 13, 14, 15, 16, 17 — and
+     the smallest four carried real sentences. Arabic is unforgiving there:
+     the letters join, what distinguishes one from the next is small beside
+     the body of the glyph, and this page sets them in a display face
+     delivered as a .ttf. 10px is not a small size here, it is an
+     unreadable one.
+
+     So: a floor at 13, and four steps instead of eight. The collapse
+     matters as much as the floor — two sizes one pixel apart are not a
+     hierarchy, they are an accident that survived. */
+  --lp-t-xs: 13px; /* was 10 and 11 — captions, legends, tags */
+  --lp-t-sm: 14px; /* was 12 and 13 — secondary lines */
+  --lp-t-md: 16px; /* was 14, 15 and 16 — body */
+  --lp-t-lg: 18px; /* was 17 — lead paragraphs */
+
+  color: var(--text-1);
+  background: #fff;
+  font-family:
+    "Audience Arabic", "Audience Arabic Fallback Naskh",
+    "Audience Arabic Fallback Geeza", "Audience Arabic Fallback Noto Sans",
+    Tahoma, sans-serif;
+  font-size: var(--lp-t-md);
+  line-height: 1.8;
+  overflow: clip;
+}
+.landing * {
+  box-sizing: border-box;
+}
+.landing a {
+  text-decoration: none;
+  color: inherit;
+}
+.landing h1,
+.landing h2,
+.landing h3,
+.landing p {
+  margin: 0;
+}
+.landing h1,
+.landing h2,
+.landing h3 {
+  font-weight: 700;
+}
+.landing h2 {
+  font-size: clamp(30px, 3.7vw, 48px);
+  line-height: 1.4;
+  letter-spacing: -0.9px;
+}
+.landing h3 {
+  /* One size. There were three — 22 here, 20 in the benefits, 19 in the
+     trust panel — for the same element on the same page. */
+  font-size: 20px;
+  line-height: 1.6;
+}
+.landing em {
+  font-style: normal;
+  color: var(--ml-indigo);
+}
+.landing section,
+.landing article,
+.landing form {
+  margin: 0;
+}
+.landing button {
+  font: inherit;
+  margin: 0;
+  min-height: 44px;
+  cursor: pointer;
+}
+/* The same ring as the rest of the product. A landing page that marks focus
+   in its own colour teaches the reader a signal the app then abandons. */
+.landing a:focus-visible,
+.landing button:focus-visible,
+.landing summary:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.landing [id] {
+  scroll-margin-top: 24px;
+}
+.lp-skip {
+  position: absolute;
+  top: -100px;
+  z-index: 10;
+  background: white;
+  padding: 12px;
+}
+.lp-skip:focus {
+  top: 0;
+}
+.lp-announcement {
+  background: var(--lp-dark);
+  color: #fff;
+  text-align: center;
+  font-size: var(--lp-t-sm);
+  padding: 7px 20px;
+}
+.lp-announcement span {
+  margin-inline-start: 18px;
+  color: #d0caff;
+}
+.lp-header {
+  padding: 25px max(5%, calc((100% - 1220px) / 2));
+  /* The same level-2 pane the app shell wears, so the two surfaces are made
+     of one material and a visitor crossing from here into the product does
+     not cross into a different piece of software. The solid comes first, as
+     everywhere: Reduce Transparency turns this back into the white bar it
+     has always been.
+
+     Not pinned, though the app's header is. `.landing` sets `overflow: clip`
+     for its decorative bleed, and clip takes the element out of the scroll
+     chain that `position: sticky` needs — so pinning here did not pin the
+     header, it detached it and left it floating mid-page. The material is
+     the shared thing; where a header sits is the page's own business. */
+  background: var(--glass-2-tint);
+  backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  border: 0;
+  border-bottom: var(--glass-2-edge);
+  box-shadow: var(--glass-2-ring), var(--glass-2-specular);
+  display: flex;
+  gap: 28px;
+  justify-content: space-between;
+  align-items: center;
+}
+.lp-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lp-brand-dot {
+  color: var(--ml-indigo);
+  margin-inline-start: -8px;
+}
+/* The mark is one SVG (BrandMark.tsx). This used to redraw it here with its
+   own rose, #ff5c67 — not the brand's --ml-rose — so a visitor saw one rose
+   on the landing and another inside the product. Now it only sizes the SVG
+   and sets the indigo the `currentColor` bars take. */
+.lp-mark {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  color: var(--ml-indigo);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.lp-nav {
+  display: flex;
+  gap: 28px;
+  font-size: var(--lp-t-sm);
+}
+.lp-nav a:hover,
+.lp-footer nav a:hover {
+  color: var(--ml-indigo);
+}
+.lp-footer {
+  background: #f8f7fb;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  padding: 45px max(6%, calc((100% - 1120px) / 2)) 22px;
+}
+.lp-footer p {
+  font-size: var(--lp-t-sm);
+  color: var(--text-3);
+  margin-top: 10px;
+}
+.lp-footer nav {
+  justify-content: end;
+  align-items: center;
+  font-size: var(--lp-t-sm);
+  gap: 25px;
+}
+/* The legal links: a row of their own across the foot, above the rule.
+   Not folded into the footer nav — that one is three product links; these
+   are three documents, and a reviewer at Google or Paddle scans for them by
+   name. `.lp-footer nav` is `justify-content: end`, so this row is placed
+   explicitly and reads from the text's start like a sentence. */
+.lp-footer .lp-legal {
+  grid-column: 1/-1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: start;
+  gap: 8px 25px;
+  font-size: var(--lp-t-sm);
+  color: var(--text-2);
+}
+.lp-footer-bottom {
+  grid-column: 1/-1;
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #e7e2ee;
+  padding-top: 18px;
+  color: var(--text-3);
+  font-size: var(--lp-t-xs);
+}
+@media (max-width: 900px) {
+  .lp-nav {
+    gap: 13px;
+    font-size: var(--lp-t-xs);
+  }
+  .lp-header {
+    gap: 12px;
+  }
+  .lp-brand {
+    font-size: var(--lp-t-lg);
+  }
+}
+@media (max-width: 650px) {
+  .lp-announcement {
+    font-size: var(--lp-t-xs);
+  }
+  .lp-announcement span {
+    margin-inline-start: 9px;
+  }
+  .lp-header {
+    padding: 18px 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .lp-brand {
+    font-size: var(--lp-t-lg);
+  }
+  .landing .lp-menu {
+    display: block;
+    color: #655a79;
+    background: #f5f2fc;
+    border: 0;
+    padding: 5px 10px;
+    font-size: var(--lp-t-xs);
+    border-radius: 6px;
+    margin-inline-start: auto;
+  }
+  .lp-header-cta {
+    display: none;
+  }
+  .lp-nav {
+    display: none;
+  }
+  .lp-footer {
+    grid-template-columns: 1fr;
+    padding: 35px 25px 20px;
+  }
+  .lp-footer nav {
+    justify-content: start;
+  }
+  .lp-footer-bottom {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* The account CTA is a ui/Button now; only its place in the row is ours. */
+.lp-header .lp-header-cta {
+  white-space: nowrap;
+}
+.lp-header .lp-header-cta span {
+  margin-inline-start: 8px;
+}
+/* The menu button exists only where the nav cannot fit. */
+.landing .lp-menu {
+  display: none;
+}
+@media (max-width: 900px) {
+  .landing .lp-nav {
+    display: none;
+  }
+  .landing .lp-menu {
+    display: inline-flex;
+  }
+  .lp-header .lp-header-cta {
+    display: none;
+  }
+}
+.lp-sheet-title {
+  font-size: var(--lp-t-sm);
+  color: var(--text-3);
+  font-weight: 600;
+}
+.lp-sheet-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.lp-sheet-nav a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-2);
+  font-size: var(--lp-t-md);
+  color: var(--text-1);
+}
+.lp-sheet-nav a:hover {
+  background: var(--bg-muted);
+  color: var(--ml-indigo);
+}
