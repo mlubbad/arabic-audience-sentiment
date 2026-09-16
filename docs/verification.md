@@ -2145,6 +2145,8 @@ WebP hero and the share image; twenty stale hashed assets removed (`gone`).
 | `/robots.txt` | **stale**: the closed 26-byte copy, `cf-cache-status: HIT`, `cache-control: max-age=14400`; a `HEAD` got a `MISS` with the new 188-byte length, a `GET` still the old body. Cloudflare's zone rule overrides the origin's cache headers for `.txt` and the edge holds the old copy; no purge credential here |
 | Fix shipped | `.htaccess` `no-cache` rule now covers `.txt` and `.xml` as well as `.html` and `.json` (`htaccess.test.ts` still green); redeployed. Prevents the next such hold, does not clear this one |
 
-Left to the owner: purge `https://app.sky-develop.net/robots.txt` in the Cloudflare dashboard
-(or wait for the TTL), confirm it reads `Allow: /` with the `Sitemap:` line, then submit the
-sitemap in Search Console.
+The owner purged the Cloudflare cache; fetched again from outside: `/robots.txt` is the
+188-byte open file (`Allow: /`, the five product routes and `/fixtures/` disallowed,
+`Sitemap: https://app.sky-develop.net/sitemap.xml`), `cf-cache-status: MISS`. All three
+indexing signals now agree on the live host. Left to the owner: submit the sitemap in Search
+Console.
