@@ -66,13 +66,19 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
     );
     // A deliberately tiny plan, so allowance behaviour is visible in a few calls.
     await db.query(
-      "insert into plans(key,analysis_units,backfill_units,channels_limit) values ('test-small',5,2,10)",
+      "insert into plans(key,analysis_units,backfill_units,channels_limit,workspaces_limit) values ('test-small',5,2,10,10)",
     );
     await db.query(
       `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
        values ($1,'test-small','active',now()-interval '1 day',now()+interval '29 days'),
               ($2,'test-small','active',now()-interval '1 day',now()+interval '29 days')`,
       [A, B],
+    );
+    // The workspace limit is read from the owner's first workspace — the
+    // personal one the auth trigger made, on free, which allows exactly one.
+    // Those move onto the tiny plan so the cases below may create workspaces.
+    await db.query(
+      "update subscriptions set plan_key='test-small' where plan_key='free'",
     );
   });
   afterAll(async () => {
@@ -636,7 +642,7 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
       db.query("select public.usage_summary($1)", [A]),
     ).rejects.toThrow();
   });
-  it("activates the pilot plan with the workspace", async () => {
+  it("activates the owner's plan with the workspace", async () => {
     await user(ownerA);
     const fresh = await db.query<{ id: string }>(
       "select public.create_workspace('مع خطة') as id",
@@ -646,8 +652,10 @@ describe("foundation SQL in embedded PostgreSQL (not live Supabase)", () => {
       [fresh.rows[0].id],
     );
     // Without this a client could sign up, connect, collect, and then watch
-    // every analysis refused for an entitlement nothing ever granted.
-    expect(summary.rows[0].summary?.plan_key).toBe("pilot");
+    // every analysis refused for an entitlement nothing ever granted. A
+    // workspace created by an owner carries the plan of the owner's home
+    // workspace (test-small here); only a home workspace starts on free.
+    expect(summary.rows[0].summary?.plan_key).toBe("test-small");
   });
   it("says plainly when no plan has been activated", async () => {
     await user(ownerA);
