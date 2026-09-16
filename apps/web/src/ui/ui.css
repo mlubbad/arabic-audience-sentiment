@@ -259,3 +259,60 @@
   max-width: 260px;
   z-index: 50;
 }
+
+.ui-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 10, 46, 0.45);
+  z-index: 60;
+}
+.ui-dialog-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(480px, calc(100vw - var(--space-6)));
+  max-height: calc(100vh - var(--space-7));
+  overflow-y: auto;
+  background: var(--bg-card);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-3);
+  padding: var(--space-6);
+  z-index: 61;
+}
+.ui-dialog-content:focus-visible {
+  outline: none;
+}
+.ui-dialog-title {
+  font-size: var(--fs-h3);
+  color: var(--text-1);
+  margin: 0 0 var(--space-2);
+}
+.ui-dialog-description {
+  color: var(--text-2);
+  margin: 0 0 var(--space-4);
+}
+.ui-dialog-close {
+  position: absolute;
+  top: var(--space-3);
+  /* Radix does not mirror a component's own CSS for it; a corner button
+     positioned with a physical inset property has to be told the direction
+     by hand. The logical property does this in one declaration instead of a
+     [dir="rtl"] override, and does it correctly for a dialog opened inside a
+     Direction context that has flipped independently of the document dir. */
+  inset-inline-end: var(--space-3);
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: var(--space-1);
+}
+.ui-dialog-close:hover {
+  color: var(--text-1);
+}
+.ui-dialog-close:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
