@@ -156,3 +156,28 @@
   background: color-mix(in srgb, var(--sentiment-mixed) 14%, white);
   color: var(--sentiment-mixed);
 }
+
+.ui-input,
+.ui-textarea {
+  width: 100%;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-1);
+  background: var(--bg-card);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  padding: var(--space-2) var(--space-3);
+}
+.ui-input:focus-visible,
+.ui-textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.ui-input[aria-invalid="true"],
+.ui-textarea[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+.ui-textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
