@@ -1606,3 +1606,27 @@ read off a screenshot failed 401 on every auth style — a misread `I`/`l`; the 
 correct.) The key is in the gitignored `.env.local`; `scripts/worker-service.sh` now exports
 `GEMINI_API_KEY` when set. The service was NOT restarted: with credits at zero every analyse
 job would end `partial / gemini_rate_limited` on the hour.
+
+## 2026-09-16 — a failed sentiment verdict is retried: PGlite, mutation-checked
+
+`supabase/tests/prediction_retry.test.ts`, four tests against every migration through
+`20260916020000` in PGlite. Seen red first, without the new migration on disk: "replaces
+the failed verdict with the retry's success" failed with the row still `{status: failed,
+label: null}`; "adopts the retried success" failed with `active_analysis_key` null; "never
+overwrites a final verdict" failed for the same reason as the first (the success it depends
+on had been dropped). After the migration: 4 passed.
+
+Mutations, each applied to the new migration, run, and the file restored byte-identical
+from a scratchpad copy (`diff` empty) — never `git checkout`:
+
+| Mutation | Test that went red |
+| --- | --- |
+| Drop `where public.sentiment_predictions.status = 'failed'` from the conflict clause | "never overwrites a final verdict with a later attempt" — the later `failed` overwrote the success |
+| Drop the `adopt_first_analysis_on_update` trigger | "adopts the retried success as the channel's first analysis" — key stayed null |
+
+Gates at this head: `npm run test:db` **207 passed, 21 files** (202 before); `tsc --noEmit`
+exit 0; `eslint` and `prettier --check` clean on the new test.
+
+Not live-tested: the migration is not applied to the linked project. It joins the queue
+of unapplied migrations listed in `docs/coordination/ACTIVE.md`, and should be pushed
+after `20260916010000`–`012000` since it follows them in order.

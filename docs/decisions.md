@@ -330,3 +330,31 @@ The first working key answered a 2.5 request with 404 "no longer available to ne
 gemini-3.6-flash". The pin lives in one place (`workers/python/src/topics/gemini.py`); the
 classification key changes with it (`topics:v1+gemini-3.6-flash+p1`), which is what the key is
 for. Nothing was classified under 2.5 anywhere, so nothing is orphaned.
+
+## 2026-09-16 — a failed sentiment verdict is retried
+
+- **A sentiment retry may overwrite only a `failed` verdict — the same rule as topics.**
+  `commit_batch`'s prediction insert now conflicts with `do update ... where
+  public.sentiment_predictions.status = 'failed'` rather than `do nothing`. A `succeeded`,
+  `skipped` or `unsupported` row is final and a later attempt never touches it, matching
+  how `comment_analysis` is metered once ever per comment. This closes the follow-up the
+  topic-classification entry above left open. The update also takes the retry's
+  `analysis_run_id` and resets `predicted_at`, so the stored row points at the run that
+  actually produced the verdict it now carries.
+- **Adoption on update is a second trigger, not a rewrite of the first.**
+  `adopt_first_analysis_on_update` (`after update ... referencing new table ... for each
+  statement`) calls the existing `private.adopt_first_analysis()` unchanged; the function
+  already filters on `status = 'succeeded'` and `active_analysis_key is null`, so a
+  failed-to-failed update adopts nothing and an already-adopted channel is never swapped.
+  Mirrors `adopt_first_topic_classification_on_update` in `20260916011000`.
+- **Rebuilt from `20260914070000`, not `20260913220000`.** The task named the latter as the
+  current definition; `grep 'create or replace function private.commit_batch'` shows the
+  former is later and adds the `sync_runs` block. Starting from `20260913220000` would have
+  silently reverted that — the exact failure `docs/coordination/ACTIVE.md` records for
+  `worker_finish` on 2026-09-14. The new migration's body is the current one plus one
+  clause, verified by `diff`.
+- **The `failed` row's `analysis_runs` row is still written as `succeeded`.** Pre-existing
+  and unchanged here: a run row's status describes the run, and the worker reports a run
+  that produced verdicts, some failed. Narrowing this migration to the conflict clause keeps
+  the diff reviewable; if run status should reflect per-verdict failure that is its own
+  decision.

@@ -596,3 +596,30 @@ migrations, and the preview build (`1c9c4eb`) — in the recorded order. The das
 `no_topic_classifier`, as designed. Remaining to see topics: lift the key's API restriction in
 the Google Cloud console, export `GEMINI_API_KEY` from `scripts/worker-service.sh`, restart the
 service. `docs/verification.md` has the byte-level checks.
+
+## 2026-09-16 — a failed sentiment verdict is retried
+
+`private.commit_batch` stored predictions with `on conflict ... do nothing` on the natural
+key (workspace, comment, text, analysis key). A verdict that failed took that key, so the
+retry that finally succeeded was dropped — after `reserve_usage` had already charged for
+it, and without the insert-only `adopt_first_analysis` trigger ever seeing a success. The
+topic layer had the identical defect and fixed it in `20260916011000`; `docs/decisions.md`
+had recorded the sentiment twin as a known follow-up.
+
+`supabase/migrations/20260916020000_a_failed_verdict_is_retried.sql` rebuilds
+`commit_batch` from its *current* definition — `20260914070000`, which carries the
+`sync_runs` open/accumulate block, not `20260913220000` as first thought — with one change:
+the predictions insert's conflict clause becomes `do update ... where
+public.sentiment_predictions.status = 'failed'`, so only a failure is ever overwritten. A
+companion `adopt_first_analysis_on_update` statement trigger lets a retry that is the
+channel's first success be adopted, exactly as `adopt_first_topic_classification_on_update`
+does for topics. The diff of the function body against `20260914070000` is that one clause.
+
+`supabase/tests/prediction_retry.test.ts` (four tests, harness copied from
+`ingestion.test.ts`) commits a `failed` verdict, then the same comment/hash/key `succeeded`,
+and asserts the row now reads `succeeded`, is charged once, and is adopted; then a later
+`failed` and a later `succeeded` with a different label leave it untouched. Three of the
+four were seen red against the unfixed function before the migration was written — the
+row still `failed`, the channel still unadopted — and all four pass after it. `npm run
+test:db`: **207 passed, 21 files** (202 before). Mutation and gate results are in
+`docs/verification.md`.
