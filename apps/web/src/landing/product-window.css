@@ -1,0 +1,205 @@
+/* The product window: one frame, two modes. Every colour is a token; the
+   four sentiment marks are the same four the dashboard paints. */
+.pw {
+  --pw-radius: var(--radius-3);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--pw-radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  font-size: var(--lp-t-sm);
+}
+.pw-chrome {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-muted);
+  border-bottom: 1px solid var(--border-1);
+}
+.pw-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+.pw-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-2);
+}
+.pw-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.pw-brand .lp-mark {
+  width: 18px;
+  height: 18px;
+}
+.pw-caption {
+  margin-inline-start: auto;
+  color: var(--text-3);
+  font-size: var(--lp-t-xs);
+}
+.pw-body.ui-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.pw-label {
+  font-size: var(--lp-t-xs);
+  font-weight: 700;
+  color: var(--text-3);
+}
+.pw-figures {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) 1fr;
+  gap: var(--space-3);
+}
+.pw-figure.ui-card {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.pw-figure strong {
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--text-1);
+}
+.pw-figure span {
+  color: var(--text-3);
+  font-size: var(--lp-t-xs);
+}
+.pw-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-muted);
+}
+.pw-seg {
+  flex-basis: 0;
+  min-width: 0;
+}
+.pw-seg.positive {
+  background: var(--sentiment-positive);
+}
+.pw-seg.negative {
+  background: var(--sentiment-negative);
+}
+.pw-seg.mixed {
+  background: var(--sentiment-mixed);
+}
+.pw-seg.neutral {
+  background: var(--sentiment-neutral);
+}
+.lp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--lp-t-xs);
+  color: var(--text-2);
+}
+.lp-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lp-legend b {
+  color: var(--text-1);
+}
+.lp-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sentiment-neutral);
+}
+.lp-dot.positive {
+  background: var(--sentiment-positive);
+}
+.lp-dot.negative {
+  background: var(--sentiment-negative);
+}
+.lp-dot.mixed {
+  background: var(--sentiment-mixed);
+}
+.pw-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.pw-filters--still span {
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--text-2);
+}
+.pw-filters--still span.is-active {
+  background: var(--ml-indigo-50);
+  color: var(--ml-indigo);
+  font-weight: 700;
+}
+.pw-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.lp-example-comment {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+}
+.lp-example-comment p {
+  margin: 0;
+  color: var(--text-1);
+  font-size: var(--lp-t-sm);
+  line-height: 1.6;
+}
+.pw-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--ink-on-dark);
+  background: var(--sentiment-neutral);
+}
+.pw-avatar.positive {
+  background: var(--sentiment-positive);
+}
+.pw-avatar.negative {
+  background: var(--sentiment-negative);
+}
+.pw-avatar.mixed {
+  background: var(--sentiment-mixed);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pw-seg {
+    transition: flex-grow 240ms ease;
+  }
+}
+@media (max-width: 520px) {
+  .pw-figures {
+    grid-template-columns: 1fr;
+  }
+  .lp-example-comment {
+    grid-template-columns: 32px 1fr;
+  }
+  .lp-example-comment .ui-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
