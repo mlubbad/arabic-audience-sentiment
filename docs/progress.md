@@ -758,3 +758,12 @@ What remains before live keys are set:
    plan's title rather than its key.
 4. The `20260917060000` migration itself is not on the live project yet: `supabase db push`
    after the controller's review, then the admin page's override against the live owner rows.
+
+## 2026-09-16 — plans are named, not keyed
+
+`pilot` is titled «شريك مؤسِّس» / "Founding Partner" (the key stays: five applied
+migrations and every early subscription reference it). The rail card, the plan panel and
+the admin select all show `title_ar`/`title_en` by the reader's locale — the admin page
+through a new admin-only `admin_plan_catalogue()` that includes the internal plans. The
+`planTitle` string and `INTERNAL_PLAN_KEYS` are gone. A plan granted for a century says
+«بلا تاريخ انتهاء» instead of a renewal year. Applied live and seen on the preview.

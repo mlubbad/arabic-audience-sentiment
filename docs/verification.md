@@ -1903,3 +1903,17 @@ fixed)` and, on the next run, `0 tax modes fixed`; `GET /prices/pri_01m2n5f8qdb4
 answers `tax_mode: external`, amount 500 — the pack and the six subscription prices now
 sell at the listed price with tax on top. The preview was rebuilt and redeployed with the
 pricing page's "manage" rule for a Paddle subscriber.
+
+## 2026-09-16 — the pilot plan is the Founding Partner, named in the reader's language
+
+`20260917070000_pilot_is_founding_partner.sql` pushed alone (`db push --linked`): the
+`pilot` row's titles are «شريك مؤسِّس» / "Founding Partner"; `admin_plan_catalogue()`
+returns every plan for an admin and `forbidden` for anyone else (PGlite-tested). On the
+preview, signed in as the pilot-plan probe `connect-probe-1789332387@`: the rail card reads
+«مساحة العمل الشخصية | شريك مؤسِّس | تحليل التعليقات: يتبقى 25,000 من 25,000» and the
+plan panel «شريك مؤسِّس · تتجدد في 2026-12-13»; after the language switch, "Founding
+Partner · Renews on 2026-12-13" and "Comment analysis: 25,000 of 25,000 left". No surface
+prints a plan key any more (`planTitle` is gone from both locales); the admin select
+offers titles from `admin_plan_catalogue()`. An open-ended plan (a period ending more than
+fifty years out) reads «بلا تاريخ انتهاء» — unit-tested; the probe's period is a real
+ninety days, so its date is the true one.
