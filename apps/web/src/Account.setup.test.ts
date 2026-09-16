@@ -162,6 +162,36 @@ describe("a workspace card", () => {
     }
   });
 
+  it("asks before it leaves for Google, on both the connect and the relink door", () => {
+    // Not connected yet: the connect button asks first; the redirect itself
+    // never fires from a bare render (onConnect only ever receives the step).
+    const asking = render({ hasClient: true, channel: null });
+    expect(asking).toContain(`data-testid="connect-${W1}"`);
+    expect(asking).not.toContain(ar.connectAboutGoogle);
+    const confirmingConnect = render({
+      hasClient: true,
+      channel: null,
+      confirmingConnect: true,
+    });
+    expect(confirmingConnect).toContain(ar.connectAboutGoogle);
+    expect(confirmingConnect).toContain(ar.connectContinueToGoogle);
+    expect(confirmingConnect).toContain(ar.renameCancel);
+    // The relink door goes through the same question — it is the same
+    // redirect, and the same two Google warnings wait on the other side.
+    // The relink door hides behind the same question, and reappears once
+    // the reader steps back from it.
+    const relinkAsking = render({
+      channel: { ...connected, handle: null, title: null },
+    });
+    expect(relinkAsking).toContain(`data-testid="relink-${W1}"`);
+    const relinking = render({
+      channel: { ...connected, handle: null, title: null },
+      confirmingConnect: true,
+    });
+    expect(relinking).not.toContain("relink-");
+    expect(relinking).toContain(ar.connectAboutGoogle);
+  });
+
   it("offers to disconnect exactly while a channel is connected, and asks first", () => {
     // Connected: the way out sits beside the way to the catalogue, and it is
     // a two-step door — the first press asks, the second disconnects.

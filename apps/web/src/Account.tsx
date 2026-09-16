@@ -136,7 +136,7 @@ export function Account() {
   // one reader, and two open confirmations would be two ways to press wrong.
   const [asking, setAsking] = useState<{
     ws: string;
-    what: "disconnect" | "rename" | "retire";
+    what: "connect" | "disconnect" | "rename" | "retire";
   } | null>(null);
   useEffect(() => {
     if (!supabase || !session) {
@@ -534,10 +534,25 @@ export function Account() {
                           setReloads((n) => n + 1);
                         });
                     }}
-                    onConnect={() => {
+                    confirmingConnect={
+                      asking?.ws === w.id && asking.what === "connect"
+                    }
+                    onConnect={(step) => {
+                      // The redirect goes to Google, which shows its own two
+                      // warnings while this application is pending Google's
+                      // review — the question here says so before the reader
+                      // ever leaves this page, rather than after they land on
+                      // an alarming screen with no context.
+                      if (step !== "continue") {
+                        setAsking(
+                          step === "ask" ? { ws: w.id, what: "connect" } : null,
+                        );
+                        return;
+                      }
                       if (!workspaceClient) return;
                       setBusy(scope);
                       setNote(null);
+                      setAsking(null);
                       void beginConnect(w.id, workspaceClient.id).then(
                         (out) => {
                           setBusy(null);

@@ -132,6 +132,9 @@ export const en: Strings = {
     "The workspace is retired and now belongs to the service operator.",
   retireLast: "Your last workspace cannot be retired; create another first.",
   retireFailed: "The workspace could not be retired.",
+  connectAboutGoogle:
+    "This opens a Google page. Because this application is pending a Google security review, you may see a warning that the app is not verified — that is expected and not a sign of risk. Click “Advanced”, then “Go to … (unsafe)”, then “Continue” to finish connecting the channel.",
+  connectContinueToGoogle: "Continue to Google",
   connectChannel: "Connect a YouTube channel",
   relinkForName: "Reconnect to store the channel's name",
 

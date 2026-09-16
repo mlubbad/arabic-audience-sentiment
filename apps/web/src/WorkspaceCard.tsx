@@ -36,6 +36,7 @@ export function WorkspaceCard({
   pending,
   feedback,
   onConnect,
+  confirmingConnect = false,
   confirmingDisconnect = false,
   onDisconnect,
   renaming = false,
@@ -51,7 +52,11 @@ export function WorkspaceCard({
   pending: boolean;
   /** What this card has to say for itself — its own note, or that it is working. */
   feedback: ReactNode;
-  onConnect: () => void;
+  /** `ask` opens the "you're about to leave for Google" question; `continue`
+   *  actually starts the redirect; `cancel` closes the question without one. */
+  onConnect: (step: "ask" | "continue" | "cancel") => void;
+  /** The connect/relink question is open; the page holds this state per card. */
+  confirmingConnect?: boolean;
   /** The first press only asks; the page holds that state per card. */
   confirmingDisconnect?: boolean;
   /** `ask` opens the question, `confirm` disconnects, `keep` closes it. */
@@ -158,12 +163,12 @@ export function WorkspaceCard({
           {S.chooseVideos}
         </a>
       )}
-      {hasClient && channel?.status !== "connected" && (
+      {hasClient && channel?.status !== "connected" && !confirmingConnect && (
         <button
           type="button"
           disabled={pending}
           data-testid={`connect-${workspace.id}`}
-          onClick={onConnect}
+          onClick={() => onConnect("ask")}
         >
           {S.connectChannel}
         </button>
@@ -178,16 +183,45 @@ export function WorkspaceCard({
       {hasClient &&
         channel?.status === "connected" &&
         !channel.title &&
-        !channel.handle && (
+        !channel.handle &&
+        !confirmingConnect && (
           <button
             type="button"
             disabled={pending}
             data-testid={`relink-${workspace.id}`}
-            onClick={onConnect}
+            onClick={() => onConnect("ask")}
           >
             {S.relinkForName}
           </button>
         )}
+      {/* Both doors above lead to the same redirect and the same two Google
+          warning screens (the app is pending Google's own review of the
+          scope it asks for); the question is asked once, here, rather than
+          split across two copies of the same panel. */}
+      {confirmingConnect && (
+        <span
+          className="disconnect-confirm"
+          role="group"
+          aria-label={S.connectChannel}
+        >
+          <span>{S.connectAboutGoogle}</span>
+          <button
+            type="button"
+            disabled={pending}
+            data-testid={`connect-continue-${workspace.id}`}
+            onClick={() => onConnect("continue")}
+          >
+            {S.connectContinueToGoogle}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onConnect("cancel")}
+          >
+            {S.renameCancel}
+          </button>
+        </span>
+      )}
       {/* The way out, offered only while there is a grant to withdraw. Two
           presses on purpose: disconnecting stops every scheduled read and
           revokes the stored grant, and a single button beside "choose videos"
