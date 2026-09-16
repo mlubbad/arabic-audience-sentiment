@@ -4,6 +4,7 @@ export default defineConfig({
     include: [
       "packages/**/*.test.ts",
       "apps/**/*.test.ts",
+      "apps/**/*.test.tsx",
       "supabase/tests/**/*.test.ts",
       "scripts/**/*.test.ts",
     ],
