@@ -35,22 +35,28 @@ row moves:
   rule retire already enforces; a signed-in person always has a workspace to stand in.
 - `billing_root` if any *other* workspace's `subscriptions.billing_workspace_id` points at
   it — deleting a root would orphan every subscription billed under it.
-- `paddle_subscription_active` if its own subscription has `provider = 'paddle'` and
-  `status = 'active'` — Paddle would keep billing a workspace that no longer exists; cancel
-  in Paddle first (the existing `set_workspace_plan` refusal uses the same code, and
-  `adminErrorMessage` already maps it).
+- `paddle_subscription_active` if it is its own billing root (`billing_workspace_id is
+  null`) and its own subscription has `provider = 'paddle'` and `status in ('active',
+  'past_due')` — a client workspace copies its root's provider/status at creation and on
+  every webhook (`create_workspace_impl`, `apply_billing_event`), so checking the row
+  without the root guard would refuse every client of a Paddle-paying agency, not just the
+  root Paddle actually bills. Cancel in Paddle first (the existing `set_workspace_plan`
+  refusal uses the same code, and `adminErrorMessage` already maps it).
 
 Then it deletes, leaves first, every row that references the workspace — the order below
 is the real FK graph, read from the migrated schema with a probe, not reconstructed by
 hand — and finally the workspace. Nothing is `on delete cascade` except `worker_seen`, so
-every step is explicit. `audit_events` for the workspace go too (their FK is `not null`
-and there is no workspace left to hang them on); the deletion itself is recorded as an
-`audit_events` row **on the admin's own home workspace**, `action = 'workspace_deleted'`,
-`target_id = <deleted workspace id>` — so the fact that it happened, who did it and when,
-survives the rows it removed.
+every step is explicit. `private.billing_events` is the one exception to "deletes": its
+`workspace_id` is set to `null` rather than the row being removed, so the webhook trail a
+chargeback dispute needs survives the workspace it was about. `audit_events` for the
+workspace go too (their FK is `not null` and there is no workspace left to hang them on);
+the deletion itself is recorded as an `audit_events` row **on the admin's own home
+workspace**, `action = 'workspace_deleted'`, `target_id = <deleted workspace id>` — so the
+fact that it happened, who did it and when, survives the rows it removed.
 
 ```
-private.billing_events, private.worker_credentials,
+private.billing_events (detached, workspace_id set to null — not deleted),
+private.worker_credentials,
 public.sentiment_predictions, public.analysis_runs,
 private.oauth_states, private.oauth_connections,
 private.job_batches, public.jobs, public.sync_runs, public.video_selections,
@@ -86,7 +92,9 @@ door only, and the privacy policy's "request deletion by email" path is what a c
   as the platform owner → `owner_cannot_retire`; delete as a non-admin → `forbidden`; delete
   a workspace that is another's billing root → `billing_root`, and every row still there;
   delete a workspace with an active Paddle subscription → `paddle_subscription_active`;
-  delete the admin's own last workspace → `last_workspace`; and the real case — a workspace
+  delete a *client* of a Paddle-paying root → allowed (the root's own status is not the
+  client's to be refused on), while the root itself is still refused; delete the admin's
+  own last workspace → `last_workspace`; and the real case — a workspace
   with a channel, videos, comments, predictions, reviews, jobs, grants, a subscription —
   deleted, then `count(*)` is 0 in every table for that id, the audit row is on the admin's
   home, and every other workspace's rows are untouched (counted before and after).

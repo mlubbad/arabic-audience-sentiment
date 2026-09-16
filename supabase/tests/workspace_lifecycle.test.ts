@@ -14,6 +14,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 const OWNER = "10000000-0000-4000-8000-000000000001";
 const ADMIN = "10000000-0000-4000-8000-00000000000a";
 const OTHER = "10000000-0000-4000-8000-00000000000b";
+const PADROOT = "10000000-0000-4000-8000-00000000000c";
 let db: PGlite;
 const as = async (user: string) => {
   await db.exec("reset role");
@@ -43,7 +44,7 @@ describe("workspace lifecycle", () => {
       .sort())
       await db.exec(readFileSync(`supabase/migrations/${f}`, "utf8"));
     await db.exec("reset role");
-    for (const u of [ADMIN, OWNER, OTHER])
+    for (const u of [ADMIN, OWNER, OTHER, PADROOT])
       await db.query("insert into auth.users(id) values ($1)", [u]);
     await db.query("insert into private.platform_admins(user_id) values ($1)", [
       ADMIN,
@@ -282,8 +283,11 @@ describe("workspace lifecycle", () => {
         "select id from workspaces where name='paid'",
       )
     ).rows[0].id;
+    // 'paid' was created after OWNER's home existed, so create_workspace_impl
+    // made it a client billing under that home; null the pointer to make it
+    // a root in its own right, the case this refusal is actually about.
     await db.query(
-      "update subscriptions set provider='paddle', provider_ref='sub_1', status='active' where workspace_id=$1",
+      "update subscriptions set provider='paddle', provider_ref='sub_1', status='active', billing_workspace_id=null where workspace_id=$1",
       [paid],
     );
     await as(ADMIN);
@@ -325,6 +329,64 @@ describe("workspace lifecycle", () => {
       [otherHome],
     );
     expect(otherHomeStill.rows[0].n).toBe(1);
+  });
+
+  it("delete_workspace refuses paddle_subscription_active only for the billing root, not for its clients", async () => {
+    // PADROOT is a fresh root with no client workspaces yet, so the
+    // billing_root refusal cannot pre-empt the paddle check below.
+    const root = await home(PADROOT);
+    // 'agency' carries a workspaces_limit above one, so PADROOT can create a
+    // second (client) workspace below.
+    await db.query(
+      "update subscriptions set provider='paddle', status='active', plan_key='agency' where workspace_id=$1",
+      [root],
+    );
+    await as(PADROOT);
+    await db.query("select create_workspace('padroot client')");
+    await db.exec("reset role");
+    const client = (
+      await db.query<{ id: string }>(
+        "select id from workspaces where name='padroot client'",
+      )
+    ).rows[0].id;
+    const clientSub = await db.query<{
+      billing_workspace_id: string;
+      provider: string;
+      status: string;
+    }>(
+      "select billing_workspace_id,provider,status from subscriptions where workspace_id=$1",
+      [client],
+    );
+    // The client row copied the root's provider/status verbatim
+    // (create_workspace_impl), which is exactly the trap the root-only guard
+    // avoids.
+    expect(clientSub.rows[0]).toEqual({
+      billing_workspace_id: root,
+      provider: "paddle",
+      status: "active",
+    });
+
+    await as(ADMIN);
+    await db.query("select delete_workspace($1)", [client]);
+    await db.exec("reset role");
+    const clientGone = await db.query<{ n: number }>(
+      "select count(*) n from workspaces where id=$1",
+      [client],
+    );
+    expect(clientGone.rows[0].n).toBe(0);
+
+    // The root itself is still refused — now with nothing billing under it,
+    // so the refusal is paddle_subscription_active, not billing_root.
+    await as(ADMIN);
+    await expect(
+      db.query("select delete_workspace($1)", [root]),
+    ).rejects.toThrow(/paddle_subscription_active/);
+    await db.exec("reset role");
+    const rootStill = await db.query<{ n: number }>(
+      "select count(*) n from workspaces where id=$1",
+      [root],
+    );
+    expect(rootStill.rows[0].n).toBe(1);
   });
 
   it("delete_workspace removes every row of one workspace, no row of another, and records the act on the admin's home", async () => {
@@ -387,7 +449,19 @@ describe("workspace lifecycle", () => {
         `insert into audit_events(workspace_id,actor_id,action,target_type,target_id) values ($1,$2,'seeded','test','x')`,
         [w, OWNER],
       );
+      // A webhook's trail: detached, not deleted, so a chargeback dispute
+      // raised after the workspace is gone still has something to read.
+      await db.query(
+        `insert into private.billing_events(event_id,event_type,occurred_at,workspace_id,outcome,payload)
+         values ($2,'subscription.created',now(),$1,'applied','{}'::jsonb)`,
+        [w, `evt-${w}`],
+      );
     }
+    const totalBillingEvents = (
+      await db.query<{ n: string }>(
+        "select count(*) n from private.billing_events",
+      )
+    ).rows[0].n;
     const tables = [
       "channels",
       "private.oauth_connections",
@@ -433,6 +507,16 @@ describe("workspace lifecycle", () => {
 
     for (const t of tables) expect(await count(t, d), t).toBe(0);
     for (const t of tables) expect(await count(t, n), t).toBe(before[t]);
+    // billing_events is detached, not deleted: no row still names the
+    // deleted workspace, but the rows themselves — the webhook trail — are
+    // all still there, by id, for later chargeback disputes.
+    expect(await count("private.billing_events", d)).toBe(0);
+    const billingEventsAfter = (
+      await db.query<{ n: string }>(
+        "select count(*) n from private.billing_events",
+      )
+    ).rows[0].n;
+    expect(billingEventsAfter).toBe(totalBillingEvents);
     const adminHome = await home(ADMIN);
     const a = await db.query<{
       action: string;
@@ -489,5 +573,8 @@ describe("workspace lifecycle", () => {
       db.query("delete from audit_events where workspace_id=$1", [g]),
     ).rejects.toThrow(/permission denied/);
     await db.exec("reset role");
+    // Session-wide GUC, left set by the query above (set_config's third
+    // argument is false): reset so it does not leak into a later test.
+    await db.query("select set_config('app.deleting_workspace','',false)");
   });
 });

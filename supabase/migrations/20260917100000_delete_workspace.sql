@@ -115,14 +115,23 @@ declare me uuid; my_home uuid; begin
     raise exception 'last_workspace' using errcode='55000'; end if;
   if exists (select 1 from public.subscriptions s where s.billing_workspace_id = w and s.workspace_id <> w) then
     raise exception 'billing_root' using errcode='55000'; end if;
-  if exists (select 1 from public.subscriptions s where s.workspace_id = w and s.provider = 'paddle' and s.status in ('active','past_due')) then
+  -- A client workspace's own row copies provider/status from its billing
+  -- root (create_workspace_impl, apply_billing_event): checking it here
+  -- without this guard would refuse every client of a Paddle-paying root,
+  -- not just the root itself. billing_workspace_id is null exactly on the
+  -- workspace that bills itself — the same test set_workspace_plan's own
+  -- Paddle refusal reaches via private.billing_root(w) = w.
+  if exists (select 1 from public.subscriptions s where s.workspace_id = w and s.billing_workspace_id is null and s.provider = 'paddle' and s.status in ('active','past_due')) then
     raise exception 'paddle_subscription_active' using errcode='55000'; end if;
 
   -- Opens the append-only guard for this workspace's rows, this transaction only.
   perform set_config('app.deleting_workspace', w::text, true);
 
   -- Leaves first. The order is the FK graph of the migrated schema.
-  delete from private.billing_events where workspace_id = w;
+  -- billing_events is detached, not deleted: the column is nullable and the
+  -- webhook trail (what Paddle told this database, and when) must survive a
+  -- chargeback dispute raised after the workspace is gone.
+  update private.billing_events set workspace_id = null where workspace_id = w;
   delete from private.worker_credentials where workspace_id = w;
   delete from public.sentiment_predictions where workspace_id = w;
   delete from public.topic_predictions where workspace_id = w;
