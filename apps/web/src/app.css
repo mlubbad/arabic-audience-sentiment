@@ -670,34 +670,6 @@
   margin: 1.4rem auto 1.6rem;
   text-align: start;
 }
-.setup-step-state {
-  display: inline-flex;
-  align-items: center;
-  min-width: 5.6rem;
-  padding: 0.1rem 0.55rem;
-  border-radius: var(--r-pill);
-  background: var(--bg-muted);
-  color: var(--text-2);
-  font-size: 0.72rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-[data-status="done"] > .setup-step-state {
-  background: var(--success-100);
-  color: var(--color-success);
-}
-[data-status="next"] > .setup-step-state {
-  background: var(--ml-indigo-100);
-  color: var(--ml-indigo);
-}
-[data-status="pending"] > .setup-step-state {
-  background: var(--ml-yellow-100);
-  color: var(--color-warning);
-}
-[data-status="attention"] > .setup-step-state {
-  background: var(--ml-rose-100);
-  color: var(--color-danger);
-}
 /* A message where the action was, not above the page. */
 .account-feedback {
   width: 100%;

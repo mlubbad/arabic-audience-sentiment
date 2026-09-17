@@ -70,16 +70,16 @@
 .setup-step[data-status="done"] > .setup-step-state {
   color: var(--color-success);
 }
-.setup-step[data-status="next"] > .setup-step-state {
+.setup-step[data-status="next"] > .setup-step-state,
+.setup-step[data-status="pending"] > .setup-step-state {
+  /* "pending" is a queued or running job — progress under way, the same
+     story as "next" — not a problem, so it takes the same indigo rather
+     than the warning tone. */
   color: var(--ml-indigo);
 }
 .setup-step[data-status="later"] > .setup-step-state {
   color: var(--text-3);
 }
-/* "pending" (a queued or running job) and "attention" (something the reader
-   must act on) both read as "keep an eye on this one" — the state word
-   itself says which; the tone is the one warning colour brand.css carries. */
-.setup-step[data-status="pending"] > .setup-step-state,
 .setup-step[data-status="attention"] > .setup-step-state {
   color: var(--color-warning);
 }

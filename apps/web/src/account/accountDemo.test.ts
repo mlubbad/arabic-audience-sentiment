@@ -273,4 +273,31 @@ describe("reduceAccountDemo: create", () => {
     reduceAccountDemo(state, { type: "create", name: "مساحة رابعة" });
     expect(JSON.stringify(state)).toBe(before);
   });
+
+  it("never reuses an id a retire freed up", async () => {
+    const state = await loaded();
+    // Retiring A2 drops the workspace count to two while "a3" is still in
+    // use — a length-based next id would have handed the new workspace "a3"
+    // right back, colliding with the one still on the list.
+    const afterRetire = reduceAccountDemo(state, { type: "retire", w: A2 });
+    const existingIds = new Set(afterRetire.workspaces.map((w) => w.id));
+
+    const afterCreate1 = reduceAccountDemo(afterRetire, {
+      type: "create",
+      name: "مساحة جديدة 1",
+    });
+    const created1 =
+      afterCreate1.workspaces[afterCreate1.workspaces.length - 1];
+    expect(existingIds.has(created1.id)).toBe(false);
+
+    const afterCreate2 = reduceAccountDemo(afterCreate1, {
+      type: "create",
+      name: "مساحة جديدة 2",
+    });
+    const created2 =
+      afterCreate2.workspaces[afterCreate2.workspaces.length - 1];
+    const allIds = afterCreate2.workspaces.map((w) => w.id);
+    expect(created2.id).not.toBe(created1.id);
+    expect(new Set(allIds).size).toBe(allIds.length);
+  });
 });
