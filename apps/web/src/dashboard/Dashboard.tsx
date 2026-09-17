@@ -12,13 +12,11 @@ import {
   PointElement,
   Tooltip,
 } from "chart.js";
-import { Bar, Doughnut, Line } from "react-chartjs-2";
 import "../report.css";
 import "./dashboard.css";
-import { byHour, byWeek, byWeekday, commenters, plottable } from "../analytics";
+import { byHour, byWeek, byWeekday, commenters } from "../analytics";
 import { pageSlice } from "../videoPaging";
 import {
-  UNCLASSIFIED,
   type Filters,
   type Label,
   type LabelledComment,
@@ -48,16 +46,8 @@ import { describeSource } from "../dataSource";
 import { useChannelStatus } from "../channelStatus";
 import { latestJobFromSync, setupProgress } from "../setup";
 import { SetupPath } from "../SetupPath";
-import {
-  AXIS_TEXT,
-  GRID_LINE,
-  SENTIMENT,
-  UNMEASURABLE,
-  VOLUME,
-  VOLUME_FILL,
-} from "../chartTheme";
+import { SENTIMENT } from "../chartTheme";
 import { n } from "./format";
-import { barOptions, doughnutOptions, lineOptions } from "./chartOptions";
 import { FilterBar } from "./FilterBar";
 import { ActiveFilters } from "./ActiveFilters";
 import { Hero } from "./Hero";
@@ -65,6 +55,8 @@ import { SectionNav, useActiveSection } from "./SectionNav";
 import { Provenance } from "./Provenance";
 import { Summary } from "./Summary";
 import { Videos } from "./Videos";
+import { Voice } from "./Voice";
+import { Timing } from "./Timing";
 import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
 import {
   chipsFor,
@@ -83,51 +75,6 @@ ChartJS.register(
   Tooltip,
   Legend,
 );
-
-/**
- * The numbers a canvas cannot say.
- *
- * Chart.js draws into a <canvas>, which is a picture: the three timing panels
- * are marked aria-hidden precisely because a screen reader announcing "canvas"
- * helps nobody. But that left a reader who cannot see the picture with the
- * caption and nothing else — the donut at least spells its four figures out in
- * its legend, while the busiest hour of this channel's day existed only as a
- * shape. This is the same data as text, folded away so it costs a sighted
- * reader one line and gives everyone else the panel.
- */
-function ChartFigures({
-  caption,
-  unit,
-  buckets,
-}: {
-  caption: string;
-  unit: string;
-  buckets: readonly { label: string; count: number }[];
-}) {
-  const S = useStrings();
-  return (
-    <details className="rp-figures">
-      <summary>{S.figuresShow}</summary>
-      <table>
-        <caption>{caption}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{unit}</th>
-            <th scope="col">{S.figuresComments}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {buckets.map((b) => (
-            <tr key={b.label}>
-              <th scope="row">{b.label}</th>
-              <td>{n(b.count)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </details>
-  );
-}
 
 /** Video cards per page of the videos section. The same size as the comments
  *  pager's default, so the two lists turn at the same rhythm. */
@@ -809,338 +756,14 @@ function DashboardBody({
                   applyFilters({ video: next });
                 }}
               />
-              <section className="rp-section" id="rp-voice">
-                <header>
-                  <h2>{S.secVoice}</h2>
-                  <p className="rp-sub">{S.voiceLead(n(s.analysed))}</p>
-                </header>
-                <div className="rp-grid rp-grid-2">
-                  <article className="rp-card">
-                    <h3>{S.sentimentsTitle}</h3>
-                    {s.analysed > 0 ? (
-                      <>
-                        <div className="rp-chart-donut" aria-hidden="true">
-                          <Doughnut
-                            data={{
-                              labels: Object.values(labels),
-                              datasets: [
-                                {
-                                  data: Object.values(s.sentiments),
-                                  // One scale, shared with the chips and the
-                                  // bars. Keyed by label so the four colours
-                                  // cannot drift out of step with the four
-                                  // counts beside them. Labels accompany every
-                                  // slice; colour is never the only carrier.
-                                  backgroundColor: (
-                                    Object.keys(s.sentiments) as Label[]
-                                  ).map((k) =>
-                                    s.measurable.has(k)
-                                      ? SENTIMENT[k]
-                                      : UNMEASURABLE,
-                                  ),
-                                  // White, the card's own colour: the gap is
-                                  // what keeps two touching slices two.
-                                  borderColor: "#ffffff",
-                                  borderWidth: 2,
-                                },
-                              ],
-                            }}
-                            options={doughnutOptions}
-                          />
-                        </div>
-                        <ul className="rp-legend">
-                          {Object.entries(s.sentiments).map(([key, v]) => {
-                            // A class the analysis cannot express is reported
-                            // as unavailable, never as zero. On this channel
-                            // about one comment in twenty is genuinely mixed,
-                            // and the active model has no such class — so the
-                            // zero was not uninformative, it was wrong.
-                            const measurable = s.measurable.has(key);
-                            return (
-                              <li key={key}>
-                                <span>
-                                  <span
-                                    className="rp-swatch"
-                                    style={{
-                                      background: measurable
-                                        ? `var(--sentiment-${key})`
-                                        : "var(--border-2)",
-                                    }}
-                                    aria-hidden="true"
-                                  />
-                                  {measurable ? (
-                                    S.legendMeasured(
-                                      labels[key as Label],
-                                      n(v),
-                                      s.analysed
-                                        ? Math.round((v / s.analysed) * 100)
-                                        : 0,
-                                    )
-                                  ) : (
-                                    <span data-testid={`unmeasurable-${key}`}>
-                                      {S.legendUnmeasured(labels[key as Label])}
-                                    </span>
-                                  )}
-                                </span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </>
-                    ) : (
-                      <p className="rp-missing">
-                        <strong>{S.noLabelsStrong}</strong>
-                        {S.noLabelsLead}
-                      </p>
-                    )}
-                  </article>
-                  <article className="rp-card" data-testid="topics-card">
-                    <h3>{S.topicsTitle}</h3>
-                    {/* Real verdicts only: the buckets are the taxonomy the
-                        workspace chose, counted under its active topic model,
-                        and a human correction wins over the model's verdict
-                        by the same rule the sentiment chart uses. Until a
-                        model has run there is nothing to draw, and the card
-                        says so rather than clustering by keyword and calling
-                        that analysis. */}
-                    {!s.active_topic_key ? (
-                      <p className="rp-missing">
-                        <strong>{S.topicsNotRunStrong}</strong>
-                        {S.topicsNotRunLead}
-                      </p>
-                    ) : (
-                      (() => {
-                        const buckets = s.topics
-                          .filter((t) => !t.retired)
-                          .map((t) => ({
-                            key: t.key,
-                            label: lang === "ar" ? t.name_ar : t.name_en,
-                            count: s.topic_counts[t.key] ?? 0,
-                          }))
-                          .filter((b) => b.count > 0)
-                          .sort(
-                            (a, b) =>
-                              b.count - a.count ||
-                              a.key.localeCompare(b.key, "en"),
-                          );
-                        const unclassified = s.topic_counts[UNCLASSIFIED] ?? 0;
-                        return (
-                          <>
-                            {buckets.length > 0 && (
-                              <div
-                                className="rp-chart rp-chart-topics"
-                                aria-hidden="true"
-                              >
-                                <Bar
-                                  data={{
-                                    labels: buckets.map((b) => b.label),
-                                    datasets: [
-                                      {
-                                        data: buckets.map((b) => b.count),
-                                        backgroundColor: VOLUME,
-                                        borderRadius: 4,
-                                      },
-                                    ],
-                                  }}
-                                  options={{
-                                    ...barOptions,
-                                    indexAxis: "y" as const,
-                                    // Horizontal, so the count axis is x: the
-                                    // shared options pin whole numbers on y,
-                                    // and a third of a comment is not a tick.
-                                    scales: {
-                                      x: {
-                                        beginAtZero: true,
-                                        ticks: {
-                                          color: AXIS_TEXT,
-                                          precision: 0,
-                                        },
-                                        grid: { color: GRID_LINE },
-                                      },
-                                      y: {
-                                        ticks: { color: AXIS_TEXT },
-                                        grid: { display: false },
-                                      },
-                                    },
-                                  }}
-                                />
-                              </div>
-                            )}
-                            <ChartFigures
-                              caption={S.topicsCaption}
-                              unit={S.topicsUnit}
-                              buckets={buckets}
-                            />
-                            {/* Not a bucket: an unclassified comment has no
-                                topic, and drawing it as one would make the
-                                gap look like a theme. */}
-                            {unclassified > 0 && (
-                              <p
-                                className="rp-metric-note"
-                                data-testid="topics-unclassified"
-                              >
-                                {S.topicsUnclassified(n(unclassified))}
-                              </p>
-                            )}
-                          </>
-                        );
-                      })()
-                    )}
-                  </article>
-                </div>
-                {/* Three figures, and the section's own prose says one of
-                    them is the one to act on — "وهي التي تستحق قراءة نصّها".
-                    They were three identical filled indigo blocks with a glow,
-                    each shouting equally, directly under a donut that had just
-                    said the same numbers in the sentiment colours. Emphasis
-                    spent three times is emphasis spent nowhere; and one fact
-                    wearing two colour languages eight pixels apart is the
-                    reader's problem, not the palette's. The lead figure is
-                    lead-sized, the other two recede, and each number wears the
-                    colour its slice wears above. */}
-                <div
-                  className="rp-grid rp-grid-3 rp-figures-row"
-                  style={{ marginTop: "var(--space-4)" }}
-                >
-                  <article className="rp-figure" data-tone="negative">
-                    <strong>{n(s.sentiments.negative)}</strong>
-                    <p>{S.figureNegative}</p>
-                  </article>
-                  <article className="rp-figure" data-tone="positive">
-                    <strong>{n(s.sentiments.positive)}</strong>
-                    <p>{S.figurePositive}</p>
-                  </article>
-                  <article className="rp-figure" data-tone="none">
-                    <strong>{n(s.unanalysed)}</strong>
-                    <p>{S.figureUnanalysed}</p>
-                  </article>
-                </div>
-              </section>
-              <section className="rp-section" id="rp-timing">
-                <header>
-                  <h2>{S.timingTitle}</h2>
-                  <p className="rp-sub">{S.timingLead}</p>
-                </header>
-                <article className="rp-card">
-                  <h3>{S.weeklyTitle}</h3>
-                  {!plottable(weeks, 3) ? (
-                    <p className="rp-missing" data-testid="weeks-unplottable">
-                      <strong>{S.weeklyTooFewStrong}</strong>
-                      {S.weeklyTooFewLead}
-                    </p>
-                  ) : (
-                    <div className="rp-chart rp-chart-tall" aria-hidden="true">
-                      <Line
-                        data={{
-                          labels: weeks.buckets.map((b) => b.label),
-                          datasets: [
-                            {
-                              data: weeks.buckets.map((b) => b.count),
-                              borderColor: VOLUME,
-                              backgroundColor: VOLUME_FILL,
-                              fill: true,
-                              tension: 0.3,
-                              pointRadius: 0,
-                            },
-                          ],
-                        }}
-                        options={lineOptions}
-                      />
-                    </div>
-                  )}
-                  {plottable(weeks, 3) && (
-                    <ChartFigures
-                      caption={S.weeklyCaption}
-                      unit={S.weeklyUnit}
-                      buckets={weeks.buckets}
-                    />
-                  )}
-                  <p className="rp-metric-note">
-                    {weeks.unplaceable > 0
-                      ? S.weeklyUnplaceable(n(weeks.unplaceable))
-                      : S.weeklyAllPlaced}
-                  </p>
-                </article>
-                <div
-                  className="rp-grid rp-grid-2"
-                  style={{ marginTop: "var(--space-4)" }}
-                >
-                  <article className="rp-card">
-                    <h3>{S.hourlyTitle}</h3>
-                    {!plottable(hours) ? (
-                      <p className="rp-missing">
-                        <strong>{S.distributionTooFewStrong}</strong>
-                        {S.hourlyTooFewLead}
-                      </p>
-                    ) : (
-                      <div className="rp-chart" aria-hidden="true">
-                        <Bar
-                          data={{
-                            labels: hours.buckets.map((b) => b.label),
-                            datasets: [
-                              {
-                                data: hours.buckets.map((b) => b.count),
-                                backgroundColor: VOLUME,
-                                borderRadius: 4,
-                              },
-                            ],
-                          }}
-                          options={barOptions}
-                        />
-                      </div>
-                    )}
-                    {plottable(hours) && (
-                      <ChartFigures
-                        caption={S.hourlyCaption}
-                        unit={S.hourlyUnit}
-                        buckets={hours.buckets}
-                      />
-                    )}
-                    <p className="rp-metric-note" data-testid="hours-excluded">
-                      {hours.unplaceable > 0
-                        ? S.hourlyUnplaceable(n(hours.unplaceable))
-                        : S.hourlyAllPlaced}
-                    </p>
-                  </article>
-                  <article className="rp-card">
-                    <h3>{S.weekdayTitle}</h3>
-                    {!plottable(weekdays) ? (
-                      <p className="rp-missing">
-                        <strong>{S.distributionTooFewStrong}</strong>
-                        {S.weekdayTooFewLead}
-                      </p>
-                    ) : (
-                      <div className="rp-chart" aria-hidden="true">
-                        <Bar
-                          data={{
-                            labels: weekdays.buckets.map((b) => b.label),
-                            datasets: [
-                              {
-                                data: weekdays.buckets.map((b) => b.count),
-                                backgroundColor: VOLUME,
-                                borderRadius: 4,
-                              },
-                            ],
-                          }}
-                          options={barOptions}
-                        />
-                      </div>
-                    )}
-                    {plottable(weekdays) && (
-                      <ChartFigures
-                        caption={S.weekdayCaption}
-                        unit={S.weekdayUnit}
-                        buckets={weekdays.buckets}
-                      />
-                    )}
-                    <p className="rp-metric-note">{S.weekdayNote}</p>
-                    <p className="rp-metric-note">
-                      {S.undatedLabel}{" "}
-                      <span data-testid="unknown-dates">{s.unknown_dates}</span>
-                    </p>
-                  </article>
-                </div>
-              </section>
+              <Voice s={s} S={S} labels={labels} topicName={topicName} />
+              <Timing
+                s={s}
+                S={S}
+                hours={hours}
+                weekdays={weekdays}
+                weeks={weeks}
+              />
               <section className="rp-section" id="rp-people">
                 <header>
                   <h2>{S.secPeople}</h2>

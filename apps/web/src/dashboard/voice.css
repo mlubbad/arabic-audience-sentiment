@@ -1,0 +1,110 @@
+/* Voice: the sentiment donut and the topics bar, and the three-figure row
+   under them. `.db-chart` and `.db-figures` are shared with Timing and live
+   in dashboard.css; what's here is specific to this section. */
+.db-chart--donut {
+  max-width: 300px;
+  margin-inline: auto;
+}
+.db-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+  margin-top: var(--space-4);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.db-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.db-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-1);
+}
+/* A chart that has nothing to draw yet — no labels, or no topic model run —
+   as a bordered note rather than a blank card. */
+.db-missing {
+  border: 1px dashed var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--bg-muted);
+  padding: var(--space-5);
+  color: var(--text-3);
+  font-size: var(--fs-small);
+  line-height: 1.9;
+}
+.db-missing strong {
+  display: block;
+  color: var(--text-2);
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-small);
+}
+/* Three figures, and the section's own prose says one of them is the one to
+   act on. The lead figure is lead-sized, the other two recede, and each
+   number wears the colour its slice wears in the donut above. */
+.db-figures-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  margin-top: var(--space-4);
+}
+.db-figure {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  padding: var(--space-5);
+  /* The accent rule sits on the inline-start edge, which in the Arabic
+     document is the right: written as a logical property so it follows the
+     text direction. */
+  border-inline-start: 3px solid var(--border-2);
+}
+.db-figure strong {
+  display: block;
+  font-family: var(--font-numeric);
+  font-size: clamp(22px, 2.6vw, 28px);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-2);
+}
+.db-figure p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-small);
+  line-height: 1.8;
+  color: var(--text-3);
+}
+.db-figure[data-tone="negative"] {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sentiment-negative) 6%, var(--bg-card)),
+    var(--bg-card) 70%
+  );
+  border-inline-start-color: var(--sentiment-negative);
+  box-shadow: var(--shadow-2);
+}
+.db-figure[data-tone="negative"] strong {
+  font-size: clamp(30px, 4vw, 44px);
+  color: var(--sentiment-negative);
+}
+.db-figure[data-tone="negative"] p {
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+.db-figure[data-tone="positive"] {
+  border-inline-start-color: var(--sentiment-positive);
+}
+.db-figure[data-tone="positive"] strong {
+  color: var(--sentiment-positive);
+}
+@media (max-width: 760px) {
+  .db-figures-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .db-figures-row {
+    grid-template-columns: 1fr;
+  }
+}

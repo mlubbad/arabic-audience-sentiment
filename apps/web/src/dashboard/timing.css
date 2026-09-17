@@ -1,0 +1,4 @@
+/* Timing: the weekly/hourly/weekday charts. The grid (`.db-grid--charts`),
+   the chart box (`.db-chart`, `.db-chart--tall`) and the figures table
+   (`.db-figures`) are shared with Voice and live in dashboard.css — nothing
+   in this section needs a rule of its own beyond those. */

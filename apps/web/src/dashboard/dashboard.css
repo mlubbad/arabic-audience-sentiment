@@ -37,9 +37,57 @@
 .db-grid--2 {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
+/* Timing's three charts: the weekly trend wider than the two distributions
+   beside it. Collapses with `.db-grid--2` below. */
+.db-grid--charts {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--space-4);
+}
 .db-card-title {
   font-size: var(--fs-h3);
   margin: 0 0 var(--space-2);
+}
+/* The box a chart canvas sits in — shared by Voice and Timing. Always
+   `aria-hidden`: `ChartFigures` right below every one of these is the same
+   numbers as text. */
+.db-chart {
+  position: relative;
+  height: 260px;
+}
+.db-chart--tall {
+  height: 320px;
+}
+/* The numbers a canvas cannot say, folded away by default: a sighted reader
+   already has the picture, and a table under every chart would treble the
+   page. Open, it is the panel. */
+.db-figures {
+  margin-top: var(--space-3);
+  font-size: var(--fs-small);
+}
+.db-figures summary {
+  cursor: pointer;
+  color: var(--ml-indigo);
+  font-size: var(--fs-small);
+}
+.db-figures table {
+  width: 100%;
+  font-size: var(--fs-small);
+  margin-top: var(--space-2);
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.db-figures th,
+.db-figures td {
+  text-align: start;
+  padding: 5px var(--space-2);
+  border-block-end: 1px solid var(--border-1);
+  font-weight: 400;
+}
+.db-figures thead th {
+  color: var(--text-3);
+  font-size: var(--fs-micro);
+  font-weight: 600;
 }
 .db-row-actions {
   display: flex;
