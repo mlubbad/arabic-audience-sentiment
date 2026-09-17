@@ -32,7 +32,9 @@ import { useStrings } from "../strings";
 import { describeJob, type JobEntry, type JobRow } from "../jobFeed";
 import { storedPerVideo } from "../catalogue";
 import { Catalogue } from "./CataloguePanel";
-import { OperationsPanels } from "./OperationsPanels";
+import { SyncHealth } from "./SyncHealth";
+import { PlanBudgets } from "./PlanBudgets";
+import { Attempts } from "./Attempts";
 import "../report.css";
 
 export function Sync() {
@@ -293,20 +295,28 @@ function SyncBody({
             workerConnected={connected}
             onChanged={refresh}
           />
-          <OperationsPanels
-            s={s}
-            health={health}
-            run={run}
+          <div className="sync-grid">
+            <SyncHealth
+              s={s}
+              health={health}
+              run={run}
+              mode={mode}
+              channelId={channelId}
+              lang={lang}
+              S={S}
+            />
+            <PlanBudgets plan={s?.plan} lang={lang} S={S} />
+          </div>
+          <Attempts
             mode={mode}
-            channelId={channelId}
-            jobs={jobs}
             jobsFailed={jobsFailed}
+            jobs={jobs}
             entries={entries}
+            lang={lang}
             acting={acting}
             actionMessage={actionMessage}
             act={act}
             refresh={refresh}
-            lang={lang}
             S={S}
           />
         </>

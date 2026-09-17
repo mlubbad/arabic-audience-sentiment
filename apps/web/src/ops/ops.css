@@ -1,0 +1,101 @@
+/**
+ * The operations panels: `BudgetMeter`, `SyncHealth`, `PlanBudgets`,
+ * `Attempts`. `pages.css`'s shared db-* rules (`db-section`, `db-missing`,
+ * `db-muted`, `db-row-actions`) carry everything these share with the
+ * dashboard; this file holds only what is specific to them.
+ */
+
+/* ---------------- budget meter ---------------- */
+.db-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.db-meter-bar {
+  height: 10px;
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.db-meter-bar > i {
+  display: block;
+  height: 100%;
+  /* budgetState's "ok" — the default, not called out below. */
+  background: var(--ml-indigo);
+}
+.db-meter-bar > i[data-state="warning"] {
+  background: var(--color-warning);
+}
+.db-meter-bar > i[data-state="critical"],
+.db-meter-bar > i[data-state="exhausted"] {
+  background: var(--color-danger);
+}
+/* A native <progress>, kept only so no browser paints its own accent onto
+   this element — the e2e suite checks that appearance is neutralised. It is
+   aria-hidden and drawn nowhere: the bar above is what every reader, sighted
+   or not, actually reads. */
+.db-meter-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  pointer-events: none;
+}
+
+/* ---------------- plan budgets ---------------- */
+.db-budgets {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.db-budget strong {
+  display: block;
+  margin-bottom: var(--space-1);
+}
+.db-budget-line {
+  display: block;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  margin-bottom: var(--space-2);
+}
+
+/* ---------------- attempt log ---------------- */
+.db-attempts {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-attempt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.db-attempt strong {
+  color: var(--text-1);
+}
+li[data-severity="critical"] .db-attempt strong {
+  color: var(--color-danger);
+}
+li[data-severity="warning"] .db-attempt strong {
+  color: var(--color-warning);
+}
+li[data-severity="muted"] .db-attempt strong {
+  color: var(--text-3);
+}
+.db-attempt span {
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+.db-attempt small {
+  color: var(--text-3);
+  font-size: var(--fs-micro);
+}
