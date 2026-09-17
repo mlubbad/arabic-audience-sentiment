@@ -10,10 +10,10 @@ export type Sentiment = (typeof SENTIMENTS)[number];
 export type Filter = "all" | Sentiment;
 
 export const examples: readonly { text: string; label: Sentiment }[] = [
-  { text: "شرح واضح، استفدت من الأمثلة كثيرًا 👏", label: "positive" },
-  { text: "المحتوى جميل، لكن المقدمة طويلة قليلًا", label: "mixed" },
-  { text: "أتمنى توضيح المصادر في الحلقة القادمة", label: "neutral" },
-  { text: "الصوت غير واضح في هذا المقطع", label: "negative" },
+  { text: "شرحك واضح، استفدت من الأمثلة كثير 👏", label: "positive" }, // Gulf
+  { text: "المحتوى باهي بصح المقدمة طويلة شوية", label: "mixed" }, // Maghrebi (Algerian)
+  { text: "ممكن توضح المصادر في الحلقة الجاية؟", label: "neutral" }, // Egyptian
+  { text: "الصوت مش واضح بهالمقطع", label: "negative" }, // Levantine
 ];
 
 export function shownFor(filter: Filter) {

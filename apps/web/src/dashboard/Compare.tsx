@@ -128,7 +128,7 @@ export function Compare({
                   className="db-compare-pick"
                   onClick={() => onPick(v.id)}
                 >
-                  {videoLabel(v.id, v.title, S)}
+                  {videoLabel(v.id, v.title)}
                 </Button>
               </h3>
               <dl className="db-compare-dl">
@@ -177,7 +177,7 @@ export function Compare({
                       className="db-compare-pick"
                       onClick={() => onPick(v.id)}
                     >
-                      {videoLabel(v.id, v.title, S)}
+                      {videoLabel(v.id, v.title)}
                     </Button>
                   </TableCell>
                   <TableCell>{v.total}</TableCell>

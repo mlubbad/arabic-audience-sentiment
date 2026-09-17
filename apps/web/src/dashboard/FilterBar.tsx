@@ -151,7 +151,7 @@ export function FilterBar({
       <SelectItem value={ALL}>{S.allVideos}</SelectItem>
       {videoOptions.map((v) => (
         <SelectItem key={v.id} value={v.id}>
-          {videoLabel(v.id, v.title, S)}
+          {videoLabel(v.id, v.title)}
         </SelectItem>
       ))}
     </Labelled>

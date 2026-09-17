@@ -32,6 +32,9 @@ const env = {
   VITE_SUPABASE_URL: "",
   VITE_SUPABASE_PUBLISHABLE_KEY: "",
   VITE_DASHBOARD_SOURCE: "",
+  // The e2e kernel, not the visitor's demo fixture — both webServer entries
+  // share it, so the built-site suite (E2E_BUILD=1) reads the same data.
+  VITE_FIXTURE_DASHBOARD: "/fixtures/e2e-dashboard.json",
 };
 
 export default defineConfig({

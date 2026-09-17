@@ -29,26 +29,16 @@ export function displayDate(date: string | null, lang: Locale) {
     : stringsFor(lang).unknownDate;
 }
 
-const fixtureVideoNumbers: Record<string, string> = {
-  "video-1": "1",
-  "video-2": "2",
-};
 /**
  * The video's real title where the row carried one.
  *
- * The fixture names are a fallback for fixture ids alone. They used to be the
- * only source, which meant a live dashboard printed a UUID for every real
- * video — and the id is still what is shown when no title came through, since
- * a wrong name is worse than an honest identifier.
+ * Every fixture now carries an authored title of its own (the demo and the
+ * e2e kernel alike), so there is nothing left to synthesise here — the id is
+ * shown when no title came through, since a wrong name is worse than an
+ * honest identifier.
  */
-export function videoLabel(
-  id: string,
-  title: string | null | undefined,
-  S: Strings,
-) {
-  if (title) return title;
-  const n = fixtureVideoNumbers[id];
-  return n ? S.fixtureVideo(n) : id;
+export function videoLabel(id: string, title: string | null | undefined) {
+  return title || id;
 }
 
 /**

@@ -196,7 +196,12 @@ function withSessionReviews(comments: Comment[]): Comment[] {
 }
 
 async function readFixture(signal?: AbortSignal) {
-  const response = await fetch("/fixtures/dashboard.json", { signal });
+  // The visitor's demo fixture by default; the e2e kernel when the browser
+  // suite points this build at it (playwright.config.ts sets the env var).
+  const response = await fetch(
+    import.meta.env.VITE_FIXTURE_DASHBOARD ?? "/fixtures/dashboard.json",
+    { signal },
+  );
   if (!response.ok) throw new Error("fixture_unavailable");
   return FixtureSchema.parse(await response.json());
 }

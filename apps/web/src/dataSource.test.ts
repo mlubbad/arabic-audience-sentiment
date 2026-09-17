@@ -68,7 +68,7 @@ describe("what the dashboard says it is showing", () => {
   it("says whose data it is, rather than leaving it implied", () => {
     expect(live().scope).toContain("ws-1");
     expect(fixture().scope).toContain("تجريبية");
-    expect(fixture().badge).toBe("بيانات اصطناعية");
+    expect(fixture().badge).toBe("بيانات توضيحية");
     expect(live().badge).toBe("بيانات مباشرة");
   });
 

@@ -98,7 +98,7 @@ export function Videos({
                 }
               }}
             >
-              <h3 className="db-card-title">{videoLabel(v.id, v.title, S)}</h3>
+              <h3 className="db-card-title">{videoLabel(v.id, v.title)}</h3>
               <div className="db-row-actions">
                 <Badge numeric>{S.countComments(n(v.total))}</Badge>
                 <Badge numeric>{S.countReplies(n(v.replies))}</Badge>

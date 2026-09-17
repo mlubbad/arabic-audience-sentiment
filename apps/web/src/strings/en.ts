@@ -36,7 +36,7 @@ export const en: Strings = {
   titleNotFound: "Page not found",
   pageOpening: "Opening the page…",
   footerTagline: "From comments to a clearer picture.",
-  footerNote: "Some pages use synthetic data, and say so plainly.",
+  footerNote: "Some pages show illustrative, authored data, and say so plainly.",
   notFoundEyebrow: "This page is not available",
   notFoundTitle: "We could not find the page you were looking for.",
   notFoundLead: "Go back to the dashboard, or start from the home page.",
@@ -294,7 +294,7 @@ export const en: Strings = {
     "A development project URL and a publishable key are needed to enable accounts. Test data is never used as a session.",
   accountTryDashboardTitle: "Start with the dashboard demo",
   accountTryDashboardLead:
-    "Explore the interface with synthetic data that says what it is.",
+    "You can explore the interface with illustrative, authored data.",
   createWorkspaceFailed: "The workspace could not be created",
   createWorkspaceListFailed: "Created, but the list could not be refreshed",
   createWorkspaceDone: "Workspace created",
@@ -392,7 +392,6 @@ export const en: Strings = {
     retry_exhausted: "The allowed attempts were used up",
   },
   unknownDate: "Unknown date",
-  fixtureVideo: (n: string) => `Synthetic video ${n}`,
   purgedText: "[Text removed after the retention period]",
   purgedAuthor: "[Not retained]",
   weekdays: [
@@ -509,7 +508,7 @@ export const en: Strings = {
   dsUpdatedUnderHour: "Last updated less than an hour ago.",
   dsUpdatedHours: (hours: string) =>
     `Last updated ${hours} ${pl(hours, "hour", "hours")} ago.`,
-  dsFixtureBadge: "Synthetic data",
+  dsFixtureBadge: "Illustrative data",
   dsFixtureScope: "A demo workspace, not connected to any channel",
   dsFixtureReading: "Reading the test data.",
   dsFixtureCoverage: (total: string) =>
@@ -535,7 +534,7 @@ export const en: Strings = {
   opsDemoTag: "demo preview",
   opsWorkspaceData: "Operations data for workspace",
   opsDemoNote:
-    "Synthetic operations data for the demo, not connected to a real channel.",
+    "Illustrative operations data for the demo, not connected to a real channel.",
   opsReading: "Reading the operations status…",
   opsReadFailed: "The operations status could not be read.",
   retry: "Try again",
@@ -912,7 +911,7 @@ export const en: Strings = {
   saveCorrection: "Save correction",
   cancel: "Cancel",
   reviewFixtureScope:
-    "Synthetic data mode: the correction is kept in this session only and is not sent to any server.",
+    "Illustrative data mode: the correction is kept in this session only and is not sent to any server.",
   pagerLabel: "Browse comments",
   previousPage: "Previous page",
   nextPage: "Next page",
@@ -1037,13 +1036,13 @@ export const en: Strings = {
     "What is the difference between a mixed and a neutral comment?",
     "A neutral comment carries no clear feeling — a question, a remark, a request. A mixed one carries both at once: “the content is great, but the intro is long”. Merging the two hides the most useful thing in the comments: what your audience liked and what bothered them, in the same sentence.",
     "Is the demo data from a real channel?",
-    "The interactive example on this page uses clearly labelled synthetic comments. Comments from a real test channel are stored in the service and are being connected to the live dashboard for the workspace owner.",
+    "The interactive example on this page uses illustrative, authored comments. Comments from a real test channel are stored in the service and are being connected to the live dashboard for the workspace owner.",
     "Can I connect my channel now?",
     "YouTube connection is available for authorised accounts, and real comments have been collected from connected channels. After connecting, syncing runs on the workspace's plan, and every collected comment is analysed automatically.",
     "Does the tool need access to my channel?",
     "Yes. Connecting a channel means signing in with Google and granting two permissions, to read channel data and comments. The service reads and never writes: it does not post, edit or delete anything on your channel. You can revoke the permission from your Google account settings at any time; the details are in the privacy policy.",
     "Are my corrections saved in the demo?",
-    "Corrections on synthetic data stay in the browser session only and are not sent to a server. The data-source strip inside the dashboard says when reviews are saved.",
+    "Corrections on illustrative data stay in the browser session only and are not sent to a server. The data-source strip inside the dashboard says when reviews are saved.",
     "How much does YouTube comment analysis cost?",
     "There is a free plan to try it, and monthly or yearly plans for creators, influencers, agencies and media teams. Each analysed comment is counted once however often it is re-collected, and analysis stops at the limit with no surprise bill. All the numbers are on the pricing page.",
   ],
