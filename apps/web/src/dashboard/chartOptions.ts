@@ -26,19 +26,24 @@ export const tooltip = () => ({
   padding: 10,
   cornerRadius: 8,
 });
+// The charts were motionless before the move and stay so; the only motion on
+// the dashboard is the section reveal.
 export const barOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: false,
   plugins: { legend: { display: false }, tooltip: tooltip() },
   scales: axes(),
 } as const;
 export const lineOptions = {
   ...barOptions,
+  animation: false,
   elements: { line: { tension: 0.3 }, point: { radius: 3 } },
 } as const;
 export const doughnutOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: false,
   cutout: "62%",
   plugins: { legend: { display: false }, tooltip: tooltip() },
 } as const;

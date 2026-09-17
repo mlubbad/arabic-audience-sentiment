@@ -4,7 +4,12 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { barOptions, doughnutOptions, tooltip } from "./chartOptions";
+import {
+  barOptions,
+  doughnutOptions,
+  lineOptions,
+  tooltip,
+} from "./chartOptions";
 
 const css = readFileSync(
   fileURLToPath(new URL("../brand.css", import.meta.url)),
@@ -33,5 +38,19 @@ describe("chart options", () => {
 
   it("the doughnut keeps its ring", () => {
     expect(doughnutOptions.cutout).toBe("62%");
+  });
+
+  // The charts were motionless before the move; the spec's motion rule
+  // allows only the section reveal, not a chart entrance animation.
+  it("barOptions has no entrance animation", () => {
+    expect(barOptions.animation).toBe(false);
+  });
+
+  it("lineOptions has no entrance animation", () => {
+    expect(lineOptions.animation).toBe(false);
+  });
+
+  it("doughnutOptions has no entrance animation", () => {
+    expect(doughnutOptions.animation).toBe(false);
   });
 });

@@ -218,16 +218,19 @@ export const tooltip = () => ({
 export const barOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: false,
   plugins: { legend: { display: false }, tooltip: tooltip() },
   scales: axes(),
 } as const;
 export const lineOptions = {
   ...barOptions,
+  animation: false,
   elements: { line: { tension: 0.3 }, point: { radius: 3 } },
 } as const;
 export const doughnutOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: false,
   cutout: "62%",
   plugins: { legend: { display: false }, tooltip: tooltip() },
 } as const;
