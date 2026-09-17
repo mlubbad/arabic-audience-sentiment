@@ -1,0 +1,493 @@
+{
+  "mode": "sanitized_fixture",
+  "revision": "fixture-dataset-v1",
+  "active_analysis_key": "fixture-v1",
+  "plan": {
+    "plan_key": "pilot-fixture",
+    "status": "active",
+    "period_start": "2026-09-01T00:00:00Z",
+    "period_end": "2026-10-01T00:00:00Z",
+    "budgets": [
+      {
+        "event_type": "comment_analysis",
+        "used": 74,
+        "allowance": 100,
+        "remaining": 26
+      },
+      {
+        "event_type": "historical_backfill",
+        "used": 0,
+        "allowance": 500,
+        "remaining": 500
+      }
+    ]
+  },
+  "sync": {
+    "worker": {
+      "connected": false,
+      "last_heartbeat_at": null
+    },
+    "queued_jobs": 0,
+    "last_run": null
+  },
+  "comments": [
+    {
+      "id": "fixture-1",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-0",
+      "author_name": "نورة القحطاني",
+      "text_raw": "المراجعة واضحة ومفيدة، شكرًا",
+      "content_hash": "3873bc5ffd5faf4f93b9ef6962d03cc713f94a43172a3dfaa7d18fbe11478727",
+      "likes_raw": "12",
+      "likes_value": 12,
+      "published_at": "2026-09-01T09:00:00Z",
+      "published_time_raw": "2026-09-01T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": false,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored illustrative demo data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": {
+        "status": "succeeded",
+        "label": "positive",
+        "content_hash": "3873bc5ffd5faf4f93b9ef6962d03cc713f94a43172a3dfaa7d18fbe11478727",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 1,
+          "negative": 0,
+          "neutral": 0,
+          "mixed": 0
+        }
+      },
+      "reviews": [],
+      "video_title": "مراجعة آيفون 17 برو بعد شهر من الاستخدام",
+      "by_channel_owner": false,
+      "topic_prediction": {
+        "status": "succeeded",
+        "topic_key": "praise",
+        "confidence": 0.93,
+        "content_hash": "3873bc5ffd5faf4f93b9ef6962d03cc713f94a43172a3dfaa7d18fbe11478727",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
+        "prompt_version": "p1",
+        "predicted_at": "2026-09-10T08:00:00Z",
+        "error_code": null
+      },
+      "topic_reviews": []
+    },
+    {
+      "id": "fixture-2",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-1",
+      "author_name": "@abu_faisal",
+      "text_raw": "ياليت تحسّن الصوت، المايك واطي",
+      "content_hash": "5bad832bdcd5810091159eae86838b9da5ff521e6033735e92778177507db09b",
+      "likes_raw": "48",
+      "likes_value": 48,
+      "published_at": "2026-09-02T09:00:00Z",
+      "published_time_raw": "2026-09-02T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": true,
+      "parent_comment_id": "fixture-1",
+      "parent_source": "api",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored illustrative demo data; not real commenters"
+      },
+      "comment_type": "اقتراح",
+      "prediction": {
+        "status": "succeeded",
+        "label": "negative",
+        "content_hash": "5bad832bdcd5810091159eae86838b9da5ff521e6033735e92778177507db09b",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 0,
+          "negative": 1,
+          "neutral": 0,
+          "mixed": 0
+        }
+      },
+      "reviews": [],
+      "video_title": "مراجعة آيفون 17 برو بعد شهر من الاستخدام",
+      "by_channel_owner": false,
+      "topic_prediction": {
+        "status": "succeeded",
+        "topic_key": "request",
+        "confidence": 0.88,
+        "content_hash": "5bad832bdcd5810091159eae86838b9da5ff521e6033735e92778177507db09b",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
+        "prompt_version": "p1",
+        "predicted_at": "2026-09-10T08:00:00Z",
+        "error_code": null
+      },
+      "topic_reviews": []
+    },
+    {
+      "id": "fixture-3",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-2",
+      "author_name": "يوسف بن عمر",
+      "text_raw": "شحال من حلقة باقية فالسلسلة؟",
+      "content_hash": "e25d9a8670fd435d1f8797d7462cdb2aec046fcb67545d4065af2a0331c6d74d",
+      "likes_raw": "3",
+      "likes_value": 3,
+      "published_at": "2026-09-03T09:00:00Z",
+      "published_time_raw": "2026-09-03T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": false,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored illustrative demo data; not real commenters"
+      },
+      "comment_type": "سؤال",
+      "prediction": {
+        "status": "succeeded",
+        "label": "neutral",
+        "content_hash": "e25d9a8670fd435d1f8797d7462cdb2aec046fcb67545d4065af2a0331c6d74d",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 0,
+          "negative": 0,
+          "neutral": 1,
+          "mixed": 0
+        }
+      },
+      "reviews": [
+        {
+          "label": "negative",
+          "content_hash": "e25d9a8670fd435d1f8797d7462cdb2aec046fcb67545d4065af2a0331c6d74d",
+          "created_at": "2026-09-05T08:00:00Z",
+          "origin": "legacy_unverified",
+          "reviewer_id": null,
+          "reason": null
+        }
+      ],
+      "video_title": "مراجعة آيفون 17 برو بعد شهر من الاستخدام",
+      "by_channel_owner": false,
+      "topic_prediction": {
+        "status": "succeeded",
+        "topic_key": "discussion",
+        "confidence": 0.64,
+        "content_hash": "e25d9a8670fd435d1f8797d7462cdb2aec046fcb67545d4065af2a0331c6d74d",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
+        "prompt_version": "p1",
+        "predicted_at": "2026-09-10T08:00:00Z",
+        "error_code": null
+      },
+      "topic_reviews": [
+        {
+          "topic_key": "question",
+          "content_hash": "caccab19907a993a2eae2d88e4aa69035b9c05b3efffb53b44463206db23ac31",
+          "created_at": "2026-09-11T09:00:00Z",
+          "origin": "human",
+          "reviewer_id": "fixture-reviewer",
+          "reason": "يسأل عن موعد الحلقة، لا يناقشها"
+        }
+      ]
+    },
+    {
+      "id": "fixture-4",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "fixture-author-3",
+      "author_name": "مريم الشرقاوي",
+      "text_raw": "الفكرة حلوة بس الشرح طويل شوية",
+      "content_hash": "6fcaee01ffb93d460653617d7b8d08655d85a3ea8279b4e290e56d39395ea399",
+      "likes_raw": "7",
+      "likes_value": 7,
+      "published_at": "2026-09-04T09:00:00Z",
+      "published_time_raw": "2026-09-04T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": true,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored illustrative demo data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": {
+        "status": "succeeded",
+        "label": "mixed",
+        "content_hash": "6fcaee01ffb93d460653617d7b8d08655d85a3ea8279b4e290e56d39395ea399",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 0,
+          "negative": 0,
+          "neutral": 0,
+          "mixed": 1
+        }
+      },
+      "reviews": [],
+      "video_title": "مراجعة آيفون 17 برو بعد شهر من الاستخدام",
+      "by_channel_owner": false,
+      "topic_prediction": {
+        "status": "succeeded",
+        "topic_key": "criticism",
+        "confidence": 0.71,
+        "content_hash": "6fcaee01ffb93d460653617d7b8d08655d85a3ea8279b4e290e56d39395ea399",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
+        "prompt_version": "p1",
+        "predicted_at": "2026-09-10T08:00:00Z",
+        "error_code": null
+      },
+      "topic_reviews": []
+    },
+    {
+      "id": "fixture-5",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-2",
+      "video_kind": "short",
+      "author_channel_id": null,
+      "author_name": "حسام الدين محمود",
+      "text_raw": "حد جرّب الجهاز ده على أندرويد؟",
+      "content_hash": "3a01a300df55cc121829f672d0baa5c9cf835ceed1285ac2f65f6aff703610bf",
+      "likes_raw": null,
+      "likes_value": null,
+      "published_at": null,
+      "published_time_raw": null,
+      "timestamp_precision": "unknown",
+      "is_reply": false,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored illustrative demo data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": null,
+      "reviews": [],
+      "video_title": "أفضل 5 تطبيقات مجانية لتنظيم وقتك",
+      "by_channel_owner": false,
+      "topic_prediction": null,
+      "topic_reviews": []
+    },
+    {
+      "id": "fixture-6",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-2",
+      "video_kind": "short",
+      "author_channel_id": "fixture-author-5",
+      "author_name": "@khadija.tn",
+      "text_raw": "برشا معلومات مفيدة، يعطيك الصحة",
+      "content_hash": "54921e65b349123939cc2ea408a25b78e418351143db595f9467d6cc0617d4e4",
+      "likes_raw": "21",
+      "likes_value": 21,
+      "published_at": "2026-09-06T09:00:00Z",
+      "published_time_raw": "2026-09-06T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": false,
+      "parent_comment_id": null,
+      "parent_source": "unknown",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored illustrative demo data; not real commenters"
+      },
+      "comment_type": null,
+      "prediction": {
+        "status": "succeeded",
+        "label": "positive",
+        "content_hash": "fec5a5889677566cb76ce659ce36a26004170441078b42279ccdebd3ce023fc8",
+        "analysis_key": "fixture-v1",
+        "model_id": "sanitized-fixture",
+        "revision": "fixture-v1",
+        "preprocessing_version": "fixture-v1",
+        "predicted_at": "2026-09-12T00:00:00Z",
+        "class_scores": {
+          "positive": 1,
+          "negative": 0,
+          "neutral": 0,
+          "mixed": 0
+        }
+      },
+      "reviews": [
+        {
+          "label": "positive",
+          "content_hash": "hash-before-the-edit",
+          "created_at": "2026-09-07T10:00:00Z",
+          "origin": "human",
+          "reviewer_id": "fixture-reviewer-1",
+          "reason": "مراجعة سابقة على النص قبل تعديله"
+        }
+      ],
+      "video_title": "أفضل 5 تطبيقات مجانية لتنظيم وقتك",
+      "by_channel_owner": false,
+      "topic_prediction": {
+        "status": "succeeded",
+        "topic_key": "praise",
+        "confidence": 0.9,
+        "content_hash": "fec5a5889677566cb76ce659ce36a26004170441078b42279ccdebd3ce023fc8",
+        "classification_key": "topics:v1+gemini-3.6-flash+p1",
+        "model_id": "gemini-3.6-flash",
+        "prompt_version": "p1",
+        "predicted_at": "2026-09-10T08:00:00Z",
+        "error_code": null
+      },
+      "topic_reviews": []
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-00000000000f",
+      "workspace_id": "00000000-0000-4000-8000-000000000001",
+      "client_id": "fixture-client",
+      "channel_id": "fixture-channel",
+      "video_id": "video-1",
+      "video_kind": "video",
+      "author_channel_id": "the-fixture-channel",
+      "author_name": "@salem_tech",
+      "text_raw": "أهلًا بك، تابع بقية الحلقات على القناة.",
+      "content_hash": "a5e561fab9a2b7c3ad9f2c94c53a564e993624e0ea09b0fb803b465e7de41161",
+      "likes_raw": "48",
+      "likes_value": 48,
+      "published_at": "2026-09-02T09:00:00Z",
+      "published_time_raw": "2026-09-02T09:00:00Z",
+      "timestamp_precision": "second",
+      "is_reply": true,
+      "parent_comment_id": "fixture-1",
+      "parent_source": "api",
+      "source": "sanitized_fixture",
+      "field_provenance": {
+        "origin": "authored illustrative demo data; not real commenters"
+      },
+      "comment_type": "اقتراح",
+      "prediction": null,
+      "reviews": [],
+      "video_title": "مراجعة آيفون 17 برو بعد شهر من الاستخدام",
+      "by_channel_owner": true,
+      "topic_prediction": null,
+      "topic_reviews": []
+    }
+  ],
+  "active_analysis_labels": [
+    "positive",
+    "negative",
+    "neutral",
+    "mixed"
+  ],
+  "topics": [
+    {
+      "key": "question",
+      "name_ar": "استفسارات وأسئلة",
+      "name_en": "Questions & inquiries",
+      "description": "Asks the creator or others something, or requests information.",
+      "position": 1,
+      "retired": false
+    },
+    {
+      "key": "religious",
+      "name_ar": "دعاء وذكر وتعبير ديني",
+      "name_en": "Prayers & religious remarks",
+      "description": "Prayer, supplication, remembrance of God, religious phrasing as the main content.",
+      "position": 2,
+      "retired": false
+    },
+    {
+      "key": "praise",
+      "name_ar": "إشادة ودعم",
+      "name_en": "Praise & support",
+      "description": "Compliments, thanks, encouragement toward the creator or content.",
+      "position": 3,
+      "retired": false
+    },
+    {
+      "key": "criticism",
+      "name_ar": "نقد واعتراض",
+      "name_en": "Criticism & objection",
+      "description": "Disagreement, complaint, or negative judgement of the content, creator or subject.",
+      "position": 4,
+      "retired": false
+    },
+    {
+      "key": "request",
+      "name_ar": "طلبات واقتراحات",
+      "name_en": "Requests & suggestions",
+      "description": "Asks for future content, features, changes, or makes a suggestion.",
+      "position": 5,
+      "retired": false
+    },
+    {
+      "key": "discussion",
+      "name_ar": "نقاش وتحليل الموضوع",
+      "name_en": "Discussion of the subject",
+      "description": "Substantive commentary on the topic of the video itself.",
+      "position": 6,
+      "retired": false
+    },
+    {
+      "key": "personal",
+      "name_ar": "تجارب وقصص شخصية",
+      "name_en": "Personal stories & experiences",
+      "description": "Shares the commenter's own situation or experience.",
+      "position": 7,
+      "retired": false
+    },
+    {
+      "key": "humour",
+      "name_ar": "مزاح ودعابة",
+      "name_en": "Humour & banter",
+      "description": "Jokes, memes, playful remarks.",
+      "position": 8,
+      "retired": false
+    },
+    {
+      "key": "promotion",
+      "name_ar": "ترويج ومحتوى دعائي",
+      "name_en": "Promotion & spam",
+      "description": "Advertising, self-promotion, links, repeated off-purpose content.",
+      "position": 9,
+      "retired": false
+    },
+    {
+      "key": "other",
+      "name_ar": "خارج الموضوع / أخرى",
+      "name_en": "Off-topic / other",
+      "description": "Does not fit the above or is unrelated to the video.",
+      "position": 10,
+      "retired": false
+    }
+  ],
+  "active_topic_key": "topics:v1+gemini-3.6-flash+p1"
+}

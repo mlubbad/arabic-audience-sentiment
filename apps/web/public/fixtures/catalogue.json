@@ -5,7 +5,7 @@
     {
       "id": "video-1",
       "external_video_id": "fixture0001",
-      "title": "فيديو اصطناعي ١",
+      "title": "مراجعة آيفون 17 برو بعد شهر من الاستخدام",
       "kind": "video",
       "published_at": "2026-08-20T10:00:00Z",
       "thumbnail_url": null,
@@ -15,7 +15,7 @@
     {
       "id": "video-2",
       "external_video_id": "fixture0002",
-      "title": "فيديو اصطناعي ٢",
+      "title": "أفضل 5 تطبيقات مجانية لتنظيم وقتك",
       "kind": "short",
       "published_at": "2026-09-01T10:00:00Z",
       "thumbnail_url": null,
@@ -25,7 +25,7 @@
     {
       "id": "video-3",
       "external_video_id": "fixture0003",
-      "title": "بث اصطناعي ٣",
+      "title": "بث مباشر: نجاوب على أسئلتكم عن اللابتوبات قبل الدراسة",
       "kind": "stream",
       "published_at": "2026-09-05T18:00:00Z",
       "thumbnail_url": null,
