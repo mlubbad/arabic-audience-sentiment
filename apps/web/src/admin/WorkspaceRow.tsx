@@ -62,9 +62,6 @@ export interface WorkspaceRowProps {
    *  page, once the lists that show it have been re-read); rejects with the
    *  refusal, which `adminErrorMessage` turns into the sentence. */
   act: (action: AdminAction) => Promise<void>;
-  /** What the page does once a delete has gone through — the live page
-   *  re-reads the rail's list; the demo needs nothing. */
-  onDeleted?: () => void;
   /** The delete dialog's count of what goes; defaults to the RPC. */
   readFootprint?: () => Promise<Footprint>;
   /** A `Card` with a `<dl>` instead of a `<tbody>`. */
@@ -77,7 +74,6 @@ export function WorkspaceRow({
   keys,
   options,
   act,
-  onDeleted,
   readFootprint,
   stacked = false,
 }: WorkspaceRowProps) {
@@ -293,7 +289,6 @@ export function WorkspaceRow({
       workspace={{ id: w.id, name: row.name }}
       onConfirm={() => act({ type: "delete", w: w.id })}
       readFootprint={readFootprint}
-      onDeleted={onDeleted}
     />
   );
 
@@ -320,8 +315,20 @@ export function WorkspaceRow({
           </div>
         </dl>
         <div className="db-admin-levers">
-          <section aria-label={S.adminSetPlan}>{planForm}</section>
-          <section aria-label={S.adminGrantPack}>{packForm}</section>
+          <div
+            role="group"
+            className="db-admin-lever"
+            aria-label={S.adminSetPlan}
+          >
+            {planForm}
+          </div>
+          <div
+            role="group"
+            className="db-admin-lever"
+            aria-label={S.adminGrantPack}
+          >
+            {packForm}
+          </div>
         </div>
         <div className="db-row-actions">{remove}</div>
       </Card>
@@ -344,8 +351,20 @@ export function WorkspaceRow({
       <TableRow className="db-admin-levers-row">
         <TableCell colSpan={6}>
           <div className="db-admin-levers">
-            <section aria-label={S.adminSetPlan}>{planForm}</section>
-            <section aria-label={S.adminGrantPack}>{packForm}</section>
+            <div
+              role="group"
+              className="db-admin-lever"
+              aria-label={S.adminSetPlan}
+            >
+              {planForm}
+            </div>
+            <div
+              role="group"
+              className="db-admin-lever"
+              aria-label={S.adminGrantPack}
+            >
+              {packForm}
+            </div>
           </div>
         </TableCell>
       </TableRow>

@@ -55,8 +55,10 @@ async function readWorkspaces() {
   return AdminWorkspacesSchema.parse(data);
 }
 
-/** The three RPCs, called with the row's action as their argument list. */
-async function callServer(action: AdminAction): Promise<void> {
+/** The three RPCs, called with the row's action as their argument list.
+ *  Exported for its test: the one place the row's `plan_key` becomes the
+ *  RPC's `plan`. */
+export async function callServer(action: AdminAction): Promise<void> {
   const db = supabase!;
   const { error } =
     action.type === "set_plan"

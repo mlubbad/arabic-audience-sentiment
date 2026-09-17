@@ -117,7 +117,7 @@
   margin-top: var(--space-4);
   padding-top: 0;
 }
-.db-admin-card .db-admin-levers > section {
+.db-admin-card .db-admin-lever {
   padding-top: var(--space-4);
   border-top: 1px solid var(--border-1);
 }
