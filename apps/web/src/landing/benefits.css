@@ -1,0 +1,15 @@
+.lp-benefits {
+  padding-top: 0;
+}
+.lp-benefit.ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+.lp-benefit h3 {
+  margin: 0;
+}
+.lp-benefit p {
+  color: var(--text-2);
+}

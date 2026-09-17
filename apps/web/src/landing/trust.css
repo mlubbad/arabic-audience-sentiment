@@ -1,0 +1,22 @@
+.lp-trust-item.ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+.lp-trust-glyph {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--ml-indigo-50);
+  color: var(--ml-indigo);
+  font-size: 18px;
+}
+.lp-trust-item h3 {
+  margin: 0;
+}
+.lp-trust-item p {
+  color: var(--text-2);
+}
