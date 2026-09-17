@@ -34,12 +34,12 @@ import {
   pageOf,
   videoLinks,
   type StoredCount,
-} from "./catalogue";
-import { supabase } from "./supabase";
-import { displayDate } from "./i18n";
-import { useLocale } from "./locale";
-import { useStrings, type Strings } from "./strings";
-import { describeJob, explainCode, type JobRow } from "./jobFeed";
+} from "../catalogue";
+import { supabase } from "../supabase";
+import { displayDate } from "../i18n";
+import { useLocale } from "../locale";
+import { useStrings, type Strings } from "../strings";
+import { describeJob, explainCode, type JobRow } from "../jobFeed";
 
 const KINDS = ["all", "video", "short", "stream"] as const;
 

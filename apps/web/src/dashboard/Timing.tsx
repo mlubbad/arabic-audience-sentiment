@@ -16,7 +16,7 @@ import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import { VOLUME, VOLUME_FILL } from "../chartTheme";
 import { barOptions, lineOptions } from "./chartOptions";
-import { ChartEmpty } from "./PageStates";
+import { ChartEmpty } from "../pageStates/PageStates";
 import { ChartFigures } from "./ChartFigures";
 import { n } from "./format";
 import "./timing.css";

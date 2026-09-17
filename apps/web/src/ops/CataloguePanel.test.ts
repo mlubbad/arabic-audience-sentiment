@@ -8,9 +8,9 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ar } from "./strings/ar";
-import { en } from "./strings/en";
-import { explainCode, type JobRow } from "./jobFeed";
+import { ar } from "../strings/ar";
+import { en } from "../strings/en";
+import { explainCode, type JobRow } from "../jobFeed";
 
 const shared = vi.hoisted(() => ({
   query: { data: undefined as unknown, isPending: false, isError: false },
@@ -18,7 +18,7 @@ const shared = vi.hoisted(() => ({
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => shared.query,
 }));
-vi.mock("./supabase", () => ({ supabase: null }));
+vi.mock("../supabase", () => ({ supabase: null }));
 
 import { Catalogue, savedFeedback } from "./CataloguePanel";
 

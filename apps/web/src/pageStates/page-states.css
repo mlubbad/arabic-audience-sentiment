@@ -1,5 +1,5 @@
 /* Loading, updating, error and empty states for the dashboard. Classes are
-   db-*, tokens only — see dashboard.css's own note. */
+   db-*, tokens only — see pages.css's own note. */
 .db-loading {
   display: flex;
   flex-direction: column;

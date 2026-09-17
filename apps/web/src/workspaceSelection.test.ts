@@ -110,7 +110,7 @@ describe("both pages read the one selection", () => {
   // That is a source fact, not a behavioural one — the two pages cannot be
   // rendered together in a unit test, and the browser suite has no signed-in
   // account with two workspaces to drive the flow.
-  const pages = ["dashboard/Dashboard.tsx", "Sync.tsx"];
+  const pages = ["dashboard/Dashboard.tsx", "ops/Sync.tsx"];
   for (const file of pages) {
     it(`${file} does not hold the chosen workspace itself`, async () => {
       const { readFileSync } = await import("node:fs");

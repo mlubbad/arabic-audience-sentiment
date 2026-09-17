@@ -76,7 +76,7 @@ describe("the rail's workspace", () => {
 
   it("is the only switch: neither page keeps its own", () => {
     // Two selects with one name on one screen is one name too few.
-    for (const page of ["dashboard/Dashboard.tsx", "Sync.tsx"]) {
+    for (const page of ["dashboard/Dashboard.tsx", "ops/Sync.tsx"]) {
       const src = readFileSync(new URL(`./${page}`, import.meta.url), "utf8");
       expect(src, page).not.toContain("S.changeWorkspace");
     }
@@ -113,7 +113,7 @@ describe("the rail's collection line", () => {
     // The health panel moved out of Sync.tsx into OperationsPanels.tsx when
     // the catalogue took the top of the page; the read is the same line.
     const page = readFileSync(
-      new URL("./OperationsPanels.tsx", import.meta.url),
+      new URL("./ops/OperationsPanels.tsx", import.meta.url),
       "utf8",
     );
     expect(page).toContain("S.syncMessages[health.key]");

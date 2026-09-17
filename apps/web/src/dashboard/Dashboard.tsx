@@ -12,7 +12,7 @@ import {
   PointElement,
   Tooltip,
 } from "chart.js";
-import "./dashboard.css";
+import "../pages.css";
 import { byHour, byWeek, byWeekday, commenters } from "../analytics";
 import { pageSlice } from "../videoPaging";
 import {
@@ -58,7 +58,7 @@ import { Compare } from "./Compare";
 import { Engaged } from "./Engaged";
 import { Comments } from "./Comments";
 import { ReviewDialog } from "./ReviewDialog";
-import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
+import { EmptyState, Loading, LoadError, Updating } from "../pageStates/PageStates";
 import {
   chipsFor,
   EMPTY_FILTERS,

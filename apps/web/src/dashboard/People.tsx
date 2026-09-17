@@ -26,7 +26,7 @@ import { Badge } from "../ui/Badge";
 import type { Strings } from "../strings";
 import type { Commenters } from "../analytics";
 import { n } from "./format";
-import { ChartEmpty } from "./PageStates";
+import { ChartEmpty } from "../pageStates/PageStates";
 import "./people.css";
 
 export function People({

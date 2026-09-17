@@ -22,7 +22,7 @@ import {
 } from "../chartTheme";
 import { barOptions, doughnutOptions } from "./chartOptions";
 import { ChartFigures } from "./ChartFigures";
-import { ChartEmpty } from "./PageStates";
+import { ChartEmpty } from "../pageStates/PageStates";
 import { n } from "./format";
 import "./voice.css";
 

@@ -86,7 +86,7 @@ describe("the workspace gate", () => {
     // The box used to be written twice. Neither page may grow its own again:
     // the chooser's one distinctive line is the empty option, and it belongs
     // to this file alone.
-    for (const page of ["dashboard/Dashboard.tsx", "Sync.tsx"]) {
+    for (const page of ["dashboard/Dashboard.tsx", "ops/Sync.tsx"]) {
       const src = readFileSync(new URL(`./${page}`, import.meta.url), "utf8");
       expect(src, page).toContain("<WorkspaceGate");
       expect(src, page).not.toContain("— اختر —");

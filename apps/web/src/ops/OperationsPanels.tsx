@@ -8,12 +8,12 @@
  * and the ten browser tests on `/sync?demo=1` see exactly what they saw.
  */
 import { budgetState, type SyncState } from "@sentiment/contracts";
-import type { deriveSnapshot } from "./data";
-import type { Health } from "./syncHealth";
-import { displayDate } from "./i18n";
-import type { Locale } from "./locale";
-import type { Strings } from "./strings";
-import { explainCode, type JobEntry, type JobRow } from "./jobFeed";
+import type { deriveSnapshot } from "../data";
+import type { Health } from "../syncHealth";
+import { displayDate } from "../i18n";
+import type { Locale } from "../locale";
+import type { Strings } from "../strings";
+import { explainCode, type JobEntry, type JobRow } from "../jobFeed";
 
 export function OperationsPanels({
   s,

@@ -165,7 +165,7 @@ export function EmptyState({
 /** The in-card note a chart shows instead of drawing on zero rows — never a
  *  blank canvas, which reads as broken rather than as "nothing here yet".
  *  Callers pass a `<strong>` lead and the sentence after it; `.db-missing`
- *  (dashboard.css) sets the lead on its own line. `testId` lets each
+ *  (pages.css) sets the lead on its own line. `testId` lets each
  *  chart's empty state be found on its own. */
 export function ChartEmpty({
   children,

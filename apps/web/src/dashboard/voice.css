@@ -1,6 +1,6 @@
 /* Voice: the sentiment donut and the topics bar, and the three-figure row
    under them. `.db-chart` and `.db-figures` are shared with Timing and live
-   in dashboard.css; what's here is specific to this section. */
+   in pages.css; what's here is specific to this section. */
 .db-chart--donut {
   max-width: 300px;
   margin-inline: auto;
