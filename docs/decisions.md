@@ -745,3 +745,80 @@ own `report.css` rules, and the day it adopts `ui/Badge` for them it inherits th
 without a decision of its own. That is the intent of a
 primitive-level fix, and it is recorded here because the entry above read as if the change
 were scoped to the landing.
+
+## 2026-09-17 — the dashboard rebuild: what was decided, and why
+
+**The filter bar is one sticky pane, with the rarely-used controls behind a «المزيد» popover
+and a sheet under 900px — and the applied-filter chips live inside that pane, not below it.**
+Four controls (video, period, per-page, comment type or whatever the section needs most) stay
+on the bar itself; the other six sit behind «المزيد» so the bar never grows past one row at
+normal widths. Under 900px the whole bar collapses to a single «الفلاتر» button that opens a
+full sheet. The chip placement was the harder call: the plan's own brief first put
+`ActiveFilters` directly below the sticky bar, non-sticky, and Task 11's cut-over shipped
+that — then failed its own e2e test, "the report says what it is narrowed to, wherever you
+have read to": scroll 2500px down a filtered report and the chips had scrolled out of view
+with everything else. That test's name states the dashboard's own principle — a reader deep
+in a narrowed report should not have to scroll back up to see what narrowed it — so the
+layout was wrong, not the test. Fix: `FilterBar` gained a `chips?: ReactNode` slot rendered as
+the form's last row, inside the sticky pane, only while at least one chip exists (an empty row
+would cost pinned height for nothing, and the Provenance strip's scope sentence already covers
+the no-filter case). The period note moved the other way, out of the pane and into a plain
+`<p>` below it, to keep the pinned height from growing again for a sentence that is not a
+filter. Net pinned height at 1280×900 with no filter applied: 154.5px (`useActiveSection`'s
+scroll-spy rootMargin is tuned to `-163px` against that number).
+
+**Radix `Select` has no empty-string option, so the sentinel `"__all"` is mapped at the
+component boundary and the filter state keeps `""`.** Every other layer of the dashboard —
+`Filters`, `filtersFrom`, `applyFilters`, the URL-adjacent state, the e2e assertions — reads
+and writes `""` for "no filter chosen", unchanged from before this redesign. Only the
+`ui/Select` trigger and its `onValueChange` translate `""` ↔ `"__all"` at the moment a value
+crosses into or out of Radix, because Radix's own `Select.Item` refuses an empty `value` prop.
+Nothing outside that one translation point ever sees `"__all"`.
+
+**The review dialog's focus rules, end to end**: opening it moves focus to the form itself
+(not the first field, not the select), matching the rest of the product's `ui/Dialog`
+convention; `Escape` closes it, except mid-save, when the guard refuses the close the same way
+`DeleteWorkspaceDialog` already refused one — a save in flight must not be interrupted by a
+key someone forgot they were near; and on close, focus returns to whatever opened the dialog:
+the row's own trigger button if that row is still in the DOM, or the comments section's
+heading (`tabIndex={-1}`) if the row is gone — which happens for real when a save moves a
+comment out of the currently-applied filter (e.g. saving under `unreviewed` after marking it
+reviewed). The first cut of the fallback had no second branch and lost focus to `<body>`
+whenever the row unmounted before the dialog finished closing; Task 10's review caught it, and
+the fix is `document.body.contains(trigger) ? trigger.focus() : heading.focus()`, pinned by a
+unit test that detaches the trigger before closing.
+
+**`.ui-split`, the primitive both the dashboard's split bars and the landing's `ProductWindow`
+share, draws pixel widths, not flex ratios.** The first version used `flex-grow` per segment,
+which Chart.js-style proportional bars normally do — but flex-grow on a set of segments that
+sum to less than the container's full width still grows them to fill it, silently hiding
+whatever "remainder" the bar was supposed to show. That is exactly the case a video's split
+bar exists to show honestly: an unanalysed remainder. So the primitive instead sets
+`flex: 0 0 auto` and an inline `width: <pct>%` per segment, computed by each caller against
+its own chosen denominator. The two callers chose different denominators on purpose:
+`Videos.tsx`'s card bar is a share of the video's TOTAL comment count, so the muted background
+that shows through is the unanalysed remainder, honestly proportioned; `Compare.tsx`'s row bar
+is a share of the ANALYSED count, because that row also prints a percentage figure beside the
+bar and that figure is itself a share of analysed comments — bar and printed number must agree
+within one cell, which they would not if the bar used total and the text used analysed (this
+was caught in Task 8's review as exactly that disagreement, in a cell for a partly-analysed
+video). `Compare.test.tsx` pins both the 50/50-over-analysed case and the width arithmetic.
+
+**`report.css` keeps loading, on purpose, for `/sync`, the catalogue panel and `/admin`
+(Operations).** This plan's scope was the dashboard page alone; those three surfaces still use
+`report.css`'s rules and were never touched by any of the twelve tasks. Deleting the stylesheet
+now would break them. `dashboard/noReportCss.test.ts` guards the boundary from the dashboard's
+side — no file under `dashboard/` may import it or carry an `rp-*` class — and phase 4 (not
+scheduled here, recorded as pending in `docs/coordination/ACTIVE.md`) is the task that moves
+those three surfaces onto the same `ui/`-primitive pattern and retires the file for good.
+
+**The chart tooltip background is a hard-coded hex, not a CSS custom property, because a
+`<canvas>` cannot read one.** `chartOptions.ts`'s shared `tooltip()` sets
+`backgroundColor` to the literal value `brand.css`'s `--text-1` currently resolves to at the
+document's default (light) theme — not `var(--text-1)`, which Chart.js's canvas renderer would
+draw as the string `"var(--text-1)"` rather than resolving it, since canvas paint calls are not
+CSS and never consult the cascade. `chartOptions.test.ts` pins the literal value directly
+against the token's own definition in `brand.css`, so the two cannot silently drift apart
+without the test catching it — the closest a canvas-drawn colour can come to being "the same
+token" as the DOM's own rule, short of resolving it at runtime with `getComputedStyle`, which
+the shared options object (built once, outside any component) has no element to call it on.

@@ -59,6 +59,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 | `apps/web/src/locale.ts`, `locale.css`, `strings/**`, `LanguageSwitch.tsx`, `tests/e2e/language.spec.ts` | **done** — English language support landed as `f9b2840`…`7478dc0` by the audit-phase-two Claude session; free | 2026-09-15 |
 | UI text in `apps/web/src/**` | **every sentence now lives in `strings/ar.ts` with a typed English twin in `strings/en.ts`.** A new sentence goes there, in both languages, or `tsc` fails. `Landing.tsx` included since `b956c64` — the demo's four comments are the one deliberate Arabic-only text, as data | 2026-09-15 |
 | `workers/python/src/topics/**`, `supabase/migrations/20260916010000`–`012000`, `supabase/functions/_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`, `packages/contracts/src/topics.ts` | **done** — topic classification (tasks 1–10) landed as `0866318`…`1b4ed30`; free, and see the not-yet-live-deployed note below | 2026-09-16 |
+| `apps/web/src/dashboard/**` (and the `.ui-split` primitive in `apps/web/src/ui/ui.css`) | **done** — the dashboard redesign (tasks 1–12) landed as `4566718`…`07e9ccd`; the old `apps/web/src/Dashboard.tsx` is deleted, `report.css` no longer loads on this page; free | 2026-09-17 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
@@ -349,3 +350,22 @@ via `npm run test:e2e:build`. `npm run test:e2e` starts the dev server alone, ru
 `default` project alone, and never touches `apps/web/dist` — checked by the file's mtime
 before and after a run. Running the build suite still leaves a fixture-mode `dist` behind,
 so `npm run build` before `deploy:preview` as ever.
+
+2026-09-17, the dashboard redesign (tasks 1–12, `4566718`…`07e9ccd`): claimed
+`apps/web/src/dashboard/**` (whole new directory; `apps/web/src/Dashboard.tsx` deleted, not
+shimmed) and the `.ui-split` primitive lifted into `apps/web/src/ui/ui.css`. Free now, row
+added to the table above. `npm run check` green at the close: lint, format:check, typecheck,
+`check:functions` (deno), unit (94 files / 597 tests), db (32 files / 310 tests), worker (195
+tests), build (8 prerendered pages), secrets (575 source files plus built assets); the
+browser suite is `tests/e2e/dashboard.spec.ts` + `app-shell.spec.ts`, 86/86, recorded in
+Task 11's report rather than re-run here. `docs/verification.md` was left alone all the way
+through — `git status --short docs/verification.md` was non-empty (another session's
+in-flight edit) at every task's start and at this one's close; its dated entry for this work
+is deferred, not skipped. `.screenshots/` (untracked) was never touched; this feature's own
+screenshots live under `.superpowers/sdd/2026-09-17-dashboard-redesign/shots/`.
+
+**PENDING: phase 4, retire `report.css`.** It still loads on `/sync`, the catalogue panel and
+`/admin` (Operations) — none of those pages moved in this redesign, by design (out of scope,
+see `docs/progress.md`'s dated entry). The next session that touches those pages should either
+carry them onto the `ui/`-primitive pattern this redesign used for the dashboard, or confirm
+they still need `report.css`'s rules verbatim before deleting anything.

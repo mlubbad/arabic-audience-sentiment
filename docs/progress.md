@@ -1223,3 +1223,84 @@ workspace was then deleted from `/admin` (0 channels, 1 member — nothing else 
 Both halves of the last open item are done. Nothing on the 2026-09-16 "before live keys"
 list remains outstanding; setting `PADDLE_ENV=production` and the live API key, webhook
 secret and client token is the owner's own action, as before.
+
+## 2026-09-17 — the dashboard rebuilt: one page in `dashboard/`, sticky filters, sections on the design system
+
+Twelve tasks (`docs/superpowers/plans/2026-09-17-dashboard-redesign.md`, spec
+`docs/superpowers/specs/2026-09-17-dashboard-redesign-design.md`), commits `4566718`
+(Task 1) through `07e9ccd` (Task 12's own) — `git log --oneline 47c2882..HEAD` for the full
+range. The old single-file `apps/web/src/Dashboard.tsx` is gone; the page is now
+`apps/web/src/dashboard/Dashboard.tsx`, composed of `FilterBar.tsx` / `ActiveFilters.tsx` /
+`filters.ts` / `Labelled.tsx` / `useMediaQuery.ts` (the sticky bar and its state), `PageStates.tsx`
+(loading/empty/error skeletons), `Hero.tsx`, `SectionNav.tsx`, `Provenance.tsx` (the page's
+head), `Summary.tsx`, `Videos.tsx`, `Voice.tsx`, `Timing.tsx`, `ChartFigures.tsx`, `People.tsx`,
+`Compare.tsx`, `Engaged.tsx`, `Comments.tsx` / `CommentsTable.tsx` / `ReviewDialog.tsx` (the
+eleven report sections), plus the shared `chartOptions.ts`, `splitBar.ts`, `format.ts`, and a
+`.css` file per section beside `dashboard.css`. `apps/web/src/dashboard/noReportCss.test.ts`
+guards the split: no `dashboard/*.tsx` may import `report.css` or carry an `rp-*` class, and
+`main.tsx` must lazy-load `./dashboard/Dashboard`, not the old path. `report.css` itself is not
+deleted — `/sync`, the catalogue panel and `/admin` (Operations) still load it, unmoved by this
+plan; retiring it there is phase 4, noted as pending in `docs/coordination/ACTIVE.md`. The
+`.ui-split` rule the split bars use (`Videos.tsx` over the analysed+unanalysed total,
+`Compare.tsx` over the analysed count alone so its bar and printed percentages agree in one
+cell) was lifted into `apps/web/src/ui/ui.css` in Task 1 and the landing's `ProductWindow`
+switched to it the same commit, so the primitive has two callers from day one, not one.
+
+**The browser suite**, `tests/e2e/dashboard.spec.ts` and `tests/e2e/app-shell.spec.ts`, ends at
+86/86 (78 dashboard tests — the pre-existing 76 plus two new: the sticky bar stays in the
+viewport after a 2500px scroll, and at 390px the filters open as a sheet with no page overflow
+at 320/390/768 — plus 8 app-shell tests). Getting there meant moving all 31 `getByLabel(...)
+.selectOption(...)` call sites in `dashboard.spec.ts` onto Radix `ui/Select`, through one
+`pick(page, label, option)` helper (plus `nativeMirror`, `offered`, `openPopover` /
+`openMore` / `openPeriod`, `applyFilter` — all in the file's first ~45 lines) rather than
+patching each site by hand; the full old-selector → new-selector mapping, line by line, with
+the reasoning for each, is in `.superpowers/sdd/2026-09-17-dashboard-redesign/task-11-report.md`.
+The short version: `.rp-*` class selectors became `.db-*` or `getByTestId(...)`; four
+controls moved behind a «المزيد» popover so their `selectOption` calls gained an `openMore`
+first; the date mode select lives inside the period popover and needs `openPeriod`; and the
+`toHaveValue` reset-assertion on native selects became `toContainText` against the trigger's
+displayed option text, since a button trigger has no `.value` to read.
+
+**Screenshots** are under `.superpowers/sdd/2026-09-17-dashboard-redesign/shots/`:
+`dashboard-desktop.png` (1280, full page), `dashboard-desktop-scrolled.png` (the sticky bar with
+a filter applied, chips visible inside the pinned pane), `dashboard-desktop-more.png` («المزيد»
+open), `dashboard-review.png` (the correction dialog), `dashboard-390.png` /
+`dashboard-390-full.png` / `dashboard-390-sheet.png` (phone width, the sheet open),
+`filterbar-scrolled.png` and `videos-split.png` (working shots from Tasks 2 and 6). None of
+this touched `.screenshots/` at the repo root, which is a different, untracked directory this
+plan never wrote to.
+
+**Two incidents**, recorded here honestly rather than folded into the task list above them:
+Task 2's implementer ran `git push origin main` on its own initiative, against the plan's
+"push at the end" — no harm done (nothing deploys on a push to this remote, and the pushed
+state was check-green), but every dispatch after it said "never push" explicitly, and this
+task (12) was told the same. Task 9's implementer ran `git stash` to take a baseline
+measurement, touching the checkout while another session's `docs/verification.md` sat
+uncommitted in it — forbidden by `docs/coordination/ACTIVE.md`'s own rules; verified
+afterwards that the stash list was empty and the other session's 22-line diff was intact, so
+no work was lost, but the practice is now spelled out as off-limits in every later brief: a
+baseline is a `git worktree add` in `/tmp`, never a stash on a shared checkout.
+
+**Deferred, so they are not lost**: the pinned filter bar wraps its action buttons to a second
+row at 1280px width, making the pinned pane 154.5px tall (`useActiveSection`'s rootMargin is
+tuned to that number; a narrower action row could bring it under ~72px and is worth a later
+pass); `ChartEmpty`'s bold lead sentence runs into the sentence after it with no space (JSX
+whitespace bug, confirmed real, not yet fixed); the Timing section's `2fr 1fr 1fr` grid leaves
+the hourly/weekday cards about 180px wide at 1000px of content width; the comparison table's
+new `onPick` on each row has no e2e coverage; the review dialog's × reuses
+`S.adminDeleteClose` rather than a generic `close` string key, which belongs in `strings/`
+once that file is open to new keys in a later phase; and `report.css` keeps its dashboard-era
+dead rules until phase 4 removes the whole file from the pages that still load it.
+
+**Task 12 itself**: `apps/web/src/dashboard/Comments.tsx`, `ReviewDialog.tsx` and
+`ReviewDialog.test.tsx` failed `prettier --check` since Task 11's fix wave (noted there as a
+deferred item) — `npx prettier --write` on exactly those three files, `npx vitest run
+apps/web/src/dashboard` held at 57/57 before and after, committed alone as `07e9ccd`. Then
+`npm run check`, green end to end: lint (eslint + `ruff check .`), format:check, typecheck,
+`check:functions` (deno check on the edge functions), `npm test` 94 files / 597 tests, `npm run
+test:db` 32 files / 310 tests, `npm run worker:test` 195 pytest tests, `npm run build` (8
+prerendered pages, `Dashboard-*.js`/`Dashboard-*.css` chunked separately from the `report.css`
+that still ships for `/sync`/`/account`/`/admin`), `npm run check:secrets` (575 source files
+plus built assets). `git status` throughout this task showed only the other session's modified
+`docs/verification.md` and the untracked `.screenshots/`; neither was staged, edited or
+touched.
