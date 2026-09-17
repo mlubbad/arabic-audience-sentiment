@@ -52,7 +52,16 @@ function loadGsi(): Promise<void> {
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error("gsi_load_failed"));
+      script.onerror = () => {
+        // A failed load must not be cached forever in the shared `loading`
+        // promise, or every later mount — a route revisit, a retry — would
+        // replay the same rejection until the page is reloaded. Clearing it
+        // and dropping the dead tag lets the next call to `loadGsi` start a
+        // fresh attempt with a fresh script element.
+        loading = null;
+        script.remove();
+        reject(new Error("gsi_load_failed"));
+      };
       document.head.appendChild(script);
     });
   return loading;

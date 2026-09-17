@@ -33,6 +33,13 @@ export function Account() {
   const [session, setSession] = useState<Session | null>(null),
     [busy, setBusy] = useState<Scope | null>(supabase ? "page" : null),
     [note, setNote] = useState<Note | null>(null);
+  // True once `getSession()` below has answered, at least once. Before that,
+  // `!session` is indistinguishable from "signed out" — it is also true for
+  // the instant before a signed-in visitor's session comes back — and gating
+  // One Tap on it alone let a signed-in reader's first paint fire the prompt
+  // and its fetch, then cancel it a moment later. `false` while `!supabase`
+  // is moot: the gate below already requires `supabase` to be present.
+  const [sessionRead, setSessionRead] = useState(!supabase);
   const pending = busy !== null;
   const say = (at: Scope, text: string) => setNote({ at, text });
   /** What a place has to say for itself: its own note, or that it is working.
@@ -73,7 +80,7 @@ export function Account() {
   // no client, an existing session, or the door not open all mean "do not
   // prompt" rather than "do not call the hook".
   useGoogleOneTap({
-    enabled: !!supabase && !session && googleOpen,
+    enabled: !!supabase && sessionRead && !session && googleOpen,
     clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
     onCredential: async (token, nonce) => {
       const { error } = await supabase!.auth.signInWithIdToken({
@@ -149,6 +156,7 @@ export function Account() {
       if (active) {
         setSession(data.session);
         setBusy(null);
+        setSessionRead(true);
         if (error) say("page", S.sessionReadFailed);
       }
     });

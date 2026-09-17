@@ -112,6 +112,54 @@ describe("useGoogleOneTap", () => {
     expect(tag.defer).toBe(true);
   });
 
+  it("retries after a failed script load, rather than caching the rejection forever", async () => {
+    // A module-fresh copy of the hook: the previous test's script tag never
+    // fires `load` or `error`, so this file's shared `loading` promise is
+    // left permanently pending in that module instance — reusing it here
+    // would make this test hang rather than exercise a real load. A fresh
+    // import gets its own `loading`, starting at `null`, the same way a
+    // separate page load would.
+    vi.resetModules();
+    const fresh = await import("./googleOneTap");
+    function FreshProbe(props: {
+      enabled: boolean;
+      clientId: string | undefined;
+      onCredential: (credential: string, rawNonce: string) => void;
+    }) {
+      fresh.useGoogleOneTap(props);
+      return null;
+    }
+
+    const onCredential = vi.fn();
+    const { unmount } = render(
+      createElement(FreshProbe, {
+        enabled: true,
+        clientId: "cid",
+        onCredential,
+      }),
+    );
+
+    await waitFor(() => expect(scriptTags()).toHaveLength(1));
+    const failedTag = scriptTags()[0];
+    failedTag.dispatchEvent(new Event("error"));
+    // The onerror handler removes the tag itself; wait for that (and the
+    // hook's own `.catch`) to settle before moving on.
+    await waitFor(() => expect(scriptTags()).toHaveLength(0));
+    unmount();
+
+    render(
+      createElement(FreshProbe, {
+        enabled: true,
+        clientId: "cid-2",
+        onCredential,
+      }),
+    );
+    // A cached, forever-rejected `loading` promise would never call
+    // `loadGsi` again, so no new tag would appear here.
+    await waitFor(() => expect(scriptTags()).toHaveLength(1));
+    expect(scriptTags()[0]).not.toBe(failedTag);
+  });
+
   it("does nothing when disabled", async () => {
     const onCredential = vi.fn();
     render(
