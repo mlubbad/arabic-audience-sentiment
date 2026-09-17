@@ -12,6 +12,7 @@
  */
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import {
   ACCOUNT_DEMO_FIXTURE,
   loadAccountDemo,
@@ -252,7 +253,7 @@ describe("reduceAccountDemo: create", () => {
     expect(out.workspaces.slice(0, 3)).toEqual(state.workspaces);
   });
 
-  it("each create keeps ids sequential and hex-valid past the ninth workspace", async () => {
+  it("each create keeps ids sequential hex, past the ninth workspace and beyond", async () => {
     let state = await loaded();
     for (let i = 0; i < 7; i++) {
       state = reduceAccountDemo(state, {
@@ -260,11 +261,40 @@ describe("reduceAccountDemo: create", () => {
         name: `مساحة ${i}`,
       });
     }
-    // 3 seeded + 7 created = 10th workspace overall: a1..a9 exhausted, so
-    // the tenth rolls to the b-suffix.
+    // 3 seeded + 7 created = 10 workspaces. Plain hex arithmetic on the
+    // fixture's own a1/a2/a3 continues a4, a5, … a9, aa — there is no
+    // separate letter scheme to run into a ceiling past a9.
     expect(state.workspaces).toHaveLength(10);
     expect(state.workspaces[8].id).toBe("00000000-0000-4000-8000-0000000000a9");
-    expect(state.workspaces[9].id).toBe("00000000-0000-4000-8000-0000000000b1");
+    expect(state.workspaces[9].id).toBe("00000000-0000-4000-8000-0000000000aa");
+  });
+
+  it("produces a well-formed UUID string, valid by the same rule zod's .uuid() checks", async () => {
+    const state = await loaded();
+    const out = reduceAccountDemo(state, {
+      type: "create",
+      name: "مساحة رابعة",
+    });
+    const added = out.workspaces[out.workspaces.length - 1];
+    expect(added.id).toBe("00000000-0000-4000-8000-0000000000a4");
+    expect(added.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(z.string().uuid().safeParse(added.id).success).toBe(true);
+  });
+
+  it("keeps minting valid ids well past where the old letter scheme would have broken (seq 55, formatting an invalid g1)", async () => {
+    let state = await loaded();
+    for (let i = 0; i < 60; i++) {
+      state = reduceAccountDemo(state, {
+        type: "create",
+        name: `مساحة ${i}`,
+      });
+    }
+    const ids = state.workspaces.map((w) => w.id);
+    for (const id of ids) {
+      expect(id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(z.string().uuid().safeParse(id).success).toBe(true);
+    }
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("does not mutate the input state", async () => {

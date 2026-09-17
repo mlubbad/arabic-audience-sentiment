@@ -93,40 +93,31 @@ function refuse(message: string, code: string): never {
   throw { message, code };
 }
 
-/** A workspace id's sequence number: `…a1`..`…a9` are 1..9, `…b1`..`…b9` are
- *  10..18, and so on — the inverse of `idFromSeq` below. 0 for anything that
- *  does not match (the fixture's own ids never do; only ids this reducer
- *  minted do). */
-const WORKSPACE_ID_SUFFIX = /^00000000-0000-4000-8000-0*([a-z])(\d+)$/;
+/** A workspace id's last UUID group, read as a plain hex integer — `…a1` is
+ *  `0xa1` (161), `…000c1` is `0xc1` (193), and so on. 0 for anything that
+ *  does not parse as hex (there is no such id in this fixture, but a
+ *  malformed one should lose the race for "highest" rather than throw). */
 function workspaceSeq(id: string): number {
-  const m = WORKSPACE_ID_SUFFIX.exec(id);
-  if (!m) return 0;
-  const [, letter, digits] = m;
-  return (letter.charCodeAt(0) - "a".charCodeAt(0)) * 9 + Number(digits);
+  const group = id.slice(id.lastIndexOf("-") + 1);
+  const n = parseInt(group, 16);
+  return Number.isNaN(n) ? 0 : n;
 }
 
-/** The id for sequence number `seq`: `a1`..`a9` while there is room in that
- *  nine, then `b1`, `b2`, … — always the twelve hex characters a UUID's last
- *  group needs, padded with leading zeros. */
-function idFromSeq(seq: number): string {
-  const letterIndex = Math.floor((seq - 1) / 9);
-  const digit = seq - letterIndex * 9;
-  const suffix = `${String.fromCharCode("a".charCodeAt(0) + letterIndex)}${digit}`;
-  const zeros = "0".repeat(12 - suffix.length);
-  return `00000000-0000-4000-8000-${zeros}${suffix}`;
-}
-
-/** The next workspace's id: one past the highest sequence number any current
- *  workspace's id carries. Read from the state rather than its length, so a
- *  create after a retire never reuses an id an earlier create (or the
- *  fixture itself) already claimed — length-based numbering handed out `a3`
- *  again the moment a workspace was retired down to two. */
+/** The next workspace's id: the UUID's last group, one past the highest any
+ *  current workspace's id carries — plain hex arithmetic on the group
+ *  itself, not a hand-rolled `a1`..`a9`/`b1`..`b9` letter scheme (which ran
+ *  out at seq 55, formatting an invalid `g1`). Hex has nowhere to run out to
+ *  short of 16^12 workspaces, and the fixture's own `…a1`/`…a2`/`…a3`
+ *  continue exactly as `…a4`, `…a5`, … Read from the state rather than its
+ *  length, so a create after a retire never reuses an id an earlier create
+ *  (or the fixture itself) already claimed. */
 function nextWorkspaceId(workspaces: { id: string }[]): string {
   const highest = workspaces.reduce(
     (max, w) => Math.max(max, workspaceSeq(w.id)),
     0,
   );
-  return idFromSeq(highest + 1);
+  const group = (highest + 1).toString(16).padStart(12, "0");
+  return `00000000-0000-4000-8000-${group}`;
 }
 
 /**
