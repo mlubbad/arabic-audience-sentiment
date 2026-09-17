@@ -279,14 +279,3 @@
     order: -1;
   }
 }
-@media (max-width: 650px) {
-  /* The landing hides its nav behind a menu button this page does not have;
-     two links fit on a line, so they stay. */
-  .pricing-page .lp-nav {
-    display: flex;
-    gap: 14px;
-  }
-  .pricing-page .lp-header-cta {
-    display: inline-block;
-  }
-}

@@ -97,8 +97,12 @@ export function ProductWindow({
         {mode === "interactive" ? (
           <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
             <TabsList aria-label={S.lpDemoFilterLabel} className="pw-filters">
+              {/* No `TabsContent` panels: the tabs filter the list below, in
+                  place. Radix still writes each trigger an `aria-controls`
+                  naming a panel id that exists nowhere; user props are
+                  spread after its own, so `undefined` removes it. */}
               {filters.map((f) => (
-                <TabsTrigger key={f} value={f}>
+                <TabsTrigger key={f} value={f} aria-controls={undefined}>
                   {nameOf(f)}
                 </TabsTrigger>
               ))}

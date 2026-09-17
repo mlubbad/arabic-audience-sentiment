@@ -114,6 +114,10 @@ export function PublicShell({
             {S.lpOpenAccount} <span aria-hidden="true">{S.arrowUpForward}</span>
           </Link>
         </Button>
+        {/* On open, Radix's FocusScope puts focus on the sheet's close
+            button, not its first link: its tabbable-candidate scan skips
+            anchors. Accepted — the close button is a real control, and the
+            links are one Tab away. */}
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button
@@ -135,7 +139,17 @@ export function PublicShell({
               if (h) {
                 pending.current = null;
                 e.preventDefault();
-                location.hash = h;
+                // Setting `location.hash` to the value it already has is a
+                // no-op — the second pick of the same section from the sheet
+                // did nothing — so that case scrolls the target directly.
+                // Focus does not return to the trigger either way: after the
+                // hash change the fragment is the browser's sequential-focus
+                // start, and a repeat pick leaves the keyboard where the
+                // page scrolled to. By design — the reader asked for the
+                // section, not the menu button.
+                const el = document.getElementById(h.slice(1));
+                if (location.hash === h) el?.scrollIntoView();
+                else location.hash = h;
               }
             }}
           >

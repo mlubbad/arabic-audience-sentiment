@@ -10,7 +10,9 @@
  * table in main.tsx is the only place that maps an address to a document,
  * and `LEGAL_PATHS` is what every link reads, so the two cannot disagree.
  */
-import "./legal.css";
+// `legal.css` is imported by `main.tsx`, not here: this page is loaded
+// lazily, and a stylesheet imported from a lazy page travels with its chunk —
+// after the prerendered page has painted without it.
 import { PublicShell } from "./public/PublicShell";
 import { useLocale, type Locale } from "./locale";
 import { useStrings } from "./strings";

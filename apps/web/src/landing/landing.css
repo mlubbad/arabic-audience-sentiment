@@ -29,25 +29,26 @@
   text-align: start;
   align-items: flex-start;
 }
-.landing h1 {
+/* `.lp-page`, not `.landing`: this stylesheet is in the entry bundle beside
+   the pricing and legal pages', and all three pages wear `.landing` for the
+   shared chrome. A `.landing h1` here is the pricing page's title too — it
+   was, at 66px. `Landing.tsx` passes `pageClassName="lp-page"` to
+   PublicShell, so these reach the landing alone. */
+.lp-page h1 {
   font-size: clamp(40px, 5.2vw, 68px);
   line-height: 1.22;
 }
-.landing h2 {
+.lp-page h2 {
   font-size: clamp(28px, 3.4vw, 44px);
   line-height: 1.35;
 }
-/* Tracking tightens Latin display sizes only; on Arabic the joined letters
-   need their zero. */
-.landing:lang(en) h1 {
+/* Tracking tightens Latin display sizes only; the Arabic zero is in
+   public.css, shared with the other public pages. */
+.lp-page:lang(en) h1 {
   letter-spacing: -1.5px;
 }
-.landing:lang(en) h2 {
+.lp-page:lang(en) h2 {
   letter-spacing: -0.6px;
-}
-.landing:lang(ar) h1,
-.landing:lang(ar) h2 {
-  letter-spacing: 0;
 }
 .lp-eyebrow.ui-badge {
   gap: 6px;

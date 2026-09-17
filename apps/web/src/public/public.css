@@ -71,6 +71,14 @@
   line-height: 1.8;
   overflow: clip;
 }
+/* The English pages take the Latin face — the same one the app's own
+   English mode uses (locale.css) and the one the prerender preloads for
+   `/en…`. Without this the English pages set in the Arabic face, ignored the
+   preloaded Readex files, then swapped once the app's own rule applied
+   (CLS 0.037 measured on 2026-09-17). */
+.landing:lang(en) {
+  font-family: var(--font-latin);
+}
 .landing * {
   box-sizing: border-box;
 }
@@ -96,10 +104,15 @@
 .landing h3 {
   font-weight: 700;
 }
-.landing h2 {
-  font-size: clamp(30px, 3.7vw, 48px);
-  line-height: 1.4;
-  letter-spacing: -0.9px;
+/* Only the weight and the margin are shared: the sizes are each page's own
+   (the landing's in landing/landing.css under `.lp-page`, the pricing and
+   legal pages' in their own files). A `.landing h2` size here once outranked
+   the landing's by bundle order and leaked onto the other two pages. The
+   Arabic tracking stays shared — joined letters need their zero on every
+   page, and the pricing and legal H1s write a Latin -1px of their own. */
+.landing:lang(ar) h1,
+.landing:lang(ar) h2 {
+  letter-spacing: 0;
 }
 .landing h3 {
   /* One size. There were three — 22 here, 20 in the benefits, 19 in the
@@ -154,6 +167,10 @@
 .lp-announcement span {
   margin-inline-start: 18px;
   color: #d0caff;
+}
+/* The language pill sits a word's width from the tag, not against it. */
+.lp-announcement .app-lang {
+  margin-inline-start: 0.9rem;
 }
 .lp-header {
   padding: 25px max(5%, calc((100% - 1220px) / 2));
@@ -342,6 +359,9 @@
   border-radius: var(--radius-2);
   font-size: var(--lp-t-md);
   color: var(--text-1);
+  /* The sheet is portaled to <body>, outside `.landing`, so the page's
+     `.landing a` reset never reaches these: said again here. */
+  text-decoration: none;
 }
 .lp-sheet-nav a:hover {
   background: var(--bg-muted);

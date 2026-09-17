@@ -14,7 +14,9 @@
  */
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import "./pricing.css";
+// `pricing.css` is imported by `main.tsx`, not here: this page is loaded
+// lazily, and a stylesheet imported from a lazy page travels with its chunk —
+// after the prerendered page has painted without it.
 import { PublicShell } from "./public/PublicShell";
 import { usePlanCatalogue } from "./planCatalogue";
 import { type Locale } from "./locale";

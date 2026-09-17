@@ -23,6 +23,17 @@ import "./app.css";
 import "./locale.css";
 import "./ui/ui.css";
 import { Landing } from "./landing/Landing";
+// The pricing and legal pages are `lazy()` below, but their stylesheets are
+// not: a prerendered public page arrives with its markup in place and links
+// only the entry's CSS, so a rule that travels with the lazy chunk reaches
+// the reader after the page has already painted without it — `/pricing`
+// and the legal documents painted as the landing's type and reflowed once
+// the low-priority bundle hydrated. Imported here, they are in the entry's
+// CSS; `scripts/prerender.mjs` checks that they stayed there. They must
+// come AFTER the landing's import: `public.css` carries the shared chrome
+// these two override at equal specificity, and later wins.
+import "./pricing.css";
+import "./legal.css";
 import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
 import { useIsPlatformAdmin } from "./adminAccess";

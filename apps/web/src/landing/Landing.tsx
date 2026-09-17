@@ -27,6 +27,9 @@ export function Landing({ locale }: { locale: Locale }) {
       page="home"
       mainId="landing-content"
       mainClassName="lp-main"
+      // The landing's own type sizes hang off this (landing.css); `.landing`
+      // alone is the chrome every public page wears.
+      pageClassName="lp-page"
       links={[
         { href: "#why", label: S.lpNavWhy, kind: "anchor" },
         { href: "#experience", label: S.lpNavExperience, kind: "anchor" },

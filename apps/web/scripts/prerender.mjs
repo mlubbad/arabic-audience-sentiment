@@ -154,7 +154,32 @@ for (const route of PUBLIC_ROUTES) {
       : join(dist, route.path.replace(/^\//, ""), "index.html");
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, page);
-  written.push({ ...route, file, page });
+  // Not `{ ...route, file, page }`: `route.page` is the kind ("home",
+  // "pricing", …) and `page` here is the HTML, and spreading both under one
+  // name silently turned every kind-specific check below into a no-op.
+  // The checks read the file back from disk; nothing needs the string.
+  written.push({ ...route, file });
+}
+
+// The stylesheets a prerendered page links are the only ones it has until
+// its bundle arrives — and that bundle is marked low priority above. The
+// pricing and legal pages are lazy routes; a stylesheet imported from a lazy
+// page travels with its chunk, so the page paints as the landing's type and
+// reflows once the chunk lands (seen on 2026-09-17, `/pricing` and the two
+// legal documents in both languages). `main.tsx` imports both stylesheets
+// eagerly for that reason; this is what notices if that import goes.
+const linkedCss = (html) =>
+  [...html.matchAll(/<link rel="stylesheet"[^>]*href="([^"]+)"/g)]
+    .map((m) => readFileSync(join(dist, m[1]), "utf8"))
+    .join("\n");
+const ownRule = { pricing: ".pricing-card", privacy: ".legal-contents" };
+ownRule.terms = ownRule.privacy;
+for (const { path, page: kind, file } of written) {
+  const rule = ownRule[kind];
+  if (rule && !linkedCss(readFileSync(file, "utf8")).includes(rule))
+    throw new Error(
+      `prerender: ${path} links no stylesheet carrying \`${rule}\` — the ${kind} page's CSS is not in the entry bundle (see main.tsx)`,
+    );
 }
 
 // The sitemap: every public address, each naming its twin in the other

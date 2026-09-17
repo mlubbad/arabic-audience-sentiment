@@ -14,11 +14,10 @@ export function Benefits({ locale }: { locale: Locale }) {
     { tag: S.lpBenefit3Tag, title: S.lpBenefit3Title, text: S.lpBenefit3 },
   ];
   return (
-    <section
-      ref={ref}
-      className="lp-section lp-benefits"
-      aria-label={S.lpBenefit1Tag}
-    >
+    // No `aria-label`: it carried the first card's tag, which named the
+    // section after one of its three parts. Unnamed, the section is not a
+    // landmark, and the three h3s carry it in the outline.
+    <section ref={ref} className="lp-section lp-benefits">
       <div className="lp-container lp-grid-3">
         {items.map((b) => (
           <Card key={b.tag} className="lp-benefit">

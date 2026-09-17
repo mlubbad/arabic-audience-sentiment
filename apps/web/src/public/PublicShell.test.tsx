@@ -73,6 +73,55 @@ describe("PublicShell", () => {
     expect(menu).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("picking the same section twice from the sheet scrolls to it again", async () => {
+    // `location.hash = "#why"` when the hash is already "#why" is a no-op,
+    // so the second pick used to do nothing; the shell scrolls the target
+    // itself in that case. jsdom has no layout and no `scrollIntoView`;
+    // vitest.setup.ts supplies one on HTMLElement.prototype (not Element's,
+    // where the spec puts it), and that is the one to watch.
+    const scroll = vi
+      .spyOn(HTMLElement.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+    // An earlier test's pick may have left jsdom on "#why" already.
+    window.history.replaceState({}, "", "/");
+    render(
+      <MemoryRouter>
+        <DirectionProvider dir="rtl">
+          <PublicShell
+            locale="ar"
+            page="home"
+            links={links}
+            mainId="landing-content"
+          >
+            <h1>محتوى</h1>
+            <section id="why" />
+          </PublicShell>
+        </DirectionProvider>
+      </MemoryRouter>,
+    );
+    const menu = screen.getByRole("button", { name: ar.lpMenuLabel });
+    const pick = async () => {
+      await userEvent.click(menu);
+      await userEvent.click(
+        within(screen.getByRole("dialog")).getByRole("link", {
+          name: ar.lpNavWhy,
+        }),
+      );
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    };
+    await pick();
+    // The first pick went through `location.hash`, as before…
+    expect(scroll).not.toHaveBeenCalled();
+    // …which jsdom applies to its own URL; pinned here in case it did not,
+    // so the second pick is unambiguously a repeat.
+    window.history.replaceState({}, "", "#why");
+    await pick();
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.instances[0]).toBe(document.getElementById("why"));
+    scroll.mockRestore();
+    window.history.replaceState({}, "", "/");
+  });
+
   it("does not intercept a cross-page anchor even while the sheet is open", async () => {
     // PricingPage's (and LegalPage's) own FAQ link points at the home page's
     // `#questions`, not this page's — the sheet must leave it to native

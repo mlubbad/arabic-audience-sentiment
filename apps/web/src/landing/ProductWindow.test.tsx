@@ -51,6 +51,10 @@ describe("ProductWindow", () => {
     );
     await userEvent.click(screen.getByRole("tab", { name: "الكل" }));
     expect(container.querySelectorAll(".lp-example-comment")).toHaveLength(4);
+    // There are no panels — the tabs filter the list in place — so no tab
+    // may claim to control one (Radix writes an `aria-controls` by default).
+    for (const tab of screen.getAllByRole("tab"))
+      expect(tab).not.toHaveAttribute("aria-controls");
   });
 
   it("uses Western digits and the ASCII percent sign in English", async () => {

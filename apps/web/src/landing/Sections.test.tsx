@@ -27,9 +27,14 @@ describe("the three text sections", () => {
     ).toHaveAttribute("href", "#experience");
   });
   it("Benefits renders three cards with their ordinals and level-3 headings", () => {
-    wrap(<Benefits locale="ar" />);
+    const { container } = wrap(<Benefits locale="ar" />);
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(3);
     expect(screen.getByText(ar.lpBenefit1Tag)).toBeInTheDocument();
+    // The tag is the first card's, not the section's name: an unnamed
+    // section is no landmark, and the h3s carry the outline.
+    expect(container.querySelector("section")).not.toHaveAttribute(
+      "aria-label",
+    );
   });
   it("Trust keeps its labelled heading and three items", () => {
     const { container } = wrap(<Trust locale="ar" />);
