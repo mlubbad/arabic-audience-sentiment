@@ -2283,3 +2283,12 @@ Platform → Data Access and paste the §5b justification; record the §5c video
 is the live `403 insufficientPermissions` under readonly, then the same call under
 force-ssl); send the §5d reply on the thread. `apps/web/src/account/*`, `app.css`,
 `setup-path.css` were dirty from another session and were left unstaged.
+
+## 2026-09-18 — oauth-start deployed with the single scope, version 13
+
+`npm run check:functions` clean (six functions), then `npx supabase functions deploy
+oauth-start` by the owner ("Docker is not running" warning only — the bundle is built
+remotely). `functions list` afterwards: `oauth-start` version 12 → **13**, `ACTIVE`,
+`verify_jwt` false as before (the function checks the caller's Supabase session itself).
+From here on the consent screen lists one scope, `youtube.force-ssl`; the demo video can be
+recorded.
