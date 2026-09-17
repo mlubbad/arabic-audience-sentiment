@@ -2302,3 +2302,23 @@ of `youtube.readonly`; `/privacy-policy` contains "صلاحية واحدة لا 
 `/account`, `/terms` all `200`. Trigger: the owner's first demo take (8:00, reviewed
 frame-by-frame from 80 stills) showed the live policy still saying "exactly two
 permissions" at 0:26 — the code had changed on 2026-09-18 but the host had not.
+
+## 2026-09-18 — the demo video, edited rather than re-recorded
+
+The owner's 8:00 take was reviewed from 80 stills and a Groq Whisper transcript (key now in
+`~/.config/watch/.env`, 0600). Narration confirmed: "the single Google scope we use" at
+0:35, "the consent screen shows one permission" at 3:40 — nothing spoken about two scopes.
+Defects: the live policy still read "exactly two permissions" (fixed by the deploy above);
+the force-ssl "success" call had hit a video with comments disabled (403 commentsDisabled);
+25 s of `invalid_state` after a browser back; 50 s of an empty workspace; Disconnect never
+clicked; recorder toolbar and Dock in frame. The owner supplied three inserts: a policy
+clip recorded before the deploy (unusable, still "two"), a 96 s clip with the 200 response
+under force-ssl and a real Disconnect, and a second policy clip after the deploy.
+
+Cut with ffmpeg (`scratchpad/video/edit.py`, ten segments, audio and video ranges chosen
+separately at silence boundaries, held frames where the narration outlasts the footage,
+`crop=1112:676:40:0` to drop the Dock and toolbar, loudnorm): 6:44, 20.8 MB, delivered as
+`~/Downloads/audience-sentiment-oauth-demo-v2.mp4`. Verified from 101 stills at 4 s: the
+consent popup with the single scope now precedes "Channel connected"; no error screen, no
+old policy text, no Playground flash inside the catalogue section. Reply text in
+`docs/oauth-verification.md` §5d-bis; awaiting the unlisted link to send it.
