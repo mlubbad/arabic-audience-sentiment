@@ -96,7 +96,16 @@ function buildPrediction(label, contentHash, predictedAt) {
   };
 }
 
-function buildTopicPrediction(topic, contentHash) {
+/** Same shape as the sentiment prediction's `predicted_at` (date + 1 day),
+ * but its own fallback for an unknown date: `2026-09-01T00:00:00Z`, not the
+ * sentiment prediction's `2026-09-14T00:00:00Z` — c13 has no date and its
+ * topic review lands 2026-09-10, so the topic prediction must predate that,
+ * while the sentiment prediction has no review to precede. */
+function topicPredictedAt(date) {
+  return date ? plusOneDay(date) : "2026-09-01T00:00:00Z";
+}
+
+function buildTopicPrediction(topic, contentHash, predictedAt) {
   if (!topic) return null;
   return {
     status: "succeeded",
@@ -106,7 +115,7 @@ function buildTopicPrediction(topic, contentHash) {
     classification_key: TOPIC_CLASSIFICATION_KEY,
     model_id: "gemini-3.6-flash",
     prompt_version: "p1",
-    predicted_at: "2026-09-10T08:00:00Z",
+    predicted_at: predictedAt,
     error_code: null,
   };
 }
@@ -194,7 +203,11 @@ export function buildDemo() {
       reviews,
       video_title: video.title,
       by_channel_owner: isOwner,
-      topic_prediction: buildTopicPrediction(c.topic, predictionHash),
+      topic_prediction: buildTopicPrediction(
+        c.topic,
+        predictionHash,
+        topicPredictedAt(c.date),
+      ),
       topic_reviews: topicReviews,
     };
   });

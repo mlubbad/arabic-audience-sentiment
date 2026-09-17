@@ -316,7 +316,7 @@ test("correcting an unanalysed comment adds it to the sentiment denominator", as
   // This row has no usable prediction, so it is outside the denominator.
   const row = page
     .locator('[data-testid="comments-table"] tbody tr')
-    .filter({ hasText: "حد جرّب الجهاز ده على أندرويد؟" });
+    .filter({ hasText: "حد جرّب التطبيق ده على أندرويد؟" });
   await expect(row).toContainText("غير محلل / قديم");
   await row.getByRole("button", { name: "تصحيح" }).click();
   await pick(page, "التصنيف الصحيح", "مختلط");
@@ -555,7 +555,7 @@ test("separates known from unknown publication dates", async ({ page }) => {
   // A comment with no date is still a comment, not a defect.
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
-  ).toContainText("حد جرّب الجهاز ده على أندرويد؟");
+  ).toContainText("حد جرّب التطبيق ده على أندرويد؟");
 });
 
 test("a date range and an explicit unknown-date selection cannot contradict", async ({
@@ -786,7 +786,7 @@ test("compares videos using each video's own denominator", async ({ page }) => {
   // share a denominator with each other or with the whole filtered set.
   await page
     .locator('[data-testid="comments-table"] tbody tr')
-    .filter({ hasText: "حد جرّب الجهاز ده على أندرويد؟" })
+    .filter({ hasText: "حد جرّب التطبيق ده على أندرويد؟" })
     .getByRole("button", { name: "تصحيح" })
     .click();
   await pick(page, "التصنيف الصحيح", "إيجابي");
@@ -1585,7 +1585,7 @@ test("ranks engaged negatives and keeps unknown engagement out of the ranking", 
 
   // Now correct the comment whose like count is unknown. It is negative, so it
   // counts as excluded, but it must not be ranked as though it had zero likes.
-  await openReview(page, "حد جرّب الجهاز ده على أندرويد؟");
+  await openReview(page, "حد جرّب التطبيق ده على أندرويد؟");
   await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("مراجعة يدوية");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();

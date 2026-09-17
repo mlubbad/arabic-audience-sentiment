@@ -511,7 +511,7 @@ export const en: Strings = {
     `Last updated ${hours} ${pl(hours, "hour", "hours")} ago.`,
   dsFixtureBadge: "Illustrative data",
   dsFixtureScope: "An illustrative workspace, not connected to any channel",
-  dsFixtureReading: "Reading the test data.",
+  dsFixtureReading: "Reading the illustrative data.",
   dsFixtureCoverage: (total: string) =>
     `${total} ${pl(total, "comment", "comments")} written to illustrate the product; they represent no real audience.`,
   dsReviewsPersist: "Corrections are saved.",

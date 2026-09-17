@@ -160,7 +160,9 @@ export function CommentsTable({
         {s.comments.map((c) => (
           <Card key={c.id} className="db-comment-row">
             <h3 className="db-card-title">
-              {c.author_name ?? S.purgedAuthor}
+              {/* `<bdi>` keeps a Latin handle reading left-to-right
+                  (`@abu_faisal`, not `abu_faisal@`) inside the RTL row. */}
+              <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
               {c.is_reply && <small>{S.replyTag}</small>}
             </h3>
             <dl className="db-comment-dl">
@@ -217,7 +219,9 @@ export function CommentsTable({
           {s.comments.map((c) => (
             <TableRow key={c.id}>
               <TableCell>
-                {c.author_name ?? S.purgedAuthor}
+                {/* `<bdi>` keeps a Latin handle reading left-to-right
+                    (`@abu_faisal`, not `abu_faisal@`) inside the RTL row. */}
+                <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
                 {c.is_reply && <small>{S.replyTag}</small>}
               </TableCell>
               <TableCell>{commentText(c, S)}</TableCell>

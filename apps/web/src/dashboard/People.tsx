@@ -53,7 +53,11 @@ export function People({
             <li key={c.key} data-testid={`rp-person-${i}`}>
               <Card className="db-person">
                 <span className="db-rank">{i + 1}</span>
-                <span className="db-person-name">{c.name}</span>
+                {/* `<bdi>` keeps a Latin handle reading left-to-right
+                    (`@abu_faisal`, not `abu_faisal@`) inside the RTL row. */}
+                <span className="db-person-name">
+                  <bdi>{c.name}</bdi>
+                </span>
                 <Badge numeric>{S.countComments(n(c.comments))}</Badge>
                 <span className="db-person-likes">
                   {/* Unknown stays unknown: a source that showed no count is

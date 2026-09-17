@@ -512,7 +512,7 @@ export const ar = {
   dsUpdatedHours: (hours: string) => `آخر تحديث قبل ${hours} ساعة.`,
   dsFixtureBadge: "بيانات توضيحية",
   dsFixtureScope: "مساحة عمل توضيحية، غير مرتبطة بأي قناة",
-  dsFixtureReading: "جارٍ قراءة بيانات الاختبار.",
+  dsFixtureReading: "جارٍ قراءة البيانات التوضيحية.",
   dsFixtureCoverage: (total: string) =>
     `${total} تعليقًا مؤلَّفًا للتوضيح، لا يمثل جمهورًا حقيقيًا.`,
   dsReviewsPersist: "التصحيحات تُحفظ.",

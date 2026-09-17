@@ -123,8 +123,10 @@ export function Comments({
                 <div className="db-comment-head">
                   <span className="db-comment-who">
                     {/* A purged author is named as purged, not left blank
-                        and not replaced with a plausible name. */}
-                    {c.author_name ?? S.purgedAuthor}
+                        and not replaced with a plausible name. `<bdi>` keeps
+                        a Latin handle reading left-to-right (`@abu_faisal`,
+                        not `abu_faisal@`) inside the surrounding RTL text. */}
+                    <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
                   </span>
                   <Badge tone={c.label ? SENTIMENT_TONE[c.label] : "neutral"}>
                     {c.label ? labels[c.label] : S.noLabel}

@@ -4,8 +4,6 @@ export interface DemoVideo {
   id: string;
   kind: "video" | "short" | "stream";
   title: string;
-  published_at: string;
-  reported: number;
 }
 export const CHANNEL: { id: string; name: string; handle: string };
 export const VIDEOS: DemoVideo[];

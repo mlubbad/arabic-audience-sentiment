@@ -11,7 +11,7 @@ export type Filter = "all" | Sentiment;
 
 export const examples: readonly { text: string; label: Sentiment }[] = [
   { text: "شرحك واضح، استفدت من الأمثلة كثير 👏", label: "positive" }, // Gulf
-  { text: "المحتوى باهي بصح المقدمة طويلة شوية", label: "mixed" }, // Maghrebi (Algerian)
+  { text: "المحتوى مليح بصح المقدمة طويلة شوية", label: "mixed" }, // Maghrebi (Algerian)
   { text: "ممكن توضح المصادر في الحلقة الجاية؟", label: "neutral" }, // Egyptian
   { text: "الصوت مش واضح بهالمقطع", label: "negative" }, // Levantine
 ];

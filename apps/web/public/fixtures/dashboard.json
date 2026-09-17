@@ -39,7 +39,7 @@
       "video_id": "video-1",
       "video_kind": "video",
       "author_channel_id": "demo-a01",
-      "author_name": "نورة القحطاني",
+      "author_name": "نورة الدوسري",
       "text_raw": "ما شاء الله مراجعة وافية، حسّيت إني استخدمت الجهاز شهر معك. كمّل يا سالم",
       "content_hash": "098be4bea7f5ec5eee6741a3ebe93544fdcc88aad6a332da898d89ab0c181e46",
       "likes_raw": "142",
@@ -82,7 +82,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-21T17:12:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -138,7 +138,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-21T18:05:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -194,7 +194,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-22T09:40:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -250,7 +250,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-22T11:15:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -306,7 +306,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-22T12:02:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -362,7 +362,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-23T20:30:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -418,7 +418,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-24T07:55:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -474,7 +474,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-24T15:20:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -530,7 +530,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-25T10:10:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -561,7 +561,7 @@
       "comment_type": null,
       "prediction": {
         "status": "succeeded",
-        "label": "positive",
+        "label": "neutral",
         "content_hash": "6fb76bdece1b86e76bd804a187fde43a93580ac70e7957d2a0eaf334a99c6731",
         "analysis_key": "fixture-v1",
         "model_id": "sanitized-fixture",
@@ -569,9 +569,9 @@
         "preprocessing_version": "fixture-v1",
         "predicted_at": "2026-08-25T10:41:00Z",
         "class_scores": {
-          "positive": 1,
+          "positive": 0,
           "negative": 0,
-          "neutral": 0,
+          "neutral": 1,
           "mixed": 0
         }
       },
@@ -586,7 +586,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-25T10:41:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -599,7 +599,7 @@
       "video_id": "video-1",
       "video_kind": "video",
       "author_channel_id": "demo-channel",
-      "author_name": "@salem_tech",
+      "author_name": "@salem.yjarrib",
       "text_raw": "شكرًا لكم، فيديو المقارنة مع البكسل الأسبوع الجاي إن شاء الله",
       "content_hash": "d1c5b18243a15cc11dd3b14aca3f027d7de6a8824132edfcf972866738c1247d",
       "likes_raw": "63",
@@ -631,8 +631,8 @@
       "video_kind": "video",
       "author_channel_id": "demo-a11",
       "author_name": "@omar.dz",
-      "text_raw": "الجهاز باهي بصح الثمن عندنا فالجزائر يقارب راتب شهرين، صعيبة",
-      "content_hash": "31e211ecda113fd6d0074c8b1899863d592ca3f0e7d96cad5e9093f47e0c9920",
+      "text_raw": "الجهاز مليح بصح الثمن عندنا فالجزائر يقارب راتب شهرين، صعيبة",
+      "content_hash": "0274cef68220505397ac0c7fa93c6b95119b59a8399fa340d5224abe9f966dc8",
       "likes_raw": "3",
       "likes_value": 3,
       "published_at": "2026-08-26T22:18:00Z",
@@ -649,7 +649,7 @@
       "prediction": {
         "status": "succeeded",
         "label": "mixed",
-        "content_hash": "31e211ecda113fd6d0074c8b1899863d592ca3f0e7d96cad5e9093f47e0c9920",
+        "content_hash": "0274cef68220505397ac0c7fa93c6b95119b59a8399fa340d5224abe9f966dc8",
         "analysis_key": "fixture-v1",
         "model_id": "sanitized-fixture",
         "revision": "fixture-v1",
@@ -669,11 +669,11 @@
         "status": "succeeded",
         "topic_key": "discussion",
         "confidence": 0.86,
-        "content_hash": "31e211ecda113fd6d0074c8b1899863d592ca3f0e7d96cad5e9093f47e0c9920",
+        "content_hash": "0274cef68220505397ac0c7fa93c6b95119b59a8399fa340d5224abe9f966dc8",
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-27T22:18:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -729,7 +729,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-28T13:30:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -785,7 +785,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-28T14:02:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -841,7 +841,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-28T14:25:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -897,7 +897,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-29T09:00:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -910,7 +910,7 @@
       "video_id": "video-2",
       "video_kind": "short",
       "author_channel_id": "demo-a17",
-      "author_name": "أحمد الطيب",
+      "author_name": "أحمد سمير",
       "text_raw": "لو تعمل نسخة طويلة من الفيديو ده هيبقى أحسن",
       "content_hash": "44195fa6498f43c8b6d0e5048a5cf3a8a8fa294192e061046d8b639197864925",
       "likes_raw": "4",
@@ -953,7 +953,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-29T19:45:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1018,7 +1018,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-30T08:10:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1074,7 +1074,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-08-31T21:33:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1130,7 +1130,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-02T17:40:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1186,7 +1186,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-02T18:22:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1242,7 +1242,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-03T06:15:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1338,7 +1338,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-03T13:50:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1394,7 +1394,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-04T10:05:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1450,7 +1450,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-04T15:30:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1500,13 +1500,13 @@
       "by_channel_owner": false,
       "topic_prediction": {
         "status": "succeeded",
-        "topic_key": "other",
+        "topic_key": "criticism",
         "confidence": 0.86,
         "content_hash": "65e35486c53c153319d663bce04b81ddfe7a43a89c0f8cdead65a44729c63989",
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-05T23:59:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1562,7 +1562,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-06T18:20:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1618,7 +1618,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-06T18:35:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1674,7 +1674,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-06T19:02:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1730,7 +1730,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-06T19:48:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1780,13 +1780,13 @@
       "by_channel_owner": false,
       "topic_prediction": {
         "status": "succeeded",
-        "topic_key": "discussion",
+        "topic_key": "criticism",
         "confidence": 0.86,
         "content_hash": "116894bed3349b30f82977056443ea5affd8d914a52589209e4f8d180dc6ad18",
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-07T08:30:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1800,8 +1800,8 @@
       "video_kind": "video",
       "author_channel_id": "demo-a28",
       "author_name": "أسماء بوعزيز",
-      "text_raw": "يعطيك الصحة، شرحك واضح حتى للي ما يفهم في التقنية بزاف",
-      "content_hash": "90e1fe3941999151ae3b4c1e30390a647e4f920ac743b43c551c2f65ec04eae2",
+      "text_raw": "يعطيك الصحة، شرحك واضح حتى للي ما يفهمش بزاف في التقنية",
+      "content_hash": "3d28fb33211c395d67005ca2f83cafbbf0f145f80d523d066cafc1158fc77e9f",
       "likes_raw": "10",
       "likes_value": 10,
       "published_at": "2026-09-06T12:00:00Z",
@@ -1818,7 +1818,7 @@
       "prediction": {
         "status": "succeeded",
         "label": "positive",
-        "content_hash": "90e1fe3941999151ae3b4c1e30390a647e4f920ac743b43c551c2f65ec04eae2",
+        "content_hash": "3d28fb33211c395d67005ca2f83cafbbf0f145f80d523d066cafc1158fc77e9f",
         "analysis_key": "fixture-v1",
         "model_id": "sanitized-fixture",
         "revision": "fixture-v1",
@@ -1838,11 +1838,11 @@
         "status": "succeeded",
         "topic_key": "praise",
         "confidence": 0.86,
-        "content_hash": "90e1fe3941999151ae3b4c1e30390a647e4f920ac743b43c551c2f65ec04eae2",
+        "content_hash": "3d28fb33211c395d67005ca2f83cafbbf0f145f80d523d066cafc1158fc77e9f",
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-07T12:00:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1898,7 +1898,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-08T14:10:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -1954,7 +1954,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-10T15:25:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -2010,7 +2010,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-10T16:40:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -2066,7 +2066,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-11T07:12:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -2122,7 +2122,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-11T20:05:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -2178,7 +2178,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-12T09:30:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -2222,7 +2222,7 @@
       "video_id": "video-6",
       "video_kind": "video",
       "author_channel_id": "demo-a01",
-      "author_name": "نورة القحطاني",
+      "author_name": "نورة الدوسري",
       "text_raw": "فعّلت التحقق بخطوتين على كل حساباتي وأنا أشوف الفيديو. شكرًا من القلب",
       "content_hash": "19c77ca257b4faacf88a29eb42b559153c4c8b660d44d9c95c88f99be09b46fe",
       "likes_raw": "36",
@@ -2265,7 +2265,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-14T14:20:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -2279,8 +2279,8 @@
       "video_kind": "video",
       "author_channel_id": "demo-a22",
       "author_name": "منال بن يحيى",
-      "text_raw": "أمي تسرقلها الحساب العام اللي فات، بعثتلها الفيديو ساعتها. يعطيك الصحة",
-      "content_hash": "2aef9ccd9f7bd2e4b31ccd4567158f00d260ae27064102fc802f6f9dce9c3bd1",
+      "text_raw": "أمي تسرقلها الحساب العام اللي فات، بعثتلها الفيديو توّا. يعطيك الصحة",
+      "content_hash": "3e6c2be447d592b119f4e4a6d6817758f32176c9833b45d135773e27c3ee71ff",
       "likes_raw": "13",
       "likes_value": 13,
       "published_at": "2026-09-13T21:05:00Z",
@@ -2297,7 +2297,7 @@
       "prediction": {
         "status": "succeeded",
         "label": "positive",
-        "content_hash": "2aef9ccd9f7bd2e4b31ccd4567158f00d260ae27064102fc802f6f9dce9c3bd1",
+        "content_hash": "3e6c2be447d592b119f4e4a6d6817758f32176c9833b45d135773e27c3ee71ff",
         "analysis_key": "fixture-v1",
         "model_id": "sanitized-fixture",
         "revision": "fixture-v1",
@@ -2317,11 +2317,11 @@
         "status": "succeeded",
         "topic_key": "personal",
         "confidence": 0.86,
-        "content_hash": "2aef9ccd9f7bd2e4b31ccd4567158f00d260ae27064102fc802f6f9dce9c3bd1",
+        "content_hash": "3e6c2be447d592b119f4e4a6d6817758f32176c9833b45d135773e27c3ee71ff",
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-14T21:05:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -2334,9 +2334,9 @@
       "video_id": "video-6",
       "video_kind": "video",
       "author_channel_id": "demo-a17",
-      "author_name": "أحمد الطيب",
-      "text_raw": "التطبيق اللي ذكرته للمصادقة آمن؟ ولا في بديل من جوجل نفسها؟",
-      "content_hash": "4bdc3152921b0549f0c13480beb2e91bc75daaba13e299e2aaf018c65cd1330e",
+      "author_name": "أحمد سمير",
+      "text_raw": "التطبيق اللي ذكرته للمصادقة آمن؟ ولا فيه بديل من جوجل نفسها؟",
+      "content_hash": "f985ac24ebdb58d02538bc58e40ce6a72673ffc9cee31116357bf0ad0b7f0f3e",
       "likes_raw": "6",
       "likes_value": 6,
       "published_at": "2026-09-14T10:33:00Z",
@@ -2353,7 +2353,7 @@
       "prediction": {
         "status": "succeeded",
         "label": "neutral",
-        "content_hash": "4bdc3152921b0549f0c13480beb2e91bc75daaba13e299e2aaf018c65cd1330e",
+        "content_hash": "f985ac24ebdb58d02538bc58e40ce6a72673ffc9cee31116357bf0ad0b7f0f3e",
         "analysis_key": "fixture-v1",
         "model_id": "sanitized-fixture",
         "revision": "fixture-v1",
@@ -2373,11 +2373,11 @@
         "status": "succeeded",
         "topic_key": "question",
         "confidence": 0.86,
-        "content_hash": "4bdc3152921b0549f0c13480beb2e91bc75daaba13e299e2aaf018c65cd1330e",
+        "content_hash": "f985ac24ebdb58d02538bc58e40ce6a72673ffc9cee31116357bf0ad0b7f0f3e",
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-15T10:33:00Z",
         "error_code": null
       },
       "topic_reviews": []
@@ -2433,7 +2433,7 @@
         "classification_key": "topics:v1+gemini-3.6-flash+p1",
         "model_id": "gemini-3.6-flash",
         "prompt_version": "p1",
-        "predicted_at": "2026-09-10T08:00:00Z",
+        "predicted_at": "2026-09-01T00:00:00Z",
         "error_code": null
       },
       "topic_reviews": [

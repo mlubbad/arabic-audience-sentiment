@@ -3,8 +3,8 @@
 // written the way their speakers write online; each comment keeps to one.
 export const CHANNEL = {
   id: "demo-channel",
-  name: "عالم التقنية مع سالم",
-  handle: "@salem_tech",
+  name: "سالم يجرّب",
+  handle: "@salem.yjarrib",
 };
 
 export const VIDEOS = [
@@ -12,43 +12,31 @@ export const VIDEOS = [
     id: "video-1",
     kind: "video",
     title: "مراجعة آيفون 17 برو بعد شهر من الاستخدام",
-    published_at: "2026-08-20T16:00:00Z",
-    reported: 21,
   },
   {
     id: "video-2",
     kind: "short",
     title: "أفضل 5 تطبيقات مجانية لتنظيم وقتك",
-    published_at: "2026-08-27T13:00:00Z",
-    reported: 9,
   },
   {
     id: "video-3",
     kind: "video",
     title: "تجربة سماعات سوني الجديدة على رحلة طيران طويلة",
-    published_at: "2026-09-01T17:00:00Z",
-    reported: 8,
   },
   {
     id: "video-4",
     kind: "stream",
     title: "بث مباشر: نجاوب على أسئلتكم عن اللابتوبات قبل الدراسة",
-    published_at: "2026-09-05T18:00:00Z",
-    reported: 6,
   },
   {
     id: "video-5",
     kind: "video",
     title: "هل يستحق جالكسي S26 الترقية؟ مقارنة صريحة",
-    published_at: "2026-09-09T15:00:00Z",
-    reported: 7,
   },
   {
     id: "video-6",
     kind: "video",
     title: "احمِ حساباتك من الاختراق في 10 دقائق",
-    published_at: "2026-09-13T14:00:00Z",
-    reported: 4,
   },
 ];
 
@@ -58,28 +46,22 @@ export const E2E_VIDEOS = [
     id: "video-1",
     kind: "video",
     title: "مراجعة آيفون 17 برو بعد شهر من الاستخدام",
-    published_at: "2026-08-20T10:00:00Z",
-    reported: 7,
   },
   {
     id: "video-2",
     kind: "short",
     title: "أفضل 5 تطبيقات مجانية لتنظيم وقتك",
-    published_at: "2026-09-01T10:00:00Z",
-    reported: 3,
   },
   {
     id: "video-3",
     kind: "stream",
     title: "بث مباشر: نجاوب على أسئلتكم عن اللابتوبات قبل الدراسة",
-    published_at: "2026-09-10T10:00:00Z",
-    reported: 0,
   },
 ];
 
 // id → display name. Handles and names from across the region; none real.
 export const AUTHORS = {
-  a01: "نورة القحطاني",
+  a01: "نورة الدوسري",
   a02: "@abu_faisal",
   a03: "يوسف بن عمر",
   a04: "مريم الشرقاوي",
@@ -95,7 +77,7 @@ export const AUTHORS = {
   a14: "طارق بن سعيد",
   a15: "هدى المرزوقي",
   a16: "@karim_casablanca",
-  a17: "أحمد الطيب",
+  a17: "أحمد سمير",
   a18: "فاطمة العلي",
   a19: "@3li_iq",
   a20: "دينا مصطفى",
@@ -216,7 +198,7 @@ export const COMMENTS = [
     author: "a10",
     date: "2026-08-24T10:41:00Z",
     likes: 18,
-    label: "positive",
+    label: "neutral",
     topic: "discussion",
     text: "من تجربتي الانتقال سهل، أهم شي تنقل الصور قبل ما تبيع القديم",
     reply: "c09",
@@ -241,7 +223,7 @@ export const COMMENTS = [
     likes: 3,
     label: "mixed",
     topic: "discussion",
-    text: "الجهاز باهي بصح الثمن عندنا فالجزائر يقارب راتب شهرين، صعيبة",
+    text: "الجهاز مليح بصح الثمن عندنا فالجزائر يقارب راتب شهرين، صعيبة",
   }, // Maghrebi (Algerian)
   {
     id: "c13",
@@ -403,7 +385,7 @@ export const COMMENTS = [
     date: "2026-09-04T23:59:00Z",
     likes: 1,
     label: "negative",
-    topic: "other",
+    topic: "criticism",
     text: "الصوت في الفيديو نفسه واطي، ارفعوا مستوى المايك المرة الجاية",
   }, // Gulf — stale: analysed on the older text below
   {
@@ -414,7 +396,7 @@ export const COMMENTS = [
     likes: 10,
     label: "positive",
     topic: "praise",
-    text: "يعطيك الصحة، شرحك واضح حتى للي ما يفهم في التقنية بزاف",
+    text: "يعطيك الصحة، شرحك واضح حتى للي ما يفهمش بزاف في التقنية",
   }, // Maghrebi (Algerian)
   // ---- video-4: live Q&A about laptops ----
   {
@@ -465,7 +447,7 @@ export const COMMENTS = [
     date: "2026-09-06T08:30:00Z",
     likes: 5,
     label: "mixed",
-    topic: "discussion",
+    topic: "criticism",
     text: "الأسئلة حلوة بس الإجابات كانت عامة، كنت أتوقع أرقام وموديلات محددة",
   }, // Gulf
   {
@@ -558,7 +540,7 @@ export const COMMENTS = [
     likes: 13,
     label: "positive",
     topic: "personal",
-    text: "أمي تسرقلها الحساب العام اللي فات، بعثتلها الفيديو ساعتها. يعطيك الصحة",
+    text: "أمي تسرقلها الحساب العام اللي فات، بعثتلها الفيديو توّا. يعطيك الصحة",
   }, // Maghrebi (Tunisian)
   {
     id: "c44",
@@ -568,7 +550,7 @@ export const COMMENTS = [
     likes: 6,
     label: "neutral",
     topic: "question",
-    text: "التطبيق اللي ذكرته للمصادقة آمن؟ ولا في بديل من جوجل نفسها؟",
+    text: "التطبيق اللي ذكرته للمصادقة آمن؟ ولا فيه بديل من جوجل نفسها؟",
   }, // Egyptian
 ];
 
@@ -607,7 +589,7 @@ export const TOPIC_REVIEWS = [
 // only these strings are new.
 export const E2E_COMMENTS = {
   "fixture-1": {
-    author: "نورة القحطاني",
+    author: "نورة الدوسري",
     text: "المراجعة واضحة ومفيدة، شكرًا",
   },
   "fixture-2": {
@@ -621,14 +603,14 @@ export const E2E_COMMENTS = {
   },
   "fixture-5": {
     author: "حسام الدين محمود",
-    text: "حد جرّب الجهاز ده على أندرويد؟",
+    text: "حد جرّب التطبيق ده على أندرويد؟",
   },
   "fixture-6": {
     author: "@khadija.tn",
     text: "برشا معلومات مفيدة، يعطيك الصحة",
   },
   "aaaaaaaa-0000-4000-8000-00000000000f": {
-    author: "@salem_tech",
+    author: "@salem.yjarrib",
     text: "أهلًا بك، تابع بقية الحلقات على القناة.",
   },
 };
