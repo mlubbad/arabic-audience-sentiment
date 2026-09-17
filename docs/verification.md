@@ -2322,3 +2322,11 @@ separately at silence boundaries, held frames where the narration outlasts the f
 consent popup with the single scope now precedes "Channel connected"; no error screen, no
 old policy text, no Playground flash inside the catalogue section. Reply text in
 `docs/oauth-verification.md` §5d-bis; awaiting the unlisted link to send it.
+
+## 2026-09-18 — the OAuth-verification reply is sent
+
+The owner pasted the new unlisted video link into Google Auth Platform → Data Access (single
+scope, §5b justification) and sent the §5d-bis reply on the "[Action Needed] OAuth
+Verification Request Acknowledgement" thread (~02:30 local). Status: waiting for the
+Third-Party Data Safety Team; further questions arrive on that thread. `main` CI is green
+again (`9867c0d`) after formatting `tests/e2e/account.spec.ts`.
