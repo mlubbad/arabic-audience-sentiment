@@ -2,21 +2,28 @@
  * The dashboard's page-level states: what a reader sees before the first
  * read returns, while a later one is in flight, when a read or a filter
  * could not be answered, when a workspace or a filtered view has nothing to
- * show, when a chart has no rows to draw, and the notice a fixture-mode card
- * carries about the data it holds.
+ * show, and when a chart has no rows to draw.
  *
- * These used to be six inline conditionals inside Dashboard.tsx — three of
+ * These used to be five inline conditionals inside Dashboard.tsx — three of
  * them ordinary `<div>`s styled from `style.css`'s old amber `.notice`, the
- * other three duplicated between the workspace-empty and filters-empty
+ * other two duplicated between the workspace-empty and filters-empty
  * branches. Pulling them out gives each state a name, a test of its own, and
  * one visual language: a `Card` with a heading and at most one action,
  * rather than a coloured strip.
+ *
+ * A fixed "this data is synthetic" notice used to live here too, and does
+ * not any more: `dataSource.ts`'s `describeSource()` derives the dashboard's
+ * provenance strip from the same values that decide behaviour, which is the
+ * only way that claim cannot drift from what the screen actually does (see
+ * that file's own docstring). A component with no caller does not belong in
+ * this file — if a fixture-only surface ever needs the sentence again, it
+ * reads `dataSource.ts`'s fixture-mode branch rather than reintroducing a
+ * hand-written one.
  */
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
-import { Badge } from "../ui/Badge";
 import { Skeleton } from "../ui/Skeleton";
 import type { Strings } from "../strings";
 import "./page-states.css";
@@ -168,23 +175,5 @@ export function ChartEmpty({
     <p className="db-chart-empty" data-testid={testId}>
       {children}
     </p>
-  );
-}
-
-/** The fixed notice a fixture-mode card carries: this data is synthetic,
- *  belongs to no real channel, and a correction made against it is never
- *  sent anywhere. Kept as one small component so a card that needs it — the
- *  landing page's interactive demo, an account page preview — renders it the
- *  same way once, rather than writing the three sentences again. The
- *  dashboard's own header no longer needs this: `dataSource.ts` derives its
- *  provenance strip from the same values that decide behaviour, which is
- *  the safer source of truth for a screen that can also be live. */
-export function FixtureNotice({ S }: { S: Strings }) {
-  return (
-    <Card className="db-fixture" data-testid="fixture-notice">
-      <Badge tone="neutral">{S.dashDemoTag}</Badge>
-      <p>{S.dsFixtureScope}</p>
-      <p>{S.dsReviewsSessionOnly}</p>
-    </Card>
   );
 }

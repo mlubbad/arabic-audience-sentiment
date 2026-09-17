@@ -8,7 +8,6 @@ import { ar } from "../strings/ar";
 import {
   ChartEmpty,
   EmptyState,
-  FixtureNotice,
   Loading,
   LoadError,
   Updating,
@@ -108,15 +107,5 @@ describe("ChartEmpty", () => {
   it("renders its children with the given test id", () => {
     render(<ChartEmpty testId="chart-empty-x">لا بيانات</ChartEmpty>);
     expect(screen.getByTestId("chart-empty-x")).toHaveTextContent("لا بيانات");
-  });
-});
-
-describe("FixtureNotice", () => {
-  it("renders the fixture badge and the fixed sentences", () => {
-    render(<FixtureNotice S={ar} />);
-    const notice = screen.getByTestId("fixture-notice");
-    expect(notice).toHaveTextContent(ar.dashDemoTag);
-    expect(notice).toHaveTextContent(ar.dsFixtureScope);
-    expect(notice).toHaveTextContent(ar.dsReviewsSessionOnly);
   });
 });

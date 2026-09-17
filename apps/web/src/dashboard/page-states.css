@@ -1,5 +1,5 @@
-/* Loading, updating, error, empty and fixture-notice states for the
-   dashboard. Classes are db-*, tokens only — see dashboard.css's own note. */
+/* Loading, updating, error and empty states for the dashboard. Classes are
+   db-*, tokens only — see dashboard.css's own note. */
 .db-loading {
   display: flex;
   flex-direction: column;
@@ -42,12 +42,5 @@
 .db-chart-empty {
   padding: var(--space-5);
   text-align: center;
-  color: var(--text-2);
-}
-.db-fixture {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  font-size: var(--fs-small);
   color: var(--text-2);
 }
