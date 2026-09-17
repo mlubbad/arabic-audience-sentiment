@@ -935,3 +935,53 @@ between the two flows either way: `signInWithIdToken` only ever produces a Supab
 and the channel-connect's own server-side callback is what performs the
 `channels.list(mine=true)` binding — neither flow can act as the other regardless of which
 client signed the token.
+
+2026-09-17 — operations and admin redesign (`docs/superpowers/plans/2026-09-17-ops-admin-redesign.md`,
+design in `docs/superpowers/specs/2026-09-17-ops-admin-redesign-design.md`).
+
+**The admin demo's reducer mirrors the server's refusals rather than mocking PostgREST.**
+`adminDemo.ts`'s `reduceAdminDemo` reads six fixture workspaces and throws the exact
+`{message, code}` shape a PostgREST error carries for `paddle_subscription_active`,
+`billing_root`, `last_workspace`, `no_active_plan`, `unknown_plan` and `invalid_months` — the
+same SQLSTATEs and conditions `set_workspace_plan`, `private.grant_units` and
+`delete_workspace` enforce — instead of stubbing the Supabase client or faking network
+responses. That lets `adminErrorMessage` (untouched) render the identical sentence a live
+refusal would, and it lets `tests/e2e/admin.spec.ts` drive the real `AdminPage`/`WorkspaceRow`
+components end to end at `/admin?demo=1` rather than a separate demo-only page — the browser
+suite is exercising the same code a real admin session runs, with only the data source swapped.
+
+**`pages.css` is the shared rhythm for every signed-in page; `ui/` never depends on it.** The
+dashboard, `/sync` and `/admin` all import `pages.css` for the `db-*` classes (`db-page`,
+`db-hero`, `db-section`, `db-grid`, `db-missing`, …), but a `ui/` primitive that needs its own
+class — `Labelled`'s field wrapper — gets that class defined in `ui/ui.css` (`ui-field`, not
+`db-field`) so `ui/` stays importable by a page that has not loaded `pages.css` at all. The same
+rule moved `useMediaQuery` into `ui/` rather than leaving `admin/` reach into `dashboard/` for
+it — one page importing another page's internals is exactly what this phase undid.
+
+**`BudgetMeter` is the meter every page adopts.** It replaced the native `<progress>` in
+`/sync`'s plan-budget panel this phase, rendering a `role="progressbar"` div coloured by
+`budgetState()` (`--ml-indigo`/`--color-warning`/`--color-danger`) instead of relying on the
+browser's own progress-bar paint (which Chrome renders green regardless of what the sentence
+beside it says). `PlanPanel.tsx` on `/account` still draws a native `<progress>` — deliberately
+left alone this phase, since `/account` had no design work done on it at all — and is phase 5's
+first candidate to move onto `BudgetMeter` instead of carrying a second, inconsistent bar
+implementation forward.
+
+**`account.css` is verbatim until phase 5.** With `report.css` retired, `/account` needed
+somewhere to keep the rules it still matches; rather than redesign the account page in the same
+task that deletes its stylesheet, every block `Account.tsx`/`WorkspaceCard.tsx`/`PlanPanel.tsx`/
+`SetupPath.tsx` still uses was copied out of `report.css` unchanged — selectors, comments, even
+the small dead ones (`.history li`, `td button`) a shared block carried along — so the page
+renders identically to before the move. No visual or structural decision about `/account` was
+made in this phase; `account.css` is a holding pen, and phase 5 is where that page is actually
+recomposed on `ui/`.
+
+**The two `<progress>` e2e assertions that changed are the only class of e2e change this phase
+allowed itself.** The ruling going in was that the oracle (`tests/e2e/dashboard.spec.ts`) does
+not get edited to make a redesign easier — except where the element under test stopped
+existing because a native control became a `ui/` one. `BudgetMeter` replacing the operations
+panel's `<progress>` is exactly that case: the two assertions that read the old element (an
+`appearance: none` check and a colour-carries-no-figure check) were rewritten against the new
+`role="progressbar"` div's computed style, asserting the same guarantee against the new markup
+rather than being dropped or loosened. Every other e2e file and every other assertion in
+`dashboard.spec.ts` is untouched by this phase.

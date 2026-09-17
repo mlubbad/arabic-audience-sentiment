@@ -1491,3 +1491,89 @@ the start of this task and remains so; its dated entry for this work is deferred
 `docs/deployment.md` was left alone too, on inspection rather than by the same rule: it
 mentions specific `VITE_*` names in prose (`VITE_DASHBOARD_SOURCE`, `VITE_SITE_PUBLIC`) but
 carries no table or list of build env vars to append the two new ones to.
+
+## 2026-09-17 — operations and admin redesigned; `report.css` retired
+
+Eight tasks (`docs/superpowers/plans/2026-09-17-ops-admin-redesign.md`, design in
+`docs/superpowers/specs/2026-09-17-ops-admin-redesign-design.md`), BASE `13265c8`, commits
+`0d6f51f`…`e3642af` (14 commits, this records entry the fifteenth). The dashboard redesign had
+left `/sync`, the catalogue panel and `/admin` still on `report.css`, out of that plan's scope
+(`docs/coordination/ACTIVE.md`'s **PENDING: phase 4**); this plan carried them onto the same
+`ui/`-primitive pattern and closed that pending item.
+
+**Shared ground moved first.** `dashboard/dashboard.css` → `apps/web/src/pages.css`, the `db-*`
+rhythm every signed-in page now shares; `dashboard/PageStates.tsx` (+ its CSS and test) →
+`apps/web/src/pageStates/`. `dashboard/Labelled.tsx` and `dashboard/useMediaQuery.ts` moved into
+`ui/`, since a `ui/` primitive must not depend on a page's own stylesheet: `Labelled`'s
+`db-field` class became `ui-field`, defined in `ui/ui.css` rather than `pages.css`.
+`ui/Checkbox` gained an optional `hideLabel`; `ui/DialogContent` gained an optional
+`closeTestId` for its built-in corner close button.
+
+**`/sync` moved into `apps/web/src/ops/`** whole: `Sync.tsx`, `Catalogue.tsx` (the catalogue
+panel, on `ui/Tabs`/`ui/Checkbox` with a real per-video checkbox), `CataloguePreview.tsx` (the
+YouTube preview, on `ui/Dialog` rather than a native `<dialog>`), `SelectionBar.tsx` (the save
+bar, now a sticky card), `SyncHealth.tsx`, `PlanBudgets.tsx`, `BudgetMeter.tsx` (a
+`role="progressbar"` div replacing the native `<progress>` the panels used to paint, styled from
+`--ml-indigo`/`--color-warning`/`--color-danger` by `budgetState()`), `Attempts.tsx`, `ops.css`
+and `catalogue.css`. All 27 `cat-*` test ids and every operations-page test id the old
+`OperationsPanels.tsx` carried were kept (`sync-panel`, `plan-panel`, `budget-${event_type}`,
+`attempts`, `jobs-failed`, …), most now living on `Card`/`Badge`/`Button` markup instead of
+`rp-*` classes. The old `opsDemoTag` string («معاينة تجريبية») is gone; the page reuses
+`dashDemoTag` («مثال توضيحي»), the same demo label the dashboard already wears. Two e2e
+assertions that read a native `<progress>` element were rewritten against the new bar — the one
+class of e2e change this phase allowed, because the control itself changed from a browser
+element to a `ui/` one, not because a behaviour changed.
+
+**`/admin` moved into `apps/web/src/admin/`**: `AdminPage.tsx` (the gate, the head, and the
+live/demo data source) and `WorkspaceRow.tsx` (the row, split out — its own form state, its own
+plan/pack levers) on `ui/Table` + `ui/Select` + `ui/Checkbox` + the toast system, plus
+`admin.css`. A wide table row that used to overflow the content column at 1280 next to the rail
+is now one `<tbody>` per workspace across two `<tr>`s (values, then a `colSpan` levers row); a
+`useMediaQuery` breakpoint switches to cards under 760px. `callServer` now maps the picker's
+`plan_key` onto the RPC's `plan` argument.
+
+**A demo mode**, `apps/web/src/admin/adminDemo.ts`: a pure reducer (`reduceAdminDemo`) over six
+illustrative workspaces (`apps/web/public/fixtures/admin.json`) that throws the same
+`{message, code}` shape a PostgREST error carries for exactly the refusals the SQL enforces —
+`paddle_subscription_active`, `billing_root`, `last_workspace`, `no_active_plan`,
+`unknown_plan`, `invalid_months` — so `adminErrorMessage` renders the identical sentence the
+live page would. `/admin?demo=1` runs the reducer instead of Supabase; `DeleteWorkspaceDialog`
+gained injectable `onConfirm`/`readFootprint` props so its confirm step (which the demo has no
+server to count against) works without an RPC.
+
+**`report.css` (1316 lines) is deleted.** Its only remaining reader, `/account` (and
+`WorkspaceCard.tsx`/`PlanPanel.tsx`/`SetupPath.tsx` under it), got its own `account.css` (494
+lines) — every block that page still matches, copied verbatim in the old file's order: the
+`.rp-page` scope, the hero banner (`.rp-hero`, `.rp-eyebrow`), the section frame (`.rp-section`,
+the reading-measure cap), `.rp-card`, the `.rp-missing` state, the forms-inside-the-system block
+(with the dead `.history li`/`.budgets li` shapes and the live plan-budget progress-bar
+colouring), `.empty-actions`/`.plan-actions`, the row action (`.rp-page td button`), and the way
+in — `.auth-card`/`.auth-or`/`.auth-providers`/`.auth-switch`/`.auth-link` and
+`.account-trust*`. Everything else in the old sheet went with it for good, because no page
+matches it any more: the report-page banner's pills and nav (`.rp-pills`, `.rp-pill`, `.rp-nav`,
+`.rp-nav-links`, `.rp-scope`, `.rp-scope-filtered`, `.rp-scope-chip`), the KPI grid
+(`.rp-grid*`, `.rp-metric*`), the insight callouts (`.rp-insight*`), the figures and bar charts
+(`.rp-figures*`, `.rp-figure*`, `.rp-bar*`, `.rp-bar-inline`, `.rp-hero-split`), the donut/topic
+charts and legend (`.rp-chart*`, `.rp-legend`, `.rp-swatch`), the tab strip (`.rp-tabs`), the
+video list (`.rp-videos`, `.rp-video-*`), the people leaderboard (`.rp-people`, `.rp-person*`,
+`.rp-rank`), the comment feed (`.rp-comments`, `.rp-comment*`, `.rp-chip*`), the provenance strip
+(`.rp-provenance*`) and the filter bar (`.rp-filters*`) — all report-page furniture no
+`ui/`-era page renders any more. The guard that used to live at
+`dashboard/noReportCss.test.ts` moved to `apps/web/src/noReportCss.test.ts` and now walks the
+whole tree rather than one directory, with an allow-list of exactly the four files
+(`Account.tsx`, `WorkspaceCard.tsx`, `PlanPanel.tsx`, `SetupPath.tsx`) permitted to import
+`account.css` or carry an `rp-*` class, each marked "until phase 5". `layers.test.ts`'s
+raw-colour check now reads `account.css` in `report.css`'s place. `PlanPanel.tsx` still draws a
+native `<progress>` — phase 5 is where it adopts `BudgetMeter` like every other page.
+
+**Tests.** `tests/e2e/admin.spec.ts` is new, 7 tests, driving the real `/admin?demo=1` page (six
+rows, a plan set, a Paddle refusal overridden, a pack granted and refused, the billing root kept
+against a delete attempt, a free row deleted down to five rows, six cards with no horizontal
+overflow at 390). Full e2e is now 114 tests (107 carried + 7 new); `test:e2e:build` is 6 and
+unaffected. `npm run check` at the close of this task is green in full: lint, format:check,
+typecheck, `check:functions` (deno), unit (102 files / 708 tests), db (32 files / 310 tests),
+worker (195 tests), build (8 prerendered pages), secrets (609 source files plus built assets).
+
+Deferred, per the standing rule in `docs/coordination/ACTIVE.md`: `docs/verification.md` —
+`git status --short docs/verification.md` was non-empty (another session's in-flight edit) at
+the start of this task and remains so; its dated entry for this work is deferred, not skipped.

@@ -62,6 +62,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 | `apps/web/src/dashboard/**` (and the `.ui-split` primitive in `apps/web/src/ui/ui.css`) | **done** — the dashboard redesign (tasks 1–12) landed as `4566718`…`07e9ccd`; the old `apps/web/src/Dashboard.tsx` is deleted, `report.css` no longer loads on this page; free | 2026-09-17 |
 | `apps/web/scripts/{demo-content,make-demo-fixture}.mjs` (+ `.d.mts`), `apps/web/public/fixtures/{dashboard,e2e-dashboard,catalogue}.json`, `apps/web/src/{demoFixture,noSyntheticWords}.test.ts`, `tests/e2e/demo.spec.ts` | **done** — the demo-data feature (tasks 1–4) landed as `938cfc0`…`97ed318`, plus this task's records commit; the visitor dashboard and the browser suite now read separate fixtures from one generator, «توضيحية» replaces «اصطناعي» everywhere reader- or test-facing; free | 2026-09-17 |
 | `apps/web/src/googleOneTap.ts` (+ `.test.ts`), `apps/web/src/google-gsi.d.ts`, `apps/web/vite-env.d.ts`, the Google door's slice of `Account.tsx`/`Account.entry.test.ts`, `.env.example` | **done** — Google sign-in and One Tap (`docs/superpowers/plans/2026-09-17-google-signin.md`) landed as `0102bea`…`5c2f9ca`, plus this task's hardening (`6e2ac2e`) and records commit; the door opens on `VITE_AUTH_PROVIDERS=google`, One Tap prompts a signed-out `/account` visitor via GIS + `signInWithIdToken`; free | 2026-09-17 |
+| `apps/web/src/pages.css`, `apps/web/src/pageStates/**`, `apps/web/src/ops/**`, `apps/web/src/admin/**`, `apps/web/src/account.css`, `apps/web/src/noReportCss.test.ts` | **done** — the operations and admin redesign (`docs/superpowers/plans/2026-09-17-ops-admin-redesign.md`, tasks 1–8) landed as `0d6f51f`…`e3642af`, plus this task's records commit; `/sync` and `/admin` are on the shared `db-*` rhythm and `ui/` primitives now, `report.css` is deleted, `/account` carries the last of its rules verbatim in `account.css` until phase 5; free | 2026-09-17 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
@@ -379,3 +380,24 @@ screenshots live under `.superpowers/sdd/2026-09-17-dashboard-redesign/shots/`.
 see `docs/progress.md`'s dated entry). The next session that touches those pages should either
 carry them onto the `ui/`-primitive pattern this redesign used for the dashboard, or confirm
 they still need `report.css`'s rules verbatim before deleting anything.
+
+2026-09-17, closing the note above: phase 4 (`docs/superpowers/plans/2026-09-17-ops-admin-redesign.md`,
+tasks 1–8) carried `/sync` and `/admin` onto the `ui/`-primitive pattern and deleted
+`report.css`. Claimed `apps/web/src/pages.css`, `apps/web/src/pageStates/**`,
+`apps/web/src/ops/**`, `apps/web/src/admin/**`, `apps/web/src/account.css`,
+`apps/web/src/noReportCss.test.ts` (row added to the table above) — done, `0d6f51f`…`e3642af`
+plus this task's records commit. `/account` keeps its remaining rules verbatim in
+`account.css` (phase 5 recomposes that page); `PlanPanel.tsx`'s native `<progress>` is the one
+piece phase 5 still owes, now that `/sync` carries `BudgetMeter` instead. `npm run check` green
+at the close: lint, format:check, typecheck, `check:functions` (deno), unit (102 files / 708
+tests), db (32 files / 310 tests), worker (195 tests), build (8 prerendered pages), secrets (609
+source files plus built assets); the browser suite gained `tests/e2e/admin.spec.ts` (7 tests,
+driving the real `/admin?demo=1`), full e2e now 114. `docs/verification.md` was left alone —
+`git status --short docs/verification.md` was non-empty (another session's in-flight edit) at
+this task's start and remains so; its dated entry for this work is deferred, not skipped.
+`.screenshots/` (untracked) was never touched; this feature's own screenshots live under
+`.superpowers/sdd/2026-09-17-ops-admin-redesign/shots/`.
+
+**PENDING, unchanged from before this phase:** phase 5 (account/billing redesign on `ui/`,
+including `PlanPanel.tsx`'s move to `BudgetMeter` and `account.css`'s own retirement) and
+phase 6 (the product tour) remain open; nothing in this phase started either.
