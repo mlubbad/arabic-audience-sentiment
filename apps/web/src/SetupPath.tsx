@@ -6,7 +6,13 @@
  * dashboard is the first screen every new reader sees, and it showed them an
  * apology with two links where the path they are on should be. Both places
  * read this component, so the path is drawn one way.
+ *
+ * Restyled on tokens in its own sheet (phase 5): `setup-path` on the `ol`,
+ * `setup-step` + `data-status` on each `li`, `setup-step-state` on the state
+ * word — replacing `account-steps`/`setup-steps`, whose rules stay in
+ * `app.css` for `Account.tsx`'s own static list until that page is rebuilt.
  */
+import "./setup-path.css";
 import type { SetupStep } from "./setup";
 import { useStrings, type StringKey } from "./strings";
 
@@ -27,14 +33,11 @@ export function SetupPath({
 }) {
   const S = useStrings();
   return (
-    <ol
-      className="account-steps setup-steps"
-      data-testid={testId}
-      aria-label={S.stepsLabel}
-    >
+    <ol className="setup-path" data-testid={testId} aria-label={S.stepsLabel}>
       {steps.map((step) => (
         <li
           key={step.key}
+          className="setup-step"
           data-status={step.status}
           aria-current={step.status === "next" ? "step" : undefined}
         >

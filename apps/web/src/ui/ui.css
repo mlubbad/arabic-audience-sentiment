@@ -709,3 +709,33 @@
     transition: width 240ms ease;
   }
 }
+
+/* ---- Budget meter: a bar and a sentence that always agree ----
+   The fill is a plain <i>, coloured from the same budgetState the sentence
+   beside it is built from — see BudgetMeter.tsx for why: a native
+   <progress> let the browser paint its own accent, so a panel warning that a
+   limit was near could show a cheerful, browser-chosen green. */
+.ui-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ui-meter-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.ui-meter-bar > i {
+  display: block;
+  height: 100%;
+  /* budgetState's "ok" — the default, not called out below. */
+  background: var(--ml-indigo);
+}
+.ui-meter-bar > i[data-state="warning"] {
+  background: var(--color-warning);
+}
+.ui-meter-bar > i[data-state="critical"],
+.ui-meter-bar > i[data-state="exhausted"] {
+  background: var(--color-danger);
+}

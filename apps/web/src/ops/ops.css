@@ -1,35 +1,11 @@
 /**
- * The operations panels: `BudgetMeter`, `SyncHealth`, `PlanBudgets`,
- * `Attempts`. `pages.css`'s shared db-* rules (`db-section`, `db-missing`,
- * `db-muted`, `db-row-actions`) carry everything these share with the
- * dashboard; this file holds only what is specific to them.
+ * The operations panels: `SyncHealth`, `PlanBudgets`, `Attempts`.
+ * `pages.css`'s shared db-* rules (`db-section`, `db-missing`, `db-muted`,
+ * `db-row-actions`) carry everything these share with the dashboard; this
+ * file holds only what is specific to them. `BudgetMeter` itself moved to
+ * `ui/BudgetMeter.tsx` — a `ui/` component, its `.ui-meter*` rules live in
+ * `ui/ui.css` beside it; `PlanBudgets` below still renders one per budget.
  */
-
-/* ---------------- budget meter ---------------- */
-.db-meter {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.db-meter-bar {
-  height: 10px;
-  border-radius: var(--r-pill);
-  background: var(--bg-muted);
-  overflow: hidden;
-}
-.db-meter-bar > i {
-  display: block;
-  height: 100%;
-  /* budgetState's "ok" — the default, not called out below. */
-  background: var(--ml-indigo);
-}
-.db-meter-bar > i[data-state="warning"] {
-  background: var(--color-warning);
-}
-.db-meter-bar > i[data-state="critical"],
-.db-meter-bar > i[data-state="exhausted"] {
-  background: var(--color-danger);
-}
 
 /* ---------------- plan budgets ---------------- */
 .db-budgets {

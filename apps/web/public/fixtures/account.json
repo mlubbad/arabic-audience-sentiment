@@ -1,0 +1,160 @@
+{
+  "workspaces": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000a1",
+      "name": "قناة سالم للتقنية"
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000a2",
+      "name": "مطبخ ريم"
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000a3",
+      "name": "عميل جديد"
+    }
+  ],
+  "clients": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000c1",
+      "workspace_id": "00000000-0000-4000-8000-0000000000a1"
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000c2",
+      "workspace_id": "00000000-0000-4000-8000-0000000000a2"
+    }
+  ],
+  "channels": [
+    {
+      "workspace_id": "00000000-0000-4000-8000-0000000000a1",
+      "channel_id": "00000000-0000-4000-8000-0000000000e1",
+      "status": "connected",
+      "external_channel_id": "UCSalemYjarrib00000001",
+      "handle": "@salem.yjarrib",
+      "title": "سالم يجرّب"
+    },
+    {
+      "workspace_id": "00000000-0000-4000-8000-0000000000a2",
+      "channel_id": "00000000-0000-4000-8000-0000000000e2",
+      "status": "reconnect_required",
+      "external_channel_id": "UCReemKitchen000000002",
+      "handle": "@reem.kitchen",
+      "title": "مطبخ ريم"
+    }
+  ],
+  "jobs": [
+    {
+      "workspace_id": "00000000-0000-4000-8000-0000000000a1",
+      "status": "succeeded",
+      "created_at": "2026-09-15T09:30:00Z"
+    },
+    {
+      "workspace_id": "00000000-0000-4000-8000-0000000000a2",
+      "status": "failed",
+      "created_at": "2026-09-16T14:05:00Z"
+    }
+  ],
+  "usage": {
+    "00000000-0000-4000-8000-0000000000a1": {
+      "plan_key": "creator_plus",
+      "status": "active",
+      "period_start": "2026-09-01T00:00:00Z",
+      "period_end": "2026-10-01T00:00:00Z",
+      "budgets": [
+        {
+          "event_type": "comment_analysis",
+          "used": 7400,
+          "allowance": 40000,
+          "granted": 0,
+          "remaining": 32600
+        },
+        {
+          "event_type": "historical_backfill",
+          "used": 0,
+          "allowance": 120000,
+          "granted": 0,
+          "remaining": 120000
+        },
+        {
+          "event_type": "topic_classification",
+          "used": 900,
+          "allowance": 4000,
+          "granted": 0,
+          "remaining": 3100
+        }
+      ],
+      "cancel_at_period_end": false,
+      "billing_interval": "month",
+      "provider": "paddle",
+      "plan": {
+        "key": "creator_plus",
+        "segment": "individual",
+        "title_ar": "منشئ بلس",
+        "title_en": "Creator Plus",
+        "price_monthly_cents": 2900,
+        "price_yearly_cents": 28800,
+        "self_serve": true,
+        "provider_prices": {},
+        "limits": {
+          "analysis_units": 30000,
+          "topic_units": 12000,
+          "insight_reports": 50,
+          "channels": 2,
+          "members": 2,
+          "workspaces": 0,
+          "live_interval_minutes": 720
+        }
+      }
+    },
+    "00000000-0000-4000-8000-0000000000a2": {
+      "plan_key": "free",
+      "status": "active",
+      "period_start": "2026-09-01T00:00:00Z",
+      "period_end": "2026-10-01T00:00:00Z",
+      "budgets": [
+        {
+          "event_type": "comment_analysis",
+          "used": 12,
+          "allowance": 100,
+          "granted": 0,
+          "remaining": 88
+        },
+        {
+          "event_type": "historical_backfill",
+          "used": 0,
+          "allowance": 0,
+          "granted": 0,
+          "remaining": 0
+        },
+        {
+          "event_type": "topic_classification",
+          "used": 8,
+          "allowance": 100,
+          "granted": 0,
+          "remaining": 92
+        }
+      ],
+      "cancel_at_period_end": false,
+      "billing_interval": null,
+      "provider": null,
+      "plan": {
+        "key": "free",
+        "segment": "individual",
+        "title_ar": "مجاني",
+        "title_en": "Free",
+        "price_monthly_cents": 0,
+        "price_yearly_cents": 0,
+        "self_serve": true,
+        "provider_prices": {},
+        "limits": {
+          "analysis_units": 100,
+          "topic_units": 100,
+          "insight_reports": 1,
+          "channels": 0,
+          "members": 1,
+          "workspaces": 0,
+          "live_interval_minutes": 0
+        }
+      }
+    }
+  }
+}

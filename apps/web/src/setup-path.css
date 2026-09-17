@@ -1,0 +1,100 @@
+/**
+ * `SetupPath`'s own sheet, on `brand.css`'s tokens — no colour, spacing or
+ * radius value invented here. Replaces `account-steps`/`setup-steps` (still
+ * in `app.css`, styling `Account.tsx`'s own separate static list until that
+ * page is rebuilt): a numbered marker like the visitor's list carried, and a
+ * state word on each line like the owner's list carried separately, in one
+ * component instead of two.
+ *
+ * Every child is placed explicitly rather than left to grid auto-flow, so
+ * the layout does not depend on `SetupPath.tsx`'s children staying in a
+ * particular order: the number tile (column 1), the state word (column 2)
+ * and the step's title (column 3) share the first row; the detail sentence,
+ * when there is one, spans columns 2–3 on the row below.
+ */
+.setup-path {
+  counter-reset: step;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.setup-step {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+
+/* The number, in the visitor's own style: a filled tile, not a bullet. */
+.setup-step::before {
+  counter-increment: step;
+  content: counter(step, decimal-leading-zero);
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: var(--radius-2);
+  background: var(--bg-muted);
+  color: var(--ml-indigo);
+  font: 700 var(--fs-small) var(--font-body);
+}
+
+.setup-step[data-status="next"] {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.setup-step-state {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  min-width: 5.6rem;
+  padding: 2px var(--space-3);
+  border-radius: 999px;
+  background: var(--bg-muted);
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.setup-step[data-status="done"] > .setup-step-state {
+  color: var(--color-success);
+}
+.setup-step[data-status="next"] > .setup-step-state {
+  color: var(--ml-indigo);
+}
+.setup-step[data-status="later"] > .setup-step-state {
+  color: var(--text-3);
+}
+/* "pending" (a queued or running job) and "attention" (something the reader
+   must act on) both read as "keep an eye on this one" — the state word
+   itself says which; the tone is the one warning colour brand.css carries. */
+.setup-step[data-status="pending"] > .setup-step-state,
+.setup-step[data-status="attention"] > .setup-step-state {
+  color: var(--color-warning);
+}
+
+/* The step's title: the second (and last, when there is no detail) real
+   child. */
+.setup-step > span:not(.setup-step-state) {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+}
+
+.setup-step small {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}

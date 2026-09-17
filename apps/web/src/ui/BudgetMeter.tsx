@@ -45,9 +45,9 @@ export function BudgetMeter({
       ? Math.min(Math.round((used / allowance) * 100), 100)
       : 0;
   return (
-    <div className="db-meter" data-testid={testId}>
+    <div className="ui-meter" data-testid={testId}>
       <div
-        className="db-meter-bar"
+        className="ui-meter-bar"
         role="progressbar"
         aria-valuenow={unlimited ? undefined : Math.min(used, allowance)}
         aria-valuemin={unlimited ? undefined : 0}

@@ -8,7 +8,7 @@
  */
 import { budgetState } from "@sentiment/contracts";
 import { Card } from "../ui/Card";
-import { BudgetMeter } from "./BudgetMeter";
+import { BudgetMeter } from "../ui/BudgetMeter";
 import type { deriveSnapshot } from "../data";
 import { displayDate } from "../i18n";
 import type { Locale } from "../locale";

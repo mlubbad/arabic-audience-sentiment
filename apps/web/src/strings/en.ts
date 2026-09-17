@@ -292,6 +292,10 @@ export const en: Strings = {
   accountTitle: "Account & workspaces",
   accountLead:
     "Your workspaces, their channels, and where each one is in setup.",
+  accountDemoLead:
+    "An illustrative account page: example workspaces and a plan; changes stay in this session.",
+  demoExternalNote:
+    "This action opens an external service and does not run in the illustrative copy.",
   accountUnavailableTitle: "Sign-in is not available in this preview",
   accountUnavailableLead:
     "A development project URL and a publishable key are needed to enable accounts. Test data is never used as a session.",
