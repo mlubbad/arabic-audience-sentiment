@@ -33,6 +33,10 @@ export interface DialogContentProps
   /** `sheet` anchors the panel to the inline-start edge, full height —
    *  a navigation drawer. `center` is the modal every other caller wants. */
   variant?: "center" | "sheet";
+  /** Lands as `data-testid` on the built-in corner close, so a suite can
+   *  find it without the caller adding a second close button — which would
+   *  share the corner one's accessible name. */
+  closeTestId?: string;
 }
 
 export function DialogContent({
@@ -40,6 +44,7 @@ export function DialogContent({
   children,
   closeLabel,
   variant = "center",
+  closeTestId,
   ...props
 }: DialogContentProps) {
   return (
@@ -58,6 +63,7 @@ export function DialogContent({
         <DialogPrimitive.Close
           className="ui-dialog-close"
           aria-label={closeLabel}
+          data-testid={closeTestId}
         >
           ✕
         </DialogPrimitive.Close>

@@ -8,16 +8,15 @@
  *
  * Presentational: the owner (`Catalogue`) holds which video is open and is
  * asked, through `onClose`, whenever Radix would close — Escape, the
- * overlay, the corner ✕ or the close button below the frame all route
- * through `onOpenChange(false)`. Focus lands on the panel itself when it
+ * overlay and the corner ✕ (the one close button, `cat-preview-close`) all
+ * route through `onOpenChange(false)`. Focus lands on the panel itself when it
  * opens, not inside the iframe (see `onOpenAutoFocus`), and goes back to
  * the row's own play button on close: that button is not a Radix trigger,
  * so the owner hands it in as `returnTo` and the dialog puts focus there.
  */
-import { useRef } from "react";
+import { useRef, type RefObject } from "react";
 import type { CatalogueVideo } from "@sentiment/contracts";
-import { Button } from "../ui/Button";
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "../ui/Dialog";
+import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { videoLinks } from "../catalogue";
 import type { Strings } from "../strings";
 
@@ -32,8 +31,9 @@ export function CataloguePreview({
   /** The kind, already in the reader's words — the owner has the table. */
   kindLabel: string;
   onClose: () => void;
-  /** The button that opened the player, if any: focus returns to it. */
-  returnTo?: HTMLElement | null;
+  /** The button that opened the player, if any: focus returns to it. A ref,
+   *  read only when the dialog closes — never during a render. */
+  returnTo?: RefObject<HTMLElement | null>;
   S: Strings;
 }) {
   const content = useRef<HTMLDivElement | null>(null);
@@ -49,6 +49,7 @@ export function CataloguePreview({
           className="db-preview"
           data-testid="cat-preview"
           closeLabel={S.catClose}
+          closeTestId="cat-preview-close"
           aria-describedby={undefined}
           ref={content}
           onOpenAutoFocus={(e) => {
@@ -61,9 +62,10 @@ export function CataloguePreview({
             content.current?.focus();
           }}
           onCloseAutoFocus={(e) => {
-            if (returnTo && document.body.contains(returnTo)) {
+            const back = returnTo?.current;
+            if (back && document.body.contains(back)) {
               e.preventDefault();
-              returnTo.focus();
+              back.focus();
             }
           }}
         >
@@ -94,15 +96,6 @@ export function CataloguePreview({
             >
               {S.catOpenYouTube} ↗
             </a>
-            <DialogClose asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                data-testid="cat-preview-close"
-              >
-                {S.catClose}
-              </Button>
-            </DialogClose>
             <small className="db-note">{S.catPreviewHint}</small>
           </footer>
         </DialogContent>

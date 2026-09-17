@@ -523,7 +523,7 @@ export function Catalogue({
             video={previewing}
             kindLabel={previewing ? kindWord(previewing.kind) : ""}
             onClose={() => setPreviewing(null)}
-            returnTo={previewTrigger.current}
+            returnTo={previewTrigger}
             S={S}
           />
 

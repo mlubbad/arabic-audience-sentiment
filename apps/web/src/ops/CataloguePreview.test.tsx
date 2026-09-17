@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /** The player, on `ui/Dialog`: nothing embedded until a video is open, the
  *  title as the dialog's h3, the privacy-enhanced embed, and two ways out —
- *  Escape and the close button — both of which ask the owner to close. */
+ *  Escape and the one close button — both of which ask the owner to close. */
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
@@ -70,9 +70,13 @@ describe("CataloguePreview", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("the close button asks the owner to close", async () => {
+  it("the close button asks the owner to close, and is the only button so named", async () => {
     const onClose = open();
-    await userEvent.click(screen.getByTestId("cat-preview-close"));
+    const close = screen.getByTestId("cat-preview-close");
+    expect(screen.getAllByRole("button", { name: ar.catClose })).toEqual([
+      close,
+    ]);
+    await userEvent.click(close);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

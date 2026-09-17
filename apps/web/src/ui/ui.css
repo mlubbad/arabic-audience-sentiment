@@ -231,6 +231,17 @@
   background: var(--ml-indigo);
   border-color: var(--ml-indigo);
 }
+/* The same frame's hover lift, press scale and waiting cursor, each
+   selector one class heavier than style.css's so it wins. */
+.ui-checkbox:hover:not(:disabled) {
+  box-shadow: none;
+}
+.ui-checkbox:active:not(:disabled) {
+  transform: none;
+}
+.ui-checkbox:disabled {
+  cursor: not-allowed;
+}
 .ui-checkbox:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;

@@ -125,6 +125,23 @@ describe("Dialog", () => {
     expect(dialog).toHaveClass("ui-dialog-content--sheet");
   });
 
+  it("puts closeTestId on the corner close it already renders, not on a second button", () => {
+    render(
+      <Dialog open>
+        <DialogContent
+          closeLabel="إغلاق"
+          closeTestId="x-close"
+          aria-describedby={undefined}
+        >
+          <DialogTitle>عنوان</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByTestId("x-close")).toBe(
+      screen.getByRole("button", { name: "إغلاق" }),
+    );
+  });
+
   it("defaults to the centred variant", () => {
     render(
       <Dialog open>
