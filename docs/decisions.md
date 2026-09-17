@@ -621,3 +621,76 @@ one already handled; (2) `private.billing_events` rows for the deleted workspace
 detached (`workspace_id` set to `null`) rather than deleted — the column is nullable, and
 the webhook trail is what a chargeback dispute needs to read after the workspace itself is
 gone (see the dated correction in `docs/progress.md` for the fix and its test).
+
+## 2026-09-17 — the landing rebuilt on the design system: what was decided, and why
+
+**The hero and the demo share one `ProductWindow` component, still for one and interactive
+for the other.** A separate hero illustration and a separate demo mock would each have
+drifted from what the dashboard actually shows, the way the six duplicated-meaning defects
+recorded in `docs/coordination/ACTIVE.md` did before. One component, built from `ui/`
+parts (badges, bar chart, comment cards), takes a `mode` and renders the same product
+picture whether it needs to sit still in the hero or respond to the demo's filters.
+
+**The hero's alt sentence lives in the figure's visually-hidden `<figcaption>`, not on an
+image, because the illustration it used to describe is no longer rendered.** The hero and
+the demo now show `ProductWindow` instead of `audience-growth-original.webp`. The sentence
+a screen reader needs did not become obsolete with the picture — it still describes what
+the hero is showing — so it moved to the figure's caption rather than being deleted with
+the `<img>` that carried it. The PNG/WebP stay on disk, unreferenced by the page, as
+provenance for the palette and composition and as the source of the OG share image
+(`docs/seo.md` §3 records the one-line update).
+
+**`PublicShell` now serves all three public pages, not just pricing and legal, and the
+pricing/legal CSS moves verbatim rather than being rewritten.** Landing, pricing and legal
+shared one header/nav/footer by copy-paste before this task; `PublicShell` (Task 3) made
+that one component, and Task 4 moved pricing's and legal's own body rules into
+`pricing.css` / `legal.css`, byte-for-byte, so that the day's redesign touches the landing's
+markup and CSS without also being a silent rewrite of two pages nobody asked to change.
+`pricing.css` keeps one dead 650px override from that move, deliberately left for the
+pricing body's own phase-5 redesign rather than pruned here.
+
+**`useReveal` never hides a section that is already on screen at the moment it mounts.**
+The eight sections fade in on scroll, but the prerendered HTML already contains the whole
+page — a reveal hook that blanks everything until its own `IntersectionObserver` fires
+would blink the page to invisible at hydration for whatever is already in the viewport,
+which is exactly the kind of defect a static screenshot or a signed-out fixture would never
+catch. Reduced-motion disables the reveal entirely rather than reducing it, for the same
+reason: a user who asked for no motion should never see the blank frame either.
+
+**Two new primitives — `ui/Accordion` and `ui/Dialog`'s `sheet` variant — carry their own
+scroll and glyph mechanics, kept out of the pages that use them.** The FAQ's chevron is
+supplied by CSS `content` on the trigger, not a text child, so a question's `textContent`
+in a screen reader or a test is the question alone (`35f88bd` — a pre-existing drift from
+`ui/Accordion`'s own documented contract, fixed as a prerequisite for Task 9's test, not a
+new decision, but recorded here since it shapes every heading's accessible name). The
+mobile sheet's same-page anchor links (`#why`, `#experience`, `#questions`) scroll from
+Radix's own `onCloseAutoFocus` hook, not a guessed timeout — the trigger's default focus
+restoration was scrolling the page back to the header after the native hash-jump already
+landed, confirmed by sampling `scrollY` on a timer (stuck at 0 until 300ms) versus on the
+hook (correct at the same instant the sheet closes). The intercept only fires for a href
+starting with `#`; a cross-page anchor (the pricing page's own FAQ link,
+`${home}#questions`) always falls through to a plain navigation, because there is no sheet
+left to close once the page unloads.
+
+**The sentiment badge tones stay live `color-mix(in srgb, var(--sentiment-*) …)`, not a
+precomputed hex.** A contrast fix was needed — the raw token as 14px text on its own 14%
+tint measured 4.31–4.65:1, under the 4.5:1 text floor a mark alone does not need — and the
+fastest fix would have been to write the darkened value out as a literal hex in `ui.css`.
+That would have reintroduced the exact "one meaning, two implementations" shape the tokens
+exist to prevent: the tone would again live in two places, one of them silently able to
+drift from `brand.css`'s own token. The tone is instead darkened by the same `color-mix()`
+formula already used for the tint, computed live; the test that used to check "no hex
+literal" for text-only reasons now also recomputes the expected mix from the token and
+asserts it clears 4.5:1 arithmetically — a stricter guarantee that still fails the moment
+the token or the CSS drift apart, which a text-only check could not have caught.
+
+**The LCP budget ("after ≤ before") missed and was waived, not fixed.** `H1.hero-title` —
+the same heading, before and after — paints at 96→132ms unthrottled and 280→408ms at 4×
+CPU throttle (`.superpowers/sdd/2026-09-17-landing-redesign/vitals.txt`). Every value sits
+well inside "good" (2.5s), the regression is the same element painting later rather than a
+heavier one replacing it, and the plausible cause — a real `ProductWindow` parsed from the
+prerendered HTML in place of what used to be a single deferred image request — is a
+reasonable cost for removing a request, not a regression to chase on a synthetic local
+`vite preview`. The measurement that actually answers the budget question is Lighthouse
+against the deployed host, which this task cannot run; recorded PENDING in
+`docs/coordination/ACTIVE.md` rather than closed here.

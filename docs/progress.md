@@ -998,3 +998,73 @@ and `Account`'s create / rename / retire invalidate the `["workspaces"]` prefix.
 and `Account.entry.test.ts` render under a `QueryClientProvider`; unit 8 files / 43 tests for
 the touched readers, typecheck and lint clean. Not walked in a signed-in browser (no seeded
 admin fixture yet — the standing gap).
+
+## 2026-09-17 — landing rebuilt on the design system
+
+`docs/superpowers/plans/2026-09-17-landing-redesign.md`, tasks 1–11, `b4d6dcf`…`b8439b2`;
+spec `docs/superpowers/specs/2026-09-17-landing-redesign-design.md`.
+
+The home page is no longer its own hand-written markup and one 1300-line stylesheet. Eight
+sections — Hero, Why, Demo, Benefits, Audience, Trust, FAQ, Closing — compose under the
+same `PublicShell` the pricing and legal pages already wear (Task 4, same day), each
+carrying its own small `landing/*.css` file. `Landing.tsx` and `landing.css` are deleted;
+the new tree lives under `apps/web/src/landing/`.
+
+**File map.** `landing/{Hero,Why,Demo,Benefits,Audience,Trust,Faq,Closing}.tsx` and their
+`.css` files; `landing/ProductWindow.tsx` — the landing's one picture of the product, drawn
+from `ui/` parts, still for the hero and interactive for the demo, one shared arithmetic in
+`demoData.ts`; `landing/useReveal.ts`, the scroll-reveal hook; `public/PublicShell.tsx` +
+`public/public.css` (Task 3 — header, sheet menu, footer, shared by all three public
+pages); `pricing.css` / `legal.css` (Task 4 — the pricing and legal bodies moved verbatim
+off the old `landing.css`); `ui/Accordion.tsx` (new primitive, `@radix-ui/react-accordion`
+exact-pinned) and `ui/Dialog`'s new `variant="sheet"` (Tasks 1–2).
+
+**Vitals** (Pixel 5 emulation, median of 3 runs; full matrix and methodology in
+`.superpowers/sdd/2026-09-17-landing-redesign/vitals.txt`), LCP element `H1.hero-title` in
+every cell, before and after:
+
+| | before (`77d90fc`) | after |
+|---|---|---|
+| LCP, unthrottled | 96ms | 132ms |
+| LCP, 4× CPU throttle | 280ms | 408ms |
+| CLS | 0 | 0 |
+
+CLS passed (tied at 0). LCP missed the "after ≤ before" budget under both CPU conditions —
+the same element paints later, not a heavier one replacing it (1.375× unthrottled, 1.457×
+at 4×, a consistent ratio rather than noise). Waived rather than chased further this task;
+the reasoning and the PENDING follow-up are in `docs/decisions.md` and
+`docs/coordination/ACTIVE.md`.
+
+**CSS budget.** Source-isolated comparison (`esbuild --minify` on each file standalone, the
+same minifier Vite uses): the old `landing.css` minifies to 25406 bytes; the ten new
+`landing/*.css` files plus `public/public.css` minify to 13073 bytes summed. 13073/25406 =
+**51.5%** against a ≤60% budget — PASS.
+
+**e2e rewritten, and why.** `tests/e2e/landing.spec.ts`'s contrast test's readiness marker
+moved from `.lp-donut` (gone with the illustration) to `[data-testid="product-window"]`,
+and its colour parser gained `color(srgb r g b)` support — this build serializes any
+`color-mix()` result that way, which the old `rgb(0-255)`-only parser silently misread as
+near-black on both sides of a contrast ratio (a measuring-instrument fix, the assertion
+itself unchanged). `tests/e2e/seo.spec.ts`'s hero-alt assertion moved from
+`.lp-hero-art img[alt]` to `.lp-hero-figure figcaption`, because the alt sentence now
+describes `ProductWindow` from a caption, not an image. `brandMark.test.ts`,
+`Landing.identity.test.ts` and `publicPaths.test.ts` were repointed from the old single
+`Landing.tsx` / `landing.css` to the split `landing/**` tree; `LegalPage.test.ts`'s footer
+scan now reads `public/PublicShell.tsx`, where the public footer lives now. Two real
+product defects surfaced only once the new code was served on a real route rather than
+tested in isolation — the mobile sheet's anchor scroll landing on the wrong place, and a
+contrast failure on the primary CTA and the sentiment badges — both fixed the same day;
+detail in `.superpowers/sdd/2026-09-17-landing-redesign/task-10-report.md`.
+
+**Deferred, not missed:** a dead 650px override in `pricing.css`, left for phase 5's
+pricing-body redesign; `ProductWindow`'s example comment rows keyed by label rather than an
+id; `sharesFor`'s missing zero-guard (unreachable with the demo's fixed denominators);
+tabs without a matching panel still carry `aria-controls` pointing at no element (Radix's
+own default markup, not written by this task); no `Landing.entry`-style page test for an
+admin flash banner, because nothing on the public landing shows one.
+
+`npm run check` — lint, format:check, typecheck, `check:functions` (deno), unit (85 files /
+548 tests), db (31 files / 303 tests), worker (195 tests), build (8 prerendered pages),
+secrets (521 source files plus built assets) — all green, 2026-09-17.
+`docs/verification.md`'s dated entry for this work is deferred: that file carries a
+concurrent session's uncommitted changes and was left untouched.

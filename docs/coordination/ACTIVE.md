@@ -307,3 +307,26 @@ migration, worker, gateway, contract or dashboard file. `npm run check` is red o
 checkout — stopped at `format:check` on four files this task did not write (see
 `docs/verification.md`'s 2026-09-16 topic-classification entry) — which the next writer in
 this area should fix before adding more code on top of it.
+
+2026-09-17, task 11 of the landing redesign (records-only): claimed
+`apps/web/src/{public,landing}/**`, `pricing.css`, `legal.css`, `ui/Accordion.tsx` (and
+`ui/Dialog`'s new `sheet` variant) — done, commits `b4d6dcf`…`b8439b2`. `npm run check` is
+green at the time of this entry: lint, format:check, typecheck, `check:functions` (deno),
+unit (85 files / 548 tests), db (31 files / 303 tests), worker (195 tests), build (8
+prerendered pages), secrets (521 source files plus built assets). `git status` at the start
+of this task, and again now, shows only the untracked `.screenshots/` and the other
+session's uncommitted `docs/verification.md` — neither touched by this task; that file's
+dated entry for this work is deferred, not skipped.
+
+**PENDING: the LCP budget.** The redesign's own rule — the hero's LCP after the rebuild
+should be no slower than before — missed on the local static preview: `H1.hero-title`,
+the same heading before and after, went 96→132ms unthrottled and 280→408ms at 4× CPU
+throttle (full matrix in `.superpowers/sdd/2026-09-17-landing-redesign/vitals.txt`). Waived
+rather than chased: every value is well inside "good" (2.5s), the same element paints
+later rather than a heavier one replacing it, and the likely cause is a real product window
+parsed from the prerendered HTML in place of a single deferred 29kB image request — plausible,
+not confirmed, because the only measurement that actually answers this is Lighthouse against
+the deployed host, not a synthetic `vite preview` on this machine. Reasoning in full in
+`docs/decisions.md`'s 2026-09-17 landing entry. Next action, the owner's to schedule: run
+Lighthouse (mobile + desktop) against the deployed landing after this work ships, the same
+way `docs/seo.md` §6 did for the previous redesign, and record the result there.

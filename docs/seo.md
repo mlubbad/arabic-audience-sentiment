@@ -71,6 +71,10 @@ been adopted), no customer or channel count, no price outside the catalogue. The
 answers about the beta ("can I connect my channel now?") are the same honest ones as
 before; two were merged and five were added. `seo.test.ts` holds the lines to this.
 
+**Update, 2026-09-17.** The hero image alt above describes an illustration that is no
+longer rendered; the same sentence now lives in the hero figure's visually-hidden
+`<figcaption>`, describing `ProductWindow` instead (`docs/landing.md`'s dated entry).
+
 ---
 
 ## 3. What each page carries

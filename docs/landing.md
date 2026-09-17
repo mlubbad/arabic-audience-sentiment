@@ -22,3 +22,23 @@ Implemented 2026-09-13 on the user's explicit request to build and integrate a l
 ## Local preview
 
 Use the pinned Node version, then `npm run dev -w @sentiment/web -- --port 5321 --strictPort` and open `http://127.0.0.1:5321/`. Browser tests use their own port and fixture environment. See the dated landing entry in `docs/verification.md` for actual results.
+
+## 2026-09-17 — the page is rebuilt on the design system
+
+The page now composes in `apps/web/src/landing/` — eight sections (Hero, Why, Demo,
+Benefits, Audience, Trust, Faq, Closing), each with its own small `landing/*.css` file —
+in place of the single `Landing.tsx` / `landing.css` described above, which are deleted.
+All eight share the `PublicShell` header/nav/footer that the pricing and legal pages
+already wear. Full account, the file map and the measurements are `docs/progress.md`'s
+"landing rebuilt on the design system" entry and
+`docs/superpowers/plans/2026-09-17-landing-redesign.md`; the decisions behind it are in
+`docs/decisions.md`.
+
+**The illustration described below is no longer rendered anywhere on the page.** The hero
+and the demo now show `ProductWindow` — a still and an interactive rendering of the actual
+dashboard's own parts (badges, a bar chart, comment cards), built from `ui/`, not a
+separate piece of art. The alt sentence that used to describe
+`audience-growth-original.webp` to a screen reader now lives in the hero figure's
+visually-hidden `<figcaption>`, describing `ProductWindow` instead. The PNG and WebP stay
+on disk exactly as before — unreferenced by the page, kept as provenance for the palette
+and composition and as the source of `og-audience-sentiment.jpg`, the share-card image.
