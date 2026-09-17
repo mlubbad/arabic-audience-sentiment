@@ -116,7 +116,19 @@ export function ReviewDialog({
             // this dialog never has — see the file comment. `triggerRef` is
             // the row's own button.
             e.preventDefault();
-            triggerRef.current?.focus();
+            if (
+              triggerRef.current &&
+              document.body.contains(triggerRef.current)
+            ) {
+              // Still on the page: focus it directly.
+              triggerRef.current.focus();
+            } else {
+              // A save can drop the row out of the current filter (e.g. a
+              // "غير المراجَع" view after the correction lands) — the button
+              // that opened this dialog is gone, so focus the section
+              // heading instead of silently falling through to `<body>`.
+              document.getElementById("rp-comments-title")?.focus();
+            }
           }}
         >
           <form

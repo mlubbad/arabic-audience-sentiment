@@ -180,6 +180,61 @@ describe("ReviewDialog", () => {
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
+  it("when the row's button has unmounted by close, falls back to the comments heading instead of <body>", async () => {
+    // A save can drop the row out of the current filter (e.g. a
+    // "غير المراجَع" view after the correction lands), so the button
+    // `triggerRef` points at may already be gone from the document by the
+    // time the dialog actually closes.
+    const user = userEvent.setup();
+    const trigger = document.createElement("button");
+    trigger.textContent = "تصحيح";
+    document.body.appendChild(trigger);
+    const triggerRef = { current: trigger };
+    const heading = document.createElement("h2");
+    heading.id = "rp-comments-title";
+    heading.tabIndex = -1;
+    document.body.appendChild(heading);
+    function Wrapper() {
+      const [reviewing, setReviewing] = useState<typeof baseComment | null>(
+        baseComment,
+      );
+      return (
+        <DirectionProvider dir="rtl">
+          <ReviewDialog
+            reviewing={reviewing}
+            kind="sentiment"
+            verdict="positive"
+            onVerdict={() => {}}
+            topicVerdict="praise"
+            onTopicVerdict={() => {}}
+            reason=""
+            onReason={() => {}}
+            topics={topics}
+            topicName={(key: string) =>
+              topics.find((t) => t.key === key)?.name_ar ?? key
+            }
+            labels={ar.labels}
+            S={ar}
+            lang="ar"
+            persisted
+            busy={false}
+            error={null}
+            onSubmit={() => {}}
+            onClose={() => setReviewing(null)}
+            triggerRef={triggerRef}
+          />
+        </DirectionProvider>
+      );
+    }
+    render(<Wrapper />);
+    await screen.findByRole("form", { name: ar.reviewFormLabel });
+    // The row is gone before the close, not because of it.
+    trigger.remove();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   it("renders the stale-comment error", () => {
     renderDialog({ error: new Error("stale_comment_text") });
     expect(screen.getByTestId("review-error")).toHaveTextContent(

@@ -87,7 +87,12 @@ export function Comments({
   return (
     <section className="db-section" id="rp-comments" data-testid="comments-table">
       <header>
-        <h2>{S.secComments}</h2>
+        {/* `tabIndex={-1}` + the id: `ReviewDialog.tsx`'s `onCloseAutoFocus`
+            fallback target, for when the row that opened it is gone (a
+            reviewed row can drop out of the "غير المراجَع" filter on save). */}
+        <h2 id="rp-comments-title" tabIndex={-1}>
+          {S.secComments}
+        </h2>
         <p className="db-lead">{S.commentsLead}</p>
       </header>
       <Tabs value={cardTab} onValueChange={(v) => onCardTab(v as CardTab)}>
