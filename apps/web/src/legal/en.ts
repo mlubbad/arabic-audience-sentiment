@@ -16,7 +16,7 @@ const PADDLE_PRIVACY = "https://www.paddle.com/legal/privacy";
 const SUPABASE_PRIVACY = "https://supabase.com/privacy";
 const CLOUDFLARE_PRIVACY = "https://www.cloudflare.com/privacypolicy/";
 const SKY_DEVELOP = "https://sky-develop.net";
-const UPDATED = "2026-09-16";
+const UPDATED = "2026-09-17";
 
 export const legalEn: LegalSet = {
   privacy: {
@@ -37,7 +37,7 @@ export const legalEn: LegalSet = {
         heading: "What this policy covers",
         paragraphs: [
           "This policy applies to the service's website, application, dashboards and APIs. It does not apply to the sites and services we link to or depend on, such as Google, YouTube and Paddle; each has its own policy, linked in the “Who we share it with” section below.",
-          "The service is in a private preview. Some pages show clearly marked synthetic data, which is nobody's personal data.",
+          "Some pages show clearly marked synthetic data, which is nobody's personal data.",
         ],
       },
       {
@@ -159,7 +159,7 @@ export const legalEn: LegalSet = {
         heading: "The service and its status",
         paragraphs: [
           "Audience Sentiment collects the public comments on a YouTube channel you connect, classifies their sentiment automatically, and shows the results in a dashboard you can filter and export.",
-          "The service is in a private preview (beta). Its features may change, a feature may be withdrawn or added, and some pages may show clearly marked synthetic data. We make reasonable efforts to keep it running without guaranteeing uninterrupted availability.",
+          "The service's features may change, a feature may be withdrawn or added, and some pages may show clearly marked synthetic data. We make reasonable efforts to keep it running without guaranteeing uninterrupted availability.",
         ],
       },
       {
@@ -213,7 +213,7 @@ export const legalEn: LegalSet = {
         id: "pilot",
         heading: "Founding partners",
         paragraphs: [
-          "During the private preview we may grant a limited number of channels a “founding partner” plan at no charge, in exchange for their feedback on the product. This plan is a grant, not an entitlement, and may be ended or converted to a published plan with reasonable notice.",
+          "We may grant a limited number of channels a “founding partner” plan at no charge, in exchange for their feedback on the product. This plan is a grant, not an entitlement, and may be ended or converted to a published plan with reasonable notice.",
         ],
       },
       {

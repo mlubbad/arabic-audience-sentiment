@@ -1150,3 +1150,10 @@ policy and the terms (`apps/web/src/legal/ar.ts:46,166` and the English twins) s
 service is in private preview — a legal-text change with its own `dateModified`.
 Typecheck, 12 string-sensitive unit files (45 tests), build + prerender guard, and the
 landing / seo / app-shell browser suites (18) green.
+
+2026-09-17, same day: the legal documents follow. The privacy policy's scope paragraph, the
+terms' "the service and its state" paragraph and the founding-partner clause no longer say
+the service is in a private preview or a beta; what they still say — synthetic data is marked,
+features may change, availability is not guaranteed, the founding-partner plan is a grant —
+stays. Both documents' `updated` date moves to 2026-09-17 (one constant per language, the
+parity test holds them equal). Legal unit tests 21/21, legal + seo browser suites green.
