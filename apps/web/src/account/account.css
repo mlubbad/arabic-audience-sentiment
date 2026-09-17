@@ -7,10 +7,10 @@
  * what is specific to `/account`. `BudgetMeter` itself is a `ui/`
  * component, styled in `ui/ui.css`.
  *
- * Only `PlanPanel` lives here so far — later tasks in this phase add
- * `WorkspaceCard`, `ConfirmDialog` and `CreateWorkspace`'s rules beside it,
- * and `.db-actions` below is already written for them to share rather than
- * each defining its own doors row.
+ * `PlanPanel` (`.db-plan*`), `WorkspaceCard` (`.db-ws*`) and `ConfirmDialog`
+ * (`.db-confirm*`) live here; a later task adds `CreateWorkspace`'s rules
+ * beside them. `.db-actions` is the doors row they all share rather than
+ * each defining its own.
  */
 
 /* ---------------- the plan card's budgets ---------------- */
@@ -47,4 +47,89 @@
   flex-wrap: wrap;
   gap: var(--space-3);
   margin-top: var(--space-4);
+}
+
+/* ---------------- a workspace card ---------------- */
+/* The list of cards, for the page to wear on its `<ul role="list">` once it
+   is recomposed: no bullet, no indent, one column with the section's gap.
+   The `li` itself is the card (`Card asChild`). */
+.db-ws-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+.db-ws {
+  list-style: none;
+}
+.db-ws-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.db-ws-name {
+  margin: 0;
+  font-size: var(--fs-h3);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.db-ws-rename {
+  display: grid;
+  gap: var(--space-2);
+}
+.db-ws-rename label {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.db-ws-rename .db-actions {
+  margin-top: var(--space-1);
+}
+.db-ws-channel {
+  margin: var(--space-2) 0 var(--space-4);
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+.db-ws-channel bdi {
+  font-weight: 600;
+  color: var(--text-1);
+}
+.db-ws-channel code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+}
+/* The retire door is a ghost button like disconnect — no fill, so the
+   card's doors read as one row — but in the danger colour, so the one that
+   hands the workspace away is told apart before it is pressed. */
+.db-ws-danger {
+  color: var(--color-danger);
+}
+/* The consent step before leaving for Google: a card inside the card, on
+   the muted plane so it reads as a nested note rather than a second
+   workspace. Its own doors row sits tighter than the card's. */
+.db-ws-consent {
+  margin-top: var(--space-4);
+  background: var(--bg-muted);
+  box-shadow: none;
+  padding: var(--space-4);
+}
+.db-ws-consent p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+.db-ws-consent .db-actions {
+  margin-top: var(--space-3);
+}
+
+/* ---------------- the disconnect / retire dialog ---------------- */
+.db-confirm-name {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-small);
+}
+.db-confirm .db-actions {
+  margin-top: 0;
 }

@@ -4,15 +4,21 @@
  * screen an owner actually uses — their workspaces, with the three steps and
  * the channel line — is asserted here, on the presentational card, with rows
  * handed in as the page would hand them.
+ *
+ * Static markup: what the card says and which doors it offers per channel
+ * state. What each door does when pressed, and the two questions that open
+ * in a dialog (a portal, which renders nothing to a string), are driven in
+ * `account/WorkspaceCard.test.tsx`.
  */
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { StaticRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { ar } from "./strings/ar";
 import { resetLocale, setLocale } from "./locale";
 import { loadStrings } from "./strings";
-import { WorkspaceCard, type ChannelRow } from "./WorkspaceCard";
+import { WorkspaceCard, type ChannelRow } from "./account/WorkspaceCard";
 import { setupSteps } from "./setup";
 
 const W1 = "11111111-1111-4111-8111-111111111111";
@@ -26,28 +32,33 @@ const connected: ChannelRow = {
   title: "قناة الأخبار الرسمية",
 };
 
+// The catalogue door is a router `Link`, so the card renders inside a router.
 function render(over: Partial<Parameters<typeof WorkspaceCard>[0]> = {}) {
   return renderToStaticMarkup(
-    createElement(WorkspaceCard, {
-      workspace: { id: W1, name: "قناة الأخبار" },
-      hasClient: true,
-      channel: null,
-      latestJob: null,
-      pending: false,
-      feedback: null,
-      onConnect: () => {},
-      ...over,
-    }),
+    createElement(
+      StaticRouter,
+      { location: "/account" },
+      createElement(WorkspaceCard, {
+        workspace: { id: W1, name: "قناة الأخبار" },
+        hasClient: true,
+        channel: null,
+        latestJob: null,
+        pending: false,
+        feedback: null,
+        onConnect: () => {},
+        ...over,
+      }),
+    ),
   );
 }
 
 describe("a workspace card", () => {
   it("names the channel by its title, then its handle, and labels a bare id as an id", () => {
     expect(render({ channel: connected })).toContain(
-      "<b>قناة الأخبار الرسمية</b>",
+      "<bdi>قناة الأخبار الرسمية</bdi>",
     );
     expect(render({ channel: { ...connected, title: null } })).toContain(
-      "<b>@akhbar</b>",
+      "<bdi>@akhbar</bdi>",
     );
     // The id was printed as though it were a name. It still appears — it is
     // the only identity there is when no name is stored — but as an id.
@@ -194,17 +205,13 @@ describe("a workspace card", () => {
 
   it("offers to disconnect exactly while a channel is connected, and asks first", () => {
     // Connected: the way out sits beside the way to the catalogue, and it is
-    // a two-step door — the first press asks, the second disconnects.
+    // a two-step door — the first press asks, the second disconnects, in a
+    // dialog (driven in `account/WorkspaceCard.test.tsx`; a portal renders
+    // nothing to static markup).
     const ask = render({ channel: connected });
     expect(ask).toContain(`data-testid="disconnect-${W1}"`);
     expect(ask).toContain(ar.disconnectChannel);
     expect(ask).not.toContain(ar.disconnectConfirm);
-    const confirming = render({
-      channel: connected,
-      confirmingDisconnect: true,
-    });
-    expect(confirming).toContain(ar.disconnectConfirm);
-    expect(confirming).toContain(ar.disconnectKeep);
     // Anything but connected: nothing to disconnect.
     expect(
       render({ channel: { ...connected, status: "disconnected" } }),
@@ -221,14 +228,8 @@ describe("a workspace card", () => {
     expect(card).toContain(ar.renameWorkspace);
     expect(card).toContain(`data-testid="retire-${W1}"`);
     expect(card).toContain(ar.retireWorkspace);
+    // The question itself opens in a dialog — driven, not rendered here.
     expect(card).not.toContain(ar.retireConfirm);
-    const asking = render({
-      channel: connected,
-      confirmingRetire: true,
-      onRetire: () => {},
-    });
-    expect(asking).toContain(ar.retireConfirm);
-    expect(asking).toContain(`data-testid="retire-confirm-${W1}"`);
     // Renaming is a form with the current name in it.
     const renaming = render({
       channel: connected,

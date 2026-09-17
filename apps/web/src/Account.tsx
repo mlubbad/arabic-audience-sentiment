@@ -12,7 +12,11 @@ import { useStrings } from "./strings";
 import { providers, type ProviderId } from "./authProviders";
 import { useGoogleOneTap } from "./googleOneTap";
 import { setupSteps } from "./setup";
-import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
+import {
+  WorkspaceCard,
+  type ChannelRow,
+  type JobRow,
+} from "./account/WorkspaceCard";
 import { PlanPanel } from "./account/PlanPanel";
 import { useIsPlatformAdmin } from "./adminAccess";
 import "./account.css";

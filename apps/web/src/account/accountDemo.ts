@@ -21,7 +21,7 @@
  */
 import { z } from "zod";
 import { UsageSummarySchema, type UsageSummary } from "@sentiment/contracts";
-import type { ChannelRow, JobRow } from "../WorkspaceCard";
+import type { ChannelRow, JobRow } from "./WorkspaceCard";
 
 export const ACCOUNT_DEMO_FIXTURE = "/fixtures/account.json";
 
