@@ -1,0 +1,12 @@
+.lp-demo .lp-lead {
+  text-align: center;
+}
+.lp-demo-frame {
+  max-width: 880px;
+  margin-inline: auto;
+}
+.lp-demo-after {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-6);
+}
