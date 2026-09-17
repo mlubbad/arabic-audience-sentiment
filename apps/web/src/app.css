@@ -708,53 +708,6 @@
 .account-create {
   margin-top: 2rem;
 }
-/* The admin table: one row per workspace, the two levers as two small stacked
-   forms in the row's last cells. Each form is a column so a row stays one
-   line tall per field; the wrap scrolls sideways on a phone. */
-.admin-page .table-wrap {
-  border-radius: 12px;
-  border: 1px solid var(--border-1);
-}
-.admin-page td,
-.admin-page th {
-  vertical-align: top;
-  white-space: nowrap;
-}
-.admin-page tbody th {
-  font-weight: 600;
-}
-.admin-form {
-  display: grid;
-  gap: 0.45rem;
-  min-width: 11rem;
-}
-.admin-form label {
-  display: grid;
-  gap: 0.2rem;
-  font-size: 0.85rem;
-}
-.admin-form input,
-.admin-form select {
-  width: 100%;
-  min-width: 0;
-}
-/* The override checkbox sits beside its words, not above them. */
-.admin-form .admin-check {
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 0.4rem;
-}
-.admin-form .admin-check input {
-  width: auto;
-}
-.admin-form button {
-  justify-self: start;
-}
-.admin-form .account-feedback {
-  white-space: normal;
-  max-width: 16rem;
-}
-
 .app-shell .history li {
   align-items: center;
   padding: 0.9rem 1.1rem;

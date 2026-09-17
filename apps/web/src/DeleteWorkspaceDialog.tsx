@@ -20,7 +20,7 @@ import {
 import { Input } from "./ui/Input";
 import { toast } from "./ui/Toast";
 
-interface Footprint {
+export interface Footprint {
   channels: number;
   videos: number;
   comments: number;
@@ -29,12 +29,39 @@ interface Footprint {
   members: number;
 }
 
+/** The two server calls, as the dialog makes them by default. Thrown as they
+ *  came: the sentence is chosen where it is shown, from the code alone. */
+async function countOnServer(w: string): Promise<Footprint> {
+  const { data, error } = await supabase!.rpc("admin_workspace_footprint", {
+    w,
+  });
+  if (error) throw error;
+  return data as Footprint;
+}
+async function deleteOnServer(w: string): Promise<void> {
+  const { error } = await supabase!.rpc("delete_workspace", { w });
+  if (error) throw error;
+}
+
+/**
+ * `onConfirm` and `readFootprint` are the two calls the dialog makes, and
+ * both default to the RPCs. The admin demo (`admin/AdminPage.tsx` behind
+ * `?demo=1`) passes its reducer for the first and a fixed count for the
+ * second; a refusal thrown by either lands in the same `role="alert"` line
+ * through `adminErrorMessage`, so the demo says exactly what the server
+ * would. `onDeleted` is what the page does once the row is gone — the live
+ * page re-reads its lists; the demo's rows already changed in `onConfirm`.
+ */
 export function DeleteWorkspaceDialog({
   workspace,
   onDeleted,
+  onConfirm,
+  readFootprint,
 }: {
   workspace: { id: string; name: string };
-  onDeleted: () => void;
+  onDeleted?: () => void;
+  onConfirm?: () => Promise<void>;
+  readFootprint?: () => Promise<Footprint>;
 }) {
   const S = useStrings();
   const [open, setOpen] = useState(false);
@@ -43,24 +70,29 @@ export function DeleteWorkspaceDialog({
   const [footprintError, setFootprintError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  // With neither injected and Supabase unconfigured there is nothing to
+  // count or delete against: the dialog opens and counts forever, and
+  // confirm never enables — the same as before the props existed.
+  const count =
+    readFootprint ?? (supabase && (() => countOnServer(workspace.id)));
+  const remove =
+    onConfirm ?? (supabase && (() => deleteOnServer(workspace.id)));
 
   // Counted when the dialog opens, not on mount: the admin table has a row
   // per workspace and this must not fire a query for each on page load.
   useEffect(() => {
-    if (!open || !supabase) return;
+    if (!open || !count) return;
     let live = true;
     setFootprint(null);
     setFootprintError(null);
-    void supabase
-      .rpc("admin_workspace_footprint", { w: workspace.id })
-      .then(({ data, error }) => {
-        if (!live) return;
-        if (error) {
-          setFootprintError(adminErrorMessage(error, S));
-          return;
-        }
-        if (data) setFootprint(data as Footprint);
-      });
+    count().then(
+      (data) => {
+        if (live && data) setFootprint(data);
+      },
+      (error: unknown) => {
+        if (live) setFootprintError(adminErrorMessage(error, S));
+      },
+    );
     return () => {
       live = false;
     };
@@ -70,21 +102,21 @@ export function DeleteWorkspaceDialog({
   const matches = typed.trim() === workspace.name.trim();
 
   function confirm() {
-    if (!supabase || !matches) return;
+    if (!remove || !matches) return;
     setBusy(true);
     setFailure(null);
-    void supabase
-      .rpc("delete_workspace", { w: workspace.id })
-      .then(({ error }) => {
+    remove().then(
+      () => {
         setBusy(false);
-        if (error) {
-          setFailure(adminErrorMessage(error, S));
-          return;
-        }
         setOpen(false);
         toast({ title: S.adminDeleteDone(workspace.name) });
-        onDeleted();
-      });
+        onDeleted?.();
+      },
+      (error: unknown) => {
+        setBusy(false);
+        setFailure(adminErrorMessage(error, S));
+      },
+    );
   }
 
   return (

@@ -21,7 +21,7 @@ import type { Locale } from "../locale";
 import type { Strings } from "../strings";
 import { Labelled } from "../ui/Labelled";
 import { extraCount, type FilterValues } from "./filters";
-import { useMediaQuery } from "./useMediaQuery";
+import { useMediaQuery } from "../ui/useMediaQuery";
 import "./filter-bar.css";
 
 /** Radix `Select` cannot hold an empty-string value — `""` (this product's

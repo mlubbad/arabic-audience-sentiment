@@ -1,0 +1,126 @@
+/* The admin page's own rules: the workspace table and the stacked cards it
+   becomes under 760px, and the two small forms every row carries. `pages.css`
+   (`db-page`, `db-hero`, `db-section`, `db-row-actions`, `db-card-title`)
+   carries what it shares with the other signed-in pages; `ui.css` styles
+   the table, inputs, selects, checkbox and buttons themselves. Tokens only —
+   the old `.admin-page` block in app.css measured in rem and hex. */
+
+/* ---------------- the wide table ---------------- */
+/* `.table-wrap` (style.css) scrolls sideways; the frame is this page's. */
+.db-admin-wrap {
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  background: var(--bg-card);
+}
+.db-admin-wrap .ui-table th,
+.db-admin-wrap .ui-table td {
+  vertical-align: top;
+  white-space: nowrap;
+}
+/* style.css shades every <th>; a row's name is a value, on the row's own
+   ground, not a second header column. */
+.db-admin-wrap .ui-table tbody th {
+  font-weight: 600;
+  color: var(--text-1);
+  background: transparent;
+}
+/* The delete sits at the end of the values row, and the two forms share the
+   row under it — a table's own way of giving a wide row a second line. */
+.db-admin-wrap .ui-table td.db-admin-delete {
+  text-align: end;
+}
+.db-admin-wrap .ui-table .db-admin-levers-row td {
+  white-space: normal;
+  padding-top: 0;
+  background: var(--bg-muted);
+}
+.db-admin-wrap .ui-table tbody tr:hover {
+  background: transparent;
+}
+
+/* ---------------- the two levers ---------------- */
+/* Side by side where there is room, one under the other where there is
+   not; each on its own ruled ground. */
+.db-admin-levers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-4) var(--space-6);
+  padding-top: var(--space-3);
+}
+.db-admin-form {
+  /* style.css frames every <form> as a bordered white box with a margin;
+     this one is a strip of fields on the row's own ground. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+}
+.db-admin-form .ui-field {
+  min-width: 0;
+  flex: 1 1 9rem;
+}
+/* The plan select and the note take the room; the numbers need little. */
+.db-admin-form .ui-field:has(input[type="number"]) {
+  flex: 0 1 6rem;
+}
+.db-admin-form .ui-select-trigger,
+.db-admin-form .ui-input {
+  width: 100%;
+  min-width: 0;
+}
+.db-admin-form .ui-checkbox-row {
+  flex: 1 1 100%;
+  font-size: var(--fs-small);
+}
+.db-admin-feedback {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-1);
+}
+.db-admin-feedback--working {
+  color: var(--text-3);
+}
+
+/* ---------------- stacked cards (≤760px) ---------------- */
+.db-admin-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-admin-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 0;
+  align-items: start;
+}
+.db-admin-dl > div {
+  display: contents;
+}
+.db-admin-dl dt {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.db-admin-dl dd {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-1);
+}
+/* In a card the two forms sit one under the other, the delete after both. */
+.db-admin-card .db-admin-levers {
+  grid-template-columns: 1fr;
+  margin-top: var(--space-4);
+  padding-top: 0;
+}
+.db-admin-card .db-admin-levers > section {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-1);
+}
+.db-admin-card .db-row-actions {
+  margin-top: var(--space-4);
+}

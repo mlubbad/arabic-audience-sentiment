@@ -37,7 +37,7 @@ import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import { videoLabel } from "../i18n";
 import { splitSegments } from "./splitBar";
-import { useMediaQuery } from "./useMediaQuery";
+import { useMediaQuery } from "../ui/useMediaQuery";
 import "./compare.css";
 
 type ComparedVideo = Snapshot["comparison"][number];

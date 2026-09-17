@@ -27,7 +27,7 @@ import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import type { Locale } from "../locale";
 import { commentText, displayDate } from "../i18n";
-import { useMediaQuery } from "./useMediaQuery";
+import { useMediaQuery } from "../ui/useMediaQuery";
 import "./comments.css";
 
 /** The sentiment scale's own tone, never `neutral`'s badge default — same

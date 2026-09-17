@@ -185,4 +185,49 @@ describe("DeleteWorkspaceDialog", () => {
       expect(toast).not.toHaveBeenCalled();
     },
   );
+
+  it("with onConfirm and readFootprint injected, neither RPC is called: the count and the delete are theirs, and a refusal they throw is said the same way", async () => {
+    const readFootprint = vi.fn(async () => footprint);
+    const onConfirm = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce({ message: "billing_root", code: "55000" })
+      .mockResolvedValueOnce(undefined);
+    const onDeleted = vi.fn();
+    render(
+      <DeleteWorkspaceDialog
+        workspace={{ id: W, name: "عميل للتسليم 1" }}
+        onDeleted={onDeleted}
+        onConfirm={onConfirm}
+        readFootprint={readFootprint}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: ar.adminDelete }));
+    await screen.findByRole("dialog");
+    expect(
+      await screen.findByText(ar.adminDeleteFootprint(footprint)),
+    ).toBeVisible();
+    expect(readFootprint).toHaveBeenCalledTimes(1);
+    await userEvent.type(
+      screen.getByLabelText(ar.adminDeleteTypeName("عميل للتسليم 1")),
+      "عميل للتسليم 1",
+    );
+    const confirm = screen.getByRole("button", { name: ar.adminDeleteConfirm });
+    await userEvent.click(confirm);
+    // Refused: the dialog stays, says the reducer's sentence, reports nothing.
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      ar.adminDeleteBillingRoot,
+    );
+    expect(onDeleted).not.toHaveBeenCalled();
+    // Allowed: it closes, toasts and reports, exactly as the RPC path does.
+    await userEvent.click(confirm);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(onConfirm).toHaveBeenCalledTimes(2);
+    expect(onDeleted).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith({
+      title: ar.adminDeleteDone("عميل للتسليم 1"),
+    });
+    expect(shared.rpc).not.toHaveBeenCalled();
+  });
 });

@@ -72,7 +72,7 @@ const Pricing = lazy(() =>
 );
 // `AdminPage`, not `Admin`, for the same reason: `adminWords.ts` is beside it.
 const AdminPage = lazy(() =>
-  import("./AdminPage").then((m) => ({ default: m.AdminPage })),
+  import("./admin/AdminPage").then((m) => ({ default: m.AdminPage })),
 );
 // The legal documents share one page; the address decides which. The
 // documents themselves load with it, not with the shell.
