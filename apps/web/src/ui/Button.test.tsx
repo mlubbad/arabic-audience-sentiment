@@ -24,6 +24,22 @@ describe("Button", () => {
     );
   });
 
+  it("offers an outline door and a link, each on its own class", () => {
+    render(
+      <>
+        <Button variant="outline">Google</Button>
+        <Button variant="link">أنشئ حسابًا</Button>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "Google" })).toHaveClass(
+      "ui-btn--outline",
+    );
+    const link = screen.getByRole("button", { name: "أنشئ حسابًا" });
+    expect(link).toHaveClass("ui-btn--link");
+    // A link wearing a button's element never submits the form around it.
+    expect(link).toHaveAttribute("type", "button");
+  });
+
   it("fires onClick", async () => {
     const onClick = vi.fn();
     render(<Button onClick={onClick}>تأكيد</Button>);

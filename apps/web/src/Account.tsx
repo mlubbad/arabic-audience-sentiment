@@ -10,14 +10,15 @@ import {
 import { beginConnect, connectErrorMessage } from "./connect";
 import { useStrings } from "./strings";
 import { providers, type ProviderId } from "./authProviders";
-import { useGoogleOneTap } from "./googleOneTap";
-import { setupSteps } from "./setup";
 import {
   WorkspaceCard,
   type ChannelRow,
   type JobRow,
 } from "./account/WorkspaceCard";
 import { PlanPanel } from "./account/PlanPanel";
+import { AuthEntry } from "./account/AuthEntry";
+import { Unavailable } from "./account/Unavailable";
+import { CreateWorkspace } from "./account/CreateWorkspace";
 import { useIsPlatformAdmin } from "./adminAccess";
 import "./account.css";
 
@@ -64,40 +65,28 @@ export function Account() {
       );
     return null;
   }
-  const [email, setEmail] = useState(""),
-    [password, setPassword] = useState(""),
-    [name, setName] = useState("");
-  // Which of the two screens is showing. A query string so the header's
-  // "تسجيل الدخول" and a "create an account" link can each land on the right
-  // one, and so a reader can send someone the signup screen directly.
-  const [joining, setJoining] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).has("signup"),
-  );
+  const [name, setName] = useState("");
   const authProviders = providers(import.meta.env.VITE_AUTH_PROVIDERS, S);
-  const googleOpen = authProviders.some(
-    (p) => p.id === "google" && !p.closedReason,
-  );
-  // Called unconditionally, above the `!supabase` early return below: hooks
-  // cannot themselves be conditional, so `enabled` carries the actual gate —
-  // no client, an existing session, or the door not open all mean "do not
-  // prompt" rather than "do not call the hook".
-  useGoogleOneTap({
-    enabled: !!supabase && sessionRead && !session && googleOpen,
+  // Google One Tap's gate and handler. The hook itself mounts inside
+  // `AuthEntry`, which only renders signed out; `enabled` still carries the
+  // whole gate — no client, an existing session, or (ANDed there) the door
+  // not open all mean "do not prompt". `sessionRead` keeps a signed-in
+  // reader's first paint, before `getSession()` answers, from prompting.
+  const oneTap = {
+    enabled: !!supabase && sessionRead && !session,
     clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-    onCredential: async (token, nonce) => {
+    onCredential: async (token: string, nonce: string) => {
       const { error } = await supabase!.auth.signInWithIdToken({
         provider: "google",
         token,
         nonce,
       });
       // A resolved session is picked up by the `onAuthStateChange` listener
-      // above, the same way the OAuth door's redirect is — nothing else to
+      // below, the same way the OAuth door's redirect is — nothing else to
       // do here on success.
       if (error) say("auth", S.providerStartFailed);
     },
-  });
+  };
   // A platform admin has nobody to hand a workspace to but themself, so the
   // retire door is not offered; retire_workspace refuses them too.
   const access = useIsPlatformAdmin(session);
@@ -232,37 +221,21 @@ export function Account() {
           <h1>{S.accountTitle}</h1>
           <p>{S.accountLead}</p>
         </header>
-        <div className="account-entry">
-          <div className="app-state">
-            <span className="app-state-symbol" aria-hidden="true">
-              ◌
-            </span>
-            <h2>{S.accountUnavailableTitle}</h2>
-            <p>{S.accountUnavailableLead}</p>
-          </div>
-          <div className="account-story">
-            <h2>{S.accountTryDashboardTitle}</h2>
-            <p>{S.accountTryDashboardLead}</p>
-            <a href="/dashboard">{S.openDashboard}</a>
-          </div>
-        </div>
+        <Unavailable />
       </div>
     );
   const client = supabase;
-  async function auth(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function auth(
+    action: AuthAction,
+    creds: { email: string; password: string },
+  ) {
     setBusy("auth");
     setNote(null);
     try {
-      const action: AuthAction =
-        (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") ===
-        "signup"
-          ? "signup"
-          : "signin";
       const { data, error } =
         action === "signup"
-          ? await client.auth.signUp({ email, password })
-          : await client.auth.signInWithPassword({ email, password });
+          ? await client.auth.signUp(creds)
+          : await client.auth.signInWithPassword(creds);
       say(
         "auth",
         error
@@ -316,136 +289,15 @@ export function Account() {
       </header>
       {feedback("page")}
       {!session ? (
-        <div className="account-entry">
-          {/* Two screens, not one form with two submits.
-              Logging in and creating an account are different intentions with
-              different stakes, and a single form that did both put them on
-              adjacent buttons — so the way to a new account and the way back
-              into an existing one were one mis-click apart. */}
-          <form className="rp-card auth-card" onSubmit={auth}>
-            <h2>{joining ? S.authJoinTitle : S.authReturnTitle}</h2>
-            <p>{joining ? S.authJoinLead : S.authReturnLead}</p>
-            <label>
-              {S.emailLabel}
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <label>
-              {S.passwordLabel}
-              <input
-                type="password"
-                autoComplete={joining ? "new-password" : "current-password"}
-                minLength={8}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
-            {feedback("auth")}
-            <button
-              name="action"
-              value={joining ? "signup" : "signin"}
-              disabled={pending}
-            >
-              {joining ? S.createAccount : S.signIn}
-            </button>
-
-            <p className="auth-or">
-              <span>{joining ? S.orJoinWith : S.orSignInWith}</span>
-            </p>
-            {/* Every door is shown, and the closed ones say they are closed.
-                Hiding them would leave a reader who came expecting Google
-                wondering whether they misremembered; offering them live would
-                spend their one moment of intent on an error. */}
-            <ul className="auth-providers">
-              {authProviders.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    data-provider={p.id}
-                    disabled={!!p.closedReason || pending}
-                    aria-describedby={
-                      p.closedReason ? `why-${p.id}` : undefined
-                    }
-                    onClick={() => startProvider(p.id)}
-                  >
-                    {p.label}
-                  </button>
-                  {p.closedReason && (
-                    <small id={`why-${p.id}`}>{p.closedReason}</small>
-                  )}
-                </li>
-              ))}
-            </ul>
-
-            <p className="auth-switch">
-              {joining ? S.haveAccount : S.noAccount}{" "}
-              <button
-                type="button"
-                className="auth-link"
-                onClick={() => {
-                  setJoining(!joining);
-                  setNote(null);
-                }}
-              >
-                {joining ? S.signIn : S.joinLink}
-              </button>
-            </p>
-          </form>
-          <aside className="account-story">
-            <p className="app-eyebrow">{S.howToStartEyebrow}</p>
-            <h2>{S.howToStartTitle}</h2>
-            <p>{S.howToStartLead}</p>
-            {/* The same three sentences the owner sees with a state on each,
-                once signed in. Written once in `setup.ts`. */}
-            <ol className="account-steps">
-              {setupSteps.map((step) => (
-                <li key={step.key}>{S[step.title]}</li>
-              ))}
-            </ol>
-
-            {/* The reassurance panel, and the reason it says none of the
-                things a panel like this usually says.
-
-                The reference it is modelled on reads "Trusted by 200,000+
-                companies in 120 countries" over five customer logos. We have
-                no customers, so that line and those logos would be an
-                invention — and on a product whose whole argument is that it
-                reports what it measured, a fabricated number on the way in
-                would undo the argument before the reader reaches the data.
-
-                So the panel carries what is true and checkable instead. Each
-                line is a property of the build, not a claim about a market,
-                and each one is asserted by a test in this repository. */}
-            <section className="account-trust" data-testid="account-trust">
-              <h3>{S.trustTitle}</h3>
-              <ul>
-                <li>
-                  <strong>{S.trustIsolationStrong}</strong>
-                  {S.trustIsolation}
-                </li>
-                <li>
-                  <strong>{S.trustCountedStrong}</strong>
-                  {S.trustCounted}
-                </li>
-                <li>
-                  <strong>{S.trustMeasuredStrong}</strong>
-                  {S.trustMeasured}
-                </li>
-                <li>
-                  <strong>{S.trustReviewStrong}</strong>
-                  {S.trustReview}
-                </li>
-              </ul>
-              <p className="account-trust-note">{S.trustNote}</p>
-            </section>
-          </aside>
-        </div>
+        <AuthEntry
+          providers={authProviders}
+          busy={pending}
+          feedback={feedback("auth")}
+          oneTap={oneTap}
+          onAuth={auth}
+          onProvider={startProvider}
+          onSwitch={() => setNote(null)}
+        />
       ) : (
         <>
           {/* Signing out moved to the header, where it is reachable from every
@@ -629,21 +481,13 @@ export function Account() {
             </ul>
           )}
           <section className="account-create">
-            <form className="rp-card" onSubmit={createWorkspace}>
-              <h2>{S.anotherWorkspaceTitle}</h2>
-              <p>{S.anotherWorkspaceLead}</p>
-              <label>
-                {S.workspaceNameLabel}
-                <input
-                  required
-                  maxLength={120}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </label>
-              {feedback("create")}
-              <button disabled={pending}>{S.createWorkspace}</button>
-            </form>
+            <CreateWorkspace
+              name={name}
+              setName={setName}
+              pending={pending}
+              feedback={feedback("create")}
+              onSubmit={createWorkspace}
+            />
           </section>
         </>
       )}

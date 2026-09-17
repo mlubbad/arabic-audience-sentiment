@@ -9,6 +9,12 @@ const button = cva("ui-btn", {
       secondary: "ui-btn--secondary",
       ghost: "ui-btn--ghost",
       danger: "ui-btn--danger",
+      /** A door that is not the page's primary action: no fill, the light
+       *  border — the account page's provider buttons. */
+      outline: "ui-btn--outline",
+      /** A link wearing a button's element, for a press that changes what
+       *  a form is rather than submitting it: no box, underlined. */
+      link: "ui-btn--link",
     },
     size: {
       sm: "ui-btn--sm",

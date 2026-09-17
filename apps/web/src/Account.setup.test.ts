@@ -110,14 +110,15 @@ describe("a workspace card", () => {
     const positions = setupSteps.map((s) => html.indexOf(ar[s.title]));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
-    // And the visitor's list is the same list, not a second copy of it.
-    const account = readFileSync(
-      new URL("./Account.tsx", import.meta.url),
+    // And the visitor's list is the same list, not a second copy of it. It
+    // is drawn by the signed-out entry (`account/AuthEntry.tsx`) since
+    // phase 5 cut that screen out of `Account.tsx`.
+    const entry = readFileSync(
+      new URL("./account/AuthEntry.tsx", import.meta.url),
       "utf8",
     );
-    expect(account).toContain("setupSteps.map(");
-    for (const step of setupSteps)
-      expect(account).not.toContain(ar[step.title]);
+    expect(entry).toContain("setupSteps.map(");
+    for (const step of setupSteps) expect(entry).not.toContain(ar[step.title]);
   });
 
   it("offers the way back through consent exactly while no name is stored", () => {
