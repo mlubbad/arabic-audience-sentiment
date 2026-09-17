@@ -341,3 +341,11 @@ stashed. Note for whoever runs the browser suite next: `playwright.config.ts` no
 servers, and the second one is `npm run build` — every `npm run test:e2e` builds first, and
 it builds into `apps/web/dist` in the suite's fixture mode (empty Supabase URL). Run `npm run
 build` again before `deploy:preview`, or the preview host gets a fixture build.
+
+2026-09-17, later the same wave — the note above about `npm run test:e2e` building into
+`dist` is closed: the built-site suite (`tests/e2e/public-build.spec.ts`, the `public-build`
+project and its build-and-preview server) now exists only when `E2E_BUILD=1`, and runs only
+via `npm run test:e2e:build`. `npm run test:e2e` starts the dev server alone, runs the
+`default` project alone, and never touches `apps/web/dist` — checked by the file's mtime
+before and after a run. Running the build suite still leaves a fixture-mode `dist` behind,
+so `npm run build` before `deploy:preview` as ever.

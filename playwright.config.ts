@@ -12,6 +12,13 @@ const origin = `http://127.0.0.1:${port}`;
 // entry's CSS. The dev server never shows that page, so a stylesheet that
 // travelled with a lazy chunk (the pricing and legal pages', 2026-09-17) was
 // invisible to every test above until it was served built.
+//
+// Opt-in, never by default: `npm run test:e2e:build` sets E2E_BUILD=1. The
+// build writes `apps/web/dist` — in this suite's fixture mode — and
+// scripts/deploy-preview.sh ships that directory as it finds it, so a default
+// `npm run test:e2e` that rebuilt would leave a fixture build where the next
+// deploy looks. With the variable unset, nothing here touches `dist`.
+const withBuild = process.env.E2E_BUILD === "1";
 const previewPort = 4175;
 const previewOrigin = `http://127.0.0.1:${previewPort}`;
 
@@ -35,11 +42,15 @@ export default defineConfig({
       name: "default",
       testIgnore: /public-build\.spec\.ts/,
     },
-    {
-      name: "public-build",
-      testMatch: /public-build\.spec\.ts/,
-      use: { baseURL: previewOrigin },
-    },
+    ...(withBuild
+      ? [
+          {
+            name: "public-build",
+            testMatch: /public-build\.spec\.ts/,
+            use: { baseURL: previewOrigin },
+          },
+        ]
+      : []),
   ],
   webServer: [
     {
@@ -52,15 +63,19 @@ export default defineConfig({
       reuseExistingServer: false,
       env,
     },
-    {
-      // A full build (vite + prerender) then `vite preview` over `dist`. The
-      // build is the slow part, hence the timeout.
-      command: `npm run build -w @sentiment/web && npm run preview -w @sentiment/web -- --port ${previewPort} --strictPort`,
-      url: previewOrigin,
-      reuseExistingServer: false,
-      env,
-      timeout: 240_000,
-    },
+    ...(withBuild
+      ? [
+          {
+            // A full build (vite + prerender) then `vite preview` over
+            // `dist`. The build is the slow part, hence the timeout.
+            command: `npm run build -w @sentiment/web && npm run preview -w @sentiment/web -- --port ${previewPort} --strictPort`,
+            url: previewOrigin,
+            reuseExistingServer: false,
+            env,
+            timeout: 240_000,
+          },
+        ]
+      : []),
   ],
   reporter: "list",
 });

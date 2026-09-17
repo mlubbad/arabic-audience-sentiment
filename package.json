@@ -22,6 +22,7 @@
     "test": "vitest run --exclude \"supabase/tests/**\"",
     "test:db": "vitest run supabase/tests",
     "test:e2e": "playwright test",
+    "test:e2e:build": "E2E_BUILD=1 playwright test --project public-build",
     "test:e2e:live": "playwright test --config playwright.live.config.ts",
     "worker:test": "uv --directory workers/python --cache-dir ../../.cache/uv run --frozen pytest",
     "worker:lint": "uv --directory workers/python --cache-dir ../../.cache/uv run --frozen ruff check .",
