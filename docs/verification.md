@@ -2083,6 +2083,28 @@ allowance did not come up.
 the untracked `.screenshots/` directory (unrelated to this plan); nothing from this plan's
 four commits (`0bb18b6`, `d97e009`, `b87abef`, `3ea6d17`) was left uncommitted.
 
+## 2026-09-17 — the quota form's submission confirmed on the second attempt
+
+The 2026-09-16 entry above recorded the form as submitted; it was not. In that browser
+session the Submit button showed a spinner for over five minutes while the network log held
+only the seven `upload-ceres` attachment uploads and no form POST — the page's client-side
+submit never fired, most likely because hidden Project #4 upload slots had been filled by
+mistake and then cleared. The page was reloaded (01:00 local) and refilled from scratch with
+the same answers and the same seven attachments, touching no hidden field.
+
+The owner's first Submit click on the refilled form did not register (button stayed enabled,
+no spinner, no request); a second click did. Evidence of the send: `POST
+support.google.com/apis/cufinsert` → 200, followed by `/apis/cufz` → 204, and the page
+replaced the form with "Your email has been sent — Thank you for submitting the YouTube API
+Services Form." No case number is shown on the page; Google's acknowledgement and any
+follow-up questions arrive by email to engmlubbad@gmail.com, and there is no self-serve
+status page for this form.
+
+Acknowledgement received at 00:18 local: subject "YouTube API Services: Thank you for your
+submission", from "YouTube API Quota" `youtube-disputes+0fgjaqtphf4qo1n@google.com` — the
+`+` suffix is the case token; follow-ups belong on that thread. Body: "We will follow up
+with a response once the application has been reviewed." Status: pending Google's review.
+
 ## 2026-09-17 — on-page SEO: `/en`, prerender, metadata, copy — checks and the whole browser suite
 
 Node 22.14.0, on `main` at the commit that carries this entry. Another session was working
@@ -2236,3 +2258,10 @@ keep the page in the fallback face for good. `swap` is deployed.
 The variance to know about: the live host answers the same build with an observed first
 paint of 0.7 s on one run and 2.2 s on the next. Field data (CrUX) is what settles that,
 and needs traffic.
+
+2026-09-17 20:02 local, same thread: "Thank you for working with us on the YouTube
+Compliance Review. We are already in the process of reviewing your request and as of this
+writing, we have seen the information provided to us: Project Key, Quota Request,
+Attachment." Any request for more information will come on this thread; they ask to be
+told if engmlubbad@gmail.com is not the preferred contact. No action required. Status:
+under review.
