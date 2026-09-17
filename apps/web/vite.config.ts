@@ -1,8 +1,45 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwind from "@tailwindcss/vite";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+/** `vite preview` answers a public address the way the host does.
+ *
+ *  Vite's preview server probes no extensions and falls back to `index.html`,
+ *  so `/pricing` got the prerendered *landing* — the SPA fallback — and not
+ *  `pricing/index.html`; only `/pricing/` found the file, and no canonical
+ *  address here carries a slash. A browser test against the preview was
+ *  therefore reading the landing's markup whichever page it asked for, with
+ *  JavaScript off, and passing. These are `public/.htaccess`'s two rewrite
+ *  rules: a directory with a prerendered `index.html` is served for its
+ *  address with or without the slash, and anything that is not a file gets
+ *  `app.html` — the empty template the shell renders from — not the landing.
+ *  Preview only: `vite dev` has no prerendered pages to serve, and the build
+ *  is untouched. */
+function prerenderedPages(): Plugin {
+  return {
+    name: "prerendered-pages",
+    configurePreviewServer(server) {
+      const dist = resolve(server.config.root, server.config.build.outDir);
+      server.middlewares.use((req, _res, next) => {
+        const url = req.url ?? "/";
+        const q = url.indexOf("?");
+        const path = q === -1 ? url : url.slice(0, q);
+        const query = q === -1 ? "" : url.slice(q);
+        const bare = path.replace(/\/+$/, "");
+        if (bare && existsSync(join(dist, bare, "index.html")))
+          req.url = `${bare}/index.html${query}`;
+        else if (bare && !existsSync(join(dist, path)))
+          req.url = `/app.html${query}`;
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwind()],
+  plugins: [react(), tailwind(), prerenderedPages()],
   // Where .env files are read from. The browser suite points this at a
   // directory holding none, so the app under test is configured by the suite
   // and not by whatever .env.local the developer happens to have. Without it a

@@ -7,28 +7,60 @@ import { resolve } from "node:path";
 const port = Number(process.env.E2E_PORT ?? 5173);
 const origin = `http://127.0.0.1:${port}`;
 
+// The built site, served by `vite preview`: what a visitor without JavaScript
+// (or before the bundle lands) actually gets — the prerendered HTML and the
+// entry's CSS. The dev server never shows that page, so a stylesheet that
+// travelled with a lazy chunk (the pricing and legal pages', 2026-09-17) was
+// invisible to every test above until it was served built.
+const previewPort = 4175;
+const previewOrigin = `http://127.0.0.1:${previewPort}`;
+
+// The suite decides how the app is configured, rather than inheriting it.
+// tests/e2e holds no .env files, so pointing Vite's envDir there means
+// apps/web/.env.local is not read and these tests describe fixture mode on
+// every machine. A developer with a live project configured used to fail
+// one test here, which made the result a property of the laptop.
+const env = {
+  VITE_ENV_DIR: resolve("tests/e2e"),
+  VITE_SUPABASE_URL: "",
+  VITE_SUPABASE_PUBLISHABLE_KEY: "",
+  VITE_DASHBOARD_SOURCE: "",
+};
+
 export default defineConfig({
   testDir: "tests/e2e",
   use: { baseURL: origin, viewport: { width: 1280, height: 800 } },
-  webServer: {
-    // One npm layer on purpose: `npm run dev -- --port X` does not forward the
-    // flag, because the root dev script is itself an npm run and npm consumes
-    // it. --strictPort makes Vite exit on an occupied port instead of quietly
-    // moving to another one.
-    command: `npm run dev -w @sentiment/web -- --port ${port} --strictPort`,
-    url: origin,
-    reuseExistingServer: false,
-    // The suite decides how the app is configured, rather than inheriting it.
-    // tests/e2e holds no .env files, so pointing Vite's envDir there means
-    // apps/web/.env.local is not read and these tests describe fixture mode on
-    // every machine. A developer with a live project configured used to fail
-    // one test here, which made the result a property of the laptop.
-    env: {
-      VITE_ENV_DIR: resolve("tests/e2e"),
-      VITE_SUPABASE_URL: "",
-      VITE_SUPABASE_PUBLISHABLE_KEY: "",
-      VITE_DASHBOARD_SOURCE: "",
+  projects: [
+    {
+      name: "default",
+      testIgnore: /public-build\.spec\.ts/,
     },
-  },
+    {
+      name: "public-build",
+      testMatch: /public-build\.spec\.ts/,
+      use: { baseURL: previewOrigin },
+    },
+  ],
+  webServer: [
+    {
+      // One npm layer on purpose: `npm run dev -- --port X` does not forward
+      // the flag, because the root dev script is itself an npm run and npm
+      // consumes it. --strictPort makes Vite exit on an occupied port instead
+      // of quietly moving to another one.
+      command: `npm run dev -w @sentiment/web -- --port ${port} --strictPort`,
+      url: origin,
+      reuseExistingServer: false,
+      env,
+    },
+    {
+      // A full build (vite + prerender) then `vite preview` over `dist`. The
+      // build is the slow part, hence the timeout.
+      command: `npm run build -w @sentiment/web && npm run preview -w @sentiment/web -- --port ${previewPort} --strictPort`,
+      url: previewOrigin,
+      reuseExistingServer: false,
+      env,
+      timeout: 240_000,
+    },
+  ],
   reporter: "list",
 });
