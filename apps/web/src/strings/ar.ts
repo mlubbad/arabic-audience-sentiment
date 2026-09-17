@@ -286,6 +286,8 @@ export const ar = {
   adminPaddleActive: "المساحة على اشتراك Paddle نشط؛ فعّل التجاوز لتغييره",
   adminDone: "تم التنفيذ.",
   adminFailed: (code: string) => `تعذّر التنفيذ: ${code}`,
+  adminDemoLead:
+    "هذه نسخة توضيحية من صفحة الإدارة: التغييرات تبقى في هذه الجلسة فقط.",
 
   // ---- the account page (Account.tsx) ----
   working: "جارٍ تنفيذ الطلب…",

@@ -279,6 +279,8 @@ export const en: Strings = {
     "This workspace has an active Paddle subscription; enable override to change it",
   adminDone: "Applied.",
   adminFailed: (code: string) => `Could not apply: ${code}`,
+  adminDemoLead:
+    "An illustrative copy of the admin page: changes stay in this session.",
 
   working: "Working…",
   ssoNeedsDomain:
