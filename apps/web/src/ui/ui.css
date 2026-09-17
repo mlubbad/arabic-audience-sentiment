@@ -533,6 +533,9 @@
   color: var(--ml-indigo);
   line-height: 1;
 }
+.ui-accordion-chevron::before {
+  content: "⌄";
+}
 .ui-accordion-trigger[data-state="open"] .ui-accordion-chevron {
   transform: rotate(180deg);
 }

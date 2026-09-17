@@ -38,9 +38,7 @@ export function AccordionTrigger({
           {...props}
         >
           <span className="ui-accordion-trigger-text">{children}</span>
-          <span className="ui-accordion-chevron" aria-hidden="true">
-            ⌄
-          </span>
+          <span className="ui-accordion-chevron" aria-hidden="true" />
         </AccordionPrimitive.Trigger>
       </Heading>
     </AccordionPrimitive.Header>
