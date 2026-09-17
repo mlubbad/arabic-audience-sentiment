@@ -95,7 +95,7 @@ export function PublicShell({
         {S.skipToContent}
       </a>
       <div className="lp-announcement">
-        {S.announcementLead} <span>{S.announcementTag}</span>
+        {S.announcementLead}
         <LanguageSwitch
           locale={locale}
           to={publicPath(page, otherLocale(locale))}
@@ -184,7 +184,6 @@ export function PublicShell({
         <LegalLinks className="lp-legal" locale={locale} />
         <div className="lp-footer-bottom">
           <span>{S.lpFooterVersion}</span>
-          <span>{S.lpFooterPreview}</span>
         </div>
       </footer>
     </div>

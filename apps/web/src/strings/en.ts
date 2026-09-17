@@ -15,7 +15,6 @@ export const en: Strings = {
   brandHomeLabel: "Audience Sentiment — home",
   skipToContent: "Skip to content",
   announcementLead: "Your audience's voice, more clearly",
-  announcementTag: "Private preview · beta",
   menuLabel: "App menu",
   menuOpen: "Menu ☰",
   menuClose: "Close ×",
@@ -37,8 +36,7 @@ export const en: Strings = {
   titleNotFound: "Page not found",
   pageOpening: "Opening the page…",
   footerTagline: "From comments to a clearer picture.",
-  footerNote:
-    "Private preview · some pages use synthetic data, and say so plainly.",
+  footerNote: "Some pages use synthetic data, and say so plainly.",
   notFoundEyebrow: "This page is not available",
   notFoundTitle: "We could not find the page you were looking for.",
   notFoundLead: "Go back to the dashboard, or start from the home page.",
@@ -302,7 +300,7 @@ export const en: Strings = {
   createWorkspaceDone: "Workspace created",
   authJoinTitle: "Create your account",
   authReturnTitle: "Welcome back",
-  authJoinLead: "Private preview — an account opens one workspace of your own.",
+  authJoinLead: "An account opens one workspace of your own.",
   authReturnLead: "Go to your workspace, channels and reports.",
   emailLabel: "Email",
   passwordLabel: "Password",
@@ -330,7 +328,7 @@ export const en: Strings = {
   trustReview:
     " A human review replaces the model's prediction for that text, and is kept with its author and reason.",
   trustNote:
-    "Private preview. No customer counts, no logos: there is nothing to count yet, and an invented number at the door undoes what the dashboard says behind it.",
+    "No customer counts, no logos: there is nothing to count yet, and an invented number at the door undoes what the dashboard says behind it.",
   insideAccount: "You are signed in. Choose the workspace you want to manage.",
   workspacesTitle: "Workspaces",
   workspacesLead:
@@ -1027,8 +1025,7 @@ export const en: Strings = {
     "Export comments under the same filters, keeping the label's source and the available review log.",
   lpFaqEyebrow: "Before you start",
   lpFaqTitle: "Frequently asked questions about YouTube comment analysis",
-  lpFaqLead:
-    "This is a beta. Here is what you can try now, and what is still being completed.",
+  lpFaqLead: "Here is what you can do now, and what is still being completed.",
   lpFaq: [
     "What is YouTube comment sentiment analysis?",
     "An automatic reading of every comment that sorts it by the feeling it carries: positive, negative, neutral or mixed. The result is a summary of how your audience felt about a video or a period, with a way back to every comment behind every share.",
@@ -1039,7 +1036,7 @@ export const en: Strings = {
     "Is the demo data from a real channel?",
     "The interactive example on this page uses clearly labelled synthetic comments. Comments from a real test channel are stored in the service and are being connected to the live dashboard for the workspace owner.",
     "Can I connect my channel now?",
-    "YouTube connection is available in the private preview for authorised accounts, and real comments have been collected for a test channel. Syncing requires the collector to be running, and live-model sentiment analysis and live-dashboard verification are still being completed.",
+    "YouTube connection is available for authorised accounts, and real comments have been collected from connected channels. After connecting, syncing runs on the workspace's plan, and every collected comment is analysed automatically.",
     "Does the tool need access to my channel?",
     "Yes. Connecting a channel means signing in with Google and granting two permissions, to read channel data and comments. The service reads and never writes: it does not post, edit or delete anything on your channel. You can revoke the permission from your Google account settings at any time; the details are in the privacy policy.",
     "Are my corrections saved in the demo?",
@@ -1057,8 +1054,7 @@ export const en: Strings = {
   lpFooterNavLabel: "Footer links",
   lpFooterDashboard: "Dashboard",
   lpFooterAccount: "Account",
-  lpFooterVersion: "Audience Sentiment · early version",
-  lpFooterPreview: "Private preview — not a public launch",
+  lpFooterVersion: "Audience Sentiment · by Sky Develop",
   legalNavLabel: "Legal pages",
   legalPrivacy: "Privacy Policy",
   legalTerms: "Terms of Service",

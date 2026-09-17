@@ -290,7 +290,6 @@ function AppLayout() {
           screen size, above the fold, and on a phone needs no menu opened. */}
       <div className="app-announcement">
         <span>{S.announcementLead}</span>
-        <span>{S.announcementTag}</span>
         <LanguageSwitch />
       </div>
       {/* A rail, not a bar.

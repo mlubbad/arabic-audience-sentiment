@@ -1136,3 +1136,17 @@ Verification: `npx vitest run apps/web/src/{public,landing,ui}` 28 files / 81 te
 unit suite 85 files / 549 tests; typecheck, lint, format:check green; `npm run build` with
 the guard; `test:e2e` landing + pricing + legal + seo 15/15 on the dev server, `--project
 public-build` 6/6 on the preview.
+
+## 2026-09-17 — the beta label comes down
+
+The operator declared the product out of beta. «معاينة خاصة · نسخة تجريبية» / "Private preview ·
+beta" is gone from the announcement band on the app shell (`main.tsx`) and the public shell
+(`PublicShell.tsx`), and the five sentences that repeated the claim were rewritten without it:
+the app footer note, the sign-up lead, the account page's trust note, the landing FAQ's lead
+and its "can I connect my channel now?" answer, and the public footer (now «مشاعر الجمهور · من
+سكاي ديفيلوب»). The dashboard's «معاينة تجريبية» eyebrow stays: it names the visitor's fixture
+data, not the product's state. Left deliberately untouched, for the operator: the privacy
+policy and the terms (`apps/web/src/legal/ar.ts:46,166` and the English twins) still say the
+service is in private preview — a legal-text change with its own `dateModified`.
+Typecheck, 12 string-sensitive unit files (45 tests), build + prerender guard, and the
+landing / seo / app-shell browser suites (18) green.
