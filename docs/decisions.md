@@ -897,3 +897,41 @@ file on disk rather than at a mutated copy of the same one. This keeps the whole
 server and one port, and keeps the interception scoped to the one file that needs it: every
 other spec's `page.route("**/fixtures/e2e-dashboard.json", …)` calls are untouched and keep
 reading the kernel.
+
+2026-09-17 — Google sign-in and One Tap (`docs/superpowers/plans/2026-09-17-google-signin.md`,
+design in `docs/superpowers/specs/2026-09-17-google-signin-design.md`).
+
+**One Tap prompts on `/account` only, never the landing or the dashboard's fixture view.** A
+visitor reading the marketing page has not asked to sign in; a visitor who came to the account
+page has. The gate that keeps it there is the same `enabled` boolean the hook already carries
+— Google an open provider, a client id configured, no session — hardened this task to also
+wait for a `sessionRead` state so a signed-in visitor's first paint cannot fire it either, only
+`getSession()` actually resolving to `null`.
+
+**Google receives the SHA-256 hash of a random nonce; Supabase receives the raw value.** The
+same raw/hashed split `oauth-start.ts` already uses for PKCE. `signInWithIdToken` verifies the
+ID token's `nonce` claim is the hash of what it was handed, so a credential minted for one
+browser's prompt cannot be replayed with a nonce that browser never asked for. `nonce()` returns
+both values from one call, so they are constructed and verified together by design, never as
+two independent pieces of state that could drift apart.
+
+**No GIS-rendered button.** `authProviders.ts` already renders a Google door that calls
+`signInWithOAuth`; a second, Google-drawn button beside it would be two controls for one
+action — the same shape the account page already refuses everywhere else it applies (sign-out
+lives once, in the header, for the same reason). One Tap is additive, a passive prompt that
+never blocks the existing door, not a replacement for it.
+
+**The client id is public; the secret lives only in Supabase's own provider configuration.**
+`VITE_GOOGLE_CLIENT_ID` ships in the built bundle by nature of being a client id — Google's own
+model assumes this — the same way the Supabase project URL and publishable key already do.
+Nothing new crosses the browser/server boundary: `GOOGLE_CLIENT_SECRET` (backend, for the
+channel-connect's own OAuth code exchange) is untouched and was never a candidate for `VITE_*`.
+
+**The same Google Cloud OAuth client the YouTube channel-connect already uses**
+(`272573239614-31idkf1nk8hegpceqt3pdmbeefnsaqsr.apps.googleusercontent.com`, project
+`272573239614`) also carries sign-in, rather than registering a second client. One project, one
+client id, one place to add a redirect URI or an authorized origin. This costs no isolation
+between the two flows either way: `signInWithIdToken` only ever produces a Supabase session,
+and the channel-connect's own server-side callback is what performs the
+`channels.list(mine=true)` binding — neither flow can act as the other regardless of which
+client signed the token.

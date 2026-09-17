@@ -1432,3 +1432,62 @@ followed — the overview eyebrow «معاينة تجريبية» is «مثال 
 likewise); one unit assertion and one browser assertion that quoted the old words follow.
 Three files left unformatted by an earlier task reflowed. `npm run check` green (unit 96/626,
 db 310, worker 195, build, secrets); dashboard + demo + landing browser suites 85/85.
+
+## 2026-09-17 — Google sign-in: the door opens by configuration, One Tap greets `/account`
+
+Three tasks (`docs/superpowers/plans/2026-09-17-google-signin.md`, design in
+`docs/superpowers/specs/2026-09-17-google-signin-design.md`). **The Google door was already
+drawn and disabled** — `authProviders.ts` renders it, `Account.tsx`'s `startProvider` already
+calls `signInWithOAuth`. Opening it is a configuration change, not new code:
+`VITE_AUTH_PROVIDERS=google` (now in `.env.example`) is what turns the existing button live.
+**One Tap is new**: `useGoogleOneTap` (`apps/web/src/googleOneTap.ts`) loads Google Identity
+Services from its own `<script>` once, shared across every hook instance so two mounts never
+inject it twice, hands Google the SHA-256 hash of a random nonce and keeps the raw value for
+`supabase.auth.signInWithIdToken` — the same raw/hashed split `oauth-start.ts` already uses for
+PKCE, so a credential Google mints for this browser's prompt cannot be replayed against a
+different nonce. It prompts on the account page's signed-out screen only, never the landing or
+the dashboard's fixture view. Two new build-time env keys: `VITE_AUTH_PROVIDERS` and
+`VITE_GOOGLE_CLIENT_ID` (the client id is public by design; the secret lives only in Supabase's
+own provider configuration). Commits `0102bea` (design), `fb16e08` (plan), `898d2d2` (the hook
+and its tests), `5c2f9ca` (the door and the account wiring), `6e2ac2e` (this task's two
+hardenings, below).
+
+**Security review (opus, focused on the auth code: nonce construction, token handling, hook
+lifecycle) came back clean on `fb16e08..5c2f9ca`** — nothing it called blocking — with two
+minor findings folded into this records task as hardening rather than a fourth task, since both
+were small and touched the same two files the review had just read:
+
+- The One Tap gate read `!session` before `getSession()` had resolved, so a signed-in visitor's
+  first paint could still fire the prompt — and its fetch — for the moment before the real
+  session came back. `Account.tsx` now tracks a `sessionRead` state, set once
+  `getSession().then(...)` answers, and the hook's `enabled` gate waits for it.
+- A failed GSI script load was cached forever in `googleOneTap.ts`'s module-level `loading`
+  promise: one bad load and no later mount would ever try again without a full page reload. The
+  script's own `onerror` now clears `loading` and removes the dead tag before rejecting, so the
+  next mount gets a fresh attempt. A new `googleOneTap.test.ts` case dispatches `error` on the
+  injected tag and confirms a second hook mount injects a new one rather than reusing the stale,
+  forever-rejected promise.
+
+**Tests.** Tasks 1–2's own report: 28/28 across `googleOneTap.test.ts` (5),
+`Account.entry.test.ts` (10), `authProviders.test.ts` (9), `Account.setup.test.ts` (4); a live
+dev server on port 5175 confirmed the Google button enabled with no closed-reason sentence and
+the GSI script tag present (`.superpowers/sdd/2026-09-17-google-signin/shots/account-google.png`,
+gitignored). This task's hardening adds one more `googleOneTap.test.ts` case and re-runs all
+three files clean (24/24). `npm run check` at the close of this task is green in full: lint,
+format:check, typecheck, `check:functions` (deno), unit (97 files / 633 tests), db (32 files /
+310 tests), worker (195 tests), build (8 prerendered pages), secrets (591 source files plus
+built assets).
+
+**PENDING, the operator's: a real Google account against the deployed host.** Everything above
+is unit-tested and, for the door and the script-injection gate, dev-server-verified locally —
+no e2e, because Google's own UI cannot be driven headlessly (recorded as out of scope in the
+design). Verify on `https://app.sky-develop.net/account` after the next deploy: the Google
+button opens Google's consent screen and completes a sign-in; a signed-out visit shows the One
+Tap prompt and a credential signs in; a signed-in visit does not show it.
+
+Deferred, per the standing rule in `docs/coordination/ACTIVE.md`: `docs/verification.md` —
+`git status --short docs/verification.md` was non-empty (another session's in-flight edit) at
+the start of this task and remains so; its dated entry for this work is deferred, not skipped.
+`docs/deployment.md` was left alone too, on inspection rather than by the same rule: it
+mentions specific `VITE_*` names in prose (`VITE_DASHBOARD_SOURCE`, `VITE_SITE_PUBLIC`) but
+carries no table or list of build env vars to append the two new ones to.

@@ -61,6 +61,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 | `workers/python/src/topics/**`, `supabase/migrations/20260916010000`–`012000`, `supabase/functions/_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`, `packages/contracts/src/topics.ts` | **done** — topic classification (tasks 1–10) landed as `0866318`…`1b4ed30`; free, and see the not-yet-live-deployed note below | 2026-09-16 |
 | `apps/web/src/dashboard/**` (and the `.ui-split` primitive in `apps/web/src/ui/ui.css`) | **done** — the dashboard redesign (tasks 1–12) landed as `4566718`…`07e9ccd`; the old `apps/web/src/Dashboard.tsx` is deleted, `report.css` no longer loads on this page; free | 2026-09-17 |
 | `apps/web/scripts/{demo-content,make-demo-fixture}.mjs` (+ `.d.mts`), `apps/web/public/fixtures/{dashboard,e2e-dashboard,catalogue}.json`, `apps/web/src/{demoFixture,noSyntheticWords}.test.ts`, `tests/e2e/demo.spec.ts` | **done** — the demo-data feature (tasks 1–4) landed as `938cfc0`…`97ed318`, plus this task's records commit; the visitor dashboard and the browser suite now read separate fixtures from one generator, «توضيحية» replaces «اصطناعي» everywhere reader- or test-facing; free | 2026-09-17 |
+| `apps/web/src/googleOneTap.ts` (+ `.test.ts`), `apps/web/src/google-gsi.d.ts`, `apps/web/vite-env.d.ts`, the Google door's slice of `Account.tsx`/`Account.entry.test.ts`, `.env.example` | **done** — Google sign-in and One Tap (`docs/superpowers/plans/2026-09-17-google-signin.md`) landed as `0102bea`…`5c2f9ca`, plus this task's hardening (`6e2ac2e`) and records commit; the door opens on `VITE_AUTH_PROVIDERS=google`, One Tap prompts a signed-out `/account` visitor via GIS + `signInWithIdToken`; free | 2026-09-17 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
@@ -235,6 +236,14 @@ Pending, from selective video sync, all the user's decisions and none of them ta
 Until these happen, no discovery or collection has run against the real channel and
 the catalogue has never been seen signed in — see `docs/verification.md`'s "Not verified"
 for 2026-09-15.
+
+**PENDING, the operator's: verify Google sign-in and One Tap on the deployed host.** Everything
+in `docs/superpowers/plans/2026-09-17-google-signin.md` is unit-tested and, for the door and
+the script-injection gate, dev-server-verified locally — there is no e2e for it, because
+Google's own UI cannot be driven headlessly. After the next deploy, on
+`app.sky-develop.net/account`: the Google button should open Google's consent screen and
+complete a sign-in; a signed-out visit should show the One Tap prompt and a credential should
+sign in; a signed-in visit should not show the prompt at all.
 
 ## What the tests are for
 
