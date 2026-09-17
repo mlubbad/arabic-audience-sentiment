@@ -69,6 +69,10 @@ through their token.
 - No insert/update/delete endpoints are called.
 
 **Which OAuth scopes, and why?**
+(As submitted 2026-09-16. Since 2026-09-18 the client requests `youtube.force-ssl` alone —
+`readonly` is a subset of it and was dropped after the OAuth-verification reviewer's
+least-privilege objection; see `docs/oauth-verification.md` §5. If the quota reviewers ask,
+that is the answer.)
 `https://www.googleapis.com/auth/youtube.readonly` and
 `https://www.googleapis.com/auth/youtube.force-ssl`. `commentThreads.list` on the owner's
 own videos refuses `youtube.readonly` alone with `insufficientPermissions`; Google offers

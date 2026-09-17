@@ -27,7 +27,8 @@ Google's verification form for a sensitive-scope app collects, per scope request
 justification and a demo. The two scopes here share one justification (§2) because the
 second scope exists only to unblock the first — see below.
 
-**Scopes requesting verification:**
+**Scopes requesting verification** (as submitted 2026-09-16; reduced to `force-ssl` alone
+on 2026-09-18 — see §5):
 - `https://www.googleapis.com/auth/youtube.readonly`
 - `https://www.googleapis.com/auth/youtube.force-ssl`
 
@@ -170,3 +171,138 @@ expected and must be shown in the video" — exactly what §2's script already d
 text and the demo video are all done. What's left is pasting the video link into the
 Data Access page's "Demo video" field and pressing Save — the owner's own action, since
 it is a live edit on the Google Auth Platform console.
+
+## 5. 2026-09-18 — Google's two objections, and the answer
+
+The thread "[Action Needed] OAuth Verification Request Acknowledgement" (from
+`api-oauth-dev-verification-reply+2ct39wymk54541d@google.com`, project `272573239614`,
+Project ID `gen-lang-client-0819726570`) carried two messages:
+
+1. **2026-09-14 02:50** — the homepage and privacy-policy URLs required sign-in, and the
+   privacy policy must fully document how the app interacts with Google user data. Both
+   were already fixed by the time the message was read: the Basic-Auth password came off
+   the host on 2026-09-16 (`docs/verification.md`, "the password removed, probed from
+   outside"; re-probed 2026-09-17: `/`, `/privacy-policy`, `/terms` all `200` with no
+   credentials), and the privacy policy's "Google and YouTube data" section names the
+   scope, the Limited Use commitment under the Google API Services User Data Policy, the
+   thirty-day purge and the revocation page. The message was not answered until now.
+2. **2026-09-17 22:59** — the demo video (`youtu.be/tqQV--DhFU0`) "does not sufficiently
+   demonstrate why the following scope(s) are necessary or why narrower permissions cannot
+   be used", for both `youtube.readonly` and `youtube.force-ssl`. Action required: a new
+   video showing the full operational functionality of every requested scope, then a reply
+   on the thread.
+
+### 5a. The scope change: one scope instead of two
+
+`youtube.force-ssl` is a superset of `youtube.readonly` — every read the app makes under
+readonly (`channels.list`, `playlistItems.list`, `videos.list`) is permitted under
+force-ssl. Requesting both was redundant, and redundancy is exactly what a least-privilege
+reviewer flags: two scopes to justify where one capability exists. On 2026-09-18
+`oauth-start` requests `force-ssl` alone (`supabase/functions/oauth-start/index.ts`); the
+privacy policy (ar/en) now says "exactly one permission"; `legal.test.ts` asserts readonly
+is absent; the oauth unit tests' fixtures follow.
+
+Three owner-side actions this needs, none of which this checkout can do:
+- **Deploy** `oauth-start` so the live consent screen asks for one scope.
+- **Google Auth Platform → Data Access**: remove `youtube.readonly` from "Your sensitive
+  scopes", keep `youtube.force-ssl`, re-paste the justification (§5b), paste the new
+  video link, Save.
+- Existing connections keep working: a token granted `readonly + force-ssl` still carries
+  force-ssl; nothing re-prompts.
+
+### 5b. Justification text for the single scope (fits the 1000-character box)
+
+```
+Audience Sentiment is a read-only YouTube audience-monitoring tool for channel owners. A
+signed-in owner authorizes their own channel once via this OAuth flow. We request one
+scope, youtube.force-ssl, and use it only to read: channels.list (mine=true) to identify
+the owner's channel, playlistItems.list and videos.list to list their videos so they can
+choose which to monitor, and commentThreads.list and comments.list to read comments and
+replies on the videos they selected, which our own model classifies by sentiment and
+topic. Why not youtube.readonly: commentThreads.list on the owner's own videos is refused
+under youtube.readonly with insufficientPermissions (shown live in the demo video), and
+Google offers no narrower scope that permits reading a channel's comments as its owner.
+The app never calls a write, update, delete, insert or rate endpoint. Comment text is
+purged 30 days after collection. Users revoke in-app or at
+myaccount.google.com/permissions and all reads stop at once. No data is sold, shared or
+aggregated across channels.
+```
+
+### 5c. The second demo video — script written against the reviewer's checklist
+
+The reviewer's criteria, verbatim: "demonstrate the full operational functionality of
+every requested scope" and "why narrower permissions cannot be used". The first video
+showed the app working; it did not show the *narrower scope failing*. That is the
+missing shot, and it is the centre of this script. Record in one take, unlisted, with
+narration; 3–4 minutes; browser address bar visible throughout.
+
+| Time | Screen | Say / show |
+| --- | --- | --- |
+| 0:00–0:20 | `app.sky-develop.net/` (signed out) | "Audience Sentiment — an Arabic-first YouTube comment-analysis tool for channel owners. Everything it does with YouTube data is read." Scroll to the footer: Privacy Policy and Terms links, open the privacy policy, scroll to **Google and YouTube data**, pause 3 s on the paragraph naming `youtube.force-ssl`. |
+| 0:20–0:50 | **Google OAuth Playground** (`developers.google.com/oauthplayground`), or the API Explorer on the `commentThreads.list` reference page | "First, why the narrower scope is not enough." Authorize with **`youtube.readonly` only**, call `youtube.commentThreads.list?part=snippet&videoId=<one of your own videos>`. Show the **403 `insufficientPermissions`** response in full. "Under readonly, YouTube refuses to return the comments on my own video." |
+| 0:50–1:05 | Same tool | Re-authorize with **`youtube.force-ssl` only**, repeat the identical call: **200** with comment threads. "The same call succeeds under force-ssl. Google offers nothing in between — this is the narrowest scope that reads a channel's comments as its owner." |
+| 1:05–1:20 | `/account`, signed in | "Now the app itself." Press **Connect a YouTube channel** — the confirmation panel that tells the user what happens at Google. |
+| 1:20–1:45 | Google consent screen | Let it render fully; the scope list shows **one** entry. "The app asks for one permission. The unverified-app warning is expected until this review completes." Allow. |
+| 1:45–2:00 | `/connected` | "Connected." |
+| 2:00–2:30 | `/sync` (catalogue) | Scroll the video list with comment counts. "channels.list identified my channel; playlistItems.list and videos.list built this list. No comment has been read yet — I choose which videos to monitor." Select two or three. |
+| 2:30–3:10 | `/dashboard` → comments | Show comments with sentiment/topic labels, filter by video, open one comment. "commentThreads.list and comments.list read the comments and replies on the videos I selected; our model labels them. This is the whole use of the scope. Nothing is ever written back — no replies, no deletions, no ratings." |
+| 3:10–3:30 | `/account` → **Disconnect channel** | Click, show the confirmation text, confirm. "Revocation from inside the app: collection stops at once and the token is discarded." |
+| 3:30–3:50 | `myaccount.google.com/permissions` | Show the app in the list, open it, show the **Remove access** button (press it if the channel was disconnected in the previous step anyway). "And from Google's side." |
+| 3:50–end | — | "That is every operation this application performs with the youtube.force-ssl scope: five read calls, no writes, thirty-day retention, revocable at either end." |
+
+Two practical notes. The Playground step needs your own OAuth client's id/secret
+(Playground → gear → "Use your own OAuth credentials") so the consent screen shows *this*
+app; if you would rather not, the API Explorer on the `commentThreads.list` docs page also
+lets you pick scopes per request and shows the raw 403. Record **after** deploying the
+one-scope `oauth-start`, otherwise the consent screen at 1:20 still lists two scopes.
+
+### 5d. The reply, one message covering both of theirs
+
+Reply on the same thread (subject unchanged) once the video is uploaded and the Data
+Access page saved. `<VIDEO>` is the new unlisted link.
+
+```
+Hello,
+
+Thank you for the review. Both messages on this thread are addressed:
+
+1. Homepage and privacy policy (your message of 14 September)
+   - Homepage: https://app.sky-develop.net/
+   - Privacy policy: https://app.sky-develop.net/privacy-policy
+   - Terms of service: https://app.sky-develop.net/terms
+   The sign-in requirement has been removed; all three open without authentication.
+   The privacy policy's section "Google and YouTube data" documents the Google user
+   data the application accesses (the channel, its video list, and the comments on
+   videos the owner selects), the scope used, how the data is used and stored, the
+   30-day deletion of comment text, that it is not sold, shared or used for
+   advertising, our adherence to the Google API Services User Data Policy including
+   the Limited Use requirements, and how users revoke access.
+
+2. Scopes and demo video (your message of 17 September)
+   - We have reduced the request to a single scope: https://www.googleapis.com/auth/youtube.force-ssl.
+     youtube.readonly has been removed from the OAuth client and from the Data Access
+     configuration, since force-ssl already covers the read calls it was used for.
+   - Why force-ssl and not a narrower scope: commentThreads.list on the owner's own
+     videos returns 403 insufficientPermissions under youtube.readonly, and no narrower
+     scope permits reading a channel's comments as its owner. The new video shows this
+     refusal live, then the same call succeeding under force-ssl.
+   - The application only reads: channels.list, playlistItems.list, videos.list,
+     commentThreads.list, comments.list. It never calls a write, update, delete,
+     insert or rate endpoint.
+   - New demonstration video (unlisted): <VIDEO>
+     It shows the narrower scope failing, the consent screen with the single scope,
+     every in-app feature that uses the scope, and revocation both inside the app and
+     from the Google Account permissions page.
+
+The Data Access configuration in the Cloud Console has been updated and saved accordingly.
+Please let me know if anything further is needed.
+
+Best regards,
+Mohammed Lubbad
+```
+
+### 5e. Status
+
+Code and policy done and tested (`legal.test.ts`, `oauth_start.test.ts`,
+`oauth_callback.test.ts` green; prettier clean). Waiting on the owner: deploy
+`oauth-start`, edit Data Access, record the video per §5c, send §5d.

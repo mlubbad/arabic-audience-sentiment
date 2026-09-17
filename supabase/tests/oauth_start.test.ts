@@ -18,10 +18,7 @@ import {
 const config: OauthConfig = {
   client_id: "1234.apps.googleusercontent.com",
   redirect_uri: "https://app.example/oauth/youtube/callback",
-  scopes: [
-    "https://www.googleapis.com/auth/youtube.readonly",
-    "https://www.googleapis.com/auth/youtube.force-ssl",
-  ],
+  scopes: ["https://www.googleapis.com/auth/youtube.force-ssl"],
 };
 const W = "00000000-0000-4000-8000-000000000001";
 const C = "00000000-0000-4000-8000-0000000000c1";

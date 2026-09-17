@@ -52,17 +52,18 @@ Deno.serve(async (request) => {
       {
         client_id: env("GOOGLE_CLIENT_ID"),
         redirect_uri: env("GOOGLE_REDIRECT_URI"),
-        // youtube.readonly alone is refused by commentThreads.list with
-        // insufficientPermissions — verified against the live API, not assumed.
-        // Comment access sits behind force-ssl, which is broader than this
-        // product needs: it permits writing and deleting comments, and we only
-        // ever read. Google's scope granularity does not offer a narrower
-        // grant, so the wider one is requested and the fact is written down
-        // rather than hidden. Nothing in this codebase calls a write endpoint.
-        scopes: [
-          "https://www.googleapis.com/auth/youtube.readonly",
-          "https://www.googleapis.com/auth/youtube.force-ssl",
-        ],
+        // One scope. youtube.readonly alone is refused by commentThreads.list
+        // with insufficientPermissions — verified against the live API, not
+        // assumed — so comment access sits behind force-ssl, which is broader
+        // than this product needs: it permits writing and deleting comments,
+        // and we only ever read. Google offers no narrower grant, so the wider
+        // one is requested and the fact is written down rather than hidden.
+        // force-ssl already covers everything readonly does (channels.list,
+        // playlistItems.list, videos.list), so readonly is not requested
+        // alongside it: two scopes for one capability is what a least-privilege
+        // reviewer objects to, and it was objected to (2026-09-17). Nothing in
+        // this codebase calls a write endpoint.
+        scopes: ["https://www.googleapis.com/auth/youtube.force-ssl"],
       },
       {
         createState: async (w, c, stateHash, verifier) => {

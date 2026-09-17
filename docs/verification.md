@@ -2265,3 +2265,21 @@ writing, we have seen the information provided to us: Project Key, Quota Request
 Attachment." Any request for more information will come on this thread; they ask to be
 told if engmlubbad@gmail.com is not the preferred contact. No action required. Status:
 under review.
+
+## 2026-09-18 — OAuth verification: one scope instead of two, second video scripted
+
+Google's Third-Party Data Safety Team rejected the demo video (thread of 2026-09-14 /
+2026-09-17, details in `docs/oauth-verification.md` §5): it did not show why
+`youtube.readonly` and `youtube.force-ssl` were both necessary or why a narrower scope
+could not be used. `readonly` is a subset of `force-ssl`, so `oauth-start` now requests
+`force-ssl` alone; the privacy policy (ar/en) says "exactly one permission" and names why.
+`legal.test.ts` asserts `youtube.readonly` is gone from the policy; the oauth fixtures
+follow. `npm test` 734 passed (103 files), `tsc --noEmit` clean, prettier clean on the
+touched code. The 14 September objection (pages behind sign-in) was already moot: `/`,
+`/privacy-policy`, `/terms` probed `200` without credentials on 2026-09-17.
+
+Not done here, owner-side: deploy `oauth-start`; remove `youtube.readonly` in Google Auth
+Platform → Data Access and paste the §5b justification; record the §5c video (its centre
+is the live `403 insufficientPermissions` under readonly, then the same call under
+force-ssl); send the §5d reply on the thread. `apps/web/src/account/*`, `app.css`,
+`setup-path.css` were dirty from another session and were left unstaged.

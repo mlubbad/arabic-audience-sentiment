@@ -72,7 +72,7 @@ requesting a sensitive scope, regardless of branding.
 
 Verification is a written submission plus a short screen recording of the consent flow,
 reviewed by Google (typically days to a few weeks for sensitive-scope, non-restricted
-apps — `youtube.force-ssl` and `youtube.readonly` are sensitive, not restricted, so this
+apps — `youtube.force-ssl` (the only scope requested since 2026-09-18; `youtube.readonly` was dropped as redundant) is sensitive, not restricted, so this
 does not need the paid third-party security assessment that Gmail- or Drive-scope apps
 require). Once approved: screen 4 stops appearing for new connections, and screen 5 shows
 "Audience Sentiment wants access…" instead of the Supabase domain. Preparing that

@@ -84,8 +84,9 @@ describe("the legal documents", () => {
     // The scopes oauth-start asks for, and the retention purge_comment_text runs.
     for (const set of [legalAr, legalEn]) {
       const privacy = text(set.privacy);
-      expect(privacy).toContain("youtube.readonly");
       expect(privacy).toContain("youtube.force-ssl");
+      // One scope, not two: readonly is a subset of force-ssl and was dropped.
+      expect(privacy).not.toContain("youtube.readonly");
       expect(privacy).toMatch(/ثلاثين يومًا|thirty days/);
       // Nobody's name or personal mailbox: the contact is the company site.
       expect(text(set.privacy) + text(set.terms)).not.toMatch(

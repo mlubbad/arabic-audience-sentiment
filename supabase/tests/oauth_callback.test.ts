@@ -52,7 +52,7 @@ function transport(
             access_token: "ya29.access",
             refresh_token: "1//refresh",
             expires_in: 3599,
-            scope: "https://www.googleapis.com/auth/youtube.readonly",
+            scope: "https://www.googleapis.com/auth/youtube.force-ssl",
           },
         ),
         { status: over.tokenOk === false ? 400 : 200 },
