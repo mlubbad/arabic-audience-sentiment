@@ -1198,3 +1198,28 @@ the sandbox plus one more sandbox payment to confirm the invoice shows tax (item
 today. Setting `PADDLE_ENV=production` and the live API key, webhook secret and client
 token themselves is the owner's own action — this session has no access to those values and
 does not ask for them in chat.
+
+## 2026-09-17 — the tax-mode fix confirmed with a real sandbox payment, through the new server-minted checkout
+
+The last item on the 2026-09-16 "before live keys" list: item 2's PATCH had already run (dry
+run against sandbox: `0 tax modes fixed` across all 8 plans/prices; `GET /prices/
+pri_01m2n5f7ndvs8vx7ax73bd4b5p` confirms `tax_mode: external` directly against Paddle) —
+what was missing was the payment that proves it. The owner's own workspace is on the
+internal `owner` plan (unlimited, no self-serve actions), so a probe user
+(`tax-fix-probe-…@sky-develop.net`, the same shape as the prior session's `connect-probe-…`)
+got a real `free`-plan workspace with the pack's "إضافة 10,000 تعليق" button showing.
+
+The checkout — opened through today's `paddle-checkout` function, not the old client-built
+`customData` — showed **Subtotal $5.00 · VAT $1.00 · Due today $6.00** before payment: tax
+added on top, not extracted from an inclusive $5.00 as the pre-fix bug did. Paid with
+Paddle's sandbox test card end to end; the completed transaction
+(`txn_01m2q53nx0en40f9tda4v4yf1y`) confirms the same figures server-side (`tax_rate: "0.2"`,
+`subtotal: 500`, `tax: 100`, `total: 600`, `fee: 80`, `earnings: 420`) and carries
+`custom_data.workspace_id` matching the probe's own workspace — proof the server-minted
+value, not a client one, is what reached Paddle. The webhook applied it: the account page's
+comment-analysis budget moved from 100 to 10,100 within seconds, no manual step. The probe
+workspace was then deleted from `/admin` (0 channels, 1 member — nothing else attached).
+
+Both halves of the last open item are done. Nothing on the 2026-09-16 "before live keys"
+list remains outstanding; setting `PADDLE_ENV=production` and the live API key, webhook
+secret and client token is the owner's own action, as before.
