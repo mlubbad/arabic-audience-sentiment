@@ -1,0 +1,60 @@
+/* The correction dialog's own rules. The form used to sit inline under
+   `.rp-page`, from whose `report.css` scope (`.rp-page .history li`,
+   `.rp-page .muted`) it inherited its history-list and muted-text styling.
+   A `ui/Dialog` portals its content to `document.body`, outside that scope,
+   so the few rules the form actually needs are restated here rather than
+   left silently unstyled. */
+.db-review-dialog {
+  width: min(560px, calc(100vw - var(--space-6)));
+}
+.db-review-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.db-review-dialog form:focus-visible {
+  outline: none;
+}
+.db-review-quote {
+  margin: 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--border-2);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  line-height: 1.8;
+}
+.db-review-history h4 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.db-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.db-history li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-2);
+  background: var(--bg-muted);
+  font-size: var(--fs-small);
+}
+.db-history small {
+  color: var(--text-3);
+}
+.db-history li[data-state="superseded_by_edit"] strong,
+.db-history li[data-state="superseded_by_review"] strong,
+.db-history li[data-state="legacy_unverified"] strong {
+  color: var(--text-3);
+  font-weight: 600;
+}
+.db-review-actions {
+  display: flex;
+  gap: var(--space-3);
+}

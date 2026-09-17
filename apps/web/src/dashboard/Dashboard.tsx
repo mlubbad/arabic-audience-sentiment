@@ -38,10 +38,8 @@ import { useSession, useWorkspaces } from "../session";
 import { useWorkspaceSelection } from "../workspaceSelection";
 import { WorkspaceGate } from "../WorkspaceGate";
 import { workspaceState, readableWorkspace } from "../workspace";
-import { displayDate, commentText } from "../i18n";
 import { useLocale } from "../locale";
 import { useStrings } from "../strings";
-import { reviewHistory } from "../reviewHistory";
 import { describeSource } from "../dataSource";
 import { useChannelStatus } from "../channelStatus";
 import { latestJobFromSync, setupProgress } from "../setup";
@@ -60,6 +58,7 @@ import { People } from "./People";
 import { Compare } from "./Compare";
 import { Engaged } from "./Engaged";
 import { Comments } from "./Comments";
+import { ReviewDialog } from "./ReviewDialog";
 import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
 import {
   chipsFor,
@@ -283,33 +282,13 @@ function DashboardBody({
     "sentiment",
   );
   const [topicVerdict, setTopicVerdict] = useState("");
-  const reviewFormRef = useRef<HTMLFormElement | null>(null);
+  // Which button asked, so `ReviewDialog`'s `onCloseAutoFocus` can hand focus
+  // back to it — see that file's comment for why the focus call has to live
+  // there rather than here.
   const reviewTriggerRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    if (reviewing) reviewFormRef.current?.focus();
-  }, [reviewing]);
   function closeReview() {
     setReviewing(null);
-    // Hand focus back to the row the reviewer came from.
-    reviewTriggerRef.current?.focus();
   }
-  // Escape closes it. The correction form takes focus and sits above the page
-  // as an overlay, and an overlay that can only be left by finding its cancel
-  // button is a trap for exactly the reader who cannot see where it is. The
-  // listener lives with the form rather than on the page, so it exists only
-  // while there is something to close.
-  useEffect(() => {
-    if (!reviewing) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      closeReview();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-    // Only `reviewing` belongs here: closeReview reads refs and setState, both
-    // stable for the life of the component.
-  }, [reviewing]);
   const [reason, setReason] = useState("");
   const review = useMutation({
     mutationFn: () =>
@@ -790,177 +769,38 @@ function DashboardBody({
                 onTopicReview={startTopicReview}
                 topicName={topicName}
               >
-                {reviewing && (
-                  <form
-                    className="review"
-                    ref={reviewFormRef}
-                    tabIndex={-1}
-                    aria-label={
-                      reviewKind === "topic"
-                        ? S.reviewTopicTitle
-                        : S.reviewFormLabel
-                    }
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      (reviewKind === "topic" ? topicReview : review).mutate();
-                    }}
-                  >
-                    <h3>
-                      {reviewKind === "topic"
-                        ? S.reviewTopicTitle
-                        : S.reviewTitle}
-                    </h3>
-                    <blockquote data-testid="review-text">
-                      {commentText(reviewing, S)}
-                    </blockquote>
-                    <p className="muted">
-                      {reviewKind === "topic"
-                        ? S.reviewTopicCurrent(
-                            reviewing.topic
-                              ? topicName(reviewing.topic)
-                              : S.topicNone,
-                          )
-                        : S.reviewCurrent(
-                            reviewing.label
-                              ? labels[reviewing.label]
-                              : S.unanalysed,
-                          )}
-                    </p>
-                    <div data-testid="review-history">
-                      <h4>{S.reviewHistoryTitle}</h4>
-                      {reviewing.reviews.length === 0 &&
-                      reviewing.topic_reviews.length === 0 ? (
-                        <p className="muted">{S.reviewHistoryEmpty}</p>
-                      ) : (
-                        <ol className="history">
-                          {reviewHistory(reviewing).map(
-                            ({ review: r, state }, i) => (
-                              <li key={`${r.created_at}-${i}`}>
-                                <strong>
-                                  {S.reviewKindSentiment}: {labels[r.label]}
-                                </strong>
-                                <span>{displayDate(r.created_at, lang)}</span>
-                                <span data-testid="review-by">
-                                  {r.reviewer_id ?? S.reviewerUnknown}
-                                </span>
-                                <small data-state={state}>
-                                  {S.reviewStateMessages[state]}
-                                </small>
-                                {r.reason && (
-                                  <q data-testid="review-reason">{r.reason}</q>
-                                )}
-                              </li>
-                            ),
-                          )}
-                          {/* The topic verdicts, under the same in-force rule.
-                              reviewHistory reads only origin, hash and date,
-                              so a topic review passes through it with its key
-                              standing where a label would; the cast is inert. */}
-                          {reviewHistory({
-                            reviews: reviewing.topic_reviews.map((r) => ({
-                              ...r,
-                              label: r.topic_key as Label,
-                            })),
-                            content_hash: reviewing.content_hash,
-                          }).map(({ review: r, state }, i) => (
-                            <li key={`topic-${r.created_at}-${i}`}>
-                              <strong>
-                                {S.reviewKindTopic}: {topicName(r.label)}
-                              </strong>
-                              <span>{displayDate(r.created_at, lang)}</span>
-                              <span data-testid="review-by">
-                                {r.reviewer_id ?? S.reviewerUnknown}
-                              </span>
-                              <small data-state={state}>
-                                {S.reviewStateMessages[state]}
-                              </small>
-                              {r.reason && (
-                                <q data-testid="review-reason">{r.reason}</q>
-                              )}
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-                    </div>
-                    {reviewKind === "topic" ? (
-                      <label>
-                        {S.correctTopicLabel}
-                        <select
-                          aria-label={S.correctTopicLabel}
-                          value={topicVerdict}
-                          onChange={(e) => setTopicVerdict(e.target.value)}
-                        >
-                          {(result.data?.topics ?? [])
-                            .filter((t) => !t.retired)
-                            .map((t) => (
-                              <option key={t.key} value={t.key}>
-                                {lang === "ar" ? t.name_ar : t.name_en}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                    ) : (
-                      <label>
-                        {S.correctLabel}
-                        <select
-                          aria-label={S.correctLabel}
-                          value={verdict}
-                          onChange={(e) => setVerdict(e.target.value as Label)}
-                        >
-                          {Object.entries(labels).map(([key, text]) => (
-                            <option key={key} value={key}>
-                              {text}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    <label>
-                      {S.correctionReason}
-                      <input
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                        maxLength={500}
-                        required
-                      />
-                    </label>
-                    {(reviewKind === "topic" ? topicReview : review)
-                      .isError && (
-                      <p role="alert" data-testid="review-error">
-                        {(reviewKind === "topic" ? topicReview : review).error
-                          ?.message === "stale_comment_text"
-                          ? S.reviewStale
-                          : S.reviewSaveFailed}
-                      </p>
-                    )}
-                    <div>
-                      <button
-                        type="submit"
-                        disabled={
-                          (reviewKind === "topic" ? topicReview : review)
-                            .isPending
-                        }
-                      >
-                        {S.saveCorrection}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          review.reset();
-                          topicReview.reset();
-                          closeReview();
-                        }}
-                      >
-                        {S.cancel}
-                      </button>
-                    </div>
-                    {!reviewsArePersisted(mode) && (
-                      <p className="muted" data-testid="review-scope">
-                        {S.reviewFixtureScope}
-                      </p>
-                    )}
-                  </form>
-                )}
+                <ReviewDialog
+                  reviewing={reviewing}
+                  kind={reviewKind}
+                  verdict={verdict}
+                  onVerdict={setVerdict}
+                  topicVerdict={topicVerdict}
+                  onTopicVerdict={setTopicVerdict}
+                  reason={reason}
+                  onReason={setReason}
+                  topics={result.data?.topics ?? []}
+                  topicName={topicName}
+                  labels={labels}
+                  S={S}
+                  lang={lang}
+                  persisted={reviewsArePersisted(mode)}
+                  busy={
+                    (reviewKind === "topic" ? topicReview : review).isPending
+                  }
+                  error={
+                    (reviewKind === "topic" ? topicReview : review).error ??
+                    null
+                  }
+                  onSubmit={() =>
+                    (reviewKind === "topic" ? topicReview : review).mutate()
+                  }
+                  onClose={() => {
+                    review.reset();
+                    topicReview.reset();
+                    closeReview();
+                  }}
+                  triggerRef={reviewTriggerRef}
+                />
               </Comments>
             </>
           )}
