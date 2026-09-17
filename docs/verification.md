@@ -2330,3 +2330,74 @@ scope, §5b justification) and sent the §5d-bis reply on the "[Action Needed] O
 Verification Request Acknowledgement" thread (~02:30 local). Status: waiting for the
 Third-Party Data Safety Team; further questions arrive on that thread. `main` CI is green
 again (`9867c0d`) after formatting `tests/e2e/account.spec.ts`.
+
+## 2026-09-18 — the account redesign verified: `npm run check` stage by stage, the demo pages probed
+
+`docs/superpowers/plans/2026-09-17-account-redesign.md`, tasks 1–8, BASE `2f128d3`, commits
+`dc7b513`…`b95f7a2`. `npm run check` (`PATH` with Node 22.14.0 pinned) failed on its first two
+foreground runs, both times at `test:db`, both times on the same single test:
+`supabase/tests/usage_grants.test.ts > usage grants > reserve_usage spends the plan first, then
+the grant, then stops`, a `Test timed out in 30000ms` — a file untouched by this phase's diff
+(`git diff 2f128d3..HEAD --stat -- supabase/` shows only oauth files) and unrelated to any
+account-page code. `uptime` read a load average of 25–100 across both runs on this 16-core
+machine, and `ps aux` showed an external LLVM build (`clang++` compiling `llvm-project` under
+`/private/tmp/s-KybF7nyE/llvm-20260918-*`) consuming most of it — the same host-load pattern
+`docs/ONBOARDING.md` already documents as a trap. Isolated with `npx vitest run
+supabase/tests/usage_grants.test.ts --testTimeout=120000`: 13/13 passed in 70s, confirming the
+test is correct and the failure is a timing artefact of the host, not a regression. `test:db`
+was rerun a third time at the default timeout and failed the same single test the same way
+(load still 25–30 on 16 cores), so the chained `npm run check` command could not be made to
+exit 0 without either the external build finishing or editing test/script code, both out of
+scope for a records-only task. Ran the remaining stages of `npm run check` individually instead
+to reach a complete, honest tally:
+
+- `npm run lint` — clean (eslint + worker `ruff check`).
+- `npm run format:check` — clean.
+- `npm run typecheck` (`tsc --noEmit`) — clean.
+- `npm run check:functions` (`deno check`, six functions) — clean.
+- `npm test` (`vitest run --exclude "supabase/tests/**"`) — 105 files / 786 tests, green; the
+  `apps/web`-only subset (`npx vitest run apps/web`) is 94 files / 669 tests, green, matching
+  task 7's baseline exactly (task 8 added no test code).
+- `npm run test:db` (`vitest run supabase/tests`) — 32 files / 310 tests; 309 passed, 1 timed
+  out (`usage_grants.test.ts`, see above) on three separate runs, all under the same external
+  build's load; not caused by this phase, not fixed here.
+- `npm run worker:test` (`uv run pytest`) — 195 passed.
+- `npm run build` — 8 prerendered pages (`/`, `/en`, `/pricing`, `/en/pricing`,
+  `/privacy-policy`, `/en/privacy-policy`, `/terms`, `/en/terms`), sitemap and robots.txt
+  written, no build errors.
+- `npm run check:secrets` — 622 source files plus built assets, clean.
+
+**e2e, not rerun here** (`npm run check` does not run Playwright — confirmed by reading
+`package.json`'s `check` script, which chains lint/format/typecheck/check:functions/test/
+test:db/worker:test/build/check:secrets and nothing under `test:e2e*`). The counts carried
+forward from task 6's and task 7's own foreground runs: `tests/e2e/account.spec.ts` 9/9 on its
+own; full `npm run test:e2e` 123 tests (114 carried + 9 new) at task 6's close; task 7's two
+foreground reruns of the full suite landed 116–117/123 under the same external-LLVM-build host
+load documented above, always the same six tests (the first, heaviest-route test Playwright
+dispatches to each of six spec files, cold-compiling that route's modules), each re-passing
+alone under `--workers=1`; 123/123 was reached before that load began. `npm run test:e2e:build`
+is 6/6, unaffected either time.
+
+**The demo pages, probed.** `/account?demo=1` and `/account` (no demo) were exercised across
+tasks 5–7's own dev-server probes (ports 5175/5176, killed after each) and again in task 6's
+Playwright suite: three workspace cards, three `role=progressbar` plan meters, rename,
+disconnect, retire down to one card then refused, create a fourth workspace, the
+connect/top-up `demoExternalNote`, and the no-demo fallback to `account-unavailable` — all
+against the real `/account` component tree, not a stand-in. This task did not repeat those
+probes; it is a records-only task and made no code change to verify against.
+
+**Screenshots.** `.superpowers/sdd/2026-09-17-account-redesign/shots/` (git-ignored, on disk)
+holds `account-1280.png`/`account-390.png` (signed-out entry), `demo-1280.png`/`demo-390.png`
+(`/account?demo=1`), `entry-1280.png`/`entry-390.png`, and task 7's post-`rp-*`-removal set
+(`after-dashboard.png`, `after-sync.png`, `after-admin.png`, `after-account-demo.png`,
+`after-account.png`) — the last two confirmed byte-identical / same-size against task 5's
+pre-removal captures, i.e. deleting the CSS changed nothing any of these four pages render.
+The top-level `.screenshots/` (untracked, dated 2026-09-14/15, unrelated to this phase) was not
+touched.
+
+**Host-load caveat, stated once for both suites above:** every failure recorded in this entry —
+the one `test:db` timeout and task 7's 116–117/123 e2e runs — occurred while an external LLVM
+build held this machine's load average at 25–281 across a 16-core machine, and every one
+resolved (passed in isolation, or was reproduced with a generous timeout) once load-driven
+timing was accounted for. None touched account-redesign code; none is treated here as a defect
+in this phase's work.

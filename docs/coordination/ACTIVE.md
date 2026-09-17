@@ -63,6 +63,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 | `apps/web/scripts/{demo-content,make-demo-fixture}.mjs` (+ `.d.mts`), `apps/web/public/fixtures/{dashboard,e2e-dashboard,catalogue}.json`, `apps/web/src/{demoFixture,noSyntheticWords}.test.ts`, `tests/e2e/demo.spec.ts` | **done** — the demo-data feature (tasks 1–4) landed as `938cfc0`…`97ed318`, plus this task's records commit; the visitor dashboard and the browser suite now read separate fixtures from one generator, «توضيحية» replaces «اصطناعي» everywhere reader- or test-facing; free | 2026-09-17 |
 | `apps/web/src/googleOneTap.ts` (+ `.test.ts`), `apps/web/src/google-gsi.d.ts`, `apps/web/vite-env.d.ts`, the Google door's slice of `Account.tsx`/`Account.entry.test.ts`, `.env.example` | **done** — Google sign-in and One Tap (`docs/superpowers/plans/2026-09-17-google-signin.md`) landed as `0102bea`…`5c2f9ca`, plus this task's hardening (`6e2ac2e`) and records commit; the door opens on `VITE_AUTH_PROVIDERS=google`, One Tap prompts a signed-out `/account` visitor via GIS + `signInWithIdToken`; free | 2026-09-17 |
 | `apps/web/src/pages.css`, `apps/web/src/pageStates/**`, `apps/web/src/ops/**`, `apps/web/src/admin/**`, `apps/web/src/account.css`, `apps/web/src/noReportCss.test.ts` | **done** — the operations and admin redesign (`docs/superpowers/plans/2026-09-17-ops-admin-redesign.md`, tasks 1–8) landed as `0d6f51f`…`e3642af`, plus this task's records commit; `/sync` and `/admin` are on the shared `db-*` rhythm and `ui/` primitives now, `report.css` is deleted, `/account` carries the last of its rules verbatim in `account.css` until phase 5; free | 2026-09-17 |
+| `apps/web/src/account/**`, `apps/web/src/ui/BudgetMeter.tsx`, `apps/web/src/setup-path.css`, `apps/web/public/fixtures/account.json`, `tests/e2e/account.spec.ts` | **done** — the account redesign (`docs/superpowers/plans/2026-09-17-account-redesign.md`, tasks 1–8) landed as `dc7b513`…`b95f7a2`, plus this task's records commit; `/account` is on `ui/` now, the verbatim `account.css` and every remaining `.app-shell .rp-*` block in `app.css` are deleted, `BudgetMeter` moved into `ui/`; free | 2026-09-18 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
@@ -401,3 +402,33 @@ this task's start and remains so; its dated entry for this work is deferred, not
 **PENDING, unchanged from before this phase:** phase 5 (account/billing redesign on `ui/`,
 including `PlanPanel.tsx`'s move to `BudgetMeter` and `account.css`'s own retirement) and
 phase 6 (the product tour) remain open; nothing in this phase started either.
+
+2026-09-18, closing the note above: phase 5 (`docs/superpowers/plans/2026-09-17-account-redesign.md`,
+tasks 1–8) rebuilt `/account` on `ui/`, moved `BudgetMeter` into `ui/`, added `/account?demo=1`
++ `accountDemo.ts`, and retired the verbatim `account.css` along with every remaining
+`.app-shell .rp-*` block in `app.css`. Claimed `apps/web/src/account/**`,
+`apps/web/src/ui/BudgetMeter.tsx`, `apps/web/src/setup-path.css`,
+`apps/web/public/fixtures/account.json`, `tests/e2e/account.spec.ts` (row added to the table
+above) — done, `dc7b513`…`b95f7a2` (interleaved with another session's OAuth commits on the same
+branch — `b3001ae`, `9135a6c`, `7dd0086`, `bf0c3a7`, `7714683`, `0a4c1f0`, and the formatting fix
+`9867c0d` — none of it touched here) plus this task's records commit. `npm run check`, run stage
+by stage after the chained command stopped at one db timeout: lint, format:check, typecheck,
+`check:functions` (deno), unit (105 files / 786 tests, `apps/web` alone 94 files / 669), db (32
+files / 310 tests, one timeout — see below), worker (195 tests), build (8 prerendered pages),
+secrets (622 source files plus built assets); full e2e is 123 (114 carried + 9 new in
+`tests/e2e/account.spec.ts`), `test:e2e:build` stays 6. `docs/verification.md`'s dated entry
+below carries the host-load caveat for both the one `test:db` timeout and the e2e counts.
+`.screenshots/` (untracked) was never touched; this feature's own screenshots live under
+`.superpowers/sdd/2026-09-17-account-redesign/shots/`.
+
+**PENDING, unchanged from before this phase: phase 6 (the in-app onboarding/product tour)
+remains open; nothing in this phase started it.**
+
+**Concurrent-session index incident, recurred 2026-09-18.** The failure mode logged on
+2026-09-16 above (a commit picking up another session's staged changes because both sessions
+share one git index) recurred: a `git rm` staged by one session landed in the other session's
+commit `9135a6c`. No work was lost either time, but the commit's message does not name the
+change it silently carried. Mitigation, unchanged from the 2026-09-16 entry and worth repeating
+since it recurred: stage and commit in one command (`git add <exact paths> && git commit`, or
+`git commit -- <paths>`), and check `git status` for a foreign `RM`/`A` before committing from
+whatever the index already holds.

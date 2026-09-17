@@ -985,3 +985,44 @@ panel's `<progress>` is exactly that case: the two assertions that read the old 
 `role="progressbar"` div's computed style, asserting the same guarantee against the new markup
 rather than being dropped or loosened. Every other e2e file and every other assertion in
 `dashboard.spec.ts` is untouched by this phase.
+
+2026-09-18 — the account redesign (`docs/superpowers/plans/2026-09-17-account-redesign.md`,
+design in `docs/superpowers/specs/2026-09-17-account-redesign-design.md`).
+
+**Demo modes — `?demo=1` on a fixture plus a pure reducer that mirrors the server's exact
+refusals — are the browser-test strategy for every gated page.** The dashboard, `/sync`,
+`/admin` and now `/account` each follow the same idiom: a fixture under
+`apps/web/public/fixtures/`, a pure reducer that throws the identical `{message, code}` shape
+PostgREST returns for the refusals the SQL enforces, and a Playwright suite that drives the real
+page component against `?demo=1` rather than a separate demo-only route or a mocked Supabase
+client. `accountDemo.ts`'s `reduceAccountDemo` (`invalid_name`, `last_workspace`) is this
+pattern's fourth implementation, closing the set: every page that requires a signed-in, gated
+session now has a demo a visitor, a screenshot tool, or a reviewer with no account can reach.
+
+**Destructive confirmations live in `ConfirmDialog` on `ui/Dialog`, not inline blocks.**
+`WorkspaceCard.tsx`'s disconnect and retire actions used to open an inline confirmation block in
+the card's own flow, styled by the old `report.css`-derived sheet's `.disconnect-confirm` rule;
+task 3 replaced both with the shared `ConfirmDialog` component wrapping `ui/Dialog`, the same
+portal-rendered, focus-trapped pattern `admin/DeleteWorkspaceDialog` already established last
+phase. A destructive action now always opens a modal the rest of the page cannot be interacted
+through, rather than an inline block that pushes surrounding content around and can be dismissed
+by a stray click outside it. `Account.setup.test.ts`'s two open-dialog assertions moved into
+`WorkspaceCard.test.tsx` for exactly this reason: a portal renders outside the page's own static
+markup, so an assertion that the dialog is open has to run against the component that owns it.
+
+**`BudgetMeter` lives in `ui/` and is the one meter.** Moved out of `ops/` this phase (where it
+had been `/sync`'s own component since the ops/admin redesign) so `/account`'s `PlanPanel` could
+adopt the identical `role="progressbar"` div instead of drawing a second, native `<progress>`
+element left over from before that page had any redesign attention. `/sync` and `/account` now
+render the same meter, coloured by the same `budgetState()` function, off the same CSS — one
+meter implementation in the tree, not two that happen to agree.
+
+**The `rp-*` vocabulary is gone, and the guard refuses it in `.tsx` and `.css` alike.** The
+verbatim `account.css` — the last reader of any `.rp-*` rule, kept alive across two prior phases
+specifically so `/account` would not need a visual redesign in the same task that deleted
+`report.css` — is deleted along with every remaining `.app-shell .rp-*` block in `app.css`.
+`noReportCss.test.ts` lost the allow-list it had carried since the ops/admin phase (the four
+files "permitted… until phase 5") and gained a second, unconditional assertion: no `.css` file
+anywhere under `apps/web/src` may contain the substring `.rp-`, in a selector or inside a
+comment. The class family that named the old report page is not just unused now; it cannot be
+reintroduced without failing a test.

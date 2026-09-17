@@ -1577,3 +1577,70 @@ worker (195 tests), build (8 prerendered pages), secrets (609 source files plus 
 Deferred, per the standing rule in `docs/coordination/ACTIVE.md`: `docs/verification.md` —
 `git status --short docs/verification.md` was non-empty (another session's in-flight edit) at
 the start of this task and remains so; its dated entry for this work is deferred, not skipped.
+
+## 2026-09-18 — the account page rebuilt on `ui/`: one meter, a demo that needs no session, and the last `rp-*` rule gone
+
+Eight tasks (`docs/superpowers/plans/2026-09-17-account-redesign.md`, design in
+`docs/superpowers/specs/2026-09-17-account-redesign-design.md`), BASE `2f128d3`, commits
+`dc7b513`…`b95f7a2` (this records entry closes the phase), interleaved on `main` with another
+session's OAuth work (`b3001ae`, `9135a6c`, `7dd0086`, `bf0c3a7`, `7714683`, `0a4c1f0`, and the
+formatting fix `9867c0d`) — none of it touched here. The ops/admin redesign had left `/account`
+on its verbatim, `report.css`-derived stylesheet, out of that plan's scope
+(`docs/coordination/ACTIVE.md`'s **PENDING: phase 5**); this plan recomposed it on `ui/` and
+closed that pending item.
+
+**`apps/web/src/account/` is the new home**: `Account.tsx`, `AuthEntry.tsx`, `Unavailable.tsx`,
+`WorkspaceCard.tsx`, `ConfirmDialog.tsx`, `PlanPanel.tsx`, `CreateWorkspace.tsx`,
+`accountDemo.ts` and `account.css`, replacing the old top-level `Account.tsx`, `WorkspaceCard.tsx`,
+`PlanPanel.tsx` and the verbatim `account.css`. `ui/BudgetMeter` moved out of `ops/` (classes
+renamed `db-meter*` → `ui-meter*`) so `/sync` and `/account` share the one meter instead of
+`PlanPanel` drawing a second, native `<progress>`. `SetupPath.tsx` was restyled onto its own
+`setup-path.css`, tokens only. `ui/Button` gained `outline`/`link` variants and `ui/Card` gained
+`asChild`, both consumed by the new account components.
+
+**A demo mode**, `apps/web/src/account/accountDemo.ts`: a pure reducer (`reduceAccountDemo`)
+over three fixture workspaces (`apps/web/public/fixtures/account.json`) that throws the same
+`{message, code}` shape a PostgREST error carries for the refusals the server enforces —
+`invalid_name`, `last_workspace` — the idiom `admin/adminDemo.ts` established last phase.
+`/account?demo=1` runs the reducer instead of Supabase; newly minted workspace ids continue the
+fixture's hex sequence from `…a3` (`…a4`, `…a5`, …) rather than a letter scheme that would have
+run out. Two new strings, `accountDemoLead` and `demoExternalNote`, cover the demo's lead line
+and the "would leave for Google/Paddle here" note standing in for `beginConnect`/`openPortal`/
+`openCheckout` when there is no real session to hand off to.
+
+**Tests.** `tests/e2e/account.spec.ts` is new, 9 tests, driving the real `/account?demo=1` page
+(three cards, three plan-panel meters, rename, disconnect, retire down to one card then refused,
+create a fourth workspace, the connect/top-up external note, narrow-viewport layout, and the
+no-demo case falling back to `account-unavailable`). Full e2e is now 123 tests (114 carried + 9
+new); `test:e2e:build` stays 6. `Account.setup.test.ts` moved its two open-dialog assertions into
+`WorkspaceCard.test.tsx` — a portal-rendered dialog doesn't show up in the page's own static
+markup, only in the card component that owns it. `PlanPanel`'s `<article>` picked up a
+`db-plan-body` class and a five-property reset once `style.css`'s bare `article` rule was found
+painting it a bordered white box it never asked for.
+
+**The verbatim `account.css` (494 lines) is deleted**, and `app.css` shrank 1286 → 755 lines
+(−531): every `.app-shell .rp-*` block plus the account/workspace-list/setup-steps/history rule
+families that had no reader left once `account/` composed its own page. `locale.css` and
+`pageStates/page-states.css` each lost a few dead rules pointing at the same retired classes.
+`noReportCss.test.ts` lost its allow-list entirely (it used to name the four files still
+permitted an `rp-*` class "until phase 5") and gained a second assertion: no `.css` file
+anywhere under `apps/web/src` may contain the substring `.rp-`, not as a selector and not inside
+a comment.
+
+**Tallies at the close of this task.** `npm run check`, run stage by stage after the chained
+command stopped mid-way (see below): lint, format:check, typecheck, `check:functions` (deno)
+clean; unit (`npm test`) 105 files / 786 tests, of which `apps/web` alone is 94 files / 669
+tests; db (`npm run test:db`) 32 files / 310 tests, with one timeout in
+`usage_grants.test.ts` — a file this phase never touched — isolated and rerun three times,
+passing 13/13 every time once the default 30s cap was raised, while an external LLVM build
+(`clang++` compiling `llvm-project` under `/private/tmp`) held this machine's load average at
+25–100 on 16 cores throughout; worker (`npm run worker:test`) 195 tests; build 8 prerendered
+pages; secrets 622 source files plus built assets. Full detail, including the same host-load
+caveat against the e2e counts above, is in `docs/verification.md`'s dated entry.
+
+**Parked for a later fix wave**, confirmed rather than re-asserted from task 7's report: `grep`
+against `apps/web/src --include='*.tsx'` shows no component wearing `style.css`'s bare
+`.workspace-list`/`.link-button*`/`.budgets`/`.rename-form`/`.disconnect-confirm`/`.history`
+selectors any more — `WorkspaceCard.tsx` and its siblings wear the namespaced `db-budgets`/
+`db-plan-budgets` classes instead. These rules are dead weight, pending the final fix wave, not
+yet deleted.
