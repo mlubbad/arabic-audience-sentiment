@@ -1157,3 +1157,44 @@ the service is in a private preview or a beta; what they still say — synthetic
 features may change, availability is not guaranteed, the founding-partner plan is a grant —
 stays. Both documents' `updated` date moves to 2026-09-17 (one constant per language, the
 parity test holds them equal). Legal unit tests 21/21, legal + seo browser suites green.
+
+## 2026-09-17 — checkout is minted server-side, closing the gap that blocked live Paddle keys
+
+The one item this entry's own 2026-09-16 billing note flagged as required before live keys:
+"the transaction created by an edge function from the caller's session, so `custom_data.
+workspace_id` is never the browser's word." Until now `apps/web/src/paddle.ts` opened
+Paddle.js with `customData` built from client state, and the webhook trusts
+`custom_data.workspace_id` completely once an event names a known price — so any signed-in
+caller reaching the checkout button could name any workspace's id and have Paddle apply a
+plan, or a customer ref, against it.
+
+`8933d77`: `public.billing_assert_owner(w uuid)` (`20260917120000`, mirrors
+`billing_customer_ref` exactly — `private.has_role(w, array['workspace_owner'])`, granted to
+`authenticated` alone). New function `paddle-checkout` (same shape as `billing-portal`: the
+caller's own token, never the service key) calls it, then Paddle's `POST /transactions` with
+`custom_data.workspace_id` fixed server-side and the buyer's email from their verified
+session, never the request body, and answers only a transaction id. `openCheckout` now asks
+this function first and opens `Paddle.Checkout.open({ transactionId })` — no `items`, no
+`customData`, nothing left for the browser to put a different workspace into. `paddle-webhook`
+is unchanged: `custom_data.workspace_id` is safe to trust now because nothing reaches it
+except through this authorized path.
+
+Pure decision in `_shared/paddle-checkout.ts` (6 cases), a PGlite case added to
+`billing_surface.test.ts` (owner passes, analyst/stranger/anon refused — 9/9 in that file),
+`paddle.test.ts` rewritten for the mint-then-open flow (13/13). `npm run check` green
+(lint, typecheck, check:functions including the new Deno function, `npm test` 549/549,
+`npm run test:db` 310/310, check:secrets). Migration pushed live and the function deployed
+(`supabase functions list` shows `paddle-checkout` v1, `verify_jwt: true`, matching
+`billing-portal`). Verified against the live project with a real session: the owner's own
+workspace with a real synced sandbox price minted a real transaction (`txn_01m2q0rjy72gbjp
+22svfvt5s07`, 200); a workspace the caller does not own answered 403 `forbidden`; a
+malformed price id answered 400 `invalid_request` before either the database or Paddle was
+asked.
+
+What remains before live keys, per the same 2026-09-16 list: the tax-mode PATCH run against
+the sandbox plus one more sandbox payment to confirm the invoice shows tax (item 2). Items 1
+(this entry) and 4 (the `20260917060000` migration) are done — that migration matched
+`local`/`remote` in `supabase migration list --linked` before this session touched anything
+today. Setting `PADDLE_ENV=production` and the live API key, webhook secret and client
+token themselves is the owner's own action — this session has no access to those values and
+does not ask for them in chat.
