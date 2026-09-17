@@ -787,9 +787,6 @@
   border-color: var(--border-2);
   border-radius: var(--r-2);
 }
-.app-shell #rp-attempts {
-  margin-top: 3rem;
-}
 
 /* The catalogue: the action at the top of the operations page. Tokens only —
    `layers.test.ts` refuses a raw colour here. */

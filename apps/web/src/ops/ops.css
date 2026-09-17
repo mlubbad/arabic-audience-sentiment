@@ -30,20 +30,6 @@
 .db-meter-bar > i[data-state="exhausted"] {
   background: var(--color-danger);
 }
-/* A native <progress>, kept only so no browser paints its own accent onto
-   this element — the e2e suite checks that appearance is neutralised. It is
-   aria-hidden and drawn nowhere: the bar above is what every reader, sighted
-   or not, actually reads. */
-.db-meter-native {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  pointer-events: none;
-}
 
 /* ---------------- plan budgets ---------------- */
 .db-budgets {
@@ -66,6 +52,12 @@
 }
 
 /* ---------------- attempt log ---------------- */
+/* Space above the log, below the health/plan grid — moved here from
+   app.css's `.app-shell #rp-attempts` when the section's id dropped its
+   rp-* prefix. */
+.app-shell #attempts {
+  margin-top: 3rem;
+}
 .db-attempts {
   list-style: none;
   margin: var(--space-4) 0 0;

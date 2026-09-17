@@ -1014,12 +1014,13 @@ test("no figure is carried by colour alone", async ({ page }) => {
     page.getByRole("listitem").filter({ hasText: "إيجابي:" }),
   ).toHaveText("إيجابي: 1 (25٪)");
   // Same for the plan meters: the numbers are text beside the bar. They moved
-  // to the operations page, and the rule follows them.
+  // to the operations page, and the rule follows them. The bar itself is a
+  // role="progressbar" div now, not a native <progress> — the numbers a
+  // screen reader needs are its aria-value*, not a picture.
   await page.goto("/sync?demo=1");
-  await expect(page.locator("progress").first()).toHaveAttribute(
-    "aria-hidden",
-    "true",
-  );
+  await expect(
+    page.getByTestId("budget-comment_analysis").getByRole("progressbar"),
+  ).toHaveAttribute("aria-valuenow", "74");
   await expect(page.getByTestId("budget-comment_analysis")).toContainText(
     "74 من 100 — يتبقى 26",
   );
@@ -1487,16 +1488,26 @@ test("a budget bar shows the state its sentence reports", async ({ page }) => {
   await expect(near).toContainText("اقترب الاستهلاك من الحد");
   // The bar used to take the browser's own accent — Chrome paints <progress>
   // green — so a panel warning about a limit showed a reassuring green bar,
-  // and a different colour in every browser. Colour and sentence now come
-  // from one state.
-  const fill = await near.locator("progress").evaluate((el) => {
-    const warning = getComputedStyle(document.documentElement)
-      .getPropertyValue("--color-warning")
-      .trim();
-    return { appearance: getComputedStyle(el).appearance, warning };
+  // and a different colour in every browser. The fill is a plain div now,
+  // coloured from the same state the sentence reports, so colour and
+  // sentence can never disagree.
+  const fill = await near.locator("[role=progressbar] > i").evaluate((el) => {
+    // Resolve the token the same way the browser does, rather than
+    // hardcoding a colour literal to compare against.
+    const probe = document.createElement("i");
+    probe.style.backgroundColor = "var(--color-warning)";
+    document.body.appendChild(probe);
+    const warning = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return { fill: getComputedStyle(el).backgroundColor, warning };
   });
-  expect(fill.appearance).toBe("none");
   expect(fill.warning).not.toBe("");
+  expect(fill.fill).toBe(fill.warning);
+  // State and colour are tied: the same attribute drives both.
+  await expect(near.locator("small[data-state]")).toHaveAttribute(
+    "data-state",
+    "warning",
+  );
 });
 
 test("a sync failure reads as a sentence, not as a raw code", async ({

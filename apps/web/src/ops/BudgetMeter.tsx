@@ -12,6 +12,12 @@
  * The bar still carries `role="progressbar"` with the numbers a screen
  * reader needs; `sentence` (into the `<small>` the e2e suite reads by
  * `data-state`) says the same thing in words.
+ *
+ * An `allowance` of -1 is an internal plan with no ceiling
+ * (`unlimited()` in `packages/contracts`'s `usage.ts`) — there is no bound
+ * to report, so the bar carries no `aria-valuenow`/`aria-valuemin`/
+ * `aria-valuemax` at all rather than a nonsensical `aria-valuemax="-1"`,
+ * and draws empty rather than guessing at a share of nothing.
  */
 export function BudgetMeter({
   used,
@@ -33,31 +39,23 @@ export function BudgetMeter({
   sentence: string;
   testId: string;
 }) {
+  const unlimited = allowance === -1;
   const pct =
-    allowance > 0 ? Math.min(Math.round((used / allowance) * 100), 100) : 0;
+    !unlimited && allowance > 0
+      ? Math.min(Math.round((used / allowance) * 100), 100)
+      : 0;
   return (
     <div className="db-meter" data-testid={testId}>
       <div
         className="db-meter-bar"
         role="progressbar"
-        aria-valuenow={used}
-        aria-valuemin={0}
-        aria-valuemax={allowance}
+        aria-valuenow={unlimited ? undefined : used}
+        aria-valuemin={unlimited ? undefined : 0}
+        aria-valuemax={unlimited ? undefined : allowance}
         aria-label={label}
       >
         <i style={{ width: `${pct}%` }} data-state={state} />
       </div>
-      {/* A hidden native `<progress>`, kept only so a browser that paints
-          its own accent on the element never gets the chance to: the e2e
-          suite checks that no such accent survives. The bar above is what
-          every reader — sighted or not — actually reads. */}
-      <progress
-        className="db-meter-native"
-        max={allowance || 1}
-        value={used}
-        aria-hidden="true"
-        tabIndex={-1}
-      />
       <small data-state={state}>{sentence}</small>
     </div>
   );

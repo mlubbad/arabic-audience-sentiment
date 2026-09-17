@@ -2,7 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { budgetState } from "@sentiment/contracts";
+import { budgetState, unlimited } from "@sentiment/contracts";
 import { BudgetMeter } from "./BudgetMeter";
 
 describe("BudgetMeter", () => {
@@ -64,5 +64,40 @@ describe("BudgetMeter", () => {
     expect(fill).toHaveStyle({ width: "0%" });
     expect(fill?.getAttribute("style") ?? "").not.toMatch(/NaN/);
     expect(fill).toHaveAttribute("data-state", "exhausted");
+  });
+
+  it("carries no numeric bound for an unlimited (internal) plan, and draws no fill", () => {
+    const budget = {
+      event_type: "comment_analysis" as const,
+      used: 40,
+      allowance: -1,
+      granted: 0,
+      remaining: -1,
+    };
+    expect(unlimited(budget)).toBe(true);
+    const state = budgetState(budget);
+    expect(state).toBe("ok");
+    render(
+      <BudgetMeter
+        used={budget.used}
+        allowance={budget.allowance}
+        state={state}
+        label="تحليل التعليقات"
+        sentence="ضمن الحد"
+        testId="budget-comment_analysis"
+      />,
+    );
+    const meter = screen.getByTestId("budget-comment_analysis");
+    const bar = within(meter).getByRole("progressbar", {
+      name: "تحليل التعليقات",
+    });
+    // No bound to report — never a nonsensical aria-valuemax="-1".
+    expect(bar).not.toHaveAttribute("aria-valuenow");
+    expect(bar).not.toHaveAttribute("aria-valuemin");
+    expect(bar).not.toHaveAttribute("aria-valuemax");
+
+    const fill = bar.querySelector("i");
+    expect(fill).toHaveStyle({ width: "0%" });
+    expect(fill).toHaveAttribute("data-state", "ok");
   });
 });

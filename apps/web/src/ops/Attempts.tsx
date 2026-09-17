@@ -41,7 +41,7 @@ export function Attempts({
   return (
     <section
       className="db-section"
-      id="rp-attempts"
+      id="attempts"
       aria-labelledby="attempts-heading"
     >
       <header>
