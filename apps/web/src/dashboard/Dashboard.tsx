@@ -63,6 +63,7 @@ import { ActiveFilters } from "./ActiveFilters";
 import { Hero } from "./Hero";
 import { SectionNav, useActiveSection } from "./SectionNav";
 import { Provenance } from "./Provenance";
+import { Summary } from "./Summary";
 import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
 import {
   chipsFor,
@@ -739,111 +740,7 @@ function DashboardBody({
       )}
       {s && (
         <>
-          <section className="rp-section" id="rp-summary">
-            <header>
-              <h2>{S.secSummary}</h2>
-              <p className="rp-sub">
-                {S.summaryLead}
-                {s.channel_own_comments > 0 && (
-                  <>
-                    {" "}
-                    <span data-testid="owner-excluded">
-                      {S.ownerExcluded(n(s.channel_own_comments))}
-                    </span>
-                  </>
-                )}
-              </p>
-            </header>
-            <div className="rp-grid rp-grid-5" aria-label={S.metricsLabel}>
-              <article className="rp-card rp-metric">
-                <span className="rp-metric-label">{S.metricComments}</span>
-                <strong className="rp-metric-value" data-testid="total">
-                  {n(s.total)}
-                </strong>
-                <span className="rp-metric-note">{S.metricCommentsNote}</span>
-              </article>
-              <article className="rp-card rp-metric">
-                <span className="rp-metric-label">{S.metricAnalysed}</span>
-                <strong className="rp-metric-value">{n(s.analysed)}</strong>
-                <span className="rp-metric-note">{S.metricAnalysedNote}</span>
-              </article>
-              <article className="rp-card rp-metric">
-                <span className="rp-metric-label">{S.metricUnanalysed}</span>
-                <strong className="rp-metric-value">{n(s.unanalysed)}</strong>
-                <span className="rp-metric-note">{S.metricUnanalysedNote}</span>
-              </article>
-              <article className="rp-card rp-metric">
-                <span className="rp-metric-label">{S.metricReplies}</span>
-                <strong className="rp-metric-value" data-testid="replies-count">
-                  {n(s.replies)}
-                </strong>
-                <span className="rp-metric-note">{S.metricRepliesNote}</span>
-              </article>
-              <article className="rp-card rp-metric">
-                <span className="rp-metric-label">{S.metricAuthors}</span>
-                <strong className="rp-metric-value">
-                  {n(s.unique_authors)}
-                </strong>
-                <span className="rp-metric-note">
-                  {/* Counted by channel id. Rows whose author was purged are
-                      not countable as people and are excluded rather than
-                      guessed at. */}
-                  {S.metricAuthorsNote}
-                </span>
-              </article>
-            </div>
-            <div
-              className="rp-grid rp-grid-4"
-              style={{ marginTop: "var(--space-4)" }}
-            >
-              {/* Named, not numbered. These four are independent readings —
-                  how much was analysed, how much is audience-to-audience, how
-                  concentrated the talk is, how much of it can be placed in
-                  time — and numbering them 1 to 4 asserted an order that is
-                  not there. A marker should say something true about what it
-                  marks; "3" said only that it came after "2". */}
-              <article className="rp-insight">
-                <p className="rp-insight-tag">{S.insightAnalysis}</p>
-                <p>
-                  {s.total > 0
-                    ? S.insightAnalysed(
-                        Math.round((s.analysed / s.total) * 100),
-                      )
-                    : S.insightNoMatches}
-                </p>
-              </article>
-              <article className="rp-insight">
-                <p className="rp-insight-tag">{S.insightReplies}</p>
-                <p>
-                  {s.total > 0
-                    ? S.insightRepliesShare(
-                        Math.round((s.replies / s.total) * 100),
-                      )
-                    : S.insightRepliesNone}
-                </p>
-              </article>
-              <article className="rp-insight">
-                <p className="rp-insight-tag">{S.insightConcentration}</p>
-                <p>
-                  {s.videos.length > 0
-                    ? S.insightTopVideo(
-                        n(s.videos[0].total),
-                        n(s.total),
-                        Math.round((s.videos[0].total / s.total) * 100),
-                      )
-                    : S.insightNoVideo}
-                </p>
-              </article>
-              <article className="rp-insight">
-                <p className="rp-insight-tag">{S.insightDates}</p>
-                <p>
-                  {s.unknown_dates > 0
-                    ? S.insightUndated(n(s.unknown_dates))
-                    : S.insightAllDated}
-                </p>
-              </article>
-            </div>
-          </section>
+          <Summary s={s} S={S} />
           {s.total === 0 ? (
             /* Two different zeros, and for years one message.
                A workspace whose collection has not run yet and a filter that

@@ -1,0 +1,19 @@
+/* Summary: KPI tiles and insight cards, both on the shared `.db-grid`. */
+.db-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.db-kpi-value {
+  font-size: var(--fs-h2);
+  line-height: 1.1;
+}
+.db-kpi-label {
+  color: var(--text-2);
+}
+.db-insight-tag {
+  font-size: var(--fs-small);
+  font-weight: 700;
+  color: var(--ml-indigo);
+  margin: 0 0 var(--space-1);
+}
