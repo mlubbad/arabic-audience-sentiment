@@ -53,7 +53,13 @@ export function extraCount(v: FilterValues): number {
   );
 }
 
-export type Chip = { key: keyof FilterValues | "period"; label: string };
+// "limit" is deliberately excluded: `extraCount` counts a non-default page
+// size toward the "more" button's badge, but no chip is ever emitted for it
+// below, so `onClear` (Dashboard.tsx) never has to handle clearing one.
+export type Chip = {
+  key: Exclude<keyof FilterValues, "limit"> | "period";
+  label: string;
+};
 
 export function chipsFor(
   v: FilterValues,

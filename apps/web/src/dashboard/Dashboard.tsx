@@ -676,9 +676,6 @@ function DashboardBody({
         setTo(EMPTY_FILTERS.to);
         applyFilters({ from: EMPTY_FILTERS.from, to: EMPTY_FILTERS.to });
         break;
-      case "limit":
-        setLimit(EMPTY_FILTERS.limit);
-        break;
     }
   }
   const chips = chipsFor(values, { S, labels, topicName });
