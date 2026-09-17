@@ -1304,3 +1304,50 @@ that still ships for `/sync`/`/account`/`/admin`), `npm run check:secrets` (575 
 plus built assets). `git status` throughout this task showed only the other session's modified
 `docs/verification.md` and the untracked `.screenshots/`; neither was staged, edited or
 touched.
+
+## 2026-09-17 — the dashboard's final-review fix wave: one bar row, a measured pinned height, the phone's reachable filters
+
+Correction to the entry above: the dashboard has **eight** report sections (`SECTIONS` in
+`SectionNav.tsx`: summary, videos, voice, timing, people, compare, engaged, comments), not
+eleven — the eleven counted files, three of which (`ChartFigures.tsx`, `CommentsTable.tsx`,
+`ReviewDialog.tsx`) are parts of a section, not sections. Also recorded from the same review,
+none of them changed here: the spec asked for `.db-section { padding-block }` and the page
+delivers the spacing as `gap` on `.db-page`; the phone sheet's search `Input` is rendered
+inside the `Dialog` portal, outside the `<form>`, so Enter there submits nothing (the sheet's
+own «تطبيق» button is the path); the `Videos` card is `role="button"` wrapping an `<h3>`,
+pre-existing and kept because an e2e reads `aria-pressed` back off the card itself; and commit
+`094b328` in the branch range is the other session's docs note, not part of this plan.
+
+The whole-branch review (probed at 1440/1280/1100/1000/900/768/390/320) found twelve items;
+all are fixed in this wave. On a phone the shell's «القائمة» button and the bar's «الفلاتر»
+button pinned in the same inline-start corner and the shell's won every tap once the reader had
+scrolled — the compact bar now lays out `justify-content: flex-end` (`filter-bar.css`, ≤900px),
+verified with `elementFromPoint` at 390 scrolled 800, and the e2e sheet test scrolls first and
+clicks by `page.mouse` at the button's box centre (a locator click auto-scrolls the button back
+into an unpinned position, which is why it never caught this); the amended test fails on the
+old CSS. The bar's height is now measured, not assumed: a `ResizeObserver` in `FilterBar`
+writes `--db-pinned-h` on the root and reports the number to `Dashboard`, `.db-section`'s
+`scroll-margin-top` reads the variable, and `useActiveSection` rebuilds its observer from the
+number whenever it changes (the baked `-163px` rootMargin is gone). Section anchors and the
+videos pager's `scrollIntoView` therefore land under the bar at whatever height it has. The
+bar itself is one row at ≥1100 (72px pinned; 141px with the chips row) and two at 1000
+(124px): the five buttons are `size="sm"`, the two always-visible selects hide their visible
+label in the pinned bar only (`Labelled`'s `labelHidden`; the trigger keeps its `aria-label`,
+so every `getByLabel` still resolves; the sheet keeps visible labels), and the widths are
+tighter than the review's ruled numbers because at 1100 the shell leaves the bar 788px inside
+its padding — search `flex: 1 1 120px`, `.db-field { min-width: 128px }`, 8px gaps. The
+`ChartEmpty` lead no longer runs into its sentence: one class, `.db-missing` in `dashboard.css`
+(`strong { display: block }`), `.db-chart-empty` deleted, Voice's and People's hand-written
+copies replaced by `ChartEmpty` and their duplicate CSS removed. Timing's grid is the weekly
+trend full-width over two halves (`1fr 1fr`, first child spanning), which gives the hourly
+card 336px at 1000 — the ≥360px the review hoped for is not reachable there, since the content
+column is 688px wide at that viewport. The phone sheet's button is now the `DialogTrigger`, so
+Escape hands focus back to it (asserted in `FilterBar.test` and in the e2e). `Loading` no longer
+draws a second hero and a second bar under the real ones. `ActiveFilters` lost its dead
+zero-chips branch and `scope` prop. `splitBar.ts`'s docstring says what is true — each caller
+picks its denominator — and the Videos bar's spoken label now gives shares over `analysed`,
+matching every printed percentage on the page (`legendMeasured` always speaks a percentage, so
+"counts only" was not available without a new string). Verified: `npx vitest run
+apps/web/src/dashboard apps/web/src/ui` 30 files / 114 tests, `npm run typecheck`, `npm run
+lint`, `npm run format:check`, and `npm run test:e2e -- tests/e2e/dashboard.spec.ts
+tests/e2e/app-shell.spec.ts` 86/86.
