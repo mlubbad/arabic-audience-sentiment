@@ -12,7 +12,6 @@ import {
   PointElement,
   Tooltip,
 } from "chart.js";
-import "../report.css";
 import "./dashboard.css";
 import { byHour, byWeek, byWeekday, commenters } from "../analytics";
 import { pageSlice } from "../videoPaging";
@@ -634,7 +633,7 @@ function DashboardBody({
       ? `${span[0].date} — ${span[span.length - 1].date}`
       : S.noKnownDates;
   return (
-    <div className="rp-page db-page">
+    <div className="db-page">
       <Hero
         s={s}
         S={S}

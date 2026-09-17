@@ -54,7 +54,7 @@ import { publicPath, resolvePublicPath } from "./publicPaths";
 import { publicRoutes } from "./publicRoutes";
 import { SessionControl } from "./SessionControl";
 const Dashboard = lazy(() =>
-  import("./Dashboard").then((m) => ({ default: m.Dashboard })),
+  import("./dashboard/Dashboard").then((m) => ({ default: m.Dashboard })),
 );
 const Connected = lazy(() =>
   import("./Connected").then((m) => ({ default: m.Connected })),

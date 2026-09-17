@@ -44,6 +44,14 @@
   grid-template-columns: 2fr 1fr 1fr;
   gap: var(--space-4);
 }
+/* A grid item's floor is otherwise its content, and a chart canvas's is the
+   300px every canvas is born with: at 320px that held the card wider than
+   its column and the page scrolled sideways. With no floor the column sizes
+   the card, and Chart.js resizes the canvas to the box it is given. */
+.db-grid > *,
+.db-grid--charts > * {
+  min-width: 0;
+}
 .db-card-title {
   font-size: var(--fs-h3);
   margin: 0 0 var(--space-2);

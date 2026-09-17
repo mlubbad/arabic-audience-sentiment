@@ -84,7 +84,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
-import { Dashboard } from "./Dashboard";
+import { Dashboard } from "./dashboard/Dashboard";
 import { MemoryRouter } from "react-router";
 
 /** The page reads the address bar now (`?ws=`), so it renders inside a

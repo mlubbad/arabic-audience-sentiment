@@ -343,6 +343,11 @@
   padding: var(--space-4);
   z-index: 65;
   max-width: 320px;
+  /* Never taller than the room Radix measured for it: a six-field stack
+     opened near the bottom of a short viewport used to run past the edge,
+     and the fields past the edge could not be reached. */
+  max-height: var(--radix-popover-content-available-height);
+  overflow-y: auto;
 }
 .ui-popover-content:focus-visible {
   outline: none;
@@ -433,6 +438,10 @@
   box-shadow: var(--shadow-2);
   z-index: 65;
   overflow: hidden;
+  /* Bounded by the room below (or above) the trigger; Radix's viewport
+     inside scrolls. A thirty-video list used to leave its tail past the
+     bottom of the screen, where no pointer could choose it. */
+  max-height: var(--radix-select-content-available-height);
 }
 .ui-select-item {
   padding: var(--space-2) var(--space-3);

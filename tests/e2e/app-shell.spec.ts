@@ -22,12 +22,14 @@ test("the inner app has a usable mobile navigation and account entry", async ({
     "حالة الجمع",
   );
   await page.goto("/dashboard");
-  const filters = page.getByRole("form", { name: "فلاتر التقرير" });
+  // At phone width the filters open as a sheet from the bar's one button.
+  const filters = page.getByRole("dialog", { name: "فلاتر التقرير" });
   await expect(filters).toBeHidden();
   await expect(page.getByRole("heading", { name: "الملخص" })).toBeVisible();
-  await page.getByRole("button", { name: "إظهار الفلاتر" }).click();
+  await page.getByRole("button", { name: /^الفلاتر/ }).click();
   await expect(filters).toBeVisible();
-  await expect(page.getByLabel("المشاعر", { exact: true })).toBeVisible();
+  await expect(filters.getByLabel("المشاعر", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

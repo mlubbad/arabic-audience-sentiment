@@ -1,11 +1,52 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+/** Choose an option in a ui/Select (Radix): open the labelled trigger, pick the
+ *  option by its visible text. The native selects this file drove with
+ *  selectOption() are gone; this is the one place that knows how the new
+ *  control opens. The trigger is found by its combobox role rather than by
+ *  label alone: while the period popover is open, "التاريخ" names both its
+ *  trigger button and the date-mode select inside it. */
+async function pick(page: Page, label: string | RegExp, option: string) {
+  await page.getByRole("combobox", { name: label, exact: true }).click();
+  await page.getByRole("option", { name: option, exact: true }).click();
+}
+
+/** The hidden native <select> Radix keeps beside a trigger that sits inside
+ *  a <form>, mirroring the option list for submission. An assertion on the
+ *  *offered* options by value (`option[value=…]`) reads it there, unchanged.
+ *  Only the bar's own controls have one: a trigger inside a popover is
+ *  portaled out of the form, and Radix renders no mirror for it. */
+const nativeMirror = (page: Page, triggerId: string) =>
+  page.locator(`#${triggerId} ~ select`);
+
+/** The options a ui/Select offers, as the reader sees them: open the
+ *  listbox and return its option locator. The caller closes it (Escape)
+ *  when it is done reading. */
+async function offered(page: Page, label: string) {
+  await page.getByRole("combobox", { name: label, exact: true }).click();
+  return page.getByRole("option");
+}
+
+/** A popover toggles on its trigger, so open it only when it is closed —
+ *  otherwise the second helper call in a test would close what the first
+ *  opened. */
+async function openPopover(page: Page, name: string | RegExp) {
+  const trigger = page.getByRole("button", { name, exact: true });
+  if ((await trigger.getAttribute("aria-expanded")) !== "true")
+    await trigger.click();
+}
+/** The secondary filters live behind «المزيد»; the date controls behind
+ *  the period button named «التاريخ». */
+const openMore = (page: Page) => openPopover(page, /المزيد/);
+const openPeriod = (page: Page) => openPopover(page, "التاريخ");
+
 test("Arabic fixture shell filters consistent totals and supports an empty state", async ({
   page,
 }) => {
   await page.goto("/dashboard");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByTestId("total")).toHaveText("6");
-  await expect(page.locator(".rp-hero")).not.toContainText("موضوعات");
+  await expect(page.getByTestId("hero")).not.toContainText("موضوعات");
   // The source strip, driven by the data mode rather than written by hand.
   const source = page.getByTestId("source");
   await expect(source).toHaveAttribute("data-mode", "sanitized_fixture");
@@ -23,7 +64,7 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
   ).toBeVisible();
   await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("6");
-  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
+  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
 });
@@ -48,8 +89,8 @@ test("shows actual pending fetch then safe error with working retry", async ({
   });
   await page.goto("/dashboard");
   await expect(page.getByTestId("loading")).toBeVisible();
-  await expect(page.locator(".rp-hero")).not.toContainText("قراءة 0 تعليقًا");
-  await expect(page.locator(".rp-hero")).not.toContainText("موضوعات");
+  await expect(page.getByTestId("hero")).not.toContainText("قراءة 0 تعليقًا");
+  await expect(page.getByTestId("hero")).not.toContainText("موضوعات");
   release();
   await expect(page.getByRole("alert")).toContainText("تعذر تحميل");
   await expect(page.getByTestId("total")).toHaveCount(0);
@@ -77,12 +118,13 @@ test("video filter offers the videos in the current dataset, including unfamilia
   });
   await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
-  const select = page.getByLabel("الفيديو", { exact: true });
+  const select = nativeMirror(page, "f-video");
   await expect(select.locator('option[value="new-channel-video"]')).toHaveCount(
     1,
   );
   await expect(select.locator('option[value="video-2"]')).toHaveCount(0);
-  await select.selectOption("new-channel-video");
+  // The remapped video kept its title, so that is the text the option shows.
+  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
   await expect(select.locator('option[value="video-1"]')).toHaveCount(1);
@@ -121,7 +163,8 @@ test("paginates with cursors without changing totals or repeating rows", async (
     page.getByRole("button", { name: "الصفحة السابقة" }),
   ).toBeDisabled();
 
-  await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
+  await openMore(page);
+  await pick(page, "عدد التعليقات في الصفحة", "5");
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 1");
   await expect(rows()).toHaveCount(5);
   const first = await rows().allInnerTexts();
@@ -145,7 +188,7 @@ test("paginates with cursors without changing totals or repeating rows", async (
   // A new filter must start at page one rather than reusing a stale cursor.
   await page.getByRole("button", { name: "الصفحة التالية" }).click();
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 2");
-  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-1");
+  await pick(page, "الفيديو", "فيديو اصطناعي ١");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("4");
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 1");
@@ -171,12 +214,12 @@ test("a filter change replaces the numbers without ever emptying the screen", as
   await page.route("**/fixtures/dashboard.json", (route) => route.abort());
 
   const apply = page.getByRole("button", { name: "تطبيق الفلاتر" });
-  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-1");
+  await pick(page, "الفيديو", "فيديو اصطناعي ١");
   await apply.click();
   await expect(page.getByTestId("total")).toHaveText("4");
   await expect(page.getByText("تعذر تحميل البيانات")).toBeHidden();
 
-  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
+  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
   await apply.click();
   await expect(page.getByTestId("total")).toHaveText("2");
 
@@ -196,7 +239,8 @@ test("both pages come from one read, so they cannot disagree", async ({
   // stale cursor — a re-read while the reader is on a later page — and is
   // tested against deriveSnapshot directly, in data.test.ts.
   await page.goto("/dashboard");
-  await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
+  await openMore(page);
+  await pick(page, "عدد التعليقات في الصفحة", "5");
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
   ).toHaveCount(5);
@@ -243,7 +287,7 @@ test("a human correction overrides the model and moves every aggregate together"
     "لا يُرسل إلى أي خادم",
   );
 
-  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ من النموذج");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
 
@@ -275,7 +319,7 @@ test("correcting an unanalysed comment adds it to the sentiment denominator", as
     .filter({ hasText: "تعليق لم يُحلل بعد" });
   await expect(row).toContainText("غير محلل / قديم");
   await row.getByRole("button", { name: "تصحيح" }).click();
-  await page.getByLabel("التصنيف الصحيح").selectOption("mixed");
+  await pick(page, "التصنيف الصحيح", "مختلط");
   await page.getByLabel("سبب التصحيح").fill("مراجعة يدوية");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
 
@@ -333,7 +377,8 @@ test("exports every filtered comment, not just the visible page", async ({
   await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
   // Shrink the page so a page-limited export would be obviously wrong.
-  await page.getByLabel("عدد التعليقات في الصفحة").selectOption("5");
+  await openMore(page);
+  await pick(page, "عدد التعليقات في الصفحة", "5");
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
   ).toHaveCount(5);
@@ -347,7 +392,7 @@ test("exports every filtered comment, not just the visible page", async ({
   expect(all.text.trim().split("\r\n")).toHaveLength(7);
 
   // A narrower filter must produce a narrower file, through the same rules.
-  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
+  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
   const filtered = await downloadCsv(page);
@@ -360,7 +405,7 @@ test("exports the corrected label rather than the superseded prediction", async 
   await page.goto("/dashboard");
   const row = page.locator('[data-testid="comments-table"] tbody tr').first();
   await row.getByRole("button", { name: "تصحيح" }).click();
-  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   await expect(
@@ -457,24 +502,38 @@ test("distinguishes no activated plan from no allowance left", async ({
   await expect(page.getByTestId("budget-comment_analysis")).toHaveCount(0);
 });
 
+/** The filters that moved behind «المزيد»; everything else is in the bar or,
+ *  for the date mode, behind the period button. */
+const behindMore = new Set([
+  "الموضوع",
+  "نوع الفيديو",
+  "نوع المشاركة",
+  "نوع التعليق",
+  "حالة المراجعة",
+  "عدد التعليقات في الصفحة",
+]);
+
 async function applyFilter(
   page: import("@playwright/test").Page,
   label: string,
-  value: string,
+  option: string,
 ) {
   // Exact: several filter labels are substrings of others, so a loose match
   // silently resolves to more than one control.
-  await page.getByLabel(label, { exact: true }).selectOption(value);
+  if (behindMore.has(label)) await openMore(page);
+  else if (label === "التاريخ") await openPeriod(page);
+  await pick(page, label, option);
+  // The apply button is outside the popover; clicking it closes the popover.
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
 }
 
 test("separates replies from top-level comments", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
-  await applyFilter(page, "نوع المشاركة", "comments");
+  await applyFilter(page, "نوع المشاركة", "تعليقات أصلية فقط");
   await expect(page.getByTestId("total")).toHaveText("4");
   await expect(page.getByTestId("replies-count")).toHaveText("0");
-  await applyFilter(page, "نوع المشاركة", "replies");
+  await applyFilter(page, "نوع المشاركة", "ردود فقط");
   await expect(page.getByTestId("total")).toHaveText("2");
   await expect(page.getByTestId("replies-count")).toHaveText("2");
 });
@@ -488,10 +547,10 @@ test("separates known from unknown publication dates", async ({ page }) => {
   await expect(
     page.getByText("تعليقات بلا تاريخ: 1", { exact: true }),
   ).toBeVisible();
-  await applyFilter(page, "التاريخ", "known");
+  await applyFilter(page, "التاريخ", "التواريخ المعروفة");
   await expect(page.getByTestId("total")).toHaveText("5");
   await expect(page.getByTestId("unknown-dates")).toHaveText("0");
-  await applyFilter(page, "التاريخ", "unknown");
+  await applyFilter(page, "التاريخ", "بلا تاريخ معروف");
   await expect(page.getByTestId("total")).toHaveText("1");
   // A comment with no date is still a comment, not a defect.
   await expect(
@@ -503,20 +562,21 @@ test("a date range and an explicit unknown-date selection cannot contradict", as
   page,
 }) => {
   await page.goto("/dashboard");
-  await page.getByLabel("التاريخ").selectOption("unknown");
+  await openPeriod(page);
+  await pick(page, "التاريخ", "بلا تاريخ معروف");
   // Ranges apply to known dates only, so they are disabled rather than silently
   // producing an empty screen.
   await expect(page.getByLabel("من تاريخ")).toBeDisabled();
   await expect(page.getByLabel("إلى تاريخ (غير شامل)")).toBeDisabled();
-  await page.getByLabel("التاريخ").selectOption("all");
+  await pick(page, "التاريخ", "كل التواريخ");
   await expect(page.getByLabel("من تاريخ")).toBeEnabled();
 });
 
 test("filters by video kind", async ({ page }) => {
   await page.goto("/dashboard");
-  await applyFilter(page, "نوع الفيديو", "video");
+  await applyFilter(page, "نوع الفيديو", "فيديو");
   await expect(page.getByTestId("total")).toHaveText("4");
-  await applyFilter(page, "نوع الفيديو", "short");
+  await applyFilter(page, "نوع الفيديو", "شورت");
   await expect(page.getByTestId("total")).toHaveText("2");
 });
 
@@ -525,11 +585,13 @@ test("filters by comment type using the types actually present", async ({
 }) => {
   await page.goto("/dashboard");
   // The list is derived from the data, not hard-coded per channel.
-  await expect(page.getByLabel("نوع التعليق").locator("option")).toHaveText([
+  await openMore(page);
+  await expect(await offered(page, "نوع التعليق")).toHaveText([
     "كل الأنواع",
     "اقتراح",
     "سؤال",
   ]);
+  await page.keyboard.press("Escape");
   await applyFilter(page, "نوع التعليق", "سؤال");
   await expect(page.getByTestId("total")).toHaveText("1");
   await expect(
@@ -537,11 +599,13 @@ test("filters by comment type using the types actually present", async ({
   ).toContainText("معلومة عن موعد الحلقة");
   // The list must not shrink to the types left on screen, or the filter would
   // be a one-way door: once narrowed, the other types could never be chosen.
-  await expect(page.getByLabel("نوع التعليق").locator("option")).toHaveText([
+  await openMore(page);
+  await expect(await offered(page, "نوع التعليق")).toHaveText([
     "كل الأنواع",
     "اقتراح",
     "سؤال",
   ]);
+  await page.keyboard.press("Escape");
   await applyFilter(page, "نوع التعليق", "اقتراح");
   await expect(page.getByTestId("total")).toHaveText("1");
   await expect(
@@ -553,41 +617,51 @@ test("filters by review status and resets every control together", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  await applyFilter(page, "حالة المراجعة", "reviewed");
+  await applyFilter(page, "حالة المراجعة", "مراجَعة بشريًا");
   await expect(page.getByTestId("total")).toHaveText("0");
 
   await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
   const row = page.locator('[data-testid="comments-table"] tbody tr').first();
   await row.getByRole("button", { name: "تصحيح" }).click();
-  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr').first(),
   ).toContainText("مراجعة بشرية");
 
-  await applyFilter(page, "حالة المراجعة", "reviewed");
+  await applyFilter(page, "حالة المراجعة", "مراجَعة بشريًا");
   await expect(page.getByTestId("total")).toHaveText("1");
-  await applyFilter(page, "حالة المراجعة", "unreviewed");
+  await applyFilter(page, "حالة المراجعة", "دون مراجعة");
   await expect(page.getByTestId("total")).toHaveText("5");
 
   // Reset must clear every control, not only the ones with visible values.
   await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("6");
-  for (const [label, value] of [
-    ["نوع المشاركة", "all"],
-    ["التاريخ", "all"],
-    ["نوع الفيديو", ""],
-    ["نوع التعليق", ""],
-    ["حالة المراجعة", "all"],
+  // A ui/Select trigger shows the chosen option's text rather than carrying a
+  // form value, so each control is read by what it displays: the "everything"
+  // option the reset returns it to. The «المزيد» controls first, then the date
+  // mode behind the period button (opening one popover closes the other).
+  await openMore(page);
+  for (const [label, shown] of [
+    ["نوع المشاركة", "تعليقات وردود"],
+    ["نوع الفيديو", "كل الأنواع"],
+    ["نوع التعليق", "كل الأنواع"],
+    ["حالة المراجعة", "الكل"],
   ] as const) {
-    await expect(page.getByLabel(label)).toHaveValue(value);
+    await expect(
+      page.getByRole("combobox", { name: label, exact: true }),
+    ).toContainText(shown);
   }
+  await openPeriod(page);
+  await expect(
+    page.getByRole("combobox", { name: "التاريخ", exact: true }),
+  ).toContainText("كل التواريخ");
 });
 
 test("the export follows the new filters too", async ({ page }) => {
   await page.goto("/dashboard");
-  await applyFilter(page, "نوع المشاركة", "replies");
+  await applyFilter(page, "نوع المشاركة", "ردود فقط");
   await expect(page.getByTestId("total")).toHaveText("2");
   const { text } = await downloadCsv(page);
   expect(text.trim().split("\r\n")).toHaveLength(3);
@@ -664,7 +738,7 @@ test("keeps every verdict and marks which one is in force", async ({
 }) => {
   await page.goto("/dashboard");
   await openReview(page, "المحتوى واضح ومفيد");
-  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("أول تصحيح");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   await expect(
@@ -672,7 +746,7 @@ test("keeps every verdict and marks which one is in force", async ({
   ).toContainText("مراجعة بشرية");
 
   await openReview(page, "المحتوى واضح ومفيد");
-  await page.getByLabel("التصنيف الصحيح").selectOption("mixed");
+  await pick(page, "التصنيف الصحيح", "مختلط");
   await page.getByLabel("سبب التصحيح").fill("إعادة نظر");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   await expect(
@@ -715,7 +789,7 @@ test("compares videos using each video's own denominator", async ({ page }) => {
     .filter({ hasText: "تعليق لم يُحلل بعد" })
     .getByRole("button", { name: "تصحيح" })
     .click();
-  await page.getByLabel("التصنيف الصحيح").selectOption("positive");
+  await pick(page, "التصنيف الصحيح", "إيجابي");
   await page.getByLabel("سبب التصحيح").fill("مراجعة يدوية");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
 
@@ -731,7 +805,7 @@ test("the comparison follows the same filters as everything else", async ({
   await page.goto("/dashboard");
   await expect(page.getByTestId("compare-video-2")).toBeVisible();
   // video-2 has no replies, so it leaves the comparison entirely.
-  await applyFilter(page, "نوع المشاركة", "replies");
+  await applyFilter(page, "نوع المشاركة", "ردود فقط");
   await expect(page.getByTestId("total")).toHaveText("2");
   await expect(page.getByTestId("compare-video-1")).toContainText("2");
   await expect(page.getByTestId("compare-video-2")).toHaveCount(0);
@@ -866,10 +940,30 @@ test("every filter is reachable and operable from the keyboard alone", async ({
 }) => {
   await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
-  // Drive the participation filter without touching the mouse.
-  await page.getByLabel("نوع المشاركة").focus();
-  await expect(page.getByLabel("نوع المشاركة")).toBeFocused();
-  await page.getByLabel("نوع المشاركة").selectOption("replies");
+  // Drive the participation filter without touching the mouse: the popover
+  // it lives behind opens on Enter, the select opens on Enter, and the
+  // option is reached with the arrow keys and chosen with Enter.
+  await page.getByRole("button", { name: /المزيد/ }).focus();
+  await page.keyboard.press("Enter");
+  const participation = page.getByRole("combobox", {
+    name: "نوع المشاركة",
+    exact: true,
+  });
+  await participation.focus();
+  await expect(participation).toBeFocused();
+  await page.keyboard.press("Enter");
+  // The listbox opens with the current option focused; the arrows walk it.
+  await expect(
+    page.getByRole("option", { name: "تعليقات وردود" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    page.getByRole("option", { name: "تعليقات أصلية فقط" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("option", { name: "ردود فقط" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(participation).toContainText("ردود فقط");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("total")).toHaveText("2");
@@ -899,7 +993,7 @@ test("focus returns to the row after a correction is saved", async ({
     .first()
     .getByRole("button", { name: "تصحيح" });
   await trigger.click();
-  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   await expect(
@@ -912,7 +1006,7 @@ test("no figure is carried by colour alone", async ({ page }) => {
   await page.goto("/dashboard");
   // The chart duplicates the list beside it, so it is kept out of the
   // accessibility tree rather than announced as an unlabelled canvas.
-  await expect(page.locator(".rp-chart-donut")).toHaveAttribute(
+  await expect(page.getByTestId("chart-donut")).toHaveAttribute(
     "aria-hidden",
     "true",
   );
@@ -969,8 +1063,12 @@ test("a chart that cannot be seen can still be read", async ({ page }) => {
   // missing is what the canvas says. Every chart that is drawn publishes its
   // figures as a table; a chart with no figures beside it is a panel that
   // exists only for readers who can see it.
-  const drawn = page.locator(".rp-chart:not([hidden]), .rp-chart-tall");
-  const figures = page.locator(".rp-figures");
+  // The donut is not in this count, as it never was: its figures are the
+  // legend list beside it, checked by "no figure is carried by colour alone".
+  const drawn = page.locator(
+    "[data-testid^='chart-']:not([hidden]):not([data-testid='chart-donut'])",
+  );
+  const figures = page.locator(".db-figures");
   await expect(figures).toHaveCount(await drawn.count());
   const first = figures.first();
   await expect(first).not.toHaveAttribute("open", "");
@@ -1032,7 +1130,7 @@ test("the report index lists every section and marks the one in view", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  const links = page.locator(".rp-nav-links a");
+  const links = page.locator(".db-nav-links a");
   // Wait for the sections to exist before comparing them to the index. The
   // header test in this file spent its life asserting against a page whose
   // data had not arrived — it counted nothing, found nothing wrong, and
@@ -1047,7 +1145,7 @@ test("the report index lists every section and marks the one in view", async ({
   expect(ids.length).toBeGreaterThan(0);
   for (const id of ids) await expect(page.locator(`#${id}`)).toHaveCount(1);
   const sections = await page
-    .locator("main section.rp-section[id]")
+    .locator("main section.db-section[id]")
     .evaluateAll((els) => els.map((e) => e.id));
   expect(new Set(ids)).toEqual(new Set(sections));
 
@@ -1072,7 +1170,7 @@ test("one figure in a row leads, and each wears its own slice's colour", async (
   page,
 }) => {
   await page.goto("/dashboard");
-  const row = page.locator(".rp-figures-row");
+  const row = page.locator(".db-figures-row");
   await expect(row).toBeVisible();
   const read = (tone: string) =>
     row.locator(`[data-tone="${tone}"] strong`).evaluate((el) => {
@@ -1145,7 +1243,7 @@ test("a marker on a card says something true about the card", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  const tags = page.locator(".rp-insight-tag");
+  const tags = page.locator(".db-insight-tag");
   await expect(tags.first()).toBeVisible();
   // These four readings are independent — coverage, reply share, concentration,
   // datedness — so numbering them 1..4 asserted a sequence that does not exist.
@@ -1169,7 +1267,7 @@ test("running text is set to a readable measure", async ({ page }) => {
   const wide = await page.evaluate(() => {
     const out = [];
     for (const el of document.querySelectorAll(
-      ".rp-sub, .rp-hero p, .rp-page .muted, .rp-page .rp-metric-note",
+      ".db-lead, .db-hero p, .db-page .db-muted, .db-page .db-note",
     )) {
       const text = (el.textContent ?? "").trim();
       if (text.length < 90) continue;
@@ -1202,9 +1300,9 @@ test("a figure and a sentence each keep their own face", async ({ page }) => {
       return el ? getComputedStyle(el).fontFamily : null;
     };
     return {
-      figure: fam(".rp-metric-value"),
-      sentence: fam(".rp-sub"),
-      heading: fam(".rp-section h2"),
+      figure: fam(".db-kpi-value"),
+      sentence: fam(".db-lead"),
+      heading: fam(".db-section h2"),
     };
   });
   // Two families with two jobs. The split used to happen by accident — one
@@ -1220,7 +1318,7 @@ test("the two pinned panes stack instead of hiding one another", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  const index = page.locator(".rp-nav");
+  const index = page.locator(".db-filterbar");
   await expect(index).toBeVisible();
   await page.evaluate(() =>
     window.scrollTo({ top: 1400, behavior: "instant" }),
@@ -1236,7 +1334,7 @@ test("the two pinned panes stack instead of hiding one another", async ({
       return el ? el.getBoundingClientRect() : null;
     };
     const h = r(".app-rail")!;
-    const n = r(".rp-nav")!;
+    const n = r(".db-filterbar")!;
     return {
       navTop: n.top,
       navBottom: n.bottom,
@@ -1257,6 +1355,9 @@ test("every pane keeps a solid the reader can fall back to", async ({
   await expect(
     page.getByRole("table", { name: /التعليقات ضمن/ }),
   ).toBeVisible();
+  // The correction dialog is a pane too, and it exists only while open.
+  await openReview(page, "المحتوى واضح ومفيد");
+  await expect(page.getByRole("dialog")).toBeVisible();
   // Glass is a lens, so the text on it has no fixed contrast unless the pane
   // itself carries enough of its own colour. Where backdrop-filter is off —
   // Reduce Transparency, an older engine — that solid is the entire surface.
@@ -1265,7 +1366,7 @@ test("every pane keeps a solid the reader can fall back to", async ({
     // The rail is not on this list: it is an opaque dark plane by design, not
     // a pane you can see through, so it has no tint alpha to keep above a
     // floor. Only the translucent surfaces are checked.
-    for (const sel of [".rp-card", ".rp-nav", ".review"]) {
+    for (const sel of [".ui-card", ".db-filterbar", "[role='dialog']"]) {
       const el = document.querySelector(sel);
       if (!el) continue;
       const bg = getComputedStyle(el).backgroundColor;
@@ -1290,7 +1391,7 @@ test("the report says what it is narrowed to, wherever you have read to", async 
   const summary = page.getByTestId("active-filters");
   await expect(summary).toBeHidden();
 
-  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
+  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
 
@@ -1336,7 +1437,7 @@ test("the export sits above the table it exports", async ({ page }) => {
   // needs to know it exists before they start scrolling rows, not after. A
   // control found only at the end is a control found after it was needed.
   const order = await page.evaluate(() => {
-    const ex = document.querySelector(".export")!;
+    const ex = document.querySelector(".db-export")!;
     const tb = document.querySelector('[data-testid="comments-table"] table')!;
     return {
       exportTop: ex.getBoundingClientRect().top + window.scrollY,
@@ -1423,7 +1524,7 @@ test("a sync failure reads as a sentence, not as a raw code", async ({
 test("the history says who reviewed and why", async ({ page }) => {
   await page.goto("/dashboard");
   await openReview(page, "المحتوى واضح ومفيد");
-  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("النموذج قرأ السخرية حرفيًا");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   await expect(page.getByRole("form", { name: "تصحيح التصنيف" })).toHaveCount(
@@ -1474,7 +1575,7 @@ test("ranks engaged negatives and keeps unknown engagement out of the ranking", 
   // Correct a liked positive to negative: it must join the ranking below the
   // more engaged one, ranked on the effective label rather than the model's.
   await openReview(page, "المحتوى واضح ومفيد");
-  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   const ranked = page.getByTestId("engaged-panel").getByRole("listitem");
@@ -1485,7 +1586,7 @@ test("ranks engaged negatives and keeps unknown engagement out of the ranking", 
   // Now correct the comment whose like count is unknown. It is negative, so it
   // counts as excluded, but it must not be ranked as though it had zero likes.
   await openReview(page, "تعليق لم يُحلل بعد");
-  await page.getByLabel("التصنيف الصحيح").selectOption("negative");
+  await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("مراجعة يدوية");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   await expect(ranked).toHaveCount(2);
@@ -1500,7 +1601,7 @@ test("the engagement panel follows the filters and says so when empty", async ({
   await page.goto("/dashboard");
   await expect(page.getByTestId("engaged-fixture-2")).toBeVisible();
   // The only negative lives on video-1, so filtering to video-2 empties it.
-  await applyFilter(page, "الفيديو", "video-2");
+  await applyFilter(page, "الفيديو", "فيديو اصطناعي ٢");
   await expect(page.getByTestId("engaged-empty")).toBeVisible();
   await expect(page.getByTestId("engaged-panel")).toContainText(
     "الإعجابات لا تُرجِّح التصنيف",
@@ -1554,11 +1655,11 @@ test("filtering does not re-read the source it cannot change", async ({
   expect(afterLoad).toBeGreaterThan(0);
 
   const apply = page.getByRole("button", { name: "تطبيق الفلاتر" });
-  await page.getByLabel("الفيديو", { exact: true }).selectOption("video-2");
+  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
   await apply.click();
   await expect(page.getByTestId("total")).toHaveText("2");
 
-  await page.getByLabel("المشاعر").selectOption("positive");
+  await pick(page, "المشاعر", "إيجابي");
   await apply.click();
   await expect(page.getByTestId("active-filters")).toContainText("المشاعر");
 
@@ -1848,7 +1949,8 @@ test("the topic filter narrows the figures, the table and the export together", 
   page,
 }) => {
   await page.goto("/dashboard");
-  await page.getByLabel("الموضوع", { exact: true }).selectOption("praise");
+  await openMore(page);
+  await pick(page, "الموضوع", "إشادة ودعم");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("1");
   await expect(
@@ -1881,9 +1983,7 @@ test("a topic correction changes the chip and the chart, with a reason", async (
     .filter({ hasText: "المحتوى واضح ومفيد" })
     .getByRole("button", { name: "تعديل الموضوع" })
     .click();
-  await page
-    .getByLabel("الموضوع الصحيح", { exact: true })
-    .selectOption("question");
+  await pick(page, "الموضوع الصحيح", "استفسارات وأسئلة");
   await page.getByLabel("سبب التصحيح").fill("يسأل عن مصدر المعلومة");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
   await expect(page.getByRole("form", { name: "تصحيح الموضوع" })).toHaveCount(
@@ -1922,7 +2022,10 @@ test("a workspace whose topics were never run shows the not-run text and no topi
   await expect(page.getByTestId("total")).toHaveText("6");
   const card = page.getByTestId("topics-card");
   await expect(card).toContainText("لم يُشغَّل تصنيف الموضوعات بعد");
-  await expect(card.locator(".rp-chart-topics")).toHaveCount(0);
+  await expect(card.getByTestId("chart-topics")).toHaveCount(0);
+  // The topic filter would sit behind «المزيد», so look there: closed, the
+  // popover holds nothing and the count would be zero for the wrong reason.
+  await openMore(page);
   await expect(page.getByLabel("الموضوع", { exact: true })).toHaveCount(0);
   await expect(page.getByTestId("topic-chip")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "تعديل الموضوع" })).toHaveCount(
@@ -1999,7 +2102,7 @@ test("the videos section pages at 25 and a filter change returns to page one", a
   // A filter applied from page two lands on page one of the narrowed list —
   // even when the narrowed list still has two pages, so the clamp alone
   // would have left the reader on page two of a list they had not read.
-  await page.getByLabel("المشاعر").selectOption("positive");
+  await pick(page, "المشاعر", "إيجابي");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("30");
   await expect(page.getByTestId("video-page-state")).toHaveText(
@@ -2007,9 +2110,7 @@ test("the videos section pages at 25 and a filter change returns to page one", a
   );
 
   // And the pager goes when one page holds everything that is left.
-  await page
-    .getByLabel("الفيديو", { exact: true })
-    .selectOption("paged-video-7");
+  await pick(page, "الفيديو", "فيديو مستنسخ 7");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("1");
   await expect(cards).toHaveCount(1);
@@ -2026,4 +2127,44 @@ test("the videos section shows no pager while one page holds every video", async
       .locator("#rp-videos")
       .getByRole("navigation", { name: "تصفح الفيديوهات" }),
   ).toHaveCount(0);
+});
+
+// ---- the redesigned page (2026-09-17): one sticky bar, a sheet on a phone ----
+
+test("the filter bar stays on screen", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await page.mouse.wheel(0, 2000);
+  await expect(
+    page.getByRole("form", { name: "فلاتر التقرير" }),
+  ).toBeInViewport();
+});
+
+test("at phone width the filters open as a sheet and nothing overflows", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(page.getByRole("button", { name: /^الفلاتر/ })).toBeVisible();
+  await page.getByRole("button", { name: /^الفلاتر/ }).click();
+  await expect(
+    page.getByRole("dialog").getByLabel("الفيديو", { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(page.getByTestId("total")).toHaveText("6");
+    // Polled: the charts resize a frame after the viewport does.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth - window.innerWidth,
+          ),
+        { message: `${width}px` },
+      )
+      .toBeLessThanOrEqual(0);
+  }
 });
