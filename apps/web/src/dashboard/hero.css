@@ -1,0 +1,36 @@
+/* The dashboard's page head. Flat, on the page's own ground — see Hero.tsx's
+   own note on why this is not the landing page's dark gradient banner. */
+.db-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-hero h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0;
+  max-width: 20ch;
+  color: var(--text-1);
+}
+.db-hero > p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--text-2);
+}
+.db-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.db-split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.db-split > span {
+  color: var(--text-2);
+}

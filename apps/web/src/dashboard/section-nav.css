@@ -1,0 +1,21 @@
+/* The report's table of contents. Not sticky — the filter bar is the page's
+   one pinned pane; see SectionNav.tsx's own note on why this one no longer
+   is. Links are styled like ui-tabs-trigger's row, scrolling sideways on a
+   narrow viewport rather than wrapping into a second line. */
+.db-nav-links {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.db-nav-links a {
+  padding: 8px 12px;
+  border-radius: var(--radius-2);
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.db-nav-links a[aria-current="true"] {
+  background: var(--ml-indigo-50);
+  color: var(--ml-indigo);
+  font-weight: 600;
+}

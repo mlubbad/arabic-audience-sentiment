@@ -42,7 +42,7 @@ import { WorkspaceGate } from "../WorkspaceGate";
 import { workspaceState, readableWorkspace } from "../workspace";
 import { videoLabel, displayDate, commentText } from "../i18n";
 import { useLocale } from "../locale";
-import { useStrings, type StringKey } from "../strings";
+import { useStrings } from "../strings";
 import { reviewHistory } from "../reviewHistory";
 import { describeSource } from "../dataSource";
 import { useChannelStatus } from "../channelStatus";
@@ -60,6 +60,9 @@ import { n } from "./format";
 import { barOptions, doughnutOptions, lineOptions } from "./chartOptions";
 import { FilterBar } from "./FilterBar";
 import { ActiveFilters } from "./ActiveFilters";
+import { Hero } from "./Hero";
+import { SectionNav, useActiveSection } from "./SectionNav";
+import { Provenance } from "./Provenance";
 import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
 import {
   chipsFor,
@@ -127,60 +130,6 @@ function ChartFigures({
 /** Video cards per page of the videos section. The same size as the comments
  *  pager's default, so the two lists turn at the same rhythm. */
 const VIDEOS_PER_PAGE = 25;
-
-/** The report's sections, in the order the page lays them out. One list, so a
- *  section cannot be added to the page and forgotten in its index — which is
- *  how "مقارنة الفيديوهات" and "أكثر التعليقات السلبية تفاعلًا" came to exist
- *  on the page and nowhere in the navigation that claims to enumerate it. */
-const SECTIONS = [
-  { id: "rp-summary", label: "secSummary" },
-  { id: "rp-videos", label: "secVideos" },
-  { id: "rp-voice", label: "secVoice" },
-  { id: "rp-timing", label: "secTiming" },
-  { id: "rp-people", label: "secPeople" },
-  { id: "rp-compare", label: "secCompare" },
-  { id: "rp-engaged", label: "secEngaged" },
-  { id: "rp-comments", label: "secComments" },
-] as const satisfies readonly { id: string; label: StringKey }[];
-
-/**
- * Which section the reader is in.
- *
- * Scroll position is the wrong question — a section can be short, or the page
- * can be scrolled to its end with three sections in view. The observer answers
- * the question actually being asked: of the sections currently on screen,
- * which starts highest. `enabled` exists because the sections do not render on
- * an empty page, and an observer watching for elements that will never appear
- * is a subscription with no subject.
- */
-function useActiveSection(enabled: boolean) {
-  const [active, setActive] = useState<string | null>(null);
-  useEffect(() => {
-    if (!enabled || typeof IntersectionObserver === "undefined") {
-      setActive(null);
-      return;
-    }
-    const seen = new Map<string, boolean>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) seen.set(e.target.id, e.isIntersecting);
-        const first = SECTIONS.find((s) => seen.get(s.id));
-        // Only move the mark when something is in view. Clearing it between
-        // two sections would make the index flicker on every scroll.
-        if (first) setActive(first.id);
-      },
-      // The header is sticky, so a section is "reached" when its top passes
-      // under it, not when it touches the viewport edge.
-      { rootMargin: "-88px 0px -55% 0px" },
-    );
-    for (const s of SECTIONS) {
-      const el = document.getElementById(s.id);
-      if (el) observer.observe(el);
-    }
-    return () => observer.disconnect();
-  }, [enabled]);
-  return active;
-}
 
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export type Snapshot = ReturnType<typeof deriveSnapshot>;
@@ -741,96 +690,13 @@ function DashboardBody({
       : S.noKnownDates;
   return (
     <div className="rp-page db-page">
-      {/* A page head, not a hero. Inside the shell this is styled flat, on
-          the page's own ground: the dark gradient pane belongs to the landing
-          page, where a reader is being sold something. The eyebrow names the
-          page as the rail does and the workspace the figures belong to, the
-          way the operations page's already did. */}
-      <header className="rp-hero">
-        <p className="rp-eyebrow">
-          {S.dashEyebrow} · {workspaceName ?? S.dashDemoTag}
-        </p>
-        <h1>{S.dashTitle}</h1>
-        {/* Before the read returns there is no count, and `?? 0` would have
-            printed "قراءة 0 تعليقًا" over a page that is still loading —
-            unknown rendered as a measurement of none. The banner says what it
-            is doing instead, and the figures appear when they exist. */}
-        {s ? (
-          <>
-            {/* What was read. The claim that used to follow — "كل رقم أدناه
-                محسوب من الصفوف المحفوظة — لا تقدير ولا استقراء" — is a pitch
-                about the method; the provenance strip below says what the
-                data is, which is the checkable version of it. */}
-            <p>{S.dashRead(n(s.total), s.videos.length)}</p>
-            <div className="rp-pills">
-              <span className="rp-pill">{range}</span>
-              <span className="rp-pill">{S.pillComments(n(s.total))}</span>
-              <span className="rp-pill">
-                {S.pillAuthors(n(s.unique_authors))}
-              </span>
-            </div>
-            {/* The answer, on the first screen.
-                The page asks "ماذا يقول جمهورك؟" at the top and then made the
-                reader scroll past ten filter controls and four panels to find
-                out — the summary tiles counted comments, replies and authors,
-                but not the one split the product exists to produce. It stays
-                out of the pills above because those describe the extract
-                (when, how many, from whom) and this is the finding.
-                Denominator said out loud: the classified rows, not the total. */}
-            {s.analysed > 0 && (
-              <p className="rp-hero-split" data-testid="hero-split">
-                <span>{S.splitOf(n(s.analysed))}</span>
-                {(Object.keys(s.sentiments) as Label[])
-                  .filter((k) => s.measurable.has(k))
-                  .map((k) => (
-                    <strong key={k}>
-                      {labels[k]} {n(s.sentiments[k])}
-                    </strong>
-                  ))}
-              </p>
-            )}
-          </>
-        ) : (
-          <p>{S.readingStored}</p>
-        )}
-      </header>
-      {/* Two sections were missing from this list and two more were being
-          offered on a page that had none: at zero rows every section below is
-          unrendered, and the nav went on linking to six of them. A control
-          that does nothing when pressed is worse than an absent one — the
-          reader concludes the page is broken rather than empty. */}
-      <nav className="rp-nav" aria-label={S.reportSectionsLabel}>
-        {s && s.total > 0 && (
-          <div className="rp-nav-links">
-            {SECTIONS.map((section) => (
-              <a
-                key={section.id}
-                href={`#${section.id}`}
-                // Where the reader is, not only where they can go. A sticky
-                // index on a page this long that never says which of its eight
-                // sections you are in is a table of contents with the bookmark
-                // removed.
-                aria-current={active === section.id ? "true" : undefined}
-              >
-                {S[section.label]}
-              </a>
-            ))}
-          </div>
-        )}
-      </nav>
-      <aside
-        className={`rp-provenance${source.tone === "warning" ? " warn" : ""}`}
-        data-testid="source"
-        data-mode={source.mode}
-      >
-        <strong>{source.badge}</strong>
-        <p data-testid="source-scope">{source.scope}</p>
-        <p data-testid="source-coverage">{source.coverage}</p>
-        <p data-testid="data-mode">{source.persistence}</p>
-        {source.freshness && (
-          <p data-testid="source-freshness">{source.freshness}</p>
-        )}
-      </aside>
+      <Hero
+        s={s}
+        S={S}
+        workspaceName={workspaceName}
+        range={range}
+        labels={labels}
+      />
       <FilterBar
         values={values}
         onChange={onChange}
@@ -855,6 +721,13 @@ function DashboardBody({
         onReset={reset}
         S={S}
       />
+      {/* Two sections were missing from this list and two more were being
+          offered on a page that had none: at zero rows every section below is
+          unrendered, and the nav went on linking to six of them. A control
+          that does nothing when pressed is worse than an absent one — the
+          reader concludes the page is broken rather than empty. */}
+      <SectionNav active={active} S={S} show={!!s && s.total > 0} />
+      <Provenance source={source} />
       {result.isPending && <Loading S={S} />}
       {!result.isPending && result.isFetching && <Updating S={S} />}
       {result.isError && (
