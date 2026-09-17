@@ -26,6 +26,18 @@ describe("Loading", () => {
     expect(container.querySelector(".db-sk-hero")).toBeNull();
     expect(container.querySelector(".db-sk-bar")).toBeNull();
   });
+
+  it("shape=ops announces the operations sentence over a catalogue and two panels", () => {
+    const { container } = render(
+      <Loading S={ar} label={ar.opsReading} shape="ops" />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(ar.opsReading);
+    expect(screen.getByRole("status")).not.toHaveTextContent(
+      ar.loadingComments,
+    );
+    expect(container.querySelectorAll(".ui-skeleton")).toHaveLength(3);
+    expect(container.querySelectorAll(".db-sk-kpi")).toHaveLength(0);
+  });
 });
 
 describe("Updating", () => {
@@ -49,6 +61,21 @@ describe("LoadError", () => {
   it("renders the load-failed sentence for a read: failure", () => {
     render(<LoadError S={ar} failure="read:net" onRetry={vi.fn()} />);
     expect(screen.getByTestId("load-error")).toHaveTextContent(ar.loadFailed);
+  });
+
+  it("prints the caller's sentence over the code when given one", () => {
+    render(
+      <LoadError
+        S={ar}
+        message={ar.opsReadFailed}
+        failure="read:net"
+        onRetry={vi.fn()}
+      />,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(ar.opsReadFailed);
+    expect(alert).not.toHaveTextContent(ar.loadFailed);
+    expect(screen.getByTestId("failure-code")).toHaveTextContent("read:net");
   });
 
   it("carries role=alert and calls onRetry from its button", async () => {
@@ -103,6 +130,40 @@ describe("EmptyState", () => {
     expect(
       screen.getByRole("link", { name: ar.emptyConnectOrSync }),
     ).toHaveAttribute("href", "/account");
+  });
+});
+
+describe("EmptyState as a page", () => {
+  it("wears the caller's eyebrow, title, heading level and test id", () => {
+    render(
+      <MemoryRouter>
+        <EmptyState
+          kind="workspace"
+          S={ar}
+          testId="sync-signed-out"
+          eyebrow={ar.opsEyebrow}
+          title={ar.opsTitle}
+          heading="h1"
+          lead={ar.opsSignedOutLead}
+          links={[
+            { to: "/account", label: ar.opsSignInOrJoin },
+            { to: "/sync?demo=1", label: ar.opsSeeDemo },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+    const state = screen.getByTestId("sync-signed-out");
+    expect(screen.queryByTestId("empty-state")).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      ar.opsTitle,
+    );
+    expect(state).not.toHaveTextContent(ar.emptyNoCommentsTitle);
+    expect(state).toHaveTextContent(ar.opsEyebrow);
+    expect(state).toHaveTextContent(ar.opsSignedOutLead);
+    expect(screen.getByRole("link", { name: ar.opsSeeDemo })).toHaveAttribute(
+      "href",
+      "/sync?demo=1",
+    );
   });
 });
 

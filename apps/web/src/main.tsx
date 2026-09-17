@@ -59,7 +59,9 @@ const Dashboard = lazy(() =>
 const Connected = lazy(() =>
   import("./Connected").then((m) => ({ default: m.Connected })),
 );
-const Sync = lazy(() => import("./Sync").then((m) => ({ default: m.Sync })));
+const Sync = lazy(() =>
+  import("./ops/Sync").then((m) => ({ default: m.Sync })),
+);
 const Account = lazy(() =>
   import("./Account").then((m) => ({ default: m.Account })),
 );

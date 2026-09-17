@@ -755,39 +755,6 @@
   max-width: 16rem;
 }
 
-/* Operations: health and allowance are parallel questions, then the job log. */
-.sync-grid {
-  display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: 1.2rem;
-  align-items: start;
-}
-.app-shell .sync-grid .rp-section {
-  margin: 0;
-}
-.sync-grid .rp-card {
-  min-height: 15rem;
-}
-.sync-grid .budgets {
-  margin-bottom: 0;
-}
-.sync-workspace {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  margin: -0.1rem 0 1.4rem;
-}
-.sync-workspace p {
-  margin: 0;
-  color: var(--text-2);
-}
-.sync-workspace select {
-  min-width: 15rem;
-  border-color: var(--border-2);
-  border-radius: var(--r-2);
-}
-
 .app-shell .history li {
   align-items: center;
   padding: 0.9rem 1.1rem;
@@ -932,12 +899,8 @@
     color: var(--ml-indigo);
     font-weight: 700;
   }
-  .account-entry,
-  .sync-grid {
+  .account-entry {
     grid-template-columns: 1fr;
-  }
-  .sync-grid .rp-card {
-    min-height: 0;
   }
   .account-story {
     order: 2;
@@ -963,14 +926,9 @@
   .app-shell .rp-page form.rp-card.rp-filters {
     grid-template-columns: 1fr;
   }
-  .account-toolbar,
-  .sync-workspace {
+  .account-toolbar {
     align-items: stretch;
     flex-direction: column;
-  }
-  .sync-workspace select {
-    min-width: 0;
-    width: 100%;
   }
   .app-state-actions {
     flex-direction: column;

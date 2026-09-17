@@ -1,10 +1,55 @@
-/* The dashboard's shared rules. Every section brings its own file beside it;
-   this one holds only what they all share. Classes are db-*; the old rp-*
-   rules in report.css never match this page again. */
+/* The signed-in pages' shared rules — the dashboard's and the operations
+   page's. Every section brings its own file beside it; this one holds only
+   what they all share. Classes are db-*; the old rp-* rules in report.css
+   never match these pages again. */
 .db-page {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+}
+/* A page head, not a hero. Flat, on the page's own ground — see
+   dashboard/Hero.tsx's note on why this is not the landing page's dark
+   gradient banner. The eyebrow is a `Badge`; the dashboard's pills and
+   split under it are hero.css's own. */
+.db-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-hero h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0;
+  max-width: 20ch;
+  color: var(--text-1);
+}
+.db-hero > p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--text-2);
+}
+/* The provenance strip — what this screen is showing and where it came
+   from: a Card's own material (see ui.css's .ui-card), at this bar's own
+   padding rather than a card's usual roomier one — it is one line of
+   sentences, not a panel. The dashboard's is `describeSource()`'s output;
+   the operations page's is its demo note. */
+.db-provenance {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.db-provenance p {
+  margin: 0;
 }
 /* An anchor lands under the pinned filter bar, not behind it. The bar's
    height is measured by `FilterBar` and written to `--db-pinned-h` on the

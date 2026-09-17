@@ -52,12 +52,8 @@
 }
 
 /* ---------------- attempt log ---------------- */
-/* Space above the log, below the health/plan grid — moved here from
-   app.css's `.app-shell #rp-attempts` when the section's id dropped its
-   rp-* prefix. */
-.app-shell #attempts {
-  margin-top: 3rem;
-}
+/* No margin of its own above the log: it is one child of `.db-page`, whose
+   gap spaces it from the health/plan grid as it spaces every section. */
 .db-attempts {
   list-style: none;
   margin: var(--space-4) 0 0;

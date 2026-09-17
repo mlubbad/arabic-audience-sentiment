@@ -4,11 +4,11 @@
  * `source` is `describeSource()`'s output — every sentence here is derived
  * from the same values that decide the dashboard's behaviour, never written
  * by hand, so the label and the truth cannot drift apart (see
- * `dataSource.ts`'s own docstring).
+ * `dataSource.ts`'s own docstring). `.db-provenance` is pages.css's: the
+ * operations page wears the same strip for its demo note.
  */
 import { Badge } from "../ui/Badge";
 import type { SourceDescription } from "../dataSource";
-import "./provenance.css";
 
 export function Provenance({ source }: { source: SourceDescription }) {
   return (

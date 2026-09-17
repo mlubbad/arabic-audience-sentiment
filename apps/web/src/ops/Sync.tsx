@@ -30,12 +30,16 @@ import { syncHealth } from "../syncHealth";
 import { useLocale } from "../locale";
 import { useStrings } from "../strings";
 import { describeJob, type JobEntry, type JobRow } from "../jobFeed";
+import { failureCode } from "../failure";
 import { storedPerVideo } from "../catalogue";
+import { Badge } from "../ui/Badge";
+import { EmptyState, Loading, LoadError } from "../pageStates/PageStates";
 import { Catalogue } from "./Catalogue";
 import { SyncHealth } from "./SyncHealth";
 import { PlanBudgets } from "./PlanBudgets";
 import { Attempts } from "./Attempts";
-import "../report.css";
+import "../pages.css";
+import "./ops.css";
 
 export function Sync() {
   const { session, loading: sessionLoading } = useSession();
@@ -82,24 +86,27 @@ export function Sync() {
   // The dashboard is a different case and keeps its demo: a sanitized report
   // shows what the product produces, and that is the thing worth showing. An
   // operations page answers a question only an owner has.
+  //
+  // The same card the dashboard shows for a workspace with nothing in it,
+  // with this page's own name over it. The page keeps its name whether you
+  // are signed in or not: the first draft of this state led with a sentence
+  // about the page instead — "هذه الصفحة تتبع تشغيل قناتك" — and a browser
+  // test caught it: a reader who arrives from a menu item called «التشغيل»
+  // should land on a heading that agrees with the thing they clicked.
   const signedOut = !session && !wantsDemo && (
-    <div className="app-state" data-testid="sync-signed-out">
-      <span className="app-state-symbol" aria-hidden="true">
-        ⟳
-      </span>
-      <p className="app-eyebrow">{S.opsEyebrow}</p>
-      {/* The page keeps its name whether you are signed in or not. The first
-            draft of this state led with a sentence about the page instead —
-            "هذه الصفحة تتبع تشغيل قناتك" — and a browser test caught it: a
-            reader who arrives from a menu item called "حالة المزامنة" should
-            land on a heading that agrees with the thing they clicked. */}
-      <h1>{S.opsTitle}</h1>
-      <p>{S.opsSignedOutLead}</p>
-      <div className="app-state-actions">
-        <a href="/account">{S.opsSignInOrJoin}</a>
-        <a href="/sync?demo=1">{S.opsSeeDemo}</a>
-      </div>
-    </div>
+    <EmptyState
+      kind="workspace"
+      S={S}
+      testId="sync-signed-out"
+      eyebrow={S.opsEyebrow}
+      title={S.opsTitle}
+      heading="h1"
+      lead={S.opsSignedOutLead}
+      links={[
+        { to: "/account", label: S.opsSignInOrJoin },
+        { to: "/sync?demo=1", label: S.opsSeeDemo },
+      ]}
+    />
   );
   const live = readableWorkspace(place);
   const mode = resolveMode({ signedIn: !!session, workspace: live });
@@ -255,11 +262,16 @@ function SyncBody({
   );
 
   return (
-    <div className="rp-page">
-      <header className="rp-hero">
-        <p className="rp-eyebrow">
-          {S.opsEyebrow} · {workspaceName ?? S.opsDemoTag}
-        </p>
+    <div className="db-page">
+      {/* The dashboard's head, in the dashboard's markup (`Hero.tsx` takes
+          a snapshot and a range and is not reusable for three elements).
+          The eyebrow names the page as the rail does and the workspace the
+          figures belong to; the demo wears the same word the dashboard's
+          does, «مثال توضيحي», so the two pages call one thing by one name. */}
+      <header className="db-hero">
+        <Badge tone="neutral">
+          {S.opsEyebrow} · {workspaceName ?? S.dashDemoTag}
+        </Badge>
         <h1>{S.opsTitle}</h1>
         {/* The one sentence that orients — this page against the other one.
             "تابع … من مكان واحد" was a pitch and is gone. */}
@@ -268,17 +280,27 @@ function SyncBody({
       {/* The workspace's name is in the head above and in the rail; the
           switch that used to sit here lives in the rail now (RailState.tsx),
           one control for every screen instead of one per page. */}
-      {mode !== "live" && <p className="sync-demo">{S.opsDemoNote}</p>}
+      {/* Where this screen's figures come from, on the strip the dashboard
+          prints its provenance on: in the demo, a fixture, and the sentence
+          says so before the panels below can be read as a machine's state. */}
+      {mode !== "live" && (
+        <aside className="db-provenance" data-testid="ops-demo-note">
+          <Badge tone="neutral">
+            <strong>{S.dashDemoTag}</strong>
+          </Badge>
+          <p>{S.opsDemoNote}</p>
+        </aside>
+      )}
 
       {snapshot.isPending ? (
-        <p role="status">{S.opsReading}</p>
+        <Loading S={S} label={S.opsReading} shape="ops" />
       ) : snapshot.isError ? (
-        <div role="alert" className="notice">
-          <p>{S.opsReadFailed}</p>
-          <button type="button" onClick={() => void snapshot.refetch()}>
-            {S.retry}
-          </button>
-        </div>
+        <LoadError
+          S={S}
+          message={S.opsReadFailed}
+          failure={failureCode("read", snapshot.error)}
+          onRetry={() => void snapshot.refetch()}
+        />
       ) : (
         <>
           {/* The action first, the diagnosis after it: what the channel has
@@ -295,7 +317,10 @@ function SyncBody({
             workerConnected={connected}
             onChanged={refresh}
           />
-          <div className="sync-grid">
+          {/* Health and allowance are parallel questions: side by side on
+              the dashboard's two-column grid, one under the other on a
+              phone. */}
+          <div className="db-grid db-grid--2">
             <SyncHealth
               s={s}
               health={health}

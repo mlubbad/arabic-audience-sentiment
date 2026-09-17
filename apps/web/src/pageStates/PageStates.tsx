@@ -23,6 +23,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Card } from "../ui/Card";
+import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Skeleton } from "../ui/Skeleton";
 import type { Strings } from "../strings";
@@ -33,22 +34,47 @@ import "./page-states.css";
  *  two charts — so the layout does not jump when real content lands. The
  *  hero and the bar themselves are real from the first frame (`Dashboard`
  *  always renders them above this), so they have no skeleton here: one did
- *  sit under each of them, a second hero and a second bar. */
-export function Loading({ S }: { S: Strings }) {
+ *  sit under each of them, a second hero and a second bar.
+ *
+ *  The operations page reads the same source under its own head and lands
+ *  a different shape — the catalogue, then health and plan side by side —
+ *  so `shape="ops"` draws that instead, and `label` says what is being
+ *  read: «جارٍ قراءة حالة التشغيل…» is not «جارٍ تحميل التعليقات…». */
+export function Loading({
+  S,
+  label,
+  shape = "report",
+}: {
+  S: Strings;
+  label?: string;
+  shape?: "report" | "ops";
+}) {
   return (
     <div role="status" data-testid="loading" className="db-loading">
       {/* The visible page says nothing while every pixel of it is a
           skeleton; a screen reader still needs a sentence. */}
-      <span className="ui-sr-only">{S.loadingComments}</span>
-      <div className="db-grid">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="db-sk-kpi" aria-hidden="true" />
-        ))}
-      </div>
-      <div className="db-grid db-grid--2">
-        <Skeleton className="db-sk-chart" aria-hidden="true" />
-        <Skeleton className="db-sk-chart" aria-hidden="true" />
-      </div>
+      <span className="ui-sr-only">{label ?? S.loadingComments}</span>
+      {shape === "ops" ? (
+        <>
+          <Skeleton className="db-sk-chart" aria-hidden="true" />
+          <div className="db-grid db-grid--2">
+            <Skeleton className="db-sk-panel" aria-hidden="true" />
+            <Skeleton className="db-sk-panel" aria-hidden="true" />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="db-grid">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="db-sk-kpi" aria-hidden="true" />
+            ))}
+          </div>
+          <div className="db-grid db-grid--2">
+            <Skeleton className="db-sk-chart" aria-hidden="true" />
+            <Skeleton className="db-sk-chart" aria-hidden="true" />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -67,19 +93,26 @@ export function Updating({ S }: { S: Strings }) {
 /** The read failed, or it answered but the requested filters could not be
  *  applied to it — two different problems, told apart by `failure`'s prefix,
  *  recovered from the same button. `failure` is a code built only from field
- *  names and a fixed vocabulary (see `failure.ts`); it is safe to print. */
+ *  names and a fixed vocabulary (see `failure.ts`); it is safe to print.
+ *  `message` is the sentence for a page whose read is not the comments —
+ *  the operations page's «تعذّرت قراءة حالة التشغيل.». */
 export function LoadError({
   S,
   failure,
+  message,
   onRetry,
 }: {
   S: Strings;
   failure: string | null;
+  message?: string;
   onRetry: () => void;
 }) {
   return (
     <Card role="alert" data-testid="load-error" className="db-error">
-      <p>{failure?.startsWith("view:") ? S.filtersFailed : S.loadFailed}</p>
+      <p>
+        {message ??
+          (failure?.startsWith("view:") ? S.filtersFailed : S.loadFailed)}
+      </p>
       {/* Small, and last — for the person who has to fix it, not the person
           reading the report. */}
       <p className="db-muted" data-testid="failure-code">
@@ -102,29 +135,46 @@ export function LoadError({
  * first comment (live mode only — the caller decides, since only it knows
  * whether this is a fixture); `kind="filters"` optionally carries `onReset`,
  * the same reset the filter bar's own control calls.
+ *
+ * The operations page shows a stranger the same card in place of the whole
+ * page — there is no collection to be the health of before signing in — so
+ * the workspace branch also takes `eyebrow`, `title` and `heading`: the
+ * page's own name over an `h1`, since the card is then the only heading on
+ * the screen and the rail's «التشغيل» must land on one that agrees with it.
+ * `testId` names that state for the browser suite (`sync-signed-out`); the
+ * default stays `empty-state`.
  */
 export function EmptyState({
   kind,
   S,
+  eyebrow,
+  title,
+  heading: Heading = "h2",
   lead,
   setup,
   onReset,
   links,
+  testId = "empty-state",
 }: {
   kind: "workspace" | "filters";
   S: Strings;
+  eyebrow?: string;
+  title?: string;
+  heading?: "h1" | "h2";
   /** The workspace branch's lead is a fixed sentence; the filters branch's
    *  names the total the filters excluded, which only the caller knows. */
   lead?: ReactNode;
   setup?: ReactNode;
   onReset?: () => void;
   links?: { to: string; label: string }[];
+  testId?: string;
 }) {
   return (
-    <Card className="db-empty" data-testid="empty-state">
+    <Card className="db-empty" data-testid={testId}>
       {kind === "workspace" ? (
         <>
-          <h2>{S.emptyNoCommentsTitle}</h2>
+          {eyebrow && <Badge tone="neutral">{eyebrow}</Badge>}
+          <Heading>{title ?? S.emptyNoCommentsTitle}</Heading>
           <p className="db-lead">{lead ?? S.emptyNoCommentsLead}</p>
           {setup}
           {links && links.length > 0 && (

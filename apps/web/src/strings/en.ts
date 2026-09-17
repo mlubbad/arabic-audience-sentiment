@@ -532,7 +532,6 @@ export const en: Strings = {
   opsSeeDemo: "See what this page looks like",
   opsLead:
     "What you see here describes the service's operation; the audience's comments and their reading are on the dashboard.",
-  opsDemoTag: "demo preview",
   opsWorkspaceData: "Operations data for workspace",
   opsDemoNote:
     "Illustrative operations data for the demo, not connected to a real channel.",

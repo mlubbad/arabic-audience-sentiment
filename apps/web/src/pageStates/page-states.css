@@ -11,6 +11,10 @@
 .db-sk-chart {
   height: 280px;
 }
+/* The operations page's two panels, under its catalogue's skeleton. */
+.db-sk-panel {
+  height: 200px;
+}
 .db-error {
   display: flex;
   flex-direction: column;
@@ -21,8 +25,24 @@
   text-align: center;
   padding: var(--space-7) var(--space-5);
 }
+.db-empty h1,
 .db-empty h2 {
   margin: 0 0 var(--space-2);
+}
+/* The page's name, when the card is the page (the operations page signed
+   out): the head's size, not style.css's, and its badge on its own line. */
+.db-empty h1 {
+  font-size: clamp(26px, 4vw, 40px);
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+.db-empty > .ui-badge {
+  margin-bottom: var(--space-3);
+}
+/* Centred, like the sentence it introduces; `.db-lead`'s own ceiling is
+   measured from the start edge and would leave a wide card lopsided. */
+.db-empty .db-lead {
+  margin-inline: auto;
 }
 .db-empty-actions {
   justify-content: center;
