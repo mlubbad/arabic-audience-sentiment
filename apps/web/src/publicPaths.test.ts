@@ -58,7 +58,8 @@ describe("the public pages", () => {
     // page's language; the product's own routes (/dashboard, /account) have
     // one address and are written as they are.
     for (const file of [
-      "Landing.tsx",
+      "landing/Landing.tsx",
+      "public/PublicShell.tsx",
       "PricingPage.tsx",
       "LegalPage.tsx",
       "LegalLinks.tsx",

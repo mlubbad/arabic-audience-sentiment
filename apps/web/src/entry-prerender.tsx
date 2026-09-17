@@ -22,7 +22,7 @@ import { Routes, StaticRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DirectionProvider } from "@radix-ui/react-direction";
 import type { Plan } from "@sentiment/contracts";
-import { Landing } from "./Landing";
+import { Landing } from "./landing/Landing";
 import { Pricing } from "./PricingPage";
 import { LegalPage } from "./LegalPage";
 import { ToastHost } from "./ui/Toast";

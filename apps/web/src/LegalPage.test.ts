@@ -59,7 +59,7 @@ describe("the footers", () => {
   const src = (file: string) =>
     readFileSync(new URL(`./${file}`, import.meta.url), "utf8");
   it("each mount the one legal-links component", () => {
-    for (const file of ["Landing.tsx", "PricingPage.tsx", "main.tsx"]) {
+    for (const file of ["public/PublicShell.tsx", "main.tsx"]) {
       const body = src(file);
       const footer = body.slice(body.lastIndexOf("<footer"));
       expect(footer, file).toContain("<LegalLinks");

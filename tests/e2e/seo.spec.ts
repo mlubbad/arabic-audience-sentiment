@@ -66,8 +66,10 @@ test("the Arabic landing carries its title, description, canonical, alternates a
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "تعليقات يوتيوب",
   );
-  await expect(page.locator(".lp-hero-art img")).toHaveAttribute(
-    "alt",
+  // The hero no longer renders an `<img>` — the redesign's ProductWindow
+  // stands in its place, and the sentence that used to be the image's alt
+  // is kept, unseen, as the figure's caption (same keyword, still indexed).
+  await expect(page.locator(".lp-hero-figure figcaption")).toContainText(
     /تعليقات يوتيوب/,
   );
 });

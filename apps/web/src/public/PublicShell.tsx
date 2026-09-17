@@ -56,7 +56,30 @@ export function PublicShell({
         {l.label}
       </Link>
     ) : (
-      <a key={l.href} href={l.href} onClick={() => setOpen(false)}>
+      <a
+        key={l.href}
+        href={l.href}
+        onClick={(e) => {
+          const wasOpen = open;
+          setOpen(false);
+          // An anchor on this same page: the browser's own hash-navigation
+          // scroll would otherwise handle this, but from inside the sheet it
+          // silently drops the scroll and nothing retries it — measured, not
+          // guessed: closing the sheet (react-remove-scroll's cleanup plus
+          // Radix's focus restoration) blocks a scrollIntoView attempted too
+          // soon after, for about 250ms, with no DOM state to observe and
+          // wait on in between. A target elsewhere (PricingPage's own FAQ
+          // link points at the home page's `#questions`) isn't on this page
+          // yet, so this leaves it to native navigation.
+          const target = document.getElementById(l.href.slice(1));
+          if (target) {
+            e.preventDefault();
+            history.pushState(null, "", l.href);
+            if (wasOpen) setTimeout(() => target.scrollIntoView(), 300);
+            else target.scrollIntoView();
+          }
+        }}
+      >
         {l.label}
       </a>
     );

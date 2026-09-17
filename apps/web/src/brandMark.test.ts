@@ -24,7 +24,10 @@ describe("the brand mark has one drawing", () => {
   it("no stylesheet paints the bars any more", () => {
     for (const css of [
       "./app.css",
-      "./landing.css",
+      "./landing/landing.css",
+      "./landing/product-window.css",
+      "./landing/closing.css",
+      "./public/public.css",
       "./report.css",
       "./style.css",
     ]) {

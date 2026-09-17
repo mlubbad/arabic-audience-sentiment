@@ -74,7 +74,14 @@
 .landing * {
   box-sizing: border-box;
 }
-.landing a {
+/* :not(.ui-btn) so this ambient reset never outranks a button's own colour
+   contract — a `Button asChild` around a `Link` renders as this very `<a>`,
+   and `.landing a` otherwise wins on specificity (0,1,1 beats 0,1,0),
+   silently repainting a primary CTA's light-on-indigo text back to the
+   page's ink. Caught by the contrast-floor e2e test the moment the landing
+   route started rendering the shared Button component instead of its own
+   markup. */
+.landing a:not(.ui-btn) {
   text-decoration: none;
   color: inherit;
 }

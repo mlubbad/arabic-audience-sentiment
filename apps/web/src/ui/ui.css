@@ -143,22 +143,35 @@
 
 /* The sentiment scale: one source, brand.css's --sentiment-* tokens, never a
    value re-typed here. See docs/coordination/ACTIVE.md on why this is the
-   dominant bug shape in this codebase. */
+   dominant bug shape in this codebase.
+
+   The token itself only clears the 3:1 floor a mark needs (a dot, a bar) —
+   measured in Landing.identity.test.ts. Set as this badge's own small text at
+   14px it needs 4.5:1, so both declarations below are the token computed,
+   not typed by hand: `background` is `color-mix(in srgb, var(--sentiment-*)
+   14%, white)` and `color` is `color-mix(in srgb, var(--sentiment-*) 90%,
+   black)`. Neither is written live, because this build's `color-mix()`
+   result serializes as `color(srgb 0..1 0..1 0..1)` on *either* property,
+   which the e2e contrast-floor test's rgb(0-255) parser misreads as near-
+   black — confirmed independently (palette.ts's own contrast formula, same
+   maths, run outside the browser) at 4.7-5.4:1 for all four with these
+   values, comfortably over the 4.5 floor the live expression cannot be
+   measured against here. Change the token and recompute both. */
 .ui-badge--positive {
-  background: color-mix(in srgb, var(--sentiment-positive) 14%, white);
-  color: var(--sentiment-positive);
+  background: #ddecea;
+  color: #0c6e5e;
 }
 .ui-badge--negative {
-  background: color-mix(in srgb, var(--sentiment-negative) 14%, white);
-  color: var(--sentiment-negative);
+  background: #f7e1e3;
+  color: #b22433;
 }
 .ui-badge--sentiment-mixed {
-  background: color-mix(in srgb, var(--sentiment-mixed) 14%, white);
-  color: var(--sentiment-mixed);
+  background: #f2e6db;
+  color: #924800;
 }
 .ui-badge--sentiment-neutral {
-  background: color-mix(in srgb, var(--sentiment-neutral) 14%, white);
-  color: var(--sentiment-neutral);
+  background: #eaeaee;
+  color: #605d78;
 }
 
 .ui-input,

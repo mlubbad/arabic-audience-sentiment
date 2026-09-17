@@ -8,31 +8,26 @@ test("landing demo filters illustrative comments and connects to the real dashbo
     "افهم مشاعر جمهورك",
   );
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  const demo = page.locator(".lp-demo-frame");
+  const demo = page.locator("#experience [data-testid='product-window']");
   await expect(demo).toContainText("4 تعليقات مؤلّفة");
   await expect(demo.locator(".lp-example-comment")).toHaveCount(4);
-  await demo.getByRole("button", { name: "مختلط", exact: true }).click();
+  await demo.getByRole("tab", { name: "مختلط", exact: true }).click();
   await expect(demo.locator(".lp-example-comment")).toHaveCount(1);
   await expect(demo.getByRole("img")).toHaveAttribute(
     "aria-label",
     /مختلط: ١٠٠٪/,
   );
   await expect(demo).toContainText("المقدمة طويلة");
-  await demo.getByRole("button", { name: "الكل", exact: true }).click();
+  await demo.getByRole("tab", { name: "الكل", exact: true }).click();
   await expect(demo.locator(".lp-example-comment")).toHaveCount(4);
-  await page
-    .getByRole("button", { name: "الوكالات والفرق", exact: true })
-    .click();
-  await expect(page.locator(".lp-audience-panel")).toContainText(
-    "لكل عميل جمهوره",
-  );
-  await page
-    .locator("summary")
-    .filter({ hasText: "هل يمكنني ربط قناتي الآن؟" })
-    .click();
-  await expect(page.locator("details[open]")).toContainText(
-    "جُمعت تعليقات حقيقية",
-  );
+  await page.getByRole("tab", { name: "الوكالات والفرق", exact: true }).click();
+  await expect(
+    page.locator(".lp-audience-panel[data-state='active']"),
+  ).toContainText("لكل عميل جمهوره");
+  await page.getByRole("button", { name: "هل يمكنني ربط قناتي الآن؟" }).click();
+  await expect(
+    page.getByRole("region", { name: "هل يمكنني ربط قناتي الآن؟" }),
+  ).toContainText("جُمعت تعليقات حقيقية");
   await page
     .getByRole("link", { name: "استكشف اللوحة", exact: false })
     .first()
@@ -58,14 +53,22 @@ test("mobile landing has working navigation, keyboard access, and no page overfl
   await page.goto("/");
   await page.keyboard.press("Tab");
   await expect(page.locator(".lp-skip")).toBeFocused();
-  const menu = page.getByRole("button", { name: "القائمة الرئيسية" });
+  // Radix's Dialog sets `aria-hidden` on the header while the sheet is open
+  // (correct isolation for assistive tech), which takes the trigger out of
+  // Playwright's role-based accessibility tree — a plain attribute selector
+  // reads the same DOM node without that filtering.
+  const menu = page.locator('button[aria-label="القائمة الرئيسية"]');
   await menu.click();
   await expect(menu).toHaveAttribute("aria-expanded", "true");
   await page
-    .getByRole("navigation", { name: "تنقل صفحة الهبوط" })
+    .getByRole("dialog")
     .getByRole("link", { name: "شاهد التجربة" })
     .click();
   await expect(menu).toHaveAttribute("aria-expanded", "false");
+  // PublicShell itself now defers this scroll by 300ms (measured: closing
+  // the sheet blocks an earlier scrollIntoView with nothing to observe and
+  // retry against — see its own comment), so this waits past that.
+  await page.waitForTimeout(400);
   await expect(page.locator("#experience")).toBeInViewport();
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
@@ -76,10 +79,10 @@ test("mobile landing has working navigation, keyboard access, and no page overfl
     ).toBe(true);
   }
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
-  await expect(page.locator(".lp-hero-art img")).toHaveJSProperty(
-    "naturalWidth",
-    1536,
-  );
+  await expect(
+    page.locator(".lp-hero [data-testid='product-window']"),
+  ).toBeVisible();
+  expect(await page.locator(".lp-hero img").count()).toBe(0);
 });
 
 /**
@@ -98,7 +101,10 @@ test("every word a visitor can read clears its contrast floor", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.waitForSelector(".lp-donut");
+  // `.lp-donut` was the old demo's chart; the redesign's ProductWindow has no
+  // element by that name, so this now waits on the equivalent readiness
+  // marker — the rendered demo itself — before scanning contrast.
+  await page.waitForSelector("[data-testid='product-window']");
   const failing = await page.evaluate(() => {
     const lum = (r: number, g: number, b: number) => {
       const f = (v: number) => {
