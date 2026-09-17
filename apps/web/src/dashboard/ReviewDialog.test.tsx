@@ -23,7 +23,12 @@ const baseComment = {
 
 const topics = [
   { key: "praise", name_ar: "إشادة", name_en: "Praise", retired: false },
-  { key: "question", name_ar: "استفسارات وأسئلة", name_en: "Questions", retired: false },
+  {
+    key: "question",
+    name_ar: "استفسارات وأسئلة",
+    name_en: "Questions",
+    retired: false,
+  },
 ] as unknown as Snapshot["topics"];
 
 function renderDialog(
@@ -86,18 +91,17 @@ describe("ReviewDialog", () => {
 
   it("labels the verdict select and the reason field", () => {
     renderDialog();
-    expect(
-      screen.getByLabelText(ar.correctLabel),
-    ).toHaveAttribute("role", "combobox");
+    expect(screen.getByLabelText(ar.correctLabel)).toHaveAttribute(
+      "role",
+      "combobox",
+    );
     expect(screen.getByLabelText(ar.correctionReason)).toBeRequired();
   });
 
   it("does not submit while the reason is empty", async () => {
     const user = userEvent.setup();
     const { onSubmit, onReason } = renderDialog();
-    await user.click(
-      screen.getByRole("button", { name: ar.saveCorrection }),
-    );
+    await user.click(screen.getByRole("button", { name: ar.saveCorrection }));
     expect(onSubmit).not.toHaveBeenCalled();
 
     // The reason field is controlled by `Dashboard.tsx`; typing reports it
@@ -109,9 +113,7 @@ describe("ReviewDialog", () => {
   it("submits once, with a reason already filled in", async () => {
     const user = userEvent.setup();
     const { onSubmit } = renderDialog({ reason: "سبب واضح" });
-    await user.click(
-      screen.getByRole("button", { name: ar.saveCorrection }),
-    );
+    await user.click(screen.getByRole("button", { name: ar.saveCorrection }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
@@ -127,7 +129,9 @@ describe("ReviewDialog", () => {
     const user = userEvent.setup();
     const { onClose } = renderDialog({ busy: true });
     await screen.findByRole("form", { name: ar.reviewFormLabel });
-    expect(screen.getByRole("button", { name: ar.saveCorrection })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: ar.saveCorrection }),
+    ).toBeDisabled();
     await user.keyboard("{Escape}");
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -247,9 +251,10 @@ describe("ReviewDialog", () => {
     expect(
       screen.getByRole("form", { name: ar.reviewTopicTitle }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(ar.correctTopicLabel),
-    ).toHaveAttribute("role", "combobox");
+    expect(screen.getByLabelText(ar.correctTopicLabel)).toHaveAttribute(
+      "role",
+      "combobox",
+    );
   });
 
   it("fixture mode: shows the not-persisted scope note", () => {

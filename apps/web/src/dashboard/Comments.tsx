@@ -85,7 +85,11 @@ export function Comments({
   children?: ReactNode;
 }) {
   return (
-    <section className="db-section" id="rp-comments" data-testid="comments-table">
+    <section
+      className="db-section"
+      id="rp-comments"
+      data-testid="comments-table"
+    >
       <header>
         {/* `tabIndex={-1}` + the id: `ReviewDialog.tsx`'s `onCloseAutoFocus`
             fallback target, for when the row that opened it is gone (a

@@ -134,7 +134,9 @@ export function ReviewDialog({
           <form
             ref={formRef}
             tabIndex={-1}
-            aria-label={kind === "topic" ? S.reviewTopicTitle : S.reviewFormLabel}
+            aria-label={
+              kind === "topic" ? S.reviewTopicTitle : S.reviewFormLabel
+            }
             onSubmit={(e) => {
               e.preventDefault();
               onSubmit();
