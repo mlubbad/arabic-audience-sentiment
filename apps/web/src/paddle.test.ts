@@ -17,9 +17,12 @@ vi.mock("./planCatalogue", () => ({
     ]),
 }));
 
-import { checkoutItems, initPaddle, openCheckout, priceIdFor } from "./paddle";
+import { checkoutParams, initPaddle, openCheckout, priceIdFor } from "./paddle";
 
-const session = { user: { id: "u1", email: "a@b.c" } } as Session;
+const session = {
+  user: { id: "u1", email: "a@b.c" },
+  access_token: "tok_1",
+} as Session;
 
 function fakePaddle() {
   const paddle = {
@@ -32,6 +35,18 @@ function fakePaddle() {
     location: { origin: "https://app.test" },
   });
   return paddle;
+}
+
+/** A fetch that answers `paddle-checkout` with a transaction id, the shape
+ *  every openCheckout test needs once the mint call sits between the price
+ *  and the overlay. */
+function fetchThatMints(transactionId = "txn_1") {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ transaction_id: transactionId }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 afterEach(() => {
@@ -52,22 +67,11 @@ describe("paddle checkout", () => {
       priceIdFor({ key: "media", provider_prices: {} }, "month"),
     ).toBeNull();
   });
-  it("builds the checkout call with the workspace in custom data", () => {
-    expect(checkoutItems("pri_m", "w1", "a@b.c", "https://app.test")).toEqual({
-      items: [{ priceId: "pri_m", quantity: 1 }],
-      customData: { workspace_id: "w1" },
-      customer: { email: "a@b.c" },
+  it("builds the overlay's params from a minted transaction id", () => {
+    expect(checkoutParams("txn_1", "https://app.test")).toEqual({
+      transactionId: "txn_1",
       settings: { successUrl: "https://app.test/account?checkout=done" },
     });
-  });
-  it("leaves the customer out when the session carries no email", () => {
-    expect(checkoutItems("pri_m", "w1", undefined, "https://app.test")).toEqual(
-      {
-        items: [{ priceId: "pri_m", quantity: 1 }],
-        customData: { workspace_id: "w1" },
-        settings: { successUrl: "https://app.test/account?checkout=done" },
-      },
-    );
   });
 });
 
@@ -111,8 +115,9 @@ describe("initPaddle", () => {
 });
 
 describe("openCheckout", () => {
-  it("opens Paddle's overlay with the plan's price and the workspace", async () => {
+  it("mints a transaction for the plan's price and the workspace, then opens the overlay with only its id", async () => {
     const paddle = fakePaddle();
+    const fetchMock = fetchThatMints("txn_y");
     vi.stubEnv("VITE_PADDLE_CLIENT_TOKEN", "test_abc");
     await openCheckout({
       planKey: "creator",
@@ -120,9 +125,36 @@ describe("openCheckout", () => {
       session,
       workspaceId: "w1",
     });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/functions/v1/paddle-checkout");
+    expect(init.headers.authorization).toBe("Bearer tok_1");
+    expect(JSON.parse(init.body)).toEqual({
+      workspace_id: "w1",
+      price_id: "pri_y",
+    });
     expect(paddle.Checkout.open).toHaveBeenCalledWith(
-      checkoutItems("pri_y", "w1", "a@b.c", "https://app.test"),
+      checkoutParams("txn_y", "https://app.test"),
     );
+  });
+  it("never mints or opens when the server refuses the transaction", async () => {
+    const paddle = fakePaddle();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ code: "forbidden" }),
+      }),
+    );
+    vi.stubEnv("VITE_PADDLE_CLIENT_TOKEN", "test_abc");
+    await expect(
+      openCheckout({
+        planKey: "creator",
+        interval: "year",
+        session,
+        workspaceId: "w1",
+      }),
+    ).rejects.toThrow("checkout_unavailable");
+    expect(paddle.Checkout.open).not.toHaveBeenCalled();
   });
   it("never opens without a workspace to bill", async () => {
     const paddle = fakePaddle();
@@ -159,6 +191,7 @@ describe("openCheckout", () => {
   });
   it("reads the pack's price from addon_catalogue", async () => {
     const paddle = fakePaddle();
+    fetchThatMints("txn_pack");
     vi.stubEnv("VITE_PADDLE_CLIENT_TOKEN", "test_abc");
     rpc.mockResolvedValue({
       data: [
@@ -180,7 +213,7 @@ describe("openCheckout", () => {
     });
     expect(rpc).toHaveBeenCalledWith("addon_catalogue");
     expect(paddle.Checkout.open).toHaveBeenCalledWith(
-      checkoutItems("pri_pack", "w1", "a@b.c", "https://app.test"),
+      checkoutParams("txn_pack", "https://app.test"),
     );
   });
   it("refuses the pack before its price is synced", async () => {

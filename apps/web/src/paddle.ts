@@ -2,18 +2,23 @@
  * The browser's side of Paddle checkout and the billing portal.
  *
  * Checkout is Paddle.js's overlay (`index.html` loads it from Paddle's CDN),
- * opened on a price id the tables carry: `plans.provider_prices[interval]`
- * for a plan, `addon_prices.provider_prices.pack` for the pack, both written
- * there by `scripts/paddle-sync-prices.mjs` and read here through the same
- * public functions the pricing page reads. The workspace being bought for
- * rides in `customData`, which is how the webhook (`paddle-webhook`) knows
- * whose subscription an event is; without one there is nothing to bill and
- * the overlay never opens.
+ * opened on a **transaction id**, not on a price and a customData this side
+ * builds itself. The price id still comes from the tables
+ * (`plans.provider_prices[interval]` for a plan, `addon_prices.
+ * provider_prices.pack` for the pack, both written by
+ * `scripts/paddle-sync-prices.mjs`), but the workspace being bought for is
+ * fixed server-side: `paddle-checkout` checks the caller owns it and mints
+ * the transaction with `custom_data.workspace_id` already in it before this
+ * side ever sees a transaction id. A browser that changed `workspaceId`
+ * before this point would only be asking to check out for a workspace it
+ * does not own — `billing_assert_owner` refuses that before Paddle is ever
+ * called — never able to put a different id in `custom_data`, which
+ * `paddle-webhook` trusts completely once an event names a known price.
  *
  * Every checkout refusal is one error, `checkout_unavailable`: the callers
  * (`PricingPage`, `PlanPanel`) show it as `S.checkoutUnavailable`, and the
- * reason — no script, no token, no price id yet, no workspace — is not a
- * reader's to act on.
+ * reason — no script, no token, no price id yet, no workspace, the server
+ * refused to mint a transaction — is not a reader's to act on.
  *
  * The portal is a server round trip instead, to the `billing-portal`
  * function: it decides who may see a Paddle customer id
@@ -39,11 +44,11 @@ export type CheckoutRequest = {
   workspaceId?: string | null;
 };
 
-/** What `Paddle.Checkout.open` is handed — the part of Paddle.js this app uses. */
+/** What `Paddle.Checkout.open` is handed — the part of Paddle.js this app
+ *  uses. A transaction id, not items or customData: the price and the
+ *  workspace are already fixed in it by `paddle-checkout`. */
 export type CheckoutParams = {
-  items: { priceId: string; quantity: number }[];
-  customData: { workspace_id: string };
-  customer?: { email: string };
+  transactionId: string;
   settings: { successUrl: string };
 };
 
@@ -71,22 +76,17 @@ export function priceIdFor(
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 
-/** The overlay's parameters: one item, the workspace in custom data so the
- *  webhook can land the event, the buyer's email when the session has one,
- *  and the account page as the place to come back to. */
-export function checkoutItems(
-  priceId: string,
-  workspaceId: string,
-  email: string | null | undefined,
+/** The overlay's parameters for an already-minted transaction: nothing but
+ *  where to land, since the transaction itself already carries the price,
+ *  the workspace and the buyer's email from the server that created it. */
+export function checkoutParams(
+  transactionId: string,
   origin: string,
 ): CheckoutParams {
-  const params: CheckoutParams = {
-    items: [{ priceId, quantity: 1 }],
-    customData: { workspace_id: workspaceId },
+  return {
+    transactionId,
     settings: { successUrl: `${origin}/account?checkout=done` },
   };
-  if (email) params.customer = { email };
-  return params;
 }
 
 // Paddle.js initialises once per page; a second `Initialize` is an error.
@@ -124,6 +124,39 @@ async function priceIdForRequest(req: CheckoutRequest) {
   return plan ? priceIdFor(plan, req.interval) : null;
 }
 
+/** Asks `paddle-checkout` to mint a transaction for this workspace and price,
+ *  carrying the caller's own token so `billing_assert_owner` checks them,
+ *  never a workspace this side decided on their behalf. */
+async function mintTransaction(
+  session: Session,
+  workspaceId: string,
+  priceId: string,
+): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paddle-checkout`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ workspace_id: workspaceId, price_id: priceId }),
+      },
+    );
+  } catch {
+    throw unavailable();
+  }
+  const body = (await response.json().catch(() => ({}))) as {
+    transaction_id?: string;
+  };
+  if (!response.ok || typeof body.transaction_id !== "string")
+    throw unavailable();
+  return body.transaction_id;
+}
+
 export async function openCheckout(req: CheckoutRequest): Promise<void> {
   // The workspace is resolved before anything is fetched: a checkout with
   // nobody to bill would be an event the webhook records as unmapped. Then
@@ -134,13 +167,13 @@ export async function openCheckout(req: CheckoutRequest): Promise<void> {
   await initPaddle();
   const priceId = await priceIdForRequest(req);
   if (!priceId) throw unavailable();
+  const transactionId = await mintTransaction(
+    req.session,
+    workspaceId,
+    priceId,
+  );
   window.Paddle!.Checkout.open(
-    checkoutItems(
-      priceId,
-      workspaceId,
-      req.session.user.email,
-      window.location.origin,
-    ),
+    checkoutParams(transactionId, window.location.origin),
   );
 }
 

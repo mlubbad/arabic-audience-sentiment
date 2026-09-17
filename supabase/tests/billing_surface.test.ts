@@ -264,4 +264,24 @@ describe("billing rpc surface", () => {
     ).rejects.toThrow(/permission denied/);
     await db.exec("reset role");
   });
+
+  it("billing_assert_owner passes for the owner and refuses everyone else — the check paddle-checkout mints a transaction behind", async () => {
+    await as(OWNER);
+    await expect(
+      db.query("select billing_assert_owner($1)", [W]),
+    ).resolves.toBeTruthy();
+    await as(ANALYST);
+    await expect(
+      db.query("select billing_assert_owner($1)", [W]),
+    ).rejects.toThrow(/forbidden/);
+    await as(STRANGER);
+    await expect(
+      db.query("select billing_assert_owner($1)", [W]),
+    ).rejects.toThrow(/forbidden/);
+    await as(STRANGER, "anon");
+    await expect(
+      db.query("select billing_assert_owner($1)", [W]),
+    ).rejects.toThrow(/permission denied/);
+    await db.exec("reset role");
+  });
 });
