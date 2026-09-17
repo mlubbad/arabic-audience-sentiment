@@ -13,10 +13,6 @@
 .app-shell:lang(en) {
   font-family: var(--font-latin);
 }
-.app-shell .rp-page .rp-eyebrow:lang(en) {
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
 .app-rail-caption:lang(en),
 .app-plan-kicker:lang(en) {
   letter-spacing: 0.08em;

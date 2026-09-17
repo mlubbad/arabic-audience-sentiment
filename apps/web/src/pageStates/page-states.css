@@ -53,8 +53,3 @@
   justify-content: center;
   margin-top: var(--space-4);
 }
-.db-empty .setup-steps {
-  max-width: 34rem;
-  margin: var(--space-5) auto;
-  text-align: start;
-}

@@ -1,7 +1,7 @@
 .db-filterbar {
   position: sticky;
   /* Below the shell header, not behind it — the offset the old report.css's
-     `.rp-nav` read. `--app-header-h` is 0px in the current rail shell (no
+     nav bar once read. `--app-header-h` is 0px in the current rail shell (no
      element above the content is actually pinned), so this is a no-op today
      and a real offset the moment it is not. */
   top: var(--app-header-h, 78px);

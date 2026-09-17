@@ -28,6 +28,21 @@
       "port": 5174
     },
     {
+      "name": "web-dev-5175",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "@sentiment/web",
+        "--",
+        "--port",
+        "5175",
+        "--strictPort"
+      ],
+      "port": 5175
+    },
+    {
       "name": "web-dev-5176",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

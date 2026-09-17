@@ -5,10 +5,12 @@
  * the operations page and the admin page each carry their own db-* rules
  * beside them, and the account page — its last reader — took the rules it
  * used into a verbatim `account.css` until phase 5 recomposed it under
- * `account/` with rules of its own. These read the source
- * as text so the old sheet cannot creep back in: not as a file, not through
- * one import, and not through one leftover `rp-*` class on a page that was
- * rebuilt without it.
+ * `account/` with rules of its own, and task 7 struck the last `rp-*` blocks
+ * from `app.css` itself. These read the source as text so the old sheet
+ * cannot creep back in: not as a file, not through one import, not through
+ * one leftover `rp-*` class on a page that was rebuilt without it, and not
+ * through one `.rp-*` selector re-declared in any stylesheet. The guard now
+ * has no exceptions — no allow-list, no page still owed a pass.
  *
  * The guard used to sit in `dashboard/` and cover that directory alone; it
  * now walks all of `apps/web/src`.
@@ -36,15 +38,7 @@ const code = files.filter((f) => /\.(tsx?|mjs|css)$/.test(f));
 const components = files.filter(
   (f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"),
 );
-
-/**
- * The account page and the components it rendered kept their `rp-*` classes
- * until phase 5 recomposed it on `ui/` (`account/Account.tsx`, task 5, was
- * the last; `SetupPath.tsx` was struck with it — it wears `setup-*` only).
- * The set is empty and stays so: a file can only be added here with a
- * reason, and the rule below that it be the true remainder still holds.
- */
-const KEEPS_RP_UNTIL_PHASE_5 = new Set<string>([]);
+const styles = files.filter((f) => f.endsWith(".css"));
 
 describe("report.css is gone", () => {
   it("walks the whole source tree", () => {
@@ -77,12 +71,13 @@ describe("report.css is gone", () => {
     expect(existsSync(join(src, "Account.tsx"))).toBe(false);
   });
 
-  it("no component outside the account page paints with an rp-* class", () => {
+  it("no component paints with an rp-* class", () => {
     // Class names only: the dashboard's sections legitimately keep `rp-*`
     // as element ids and anchors (`id="rp-videos"`, `#rp-comments-title`),
-    // which are addresses, not paint.
+    // which are addresses, not paint. No file is exempt from this any more —
+    // `account/Account.tsx` (task 5) and `SetupPath.tsx` were the last two
+    // to carry the class, and neither does now.
     for (const f of components) {
-      if (KEEPS_RP_UNTIL_PHASE_5.has(f)) continue;
       const s = read(f);
       expect(s, f).not.toContain('className="rp-');
       expect(s, f).not.toContain("className={`rp-");
@@ -91,14 +86,14 @@ describe("report.css is gone", () => {
     }
   });
 
-  it("the allow-list is the true remainder", () => {
-    // A file struck from the page's rp-* wardrobe is struck from the list
-    // too, so the list never quietly covers more than it has to.
-    for (const f of KEEPS_RP_UNTIL_PHASE_5) expect(components).toContain(f);
-    const painting = [...KEEPS_RP_UNTIL_PHASE_5].filter((f) =>
-      /className="rp-/.test(read(f)),
-    );
-    expect(painting.sort()).toEqual([]);
+  it("no stylesheet declares an rp-* selector", () => {
+    // app.css's last `.rp-*` blocks (the hero, the filters, the section and
+    // card rules) went with task 7. This is the remainder guard: a `.rp-`
+    // selector — or a comment naming one — may not creep back into any sheet
+    // under src, in app.css or anywhere else.
+    for (const f of styles) {
+      expect(read(f), f).not.toContain(".rp-");
+    }
   });
 
   it("main.tsx loads the page from ./dashboard/Dashboard", () => {
