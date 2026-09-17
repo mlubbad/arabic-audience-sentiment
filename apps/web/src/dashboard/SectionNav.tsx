@@ -55,11 +55,14 @@ export function useActiveSection(enabled: boolean) {
         // two sections would make the index flicker on every scroll.
         if (first) setActive(first.id);
       },
-      // The filter bar is the page's one sticky element now (~155px pinned,
-      // measured at 1280×900 with the search field's own row and its date
-      // note both visible) — a section is "reached" when its top passes
-      // under that bar, not when it touches the viewport edge.
-      { rootMargin: "-155px 0px -55% 0px" },
+      // The filter bar is the page's one sticky element now: 154.5px pinned,
+      // measured at 1280×900 scrolled 1500 with no filter applied (the
+      // fields' row and the actions' row; the date note left the pane), plus
+      // 8px of slack — a section is "reached" when its top passes under that
+      // bar, not when it touches the viewport edge. With filters applied the
+      // chips add a row (223px measured); the mark then moves a little late,
+      // which reads better than moving early with none applied.
+      { rootMargin: "-163px 0px -55% 0px" },
     );
     for (const s of SECTIONS) {
       const el = document.getElementById(s.id);

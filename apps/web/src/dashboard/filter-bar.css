@@ -41,8 +41,12 @@
   margin: 0;
   color: var(--color-danger);
 }
-.db-filterbar .db-note {
+.db-filterbar-chips {
   flex-basis: 100%;
+}
+/* The period note sits under the bar, outside the pinned pane: pinned height
+   is the price of every row, and this one is read once. */
+.db-filterbar-note {
   margin: 0;
 }
 .db-popover-stack {

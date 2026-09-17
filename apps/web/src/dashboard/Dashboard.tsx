@@ -657,14 +657,22 @@ function DashboardBody({
         lang={lang}
         labels={labels}
         appliedCount={chips.length}
+        chips={
+          // Only while something is applied: the pinned pane pays for every
+          // row, and the no-filter fallback (the source's scope sentence) is
+          // already on the Provenance strip below.
+          chips.length > 0 ? (
+            <ActiveFilters
+              chips={chips}
+              scope={source.scope}
+              onClear={onClear}
+              onReset={reset}
+              S={S}
+            />
+          ) : null
+        }
       />
-      <ActiveFilters
-        chips={chips}
-        scope={source.scope}
-        onClear={onClear}
-        onReset={reset}
-        S={S}
-      />
+      <p className="db-note db-filterbar-note">{S.periodNote}</p>
       {/* Two sections were missing from this list and two more were being
           offered on a page that had none: at zero rows every section below is
           unrendered, and the nav went on linking to six of them. A control

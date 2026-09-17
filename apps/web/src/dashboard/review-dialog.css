@@ -11,7 +11,18 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  /* style.css frames every bare <form> (padding, border, white ground,
+     1rem block margin) for the simpler screens. Inside a ui/Dialog that
+     frame drew a second box under the content's own, with the close ×
+     floating above it. The dialog is the frame; the form is its rows. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
+/* Focused by script when the dialog opens (`tabIndex={-1}`), so no ring —
+   the same rule `.ui-dialog-content:focus-visible` states for its panel. */
 .db-review-dialog form:focus-visible {
   outline: none;
 }

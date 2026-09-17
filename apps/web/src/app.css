@@ -1678,7 +1678,11 @@
     inset-block: 0;
     inset-inline-end: 0;
     width: min(82vw, 300px);
-    z-index: 80;
+    /* The shell's band of the stacking scale: header 50 < rail 55 < menu
+       button 56 < ui dialog 60/61 < tooltip 62 < popover/select 65 < toast
+       70. The rail used to sit at 80 and its button at 90, above every
+       dialog — a phone's filter sheet opened under the «القائمة» button. */
+    z-index: 55;
     /* Hidden past the edge it is anchored to. `transform` is physical and this
        document is right-to-left, so `inset-inline-end: 0` puts the sheet
        against the LEFT edge and a positive translate slid it into the middle
@@ -1702,7 +1706,9 @@
     display: inline-flex;
     position: sticky;
     top: var(--space-3);
-    z-index: 90;
+    /* One above the rail it toggles (it is the close control while the rail
+       is open), and under the ui layers — see the scale on `.app-rail`. */
+    z-index: 56;
     margin: var(--space-3);
     align-self: start;
     justify-self: start;

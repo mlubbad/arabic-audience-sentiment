@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { UNCLASSIFIED, type Label } from "@sentiment/contracts";
 import { Button } from "../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
@@ -39,6 +39,11 @@ export type FilterBarProps = {
    *  sheet. Computed by the caller (`chipsFor(values, …).length`) rather
    *  than here, so this component stays a pure view over `values`. */
   appliedCount: number;
+  /** The applied-filter chips (`ActiveFilters`), rendered as the last row
+   *  inside the pinned pane. A narrowed report read as a whole one is a
+   *  wrong one, and a reader who has scrolled learns what the page is
+   *  narrowed to only if that row travels with the bar. */
+  chips?: ReactNode;
 };
 
 export function FilterBar({
@@ -55,6 +60,7 @@ export function FilterBar({
   lang,
   labels,
   appliedCount,
+  chips,
 }: FilterBarProps) {
   const compact = useMediaQuery("(max-width: 900px)");
   const [sheet, setSheet] = useState(false);
@@ -366,7 +372,7 @@ export function FilterBar({
           {formError}
         </p>
       )}
-      <p className="db-note">{S.periodNote}</p>
+      {chips && <div className="db-filterbar-chips">{chips}</div>}
     </form>
   );
 }
