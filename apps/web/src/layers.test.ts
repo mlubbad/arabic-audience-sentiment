@@ -9,7 +9,9 @@
  * (`#f3f0ff` beside `--ml-indigo-50: #f4f2fe`, ΔE 0.6).
  *
  * Measured before anything was changed: `style.css` 0 raw colours,
- * `report.css` 7 (all `#fff`), `app.css` 56 uses of 37 distinct values, of
+ * `report.css` 7 (all `#fff`; the sheet is gone since 2026-09-17 and
+ * `account.css`, the verbatim remnant the account page keeps, stands in its
+ * place below), `app.css` 56 uses of 37 distinct values, of
  * which 14 repeated a token and 34 distinct did not. `landing.css` carries 95
  * and is out of scope here: it is the marketing page's, loaded only by it,
  * and it is being edited in another session.
@@ -58,7 +60,7 @@ const APP_BACKLOG = new Set<string>([]);
 
 describe("the layers above the tokens", () => {
   it("never write a token's value out again", () => {
-    for (const f of ["style.css", "app.css", "report.css"]) {
+    for (const f of ["style.css", "app.css", "account.css"]) {
       const repeats = hexes(read(f)).filter((h) => tokens.has(h));
       expect(
         repeats.map((h) => `${h} is ${tokens.get(h)}`),
@@ -67,8 +69,8 @@ describe("the layers above the tokens", () => {
     }
   });
 
-  it("style.css and report.css carry no raw colour at all", () => {
-    for (const f of ["style.css", "report.css"])
+  it("style.css and account.css carry no raw colour at all", () => {
+    for (const f of ["style.css", "account.css"])
       expect(hexes(read(f)), f).toEqual([]);
   });
 

@@ -200,12 +200,13 @@
 }
 
 /* A page head, not a hero.
-   `report.css` paints `.rp-hero` as the landing page's pane — indigo
-   gradient, blurred colour washes, white ink — and until now the shell
-   repainted it with a second gradient of its own, so every page inside the
-   tool opened on a marketing block. Inside the shell it is flat and on the
-   page's own ground: what the page is, whose figures these are, and the
-   first useful figure, with nothing between the reader and the panels. */
+   `account.css` (verbatim from the old `report.css`) paints `.rp-hero` as
+   the landing page's pane — indigo gradient, blurred colour washes, white
+   ink — and until now the shell repainted it with a second gradient of its
+   own, so every page inside the tool opened on a marketing block. Inside
+   the shell it is flat and on the page's own ground: what the page is, whose
+   figures these are, and the first useful figure, with nothing between the
+   reader and the panels. */
 .app-shell .rp-page .rp-hero {
   display: block;
   position: static;
@@ -246,10 +247,11 @@
   color: var(--ml-indigo);
   font-size: 0.8rem;
   font-weight: 700;
-  /* Zero, and deliberately so: `report.css` tracks this eyebrow at 0.16em and
-     this is the rule that undoes it inside the app shell. It was set back to
-     0.03em somewhere in the restyle, which is enough to pull the joins in
-     "تقرير تحليلي" apart — `dashboard.spec.ts` asserts against exactly this. */
+  /* Zero, and deliberately so: `account.css` (once `report.css`) tracks this
+     eyebrow at 0.16em and this is the rule that undoes it inside the app
+     shell. It was set back to 0.03em somewhere in the restyle, which is
+     enough to pull the joins in "تقرير تحليلي" apart — `dashboard.spec.ts`
+     asserts against exactly this. */
   letter-spacing: 0;
 }
 .app-shell .rp-pills {
@@ -351,7 +353,8 @@
 .app-shell .rp-metric:first-child {
   border-top-color: var(--ml-indigo);
 }
-/* The figure face now comes from the token, on every figure, in report.css.
+/* The figure face now comes from the token, on every figure (the old
+   report.css's `.rp-figure`, gone with that sheet on 2026-09-17).
    This rule set one group of numbers in what was then the body font — the
    right instinct, reaching the right face only because the token happened to
    point at it. When the token was corrected to name the family the product

@@ -1,6 +1,8 @@
 /* The correction dialog's own rules. The form used to sit inline under
-   `.rp-page`, from whose `report.css` scope (`.rp-page .history li`,
-   `.rp-page .muted`) it inherited its history-list and muted-text styling.
+   `.rp-page`, from whose scope in the old `report.css` (`.rp-page .history
+   li`, `.rp-page .muted`; the sheet is deleted, the account page keeps its
+   share in `account.css`) it inherited its history-list and muted-text
+   styling.
    A `ui/Dialog` portals its content to `document.body`, outside that scope,
    so the few rules the form actually needs are restated here rather than
    left silently unstyled. */

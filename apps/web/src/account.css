@@ -1,0 +1,494 @@
+/* =====================================================================
+   The account page's rules, verbatim from `report.css` — pending phase 5.
+
+   `report.css` was the analytical report's sheet, and by the end of phase 4
+   the account page was its last reader: the dashboard, the operations page
+   and the admin page each carry their own db-* rules beside them. Rather
+   than keep a 1300-line sheet alive for one page, every block that page
+   (and `WorkspaceCard.tsx`, `PlanPanel.tsx`, `SetupPath.tsx` under it)
+   matches was copied here unchanged — selectors, comments and all, in the
+   order they had — and the sheet was deleted. Nothing here is edited;
+   phase 5 recomposes /account on `ui/` and this file goes with it. The
+   blocks, by their old section heads: the `.rp-page` scope, the banner,
+   the section frame and cards, the states, the forms inside the system
+   (with the history and budgets lists), the plan budgets and actions, the
+   row action, and the way in (auth) with the trust panel. A rule whose
+   selector this page never matches (`.history li`, `td button`, the
+   `.empty-actions` half of a shared block) is kept because the copy is
+   verbatim; pruning is phase 5's, not this move's.
+
+   The account-* and app-state rules the page also wears live in `app.css`,
+   as they did before; they are not here.
+   ===================================================================== */
+
+.rp-page {
+  --rp-gutter: clamp(16px, 3vw, 32px);
+}
+.rp-page * {
+  box-sizing: border-box;
+}
+
+/* ---------------- banner ---------------- */
+.rp-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-2xl);
+  background: var(--ml-grad-warm-cool);
+  /* The tinted pane. Its edge and specular come from the system so it reads
+     as the same material as everything else, only coloured. */
+  border: var(--glass-brand-edge);
+  box-shadow: var(--glass-brand-lift), var(--glass-brand-specular);
+  color: var(--ink-on-dark);
+  padding: clamp(28px, 5vw, 56px) var(--rp-gutter);
+  box-shadow: var(--shadow-glow-indigo);
+  margin-bottom: var(--space-6);
+}
+.rp-hero::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(
+      50% 60% at 88% 18%,
+      rgba(253, 230, 118, 0.35) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      60% 70% at 8% 80%,
+      rgba(60, 233, 249, 0.28) 0%,
+      transparent 62%
+    );
+  filter: blur(26px);
+  pointer-events: none;
+}
+.rp-hero > * {
+  position: relative;
+  z-index: 1;
+}
+.rp-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--ml-yellow);
+  margin: 0 0 var(--space-3);
+}
+.rp-hero h1 {
+  font-size: clamp(26px, 4vw, 46px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-4);
+  color: var(--ink-on-dark);
+  text-wrap: balance;
+  max-width: 20ch;
+}
+.rp-hero p {
+  margin: 0;
+  font-size: clamp(14px, 1.3vw, 17px);
+  line-height: 1.9;
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 62ch;
+}
+
+/* ---------------- section frame ---------------- */
+.rp-section {
+  margin-bottom: var(--space-8);
+  /* Clears both pinned panes, so an anchor lands the heading below them
+     rather than underneath. */
+  scroll-margin-top: calc(var(--app-header-h, 78px) + 72px);
+}
+.rp-section > header {
+  margin-bottom: var(--space-5);
+  /* Eight sections down one column, each opening exactly like the last, gave
+     the page no rhythm to read by — a hairline above the heading is where one
+     section visibly ends and the next begins. */
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-1);
+}
+/* Except the first, which opens under the index and needs no rule to separate
+   it from a section that is not there. */
+.rp-section:first-of-type > header {
+  padding-top: 0;
+  border-top: 0;
+}
+.rp-section h2 {
+  font-size: clamp(21px, 2.4vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+  color: var(--fg-1);
+  /* Body leading on a display size. The shell sets 1.75 for running text,
+     which every heading inherited: at 30px that is 52px between baselines, so
+     a heading that wraps reads as two separate headings. Leading tightens as
+     type grows — the lines are already far apart in absolute terms. */
+  line-height: 1.25;
+}
+.rp-page h3 {
+  line-height: 1.35;
+}
+/* A line of running text has a width beyond which the eye loses its place on
+   the return sweep. The conventional band is 50-60 characters; these ran to
+   194 at desktop, because nothing capped them and the page is 1204px wide.
+   `ch` is the width of the font's own "0", so the cap follows the type rather
+   than assuming a size. */
+.rp-sub,
+.rp-page .muted,
+.rp-page .rp-section > header p,
+.rp-page .rp-metric-note,
+.rp-page .rp-missing {
+  max-width: 62ch;
+}
+.rp-sub {
+  margin: 0;
+  color: var(--fg-3);
+  font-size: 14px;
+}
+
+/* ---------------- cards ---------------- */
+.rp-card {
+  /* Level 1. The solid comes first: where backdrop-filter is unavailable or
+     the reader has asked for less transparency, this is the whole card. */
+  background: var(--glass-1-tint);
+  backdrop-filter: var(--glass-1-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-1-blur) var(--glass-lens);
+  border: var(--glass-1-edge);
+  border-radius: var(--r-3);
+  /* A hairline separates; a drop shadow lifts. Around twenty cards were each
+     carrying the lifting shadow, so the whole page hovered by the same amount
+     and nothing on it was above anything else. Depth is a comparison, and a
+     page where every plane is raised has none. The ring and the specular
+     highlight are the pane's own edge, not a lift; the real shadow is kept
+     for the overlay, which is the only thing genuinely above the page. */
+  box-shadow: var(--glass-1-ring), var(--glass-1-specular);
+  padding: var(--space-5);
+}
+
+/* ---------------- states ---------------- */
+.rp-missing {
+  border: 1px dashed var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--bg-muted);
+  padding: var(--space-5);
+  color: var(--fg-3);
+  font-size: 13.5px;
+  line-height: 1.9;
+}
+.rp-missing strong {
+  display: block;
+  color: var(--fg-2);
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+/* ---------------- forms inside the system ----------------
+   The filter bar sets the pattern; every other form on these pages follows it
+   rather than falling back to the base stylesheet's bare controls, which look
+   like a different product sitting inside this one. */
+.rp-page form.rp-card {
+  /* Flex rather than grid so the actions at the end sit on one row while every
+     field still takes the full width above them. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-4);
+  max-width: 30rem;
+}
+.rp-page form.rp-card > label {
+  flex: 1 1 100%;
+}
+.rp-page form.rp-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.rp-page form.rp-card input,
+.rp-page form.rp-card select {
+  width: 100%;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-sm);
+  padding: 0.6rem 0.7rem;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--fg-1);
+  background: var(--bg-card);
+}
+.rp-page form.rp-card input:focus-visible,
+.rp-page form.rp-card select:focus-visible {
+  border-color: var(--ml-indigo);
+}
+.rp-page form.rp-card button {
+  margin: 0;
+  border-radius: var(--r-sm);
+  border-color: var(--ml-indigo);
+}
+.rp-page form.rp-card > button {
+  flex: 0 0 auto;
+}
+
+/* The workspace list and the history list keep their own shapes but take the
+   page's surfaces, so nothing reads as a leftover from the base stylesheet. */
+.rp-page .history li {
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+  gap: var(--space-2);
+}
+.rp-page .history li[data-severity="critical"] strong {
+  color: var(--color-danger);
+}
+.rp-page .history li[data-severity="warning"] strong {
+  color: var(--color-warning);
+}
+.rp-page .history li[data-severity="muted"] strong {
+  color: var(--fg-3);
+}
+.rp-page .budgets li {
+  border-radius: var(--r-md);
+}
+
+/* ---------------- plan budgets ---------------- */
+/* A native <progress> takes the browser's accent — Chrome paints it green. It
+   was reporting "74٪ — اقترب الاستهلاك من الحد" in warning ink above a
+   cheerful green bar, and painting a different colour in every browser. The
+   bar now says what the sentence says. */
+.rp-page .budgets progress {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  inline-size: 100%;
+  block-size: 8px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.rp-page .budgets progress::-webkit-progress-bar {
+  background: var(--bg-muted);
+  border-radius: var(--r-pill);
+}
+.rp-page .budgets progress::-webkit-progress-value {
+  background: var(--ml-indigo);
+  border-radius: var(--r-pill);
+}
+.rp-page .budgets progress::-moz-progress-bar {
+  background: var(--ml-indigo);
+  border-radius: var(--r-pill);
+}
+.rp-page
+  .budgets
+  li:has(small[data-state="warning"])
+  progress::-webkit-progress-value {
+  background: var(--color-warning);
+}
+.rp-page
+  .budgets
+  li:has(small[data-state="warning"])
+  progress::-moz-progress-bar {
+  background: var(--color-warning);
+}
+.rp-page
+  .budgets
+  li:has(small[data-state="critical"])
+  progress::-webkit-progress-value,
+.rp-page
+  .budgets
+  li:has(small[data-state="exhausted"])
+  progress::-webkit-progress-value {
+  background: var(--color-danger);
+}
+.rp-page
+  .budgets
+  li:has(small[data-state="critical"])
+  progress::-moz-progress-bar,
+.rp-page
+  .budgets
+  li:has(small[data-state="exhausted"])
+  progress::-moz-progress-bar {
+  background: var(--color-danger);
+}
+
+/* The empty page is a page like any other: it says which of the two empties
+   this is, and carries the control that resolves it. */
+.rp-page .empty-actions,
+.rp-page .plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.rp-page .empty-actions a,
+.rp-page .empty-actions button,
+.rp-page .plan-actions a,
+.rp-page .plan-actions button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-2);
+  background: var(--bg-card);
+  color: var(--link);
+  font-family: inherit;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.rp-page .empty-actions a:first-child,
+.rp-page .empty-actions button:first-child,
+.rp-page .plan-actions a:first-child,
+.rp-page .plan-actions button:first-child {
+  background: var(--ml-indigo);
+  border-color: var(--ml-indigo);
+  color: var(--ink-on-dark);
+}
+
+/* A row action is not the page's primary action.
+   Every <button> in the product defaults to filled indigo, so a table of 25
+   comments shipped 25 filled buttons down its last column — a wall of equal
+   shouting in which nothing is emphasised and the eye has nowhere to rest.
+   Emphasis is finite: spending it on a repeating control leaves none for the
+   one button the reader actually has to find. Scoped to table cells rather
+   than given a class, so the next table cannot forget it. */
+.rp-page td button {
+  background: var(--bg-card);
+  border-color: var(--border-2);
+  color: var(--link);
+  font-weight: 600;
+  min-height: 36px;
+  padding: 0.35rem 0.8rem;
+}
+.rp-page td button:hover:not(:disabled) {
+  border-color: var(--ml-indigo);
+  background: var(--ml-indigo-50);
+}
+
+/* ---------------- the way in ---------------- */
+.auth-card h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  line-height: 1.3;
+}
+.rp-page .auth-or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 var(--space-2);
+  flex: 1 1 100%;
+  color: var(--fg-3);
+  font-size: 12.5px;
+}
+.rp-page .auth-or::before,
+.rp-page .auth-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-1);
+}
+.rp-page .auth-providers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 100%;
+}
+.rp-page .auth-providers li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* A door, not the page's primary action: the reader's own credentials are.
+   And a closed one stays legible — a greyed-out control the reader cannot
+   read is a control they cannot tell is deliberate. */
+.rp-page .auth-providers button {
+  margin: 0;
+  width: 100%;
+  min-height: 42px;
+  background: var(--bg-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-2);
+  box-shadow: none;
+  color: var(--fg-1);
+  font-weight: 600;
+  font-size: 14px;
+}
+.rp-page .auth-providers button:disabled {
+  opacity: 1;
+  color: var(--fg-3);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+.rp-page .auth-providers small {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--fg-3);
+}
+.rp-page .auth-switch {
+  flex: 1 1 100%;
+  margin: var(--space-4) 0 0;
+  font-size: 13.5px;
+  color: var(--fg-3);
+}
+.rp-page button.auth-link {
+  margin: 0;
+  min-height: 0;
+  padding: 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--link);
+  font-weight: 700;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+/* What the build guarantees, in place of a customer count we do not have. */
+.account-trust {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-1);
+}
+.account-trust h3 {
+  margin: 0 0 var(--space-3);
+  font-size: 15px;
+}
+.account-trust ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.account-trust li {
+  position: relative;
+  padding-inline-start: 1.5rem;
+  font-size: 13.5px;
+  line-height: 1.85;
+  color: var(--fg-2);
+  max-width: 52ch;
+}
+.account-trust li::before {
+  content: "✓";
+  position: absolute;
+  inset-inline-start: 0;
+  color: var(--sentiment-positive);
+  font-weight: 700;
+}
+.account-trust li strong {
+  color: var(--fg-1);
+}
+.account-trust-note {
+  margin: var(--space-4) 0 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--fg-3);
+  max-width: 52ch;
+}

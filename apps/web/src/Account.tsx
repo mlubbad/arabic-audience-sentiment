@@ -15,7 +15,7 @@ import { setupSteps } from "./setup";
 import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
 import { PlanPanel } from "./PlanPanel";
 import { useIsPlatformAdmin } from "./adminAccess";
-import "./report.css";
+import "./account.css";
 
 /**
  * Where a message belongs. Feedback used to be one string for the whole page,

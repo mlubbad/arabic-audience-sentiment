@@ -1,7 +1,8 @@
 /* The signed-in pages' shared rules — the dashboard's and the operations
    page's. Every section brings its own file beside it; this one holds only
-   what they all share. Classes are db-*; the old rp-* rules in report.css
-   never match these pages again. */
+   what they all share. Classes are db-*; the old rp-* rules (report.css,
+   deleted 2026-09-17 — the account page keeps its share in account.css)
+   never match these pages. */
 .db-page {
   display: flex;
   flex-direction: column;
