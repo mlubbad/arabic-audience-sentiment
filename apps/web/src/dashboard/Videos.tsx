@@ -73,17 +73,24 @@ export function Videos({
             count: v.sentiments[k],
             pct: pct(v.sentiments[k]),
           })).filter((seg) => seg.count > 0);
-          const splitLabel = segments
-            .map((seg) =>
-              s.measurable.has(seg.key)
-                ? S.legendMeasured(
-                    labels[seg.key],
-                    n(seg.count),
-                    Math.round(seg.pct),
+          // No segments is not "no bar": the container's own muted
+          // background is the true state for a video with nothing analysed
+          // yet, and the same string the comparison table already uses for
+          // that case names it.
+          const splitLabel =
+            segments.length > 0
+              ? segments
+                  .map((seg) =>
+                    s.measurable.has(seg.key)
+                      ? S.legendMeasured(
+                          labels[seg.key],
+                          n(seg.count),
+                          Math.round(seg.pct),
+                        )
+                      : S.legendUnmeasured(labels[seg.key]),
                   )
-                : S.legendUnmeasured(labels[seg.key]),
-            )
-            .join("، ");
+                  .join("، ")
+              : S.noAnalysedInFilters;
           return (
             <Card
               key={v.id}
@@ -106,17 +113,15 @@ export function Videos({
                 <Badge numeric>{S.countReplies(n(v.replies))}</Badge>
                 <Badge numeric>{S.countAnalysed(n(v.analysed))}</Badge>
               </div>
-              {segments.length > 0 && (
-                <div className="ui-split" role="img" aria-label={splitLabel}>
-                  {segments.map((seg) => (
-                    <i
-                      key={seg.key}
-                      className={seg.key}
-                      style={{ flexGrow: seg.pct }}
-                    />
-                  ))}
-                </div>
-              )}
+              <div className="ui-split" role="img" aria-label={splitLabel}>
+                {segments.map((seg) => (
+                  <i
+                    key={seg.key}
+                    className={seg.key}
+                    style={{ width: `${seg.pct}%` }}
+                  />
+                ))}
+              </div>
             </Card>
           );
         })}

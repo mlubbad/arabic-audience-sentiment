@@ -2,7 +2,7 @@
 .db-kpi {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .db-kpi-value {
   font-size: var(--fs-h2);

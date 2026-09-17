@@ -80,7 +80,7 @@ export function ProductWindow({
                 <i
                   key={c.label}
                   className={c.label}
-                  style={{ flexGrow: c.percent }}
+                  style={{ width: `${c.percent}%` }}
                 />
               ))}
             </div>

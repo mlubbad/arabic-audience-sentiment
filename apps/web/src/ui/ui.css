@@ -647,7 +647,7 @@
   background: var(--bg-muted);
 }
 .ui-split > i {
-  flex-basis: 0;
+  flex: 0 0 auto;
   min-width: 0;
   background: var(--sentiment-neutral);
 }
@@ -662,6 +662,6 @@
 }
 @media (prefers-reduced-motion: no-preference) {
   .ui-split > i {
-    transition: flex-grow 240ms ease;
+    transition: width 240ms ease;
   }
 }

@@ -33,6 +33,11 @@ describe("ProductWindow", () => {
         ".lp-dot:not(.positive):not(.negative):not(.mixed)",
       ),
     ).toHaveLength(1);
+    // The bar draws widths, not flex ratios: four equal shares are four
+    // equal widths, not four segments stretched to fill the whole bar.
+    const segments = container.querySelectorAll(".pw-bar > i");
+    expect(segments).toHaveLength(4);
+    for (const seg of segments) expect(seg).toHaveStyle({ width: "25%" });
   });
 
   it("interactive: choosing a sentiment narrows the list, the bar and the count", async () => {
@@ -45,6 +50,10 @@ describe("ProductWindow", () => {
       "aria-label",
       expect.stringMatching(/مختلط: ١٠٠٪/),
     );
+    // One label at 100% is one full-width segment, not four ratios that
+    // still sum to a full bar regardless of the true share.
+    const mixedSegment = container.querySelector(".pw-bar > i.mixed");
+    expect(mixedSegment).toHaveStyle({ width: "100%" });
     expect(container.querySelector(".pw-list")).toHaveAttribute(
       "aria-live",
       "polite",
