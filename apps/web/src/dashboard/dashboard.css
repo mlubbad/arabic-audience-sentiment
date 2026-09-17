@@ -1,0 +1,73 @@
+/* The dashboard's shared rules. Every section brings its own file beside it;
+   this one holds only what they all share. Classes are db-*; the old rp-*
+   rules in report.css never match this page again. */
+.db-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.db-section {
+  scroll-margin-top: 72px;
+}
+.db-section > header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.db-section > header h2 {
+  font-size: var(--fs-h2);
+  margin: 0;
+}
+.db-lead,
+.db-muted,
+.db-note {
+  color: var(--text-2);
+  max-width: 70ch;
+}
+.db-note {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.db-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.db-grid--2 {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.db-card-title {
+  font-size: var(--fs-h3);
+  margin: 0 0 var(--space-2);
+}
+.db-row-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.db-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.db-pager p {
+  margin: 0;
+  color: var(--text-2);
+}
+@media (max-width: 760px) {
+  .db-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .db-grid--2,
+  .db-grid--charts {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .db-grid {
+    grid-template-columns: 1fr;
+  }
+}

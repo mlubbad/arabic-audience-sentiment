@@ -76,7 +76,7 @@ describe("the rail's workspace", () => {
 
   it("is the only switch: neither page keeps its own", () => {
     // Two selects with one name on one screen is one name too few.
-    for (const page of ["Dashboard.tsx", "Sync.tsx"]) {
+    for (const page of ["dashboard/Dashboard.tsx", "Sync.tsx"]) {
       const src = readFileSync(new URL(`./${page}`, import.meta.url), "utf8");
       expect(src, page).not.toContain("S.changeWorkspace");
     }

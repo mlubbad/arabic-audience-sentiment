@@ -75,11 +75,11 @@ export function ProductWindow({
             <span>{S.lpDemoInSelection}</span>
           </Card>
           <Card className="pw-figure pw-figure--bar">
-            <div className="pw-bar" role="img" aria-label={barLabel}>
+            <div className="ui-split pw-bar" role="img" aria-label={barLabel}>
               {shares.map((c) => (
                 <i
                   key={c.label}
-                  className={`pw-seg ${c.label}`}
+                  className={c.label}
                   style={{ flexGrow: c.percent }}
                 />
               ))}

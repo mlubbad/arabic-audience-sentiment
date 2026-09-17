@@ -637,3 +637,31 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ---- Split bar: one bar, four sentiment segments ---- */
+.ui-split {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-muted);
+}
+.ui-split > i {
+  flex-basis: 0;
+  min-width: 0;
+  background: var(--sentiment-neutral);
+}
+.ui-split > i.positive {
+  background: var(--sentiment-positive);
+}
+.ui-split > i.negative {
+  background: var(--sentiment-negative);
+}
+.ui-split > i.mixed {
+  background: var(--sentiment-mixed);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-split > i {
+    transition: flex-grow 240ms ease;
+  }
+}
