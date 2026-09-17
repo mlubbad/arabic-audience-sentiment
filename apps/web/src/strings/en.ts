@@ -36,7 +36,8 @@ export const en: Strings = {
   titleNotFound: "Page not found",
   pageOpening: "Opening the page…",
   footerTagline: "From comments to a clearer picture.",
-  footerNote: "Some pages show illustrative, authored data, and say so plainly.",
+  footerNote:
+    "Some pages show illustrative, authored data, and say so plainly.",
   notFoundEyebrow: "This page is not available",
   notFoundTitle: "We could not find the page you were looking for.",
   notFoundLead: "Go back to the dashboard, or start from the home page.",
@@ -509,10 +510,10 @@ export const en: Strings = {
   dsUpdatedHours: (hours: string) =>
     `Last updated ${hours} ${pl(hours, "hour", "hours")} ago.`,
   dsFixtureBadge: "Illustrative data",
-  dsFixtureScope: "A demo workspace, not connected to any channel",
+  dsFixtureScope: "An illustrative workspace, not connected to any channel",
   dsFixtureReading: "Reading the test data.",
   dsFixtureCoverage: (total: string) =>
-    `${total} ${pl(total, "comment", "comments")} written for testing. They represent no real audience.`,
+    `${total} ${pl(total, "comment", "comments")} written to illustrate the product; they represent no real audience.`,
   dsReviewsPersist: "Corrections are saved.",
   dsReviewsSessionOnly:
     "Corrections stay in this session only and are not sent to any server.",
@@ -672,7 +673,7 @@ export const en: Strings = {
   chipPeriod: "a set period",
   noKnownDates: "No known dates",
   dashEyebrow: "Overview",
-  dashDemoTag: "demo preview",
+  dashDemoTag: "illustrative example",
   dashTitle: "What does your audience say — and where?",
   dashRead: (comments: string, videos: number) =>
     `${comments} ${pl(comments, "comment", "comments")} read across ${videos} ${pl(videos, "video", "videos")}, with who said them and when.`,

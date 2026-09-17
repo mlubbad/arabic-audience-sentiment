@@ -1425,3 +1425,10 @@ other step passed run individually: lint, typecheck, `check:functions`, unit (62
 the one `noSyntheticWords` failure this task caused and then fixed), `test:db`, `worker:test`,
 build, `check:secrets`. The next session touching those three files should run
 `npx prettier --write` on them.
+
+2026-09-17, closing the demo-data plan: the last three sentences from the placeholder family
+followed — the overview eyebrow «معاينة تجريبية» is «مثال توضيحي», the provenance strip says
+«مساحة عمل توضيحية» and «N تعليقًا مؤلَّفًا للتوضيح، لا يمثل جمهورًا حقيقيًا» (English twins
+likewise); one unit assertion and one browser assertion that quoted the old words follow.
+Three files left unformatted by an earlier task reflowed. `npm run check` green (unit 96/626,
+db 310, worker 195, build, secrets); dashboard + demo + landing browser suites 85/85.

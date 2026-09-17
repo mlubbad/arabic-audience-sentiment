@@ -68,9 +68,10 @@ function assertClean(files: string[], label: string) {
     .map((f) => ({ f, hit: readFileSync(f, "utf8").includes(WORD) }))
     .filter((r) => r.hit)
     .map((r) => relative(repoRoot, r.f));
-  expect(offenders, `${label} contains «${WORD}»: ${offenders.join(", ")}`).toEqual(
-    [],
-  );
+  expect(
+    offenders,
+    `${label} contains «${WORD}»: ${offenders.join(", ")}`,
+  ).toEqual([]);
 }
 
 describe("no reader- or test-facing text uses «اصطناع» any more", () => {

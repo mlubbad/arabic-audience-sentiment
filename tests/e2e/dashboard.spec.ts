@@ -54,7 +54,7 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
   // Fixture mode must say plainly that a correction goes nowhere.
   await expect(page.getByTestId("data-mode")).toContainText("لا تُرسل");
   // And it must not claim a collection that never happened.
-  await expect(source).toContainText("لا يمثل أي جمهور حقيقي");
+  await expect(source).toContainText("لا يمثل جمهورًا حقيقيًا");
   await page
     .getByLabel("البحث في التعليقات والمؤلفين")
     .fill("غير موجود نهائياً");

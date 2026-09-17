@@ -301,8 +301,7 @@ export const ar = {
   accountUnavailableLead:
     "يلزم عنوان مشروع تطوير ومفتاح نشر عام لتفعيل الحساب. لا تُستخدم بيانات الاختبار كجلسة دخول.",
   accountTryDashboardTitle: "ابدأ من تجربة اللوحة",
-  accountTryDashboardLead:
-    "يمكنك استكشاف الواجهة ببيانات توضيحية مؤلَّفة.",
+  accountTryDashboardLead: "يمكنك استكشاف الواجهة ببيانات توضيحية مؤلَّفة.",
   createWorkspaceFailed: "تعذر إنشاء مساحة العمل",
   createWorkspaceListFailed: "تم الإنشاء وتعذر تحديث القائمة",
   createWorkspaceDone: "تم إنشاء مساحة العمل",
@@ -512,10 +511,10 @@ export const ar = {
   dsUpdatedUnderHour: "آخر تحديث قبل أقل من ساعة.",
   dsUpdatedHours: (hours: string) => `آخر تحديث قبل ${hours} ساعة.`,
   dsFixtureBadge: "بيانات توضيحية",
-  dsFixtureScope: "مساحة عمل تجريبية، غير مرتبطة بأي قناة",
+  dsFixtureScope: "مساحة عمل توضيحية، غير مرتبطة بأي قناة",
   dsFixtureReading: "جارٍ قراءة بيانات الاختبار.",
   dsFixtureCoverage: (total: string) =>
-    `${total} تعليقًا مؤلَّفًا للاختبار. لا يمثل أي جمهور حقيقي.`,
+    `${total} تعليقًا مؤلَّفًا للتوضيح، لا يمثل جمهورًا حقيقيًا.`,
   dsReviewsPersist: "التصحيحات تُحفظ.",
   dsReviewsSessionOnly:
     "التصحيحات تبقى في هذه الجلسة فقط ولا تُرسل إلى أي خادم.",
@@ -671,7 +670,7 @@ export const ar = {
   chipPeriod: "فترة محدَّدة",
   noKnownDates: "لا توجد تواريخ معروفة",
   dashEyebrow: "نظرة عامة",
-  dashDemoTag: "معاينة تجريبية",
+  dashDemoTag: "مثال توضيحي",
   dashTitle: "ماذا يقول جمهورك — وأين يقوله؟",
   dashRead: (comments: string, videos: number) =>
     `قراءة ${comments} تعليقًا عبر ${videos} فيديو، مع من قالها ومتى.`,
