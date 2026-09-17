@@ -694,3 +694,54 @@ reasonable cost for removing a request, not a regression to chase on a synthetic
 `vite preview`. The measurement that actually answers the budget question is Lighthouse
 against the deployed host, which this task cannot run; recorded PENDING in
 `docs/coordination/ACTIVE.md` rather than closed here.
+
+## 2026-09-17 — the landing's final review: corrections and clauses to the entry above
+
+**Correction: the 650px block in `pricing.css` was live, not dead.** The entry above (and
+the same day's progress note) recorded `@media (max-width: 650px) { .pricing-page .lp-nav
+{ display: flex } .pricing-page .lp-header-cta { display: inline-block } }` as a dead
+override, deferred to the pricing-body redesign. It was not dead: `.pricing-page .lp-nav`
+and `.pricing-page .lp-header-cta` are (0,2,0), the same specificity as `public.css`'s
+`.landing .lp-nav` and `.lp-header .lp-header-cta` hides, and the pricing stylesheet comes
+later in the bundle — so on a phone the pricing header showed the inline links, the account
+CTA and the sheet's menu button all at once, the one arrangement the sheet exists to
+prevent. The block is deleted. The pricing page's header is the landing's header,
+everywhere; a page that wants its own must say so with a class the shell reads, not by
+out-ordering the shell's stylesheet.
+
+**The two stylesheets a lazy page needs go in the entry.** `PricingPage` and `LegalPage`
+are `lazy()` — the right shape, a visitor on the landing has no use for either — but a
+stylesheet imported from a lazy page travels with its chunk, and a prerendered page has
+painted long before a low-priority chunk lands. So `main.tsx` imports `pricing.css` and
+`legal.css` eagerly, after the landing's, and `scripts/prerender.mjs` fails the build if
+the stylesheet a pricing or legal page links stops carrying that page's rules. The
+alternative — un-lazying the pages — would ship the catalogue reader and the legal texts
+to every visitor to fix a problem that is only about CSS.
+
+**The landing's type sizes hang off `.lp-page`, not `.landing`.** Three pages wear
+`.landing` for the shared chrome; a `.landing h1` size in any one of their stylesheets is a
+rule for all three. `public.css` keeps what is genuinely shared — margin, weight, and
+`.landing:lang(ar) h1, h2 { letter-spacing: 0 }`, because joined letters need their zero
+on every page — and the landing's sizes and Latin tracking are `.lp-page h1`/`h2` in
+`landing/landing.css`, reached only through the class `Landing.tsx` passes to the shell.
+The old `:lang(en) .lp-eyebrow { text-transform: uppercase; letter-spacing: 0.08em }` is
+not restored: the eyebrow is a `ui/Badge` now and takes the badge's own case and tracking,
+the same as everywhere else in the product.
+
+**`vite preview` answers like the host, or the build guard measures the wrong page.** The
+preview server probes no extensions and falls back to `index.html`, which on this site is
+the prerendered landing — so `/pricing` returned the landing's markup, and a JavaScript-off
+test that checked the pricing page's grid "where present" passed against the wrong page.
+`vite.config.ts` gives the preview server `public/.htaccess`'s two rewrites, preview only.
+A guard whose fixture differs from production in the very thing it guards is a guard in
+name only; the middleware is twelve lines and the alternative was a second static server.
+
+**Clause to the badge-ink decision above:** the darkened `color-mix(in srgb,
+var(--sentiment-*) 90%, black)` ink is written in `ui.css` on the tone itself, so it
+repaints every `Badge tone="positive" | "negative" | "sentiment-mixed" |
+"sentiment-neutral"` anywhere in the product, not the landing alone. Today the only
+caller is the landing's `ProductWindow`; the dashboard still draws its verdicts with its
+own `report.css` rules, and the day it adopts `ui/Badge` for them it inherits this ink
+without a decision of its own. That is the intent of a
+primitive-level fix, and it is recorded here because the entry above read as if the change
+were scoped to the landing.

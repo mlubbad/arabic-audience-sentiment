@@ -1068,3 +1068,71 @@ admin flash banner, because nothing on the public landing shows one.
 secrets (521 source files plus built assets) — all green, 2026-09-17.
 `docs/verification.md`'s dated entry for this work is deferred: that file carries a
 concurrent session's uncommitted changes and was left untouched.
+
+## 2026-09-17 — landing redesign, final-review fix wave
+
+Fourteen findings from a whole-branch review that served the built `apps/web/dist` and
+probed it with Playwright, JavaScript on and off. The code in `5131a66`, the build guard in
+`074431a`, these records in the commit after. Brief and report in
+`.superpowers/sdd/2026-09-17-landing-redesign/final-fix-{brief,report}.md`.
+
+**The critical one: `/pricing`, `/privacy-policy` and `/terms` painted unstyled, then
+reflowed.** Both pages are `lazy()` routes, and both imported their own stylesheet — so Vite
+emitted `pricing.css` and `legal.css` with the lazy chunks, and the prerendered HTML linked
+only the entry's CSS. Before the branch the two pages imported the eager old `landing.css`
+and never noticed. Now `main.tsx` imports both stylesheets after the landing's (the page
+files no longer import them, with a comment saying where they went), and
+`scripts/prerender.mjs` reads the stylesheets each written page links and fails the build
+unless the pricing page's carry `.pricing-card` and the legal pages' `.legal-contents` —
+tried with the imports removed: the build exits 1 on `/pricing`. While adding that guard:
+`written.push({ ...route, file, page })` had been spreading the HTML string over
+`route.page` (the kind), so every kind-specific check in the prerender — the home page's
+`FAQPage`, the pricing page's `offers`, embedded catalogue and cards — was a no-op. Fixed;
+all of them pass live now.
+
+**Type and face.** `/en` lost `.landing:lang(en) { font-family: var(--font-latin) }` in the
+move to `public.css` and set in the Arabic face, ignored the preloaded Readex files, then
+swapped (CLS 0.037); restored. `public.css`'s copied `.landing h2` size outranked the spec's
+`landing.css` rule by bundle order, and the landing's `h1`/`h2` element rules leaked onto the
+pricing and legal pages (the pricing H1 measured 66px, the landing hero's clamp). The sizes
+are now `.lp-page h1`/`.lp-page h2` (Landing passes `pageClassName="lp-page"`); `public.css`
+keeps only margin, weight and the Arabic `letter-spacing: 0`. Measured on the preview at
+1280: landing h2 43.52px / lh 58.75px on `/` and `/en`, pricing H1 51.2px (its own
+`clamp(34px, 4vw, 52px)`), legal `.legal` max-width 720px, `/en` H1 and body `"Readex Pro"`.
+
+**Correction to the 2026-09-17 "landing rebuilt" entry above:** the `@media (max-width:
+650px)` block in `pricing.css` (`.pricing-page .lp-nav { display: flex }` /
+`.lp-header-cta { display: inline-block }`) was recorded there as a *dead* override deferred
+to phase 5. It was live: same specificity as `public.css`'s hides and later in bundle order,
+so at ≤650px the pricing header showed the inline links, the account CTA and the sheet
+button together. Deleted; the pricing header now matches the landing's at 390px (one
+header, the sheet button alone — `shots/pricing-390-js.png`).
+
+**Smaller.** The sheet's same-section-twice pick did nothing (`location.hash = h` with the
+hash unchanged is a no-op) — it now calls `scrollIntoView` on the target in that case, with a
+unit test that spies on `HTMLElement.prototype.scrollIntoView` (where `vitest.setup.ts`
+supplies it; jsdom has none). Sheet links are `text-decoration: none` again (the dialog is
+portaled outside `.landing`). The demo's five filter tabs no longer carry `aria-controls`
+to ids that exist nowhere (`aria-controls={undefined}` on the trigger; Radix spreads user
+props last) — the Audience section's two tabs keep theirs, their panels exist. The
+Benefits section drops its `aria-label` (it was the first card's tag). The announcement
+band's language pill gets its `0.9rem` start margin back.
+
+**A Playwright project for the build.** `playwright.config.ts` now has two projects —
+`default` (everything but `public-build.spec.ts`) and `public-build` (that file alone, at
+`http://127.0.0.1:4175`) — and two `webServer` entries: the dev server as before, and
+`npm run build && vite preview --port 4175`. `tests/e2e/public-build.spec.ts` reads five
+addresses with JavaScript off (one `h1`, the page's own body class, `.pricing-cards`
+`display: grid`, `.legal`'s max-width read from `legal.css`, no visible box past either
+viewport edge) and, JavaScript on, the H1 face on `/en` and `/`. Getting that project to
+mean anything took one more fix: `vite preview` probes no extensions and answers
+`/pricing` with `index.html` — the prerendered *landing* — so a first draft that looked for
+`.pricing-cards` "where present" passed on the wrong page. `apps/web/vite.config.ts` gives
+the preview server `public/.htaccess`'s two rewrites (`<path>/index.html` for a
+prerendered address with or without its slash, `app.html` for anything that is not a file),
+and the spec names which page each address must be.
+
+Verification: `npx vitest run apps/web/src/{public,landing,ui}` 28 files / 81 tests; whole
+unit suite 85 files / 549 tests; typecheck, lint, format:check green; `npm run build` with
+the guard; `test:e2e` landing + pricing + legal + seo 15/15 on the dev server, `--project
+public-build` 6/6 on the preview.

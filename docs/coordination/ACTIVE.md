@@ -330,3 +330,14 @@ the deployed host, not a synthetic `vite preview` on this machine. Reasoning in 
 `docs/decisions.md`'s 2026-09-17 landing entry. Next action, the owner's to schedule: run
 Lighthouse (mobile + desktop) against the deployed landing after this work ships, the same
 way `docs/seo.md` §6 did for the previous redesign, and record the result there.
+
+2026-09-17, landing redesign final-review fix wave: claimed `apps/web/src/main.tsx`,
+`apps/web/src/{PricingPage,LegalPage}.tsx`, `apps/web/src/{pricing,legal}.css`,
+`apps/web/src/{public,landing}/**`, `apps/web/scripts/prerender.mjs`,
+`apps/web/vite.config.ts`, `playwright.config.ts`, `tests/e2e/public-build.spec.ts` —
+done, `5131a66` (code), `074431a` (build guard), and the records commit after them. The other session's
+uncommitted `docs/verification.md` and untracked `.screenshots/` were not touched, staged or
+stashed. Note for whoever runs the browser suite next: `playwright.config.ts` now starts two
+servers, and the second one is `npm run build` — every `npm run test:e2e` builds first, and
+it builds into `apps/web/dist` in the suite's fixture mode (empty Supabase URL). Run `npm run
+build` again before `deploy:preview`, or the preview host gets a fixture build.
