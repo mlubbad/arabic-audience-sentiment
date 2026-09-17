@@ -57,6 +57,10 @@ export function Videos({
       </header>
       <div className="db-videos">
         {slice.items.map((v) => {
+          // Denominator: `total`, not `analysed` — this card prints no
+          // percentages beside the bar, so its muted remainder is itself
+          // the "unanalysed" statement (contrast `Compare.tsx`'s cell,
+          // which prints shares and so must share their `analysed` base).
           // Only the segments that hold something, each sized to its share
           // of `total` — a video with no mixed comments does not draw a
           // sliver of one, and one only half analysed draws half a bar.

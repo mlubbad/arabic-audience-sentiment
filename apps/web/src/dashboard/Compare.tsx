@@ -8,13 +8,19 @@
  * a comparison a reader wants to drill into is a filter change like any
  * other, not a second selection mechanism.
  *
- * The split bar's segment widths are the share of each video's TOTAL
- * comments (`splitBar.ts`, lifted from `Videos.tsx`), never of `analysed` —
- * but the exact per-class counts and percentages in the `<ul className="share">`
- * list beside it stay computed against `analysed`, unchanged: that list
- * answers "of what was analysed, how much was each label", which is a
- * different question from the bar's "how much of the video is this slice",
- * and only the second one was ever wrong.
+ * Within this column's cell, the bar and the `<ul className="share">` list
+ * beside it share one denominator: `analysed`. This column reports the
+ * distribution *among analysed rows* — "of what was analysed, how much was
+ * each label" — so a bar drawn against `total` here would show a narrower
+ * slice than the percentages printed right next to it for the same video,
+ * which is the one thing a bar-plus-figures pairing must never do. (Fix
+ * round 1: an earlier version of this file drew the bar against `total`,
+ * copying `Videos.tsx`'s rule into a cell that prints against a different
+ * denominator — the two disagreed for any partly analysed video.)
+ * `Videos.tsx` keeps `total` for its own bar: it prints no percentages
+ * beside it, and the muted remainder of that bar *is* its statement about
+ * what is unanalysed, which this column already makes in words via
+ * `S.colAnalysed`'s own value.
  */
 import type { Label } from "@sentiment/contracts";
 import {
@@ -46,12 +52,19 @@ function Distribution({
   S: Strings;
 }) {
   if (v.analysed === 0) return <small>{S.noAnalysedInFilters}</small>;
-  const segments = splitSegments(v.sentiments, v.total);
+  // Denominator: `analysed`, not `total` — this cell's bar and its printed
+  // shares must agree, and the shares beside it are already a share of what
+  // was analysed.
+  const segments = splitSegments(v.sentiments, v.analysed);
+  // Spoken form matches the printed form exactly: same labels, same counts,
+  // same rounded percentage — built from `seg.pct`, which is already
+  // `count / analysed * 100`, not recomputed against a different base.
+  const shareLabel = segments
+    .map((seg) => S.shareItem(labels[seg.key], seg.count, Math.round(seg.pct)))
+    .join("، ");
   return (
     <div className="db-compare-distribution">
-      {/* Decorative: the list right below carries the same information as
-          text, so the bar is not announced a second time. */}
-      <span className="ui-split" aria-hidden="true">
+      <span className="ui-split" role="img" aria-label={shareLabel}>
         {segments.map((seg) => (
           <i
             key={seg.key}
