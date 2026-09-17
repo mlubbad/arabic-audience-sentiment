@@ -1,0 +1,59 @@
+/* Most-engaged negative comments: one Card row per comment, on an <ol> so
+   each row keeps its own `role="listitem"`. */
+.db-engaged {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-engaged-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+.db-engaged-count {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+}
+.db-engaged-unit {
+  font-size: var(--fs-micro);
+  color: var(--text-3);
+}
+.db-engaged-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.db-engaged-text {
+  display: block;
+  font-size: var(--fs-small);
+  line-height: 1.8;
+  color: var(--text-1);
+}
+.db-engaged-bar {
+  display: block;
+  block-size: 3px;
+  margin-top: var(--space-2);
+  border-radius: 999px;
+  background: var(--sentiment-negative);
+  opacity: 0.5;
+}
+.db-engaged small {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: var(--fs-micro);
+  color: var(--text-3);
+}
+@media (max-width: 480px) {
+  .db-engaged-row {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .db-engaged-count {
+    min-width: 0;
+  }
+}

@@ -38,7 +38,7 @@ import { useSession, useWorkspaces } from "../session";
 import { useWorkspaceSelection } from "../workspaceSelection";
 import { WorkspaceGate } from "../WorkspaceGate";
 import { workspaceState, readableWorkspace } from "../workspace";
-import { videoLabel, displayDate, commentText } from "../i18n";
+import { displayDate, commentText } from "../i18n";
 import { useLocale } from "../locale";
 import { useStrings } from "../strings";
 import { reviewHistory } from "../reviewHistory";
@@ -46,7 +46,6 @@ import { describeSource } from "../dataSource";
 import { useChannelStatus } from "../channelStatus";
 import { latestJobFromSync, setupProgress } from "../setup";
 import { SetupPath } from "../SetupPath";
-import { SENTIMENT } from "../chartTheme";
 import { n } from "./format";
 import { FilterBar } from "./FilterBar";
 import { ActiveFilters } from "./ActiveFilters";
@@ -57,6 +56,9 @@ import { Summary } from "./Summary";
 import { Videos } from "./Videos";
 import { Voice } from "./Voice";
 import { Timing } from "./Timing";
+import { People } from "./People";
+import { Compare } from "./Compare";
+import { Engaged } from "./Engaged";
 import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
 import {
   chipsFor,
@@ -602,6 +604,20 @@ function DashboardBody({
       .getElementById("rp-videos")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+  // Selecting a video is a filter change like any other, so it goes through
+  // the same apply path — which resets paging and builds the filters from
+  // one definition rather than a second one here. Shared by `Videos`' cards
+  // and `Compare`'s rows, which both offer the same "filter to this one"
+  // action on the same underlying id.
+  //
+  // `next` is computed rather than relied upon from `video` after the
+  // state setter: `setVideo` has not landed yet when `applyFilters` runs,
+  // so reading `video` there would apply the previous selection.
+  function pickVideo(id: string) {
+    const next = video === id ? "" : id;
+    setVideo(next);
+    applyFilters({ video: next });
+  }
   const cards = useMemo(() => {
     const list = [...rows];
     if (cardTab === "critical")
@@ -742,19 +758,7 @@ function DashboardBody({
                 slice={videoSlice}
                 video={video}
                 onTurn={turnVideoPage}
-                onPick={(id) => {
-                  // Selecting a video is a filter change like any other, so
-                  // it goes through the same apply path — which resets
-                  // paging and builds the filters from one definition rather
-                  // than a second one here.
-                  //
-                  // `next` is passed rather than relied upon from state:
-                  // setVideo has not landed yet when this runs, so reading
-                  // `video` would apply the previous selection.
-                  const next = video === id ? "" : id;
-                  setVideo(next);
-                  applyFilters({ video: next });
-                }}
+                onPick={pickVideo}
               />
               <Voice s={s} S={S} labels={labels} topicName={topicName} />
               <Timing
@@ -764,218 +768,9 @@ function DashboardBody({
                 weekdays={weekdays}
                 weeks={weeks}
               />
-              <section className="rp-section" id="rp-people">
-                <header>
-                  <h2>{S.secPeople}</h2>
-                  <p className="rp-sub">{S.peopleLead}</p>
-                </header>
-                <article className="rp-card">
-                  <div className="rp-tabs" style={{ marginBottom: "16px" }}>
-                    <button
-                      type="button"
-                      className="rp-tab"
-                      aria-pressed={peopleBy === "comments"}
-                      onClick={() => setPeopleBy("comments")}
-                    >
-                      {S.mostActive}
-                    </button>
-                    <button
-                      type="button"
-                      className="rp-tab"
-                      aria-pressed={peopleBy === "likes"}
-                      onClick={() => setPeopleBy("likes")}
-                    >
-                      {S.mostInfluential}
-                    </button>
-                  </div>
-                  {people.ranked.length === 0 ? (
-                    <p className="rp-missing">
-                      <strong>{S.noCommenterStrong}</strong>
-                      {S.noCommenterLead}
-                    </p>
-                  ) : (
-                    <ol className="rp-people">
-                      {people.ranked.slice(0, 20).map((c, i) => (
-                        <li
-                          key={c.key}
-                          className="rp-person"
-                          data-testid={`rp-person-${i}`}
-                        >
-                          <span className="rp-rank">{i + 1}</span>
-                          <span className="rp-person-name">{c.name}</span>
-                          <span className="rp-person-n">
-                            {S.countComments(n(c.comments))}
-                          </span>
-                          <span className="rp-person-likes">
-                            {/* Unknown stays unknown: a source that showed no
-                                count is not a source that showed zero. */}
-                            {c.likes === null
-                              ? S.likesUnknown
-                              : S.countLikes(n(c.likes))}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                  {people.anonymous > 0 && (
-                    <p className="rp-metric-note" data-testid="rp-anonymous">
-                      {S.anonymousNote(n(people.anonymous))}
-                    </p>
-                  )}
-                </article>
-              </section>
-              <section
-                className="rp-section"
-                id="rp-compare"
-                aria-labelledby="comparison-heading"
-              >
-                <header>
-                  <h2 id="comparison-heading">{S.compareTitle}</h2>
-                </header>
-                <p className="muted" data-testid="comparison-scope">
-                  {S.compareScope}
-                </p>
-                {s.comparison_truncated && (
-                  <p className="muted">{S.compareTruncated}</p>
-                )}
-                <div className="table-wrap">
-                  <table>
-                    <caption>{S.compareCaption}</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">{S.colVideo}</th>
-                        <th scope="col">{S.colComments}</th>
-                        <th scope="col">{S.colReplies}</th>
-                        <th scope="col">{S.colAnalysed}</th>
-                        <th scope="col">{S.colDistribution}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {s.comparison.map((v) => (
-                        <tr key={v.id} data-testid={`compare-${v.id}`}>
-                          <td>{videoLabel(v.id, v.title, S)}</td>
-                          <td>{v.total}</td>
-                          <td>{v.replies}</td>
-                          <td>{v.analysed}</td>
-                          <td>
-                            {v.analysed === 0 ? (
-                              <small>{S.noAnalysedInFilters}</small>
-                            ) : (
-                              <>
-                                {/* A comparison table whose comparison column
-                                    is a run-on sentence compares nothing: the
-                                    reader parses four numbers per row and holds
-                                    them against four more. The bar is read
-                                    across rows at a glance; the list under it
-                                    keeps the exact figures, because a bar is an
-                                    impression and this page promises counts. */}
-                                <span
-                                  className="rp-bar rp-bar-inline"
-                                  aria-hidden="true"
-                                >
-                                  {(
-                                    Object.entries(v.sentiments) as [
-                                      Label,
-                                      number,
-                                    ][]
-                                  )
-                                    .filter(([, count]) => count > 0)
-                                    .map(([k, count]) => (
-                                      <span
-                                        key={k}
-                                        style={{
-                                          width: `${(count / v.analysed) * 100}%`,
-                                          background: SENTIMENT[k],
-                                        }}
-                                      />
-                                    ))}
-                                </span>
-                                <ul className="share">
-                                  {Object.entries(v.sentiments).map(
-                                    ([k, n]) => (
-                                      <li key={k}>
-                                        {S.shareItem(
-                                          labels[k as Label],
-                                          n,
-                                          Math.round((n / v.analysed) * 100),
-                                        )}
-                                      </li>
-                                    ),
-                                  )}
-                                </ul>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-              <section
-                className="rp-section"
-                id="rp-engaged"
-                aria-labelledby="engaged-heading"
-                data-testid="engaged-panel"
-              >
-                <header>
-                  <h2 id="engaged-heading">{S.engagedTitle}</h2>
-                </header>
-                <p className="muted">{S.engagedLead}</p>
-                {s.most_engaged_negative.length === 0 ? (
-                  <p data-testid="engaged-empty">{S.engagedEmpty}</p>
-                ) : (
-                  /* A heading promising a ranking, over a run of sentences
-                     that began with a number. Ranked things want a rank: the
-                     count is the mark, the text is the row, and the bar under
-                     each is that row's share of the top one — which is the
-                     only reason to order them in the first place. */
-                  <ol className="engaged">
-                    {s.most_engaged_negative.map((c) => {
-                      const top = s.most_engaged_negative[0].likes_value ?? 0;
-                      const likes = c.likes_value ?? 0;
-                      return (
-                        <li key={c.id} data-testid={`engaged-${c.id}`}>
-                          <span className="engaged-count">
-                            <strong>{c.likes_raw ?? c.likes_value}</strong>
-                            <span>{S.unitLikes}</span>
-                          </span>
-                          <span className="engaged-body">
-                            <span className="engaged-text">
-                              {commentText(c, S)}
-                            </span>
-                            {c.reviewed && <small>{S.humanReview}</small>}
-                            <span
-                              className="engaged-bar"
-                              aria-hidden="true"
-                              style={{
-                                // Relative to the most-liked row, not to the
-                                // page: these five are the top of a longer
-                                // list, and a bar drawn against a total the
-                                // reader cannot see measures nothing.
-                                inlineSize: `${top > 0 ? Math.max((likes / top) * 100, 2) : 0}%`,
-                              }}
-                            />
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
-                {s.negative_ranked > s.most_engaged_negative.length && (
-                  <p className="muted" data-testid="engaged-truncated">
-                    {S.engagedTruncated(
-                      s.most_engaged_negative.length,
-                      s.negative_ranked,
-                    )}
-                  </p>
-                )}
-                {s.negative_unranked > 0 && (
-                  <p className="muted" data-testid="engaged-unranked">
-                    {S.engagedUnranked(s.negative_unranked)}
-                  </p>
-                )}
-              </section>
+              <People S={S} people={people} by={peopleBy} onBy={setPeopleBy} />
+              <Compare s={s} S={S} labels={labels} onPick={pickVideo} />
+              <Engaged s={s} S={S} />
               <section
                 className="rp-section"
                 id="rp-comments"

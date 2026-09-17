@@ -1,0 +1,61 @@
+/* Commenters, ranked by volume or reach — one Card row per person on an
+   <ol>, the sort switched by the tabs above it. */
+.db-people-tabs {
+  margin-bottom: var(--space-4);
+}
+.db-ranked {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.db-person {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  gap: var(--space-3);
+  align-items: center;
+}
+.db-rank {
+  color: var(--text-3);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+}
+.db-person-name {
+  font-weight: 600;
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.db-person-likes {
+  color: var(--text-3);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  min-width: 72px;
+  text-align: end;
+}
+.db-missing {
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-2);
+  background: var(--bg-muted);
+  padding: var(--space-5);
+  color: var(--text-3);
+  font-size: var(--fs-small);
+  line-height: 1.9;
+  max-width: 62ch;
+}
+.db-missing strong {
+  display: block;
+  color: var(--text-2);
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-body);
+}
+@media (max-width: 480px) {
+  .db-person {
+    grid-template-columns: 20px 1fr auto;
+  }
+  .db-person-likes {
+    grid-column: 2 / -1;
+    text-align: start;
+  }
+}

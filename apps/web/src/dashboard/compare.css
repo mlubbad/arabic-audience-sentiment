@@ -1,0 +1,38 @@
+/* Video comparison: `ui/Table` on wide screens, stacked `Card`+`dl` at
+   phone width — the two are different markup, not the same markup
+   reflowed, so they are switched by `useMediaQuery` rather than a media
+   query alone. */
+.db-compare-pick {
+  justify-content: flex-start;
+  padding-inline: var(--space-2);
+  text-align: start;
+  white-space: normal;
+  font-weight: 600;
+}
+.db-compare-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-compare-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-3) 0 0;
+  align-items: start;
+}
+.db-compare-dl > div {
+  display: contents;
+}
+.db-compare-dl dt {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.db-compare-dl dd {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-1);
+}
+.db-compare-distribution .ui-split {
+  margin-bottom: var(--space-2);
+}

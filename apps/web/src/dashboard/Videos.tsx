@@ -20,7 +20,6 @@
  * carried only by the visible counts beside it), so this is a new,
  * accurate one built entirely from strings that already exist.
  */
-import type { Label } from "@sentiment/contracts";
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -29,14 +28,8 @@ import type { Snapshot } from "./Dashboard";
 import type { PageSlice } from "../videoPaging";
 import { videoLabel } from "../i18n";
 import { n } from "./format";
+import { splitAriaLabel, splitSegments } from "./splitBar";
 import "./videos.css";
-
-const SENTIMENT_CLASSES: readonly Label[] = [
-  "positive",
-  "negative",
-  "neutral",
-  "mixed",
-];
 
 export function Videos({
   s,
@@ -64,33 +57,15 @@ export function Videos({
       </header>
       <div className="db-videos">
         {slice.items.map((v) => {
-          const pct = (x: number) => (v.total ? (x / v.total) * 100 : 0);
-          // Only the segments that hold something — the same rule the
-          // inline bar used, so a video with no mixed comments does not
-          // draw a sliver of one.
-          const segments = SENTIMENT_CLASSES.map((k) => ({
-            key: k,
-            count: v.sentiments[k],
-            pct: pct(v.sentiments[k]),
-          })).filter((seg) => seg.count > 0);
+          // Only the segments that hold something, each sized to its share
+          // of `total` — a video with no mixed comments does not draw a
+          // sliver of one, and one only half analysed draws half a bar.
+          const segments = splitSegments(v.sentiments, v.total);
           // No segments is not "no bar": the container's own muted
           // background is the true state for a video with nothing analysed
           // yet, and the same string the comparison table already uses for
           // that case names it.
-          const splitLabel =
-            segments.length > 0
-              ? segments
-                  .map((seg) =>
-                    s.measurable.has(seg.key)
-                      ? S.legendMeasured(
-                          labels[seg.key],
-                          n(seg.count),
-                          Math.round(seg.pct),
-                        )
-                      : S.legendUnmeasured(labels[seg.key]),
-                  )
-                  .join("، ")
-              : S.noAnalysedInFilters;
+          const splitLabel = splitAriaLabel(segments, s.measurable, labels, S);
           return (
             <Card
               key={v.id}
