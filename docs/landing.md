@@ -42,3 +42,11 @@ separate piece of art. The alt sentence that used to describe
 visually-hidden `<figcaption>`, describing `ProductWindow` instead. The PNG and WebP stay
 on disk exactly as before — unreferenced by the page, kept as provenance for the palette
 and composition and as the source of `og-audience-sentiment.jpg`, the share-card image.
+
+## 2026-09-17 — the demo section's four comments are now dialectal
+
+`apps/web/src/landing/demoData.ts`'s four illustrative comments (`ProductWindow`'s demo,
+one per sentiment) are each written in a different spoken Arabic dialect (Gulf, Maghrebi/
+Algerian, Egyptian, Levantine) instead of four generic sentences — the same authenticity pass
+covered by `docs/decisions.md`'s 2026-09-17 demo-data entry and `docs/progress.md`'s matching
+entry, which also rewrote the visitor dashboard's fixture the same way.

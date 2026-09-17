@@ -1351,3 +1351,77 @@ matching every printed percentage on the page (`legendMeasured` always speaks a 
 apps/web/src/dashboard apps/web/src/ui` 30 files / 114 tests, `npm run typecheck`, `npm run
 lint`, `npm run format:check`, and `npm run test:e2e -- tests/e2e/dashboard.spec.ts
 tests/e2e/app-shell.spec.ts` 86/86.
+
+## 2026-09-17 — the demo reads like a real channel, and the browser suite proves it
+
+Requested after the dashboard rebuild: no visitor-facing «بيانات اصطناعية» / «مؤلف اصطناعي 1» /
+«فيديو اصطناعي ١» anywhere. Four tasks (`docs/superpowers/sdd/2026-09-17-demo-data/`):
+
+**One content module, one generator, two fixtures.** `apps/web/scripts/demo-content.mjs`
+authors a channel («عالم التقنية مع سالم»), its 6 videos, its commenters and its 44 comments —
+in Gulf, Maghrebi, Egyptian, Levantine, Iraqi and Sudanese dialects, plain data with a dialect
+tag per row — as the single source of truth. `apps/web/scripts/make-demo-fixture.mjs`
+(`npm run demo:fixture`) builds both fixtures from it, so hashes, ids and timestamps stay
+consistent and an edit is a content edit, not JSON surgery: `apps/web/public/fixtures/
+dashboard.json`, the **demo** a visitor's browser reads by default (44 comments, 1 of them the
+channel's own reply — excluded from the summary's denominator like every channel-owner row
+always was — 6 videos, ~12 replies, 2 unanalysed rows, 1 stale-hash row, 2 rows with an unknown
+date or likes count, topic predictions and a handful of human reviews); and
+`apps/web/public/fixtures/e2e-dashboard.json`, the existing 7-row **test kernel** re-skinned
+with new human-visible strings only — same ids, counts, likes, dates, flags, reply/owner
+structure, comment types and topics, so the 76+ existing `dashboard.spec.ts` assertions kept
+their exact arithmetic through the words changing under them (commit `97ed318`). `data.ts`
+reads the fixture path from `VITE_FIXTURE_DASHBOARD ?? "/fixtures/dashboard.json"`;
+`playwright.config.ts` points both its web servers at the e2e kernel, so every existing spec
+keeps reading it untouched and only a visitor's real browser (or a test that deliberately
+intercepts the path) ever sees the demo.
+
+**Words.** The provenance badge and the six prose strings that named the fixture now say
+«بيانات توضيحية» / "illustrative data" — never «اصطناعي» — and the retired word is gone from
+`apps/web/src/**` (excluding `legal/`, out of scope), both fixture JSON files, and every
+`tests/e2e/*.ts` spec, enforced by a new repo-wide scan,
+`apps/web/src/noSyntheticWords.test.ts`. The landing's four demo comments
+(`apps/web/src/landing/demoData.ts`) are now one authored line per dialect (Gulf, Maghrebi/
+Algerian, Egyptian, Levantine) instead of four generic sentences — see `docs/landing.md`.
+
+**The demo smoke test.** `tests/e2e/demo.spec.ts` (new, 2 tests) stays in the suite's default
+project — sharing the same dev server as every other spec — but intercepts
+`**/fixtures/e2e-dashboard.json` and answers it with `/fixtures/dashboard.json` instead (a
+`route.fetch({ url })` + `route.fulfill({ response })` pair, the same technique
+`dashboard.spec.ts` already uses to rewrite a fixture in flight, aimed at a different file).
+It is the only spec in the suite that reads the demo fixture rather than the kernel. It pins:
+the hero's «قراءة 43 تعليقًا» and `getByTestId("total")` = "43" (44 authored comments minus the
+excluded owner reply, read off the running page rather than assumed), 6 cards under
+`#rp-videos`, the «بيانات توضيحية» badge, no «اصطناع» anywhere in `body` text (written across
+two concatenated string literals so the assertion itself does not trip the new repo-wide scan,
+which treats `tests/e2e/*.ts` as reader-facing rather than exempting it the way `*.test.ts`
+files are), no horizontal overflow at 390, and — widening the page to 50 rows so nothing is
+hidden behind pagination — one visible comment from each of three dialect groups: Moroccan
+(«واش كاين فرق كبير بين 17 برو و16 برو فالكاميرا ولا غير التسويق؟»), Iraqi («عاشت ايدك، هاي أول
+مرة أشوف شرح مختصر ومفيد بنفس الوقت»), Egyptian («السعر ده مبالغ فيه جدًا، مفيش حاجة جديدة
+تستاهل الفرق كله»). `npm run test:e2e -- tests/e2e/demo.spec.ts`: 2/2.
+
+**Screenshots.** `npm run dev -w @sentiment/web -- --port 5175 --strictPort`, no
+`VITE_FIXTURE_DASHBOARD` set so the default path serves the demo, full-page captures at 1280
+and 390 saved to `.superpowers/sdd/2026-09-17-demo-data/shots/`. Inspected in crops: the hero,
+badge and summary tiles read cleanly (43/40/3/3/30, «بيانات توضيحية» in an orange warning
+badge); the two video cards visible above the fold carry real-looking titles («مراجعة آيفون 17
+برو بعد شهر من الاستخدام», «أفضل 5 تطبيقات مجانية لتنظيم وقتك») with plausible per-card counts;
+the comments table shows realistic Arab names and handles across countries (نورة القحطاني,
+@abu_faisal, يوسف بن عمر, @khadija.tn, @omar.dz, @3li_iq, @karim_casablanca, @rashid_om — the
+handle suffixes doubling as a country cue) and all three pinned dialect lines render correctly,
+including an inline 😂 emoji inside RTL text with no garbling. The 390 capture wraps every card
+and table row within the viewport with no overflow, on the full 22.8k-px page.
+
+**Deferred:** `docs/verification.md` — `git status --short docs/verification.md` was non-empty
+(another session's in-flight edit) at the start of this task and remains so; its dated entry
+for this work is deferred, not skipped, per the standing rule in `docs/coordination/ACTIVE.md`.
+**Also noted, not fixed:** `npm run check` stops at `format:check` on three files this task did
+not write and that carry no uncommitted changes — `apps/web/src/noSyntheticWords.test.ts`,
+`apps/web/src/strings/ar.ts`, `apps/web/src/strings/en.ts` (one line each, e.g. `ar.ts`'s
+`accountTryDashboardLead` wraps to two lines under the current Prettier where the committed
+version is one) — pre-existing drift from an earlier task's commit, not introduced here. Every
+other step passed run individually: lint, typecheck, `check:functions`, unit (626 tests, only
+the one `noSyntheticWords` failure this task caused and then fixed), `test:db`, `worker:test`,
+build, `check:secrets`. The next session touching those three files should run
+`npx prettier --write` on them.

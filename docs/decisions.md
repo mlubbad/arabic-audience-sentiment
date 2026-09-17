@@ -822,3 +822,78 @@ against the token's own definition in `brand.css`, so the two cannot silently dr
 without the test catching it — the closest a canvas-drawn colour can come to being "the same
 token" as the DOM's own rule, short of resolving it at runtime with `getComputedStyle`, which
 the shared options object (built once, outside any component) has no element to call it on.
+
+2026-09-17 — the demo data reads like a real channel (`docs/superpowers/sdd/2026-09-17-demo-data/`).
+
+**Two fixtures, not one re-skinned in place.** The existing 7-row `dashboard.json` was a
+deliberately-built **test kernel**: one unanalysed row, one whose text changed after analysis
+(stale hash), one with an unknown date and unknown likes, a reply, a channel-owner reply, two
+comment types — good test design, and load-bearing for 76+ `dashboard.spec.ts` assertions on
+its exact arithmetic. A visitor's demo needs the opposite shape: a real-looking channel at
+plausible scale (44 comments, 6 videos, several dialects), where "one row of each honesty
+state" would read as thin and repetitive rather than as a channel. Rather than compromise
+either shape to fit the other, the kernel stays exactly as it was — moved to
+`e2e-dashboard.json`, only its human-visible strings re-skinned — and a new `dashboard.json`
+is authored as the demo. `data.ts` picks between them by `VITE_FIXTURE_DASHBOARD`, which only
+`playwright.config.ts` ever sets, so the existing browser suite is unaffected by content it
+was never testing and a real visitor never sees test-kernel data.
+
+**One authored content module feeds both fixtures through one generator**
+(`apps/web/scripts/demo-content.mjs` → `make-demo-fixture.mjs`, `npm run demo:fixture`), rather
+than either fixture being hand-edited JSON. This is what keeps `content_hash`, ids, dates and
+the re-skin's structural fields (likes, flags, reply/owner structure, comment types, topics)
+consistent with each other by construction: a future wording change is a content-module edit
+regenerated through the same pipeline, not a second place that can drift from the first. A
+unit test asserts the committed JSON equals the generator's fresh output.
+
+**«توضيحية» (illustrative) replaces «اصطناعي» (synthetic/artificial) everywhere a reader or a
+spec sees it**, because the operator's complaint was specifically that the word reads as
+"fake" rather than "an example" — the fixture badge, the six prose strings, and the fixture's
+own `field_provenance.origin` ("authored illustrative demo data; not real commenters") all say
+what the data is (authored, for demonstration) without the connotation the retired word
+carried. The honesty property itself — that fixture mode is clearly marked as non-live and
+persists nothing — is unchanged; only the adjective describing it changed. A repo-wide scan,
+`apps/web/src/noSyntheticWords.test.ts`, keeps the retired word from creeping back through a
+new file or a copied sentence rather than trusting every future edit to remember the rule;
+`apps/web/src/legal/*` is excluded on purpose, since the legal text's own «بيانات اصطناعية
+موضّحة بوضوح» is out of this pass's scope.
+
+**Content rules for the authored comments** (`demo-content.mjs`'s docstring is the source of
+truth; recorded here so the rule is not only implicit in the data): every comment reads as
+something a real person would type under that video — dialect-consistent, spelled the way that
+dialect is actually written online, never two dialects mixed in one comment, transliterated
+English limited to what is genuinely common (آيفون، لابتوب، أبديت). Names and handles are
+realistic across the region and never a real public figure. No hate, politics or religion
+beyond a passing «ما شاء الله» / «الله يعطيك العافية» (which is why the `religious` topic
+exists at all), and no product claim presented as settled fact. Sentiment and topic labels are
+what a careful annotator would actually assign — mixed comments read as "good, but…", neutral
+ones as a genuine question or a flat statement — rather than picked to make the distribution
+look tidy. Likes and dates follow a plausible shape: bursts in the days after a video posts, a
+long tail of later stragglers, no comment liked more than its video's apparent reach would
+support.
+
+**The stale-hash row, the unanalysed rows and the unknown-date/likes rows are kept in the demo
+fixture on purpose, as honesty features rather than gaps to fill in.** A demo channel with a
+perfectly complete, perfectly current dataset would misrepresent what the product actually
+looks like on a real channel — some comments are always edited after being read, some rows are
+always missing a field the source never supplied, and the dashboard's whole "غير محلل / قديم" /
+"لا تاريخ معروف" vocabulary exists to say so plainly rather than hide it. Removing those rows
+from the demo to make the numbers rounder would make the demo a worse rehearsal for the real
+product than the seven-row test kernel it replaced. `docs/superpowers/sdd/2026-09-17-demo-data/
+task-1-report.md` records the exact counts this produced: 2 rows unanalysed (excluding the
+channel-owner reply, which is null for the unrelated reason that owner rows are never
+analysed), 1 stale-hash row, 1 row with an unknown `published_at`, 1 further row with an
+unknown `likes_value` only.
+
+**The demo smoke test intercepts the fixture path rather than running its own dev server.**
+`playwright.config.ts`'s shared server sets `VITE_FIXTURE_DASHBOARD` server-wide, so there is
+no environment variable `tests/e2e/demo.spec.ts` alone could set per-test. Rather than stand up
+a second `webServer` entry with its own port and env (`playwright.config.ts`'s own comment
+already warns that an orphaned server from another worktree makes a lane silently test the
+wrong build), the test answers every request for the e2e path with the demo fixture instead —
+the same `page.route` + `route.fetch({ url })` + `route.fulfill({ response })` shape
+`dashboard.spec.ts` already uses elsewhere to rewrite a fixture in flight, aimed at a sibling
+file on disk rather than at a mutated copy of the same one. This keeps the whole suite on one
+server and one port, and keeps the interception scoped to the one file that needs it: every
+other spec's `page.route("**/fixtures/e2e-dashboard.json", …)` calls are untouched and keep
+reading the kernel.
