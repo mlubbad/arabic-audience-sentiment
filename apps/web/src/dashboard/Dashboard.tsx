@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Chart as ChartJS,
@@ -58,6 +58,14 @@ import {
 } from "../chartTheme";
 import { n } from "./format";
 import { barOptions, doughnutOptions, lineOptions } from "./chartOptions";
+import { FilterBar } from "./FilterBar";
+import { ActiveFilters } from "./ActiveFilters";
+import {
+  chipsFor,
+  EMPTY_FILTERS,
+  type Chip,
+  type FilterValues,
+} from "./filters";
 ChartJS.register(
   ArcElement,
   BarElement,
@@ -277,17 +285,6 @@ function DashboardBody({
   // reach the read. Cleared with the cursors: a page into a filtered list is
   // only meaningful for the list it was turned in.
   const [videoPage, setVideoPage] = useState(0);
-  const [filtersOpen, setFiltersOpen] = useState(
-    () =>
-      typeof window === "undefined" ||
-      !window.matchMedia("(max-width: 760px)").matches,
-  );
-  useEffect(() => {
-    const mobile = window.matchMedia("(max-width: 760px)");
-    const onResize = () => setFiltersOpen(!mobile.matches);
-    mobile.addEventListener("change", onResize);
-    return () => mobile.removeEventListener("change", onResize);
-  }, []);
   const page = {
     ...filters,
     workspace_id: workspaceId,
@@ -495,35 +492,76 @@ function DashboardBody({
    * not; it wrote its own object beside it. So there is one path now, and the
    * card passes what it changed rather than restating everything.
    */
-  function filtersFrom(over: { video?: string } = {}): Filters {
+  /**
+   * `over` lets a caller that just changed a control pass what it changed,
+   * rather than relying on the corresponding `useState` — the same reason
+   * the video cards below pass `{ video: next }`: their own `setVideo` has
+   * not landed yet when they call this, so reading `video` would apply the
+   * previous selection. `ActiveFilters`' chip removal needs the same escape
+   * for every other field, which is why every field the chips can clear
+   * has one here now, not only `video`.
+   */
+  function filtersFrom(
+    over: {
+      video?: string;
+      query?: string;
+      sentiment?: string;
+      topic?: string;
+      videoKind?: string;
+      replies?: "all" | "comments" | "replies";
+      commentType?: string;
+      reviewStatus?: "all" | "reviewed" | "unreviewed";
+      dateMode?: "all" | "known" | "unknown";
+      from?: string;
+      to?: string;
+    } = {},
+  ): Filters {
     const chosenVideo = over.video ?? video;
+    const chosenQuery = over.query ?? query;
+    const chosenSentiment = over.sentiment ?? sentiment;
+    const chosenTopic = over.topic ?? topic;
+    const chosenVideoKind = over.videoKind ?? videoKind;
+    const chosenReplies = over.replies ?? replies;
+    const chosenCommentType = over.commentType ?? commentType;
+    const chosenReviewStatus = over.reviewStatus ?? reviewStatus;
+    const chosenDateMode = over.dateMode ?? dateMode;
+    const chosenFrom = over.from ?? from;
+    const chosenTo = over.to ?? to;
     // A range describes known dates, so it is not sent when the user has asked
     // for the rows that have no date at all.
-    const ranged = dateMode !== "unknown";
+    const ranged = chosenDateMode !== "unknown";
     return {
       ...defaults,
-      q: query,
+      q: chosenQuery,
       video_ids: chosenVideo ? [chosenVideo] : [],
-      video_kind: (videoKind || undefined) as Filters["video_kind"],
-      sentiments: sentiment ? [sentiment as Label] : [],
-      topics: topic ? [topic] : [],
-      replies,
-      date_mode: dateMode,
-      comment_type: commentType || undefined,
-      review_status: reviewStatus,
+      video_kind: (chosenVideoKind || undefined) as Filters["video_kind"],
+      sentiments: chosenSentiment ? [chosenSentiment as Label] : [],
+      topics: chosenTopic ? [chosenTopic] : [],
+      replies: chosenReplies,
+      date_mode: chosenDateMode,
+      comment_type: chosenCommentType || undefined,
+      review_status: chosenReviewStatus,
       from:
-        ranged && from
-          ? new Date(from + "T00:00:00+03:00").toISOString()
+        ranged && chosenFrom
+          ? new Date(chosenFrom + "T00:00:00+03:00").toISOString()
           : undefined,
       to:
-        ranged && to
-          ? new Date(to + "T00:00:00+03:00").toISOString()
+        ranged && chosenTo
+          ? new Date(chosenTo + "T00:00:00+03:00").toISOString()
           : undefined,
     };
   }
   /** Narrowing the report: validate, drop the paging, and set them. */
-  function applyFilters(over: { video?: string } = {}) {
-    if (dateMode !== "unknown" && from && to && from >= to) {
+  function applyFilters(over: Parameters<typeof filtersFrom>[0] = {}) {
+    const chosenDateMode = over.dateMode ?? dateMode;
+    const chosenFrom = over.from ?? from;
+    const chosenTo = over.to ?? to;
+    if (
+      chosenDateMode !== "unknown" &&
+      chosenFrom &&
+      chosenTo &&
+      chosenFrom >= chosenTo
+    ) {
       setFormError(S.dateOrderError);
       return;
     }
@@ -532,10 +570,6 @@ function DashboardBody({
     setCursors([]);
     setVideoPage(0);
     setFilters(filtersFrom(over));
-  }
-  function apply(e: FormEvent) {
-    e.preventDefault();
-    applyFilters();
   }
   function reset() {
     setQuery("");
@@ -556,28 +590,98 @@ function DashboardBody({
     setLimit(25);
     setFilters(defaults);
   }
-  // Which filters are actually narrowing the answer. Ten controls can be set
-  // without the reader remembering they set them — and every figure on the
-  // page is quietly conditional on them. Naming them is the difference
-  // between a filtered report and a wrong one.
-  const activeFilters = [
-    query && S.chipSearch(query),
-    video && S.chipVideo,
-    sentiment && S.chipSentiment(labels[sentiment as Label] ?? sentiment),
-    topic &&
-      S.chipTopic(
-        topic === UNCLASSIFIED ? S.topicUnclassifiedOption : topicName(topic),
-      ),
-    videoKind && S.chipVideoKind,
-    commentType && S.chipCommentType,
-    replies !== "all" &&
-      (replies === "replies" ? S.chipRepliesOnly : S.chipCommentsOnly),
-    reviewStatus !== "all" &&
-      (reviewStatus === "reviewed" ? S.chipReviewedOnly : S.chipUnreviewedOnly),
-    dateMode !== "all" &&
-      (dateMode === "known" ? S.chipDatedOnly : S.chipUndatedOnly),
-    (from || to) && S.chipPeriod,
-  ].filter(Boolean) as string[];
+  // The bar's view over the twelve `useState`s above — a fresh object each
+  // render, never itself stored. `onChange` writes patches back to whichever
+  // state each key belongs to; `onLimitChange` goes through the same
+  // cursor-clearing path the old per-page `<select>` did.
+  const values: FilterValues = {
+    query,
+    video,
+    sentiment,
+    topic,
+    videoKind,
+    replies,
+    commentType,
+    reviewStatus,
+    dateMode,
+    from,
+    to,
+    limit,
+  };
+  function onChange(p: Partial<FilterValues>) {
+    if ("query" in p) setQuery(p.query!);
+    if ("video" in p) setVideo(p.video!);
+    if ("sentiment" in p) setSentiment(p.sentiment!);
+    if ("topic" in p) setTopic(p.topic!);
+    if ("videoKind" in p) setVideoKind(p.videoKind!);
+    if ("replies" in p) setReplies(p.replies!);
+    if ("commentType" in p) setCommentType(p.commentType!);
+    if ("reviewStatus" in p) setReviewStatus(p.reviewStatus!);
+    if ("dateMode" in p) setDateMode(p.dateMode!);
+    if ("from" in p) setFrom(p.from!);
+    if ("to" in p) setTo(p.to!);
+  }
+  function onLimitChange(next: number) {
+    goTo([]);
+    setLimit(next);
+  }
+  /**
+   * A chip is the applied state itself, not a draft of it — so clearing one
+   * applies immediately, unlike the bar's own apply button. The cleared
+   * value is passed to `applyFilters` as an override rather than relied on
+   * from the state just set above: the same reason the video cards pass
+   * `{ video: next }` (see `filtersFrom`'s comment) — the `setX` call has
+   * not landed yet when `applyFilters` runs here.
+   */
+  function onClear(key: Chip["key"]) {
+    switch (key) {
+      case "query":
+        setQuery(EMPTY_FILTERS.query);
+        applyFilters({ query: EMPTY_FILTERS.query });
+        break;
+      case "video":
+        setVideo(EMPTY_FILTERS.video);
+        applyFilters({ video: EMPTY_FILTERS.video });
+        break;
+      case "sentiment":
+        setSentiment(EMPTY_FILTERS.sentiment);
+        applyFilters({ sentiment: EMPTY_FILTERS.sentiment });
+        break;
+      case "topic":
+        setTopic(EMPTY_FILTERS.topic);
+        applyFilters({ topic: EMPTY_FILTERS.topic });
+        break;
+      case "videoKind":
+        setVideoKind(EMPTY_FILTERS.videoKind);
+        applyFilters({ videoKind: EMPTY_FILTERS.videoKind });
+        break;
+      case "commentType":
+        setCommentType(EMPTY_FILTERS.commentType);
+        applyFilters({ commentType: EMPTY_FILTERS.commentType });
+        break;
+      case "replies":
+        setReplies(EMPTY_FILTERS.replies);
+        applyFilters({ replies: EMPTY_FILTERS.replies });
+        break;
+      case "reviewStatus":
+        setReviewStatus(EMPTY_FILTERS.reviewStatus);
+        applyFilters({ reviewStatus: EMPTY_FILTERS.reviewStatus });
+        break;
+      case "dateMode":
+        setDateMode(EMPTY_FILTERS.dateMode);
+        applyFilters({ dateMode: EMPTY_FILTERS.dateMode });
+        break;
+      case "period":
+        setFrom(EMPTY_FILTERS.from);
+        setTo(EMPTY_FILTERS.to);
+        applyFilters({ from: EMPTY_FILTERS.from, to: EMPTY_FILTERS.to });
+        break;
+      case "limit":
+        setLimit(EMPTY_FILTERS.limit);
+        break;
+    }
+  }
+  const chips = chipsFor(values, { S, labels, topicName });
   const s = result.data;
   const active = useActiveSection(!!s && s.total > 0);
   // Aggregations for the charts, over every row the filters admit rather than
@@ -715,29 +819,6 @@ function DashboardBody({
             ))}
           </div>
         )}
-        {/* What the numbers below are conditional on, carried by the one bar
-            that stays on screen. A reader who scrolled past the filter panel
-            an hour ago has no other way to know the report is narrowed — and
-            a narrowed report read as a whole one is not a smaller answer, it
-            is a wrong one. */}
-        {activeFilters.length > 0 ? (
-          <p
-            className="rp-scope rp-scope-filtered"
-            data-testid="active-filters"
-          >
-            <span>{S.filteredLabel}</span>
-            {activeFilters.map((f) => (
-              <span key={f} className="rp-scope-chip">
-                {f}
-              </span>
-            ))}
-            <button type="button" onClick={reset}>
-              {S.showAll}
-            </button>
-          </p>
-        ) : (
-          <span className="rp-scope">{source.scope}</span>
-        )}
       </nav>
       <aside
         className={`rp-provenance${source.tone === "warning" ? " warn" : ""}`}
@@ -752,211 +833,30 @@ function DashboardBody({
           <p data-testid="source-freshness">{source.freshness}</p>
         )}
       </aside>
-      <button
-        className="rp-filter-toggle"
-        type="button"
-        aria-expanded={filtersOpen}
-        aria-controls="report-filters"
-        onClick={() => setFiltersOpen((open) => !open)}
-      >
-        {filtersOpen ? S.hideFilters : S.showFilters}
-        <span aria-hidden="true">{filtersOpen ? "−" : "+"}</span>
-      </button>
-      <form
-        id="report-filters"
-        aria-label={S.filtersLabel}
-        hidden={!filtersOpen}
-        onSubmit={apply}
-        className="filters rp-card rp-filters"
-      >
-        <label>
-          {S.searchLabel}
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            maxLength={500}
-          />
-        </label>
-        <label>
-          {S.videoLabelText}
-          <select
-            aria-label={S.videoLabelText}
-            value={video}
-            onChange={(e) => setVideo(e.target.value)}
-          >
-            <option value="">{S.allVideos}</option>
-            {/* Built from the videos actually in the current read. These were
-                hard-coded to the two fixture ids, so a live account was
-                offered a choice between two videos it does not have and none
-                of the ones it does. */}
-            {(s?.video_options ?? []).map((v) => (
-              <option key={v.id} value={v.id}>
-                {videoLabel(v.id, v.title, S)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {S.sentimentLabel}
-          <select
-            aria-label={S.sentimentLabel}
-            value={sentiment}
-            onChange={(e) => setSentiment(e.target.value)}
-          >
-            <option value="">{S.allSentiments}</option>
-            {Object.entries(labels).map(([key, text]) => (
-              <option key={key} value={key}>
-                {text}
-              </option>
-            ))}
-          </select>
-        </label>
-        {/* Offered only once a topic model has run: every workspace carries
-            a taxonomy from its first day, so its presence says nothing. A
-            filter on a dimension no row has yet would narrow every figure to
-            nothing and leave the reader to guess why. */}
-        {!!result.data?.active_topic_key && (
-          <label>
-            {S.topicFilterLabel}
-            <select
-              aria-label={S.topicFilterLabel}
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-            >
-              <option value="">{S.topicAll}</option>
-              {(result.data?.topics ?? [])
-                .filter((t) => !t.retired)
-                .map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {lang === "ar" ? t.name_ar : t.name_en}
-                  </option>
-                ))}
-              <option value={UNCLASSIFIED}>{S.topicUnclassifiedOption}</option>
-            </select>
-          </label>
-        )}
-        <label>
-          {S.videoKindLabel}
-          <select
-            aria-label={S.videoKindLabel}
-            value={videoKind}
-            onChange={(e) => setVideoKind(e.target.value)}
-          >
-            <option value="">{S.allKinds}</option>
-            <option value="video">{S.kindVideo}</option>
-            <option value="short">{S.kindShort}</option>
-            <option value="stream">{S.kindStream}</option>
-          </select>
-        </label>
-        <label>
-          {S.participationLabel}
-          <select
-            aria-label={S.participationLabel}
-            value={replies}
-            onChange={(e) =>
-              setReplies(e.target.value as "all" | "comments" | "replies")
-            }
-          >
-            <option value="all">{S.commentsAndReplies}</option>
-            <option value="comments">{S.originalOnly}</option>
-            <option value="replies">{S.repliesOnly}</option>
-          </select>
-        </label>
-        {/* Only when the data has types to offer. Comment types come from
-            annotations, and nothing in the collection path writes them yet, so
-            in live mode this was a control whose only option was "all" —
-            something to operate that could not change the answer. */}
-        {(result.data?.comment_types ?? []).length > 0 && (
-          <label>
-            {S.commentTypeLabel}
-            <select
-              aria-label={S.commentTypeLabel}
-              value={commentType}
-              onChange={(e) => setCommentType(e.target.value)}
-            >
-              <option value="">{S.allKinds}</option>
-              {(result.data?.comment_types ?? []).map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label>
-          {S.reviewStatusLabel}
-          <select
-            aria-label={S.reviewStatusLabel}
-            value={reviewStatus}
-            onChange={(e) =>
-              setReviewStatus(
-                e.target.value as "all" | "reviewed" | "unreviewed",
-              )
-            }
-          >
-            <option value="all">{S.all}</option>
-            <option value="reviewed">{S.reviewedByHuman}</option>
-            <option value="unreviewed">{S.unreviewed}</option>
-          </select>
-        </label>
-        <label>
-          {S.dateLabel}
-          <select
-            aria-label={S.dateLabel}
-            value={dateMode}
-            onChange={(e) =>
-              setDateMode(e.target.value as "all" | "known" | "unknown")
-            }
-          >
-            <option value="all">{S.allDates}</option>
-            <option value="known">{S.knownDates}</option>
-            <option value="unknown">{S.unknownDates}</option>
-          </select>
-        </label>
-        <label>
-          {S.fromDate}
-          <input
-            type="date"
-            value={from}
-            disabled={dateMode === "unknown"}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </label>
-        <label>
-          {S.toDate}
-          <input
-            type="date"
-            value={to}
-            disabled={dateMode === "unknown"}
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </label>
-        <label>
-          {S.perPageLabel}
-          <select
-            aria-label={S.perPageLabel}
-            value={limit}
-            onChange={(e) => {
-              goTo([]);
-              setLimit(Number(e.target.value));
-            }}
-          >
-            {[5, 10, 25, 50].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div>
-          <button type="submit">{S.applyFilters}</button>
-          <button type="button" onClick={reset}>
-            {S.resetFilters}
-          </button>
-        </div>
-      </form>
-      <p className="muted">{S.periodNote}</p>
-      {formError && <p role="alert">{formError}</p>}
+      <FilterBar
+        values={values}
+        onChange={onChange}
+        onApply={applyFilters}
+        onReset={reset}
+        onLimitChange={onLimitChange}
+        formError={formError}
+        videoOptions={s?.video_options ?? []}
+        topics={
+          result.data?.active_topic_key ? (result.data?.topics ?? []) : null
+        }
+        commentTypes={result.data?.comment_types ?? []}
+        S={S}
+        lang={lang}
+        labels={labels}
+        appliedCount={chips.length}
+      />
+      <ActiveFilters
+        chips={chips}
+        scope={source.scope}
+        onClear={onClear}
+        onReset={reset}
+        S={S}
+      />
       {result.isPending && (
         <div role="status" data-testid="loading" className="loading">
           {S.loadingComments}

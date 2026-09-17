@@ -1,0 +1,68 @@
+.db-filterbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-inline: calc(-1 * var(--space-4));
+  background: var(--glass-2-tint);
+  backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  border-bottom: var(--glass-2-edge);
+  box-shadow: var(--glass-2-ring);
+}
+.db-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+.db-field > label {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.db-filterbar .db-field--search {
+  flex: 1 1 220px;
+}
+.db-filterbar-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+.db-filterbar-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-danger);
+}
+.db-filterbar .db-note {
+  flex-basis: 100%;
+  margin: 0;
+}
+.db-popover-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 260px;
+}
+.db-sheet-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+}
+.db-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+.db-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
