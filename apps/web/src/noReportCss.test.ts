@@ -40,14 +40,15 @@ const components = files.filter(
  * The account page and the components it renders keep their `rp-*` classes
  * until phase 5 recomposes it on `ui/`; `account.css` carries the rules they
  * match. `DeleteWorkspaceDialog.tsx` is the admin page's, not this page's,
- * and wears none. Of the four, only `Account.tsx` and `PlanPanel.tsx` paint
- * with `rp-*` today; the other two are listed as the page's children so a
- * class moved between them during phase 5 does not trip the guard mid-move.
+ * and wears none. `PlanPanel.tsx` moved to `account/PlanPanel.tsx` on `ui/`
+ * (task 2) and paints no `rp-*` class any more, so it is off this list; of
+ * the rest, only `Account.tsx` still paints with `rp-*` today — the other
+ * two are listed as the page's children so a class moved between them
+ * during phase 5 does not trip the guard mid-move.
  */
 const KEEPS_RP_UNTIL_PHASE_5 = new Set([
   "Account.tsx",
   "WorkspaceCard.tsx",
-  "PlanPanel.tsx",
   "SetupPath.tsx",
 ]);
 
@@ -100,7 +101,7 @@ describe("report.css is gone", () => {
     const painting = [...KEEPS_RP_UNTIL_PHASE_5].filter((f) =>
       /className="rp-/.test(read(f)),
     );
-    expect(painting.sort()).toEqual(["Account.tsx", "PlanPanel.tsx"]);
+    expect(painting.sort()).toEqual(["Account.tsx"]);
   });
 
   it("main.tsx loads the page from ./dashboard/Dashboard", () => {

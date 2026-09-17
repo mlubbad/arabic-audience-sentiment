@@ -1,0 +1,50 @@
+/**
+ * The account page's own rules, on tokens — the replacement for the
+ * verbatim `apps/web/src/account.css` this phase retires page by page.
+ * `pages.css`'s shared db-* rules (`db-section`, `db-card-title`,
+ * `db-missing`, `db-muted`) carry everything this page shares with the
+ * dashboard, the operations page and the admin page; this file holds only
+ * what is specific to `/account`. `BudgetMeter` itself is a `ui/`
+ * component, styled in `ui/ui.css`.
+ *
+ * Only `PlanPanel` lives here so far — later tasks in this phase add
+ * `WorkspaceCard`, `ConfirmDialog` and `CreateWorkspace`'s rules beside it,
+ * and `.db-actions` below is already written for them to share rather than
+ * each defining its own doors row.
+ */
+
+/* ---------------- the plan card's budgets ---------------- */
+.db-plan-budgets {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.db-plan-budgets strong {
+  display: block;
+  margin-bottom: var(--space-1);
+}
+.db-plan-budget-line {
+  display: block;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  margin-bottom: var(--space-2);
+}
+.db-plan-feedback {
+  margin-top: var(--space-3);
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+
+/* ---------------- doors row ---------------- */
+/* Shared by every card on this page that offers more than one action: the
+   plan's upgrade/manage/topup/contact doors here, a workspace's own
+   sync/connect/disconnect/retire doors in a later task. */
+.db-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}

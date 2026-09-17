@@ -13,7 +13,7 @@ import { providers, type ProviderId } from "./authProviders";
 import { useGoogleOneTap } from "./googleOneTap";
 import { setupSteps } from "./setup";
 import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
-import { PlanPanel } from "./PlanPanel";
+import { PlanPanel } from "./account/PlanPanel";
 import { useIsPlatformAdmin } from "./adminAccess";
 import "./account.css";
 
