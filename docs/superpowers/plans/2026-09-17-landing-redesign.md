@@ -2592,6 +2592,8 @@ and replace the final `.lp-hero-art img` assertion with:
 ```
 Leave the three computed-style tests untouched — they must pass as written.
 
+Also update `apps/web/src/LegalPage.test.ts` — its "the footers → each mount the one legal-links component" case scans source files for a `<footer` containing `<LegalLinks`; the public footer now lives in `PublicShell.tsx` and `Landing.tsx` is deleted. Change the list to `["public/PublicShell.tsx", "main.tsx"]` and the `src()` helper reads relative to `./` so the `public/` prefix resolves. Run `npx vitest run apps/web/src/LegalPage.test.ts` → PASS. Add that file to the commit's `prettier` and `git add` lists.
+
 - [ ] **Step 5: Run everything**
 
 ```bash
