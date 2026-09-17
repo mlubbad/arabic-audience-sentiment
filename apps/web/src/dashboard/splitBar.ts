@@ -2,14 +2,14 @@
  * The `.ui-split` bar's data: which segments to draw and how to describe
  * them out loud.
  *
- * A segment's width is always the share of the row's TOTAL comments, never
- * of the analysed subset — a video half analysed draws half a bar, the rest
- * left to the track's own muted background rather than stretched to fill
- * it. That rule was fixed for the per-video cards in `ed74413` (`Videos.tsx`
- * originally computed `pct` against `total` there too); lifted out here so
- * `Compare.tsx` draws the same widths from the same function instead of
- * re-deriving them from `analysed`, which was the exact defect that commit
- * fixed for the cards.
+ * A segment is sized to the span the caller passes; see each caller for its
+ * denominator. `Videos.tsx` draws over the row's TOTAL (a video half
+ * analysed draws half a bar, the rest left to the track's own muted
+ * background — the rule `ed74413` fixed for the cards) and speaks its
+ * shares over `analysed`, like every printed percentage on the page;
+ * `Compare.tsx` draws and prints over `analysed`, so its bar and the shares
+ * beside it agree. One function for the widths either way, so neither
+ * re-derives them.
  */
 import type { Label } from "@sentiment/contracts";
 import type { Strings } from "../strings";
@@ -25,8 +25,8 @@ export const SENTIMENT_CLASSES: readonly Label[] = [
 export type SplitSegment = { key: Label; count: number; pct: number };
 
 /** Only the segments that hold something, each sized to its share of
- *  `total`. Empty when nothing is analysed — that is "no bar", not a
- *  full-width unknown segment. */
+ *  `total` — whatever span the caller chose. Empty when nothing is analysed
+ *  — that is "no bar", not a full-width unknown segment. */
 export function splitSegments(
   sentiments: Record<Label, number>,
   total: number,

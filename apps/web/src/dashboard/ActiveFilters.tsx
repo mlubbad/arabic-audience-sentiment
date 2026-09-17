@@ -15,20 +15,17 @@ import type { Chip } from "./filters";
  */
 export function ActiveFilters({
   chips,
-  scope,
   onClear,
   onReset,
   S,
 }: {
+  /** Never empty: `Dashboard` renders this only while something is applied
+   *  (the no-filter case is the Provenance strip's scope sentence). */
   chips: Chip[];
-  scope: string;
   onClear: (key: Chip["key"]) => void;
   onReset: () => void;
   S: Strings;
 }) {
-  if (chips.length === 0) {
-    return <span className="db-scope">{scope}</span>;
-  }
   return (
     <p className="db-scope" data-testid="active-filters">
       <span>{S.filteredLabel}</span>

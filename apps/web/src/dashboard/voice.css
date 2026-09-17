@@ -24,23 +24,6 @@
   height: 10px;
   border-radius: var(--r-1);
 }
-/* A chart that has nothing to draw yet — no labels, or no topic model run —
-   as a bordered note rather than a blank card. */
-.db-missing {
-  border: 1px dashed var(--border-2);
-  border-radius: var(--r-md);
-  background: var(--bg-muted);
-  padding: var(--space-5);
-  color: var(--text-3);
-  font-size: var(--fs-small);
-  line-height: 1.9;
-}
-.db-missing strong {
-  display: block;
-  color: var(--text-2);
-  margin-bottom: var(--space-1);
-  font-size: var(--fs-small);
-}
 /* Three figures, and the section's own prose says one of them is the one to
    act on. The lead figure is lead-sized, the other two recede, and each
    number wears the colour its slice wears in the donut above. */

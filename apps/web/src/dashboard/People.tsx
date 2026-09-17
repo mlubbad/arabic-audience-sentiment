@@ -26,6 +26,7 @@ import { Badge } from "../ui/Badge";
 import type { Strings } from "../strings";
 import type { Commenters } from "../analytics";
 import { n } from "./format";
+import { ChartEmpty } from "./PageStates";
 import "./people.css";
 
 export function People({
@@ -42,10 +43,10 @@ export function People({
   const list = (
     <>
       {people.ranked.length === 0 ? (
-        <p className="db-missing">
+        <ChartEmpty>
           <strong>{S.noCommenterStrong}</strong>
           {S.noCommenterLead}
-        </p>
+        </ChartEmpty>
       ) : (
         <ol className="db-ranked">
           {people.ranked.slice(0, 20).map((c, i) => (

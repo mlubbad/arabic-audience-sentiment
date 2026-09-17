@@ -41,12 +41,17 @@
 .db-grid--2 {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
-/* Timing's three charts: the weekly trend wider than the two distributions
-   beside it. Collapses with `.db-grid--2` below. */
+/* Timing's three charts: the weekly trend across the full width, the two
+   distributions as halves beneath it. `2fr 1fr 1fr` gave a 24-bar hourly
+   chart 164–234px at 1000–1280; a half is at least 360px at 1000. Collapses
+   with `.db-grid--2` below. */
 .db-grid--charts {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
+}
+.db-grid--charts > :first-child {
+  grid-column: 1 / -1;
 }
 /* A grid item's floor is otherwise its content, and a chart canvas's is the
    300px every canvas is born with: at 320px that held the card wider than
@@ -59,6 +64,27 @@
 .db-card-title {
   font-size: var(--fs-h3);
   margin: 0 0 var(--space-2);
+}
+/* A card that has nothing to draw yet — no labels, no topic model run, too
+   few dated rows, no commenter — as a bordered note rather than a blank
+   card. One rule for every `ChartEmpty`; Voice and People used to carry a
+   copy each while the Timing charts had a third class with no `strong`
+   rule, so their bold lead ran straight into the sentence after it. */
+.db-missing {
+  border: 1px dashed var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--bg-muted);
+  padding: var(--space-5);
+  color: var(--text-3);
+  font-size: var(--fs-small);
+  line-height: 1.9;
+  max-width: 62ch;
+}
+.db-missing strong {
+  display: block;
+  color: var(--text-2);
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-body);
 }
 /* The box a chart canvas sits in — shared by Voice and Timing. Always
    `aria-hidden`: `ChartFigures` right below every one of these is the same

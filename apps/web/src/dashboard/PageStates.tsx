@@ -28,17 +28,18 @@ import { Skeleton } from "../ui/Skeleton";
 import type { Strings } from "../strings";
 import "./page-states.css";
 
-/** Before the first read has answered. Skeletons in the rough shape of the
- *  page that is about to appear — the hero line, the filter bar, five KPI
- *  tiles, two charts — so the layout does not jump when real content lands. */
+/** Before the first read has answered. Skeletons in the rough shape of what
+ *  is about to appear below the hero and the filter bar — five KPI tiles,
+ *  two charts — so the layout does not jump when real content lands. The
+ *  hero and the bar themselves are real from the first frame (`Dashboard`
+ *  always renders them above this), so they have no skeleton here: one did
+ *  sit under each of them, a second hero and a second bar. */
 export function Loading({ S }: { S: Strings }) {
   return (
     <div role="status" data-testid="loading" className="db-loading">
       {/* The visible page says nothing while every pixel of it is a
           skeleton; a screen reader still needs a sentence. */}
       <span className="ui-sr-only">{S.loadingComments}</span>
-      <Skeleton className="db-sk-hero" aria-hidden="true" />
-      <Skeleton className="db-sk-bar" aria-hidden="true" />
       <div className="db-grid">
         {[0, 1, 2, 3, 4].map((i) => (
           <Skeleton key={i} className="db-sk-kpi" aria-hidden="true" />
@@ -161,9 +162,11 @@ export function EmptyState({
   );
 }
 
-/** The in-card sentence a chart shows instead of drawing on zero rows —
- *  never a blank canvas, which reads as broken rather than as "nothing here
- *  yet". `testId` lets each chart's empty state be found on its own. */
+/** The in-card note a chart shows instead of drawing on zero rows — never a
+ *  blank canvas, which reads as broken rather than as "nothing here yet".
+ *  Callers pass a `<strong>` lead and the sentence after it; `.db-missing`
+ *  (dashboard.css) sets the lead on its own line. `testId` lets each
+ *  chart's empty state be found on its own. */
 export function ChartEmpty({
   children,
   testId,
@@ -172,7 +175,7 @@ export function ChartEmpty({
   testId?: string;
 }) {
   return (
-    <p className="db-chart-empty" data-testid={testId}>
+    <p className="db-missing" data-testid={testId}>
       {children}
     </p>
   );

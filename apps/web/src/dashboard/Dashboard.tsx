@@ -667,7 +667,6 @@ function DashboardBody({
           chips.length > 0 ? (
             <ActiveFilters
               chips={chips}
-              scope={source.scope}
               onClear={onClear}
               onReset={reset}
               S={S}

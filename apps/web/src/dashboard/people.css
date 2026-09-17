@@ -34,22 +34,6 @@
   min-width: 72px;
   text-align: end;
 }
-.db-missing {
-  border: 1px dashed var(--border-2);
-  border-radius: var(--radius-2);
-  background: var(--bg-muted);
-  padding: var(--space-5);
-  color: var(--text-3);
-  font-size: var(--fs-small);
-  line-height: 1.9;
-  max-width: 62ch;
-}
-.db-missing strong {
-  display: block;
-  color: var(--text-2);
-  margin-bottom: var(--space-1);
-  font-size: var(--fs-body);
-}
 @media (max-width: 480px) {
   .db-person {
     grid-template-columns: 20px 1fr auto;

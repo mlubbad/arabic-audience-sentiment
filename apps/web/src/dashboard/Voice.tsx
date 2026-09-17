@@ -22,6 +22,7 @@ import {
 } from "../chartTheme";
 import { barOptions, doughnutOptions } from "./chartOptions";
 import { ChartFigures } from "./ChartFigures";
+import { ChartEmpty } from "./PageStates";
 import { n } from "./format";
 import "./voice.css";
 
@@ -120,10 +121,10 @@ export function Voice({
               </ul>
             </>
           ) : (
-            <p className="db-missing">
+            <ChartEmpty>
               <strong>{S.noLabelsStrong}</strong>
               {S.noLabelsLead}
-            </p>
+            </ChartEmpty>
           )}
         </Card>
         <Card data-testid="topics-card">
@@ -135,10 +136,10 @@ export function Voice({
               draw, and the card says so rather than clustering by keyword
               and calling that analysis. */}
           {!s.active_topic_key ? (
-            <p className="db-missing">
+            <ChartEmpty>
               <strong>{S.topicsNotRunStrong}</strong>
               {S.topicsNotRunLead}
-            </p>
+            </ChartEmpty>
           ) : (
             (() => {
               const buckets = s.topics

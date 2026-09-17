@@ -5,12 +5,6 @@
   flex-direction: column;
   gap: var(--space-4);
 }
-.db-sk-hero {
-  height: 96px;
-}
-.db-sk-bar {
-  height: 56px;
-}
 .db-sk-kpi {
   height: 112px;
 }
@@ -38,9 +32,4 @@
   max-width: 34rem;
   margin: var(--space-5) auto;
   text-align: start;
-}
-.db-chart-empty {
-  padding: var(--space-5);
-  text-align: center;
-  color: var(--text-2);
 }

@@ -1,7 +1,8 @@
 /**
  * Engagement timing: the weekly trend, the hour-of-day and day-of-week
- * distributions, in Cards on one three-up grid — the weekly line wider than
- * its two neighbours, since a trend needs the width a distribution does not.
+ * distributions, in Cards on one grid — the weekly line across the full
+ * width, the two distributions as halves beneath it, since a 24-bar chart
+ * needs more than the third of a row it used to get.
  *
  * Moved out of `Dashboard.tsx`'s `#rp-timing` section verbatim — the
  * `hours`/`weekdays`/`weeks` aggregations stay `useMemo`s in `Dashboard.tsx`

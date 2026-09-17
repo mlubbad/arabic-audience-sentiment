@@ -15,10 +15,11 @@
  *
  * The split bar's `aria-label` is built from the same `legendMeasured` /
  * `legendUnmeasured` sentences the sentiment legend already reads out loud,
- * one per non-empty class — there was no prior spoken description of a
- * per-video split to preserve (the bar was `aria-hidden`, its numbers
- * carried only by the visible counts beside it), so this is a new,
- * accurate one built entirely from strings that already exist.
+ * one per non-empty class, with the same denominator the legend uses
+ * (`analysed`) — there was no prior spoken description of a per-video
+ * split to preserve (the bar was `aria-hidden`, its numbers carried only by
+ * the visible counts beside it), so this is a new, accurate one built
+ * entirely from strings that already exist.
  */
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
@@ -65,11 +66,22 @@ export function Videos({
           // of `total` — a video with no mixed comments does not draw a
           // sliver of one, and one only half analysed draws half a bar.
           const segments = splitSegments(v.sentiments, v.total);
+          // Spoken over `analysed`, not `total`: `legendMeasured` always
+          // says a percentage, and every percentage printed on this page —
+          // the sentiment legend, the comparison table — is a share of what
+          // was analysed. The drawn widths above stay a share of `total`
+          // (the muted remainder is the unanalysed part); the spoken shares
+          // are the ones a reader would compare with the rest of the page.
           // No segments is not "no bar": the container's own muted
           // background is the true state for a video with nothing analysed
           // yet, and the same string the comparison table already uses for
           // that case names it.
-          const splitLabel = splitAriaLabel(segments, s.measurable, labels, S);
+          const splitLabel = splitAriaLabel(
+            splitSegments(v.sentiments, v.analysed),
+            s.measurable,
+            labels,
+            S,
+          );
           return (
             <Card
               key={v.id}

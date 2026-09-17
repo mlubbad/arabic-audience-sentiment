@@ -58,5 +58,14 @@ describe("Videos", () => {
       "aria-label",
       expect.stringContaining(ar.labels.negative),
     );
+    // Spoken shares are over `analysed`, like every printed percentage on
+    // the page: one of two analysed is 50%, not the 25% of total the bar
+    // draws.
+    expect(bar).toHaveAttribute(
+      "aria-label",
+      ar.legendMeasured(ar.labels.positive, "1", 50) +
+        "، " +
+        ar.legendMeasured(ar.labels.negative, "1", 50),
+    );
   });
 });

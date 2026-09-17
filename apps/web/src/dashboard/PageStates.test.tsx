@@ -14,14 +14,17 @@ import {
 } from "./PageStates";
 
 describe("Loading", () => {
-  it("announces the loading sentence and shows at least five skeletons", () => {
+  it("announces the loading sentence and shows the KPI and chart skeletons only", () => {
     render(<Loading S={ar} />);
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent(ar.loadingComments);
     const { container } = render(<Loading S={ar} />);
-    expect(
-      container.querySelectorAll(".ui-skeleton").length,
-    ).toBeGreaterThanOrEqual(5);
+    // Five KPI tiles and two charts. No hero and no bar: the real ones are
+    // already on screen above this, and a skeleton under each was a second
+    // hero and a second bar.
+    expect(container.querySelectorAll(".ui-skeleton")).toHaveLength(7);
+    expect(container.querySelector(".db-sk-hero")).toBeNull();
+    expect(container.querySelector(".db-sk-bar")).toBeNull();
   });
 });
 
