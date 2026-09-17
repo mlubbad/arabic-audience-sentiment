@@ -4,7 +4,8 @@
  * It was the analytical report's sheet; by the end of phase 4 the dashboard,
  * the operations page and the admin page each carry their own db-* rules
  * beside them, and the account page — its last reader — took the rules it
- * uses into `account.css`, verbatim, pending phase 5. These read the source
+ * used into a verbatim `account.css` until phase 5 recomposed it under
+ * `account/` with rules of its own. These read the source
  * as text so the old sheet cannot creep back in: not as a file, not through
  * one import, and not through one leftover `rp-*` class on a page that was
  * rebuilt without it.
@@ -37,21 +38,18 @@ const components = files.filter(
 );
 
 /**
- * The account page and the components it renders keep their `rp-*` classes
- * until phase 5 recomposes it on `ui/`; `account.css` carries the rules they
- * match. `DeleteWorkspaceDialog.tsx` is the admin page's, not this page's,
- * and wears none. `PlanPanel.tsx` (task 2) and `WorkspaceCard.tsx` (task 3)
- * moved under `account/` on `ui/` and paint no `rp-*` class any more, so
- * they are off this list; of the rest, only `Account.tsx` still paints with
- * `rp-*` today — `SetupPath.tsx` is listed as the page's child so a class
- * moved between them during phase 5 does not trip the guard mid-move.
+ * The account page and the components it rendered kept their `rp-*` classes
+ * until phase 5 recomposed it on `ui/` (`account/Account.tsx`, task 5, was
+ * the last; `SetupPath.tsx` was struck with it — it wears `setup-*` only).
+ * The set is empty and stays so: a file can only be added here with a
+ * reason, and the rule below that it be the true remainder still holds.
  */
-const KEEPS_RP_UNTIL_PHASE_5 = new Set(["Account.tsx", "SetupPath.tsx"]);
+const KEEPS_RP_UNTIL_PHASE_5 = new Set<string>([]);
 
 describe("report.css is gone", () => {
   it("walks the whole source tree", () => {
     expect(components.length).toBeGreaterThan(50);
-    expect(components).toContain("Account.tsx");
+    expect(components).toContain("account/Account.tsx");
     expect(components).toContain("dashboard/Dashboard.tsx");
     expect(components).toContain("admin/AdminPage.tsx");
     expect(components).toContain("ops/Sync.tsx");
@@ -71,9 +69,12 @@ describe("report.css is gone", () => {
     }
   });
 
-  it("the account page loads account.css in its place", () => {
-    expect(read("Account.tsx")).toContain('import "./account.css"');
-    expect(existsSync(join(src, "account.css"))).toBe(true);
+  it("the account page loads its own account/account.css in its place", () => {
+    expect(read("account/Account.tsx")).toContain('import "./account.css"');
+    expect(existsSync(join(src, "account/account.css"))).toBe(true);
+    // The verbatim copy of report.css's account rules is gone with phase 5.
+    expect(existsSync(join(src, "account.css"))).toBe(false);
+    expect(existsSync(join(src, "Account.tsx"))).toBe(false);
   });
 
   it("no component outside the account page paints with an rp-* class", () => {
@@ -97,7 +98,7 @@ describe("report.css is gone", () => {
     const painting = [...KEEPS_RP_UNTIL_PHASE_5].filter((f) =>
       /className="rp-/.test(read(f)),
     );
-    expect(painting.sort()).toEqual(["Account.tsx"]);
+    expect(painting.sort()).toEqual([]);
   });
 
   it("main.tsx loads the page from ./dashboard/Dashboard", () => {

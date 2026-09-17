@@ -7,7 +7,8 @@
  * what is specific to `/account`. `BudgetMeter` itself is a `ui/`
  * component, styled in `ui/ui.css`.
  *
- * `PlanPanel` (`.db-plan*`), `WorkspaceCard` (`.db-ws*`), `ConfirmDialog`
+ * The page's own feedback line (`.db-feedback`), `PlanPanel` (`.db-plan*`),
+ * `WorkspaceCard` (`.db-ws*`), `ConfirmDialog`
  * (`.db-confirm*`), `AuthEntry` (`.db-entry*`, `.db-or`, `.db-providers`,
  * `.db-switch`, `.db-steps`, `.db-trust*`), `Unavailable` (`.db-empty-*`
  * additions to page-states.css's card) and `CreateWorkspace` (`.db-create`)
@@ -15,7 +16,33 @@
  * defining its own.
  */
 
+/* ---------------- a place's own line ---------------- */
+/* What a place has to say for itself — «جارٍ العمل…», or the answer to the
+   last press — printed where the press was: under the head for the page,
+   inside the form, inside the card. One sentence, no band: the old
+   `.account-feedback.notice` was a bordered strip. */
+.db-feedback {
+  margin: 0;
+  width: 100%;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  line-height: 1.7;
+}
+.db-feedback--note {
+  color: var(--text-1);
+}
+
 /* ---------------- the plan card's budgets ---------------- */
+/* style.css's element rule `article {…}` paints every <article> as a white
+   bordered box with its own padding and margin — a card inside the card.
+   The plan's body is the card's own content: flush, on the card's ground. */
+.db-plan-body {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
 .db-plan-budgets {
   list-style: none;
   margin: var(--space-4) 0 0;

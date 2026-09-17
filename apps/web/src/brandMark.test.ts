@@ -28,7 +28,7 @@ describe("the brand mark has one drawing", () => {
       "./landing/product-window.css",
       "./landing/closing.css",
       "./public/public.css",
-      "./account.css",
+      "./account/account.css",
       "./style.css",
     ]) {
       expect(read(css), css).not.toMatch(/\.lp-mark\s+i\b/);

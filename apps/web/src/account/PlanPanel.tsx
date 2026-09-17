@@ -145,7 +145,7 @@ export function PlanPanelView({
   };
 
   return shell(
-    <article>
+    <article className="db-plan-body">
       <h3>{words.title}</h3>
       <p className="db-muted">{words.statusLine}</p>
       {words.notice && (

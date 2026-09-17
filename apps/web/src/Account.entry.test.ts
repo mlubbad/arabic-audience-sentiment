@@ -48,7 +48,7 @@ atUrl("");
 async function render() {
   vi.stubEnv("VITE_AUTH_PROVIDERS", shared.providers);
   vi.stubEnv("VITE_GOOGLE_CLIENT_ID", shared.googleClientId);
-  const { Account } = await import("./Account");
+  const { Account } = await import("./account/Account");
   return renderToStaticMarkup(
     createElement(
       QueryClientProvider,
