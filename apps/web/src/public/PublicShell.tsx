@@ -69,7 +69,15 @@ export function PublicShell({
         key={l.href}
         href={l.href}
         onClick={(e) => {
-          if (open) {
+          // Same-page only — the three anchors this page itself owns
+          // (#why/#experience/#questions) are always written bare, so this
+          // is enough without resolving a full URL. A cross-page anchor
+          // (PricingPage's and LegalPage's own FAQ link, `${home}#questions`)
+          // unloads this page regardless of the sheet, so it keeps the plain
+          // `<a>` behaviour whether the sheet is open or not — intercepting
+          // it here once cost a real regression: `location.hash` was being
+          // set on the *current* page's URL instead of navigating home.
+          if (open && l.href.startsWith("#")) {
             e.preventDefault();
             pending.current = l.href;
           }

@@ -72,4 +72,53 @@ describe("PublicShell", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(menu).toHaveAttribute("aria-expanded", "false");
   });
+
+  it("does not intercept a cross-page anchor even while the sheet is open", async () => {
+    // PricingPage's (and LegalPage's) own FAQ link points at the home page's
+    // `#questions`, not this page's — the sheet must leave it to native
+    // navigation. Regression once: the sheet swallowed the click and set
+    // `location.hash` on the *current* page instead of navigating home.
+    // jsdom's own location starts at "/", the same pathname the link's own
+    // "/" resolves to, which would make an *uncancelled* click a same-page
+    // hash update regardless of the fix under test — so this puts jsdom on
+    // "/pricing" first, matching the `page="pricing"` prop, so the link
+    // genuinely points elsewhere.
+    window.history.pushState({}, "", "/pricing");
+    render(
+      <MemoryRouter>
+        <DirectionProvider dir="rtl">
+          <PublicShell
+            locale="ar"
+            page="pricing"
+            links={[
+              { href: "/#questions", label: ar.lpNavFaq, kind: "anchor" },
+            ]}
+            mainId="pricing-content"
+          >
+            <h1>الأسعار</h1>
+          </PublicShell>
+        </DirectionProvider>
+      </MemoryRouter>,
+    );
+    const menu = screen.getByRole("button", { name: ar.lpMenuLabel });
+    await userEvent.click(menu);
+    let defaultPrevented: boolean | null = null;
+    const onClick = (e: Event) => {
+      defaultPrevented = e.defaultPrevented;
+    };
+    document.addEventListener("click", onClick);
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("link", {
+        name: ar.lpNavFaq,
+      }),
+    );
+    document.removeEventListener("click", onClick);
+    expect(defaultPrevented).toBe(false);
+    // jsdom does not implement navigating to a different pathname, so this
+    // stays empty rather than becoming "#questions" — the assertion that
+    // matters is defaultPrevented above: the shell did not swallow the
+    // click, whatever jsdom then does or doesn't do with it.
+    expect(location.hash).toBe("");
+    window.history.pushState({}, "", "/");
+  });
 });
