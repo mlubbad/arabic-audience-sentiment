@@ -60,6 +60,7 @@ import { n } from "./format";
 import { barOptions, doughnutOptions, lineOptions } from "./chartOptions";
 import { FilterBar } from "./FilterBar";
 import { ActiveFilters } from "./ActiveFilters";
+import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
 import {
   chipsFor,
   EMPTY_FILTERS,
@@ -854,32 +855,14 @@ function DashboardBody({
         onReset={reset}
         S={S}
       />
-      {result.isPending && (
-        <div role="status" data-testid="loading" className="loading">
-          {S.loadingComments}
-        </div>
-      )}
-      {!result.isPending && result.isFetching && (
-        <p role="status" data-testid="updating" className="updating">
-          {S.updatingResults}
-        </p>
-      )}
+      {result.isPending && <Loading S={S} />}
+      {!result.isPending && result.isFetching && <Updating S={S} />}
       {result.isError && (
-        <div role="alert" className="notice" data-testid="load-error">
-          <p>
-            {result.failure?.startsWith("view:")
-              ? S.filtersFailed
-              : S.loadFailed}
-          </p>
-          {/* Small, and last. It is for the person who has to fix it, not for
-              the person reading the report — but it is on the screen, because
-              the alternative is fetching the payload by hand to find out what
-              a page in front of you already knows. */}
-          <p className="muted" data-testid="failure-code">
-            {S.failureCode} <code>{result.failure}</code>
-          </p>
-          <button onClick={() => void result.refetch()}>{S.retry}</button>
-        </div>
+        <LoadError
+          S={S}
+          failure={result.failure}
+          onRetry={() => void result.refetch()}
+        />
       )}
       {s && (
         <>
@@ -996,18 +979,18 @@ function DashboardBody({
                — which is the one thing a new client, on their first screen,
                with no filters set, cannot do. It also offered to show them
                "بيانات الاختبار" on a page reading their real channel. */
-            <section className="empty" data-testid="empty-state">
-              {s.workspace_total === 0 ? (
-                <>
-                  <h2>{S.emptyNoCommentsTitle}</h2>
-                  <p>{S.emptyNoCommentsLead}</p>
-                  {/* The path the reader is on, where the charts will be.
-                      This is the first screen every new reader sees, and it
-                      used to be an apology with two links. The steps are the
-                      account page's, from the same function; the second is
-                      read from the channel row, the third from the sync
-                      state the source already carries. */}
-                  {mode === "live" && (
+            s.workspace_total === 0 ? (
+              <EmptyState
+                kind="workspace"
+                S={S}
+                // The path the reader is on, where the charts will be. This
+                // is the first screen every new reader sees, and it used to
+                // be an apology with two links. The steps are the account
+                // page's, from the same function; the second is read from
+                // the channel row, the third from the sync state the source
+                // already carries.
+                setup={
+                  mode === "live" ? (
                     <SetupPath
                       steps={setupProgress(
                         {
@@ -1018,28 +1001,21 @@ function DashboardBody({
                       )}
                       testId="empty-setup"
                     />
-                  )}
-                  <div className="empty-actions">
-                    <a href="/sync">{S.emptyFollowCollection}</a>
-                    <a href="/account">{S.emptyConnectOrSync}</a>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2>{S.emptyNoMatchTitle}</h2>
-                  <p>{S.emptyNoMatchLead(n(s.workspace_total))}</p>
-                  <div className="empty-actions">
-                    {/* Not "إعادة ضبط الفلاتر", which is what the button in
-                        the filter bar says. Two controls with one name are one
-                        name too few — and from an empty page the useful
-                        promise is the result, not the mechanism. */}
-                    <button type="button" onClick={reset}>
-                      {S.showAllComments}
-                    </button>
-                  </div>
-                </>
-              )}
-            </section>
+                  ) : null
+                }
+                links={[
+                  { to: "/sync", label: S.emptyFollowCollection },
+                  { to: "/account", label: S.emptyConnectOrSync },
+                ]}
+              />
+            ) : (
+              <EmptyState
+                kind="filters"
+                S={S}
+                lead={S.emptyNoMatchLead(n(s.workspace_total))}
+                onReset={reset}
+              />
+            )
           ) : (
             <>
               <section className="rp-section" id="rp-videos">

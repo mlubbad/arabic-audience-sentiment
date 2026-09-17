@@ -1,0 +1,53 @@
+/* Loading, updating, error, empty and fixture-notice states for the
+   dashboard. Classes are db-*, tokens only — see dashboard.css's own note. */
+.db-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.db-sk-hero {
+  height: 96px;
+}
+.db-sk-bar {
+  height: 56px;
+}
+.db-sk-kpi {
+  height: 112px;
+}
+.db-sk-chart {
+  height: 280px;
+}
+.db-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.db-empty {
+  text-align: center;
+  padding: var(--space-7) var(--space-5);
+}
+.db-empty h2 {
+  margin: 0 0 var(--space-2);
+}
+.db-empty-actions {
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+.db-empty .setup-steps {
+  max-width: 34rem;
+  margin: var(--space-5) auto;
+  text-align: start;
+}
+.db-chart-empty {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--text-2);
+}
+.db-fixture {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
