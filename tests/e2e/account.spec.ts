@@ -114,7 +114,9 @@ test("retiring workspaces removes them until the last one refuses", async ({
   page,
 }) => {
   // Third workspace goes: two cards left.
-  await card(page, 3).getByTestId(`retire-${id(3)}`).click();
+  await card(page, 3)
+    .getByTestId(`retire-${id(3)}`)
+    .click();
   let dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await dialog.getByTestId(`retire-confirm-${id(3)}`).click();
@@ -122,7 +124,9 @@ test("retiring workspaces removes them until the last one refuses", async ({
   await expect(cards(page)).toHaveCount(2);
 
   // Second workspace goes: one card left.
-  await card(page, 2).getByTestId(`retire-${id(2)}`).click();
+  await card(page, 2)
+    .getByTestId(`retire-${id(2)}`)
+    .click();
   dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await dialog.getByTestId(`retire-confirm-${id(2)}`).click();
@@ -180,9 +184,7 @@ test("at 390px the three cards stack and nothing scrolls sideways", async ({
   await page.reload();
   await expect(cards(page)).toHaveCount(3);
   await expect(page.getByTestId("account-plan-panel")).toBeVisible();
-  const width = await page.evaluate(
-    () => document.documentElement.scrollWidth,
-  );
+  const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(390);
 });
 
