@@ -65,10 +65,9 @@ test("mobile landing has working navigation, keyboard access, and no page overfl
     .getByRole("link", { name: "شاهد التجربة" })
     .click();
   await expect(menu).toHaveAttribute("aria-expanded", "false");
-  // PublicShell itself now defers this scroll by 300ms (measured: closing
-  // the sheet blocks an earlier scrollIntoView with nothing to observe and
-  // retry against — see its own comment), so this waits past that.
-  await page.waitForTimeout(400);
+  // The scroll happens from PublicShell's own onCloseAutoFocus, right as the
+  // sheet finishes closing — toBeInViewport retries until Playwright's
+  // default timeout, no fixed wait needed.
   await expect(page.locator("#experience")).toBeInViewport();
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
@@ -113,7 +112,20 @@ test("every word a visitor can read clears its contrast floor", async ({
       };
       return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
     };
-    const parse = (c: string) => (c.match(/[\d.]+/g) ?? []).map(Number);
+    // A `color-mix()` result (background or text) serializes on this build
+    // as `color(srgb r g b [/ a])` with 0-1 components, not legacy
+    // `rgb(0-255)` — read that form too, scaled up, rather than reading past
+    // it: the four sentiment badge tones are `color-mix()` on both
+    // properties (ui.css), a live expression by design.
+    const parse = (c: string) => {
+      const nums = (c.match(/[\d.]+/g) ?? []).map(Number);
+      if (c.startsWith("color(srgb")) {
+        const [r, g, b, a] = nums;
+        const rgb = [r, g, b].map((v) => Math.round(v * 255));
+        return a === undefined ? rgb : [...rgb, a];
+      }
+      return nums;
+    };
     // The ground a translucent layer sits on, not the layer itself.
     const groundOf = (el: Element) => {
       let e: Element | null = el;

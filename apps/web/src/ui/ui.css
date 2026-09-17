@@ -20,6 +20,7 @@
   border: 1px solid transparent;
   font-family: var(--font-body);
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -147,31 +148,28 @@
 
    The token itself only clears the 3:1 floor a mark needs (a dot, a bar) —
    measured in Landing.identity.test.ts. Set as this badge's own small text at
-   14px it needs 4.5:1, so both declarations below are the token computed,
-   not typed by hand: `background` is `color-mix(in srgb, var(--sentiment-*)
-   14%, white)` and `color` is `color-mix(in srgb, var(--sentiment-*) 90%,
-   black)`. Neither is written live, because this build's `color-mix()`
-   result serializes as `color(srgb 0..1 0..1 0..1)` on *either* property,
-   which the e2e contrast-floor test's rgb(0-255) parser misreads as near-
-   black — confirmed independently (palette.ts's own contrast formula, same
-   maths, run outside the browser) at 4.7-5.4:1 for all four with these
-   values, comfortably over the 4.5 floor the live expression cannot be
-   measured against here. Change the token and recompute both. */
+   14px it needs 4.5:1, so `color` is the token mixed 90% toward black and
+   `background` is the token mixed 14% toward white — both live
+   `color-mix()`, both derived from the one token, never a hex written again.
+   This build serializes a `color-mix()` result as `color(srgb r g b)`, which
+   the e2e contrast-floor test's parser has been taught to read (see its own
+   comment); the colour stays the live expression here rather than working
+   around the test in the primitive. */
 .ui-badge--positive {
-  background: #ddecea;
-  color: #0c6e5e;
+  background: color-mix(in srgb, var(--sentiment-positive) 14%, white);
+  color: color-mix(in srgb, var(--sentiment-positive) 90%, black);
 }
 .ui-badge--negative {
-  background: #f7e1e3;
-  color: #b22433;
+  background: color-mix(in srgb, var(--sentiment-negative) 14%, white);
+  color: color-mix(in srgb, var(--sentiment-negative) 90%, black);
 }
 .ui-badge--sentiment-mixed {
-  background: #f2e6db;
-  color: #924800;
+  background: color-mix(in srgb, var(--sentiment-mixed) 14%, white);
+  color: color-mix(in srgb, var(--sentiment-mixed) 90%, black);
 }
 .ui-badge--sentiment-neutral {
-  background: #eaeaee;
-  color: #605d78;
+  background: color-mix(in srgb, var(--sentiment-neutral) 14%, white);
+  color: color-mix(in srgb, var(--sentiment-neutral) 90%, black);
 }
 
 .ui-input,

@@ -36,10 +36,13 @@ const css = cssFiles
 describe("the landing speaks the product's language", () => {
   it("writes no sentiment word of its own", () => {
     // It used to carry a `name` per demo comment — "إيجابي", "مختلط",
-    // "محايد", "سلبي" — beside the shared table that already held them.
-    const body = src.slice(src.indexOf("const examples"));
+    // "محايد", "سلبي" — beside the shared table that already held them. The
+    // landing is now several files, not one, so this scans all of them —
+    // slicing to just past "const examples" (where the old single-file
+    // version's demo data began) would silently skip every component file
+    // sorted ahead of `demoData.ts`.
     for (const word of Object.values(labels)) {
-      expect(body.includes(`"${word}"`), word).toBe(false);
+      expect(src.includes(`"${word}"`), word).toBe(false);
     }
     // The shared strings, through the same hook the product reads them with
     // — so the landing's four words are the dashboard's four words in either

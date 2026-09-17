@@ -203,3 +203,11 @@
     justify-self: start;
   }
 }
+@media (max-width: 420px) {
+  /* Five filters ("الكل" plus the four sentiments) at the shared tab
+     padding wrap the fifth ("سلبي") onto its own row at 390px. */
+  .pw-filters .ui-tabs-trigger {
+    padding-inline: 8px;
+    font-size: var(--lp-t-xs);
+  }
+}

@@ -13,3 +13,8 @@
 .lp-benefit p {
   color: var(--text-2);
 }
+/* The card is a column flex box with no `align-items`, so its default
+   `stretch` pulls the ordinal badge to the card's full width. */
+.lp-benefit .ui-badge {
+  align-self: flex-start;
+}

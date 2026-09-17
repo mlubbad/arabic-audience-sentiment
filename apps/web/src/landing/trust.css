@@ -20,3 +20,8 @@
 .lp-trust-item p {
   color: var(--text-2);
 }
+/* Same fix as .lp-benefit: the column flex box's default `stretch` pulls
+   the eyebrow badge to the card's full width otherwise. */
+.lp-trust-item .ui-badge {
+  align-self: flex-start;
+}

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import "./public.css";
 import { BrandMark } from "../BrandMark";
@@ -47,6 +47,15 @@ export function PublicShell({
 }) {
   const S = useStrings(locale);
   const [open, setOpen] = useState(false);
+  // An anchor clicked while the sheet is open: the browser's native hash-jump
+  // fires, but Radix's own close-focus lands right after it — `DialogContent`'s
+  // default `onCloseAutoFocus` focuses the trigger without `preventScroll`,
+  // which scrolls the page straight back to the header. So the jump has to
+  // happen *after* that focus restoration, not race it: stash the target
+  // here, cancel Radix's default autofocus in `onCloseAutoFocus` below, and
+  // do the native fragment navigation there instead, once nothing is left to
+  // undo it.
+  const pending = useRef<string | null>(null);
   const home = publicPath("home", locale);
   const pricing = publicPath("pricing", locale);
   const questions = page === "home" ? "#questions" : `${home}#questions`;
@@ -60,24 +69,13 @@ export function PublicShell({
         key={l.href}
         href={l.href}
         onClick={(e) => {
-          const wasOpen = open;
-          setOpen(false);
-          // An anchor on this same page: the browser's own hash-navigation
-          // scroll would otherwise handle this, but from inside the sheet it
-          // silently drops the scroll and nothing retries it — measured, not
-          // guessed: closing the sheet (react-remove-scroll's cleanup plus
-          // Radix's focus restoration) blocks a scrollIntoView attempted too
-          // soon after, for about 250ms, with no DOM state to observe and
-          // wait on in between. A target elsewhere (PricingPage's own FAQ
-          // link points at the home page's `#questions`) isn't on this page
-          // yet, so this leaves it to native navigation.
-          const target = document.getElementById(l.href.slice(1));
-          if (target) {
+          if (open) {
             e.preventDefault();
-            history.pushState(null, "", l.href);
-            if (wasOpen) setTimeout(() => target.scrollIntoView(), 300);
-            else target.scrollIntoView();
+            pending.current = l.href;
           }
+          // Closed already (the desktop nav, never inside the sheet): the
+          // browser's own hash-navigation does what it always did.
+          setOpen(false);
         }}
       >
         {l.label}
@@ -124,6 +122,14 @@ export function PublicShell({
             closeLabel={S.menuClose}
             className="lp-sheet"
             aria-describedby={undefined}
+            onCloseAutoFocus={(e) => {
+              const h = pending.current;
+              if (h) {
+                pending.current = null;
+                e.preventDefault();
+                location.hash = h;
+              }
+            }}
           >
             <DialogTitle className="lp-sheet-title">{S.lpNavLabel}</DialogTitle>
             <nav className="lp-sheet-nav" aria-label={S.lpNavLabel}>
