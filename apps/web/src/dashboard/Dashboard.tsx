@@ -59,6 +59,7 @@ import { Timing } from "./Timing";
 import { People } from "./People";
 import { Compare } from "./Compare";
 import { Engaged } from "./Engaged";
+import { Comments } from "./Comments";
 import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
 import {
   chipsFor,
@@ -771,206 +772,24 @@ function DashboardBody({
               <People S={S} people={people} by={peopleBy} onBy={setPeopleBy} />
               <Compare s={s} S={S} labels={labels} onPick={pickVideo} />
               <Engaged s={s} S={S} />
-              <section
-                className="rp-section"
-                id="rp-comments"
-                data-testid="comments-table"
+              <Comments
+                s={s}
+                S={S}
+                lang={lang}
+                labels={labels}
+                cards={cards}
+                cardTab={cardTab}
+                onCardTab={setCardTab}
+                cursors={cursors}
+                onGo={goTo}
+                isFetching={result.isFetching}
+                cursorNotice={cursorNotice}
+                exporting={exporting}
+                onExport={() => exporting.mutate()}
+                onReview={startReview}
+                onTopicReview={startTopicReview}
+                topicName={topicName}
               >
-                <header>
-                  <h2>{S.secComments}</h2>
-                  <p className="rp-sub">{S.commentsLead}</p>
-                </header>
-                <div className="rp-tabs" style={{ marginBottom: "16px" }}>
-                  <button
-                    type="button"
-                    className="rp-tab"
-                    aria-pressed={cardTab === "liked"}
-                    onClick={() => setCardTab("liked")}
-                  >
-                    {S.tabMostLiked}
-                  </button>
-                  <button
-                    type="button"
-                    className="rp-tab"
-                    aria-pressed={cardTab === "recent"}
-                    onClick={() => setCardTab("recent")}
-                  >
-                    {S.tabNewest}
-                  </button>
-                  <button
-                    type="button"
-                    className="rp-tab"
-                    aria-pressed={cardTab === "critical"}
-                    onClick={() => setCardTab("critical")}
-                  >
-                    {S.tabCritical}
-                  </button>
-                </div>
-                <ul className="rp-comments" data-testid="rp-cards">
-                  {cards.map((c) => (
-                    <li key={c.id} className="rp-comment">
-                      <div className="rp-comment-head">
-                        <span className="rp-comment-who">
-                          {/* A purged author is named as purged, not left
-                              blank and not replaced with a plausible name. */}
-                          {c.author_name ?? S.purgedAuthor}
-                        </span>
-                        <span
-                          className="rp-chip"
-                          data-label={c.label ?? "none"}
-                        >
-                          {c.label ? labels[c.label] : S.noLabel}
-                          {c.label &&
-                            !c.reviewed &&
-                            typeof c.prediction?.class_scores?.[c.label] ===
-                              "number" && (
-                              <span className="rp-chip-score">
-                                {Math.round(
-                                  (c.prediction.class_scores[c.label] ?? 0) *
-                                    100,
-                                )}
-                                {lang === "ar" ? "٪" : "%"}
-                              </span>
-                            )}
-                        </span>
-                      </div>
-                      <p className="rp-comment-text">{commentText(c, S)}</p>
-                      <div className="rp-comment-foot">
-                        <span>{displayDate(c.published_at, lang)}</span>
-                        <span>
-                          {/* Unknown likes are said to be unknown. Rendering a
-                              zero here would be a number we invented. */}
-                          {c.likes_value === null
-                            ? S.likesUnknown
-                            : S.countLikes(n(c.likes_value))}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                {cursorNotice && (
-                  <p
-                    role="status"
-                    data-testid="cursor-notice"
-                    className="muted"
-                  >
-                    {S.cursorReset}
-                  </p>
-                )}
-                {/* Above the table, not under it.
-                    It exports the whole filtered set, not the page on screen —
-                    so it belongs with the thing it describes, before a reader
-                    has scrolled twenty-five rows past the point where knowing
-                    that would have helped. A control that only appears once
-                    you have finished reading is one you find after you needed
-                    it. */}
-                <div className="export">
-                  <button
-                    type="button"
-                    onClick={() => exporting.mutate()}
-                    disabled={exporting.isPending}
-                  >
-                    {S.exportCsv}
-                  </button>
-                  <p className="muted">{S.exportNote(s.total)}</p>
-                  {exporting.isError && (
-                    <p role="alert" data-testid="export-error">
-                      {S.exportFailed}
-                    </p>
-                  )}
-                </div>
-                <div className="table-wrap">
-                  <table>
-                    <caption>{S.commentsCaption}</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">{S.colAuthor}</th>
-                        <th scope="col">{S.colComment}</th>
-                        <th scope="col">{S.colSentiment}</th>
-                        <th scope="col">{S.colDate}</th>
-                        <th scope="col">{S.colCorrection}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {s.comments.map((c) => (
-                        <tr key={c.id}>
-                          <td>
-                            {c.author_name ?? S.purgedAuthor}
-                            {c.is_reply && <small>{S.replyTag}</small>}
-                          </td>
-                          <td>{commentText(c, S)}</td>
-                          <td>
-                            {/* The cards a hundred pixels above wear a chip for
-                                this. Printing it as bare text here made one
-                                attribute look like two and left the column
-                                impossible to scan. */}
-                            <span
-                              className="rp-chip"
-                              data-label={c.label ?? "none"}
-                            >
-                              {c.label ? labels[c.label] : S.unanalysedOrOld}
-                              {c.label &&
-                                !c.reviewed &&
-                                typeof c.prediction?.class_scores?.[c.label] ===
-                                  "number" && (
-                                  <span className="rp-chip-score">
-                                    {Math.round(
-                                      (c.prediction.class_scores[c.label] ??
-                                        0) * 100,
-                                    )}
-                                    {lang === "ar" ? "٪" : "%"}
-                                  </span>
-                                )}
-                            </span>
-
-                            {c.reviewed && <small>{S.humanReview}</small>}
-                            {/* The topic beside the sentiment, once a model
-                                has run. "No topic" is said in words so an
-                                empty cell is not mistaken for an unclassified
-                                one: the two mean different things. */}
-                            {s.active_topic_key && (
-                              <span
-                                className="rp-chip rp-chip-topic"
-                                data-topic={c.topic ?? "none"}
-                                data-testid="topic-chip"
-                              >
-                                {c.topic ? topicName(c.topic) : S.topicNone}
-                                {c.topic_reviewed && (
-                                  <small>{S.topicReviewed}</small>
-                                )}
-                              </span>
-                            )}
-                          </td>
-                          <td>{displayDate(c.published_at, lang)}</td>
-                          <td>
-                            <button
-                              type="button"
-                              onClick={(e) => startReview(c, e.currentTarget)}
-                              aria-label={S.correctLabelFor(
-                                c.author_name ?? S.purgedAuthor,
-                              )}
-                            >
-                              {S.correct}
-                            </button>
-                            {s.active_topic_key && (
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  startTopicReview(c, e.currentTarget)
-                                }
-                                aria-label={S.correctTopicFor(
-                                  c.author_name ?? S.purgedAuthor,
-                                )}
-                              >
-                                {S.correctTopic}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
                 {reviewing && (
                   <form
                     className="review"
@@ -1142,32 +961,7 @@ function DashboardBody({
                     )}
                   </form>
                 )}
-                <nav className="pager" aria-label={S.pagerLabel}>
-                  <button
-                    type="button"
-                    disabled={cursors.length === 0 || result.isFetching}
-                    onClick={() => goTo(cursors.slice(0, -1))}
-                  >
-                    {S.previousPage}
-                  </button>
-                  <p data-testid="page-state" aria-live="polite">
-                    {S.pageState(
-                      cursors.length + 1,
-                      s.comments.length,
-                      s.total,
-                    )}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={!s.next_cursor || result.isFetching}
-                    onClick={() =>
-                      s.next_cursor && goTo([...cursors, s.next_cursor])
-                    }
-                  >
-                    {S.nextPage}
-                  </button>
-                </nav>
-              </section>
+              </Comments>
             </>
           )}
           {/* Plan limits and worker health used to sit here, under the

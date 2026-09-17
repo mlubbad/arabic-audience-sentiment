@@ -1,0 +1,115 @@
+/* The comments section: the "most liked / newest / critical" cards, the
+   export action, and `CommentsTable`'s two layouts (table wide, stacked
+   `Card`+`dl` at phone width — see `compare.css` for the same split). */
+.db-card-tabs {
+  margin-bottom: var(--space-4);
+}
+.db-comment-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+}
+.db-comment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+}
+.db-comment-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.db-comment-who {
+  font-weight: 600;
+  font-size: var(--fs-small);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+.db-comment-text {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: 1.9;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.db-comment-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--fs-micro);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+/* The score beside an unreviewed label's chip — muted relative to the
+   chip's own tone, not a second colour. */
+.db-chip-score {
+  opacity: 0.85;
+  font-size: 0.85em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-inline-start: 3px;
+}
+/* The topic chip sits beside the sentiment chip and must not read as one:
+   sentiment has a colour scale, a topic is a name. Filled, muted, no hue. */
+.db-chip-topic {
+  margin-inline-start: var(--space-2);
+}
+.db-chip-topic[data-topic="none"] {
+  border: 1px dashed var(--border-2);
+  background: transparent;
+  color: var(--text-3);
+}
+.db-export {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.db-export p {
+  margin: 0;
+}
+/* Stacked comment rows, under 760px (see `CommentsTable.tsx`). */
+.db-comments-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-comment-row .db-row-actions {
+  margin-top: var(--space-3);
+}
+.db-comment-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 0;
+  align-items: start;
+}
+.db-comment-dl > div {
+  display: contents;
+}
+.db-comment-dl dt {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.db-comment-dl dd {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-1);
+}
+@media (max-width: 1080px) {
+  .db-comment-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .db-comment-cards {
+    grid-template-columns: 1fr;
+  }
+}
