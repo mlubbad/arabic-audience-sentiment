@@ -10,6 +10,7 @@ import {
 import { beginConnect, connectErrorMessage } from "./connect";
 import { useStrings } from "./strings";
 import { providers, type ProviderId } from "./authProviders";
+import { useGoogleOneTap } from "./googleOneTap";
 import { setupSteps } from "./setup";
 import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
 import { PlanPanel } from "./PlanPanel";
@@ -64,6 +65,28 @@ export function Account() {
       new URLSearchParams(window.location.search).has("signup"),
   );
   const authProviders = providers(import.meta.env.VITE_AUTH_PROVIDERS, S);
+  const googleOpen = authProviders.some(
+    (p) => p.id === "google" && !p.closedReason,
+  );
+  // Called unconditionally, above the `!supabase` early return below: hooks
+  // cannot themselves be conditional, so `enabled` carries the actual gate —
+  // no client, an existing session, or the door not open all mean "do not
+  // prompt" rather than "do not call the hook".
+  useGoogleOneTap({
+    enabled: !!supabase && !session && googleOpen,
+    clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+    onCredential: async (token, nonce) => {
+      const { error } = await supabase!.auth.signInWithIdToken({
+        provider: "google",
+        token,
+        nonce,
+      });
+      // A resolved session is picked up by the `onAuthStateChange` listener
+      // above, the same way the OAuth door's redirect is — nothing else to
+      // do here on success.
+      if (error) say("auth", S.providerStartFailed);
+    },
+  });
   // A platform admin has nobody to hand a workspace to but themself, so the
   // retire door is not offered; retire_workspace refuses them too.
   const access = useIsPlatformAdmin(session);

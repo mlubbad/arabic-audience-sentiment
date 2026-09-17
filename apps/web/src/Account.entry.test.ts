@@ -9,8 +9,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ar } from "./strings/ar";
 
-const shared = vi.hoisted(() => ({ providers: "", isAdmin: false }));
+const shared = vi.hoisted(() => ({
+  providers: "",
+  isAdmin: false,
+  googleClientId: "test-client-id",
+}));
 
 vi.mock("./supabase", () => ({
   supabase: {
@@ -42,6 +47,7 @@ atUrl("");
 // static render never fires them, so an empty client is enough.
 async function render() {
   vi.stubEnv("VITE_AUTH_PROVIDERS", shared.providers);
+  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", shared.googleClientId);
   const { Account } = await import("./Account");
   return renderToStaticMarkup(
     createElement(
@@ -56,6 +62,7 @@ beforeEach(() => {
   vi.resetModules();
   shared.providers = "";
   shared.isAdmin = false;
+  shared.googleClientId = "test-client-id";
   atUrl("");
 });
 
@@ -98,6 +105,18 @@ describe("the sign-in surface", () => {
     // And leaves the others shut, so the UI cannot get ahead of the backend.
     expect(html).toContain('id="why-azure"');
     expect(html).toContain('id="why-sso"');
+  });
+
+  it("the Google button carries no closed sentence once the door is configured open, and does once it is not", async () => {
+    shared.providers = "google";
+    const open = await render();
+    expect(open).toContain('data-provider="google"');
+    expect(open).not.toContain(ar.providerClosedGoogle);
+
+    shared.providers = "";
+    const closed = await render();
+    expect(closed).toContain('data-provider="google"');
+    expect(closed).toContain(ar.providerClosedGoogle);
   });
 
   it("never puts two buttons of the same name on one screen", async () => {
