@@ -191,6 +191,9 @@ export async function fetchOwnChannel(
     // between "something failed" and "the YouTube Data API is switched off in
     // your Google Cloud project". Anything unrecognised stays generic.
     const reason = await refusalReason(response);
+    // Status and reason are enums, never the body: enough to name the refusal
+    // in the function log without echoing the request or the credential.
+    console.error("channels.list refused", response.status, reason || "-");
     if (reason === "accessNotConfigured" || reason === "SERVICE_DISABLED")
       throw new ConnectError("youtube_api_not_enabled");
     if (reason === "quotaExceeded")
