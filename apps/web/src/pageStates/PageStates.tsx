@@ -22,6 +22,7 @@
  */
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { cn } from "../ui/cn";
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -142,11 +143,13 @@ export function LoadError({
  * page's own name over an `h1`, since the card is then the only heading on
  * the screen and the rail's «التشغيل» must land on one that agrees with it.
  * `testId` names that state for the browser suite (`sync-signed-out`); the
- * default stays `empty-state`.
+ * default stays `empty-state`. `className` is for that page's
+ * `db-empty--page` measure; the dashboard's card spans its column.
  */
 export function EmptyState({
   kind,
   S,
+  className,
   eyebrow,
   title,
   heading: Heading = "h2",
@@ -158,6 +161,7 @@ export function EmptyState({
 }: {
   kind: "workspace" | "filters";
   S: Strings;
+  className?: string;
   eyebrow?: string;
   title?: string;
   heading?: "h1" | "h2";
@@ -170,7 +174,7 @@ export function EmptyState({
   testId?: string;
 }) {
   return (
-    <Card className="db-empty" data-testid={testId}>
+    <Card className={cn("db-empty", className)} data-testid={testId}>
       {kind === "workspace" ? (
         <>
           {eyebrow && <Badge tone="neutral">{eyebrow}</Badge>}

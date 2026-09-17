@@ -15,6 +15,20 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  /* style.css's element rule `header {…}` paints every <header> as the old
+     site's top bar — card ground, a bottom border, 1rem of padding and
+     `align-items: center`, which centred the eyebrow, the h1 and the lead
+     over a white band. Reset here, and on every section head below. */
+  background: none;
+  border: 0;
+  padding: 0;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+/* The eyebrow is a pill, not a band: stretched with its siblings it ran
+   the full column as one pale bar. It sits at the start edge on its own. */
+.db-hero > .ui-badge {
+  align-self: flex-start;
 }
 .db-hero h1 {
   margin: 0;
@@ -63,6 +77,12 @@
   flex-direction: column;
   gap: var(--space-2);
   margin-bottom: var(--space-4);
+  /* The same reset as `.db-hero`'s: flush on the section's own ground. */
+  background: none;
+  border: 0;
+  padding: 0;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 .db-section > header h2 {
   font-size: var(--fs-h2);

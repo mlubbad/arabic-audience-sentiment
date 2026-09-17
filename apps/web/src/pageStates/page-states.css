@@ -34,7 +34,12 @@
 .db-empty h1 {
   font-size: clamp(26px, 4vw, 40px);
   line-height: 1.25;
-  letter-spacing: 0;
+}
+/* The card as the page (the operations page signed out): a reading measure
+   in the middle of the content column, not a band across all of it. */
+.db-empty--page {
+  max-width: 44rem;
+  margin-inline: auto;
 }
 .db-empty > .ui-badge {
   margin-bottom: var(--space-3);

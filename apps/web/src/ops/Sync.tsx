@@ -98,6 +98,7 @@ export function Sync() {
       kind="workspace"
       S={S}
       testId="sync-signed-out"
+      className="db-empty--page"
       eyebrow={S.opsEyebrow}
       title={S.opsTitle}
       heading="h1"

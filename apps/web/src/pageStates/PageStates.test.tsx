@@ -141,6 +141,7 @@ describe("EmptyState as a page", () => {
           kind="workspace"
           S={ar}
           testId="sync-signed-out"
+          className="db-empty--page"
           eyebrow={ar.opsEyebrow}
           title={ar.opsTitle}
           heading="h1"
@@ -154,6 +155,7 @@ describe("EmptyState as a page", () => {
     );
     const state = screen.getByTestId("sync-signed-out");
     expect(screen.queryByTestId("empty-state")).toBeNull();
+    expect(state).toHaveClass("db-empty", "db-empty--page");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       ar.opsTitle,
     );
