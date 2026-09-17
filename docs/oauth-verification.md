@@ -85,17 +85,23 @@ channels; row-level security isolates each customer's data in our database.
 
 **Where in your app is this scope used? (screens to show in the video)**
 ```
-1. The account page (/account), pressing "Connect a YouTube channel" — this is where the
-   OAuth flow in question starts.
-2. Google's consent screen granting youtube.readonly and youtube.force-ssl.
-3. The application's own confirmation that the channel connected.
-4. The video catalogue (/sync), which is populated using videos.list and playlistItems.list
-   under youtube.readonly.
-5. The dashboard's comments view, populated using commentThreads.list and comments.list
-   under youtube.force-ssl — the actual, and only, use of the sensitive scope.
-6. The account page again, showing the "disconnect channel" control — the in-app revocation
-   path.
+1. Why a narrower scope is not enough: commentThreads.list on one of my own videos,
+   authorized with youtube.readonly only, returns 403 insufficientPermissions; the same
+   call under youtube.force-ssl returns the comments (OAuth Playground / API Explorer).
+2. The account page (/account), pressing "Connect a YouTube channel" — where the OAuth
+   flow starts, with the app's own notice of what happens at Google.
+3. Google's consent screen granting the single scope, youtube.force-ssl.
+4. The application's own confirmation that the channel connected.
+5. The video catalogue (/sync), populated with channels.list, playlistItems.list and
+   videos.list under youtube.force-ssl — no comment read yet; the owner selects videos.
+6. The dashboard's comments view, populated with commentThreads.list and comments.list on
+   the selected videos — the reason the scope is needed; labels are ours, nothing is
+   written back.
+7. Revocation, both ways: the "Disconnect channel" control on /account, and the app's
+   entry on myaccount.google.com/permissions.
 ```
+(Revised 2026-09-18 for the single scope and the reviewer's "why not narrower" criterion;
+the 2026-09-16 wording listed both scopes and had no failing-scope shot.)
 
 **Privacy Policy URL:** `https://app.sky-develop.net/privacy-policy`
 **App homepage:** `https://app.sky-develop.net`
