@@ -122,7 +122,7 @@ export function FilterBar({
   }
 
   const searchField = (
-    <div className="db-field db-field--search">
+    <div className="ui-field ui-field--search">
       <label htmlFor="f-query" className="ui-sr-only">
         {S.searchLabel}
       </label>

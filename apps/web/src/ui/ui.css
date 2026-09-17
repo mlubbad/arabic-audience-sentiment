@@ -197,6 +197,20 @@
   resize: vertical;
 }
 
+/* A labelled control: `ui/Labelled`'s select, the filter bar's inputs. It
+   sat in pages.css as `.db-field`, which made a ui/ primitive depend on a
+   page sheet — a page that never loaded pages.css got an unstyled field. */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+.ui-field > label {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+
 .ui-checkbox-row,
 .ui-switch-row {
   display: inline-flex;

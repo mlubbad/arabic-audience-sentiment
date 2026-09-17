@@ -128,19 +128,6 @@
   font-size: var(--fs-micro);
   font-weight: 600;
 }
-/* A labelled control — `ui/Labelled`'s select, the filter bar's inputs.
-   Moved here from filter-bar.css when the helper moved to ui/: the
-   catalogue's sort uses it on a page that never loads the bar's sheet. */
-.db-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 140px;
-}
-.db-field > label {
-  font-size: var(--fs-small);
-  color: var(--text-2);
-}
 .db-row-actions {
   display: flex;
   gap: var(--space-2);

@@ -1,8 +1,9 @@
 /**
  * The catalogue: `Catalogue`, `CataloguePreview`, `SelectionBar`.
  * `pages.css`'s shared db-* rules (`db-section`, `db-lead`, `db-note`,
- * `db-missing`, `db-row-actions`, `db-pager`, `db-field`) carry what this
- * shares with the dashboard; this file holds only what is the catalogue's.
+ * `db-missing`, `db-row-actions`, `db-pager`) carry what this shares with
+ * the dashboard, and `ui/ui.css`'s `.ui-field` dresses the sort's label;
+ * this file holds only what is the catalogue's.
  * Tokens only: `layers.test.ts`'s rule for app.css holds here too.
  */
 

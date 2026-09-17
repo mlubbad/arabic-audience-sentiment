@@ -22,7 +22,7 @@
   border-bottom: var(--glass-2-edge);
   box-shadow: var(--glass-2-ring);
 }
-.db-filterbar .db-field--search {
+.db-filterbar .ui-field--search {
   flex: 1 1 180px;
 }
 .db-filterbar-actions {

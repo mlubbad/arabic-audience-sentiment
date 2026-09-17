@@ -34,7 +34,7 @@ export function Labelled({
   children: ReactNode;
 }) {
   return (
-    <div className="db-field">
+    <div className="ui-field">
       <label htmlFor={id} className={labelHidden ? "ui-sr-only" : undefined}>
         {label}
       </label>
