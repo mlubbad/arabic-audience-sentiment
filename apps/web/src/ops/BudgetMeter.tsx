@@ -37,7 +37,7 @@ export function BudgetMeter({
   label: string;
   /** The share and the state message, e.g. «74٪ — اقترب الاستهلاك من الحد». */
   sentence: string;
-  testId: string;
+  testId?: string;
 }) {
   const unlimited = allowance === -1;
   const pct =
@@ -49,7 +49,7 @@ export function BudgetMeter({
       <div
         className="db-meter-bar"
         role="progressbar"
-        aria-valuenow={unlimited ? undefined : used}
+        aria-valuenow={unlimited ? undefined : Math.min(used, allowance)}
         aria-valuemin={unlimited ? undefined : 0}
         aria-valuemax={unlimited ? undefined : allowance}
         aria-label={label}

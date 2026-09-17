@@ -39,6 +39,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  /* A real <ul>/<li> pair, so a screen reader still announces "list, N
+     items" and each row's position — list-style: none alone can drop
+     that in Safari/VoiceOver, which is why the markup also carries
+     role="list" (Catalogue.tsx). */
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 .db-cat-row {
   display: grid;
@@ -62,10 +69,17 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
+  /* A Radix/plain <button> is a <button>, and style.css frames every bare
+     button as a 44px glass control with its own shadow and hover/active
+     motion. This is a row-opening link, not that control. */
+  min-height: 0;
   padding: 0;
   border: 0;
   border-radius: var(--r-1);
-  background: none;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   font: inherit;
   color: inherit;
   text-align: start;
@@ -75,6 +89,12 @@
 .db-cat-open:focus-visible .db-cat-title {
   color: var(--link);
   text-decoration: underline;
+}
+.db-cat-open:hover:not(:disabled) {
+  box-shadow: none;
+}
+.db-cat-open:active:not(:disabled) {
+  transform: none;
 }
 .db-cat-open:focus-visible {
   outline: 2px solid var(--focus-ring);

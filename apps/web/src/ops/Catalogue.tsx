@@ -398,84 +398,84 @@ export function Catalogue({
               <strong>{S.catNoMatch}</strong>
             </p>
           ) : (
-            <div className="db-cat-list">
+            <ul className="db-cat-list" role="list">
               {paged.rows.map((r) => {
                 const off = r.comments_state === "disabled";
                 const s = stateOf(r);
                 return (
-                  <Card
-                    key={r.id}
-                    className="db-cat-row"
-                    data-testid={`cat-row-${r.id}`}
-                    data-kind={r.kind}
-                    data-checked={ticked.has(r.id)}
-                    data-disabled={off}
-                  >
-                    <Checkbox
-                      label={r.title}
-                      hideLabel
-                      data-testid={`cat-check-${r.id}`}
-                      checked={ticked.has(r.id)}
-                      disabled={off || busy}
-                      onCheckedChange={(on) => toggle(r.id, on === true)}
-                    />
-                    {/* The thumbnail and the title are one button: press
-                        either to watch here. A button, not a link — nothing
-                        navigates. */}
-                    <button
-                      type="button"
-                      className="db-cat-open"
-                      data-testid={`cat-open-${r.id}`}
-                      aria-label={S.catPreview(r.title)}
-                      onClick={(e) => {
-                        previewTrigger.current = e.currentTarget;
-                        setPreviewing(r);
-                      }}
+                  <li key={r.id} data-testid={`cat-row-${r.id}`}>
+                    <Card
+                      className="db-cat-row"
+                      data-kind={r.kind}
+                      data-checked={ticked.has(r.id)}
+                      data-disabled={off}
                     >
-                      <span className="db-cat-thumb" aria-hidden="true">
-                        {r.thumbnail_url && (
-                          <img src={r.thumbnail_url} alt="" loading="lazy" />
-                        )}
-                        <span
-                          className="db-cat-play"
-                          data-testid={`cat-play-${r.id}`}
-                        />
+                      <Checkbox
+                        label={r.title}
+                        hideLabel
+                        data-testid={`cat-check-${r.id}`}
+                        checked={ticked.has(r.id)}
+                        disabled={off || busy}
+                        onCheckedChange={(on) => toggle(r.id, on === true)}
+                      />
+                      {/* The thumbnail and the title are one button: press
+                          either to watch here. A button, not a link — nothing
+                          navigates. */}
+                      <button
+                        type="button"
+                        className="db-cat-open"
+                        data-testid={`cat-open-${r.id}`}
+                        aria-label={S.catPreview(r.title)}
+                        onClick={(e) => {
+                          previewTrigger.current = e.currentTarget;
+                          setPreviewing(r);
+                        }}
+                      >
+                        <span className="db-cat-thumb" aria-hidden="true">
+                          {r.thumbnail_url && (
+                            <img src={r.thumbnail_url} alt="" loading="lazy" />
+                          )}
+                          <span
+                            className="db-cat-play"
+                            data-testid={`cat-play-${r.id}`}
+                          />
+                        </span>
+                        <span className="db-cat-title">{r.title}</span>
+                      </button>
+                      <a
+                        className="db-cat-link"
+                        data-testid={`cat-link-${r.id}`}
+                        href={videoLinks(r.external_video_id, r.kind).watch}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${S.catOpenYouTube}: ${r.title}`}
+                      >
+                        ↗
+                      </a>
+                      <Badge className="db-cat-kind">{kindWord(r.kind)}</Badge>
+                      <span className="db-cat-date">
+                        {r.published_at
+                          ? displayDate(r.published_at, lang)
+                          : S.catCountUnknown}
                       </span>
-                      <span className="db-cat-title">{r.title}</span>
-                    </button>
-                    <a
-                      className="db-cat-link"
-                      data-testid={`cat-link-${r.id}`}
-                      href={videoLinks(r.external_video_id, r.kind).watch}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${S.catOpenYouTube}: ${r.title}`}
-                    >
-                      ↗
-                    </a>
-                    <Badge className="db-cat-kind">{kindWord(r.kind)}</Badge>
-                    <span className="db-cat-date">
-                      {r.published_at
-                        ? displayDate(r.published_at, lang)
-                        : S.catCountUnknown}
-                    </span>
-                    <span className="db-cat-count">
-                      {r.reported_comment_count === null
-                        ? S.catCountUnknown
-                        : r.reported_comment_count}
-                    </span>
-                    <Badge
-                      className="db-cat-state"
-                      tone={toneOf(s)}
-                      data-testid={`cat-state-${r.id}`}
-                      data-state={s}
-                    >
-                      {state(r)}
-                    </Badge>
-                  </Card>
+                      <span className="db-cat-count">
+                        {r.reported_comment_count === null
+                          ? S.catCountUnknown
+                          : r.reported_comment_count}
+                      </span>
+                      <Badge
+                        className="db-cat-state"
+                        tone={toneOf(s)}
+                        data-testid={`cat-state-${r.id}`}
+                        data-state={s}
+                      >
+                        {state(r)}
+                      </Badge>
+                    </Card>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
 
           {shown.length > 0 && (

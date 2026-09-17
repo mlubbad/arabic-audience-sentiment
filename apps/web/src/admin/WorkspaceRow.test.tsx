@@ -56,15 +56,13 @@ function mount(act: (action: AdminAction) => Promise<void>, stacked = false) {
       />
     ) : (
       <table>
-        <tbody>
-          <WorkspaceRow
-            workspace={workspace}
-            row={row}
-            keys={keys}
-            options={options}
-            act={act}
-          />
-        </tbody>
+        <WorkspaceRow
+          workspace={workspace}
+          row={row}
+          keys={keys}
+          options={options}
+          act={act}
+        />
       </table>
     ),
   );

@@ -74,7 +74,6 @@ export function PlanBudgets({
                     state={state}
                     label={label}
                     sentence={S.opsShare(share, S.budgetMessages[state])}
-                    testId={`budget-${b.event_type}-meter`}
                   />
                 </li>
               );

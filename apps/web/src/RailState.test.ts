@@ -111,7 +111,7 @@ describe("the rail's collection line", () => {
       expect(html).toContain(ar.syncMessages[key]);
     }
     // The health panel moved out of Sync.tsx into OperationsPanels.tsx, then
-    // Task 2 split that file into SyncHealth.tsx; the read is the same line.
+    // out of that file into SyncHealth.tsx; the read is the same line.
     const page = readFileSync(
       new URL("./ops/SyncHealth.tsx", import.meta.url),
       "utf8",

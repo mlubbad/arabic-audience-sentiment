@@ -13,7 +13,6 @@ import type { Strings } from "../strings";
 import type { Locale } from "../locale";
 import type { JobEntry, JobRow } from "../jobFeed";
 import { displayDate } from "../i18n";
-import "./ops.css";
 
 export function Attempts({
   mode,

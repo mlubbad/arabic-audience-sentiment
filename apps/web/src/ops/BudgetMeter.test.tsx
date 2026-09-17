@@ -66,6 +66,36 @@ describe("BudgetMeter", () => {
     expect(fill).toHaveAttribute("data-state", "exhausted");
   });
 
+  it("clamps aria-valuenow to aria-valuemax when usage overruns the allowance", () => {
+    const budget = {
+      event_type: "comment_analysis" as const,
+      used: 130,
+      allowance: 100,
+      granted: 0,
+      remaining: -30,
+    };
+    const state = budgetState(budget);
+    expect(state).toBe("exhausted");
+    render(
+      <BudgetMeter
+        used={budget.used}
+        allowance={budget.allowance}
+        state={state}
+        label="تحليل التعليقات"
+        sentence="نفد الحد"
+        testId="budget-comment_analysis"
+      />,
+    );
+    const meter = screen.getByTestId("budget-comment_analysis");
+    const bar = within(meter).getByRole("progressbar", {
+      name: "تحليل التعليقات",
+    });
+    // aria-valuenow may never exceed aria-valuemax — clamp rather than
+    // report an out-of-range value for an exhausted budget.
+    expect(bar).toHaveAttribute("aria-valuenow", "100");
+    expect(bar).toHaveAttribute("aria-valuemax", "100");
+  });
+
   it("carries no numeric bound for an unlimited (internal) plan, and draws no fill", () => {
     const budget = {
       event_type: "comment_analysis" as const,

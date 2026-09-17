@@ -1,9 +1,9 @@
 /**
  * The demo copy of `/admin`'s three server calls: `admin_workspaces()`,
  * `set_workspace_plan()`, `grant_pack()` and `delete_workspace()`, replayed
- * over a fixture instead of Postgres. Task 6 wires this into `AdminPage.tsx`
- * behind `?demo=1`, so the browser suite can drive the operator's page
- * without a server.
+ * over a fixture instead of Postgres. `AdminPage.tsx` wires this in behind
+ * `?demo=1`, so the browser suite can drive the operator's page without a
+ * server.
  *
  * `reduceAdminDemo` is pure and refuses exactly what the migrations refuse
  * (`supabase/migrations/20260917100000_delete_workspace.sql` for `delete`,

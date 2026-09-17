@@ -89,6 +89,13 @@
   font-size: var(--fs-h2);
   margin: 0;
 }
+/* style.css's element rule `header p { font-weight: 700 }` bolds every <p>
+   inside a <header> — the reset above removes the band but not this, so
+   the lead under every h1 and every section lead stayed bold. */
+.db-hero > p,
+.db-section > header p {
+  font-weight: 400;
+}
 .db-lead,
 .db-muted,
 .db-note {
