@@ -50,7 +50,7 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
   // The source strip, driven by the data mode rather than written by hand.
   const source = page.getByTestId("source");
   await expect(source).toHaveAttribute("data-mode", "sanitized_fixture");
-  await expect(source).toContainText("بيانات اصطناعية");
+  await expect(source).toContainText("بيانات توضيحية");
   // Fixture mode must say plainly that a correction goes nowhere.
   await expect(page.getByTestId("data-mode")).toContainText("لا تُرسل");
   // And it must not claim a collection that never happened.
@@ -64,7 +64,7 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
   ).toBeVisible();
   await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("6");
-  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
+  await pick(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
 });
@@ -82,7 +82,7 @@ test("shows actual pending fetch then safe error with working retry", async ({
     release = r;
   });
   let failing = true;
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     if (!failing) return route.continue();
     await pending;
     await route.fulfill({ status: 503, body: "unavailable" });
@@ -102,7 +102,7 @@ test("shows actual pending fetch then safe error with working retry", async ({
 test("video filter offers the videos in the current dataset, including unfamiliar ids", async ({
   page,
 }) => {
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const response = await route.fetch();
     const fixture = await response.json();
     fixture.comments = fixture.comments.map(
@@ -124,7 +124,7 @@ test("video filter offers the videos in the current dataset, including unfamilia
   );
   await expect(select.locator('option[value="video-2"]')).toHaveCount(0);
   // The remapped video kept its title, so that is the text the option shows.
-  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
+  await pick(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
   await expect(select.locator('option[value="video-1"]')).toHaveCount(1);
@@ -188,7 +188,7 @@ test("paginates with cursors without changing totals or repeating rows", async (
   // A new filter must start at page one rather than reusing a stale cursor.
   await page.getByRole("button", { name: "الصفحة التالية" }).click();
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 2");
-  await pick(page, "الفيديو", "فيديو اصطناعي ١");
+  await pick(page, "الفيديو", "مراجعة آيفون 17 برو بعد شهر من الاستخدام");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("4");
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 1");
@@ -211,15 +211,15 @@ test("a filter change replaces the numbers without ever emptying the screen", as
 
   // Nothing may be served from here on. If a filter change needed the source,
   // every assertion below would hang rather than quietly pass.
-  await page.route("**/fixtures/dashboard.json", (route) => route.abort());
+  await page.route("**/fixtures/e2e-dashboard.json", (route) => route.abort());
 
   const apply = page.getByRole("button", { name: "تطبيق الفلاتر" });
-  await pick(page, "الفيديو", "فيديو اصطناعي ١");
+  await pick(page, "الفيديو", "مراجعة آيفون 17 برو بعد شهر من الاستخدام");
   await apply.click();
   await expect(page.getByTestId("total")).toHaveText("4");
   await expect(page.getByText("تعذر تحميل البيانات")).toBeHidden();
 
-  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
+  await pick(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
   await apply.click();
   await expect(page.getByTestId("total")).toHaveText("2");
 
@@ -247,7 +247,7 @@ test("both pages come from one read, so they cannot disagree", async ({
 
   // The source is withdrawn. Paging must be unaffected, because it is a
   // question about rows that are already here.
-  await page.route("**/fixtures/dashboard.json", (route) => route.abort());
+  await page.route("**/fixtures/e2e-dashboard.json", (route) => route.abort());
 
   await page.getByRole("button", { name: "الصفحة التالية" }).click();
   await expect(page.getByTestId("page-state")).toContainText("الصفحة 2");
@@ -280,7 +280,7 @@ test("a human correction overrides the model and moves every aggregate together"
   await row.getByRole("button", { name: "تصحيح" }).click();
 
   await expect(page.getByTestId("review-text")).toContainText(
-    "المحتوى واضح ومفيد",
+    "المراجعة واضحة ومفيدة",
   );
   // Fixture mode must say plainly that nothing is persisted.
   await expect(page.getByTestId("review-scope")).toContainText(
@@ -316,7 +316,7 @@ test("correcting an unanalysed comment adds it to the sentiment denominator", as
   // This row has no usable prediction, so it is outside the denominator.
   const row = page
     .locator('[data-testid="comments-table"] tbody tr')
-    .filter({ hasText: "تعليق لم يُحلل بعد" });
+    .filter({ hasText: "حد جرّب الجهاز ده على أندرويد؟" });
   await expect(row).toContainText("غير محلل / قديم");
   await row.getByRole("button", { name: "تصحيح" }).click();
   await pick(page, "التصنيف الصحيح", "مختلط");
@@ -341,7 +341,7 @@ test("refuses a correction written against text that changed meanwhile", async (
 
   // The comment is edited after the reviewer read it, so the verdict now belongs
   // to a version of the text that no longer exists.
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const fixture = await (await route.fetch()).json();
     fixture.comments[0].text_raw = "نص مُعدَّل بعد فتح شاشة التصحيح";
     fixture.comments[0].content_hash = "hash-after-the-edit";
@@ -392,7 +392,7 @@ test("exports every filtered comment, not just the visible page", async ({
   expect(all.text.trim().split("\r\n")).toHaveLength(7);
 
   // A narrower filter must produce a narrower file, through the same rules.
-  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
+  await pick(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
   const filtered = await downloadCsv(page);
@@ -421,7 +421,7 @@ test("neutralises spreadsheet formulas in the file but not on screen", async ({
   page,
 }) => {
   const attack = '=HYPERLINK("http://attacker.example","اضغط")';
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const fixture = await (await route.fetch()).json();
     fixture.comments[0].text_raw = attack;
     await route.fulfill({ json: fixture });
@@ -460,7 +460,7 @@ test("shows the plan limit while there is still room to act", async ({
 });
 
 test("escalates to a spent state instead of only warning", async ({ page }) => {
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const fixture = await (await route.fetch()).json();
     fixture.plan.budgets[0] = {
       event_type: "comment_analysis",
@@ -487,7 +487,7 @@ test("escalates to a spent state instead of only warning", async ({ page }) => {
 test("distinguishes no activated plan from no allowance left", async ({
   page,
 }) => {
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const fixture = await (await route.fetch()).json();
     fixture.plan = null;
     await route.fulfill({ json: fixture });
@@ -555,7 +555,7 @@ test("separates known from unknown publication dates", async ({ page }) => {
   // A comment with no date is still a comment, not a defect.
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
-  ).toContainText("تعليق لم يُحلل بعد");
+  ).toContainText("حد جرّب الجهاز ده على أندرويد؟");
 });
 
 test("a date range and an explicit unknown-date selection cannot contradict", async ({
@@ -596,7 +596,7 @@ test("filters by comment type using the types actually present", async ({
   await expect(page.getByTestId("total")).toHaveText("1");
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
-  ).toContainText("معلومة عن موعد الحلقة");
+  ).toContainText("شحال من حلقة باقية فالسلسلة؟");
   // The list must not shrink to the types left on screen, or the filter would
   // be a one-way door: once narrowed, the other types could never be chosen.
   await openMore(page);
@@ -610,7 +610,7 @@ test("filters by comment type using the types actually present", async ({
   await expect(page.getByTestId("total")).toHaveText("1");
   await expect(
     page.locator('[data-testid="comments-table"] tbody tr'),
-  ).toContainText("أتمنى تحسين الصوت");
+  ).toContainText("ياليت تحسّن الصوت");
 });
 
 test("filters by review status and resets every control together", async ({
@@ -682,7 +682,7 @@ test("shows no history for a comment that has never been reviewed", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  await openReview(page, "المحتوى واضح ومفيد");
+  await openReview(page, "المراجعة واضحة ومفيدة");
   await expect(page.getByTestId("review-history")).toContainText(
     "لا توجد مراجعات سابقة",
   );
@@ -695,11 +695,11 @@ test("says a correction no longer applies once the text changed", async ({
   // This row carries a human verdict made against text that was later edited.
   const row = page
     .locator('[data-testid="comments-table"] tbody tr')
-    .filter({ hasText: "هذا النص تغير" });
+    .filter({ hasText: "برشا معلومات مفيدة" });
   await expect(row).toContainText("غير محلل / قديم");
   await expect(row).not.toContainText("مراجعة بشرية");
 
-  await openReview(page, "هذا النص تغير");
+  await openReview(page, "برشا معلومات مفيدة");
   const entries = page.getByTestId("review-history").getByRole("listitem");
   await expect(entries).toHaveCount(1);
   await expect(entries.first()).toContainText("إيجابي");
@@ -716,12 +716,12 @@ test("marks a legacy amendment as unverified rather than a human review", async 
   await page.goto("/dashboard");
   const row = page
     .locator('[data-testid="comments-table"] tbody tr')
-    .filter({ hasText: "موعد الحلقة" });
+    .filter({ hasText: "شحال من حلقة باقية فالسلسلة؟" });
   // It must not be counted as a human review, and the model label still stands.
   await expect(row).toContainText("محايد");
   await expect(row).not.toContainText("مراجعة بشرية");
 
-  await openReview(page, "موعد الحلقة");
+  await openReview(page, "شحال من حلقة باقية فالسلسلة؟");
   const entry = page
     .getByTestId("review-history")
     .getByRole("listitem")
@@ -737,7 +737,7 @@ test("keeps every verdict and marks which one is in force", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  await openReview(page, "المحتوى واضح ومفيد");
+  await openReview(page, "المراجعة واضحة ومفيدة");
   await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("أول تصحيح");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
@@ -745,7 +745,7 @@ test("keeps every verdict and marks which one is in force", async ({
     page.locator('[data-testid="comments-table"] tbody tr').first(),
   ).toContainText("مراجعة بشرية");
 
-  await openReview(page, "المحتوى واضح ومفيد");
+  await openReview(page, "المراجعة واضحة ومفيدة");
   await pick(page, "التصنيف الصحيح", "مختلط");
   await page.getByLabel("سبب التصحيح").fill("إعادة نظر");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
@@ -753,7 +753,7 @@ test("keeps every verdict and marks which one is in force", async ({
     page.locator('[data-testid="comments-table"] tbody tr').first(),
   ).toContainText("مختلط");
 
-  await openReview(page, "المحتوى واضح ومفيد");
+  await openReview(page, "المراجعة واضحة ومفيدة");
   const entries = page.getByTestId("review-history").getByRole("listitem");
   // Append-only: the first verdict is kept, not overwritten.
   await expect(entries).toHaveCount(2);
@@ -786,7 +786,7 @@ test("compares videos using each video's own denominator", async ({ page }) => {
   // share a denominator with each other or with the whole filtered set.
   await page
     .locator('[data-testid="comments-table"] tbody tr')
-    .filter({ hasText: "تعليق لم يُحلل بعد" })
+    .filter({ hasText: "حد جرّب الجهاز ده على أندرويد؟" })
     .getByRole("button", { name: "تصحيح" })
     .click();
   await pick(page, "التصنيف الصحيح", "إيجابي");
@@ -821,7 +821,7 @@ test("does not present comment-scoped figures as lifetime video metrics", async 
 });
 
 async function withSync(page: import("@playwright/test").Page, sync: unknown) {
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const fixture = await (await route.fetch()).json();
     fixture.sync = sync;
     await route.fulfill({ json: fixture });
@@ -1105,7 +1105,7 @@ test("a workspace with nothing collected is not told to change its filters", asy
   // fixture cannot otherwise produce. It used to read "غيّر الفلاتر أو أعد
   // ضبطها لعرض بيانات الاختبار" — advice that cannot work for a reader with no
   // filters set, offering test data on a page reading their own channel.
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const fixture = await (await route.fetch()).json();
     fixture.comments = [];
     await route.fulfill({ json: fixture });
@@ -1356,7 +1356,7 @@ test("every pane keeps a solid the reader can fall back to", async ({
     page.getByRole("table", { name: /التعليقات ضمن/ }),
   ).toBeVisible();
   // The correction dialog is a pane too, and it exists only while open.
-  await openReview(page, "المحتوى واضح ومفيد");
+  await openReview(page, "المراجعة واضحة ومفيدة");
   await expect(page.getByRole("dialog")).toBeVisible();
   // Glass is a lens, so the text on it has no fixed contrast unless the pane
   // itself carries enough of its own colour. Where backdrop-filter is off —
@@ -1391,7 +1391,7 @@ test("the report says what it is narrowed to, wherever you have read to", async 
   const summary = page.getByTestId("active-filters");
   await expect(summary).toBeHidden();
 
-  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
+  await pick(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
 
@@ -1523,7 +1523,7 @@ test("a sync failure reads as a sentence, not as a raw code", async ({
 
 test("the history says who reviewed and why", async ({ page }) => {
   await page.goto("/dashboard");
-  await openReview(page, "المحتوى واضح ومفيد");
+  await openReview(page, "المراجعة واضحة ومفيدة");
   await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("النموذج قرأ السخرية حرفيًا");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
@@ -1531,7 +1531,7 @@ test("the history says who reviewed and why", async ({ page }) => {
     0,
   );
 
-  await openReview(page, "المحتوى واضح ومفيد");
+  await openReview(page, "المراجعة واضحة ومفيدة");
   const entry = page
     .getByTestId("review-history")
     .getByRole("listitem")
@@ -1550,7 +1550,7 @@ test("an imported amendment shows no reviewer and states no reason", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  await openReview(page, "موعد الحلقة");
+  await openReview(page, "شحال من حلقة باقية فالسلسلة؟");
   const entry = page
     .getByTestId("review-history")
     .getByRole("listitem")
@@ -1574,7 +1574,7 @@ test("ranks engaged negatives and keeps unknown engagement out of the ranking", 
 
   // Correct a liked positive to negative: it must join the ranking below the
   // more engaged one, ranked on the effective label rather than the model's.
-  await openReview(page, "المحتوى واضح ومفيد");
+  await openReview(page, "المراجعة واضحة ومفيدة");
   await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("تصنيف خاطئ");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
@@ -1585,7 +1585,7 @@ test("ranks engaged negatives and keeps unknown engagement out of the ranking", 
 
   // Now correct the comment whose like count is unknown. It is negative, so it
   // counts as excluded, but it must not be ranked as though it had zero likes.
-  await openReview(page, "تعليق لم يُحلل بعد");
+  await openReview(page, "حد جرّب الجهاز ده على أندرويد؟");
   await pick(page, "التصنيف الصحيح", "سلبي");
   await page.getByLabel("سبب التصحيح").fill("مراجعة يدوية");
   await page.getByRole("button", { name: "حفظ التصحيح" }).click();
@@ -1601,7 +1601,7 @@ test("the engagement panel follows the filters and says so when empty", async ({
   await page.goto("/dashboard");
   await expect(page.getByTestId("engaged-fixture-2")).toBeVisible();
   // The only negative lives on video-1, so filtering to video-2 empties it.
-  await applyFilter(page, "الفيديو", "فيديو اصطناعي ٢");
+  await applyFilter(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
   await expect(page.getByTestId("engaged-empty")).toBeVisible();
   await expect(page.getByTestId("engaged-panel")).toContainText(
     "الإعجابات لا تُرجِّح التصنيف",
@@ -1645,7 +1645,7 @@ test("filtering does not re-read the source it cannot change", async ({
   // screen — it empties it, because every figure, every chart and the video
   // dropdown itself are read from that one response.
   let reads = 0;
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     reads++;
     await route.continue();
   });
@@ -1655,7 +1655,7 @@ test("filtering does not re-read the source it cannot change", async ({
   expect(afterLoad).toBeGreaterThan(0);
 
   const apply = page.getByRole("button", { name: "تطبيق الفلاتر" });
-  await pick(page, "الفيديو", "فيديو اصطناعي ٢");
+  await pick(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
   await apply.click();
   await expect(page.getByTestId("total")).toHaveText("2");
 
@@ -1764,7 +1764,7 @@ test("the catalogue narrows by search and kind, and prices a selection live", as
 });
 
 test("the catalogue stops at the quota and says why", async ({ page }) => {
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const fixture = await (await route.fetch()).json();
     fixture.plan.budgets[0] = {
       event_type: "comment_analysis",
@@ -1908,7 +1908,7 @@ test("each video links to YouTube and plays inside the page", async ({
   expect(Math.abs(box!.x - (width - box!.x - box!.width))).toBeLessThan(4);
   expect(box!.width).toBeLessThanOrEqual(720);
   await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(
-    "بث اصطناعي ٣",
+    "بث مباشر: نجاوب على أسئلتكم عن اللابتوبات قبل الدراسة",
   );
   await expect(page.getByTestId("cat-preview-frame")).toHaveAttribute(
     "src",
@@ -1980,7 +1980,7 @@ test("a topic correction changes the chip and the chart, with a reason", async (
   // button beside it is located by that word alone throughout this file.
   await page
     .locator('[data-testid="comments-table"] tbody tr')
-    .filter({ hasText: "المحتوى واضح ومفيد" })
+    .filter({ hasText: "المراجعة واضحة ومفيدة" })
     .getByRole("button", { name: "تعديل الموضوع" })
     .click();
   await pick(page, "الموضوع الصحيح", "استفسارات وأسئلة");
@@ -1991,7 +1991,7 @@ test("a topic correction changes the chip and the chart, with a reason", async (
   );
   const row = page
     .locator('[data-testid="comments-table"] tbody tr')
-    .filter({ hasText: "المحتوى واضح ومفيد" });
+    .filter({ hasText: "المراجعة واضحة ومفيدة" });
   await expect(row.getByTestId("topic-chip")).toContainText("استفسارات وأسئلة");
   // The topic chip's own marker, not the sentiment one: fixture-3's row holds
   // a legacy sentiment amendment beside a human topic verdict, and an earlier
@@ -2012,7 +2012,7 @@ test("a workspace whose topics were never run shows the not-run text and no topi
   // The fixture carries a taxonomy either way — every workspace has one from
   // its first day — so the taxonomy's presence is not what says a model has
   // run. The active key is.
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const response = await route.fetch();
     const fixture = await response.json();
     fixture.active_topic_key = "";
@@ -2042,7 +2042,7 @@ test("the videos section pages at 25 and a filter change returns to page one", a
   // one unbroken wall of cards. Clone the fixture's comments across 30
   // videos so there is a second page to reach; each clone keeps a distinct
   // id so nothing is deduplicated away.
-  await page.route("**/fixtures/dashboard.json", async (route) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
     const response = await route.fetch();
     const fixture = await response.json();
     const seed = fixture.comments as {

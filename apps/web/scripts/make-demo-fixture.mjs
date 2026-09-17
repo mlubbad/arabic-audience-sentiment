@@ -238,14 +238,19 @@ export function buildE2E() {
     // A review formed on the text as it stood before this re-skin keeps
     // meaning "this review no longer matches the current text" only if it
     // already meant that before the re-skin — never sha256("hash-before-the-edit"),
-    // and never made to match by accident either.
-    const reviews = (original.reviews ?? []).map((review) => ({
+    // and never made to match by accident either. The topic dimension keeps
+    // its own review log (see demo-content.mjs), and needs the identical
+    // remap: a human topic verdict formed on the pre-re-skin text must still
+    // read as current, not fall back to stale merely because the words moved.
+    const remapReviewHash = (review) => ({
       ...review,
       content_hash:
         review.content_hash === original.content_hash
           ? newHash
           : review.content_hash,
-    }));
+    });
+    const reviews = (original.reviews ?? []).map(remapReviewHash);
+    const topicReviews = (original.topic_reviews ?? []).map(remapReviewHash);
     const isStaleRow = Object.prototype.hasOwnProperty.call(
       E2E_STALE_OLD_TEXT,
       original.id,
@@ -270,6 +275,7 @@ export function buildE2E() {
         ...original.topic_prediction,
         content_hash: predictionHash,
       },
+      topic_reviews: topicReviews,
     };
   });
 
