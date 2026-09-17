@@ -560,7 +560,10 @@ function DashboardBody({
   }
   const chips = chipsFor(values, { S, labels, topicName });
   const s = result.data;
-  const active = useActiveSection(!!s && s.total > 0);
+  // The pinned bar's height as `FilterBar` last measured it — the section
+  // observer's top edge. Zero until the first measurement lands.
+  const [pinnedHeight, setPinnedHeight] = useState(0);
+  const active = useActiveSection(!!s && s.total > 0, pinnedHeight);
   // Aggregations for the charts, over every row the filters admit rather than
   // the page on screen. Memoised on the filtered array itself: it is a new
   // array only when the read or the filters actually changed.
@@ -671,6 +674,7 @@ function DashboardBody({
             />
           ) : null
         }
+        onPinnedHeight={setPinnedHeight}
       />
       <p className="db-note db-filterbar-note">{S.periodNote}</p>
       {/* Two sections were missing from this list and two more were being

@@ -2146,13 +2146,23 @@ test("at phone width the filters open as a sheet and nothing overflows", async (
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/dashboard");
   await expect(page.getByTestId("total")).toHaveText("6");
-  await expect(page.getByRole("button", { name: /^الفلاتر/ })).toBeVisible();
-  await page.getByRole("button", { name: /^الفلاتر/ }).click();
+  const filters = page.getByRole("button", { name: /^الفلاتر/ });
+  await expect(filters).toBeVisible();
+  // Scrolled, and clicked where the button actually is: the shell's own
+  // «القائمة» button pins in the inline-start corner too, and once pinned it
+  // used to sit over this one. A locator click would auto-scroll the button
+  // back into an unpinned position and never notice.
+  await page.evaluate(() => window.scrollTo(0, 800));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(800);
+  const box = (await filters.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(
     page.getByRole("dialog").getByLabel("الفيديو", { exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(filters).toBeFocused();
+  await page.evaluate(() => window.scrollTo(0, 0));
   for (const width of [320, 390, 768]) {
     await page.setViewportSize({ width, height: 844 });
     await expect(page.getByTestId("total")).toHaveText("6");

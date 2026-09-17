@@ -1,7 +1,18 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { UNCLASSIFIED, type Label } from "@sentiment/contracts";
 import { Button } from "../ui/Button";
-import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/Popover";
 import { SelectItem } from "../ui/Select";
@@ -44,7 +55,17 @@ export type FilterBarProps = {
    *  wrong one, and a reader who has scrolled learns what the page is
    *  narrowed to only if that row travels with the bar. */
   chips?: ReactNode;
+  /** The pinned bar's measured height in px, reported whenever it changes
+   *  (a wrapped row, a chips row appearing, a resize). `Dashboard` hands it
+   *  to `useActiveSection`, whose observer must know where the bar ends;
+   *  the CSS side reads the same number from `--db-pinned-h`. */
+  onPinnedHeight?: (px: number) => void;
 };
+
+/** The custom property `.db-section`'s `scroll-margin-top` reads, written
+ *  on the root so a section anchor lands under the bar rather than behind
+ *  it whatever the bar's height is this minute. */
+export const PINNED_HEIGHT_VAR = "--db-pinned-h";
 
 export function FilterBar({
   values,
@@ -61,9 +82,35 @@ export function FilterBar({
   labels,
   appliedCount,
   chips,
+  onPinnedHeight,
 }: FilterBarProps) {
   const compact = useMediaQuery("(max-width: 900px)");
   const [sheet, setSheet] = useState(false);
+  const barRef = useRef<HTMLFormElement>(null);
+
+  // The bar is the page's one pinned element and its height is not a
+  // constant: one row or two, a chips row or none, a phone's single button.
+  // Measured rather than assumed, and published two ways — as a custom
+  // property for `scroll-margin-top`, and as a number for the section
+  // observer — so neither can drift from what is actually on screen.
+  // Guarded for the prerender (no `window`) and for jsdom (no observer).
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const publish = () => {
+      const h = el.getBoundingClientRect().height;
+      root.style.setProperty(PINNED_HEIGHT_VAR, `${Math.round(h)}px`);
+      onPinnedHeight?.(h);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty(PINNED_HEIGHT_VAR);
+    };
+  }, [onPinnedHeight]);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -89,10 +136,15 @@ export function FilterBar({
     </div>
   );
 
+  // In the pinned bar the two always-visible selects go without a visible
+  // label: their triggers already read «كل الفيديوهات» / «كل المشاعر», and a
+  // label row above them is the difference between a bar of one row and one
+  // of two. The sheet, which is not pinned, keeps the labels.
   const videoSelect = (
     <Labelled
       id="f-video"
       label={S.videoLabelText}
+      labelHidden={!compact}
       value={values.video || ALL}
       onValueChange={(v) => onChange({ video: v === ALL ? "" : v })}
     >
@@ -109,6 +161,7 @@ export function FilterBar({
     <Labelled
       id="f-sentiment"
       label={S.sentimentLabel}
+      labelHidden={!compact}
       value={values.sentiment || ALL}
       onValueChange={(v) => onChange({ sentiment: v === ALL ? "" : v })}
     >
@@ -295,17 +348,21 @@ export function FilterBar({
       aria-label={S.filtersLabel}
       className="db-filterbar"
       onSubmit={submit}
+      ref={barRef}
     >
       {compact ? (
         <>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setSheet(true)}
-          >
-            {S.filtersButton(appliedCount)}
-          </Button>
+          {/* The button is the dialog's own trigger, not a button that
+              happens to open it: Radix then knows where focus came from and
+              puts it back there on close, which a manual `setSheet(true)`
+              never told it. `open`/`onOpenChange` stay controlled so the
+              sheet's «تطبيق» can close it. */}
           <Dialog open={sheet} onOpenChange={setSheet}>
+            <DialogTrigger asChild>
+              <Button type="button" variant="secondary" size="sm">
+                {S.filtersButton(appliedCount)}
+              </Button>
+            </DialogTrigger>
             <DialogContent
               variant="sheet"
               closeLabel={S.cancel}
@@ -340,6 +397,7 @@ export function FilterBar({
               <Button
                 type="button"
                 variant="secondary"
+                size="sm"
                 aria-label={S.dateLabel}
               >
                 {periodLabel}
@@ -351,7 +409,7 @@ export function FilterBar({
           </Popover>
           <Popover>
             <PopoverTrigger asChild>
-              <Button type="button" variant="secondary">
+              <Button type="button" variant="secondary" size="sm">
                 {S.moreFilters(extraCount(values))}
               </Button>
             </PopoverTrigger>
@@ -360,8 +418,10 @@ export function FilterBar({
             </PopoverContent>
           </Popover>
           <div className="db-filterbar-actions">
-            <Button type="submit">{S.applyFilters}</Button>
-            <Button variant="ghost" type="button" onClick={onReset}>
+            <Button type="submit" size="sm">
+              {S.applyFilters}
+            </Button>
+            <Button variant="ghost" size="sm" type="button" onClick={onReset}>
               {S.resetFilters}
             </Button>
           </div>

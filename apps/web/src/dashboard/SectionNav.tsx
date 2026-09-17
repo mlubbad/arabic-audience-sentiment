@@ -38,14 +38,23 @@ export const SECTIONS = [
  * which starts highest. `enabled` exists because the sections do not render on
  * an empty page, and an observer watching for elements that will never appear
  * is a subscription with no subject.
+ *
+ * `pinnedHeight` is the filter bar's measured height in px (`FilterBar`'s
+ * `onPinnedHeight`, the same measurement that writes `--db-pinned-h`): the
+ * observer's top margin is rebuilt from it whenever it changes, so a section
+ * is "reached" when its top passes under the bar as it is now — one row or
+ * two, chips or none — not under a number measured once.
  */
-export function useActiveSection(enabled: boolean) {
+export function useActiveSection(enabled: boolean, pinnedHeight: number) {
   const [active, setActive] = useState<string | null>(null);
   useEffect(() => {
     if (!enabled || typeof IntersectionObserver === "undefined") {
       setActive(null);
       return;
     }
+    // 8px of slack under the bar; the fallback is only for the frame before
+    // the first measurement lands.
+    const top = Math.round((pinnedHeight || 72) + 8);
     const seen = new Map<string, boolean>();
     const observer = new IntersectionObserver(
       (entries) => {
@@ -55,21 +64,17 @@ export function useActiveSection(enabled: boolean) {
         // two sections would make the index flicker on every scroll.
         if (first) setActive(first.id);
       },
-      // The filter bar is the page's one sticky element now: 154.5px pinned,
-      // measured at 1280×900 scrolled 1500 with no filter applied (the
-      // fields' row and the actions' row; the date note left the pane), plus
-      // 8px of slack — a section is "reached" when its top passes under that
-      // bar, not when it touches the viewport edge. With filters applied the
-      // chips add a row (223px measured); the mark then moves a little late,
-      // which reads better than moving early with none applied.
-      { rootMargin: "-163px 0px -55% 0px" },
+      // The filter bar is the page's one sticky element: a section is
+      // "reached" when its top passes under that bar, not when it touches
+      // the viewport edge.
+      { rootMargin: `-${top}px 0px -55% 0px` },
     );
     for (const s of SECTIONS) {
       const el = document.getElementById(s.id);
       if (el) observer.observe(el);
     }
     return () => observer.disconnect();
-  }, [enabled]);
+  }, [enabled, pinnedHeight]);
   return active;
 }
 

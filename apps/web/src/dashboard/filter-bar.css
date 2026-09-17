@@ -9,7 +9,11 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--space-2) var(--space-3);
+  /* One row down to 1100px of viewport, where the shell leaves this bar
+     788px inside its padding: search at its 120px floor, two content-sized
+     selects (~129px and ~108px), two small triggers, the two actions, and
+     five 8px gaps come to 780px. Every wider viewport goes to the search. */
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   margin-inline: calc(-1 * var(--space-4));
   background: var(--glass-2-tint);
@@ -22,14 +26,14 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 160px;
+  min-width: 128px;
 }
 .db-field > label {
   font-size: var(--fs-small);
   color: var(--text-2);
 }
 .db-filterbar .db-field--search {
-  flex: 1 1 220px;
+  flex: 1 1 120px;
 }
 .db-filterbar-actions {
   display: flex;
@@ -73,4 +77,14 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+/* On a phone the shell's own «القائمة» button is pinned in the inline-start
+   corner (app.css, `.app-shell .app-menu`, z-index 56) — the same corner
+   this bar's one button would pin in, and the shell's wins the tap. The
+   button sits at inline-end instead; the chips and the error still take the
+   full row beneath it. */
+@media (max-width: 900px) {
+  .db-filterbar {
+    justify-content: flex-end;
+  }
 }

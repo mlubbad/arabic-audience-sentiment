@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DirectionProvider } from "@radix-ui/react-direction";
 import { ar } from "../strings/ar";
@@ -135,5 +141,13 @@ describe("FilterBar", () => {
     expect(
       within(dialog).getByRole("combobox", { name: ar.videoLabelText }),
     ).toBeInTheDocument();
+    // Closing hands focus back to the button that opened it — the button is
+    // the dialog's own trigger, so Radix knows where focus came from. A
+    // reader who pressed Escape used to land on <body>.
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(
+      screen.getByRole("button", { name: ar.filtersButton(0) }),
+    ).toHaveFocus();
   });
 });

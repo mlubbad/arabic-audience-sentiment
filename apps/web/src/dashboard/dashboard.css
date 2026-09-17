@@ -6,8 +6,12 @@
   flex-direction: column;
   gap: var(--space-6);
 }
+/* An anchor lands under the pinned filter bar, not behind it. The bar's
+   height is measured by `FilterBar` and written to `--db-pinned-h` on the
+   root (one row or two, chips or none); the fallback only matters before
+   the first measurement. */
 .db-section {
-  scroll-margin-top: 72px;
+  scroll-margin-top: calc(var(--db-pinned-h, 72px) + var(--space-3));
 }
 .db-section > header {
   display: flex;
