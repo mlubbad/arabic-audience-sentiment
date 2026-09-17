@@ -19,7 +19,7 @@ import { SelectItem } from "../ui/Select";
 import { videoLabel } from "../i18n";
 import type { Locale } from "../locale";
 import type { Strings } from "../strings";
-import { Labelled } from "./Labelled";
+import { Labelled } from "../ui/Labelled";
 import { extraCount, type FilterValues } from "./filters";
 import { useMediaQuery } from "./useMediaQuery";
 import "./filter-bar.css";

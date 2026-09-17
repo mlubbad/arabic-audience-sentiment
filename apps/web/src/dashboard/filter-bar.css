@@ -22,16 +22,6 @@
   border-bottom: var(--glass-2-edge);
   box-shadow: var(--glass-2-ring);
 }
-.db-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 140px;
-}
-.db-field > label {
-  font-size: var(--fs-small);
-  color: var(--text-2);
-}
 .db-filterbar .db-field--search {
   flex: 1 1 180px;
 }

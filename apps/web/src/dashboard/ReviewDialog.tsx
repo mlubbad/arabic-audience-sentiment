@@ -34,7 +34,7 @@ import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { SelectItem } from "../ui/Select";
-import { Labelled } from "./Labelled";
+import { Labelled } from "../ui/Labelled";
 import { commentText, displayDate } from "../i18n";
 import { reviewHistory } from "../reviewHistory";
 import type { Strings } from "../strings";

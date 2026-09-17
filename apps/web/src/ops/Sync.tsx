@@ -31,7 +31,7 @@ import { useLocale } from "../locale";
 import { useStrings } from "../strings";
 import { describeJob, type JobEntry, type JobRow } from "../jobFeed";
 import { storedPerVideo } from "../catalogue";
-import { Catalogue } from "./CataloguePanel";
+import { Catalogue } from "./Catalogue";
 import { SyncHealth } from "./SyncHealth";
 import { PlanBudgets } from "./PlanBudgets";
 import { Attempts } from "./Attempts";

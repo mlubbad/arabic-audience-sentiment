@@ -1,0 +1,284 @@
+/**
+ * The catalogue: `Catalogue`, `CataloguePreview`, `SelectionBar`.
+ * `pages.css`'s shared db-* rules (`db-section`, `db-lead`, `db-note`,
+ * `db-missing`, `db-row-actions`, `db-pager`, `db-field`) carry what this
+ * shares with the dashboard; this file holds only what is the catalogue's.
+ * Tokens only: `layers.test.ts`'s rule for app.css holds here too.
+ */
+
+/* ---------------- toolbar ---------------- */
+.db-cat-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.db-cat-toolbar .db-cat-search {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+/* Filters in a row of controls, not a tab strip over a panel: no rule
+   under the list, the active one still underlined. */
+.db-cat-toolbar .ui-tabs-list {
+  flex-wrap: wrap;
+  border-bottom: 0;
+}
+.db-cat-toolbar .ui-tabs-trigger {
+  padding-inline: var(--space-3);
+  font-size: var(--fs-small);
+}
+.db-cat-refreshed {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* ---------------- rows ---------------- */
+.db-cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.db-cat-row {
+  display: grid;
+  /* box · thumbnail and title · link · kind · date · count · state */
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto auto;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+}
+.db-cat-row[data-checked="true"] {
+  border-color: var(--ml-indigo-300);
+  background: var(--ml-indigo-50);
+}
+.db-cat-row[data-disabled="true"] {
+  color: var(--text-3);
+}
+/* The thumbnail and the title are one button: press either to watch here.
+   A button, not a link — nothing navigates. */
+.db-cat-open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-1);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.db-cat-open:hover .db-cat-title,
+.db-cat-open:focus-visible .db-cat-title {
+  color: var(--link);
+  text-decoration: underline;
+}
+.db-cat-open:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.db-cat-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+/* The thumbnail is a stage: a play badge appears over it on hover or focus,
+   and stays on a touch screen, where there is no hover to reveal it. */
+.db-cat-thumb {
+  position: relative;
+  display: block;
+  flex: 0 0 64px;
+  width: 64px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-1);
+  overflow: hidden;
+  background: var(--bg-muted);
+}
+.db-cat-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.db-cat-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text-1) 35%, transparent);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.db-cat-play::before {
+  content: "";
+  width: 0;
+  height: 0;
+  /* A triangle pointing the reading direction's way: play is play. */
+  border-block: 7px solid transparent;
+  border-inline-start: 12px solid var(--ink-on-dark);
+  filter: drop-shadow(
+    0 1px 1px color-mix(in srgb, var(--text-1) 60%, transparent)
+  );
+}
+.db-cat-open:hover .db-cat-play,
+.db-cat-open:focus-visible .db-cat-play {
+  opacity: 1;
+}
+@media (hover: none) {
+  .db-cat-play {
+    opacity: 0.85;
+  }
+}
+.db-cat-link {
+  color: var(--link);
+  text-decoration: none;
+  font-size: var(--fs-small);
+  padding: 2px var(--space-2);
+  border-radius: var(--r-1);
+}
+.db-cat-link:hover,
+.db-cat-link:focus-visible {
+  background: var(--ml-indigo-50);
+}
+.db-cat-kind,
+.db-cat-state {
+  white-space: nowrap;
+}
+.db-cat-date {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.db-cat-count {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  min-width: 2.5ch;
+}
+
+/* ---------------- pager ---------------- */
+.db-cat-pager {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.db-cat-pager p {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+.db-cat-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.db-cat-jump .ui-input {
+  width: 6ch;
+  font-family: var(--font-numeric);
+}
+
+/* ---------------- the player ---------------- */
+/* Wider than the dialog default: the frame is 16:9 and a 480px player is a
+   postage stamp. Centred by `.ui-dialog-content`; the browser suite reads
+   the width and the margins. */
+.db-preview {
+  width: min(720px, calc(100vw - 32px));
+  /* The corner ✕ sits at the top inset; the title's line starts under it. */
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+.db-preview-title {
+  margin: 0;
+  /* Room for the corner ✕. */
+  padding-inline-end: var(--space-6);
+  font-size: var(--fs-body);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.db-preview-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--r-1);
+  background: var(--bg-muted);
+}
+.db-preview-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.db-preview-foot small {
+  flex-basis: 100%;
+}
+
+/* ---------------- the selection bar ---------------- */
+/* Pinned to the bottom of the viewport while the list is on screen, on the
+   level-2 glass every floating chrome uses, so a long catalogue on a phone
+   never puts the price out of reach. */
+.db-selection-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--glass-2-tint);
+  backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  -webkit-backdrop-filter: var(--glass-2-blur) var(--glass-lens);
+  border: var(--glass-2-edge);
+  box-shadow: var(--glass-2-ring), var(--glass-2-specular);
+}
+.db-selection-line {
+  flex: 1 1 18rem;
+  margin: 0;
+  font-weight: 600;
+}
+.db-selection-line[data-exceeds="true"] {
+  color: var(--color-danger);
+}
+.db-selection-bar > small {
+  flex-basis: 100%;
+  order: 3;
+}
+.db-selection-feedback {
+  flex-basis: 100%;
+  order: 4;
+  margin: 0;
+}
+
+/* One card per video still, but wrapped: the box, the thumbnail and the
+   title on the first line, the link at its end, kind · date · count on the
+   next, the state on the last. Seven grid columns at 375px put each datum
+   on its own line, five lines a video. */
+@media (max-width: 760px) {
+  .db-cat-row {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .db-cat-open {
+    flex: 1 1 calc(100% - 5rem);
+  }
+  .db-cat-kind,
+  .db-cat-date,
+  .db-cat-state {
+    white-space: normal;
+  }
+  .db-cat-count {
+    text-align: start;
+    min-width: 0;
+  }
+  .db-cat-state {
+    flex-basis: 100%;
+  }
+}
