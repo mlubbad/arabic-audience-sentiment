@@ -64,6 +64,7 @@ import { Hero } from "./Hero";
 import { SectionNav, useActiveSection } from "./SectionNav";
 import { Provenance } from "./Provenance";
 import { Summary } from "./Summary";
+import { Videos } from "./Videos";
 import { EmptyState, Loading, LoadError, Updating } from "./PageStates";
 import {
   chipsFor,
@@ -788,121 +789,26 @@ function DashboardBody({
             )
           ) : (
             <>
-              <section className="rp-section" id="rp-videos">
-                <header>
-                  <h2>{S.secVideos}</h2>
-                  <p className="rp-sub">{S.videosLead}</p>
-                </header>
-                <ul className="rp-videos">
-                  {videoSlice.items.map((v) => {
-                    const known =
-                      v.sentiments.positive +
-                      v.sentiments.negative +
-                      v.sentiments.neutral +
-                      v.sentiments.mixed;
-                    const pct = (x: number) =>
-                      v.total ? (x / v.total) * 100 : 0;
-                    return (
-                      <li key={v.id}>
-                        <button
-                          type="button"
-                          className="rp-video"
-                          aria-pressed={video === v.id}
-                          data-testid={`rp-video-${v.id}`}
-                          onClick={() => {
-                            // Selecting a video is a filter change like any
-                            // other, so it goes through the same apply path —
-                            // which resets paging and builds the filters from
-                            // one definition rather than a second one here.
-                            //
-                            // `next` is passed rather than relied upon from
-                            // state: setVideo has not landed yet when this
-                            // runs, so reading `video` would apply the
-                            // previous selection.
-                            const next = video === v.id ? "" : v.id;
-                            setVideo(next);
-                            applyFilters({ video: next });
-                          }}
-                        >
-                          <span>
-                            <span className="rp-video-title">
-                              {videoLabel(v.id, v.title, S)}
-                            </span>
-                            <span className="rp-video-meta">
-                              <span>{S.countComments(n(v.total))}</span>
-                              <span>{S.countReplies(n(v.replies))}</span>
-                              <span>{S.countAnalysed(n(v.analysed))}</span>
-                            </span>
-                            {/* Only the segments that hold something. The 2px
-                                gap that keeps two touching fills apart would
-                                otherwise be drawn around segments of width
-                                zero, printing a sliver of "a few" where the
-                                count is none. The unanalysed remainder is a
-                                segment like any other and is drawn, not
-                                omitted: a bar that filled to 100% from four
-                                labels would claim every comment was read. */}
-                            <span className="rp-bar" aria-hidden="true">
-                              {(
-                                [
-                                  ["pos", v.sentiments.positive],
-                                  ["neg", v.sentiments.negative],
-                                  ["neu", v.sentiments.neutral],
-                                  ["mix", v.sentiments.mixed],
-                                  ["un", v.total - known],
-                                ] as const
-                              )
-                                .filter(([, count]) => count > 0)
-                                .map(([cls, count]) => (
-                                  <span
-                                    key={cls}
-                                    className={cls}
-                                    style={{ width: `${pct(count)}%` }}
-                                  />
-                                ))}
-                            </span>
-                          </span>
-                          <span className="rp-video-figure">
-                            <strong>{n(v.total)}</strong>
-                            <span>{S.unitComments}</span>
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {/* Only when there is a second page. A pager reading "1 of 1"
-                    under five cards is furniture; under 194 it is the way in.
-                    Moving a page scrolls the section's head back into view:
-                    the reader pressed a button at the foot of the old page and
-                    would otherwise be left looking at the foot of the new one. */}
-                {videoSlice.pages > 1 && (
-                  <nav className="pager" aria-label={S.videosPagerLabel}>
-                    <button
-                      type="button"
-                      disabled={videoSlice.page === 0}
-                      onClick={() => turnVideoPage(videoSlice.page - 1)}
-                    >
-                      {S.previousPage}
-                    </button>
-                    <p data-testid="video-page-state" aria-live="polite">
-                      {S.videosPageState(
-                        videoSlice.page + 1,
-                        videoSlice.pages,
-                        videoSlice.from,
-                        videoSlice.to,
-                        s.videos.length,
-                      )}
-                    </p>
-                    <button
-                      type="button"
-                      disabled={videoSlice.page >= videoSlice.pages - 1}
-                      onClick={() => turnVideoPage(videoSlice.page + 1)}
-                    >
-                      {S.nextPage}
-                    </button>
-                  </nav>
-                )}
-              </section>
+              <Videos
+                s={s}
+                S={S}
+                slice={videoSlice}
+                video={video}
+                onTurn={turnVideoPage}
+                onPick={(id) => {
+                  // Selecting a video is a filter change like any other, so
+                  // it goes through the same apply path — which resets
+                  // paging and builds the filters from one definition rather
+                  // than a second one here.
+                  //
+                  // `next` is passed rather than relied upon from state:
+                  // setVideo has not landed yet when this runs, so reading
+                  // `video` would apply the previous selection.
+                  const next = video === id ? "" : id;
+                  setVideo(next);
+                  applyFilters({ video: next });
+                }}
+              />
               <section className="rp-section" id="rp-voice">
                 <header>
                   <h2>{S.secVoice}</h2>
