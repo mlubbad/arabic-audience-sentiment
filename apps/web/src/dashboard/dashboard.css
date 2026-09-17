@@ -43,7 +43,8 @@
 }
 /* Timing's three charts: the weekly trend across the full width, the two
    distributions as halves beneath it. `2fr 1fr 1fr` gave a 24-bar hourly
-   chart 164–234px at 1000–1280; a half is at least 360px at 1000. Collapses
+   chart 164–234px at 1000–1280; a half measures 336px at 1000 and ~500px at
+   1280 (the content column is 688px at 1000). Collapses
    with `.db-grid--2` below. */
 .db-grid--charts {
   display: grid;
