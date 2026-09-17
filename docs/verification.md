@@ -2292,3 +2292,13 @@ remotely). `functions list` afterwards: `oauth-start` version 12 → **13**, `AC
 `verify_jwt` false as before (the function checks the caller's Supabase session itself).
 From here on the consent screen lists one scope, `youtube.force-ssl`; the demo video can be
 recorded.
+
+## 2026-09-18 — pushed and deployed: the live privacy policy names one scope
+
+`git push origin main` (`af5526b..bf0c3a7`, includes the other session's account-page
+commits and the `oauth-callback` log line), `npm run build`, `npm run deploy:preview`.
+Probed after: `/en/privacy-policy` contains "exactly one permission" and zero occurrences
+of `youtube.readonly`; `/privacy-policy` contains "صلاحية واحدة لا أكثر"; `/`, `/en`,
+`/account`, `/terms` all `200`. Trigger: the owner's first demo take (8:00, reviewed
+frame-by-frame from 80 stills) showed the live policy still saying "exactly two
+permissions" at 0:26 — the code had changed on 2026-09-18 but the host had not.
