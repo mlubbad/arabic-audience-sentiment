@@ -2401,3 +2401,76 @@ build held this machine's load average at 25–281 across a 16-core machine, and
 resolved (passed in isolation, or was reproduced with a generous timeout) once load-driven
 timing was accounted for. None touched account-redesign code; none is treated here as a defect
 in this phase's work.
+
+## 2026-09-18 — the owner's video selection was refused by the browser alone; the worker's two tenants
+
+**Reproduced before the fix**, on the contract with a small script under
+`node --experimental-strip-types`: `selectionEstimate(rows, {new}, -1)` →
+`{ remainingAfter: -3, exceeds: true }`; `fitNewest(rows, Math.max(0, -1 - 1))` → `[]`. The
+same shape as the two screenshots («المحدد: 789 فيديو · حتى 1 تعليقًا · الاختيار يتجاوز…»,
+then 793 and 10). Read, not run: `private.analysis_remaining` as last rebuilt in
+`20260917060000` returns `2147483647` for a null `analysis_units`, so the refusal never
+reached the server; the owner's plan row in `20260917010000` has null for all three units.
+
+**Red, then green.** `packages/contracts/src/selection.test.ts`: 2 failed / 8 passed before the
+contract change — the -1 case answered `exceeds: true, remainingAfter: -42`, and the first
+case's `toEqual` lacked the new `unlimited` field — 10/10 after. `apps/web/src/ops/Catalogue.test.tsx`:
+the new case red on «المحدد: 2 فيديو · حتى 3 تعليقًا · يتبقى بعدها 0» where «بلا حدود» was
+expected, green once `SelectionBar` and `Catalogue` changed; 14/14. `tests/e2e/dashboard.spec.ts`
+"a plan with no ceiling never exceeds, and the save is offered": red on the same sentence
+before the component change, green after (2.9 s). The `fitNewest(rows, Infinity)` case passed
+as written — a characterisation of arithmetic the component now relies on, not a red.
+
+**`npm run check`**, chained, exit 0, on a tree that by then also carried the other session's
+tour commits through `847c369`: lint, format:check, typecheck, `check:functions`; unit 110
+files / 858 tests; db 32 files / 310 tests, no timeout this time; worker 195; build 8
+prerendered pages; secrets 637 source files plus built assets.
+
+**Whole dashboard browser spec** (`tests/e2e/dashboard.spec.ts`, 79 tests): 78 passed, 1 failed
+on the first run — "the catalogue is paged by fifty, and the selection is not", `cat-page` not
+found after «التالية», while the other session was saving `tour/*` files into the same working
+tree the dev server was serving. Rerun alone on a free port (`E2E_PORT=5198`): passed in 3.1 s.
+Run against the deploy worktree's source (`46ec419` + `699bbba`, `E2E_PORT=5199`) together with
+the new case: 2/2. The failure did not reproduce and is attributed to a mid-run reload; not a
+regression of this change.
+
+**The deploy: built, verified against the host, not uploaded.** `curl` of `PREVIEW_URL/`
+found the host serving `static/index-BmIMt0s_.js` with no `tour:v1` marker in it. A detached
+worktree at `46ec419` (node_modules linked in, `@sentiment/*` re-pointed at the worktree's
+own packages, `.env.local` copied) built to exactly `index-BmIMt0s_.js` — so the host is at
+`46ec419`. `699bbba` cherry-picked onto it built to `index-CxI1oaAs.js`, and its `Sync-*` chunk
+carries the new `unlimited` branch. `scripts/deploy-preview.sh` from that worktree was refused
+by the Claude Code auto-mode guard ("Production Deploy") and was not retried; the worktree is
+left in place under the session's scratch directory for the operator to run the script from,
+or to grant the permission. Until then the host still refuses the owner's selections.
+
+**Not verified:** the owner ticking a video and saving on the live host after the deploy — needs
+the owner's own session and the upload above.
+
+**The second problem — «الجمع متوقّف الآن» for a `creator_plus` tenant — diagnosed from the
+code and the service log, not fixed.**
+
+- `public.worker_seen` is written per workspace by `claim_job`, and `sync_state.worker.connected`
+  reads it: a workspace is "connected" only if a worker asked *that workspace* for work in the
+  last three minutes (`20260914200000`). A worker asks on behalf of one credential, and a
+  credential is bound to one workspace (`private.worker_credentials.workspace_id`, not null).
+- The service (`scripts/worker-service.sh`) holds exactly two: `WORKER_CREDENTIAL` and
+  `WORKER_CREDENTIAL_WS2` (`tenants=2` in the log). A workspace created by a signup has no
+  credential, so nothing ever asks for its jobs, its discover job stays `queued`, and the page
+  says so honestly. This is structural: every new customer needs the operator to mint a
+  credential (`svc_register_worker_credential`), add it to the service's `.env.local`, extend
+  the service script (it knows only `_WS2`) and restart — or the model changes to a
+  platform-wide credential.
+- Separately, `service.log` shows `control plane refused: invalid_worker_credential` and
+  `tick refused: invalid_worker_credential` once per round since 2026-09-17 01:23:36 local
+  (3,658 refusals by 11:50 on 09-18), after a healthy `comment counts` pass at 01:15. Exactly
+  one refusal per round with two tenants means one credential is dead and the other still
+  polls and reads counts (`748 unchanged` at 11:46). Both credential values are byte-identical
+  between the repo's `.env.local` and the service's copy, so the change was on the server. The
+  timeline fits the delete door: `delete_workspace` (`20260917100000`, commits 00:24–01:38 that
+  night) deletes `private.worker_credentials` of the workspace it removes, and a test
+  workspace deleted then would have taken its credential with it. Confirmation needs one read
+  of `private.worker_credentials` on the live project; `npx supabase db query --linked` for it
+  was refused by the auto-mode guard ("Production Reads") and left to the operator.
+- The worker's Python is unchanged since its checkout (`88a918b`; no commits under `workers/`
+  since), so a restart with a corrected credential list needs no code update.

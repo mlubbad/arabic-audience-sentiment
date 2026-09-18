@@ -1645,3 +1645,42 @@ selectors any more — `ops/PlanBudgets.tsx` wears the namespaced `db-budgets` c
 `account/PlanPanel.tsx` wears `db-plan-budgets`. These rules were dead weight, pending the
 final fix wave; the fix wave (`.superpowers/sdd/2026-09-17-account-redesign/final-fix-report.md`)
 deleted them from `style.css`.
+
+## 2026-09-18 — the owner's plan no longer refuses every video selection
+
+Reported from the live host with screenshots: the owner (plan `owner`, no ceiling) ticking
+videos on `/sync` read «الاختيار يتجاوز ما تبقى من الحصة؛ ألغِ بعضه أولًا.» with the save
+disabled, and «اختر الأحدث بما يناسب الحصة» ticked nothing. The cause, reproduced on the
+contract before any change: `usage_summary` reports a plan with no ceiling as `remaining: -1`
+— `BudgetSchema`'s own convention, so the panels can say «بلا حدود» rather than invent a
+number — and `selectionEstimate` (`packages/contracts/src/selection.ts`) subtracted the
+selection's cost from that -1 as if it were a count. Every selection came out negative,
+`exceeds` was true, and `Catalogue.tsx`'s save guard held; the fit button was handed
+`Math.max(0, -1 - owed)`, i.e. nothing. The server was never involved:
+`private.analysis_remaining` answers `2147483647` for a null allowance, so `select_videos`
+would have accepted whatever the browser let through.
+
+`699bbba`: `selectionEstimate` reads -1 as the contract's "no ceiling" — `remainingAfter`
+null, `exceeds` false, and a new `unlimited` flag in its result, so no caller decides what -1
+means on its own again; `SelectionBar` prints `pricingUnlimited` («بلا حدود», the one key for
+that sentence) where «يتبقى بعدها …» went; `Catalogue`'s fit hands `fitNewest` `Infinity` for
+such a plan, so everything priceable fits and the disabled or unpriced videos still stay off.
+Tests first, each watched red: two contract cases in `selection.test.ts`, one component case in
+`Catalogue.test.tsx`, one browser case appended to `tests/e2e/dashboard.spec.ts` with the e2e
+fixture's analysis budget overridden to -1/-1. Tallies and the deploy state are in
+`docs/verification.md`'s entry of the same date.
+
+**The deploy is built and waiting for a hand.** The live host serves the build of `46ec419`
+(proved: a fresh build of that commit produced the identical entry `index-BmIMt0s_.js`), and
+`main` has since taken phase 6's tour, which is not meant to ship yet. So the fix was
+cherry-picked onto a detached worktree at `46ec419` and built there (`index-CxI1oaAs.js`);
+the upload itself (`scripts/deploy-preview.sh`) was refused by the Claude Code auto-mode
+guard as a production deploy and is left to the operator — see the verification entry.
+
+**Found alongside, diagnosed, not fixed** — a second signed-in tenant on `creator_plus` sees
+«الجمع متوقّف الآن — لا شيء يعمل» over one queued discover job. Two things, both in the
+verification entry: the worker holds one scoped credential per workspace
+(`WORKER_CREDENTIAL`, `WORKER_CREDENTIAL_WS2`), so a self-serve workspace has no worker at
+all until the operator mints one; and one of those two credentials has been refused
+(`invalid_worker_credential`) every minute since 2026-09-17 01:23 local. The fix — a
+platform-wide credential, or per-workspace provisioning — is the owner's decision, pending.
