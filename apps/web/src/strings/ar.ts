@@ -1085,6 +1085,39 @@ export const ar = {
   arrowUpForward: "↖",
   arrowDownForward: "↙",
   listSeparator: "، ",
+  // ---- the onboarding tour: a welcome dialog, then seven coach marks ----
+  tourWelcomeTitle: "جولة قصيرة في مشاعر الجمهور",
+  tourWelcomeBody:
+    "ثلاث صفحات: الحساب لمساحات العمل وقنواتها، التشغيل لما يُجمع، ولوحة البيانات لما قاله الجمهور. الجولة أقل من دقيقة، وتُتخطّى في أي وقت.",
+  tourStart: "ابدأ الجولة",
+  tourLater: "ليس الآن",
+  tourNext: "التالي",
+  tourBack: "السابق",
+  tourFinish: "إنهاء",
+  tourSkip: "تخطّي الجولة",
+  tourProgress: (n: number, total: number) => `${n} من ${total}`,
+  tourReplay: "الجولة التعريفية",
+  tourStepRailTitle: "التنقّل",
+  tourStepRailBody:
+    "ثلاث وجهات: نظرة عامة، التشغيل، والمصادر والحساب. مبدّل مساحة العمل في أعلى الشريط يحدّد ما تعرضه كل صفحة.",
+  tourStepWorkspaceTitle: "مساحة العمل",
+  tourStepWorkspaceBody:
+    "لكل قناة أو عميل مساحة مستقلة بياناتها لا تُقرأ من مساحة أخرى. من هنا تعيد تسميتها، أو تربط قناتها، أو تنهيها.",
+  tourStepSetupTitle: "خطوات الإعداد",
+  tourStepSetupBody:
+    "ثلاث خطوات: الحساب، ثم ربط قناة يوتيوب بإذنك، ثم اختيار ما يُجمع. الخطوة التالية مكتوبة دائمًا هنا.",
+  tourStepCatalogueTitle: "الكتالوج",
+  tourStepCatalogueBody:
+    "كل ما تعلنه قناتك من فيديوهات. اختر ما يُجمع ويُحلَّل؛ التقدير يُقرأ قبل الحفظ لا بعده.",
+  tourStepSelectionTitle: "الحفظ",
+  tourStepSelectionBody:
+    "لا يُجمع شيء قبل الحفظ. الشريط يقول كم تعليقًا سيُقرأ وكم يتبقى من حصة الخطة بعده.",
+  tourStepFiltersTitle: "الفلاتر",
+  tourStepFiltersBody:
+    "كل رقم في اللوحة يتبع ما تختاره هنا: الفترة، الفيديو، المشاعر، والموضوع. الشريط يبقى معك أثناء التمرير.",
+  tourStepSectionsTitle: "الأقسام",
+  tourStepSectionsBody:
+    "انتقل بين الملخّص والفيديوهات وصوت الجمهور والتعليقات من هنا. انتهت الجولة؛ تجدها متى شئت في الشريط الجانبي.",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,

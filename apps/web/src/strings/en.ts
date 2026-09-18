@@ -1072,4 +1072,36 @@ export const en: Strings = {
   arrowUpForward: "↗",
   arrowDownForward: "↘",
   listSeparator: ", ",
+  tourWelcomeTitle: "A short tour of audience sentiment",
+  tourWelcomeBody:
+    "Three pages: Account for workspaces and channels, Operations for what gets collected, and the Dashboard for what your audience said. The tour takes under a minute, and skips at any time.",
+  tourStart: "Start the tour",
+  tourLater: "Not now",
+  tourNext: "Next",
+  tourBack: "Back",
+  tourFinish: "Finish",
+  tourSkip: "Skip the tour",
+  tourProgress: (n: number, total: number) => `${n} of ${total}`,
+  tourReplay: "Guided tour",
+  tourStepRailTitle: "Navigation",
+  tourStepRailBody:
+    "Three destinations: Overview, Operations, and Sources and account. The workspace switch at the top of the rail decides what each page shows.",
+  tourStepWorkspaceTitle: "Workspace",
+  tourStepWorkspaceBody:
+    "Each channel or client has its own workspace; its data is never read from another. From here you rename it, connect its channel, or retire it.",
+  tourStepSetupTitle: "Setup steps",
+  tourStepSetupBody:
+    "Three steps: the account, then connecting a YouTube channel with your permission, then choosing what gets collected. The next step is always written here.",
+  tourStepCatalogueTitle: "The catalogue",
+  tourStepCatalogueBody:
+    "Every video your channel declares. Choose what gets collected and analysed; the estimate is read before saving, not after.",
+  tourStepSelectionTitle: "Saving",
+  tourStepSelectionBody:
+    "Nothing is collected before saving. The bar states how many comments will be read and how much of the plan's allowance remains after it.",
+  tourStepFiltersTitle: "Filters",
+  tourStepFiltersBody:
+    "Every figure on the dashboard follows what you choose here: the period, the video, the sentiment, and the topic. The bar stays with you while scrolling.",
+  tourStepSectionsTitle: "Sections",
+  tourStepSectionsBody:
+    "Move between the summary, videos, audience voice and comments from here. The tour has ended; find it again any time in the rail.",
 };
