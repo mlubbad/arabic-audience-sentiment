@@ -554,7 +554,12 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
             pending={pending}
             feedback={feedback("create")}
             onSubmit={createWorkspace}
-            tourAnchor={workspaces.length === 0 ? "workspace" : undefined}
+            tourAnchor={
+              loadedWorkspaceUserId === session.user.id &&
+              workspaces.length === 0
+                ? "workspace"
+                : undefined
+            }
           />
         </>
       )}

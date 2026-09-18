@@ -8,7 +8,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOUR_STEPS, TOUR_VERSION, type TourStep } from "./tourSteps";
-import { keepDemo, useTour } from "./useTour";
+import { dropTour, keepDemo, useTour } from "./useTour";
 
 const KEY = `tour:v${TOUR_VERSION}`;
 
@@ -62,6 +62,73 @@ describe("keepDemo", () => {
 
   it("drops anything else — the tour's own navigations carry only the demo flag", () => {
     expect(keepDemo("?ws=abc&demo=1")).toBe("?demo=1");
+  });
+});
+
+describe("dropTour", () => {
+  it("drops only tour and keeps everything else in place", () => {
+    expect(dropTour("?demo=1&tour=1")).toBe("?demo=1");
+    expect(dropTour("?tour=1&ws=abc")).toBe("?ws=abc");
+    expect(dropTour("?ws=abc&tour=1&demo=1")).toBe("?ws=abc&demo=1");
+    expect(dropTour("?tour=1")).toBe("");
+    expect(dropTour("?demo=1")).toBe("?demo=1");
+    expect(dropTour("")).toBe("");
+  });
+});
+
+describe("useTour: the gates", () => {
+  it("begin() only opens from the welcome", () => {
+    const { result } = mount();
+    act(() => result.current.begin());
+    expect(result.current.status).toBe("idle");
+  });
+
+  it("next() and back() only act while running", () => {
+    anchor("rail");
+    const { result, navigate } = mount();
+    act(() => result.current.next());
+    expect(result.current.status).toBe("idle");
+    expect(localStorage.getItem(KEY)).toBeNull();
+    act(() => result.current.start());
+    act(() => result.current.next());
+    act(() => result.current.back());
+    expect(result.current.status).toBe("welcome");
+    expect(result.current.index).toBe(0);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("skip() ends as seen from the welcome and while running, not from idle", () => {
+    const { result } = mount();
+    act(() => result.current.skip());
+    expect(result.current.status).toBe("idle");
+    expect(localStorage.getItem(KEY)).toBeNull();
+    act(() => result.current.start());
+    act(() => result.current.skip());
+    expect(result.current.status).toBe("done");
+    expect(localStorage.getItem(KEY)).toBe("seen");
+  });
+
+  it("later() only acts on the welcome", () => {
+    anchor("rail");
+    const { result } = mount();
+    act(() => result.current.later());
+    expect(localStorage.getItem(KEY)).toBeNull();
+    act(() => result.current.start());
+    act(() => result.current.begin());
+    act(() => result.current.later());
+    expect(result.current.status).toBe("running");
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("a door pressed on done does nothing until the machine is idle again", () => {
+    const { result } = mount();
+    act(() => result.current.start());
+    act(() => result.current.later());
+    expect(result.current.status).toBe("done");
+    act(() => result.current.begin());
+    act(() => result.current.skip());
+    expect(result.current.status).toBe("done");
+    expect(localStorage.getItem(KEY)).toBe("dismissed");
   });
 });
 
@@ -216,6 +283,75 @@ describe("useTour: anchors and routes", () => {
     act(() => vi.advanceTimersByTime(20));
     expect(result.current.anchorEl).toBe(ws);
     expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for a route once per step, however often the effect re-runs", () => {
+    anchor("rail");
+    const { result, navigate, rerender } = mount({ pathname: "/dashboard" });
+    act(() => result.current.start());
+    act(() => result.current.begin());
+    act(() => result.current.next());
+    rerender({ pathname: "/dashboard", search: "" });
+    rerender({ pathname: "/dashboard", search: "?ws=abc" });
+    act(() => vi.advanceTimersByTime(500));
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(result.current.index).toBe(1);
+  });
+
+  it("skips forward when the route it asked for never arrives", () => {
+    anchor("rail");
+    const { result, navigate } = mount({ pathname: "/dashboard" });
+    act(() => result.current.start());
+    act(() => result.current.begin());
+    act(() => result.current.next());
+    expect(navigate).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(1400));
+    expect(result.current.index).toBe(1);
+    act(() => vi.advanceTimersByTime(200));
+    // Step 3 is on /account too: asked for again, once, with its own clock.
+    expect(result.current.index).toBe(2);
+    expect(result.current.status).toBe("running");
+    expect(navigate).toHaveBeenCalledTimes(2);
+    act(() => vi.advanceTimersByTime(1600));
+    expect(result.current.index).toBe(3);
+    expect(navigate).toHaveBeenCalledTimes(3);
+    expect(navigate).toHaveBeenLastCalledWith({
+      pathname: "/sync",
+      search: "",
+    });
+  });
+
+  it("the clock starts on entering the step: a late page has only what is left", () => {
+    anchor("rail");
+    const { result, rerender } = mount({ pathname: "/dashboard" });
+    act(() => result.current.start());
+    act(() => result.current.begin());
+    act(() => result.current.next());
+    act(() => vi.advanceTimersByTime(1200));
+    rerender({ pathname: "/account", search: "" });
+    act(() => vi.advanceTimersByTime(200));
+    expect(result.current.index).toBe(1);
+    act(() => vi.advanceTimersByTime(200));
+    expect(result.current.index).toBe(2);
+  });
+
+  it("a step revisited with back() then next() gets a fresh clock", () => {
+    anchor("rail");
+    const ws = anchor("workspace");
+    const { result, rerender } = mount({ pathname: "/dashboard" });
+    act(() => result.current.start());
+    act(() => result.current.begin());
+    act(() => result.current.next());
+    rerender({ pathname: "/account", search: "" });
+    act(() => vi.advanceTimersByTime(20));
+    expect(result.current.anchorEl).toBe(ws);
+    act(() => vi.advanceTimersByTime(3000));
+    act(() => result.current.back());
+    act(() => vi.advanceTimersByTime(20));
+    act(() => result.current.next());
+    act(() => vi.advanceTimersByTime(20));
+    expect(result.current.index).toBe(1);
+    expect(result.current.anchorEl).toBe(ws);
   });
 
   it("does not navigate for the first step, which has no route", () => {

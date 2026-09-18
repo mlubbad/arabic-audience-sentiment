@@ -11,15 +11,22 @@
  * `useNavigate`/`useLocation`, and the unit test hands in a spy and a
  * location it re-renders with — the machine itself never touches
  * `window.location`. When a step's route is not the page it is on, it asks
- * for that route (keeping `?demo=1`, dropping `?tour=1`) and waits for the
- * location to change; on the right page it polls the document for the
- * step's `data-tour` anchor every animation frame for up to `anchorWait`
- * ms, lights it when it appears, and skips the step forward when it never
- * does — an empty dashboard has no section nav, a fresh account no
- * workspace card. Browser back while running ends the tour, so a hole
- * never sits over a page the step was not written for.
+ * for that route once (keeping `?demo=1`, dropping `?tour=1`) and waits for
+ * the location to change; on the right page it polls the document for the
+ * step's `data-tour` anchor every animation frame, lights it when it
+ * appears, and skips the step forward when it never does — an empty
+ * dashboard has no section nav, a fresh account no workspace card. The
+ * `anchorWait` deadline runs from the moment the step is entered, so a
+ * route that never arrives (a page that refuses the reader) skips forward
+ * the same way. Browser back while running ends the tour, so a hole never
+ * sits over a page the step was not written for.
+ *
+ * The doors are gated on the state they open from: `begin`/`later` from
+ * the welcome, `next`/`back` while running, `skip` from either — a stale
+ * press from a layer that is unmounting, or a double-fired handler, does
+ * nothing.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TourStep } from "./tourSteps";
 import { writeTour, type TourMemory } from "./tourState";
 
@@ -71,6 +78,16 @@ export function keepDemo(search: string): string {
   return params.has("demo") ? `?demo=${params.get("demo") ?? ""}` : "";
 }
 
+/** The same address without the `tour` flag and nothing else changed —
+ *  the provider's cleanup after `?tour=1` has started the tour, on the page
+ *  the reader is already on, whose own parameters stay. */
+export function dropTour(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete("tour");
+  const rest = params.toString();
+  return rest ? `?${rest}` : "";
+}
+
 export function useTour({
   steps,
   navigate,
@@ -85,42 +102,57 @@ export function useTour({
   const total = steps.length;
   const last = total - 1;
   const step = status === "running" ? (steps[index] ?? null) : null;
+  // The step whose route was asked for, and the deadline that started when
+  // it was — one request per step, however many times the effect re-runs
+  // (StrictMode runs it twice), and one clock from entering the step.
+  const entered = useRef<{
+    index: number;
+    deadline: number;
+    asked: boolean;
+  } | null>(null);
+
+  const goTo = useCallback((i: number) => {
+    entered.current = null;
+    setAnchorEl(null);
+    setIndex(i);
+  }, []);
 
   const finish = useCallback((memory: TourMemory) => {
     writeTour(memory);
+    entered.current = null;
     setAnchorEl(null);
     setStatus("done");
   }, []);
 
   const start = useCallback(() => {
-    setIndex(0);
-    setAnchorEl(null);
+    goTo(0);
     setStatus("welcome");
-  }, []);
+  }, [goTo]);
 
   const begin = useCallback(() => {
-    setIndex(0);
-    setAnchorEl(null);
+    if (status !== "welcome") return;
+    goTo(0);
     setStatus("running");
-  }, []);
+  }, [status, goTo]);
 
   const next = useCallback(() => {
+    if (status !== "running") return;
     if (index >= last) finish("seen");
-    else {
-      setAnchorEl(null);
-      setIndex(index + 1);
-    }
-  }, [index, last, finish]);
+    else goTo(index + 1);
+  }, [status, index, last, finish, goTo]);
 
   const back = useCallback(() => {
-    if (index > 0) {
-      setAnchorEl(null);
-      setIndex(index - 1);
-    }
-  }, [index]);
+    if (status !== "running") return;
+    if (index > 0) goTo(index - 1);
+  }, [status, index, goTo]);
 
-  const skip = useCallback(() => finish("seen"), [finish]);
-  const later = useCallback(() => finish("dismissed"), [finish]);
+  const skip = useCallback(() => {
+    if (status === "running" || status === "welcome") finish("seen");
+  }, [status, finish]);
+
+  const later = useCallback(() => {
+    if (status === "welcome") finish("dismissed");
+  }, [status, finish]);
 
   // `done` is one tick long: the layer sees it, unmounts, and the machine
   // is idle for the next start.
@@ -135,9 +167,25 @@ export function useTour({
     if (status !== "running") return;
     const current = steps[index];
     if (!current) return;
+    if (entered.current?.index !== index)
+      entered.current = {
+        index,
+        deadline: Date.now() + anchorWait,
+        asked: false,
+      };
+    const clock = entered.current;
+    const advance = () => {
+      if (index >= last) finish("seen");
+      else goTo(index + 1);
+    };
     if (current.route && current.route !== pathname) {
-      navigate({ pathname: current.route, search: keepDemo(search) });
-      return;
+      if (!clock.asked) {
+        clock.asked = true;
+        navigate({ pathname: current.route, search: keepDemo(search) });
+      }
+      // The page may never come: skip forward when the clock runs out.
+      const t = setTimeout(advance, Math.max(0, clock.deadline - Date.now()));
+      return () => clearTimeout(t);
     }
     const d = doc ?? globalThis.document;
     if (!d) return;
@@ -146,7 +194,6 @@ export function useTour({
       view && typeof view.requestAnimationFrame === "function"
         ? (cb: () => void) => view.requestAnimationFrame(cb)
         : (cb: () => void) => setTimeout(cb, 16);
-    const deadline = Date.now() + anchorWait;
     let cancelled = false;
     const look = () => {
       if (cancelled) return;
@@ -157,12 +204,8 @@ export function useTour({
         setAnchorEl(el);
         return;
       }
-      if (Date.now() >= deadline) {
-        if (index >= last) finish("seen");
-        else {
-          setAnchorEl(null);
-          setIndex(index + 1);
-        }
+      if (Date.now() >= clock.deadline) {
+        advance();
         return;
       }
       raf(look);
@@ -173,7 +216,7 @@ export function useTour({
     };
     // `search` is read, not watched: a search change alone (the tour flag
     // being dropped, a workspace switch) is not a page change.
-  }, [status, index, pathname, steps, doc, anchorWait, last, finish]);
+  }, [status, index, pathname, steps, doc, anchorWait, last, finish, goTo]);
 
   // Browser back while running: end, rather than light a stale hole.
   useEffect(() => {

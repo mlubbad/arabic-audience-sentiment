@@ -7,8 +7,8 @@
  * where a reader is signed in (or in the demo), this browser has no memory
  * of the tour, and the page is one of the three the tour visits — the
  * welcome. `?tour=1` is a support link that starts it regardless of memory,
- * clearing the memory first; the flag is then dropped from the address so a
- * reload does not start it again. Both fire at most once per page load: a
+ * clearing the memory first; the flag alone is then dropped from the
+ * address (`?demo`, `?ws` stay) so a reload does not start it again. Both fire at most once per page load: a
  * reader who dismissed the welcome and walks to another page is not asked
  * on arrival.
  *
@@ -31,7 +31,7 @@ import type { Session } from "@supabase/supabase-js";
 import { useMediaQuery } from "../ui/useMediaQuery";
 import { stepsFor } from "./tourSteps";
 import { clearTour, readTour, wantsTour } from "./tourState";
-import { keepDemo, useTour, type TourMachine } from "./useTour";
+import { dropTour, useTour, type TourMachine } from "./useTour";
 
 const TourLayer = lazy(() => import("./Tour"));
 
@@ -84,7 +84,7 @@ export function TourProvider({
       asked.current = true;
       clearTour();
       start();
-      navigate({ pathname, search: keepDemo(search) }, { replace: true });
+      navigate({ pathname, search: dropTour(search) }, { replace: true });
       return;
     }
     if (
