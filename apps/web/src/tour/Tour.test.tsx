@@ -7,8 +7,10 @@ import { ar } from "../strings/ar";
 import { TourContextForTests } from "./TourProvider";
 import Tour, {
   CARD_ROOM,
+  MIN_CUT,
   cardAnchorRect,
   fitSide,
+  isTall,
   scrollBlockFor,
   sideFor,
 } from "./Tour";
@@ -141,7 +143,7 @@ describe("Tour — running", () => {
     expect(screen.getByTestId("tour-next")).toHaveTextContent(ar.tourNext);
     expect(screen.getByTestId("tour-skip")).toHaveTextContent(ar.tourSkip);
     expect(screen.getByTestId("tour-skip")).toHaveClass("ui-btn--link");
-    // Focus lands inside the card on each step.
+    // Focus lands inside the card when it mounts.
     await waitFor(() =>
       expect(card).toContainElement(document.activeElement as HTMLElement),
     );
@@ -333,6 +335,9 @@ describe("Tour — running", () => {
     expect(scrollBlockFor(short, viewport, "bottom")).toBe("center");
     expect(scrollBlockFor(edge, viewport, "top")).toBe("center");
     expect(scrollBlockFor(tall, viewport, "bottom")).toBe("start");
+    // A phone held sideways holds one room: everything goes to the top.
+    const sideways = { width: 844, height: 390 };
+    expect(scrollBlockFor(short, sideways, "bottom")).toBe("start");
     // Beside the anchor, the card needs no room above or below it.
     expect(scrollBlockFor(tall, viewport, "left")).toBe("center");
     expect(scrollBlockFor({ ...short, height: 900 }, viewport, "right")).toBe(
@@ -362,5 +367,46 @@ describe("Tour — running", () => {
     // Tall, but starting low enough that a card fits above it.
     const below = { top: 600, left: 24, width: 968, height: 900 };
     expect(cardAnchorRect(below, viewport)).toEqual(below);
+    // Not tall: a small anchor mid-screen is never cut, wherever it sits.
+    const small = { top: 350, left: 24, width: 968, height: 40 };
+    expect(cardAnchorRect(small, viewport)).toEqual(small);
+  });
+
+  it("calls an anchor tall by the room a centred card has beside it", () => {
+    const wide = { width: 1280, height: 800 };
+    const sideways = { width: 844, height: 390 };
+    const box = (height: number) => ({ top: 0, left: 0, width: 100, height });
+    expect(isTall(box(800 - 2 * CARD_ROOM), wide)).toBe(false);
+    expect(isTall(box(800 - 2 * CARD_ROOM + 1), wide)).toBe(true);
+    // A short screen holds less than two rooms; the bar stops at half one.
+    expect(isTall(box(40), sideways)).toBe(false);
+    expect(isTall(box(CARD_ROOM / 2), sideways)).toBe(false);
+    expect(isTall(box(334), sideways)).toBe(true);
+  });
+
+  it("on a phone held sideways, cuts a tall anchor and leaves a short one", () => {
+    const sideways = { width: 844, height: 390 };
+    // A 40px tabs row mid-screen, with no room either side of it: left
+    // whole, never trimmed to nothing.
+    const tabs = { top: 175, left: 16, width: 812, height: 40 };
+    expect(cardAnchorRect(tabs, sideways)).toEqual(tabs);
+    // A workspace card scrolled to the top: cut so the card lands on
+    // screen, over its lower part.
+    const card = { top: 24, left: 16, width: 796, height: 334 };
+    expect(cardAnchorRect(card, sideways)).toEqual({
+      ...card,
+      height: 390 - CARD_ROOM - 24,
+    });
+    // The catalogue under a page's own scroll margin: the room is gone,
+    // the box is a sliver of the floor's size, never thinner.
+    const low = { top: 84, left: 16, width: 796, height: 769 };
+    expect(cardAnchorRect(low, sideways)).toEqual({ ...low, height: MIN_CUT });
+    // Its top scrolled past: the visible top.
+    const tall = { top: -40, left: 16, width: 812, height: 900 };
+    expect(cardAnchorRect(tall, sideways)).toEqual({
+      ...tall,
+      top: 0,
+      height: 390 - CARD_ROOM,
+    });
   });
 });

@@ -20,17 +20,26 @@
      lit anchor stays clickable. The dimming is the hole's shadow. */
   pointer-events: none;
   overflow: hidden;
+  /* Fades in once per step: the layer remounts for each anchor. */
+  animation: tour-veil-in var(--dur-2) var(--ease-glass);
+}
+@keyframes tour-veil-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .tour-hole {
   position: fixed;
   border-radius: var(--radius-2);
   box-shadow: 0 0 0 200vmax var(--tour-veil);
-  transition:
-    top var(--dur-2) var(--ease-glass),
-    left var(--dur-2) var(--ease-glass),
-    width var(--dur-2) var(--ease-glass),
-    height var(--dur-2) var(--ease-glass);
+  /* No transition on the box itself: it is re-measured every scroll frame,
+     and a transition restarted each frame trailed behind the anchor. The
+     motion is the veil's fade below, which plays once per step because
+     the layer remounts for each anchor. */
 }
 
 /* The anchor itself, while lit. An outline only — no position or z-index
@@ -38,9 +47,12 @@
 [data-tour-active] {
   outline: 2px solid var(--ml-indigo);
   outline-offset: 4px;
-  /* A tall anchor is scrolled to the top of the view (`Tour.tsx`): this
-     keeps its outline and the hole's edge off the viewport's edge. */
-  scroll-margin-block: var(--space-5);
+  /* An anchor scrolled to the top of the view (`Tour.tsx`) lands below
+     the dashboard's pinned filter bar (`--db-pinned-h`, written by
+     `FilterBar` while it is mounted and 0 elsewhere) and off the
+     viewport's edge, outline and hole ring included. */
+  scroll-margin-top: calc(var(--db-pinned-h, 0px) + var(--space-5));
+  scroll-margin-bottom: var(--space-5);
 }
 
 /* The card: `ui-popover-content`'s surface (the same tokens, inherited by
@@ -87,7 +99,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tour-hole {
-    transition: none;
+  .tour-veil {
+    animation: none;
   }
 }

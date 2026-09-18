@@ -84,35 +84,48 @@ export function fitSide(side: Side, rect: Rect, viewport: Viewport): Side {
 }
 
 /** Where the anchor is scrolled to when it is lit. The middle of the view
- *  (the design's choice), except for an anchor whose card goes above or
- *  below it and which is too tall to leave a card's room on either side
- *  when centred — a workspace card with its setup path, the catalogue —
- *  which goes to the top, so the room is all on one side, below. */
+ *  (the design's choice) when that leaves a card's room above and below
+ *  it; the top when it does not — a workspace card with its setup path,
+ *  the catalogue, or any anchor at all on a phone held sideways, whose
+ *  390px hold one room and no more — so the room is all on one side,
+ *  below. Beside the anchor, the card needs no room above or below. */
 export function scrollBlockFor(
   rect: Rect,
   viewport: Viewport,
   side: Side,
 ): ScrollLogicalPosition {
   if (side === "left" || side === "right") return "center";
-  return rect.height <= viewport.height - 2 * CARD_ROOM ? "center" : "start";
+  return viewport.height - rect.height >= 2 * CARD_ROOM ? "center" : "start";
+}
+
+/** Whether an anchor is tall enough to be cut for its card (below): the
+ *  rule `scrollBlockFor` scrolls by — too tall for a centred card's room
+ *  on both sides — except that on a screen shorter than two rooms that
+ *  would call every anchor tall, so the bar never drops below half a
+ *  room: a tabs row or a section nav is short on any screen, and is
+ *  scrolled to the top there rather than cut. */
+export function isTall(rect: Rect, viewport: Viewport): boolean {
+  return rect.height > Math.max(viewport.height - 2 * CARD_ROOM, CARD_ROOM / 2);
 }
 
 /** The box the card is placed against: the anchor's, whenever the screen
  *  has a card's room above it or below it (Radix flips between the two).
- *  When it has neither — the anchor fills the screen from near the top
- *  down past where a card would go — the visible top of it, cut to leave
- *  the room at the bottom of the screen, so the card sits over the anchor's
- *  lower part rather than past the viewport's edge. The hole is never cut:
- *  it is the veil's, and it follows the real box. */
+ *  When it has neither — a tall anchor that fills the screen from near
+ *  the top down past where a card would go — the visible top of it, cut
+ *  to leave the room at the bottom of the screen, so the card sits over
+ *  the anchor's lower part rather than past the viewport's edge; never
+ *  thinner than `MIN_CUT`, so a card always has a box to sit under. A
+ *  short anchor is never cut, on any screen: with no room either side of
+ *  it Radix places the card as best it can. The hole is never cut: it is
+ *  the veil's, and it follows the real box. */
+export const MIN_CUT = 24;
 export function cardAnchorRect(rect: Rect, viewport: Viewport): Rect {
+  if (!isTall(rect, viewport)) return rect;
   const top = Math.max(rect.top, 0);
   const bottom = Math.min(rect.top + rect.height, viewport.height);
-  if (top >= CARD_ROOM || bottom <= viewport.height - CARD_ROOM) return rect;
-  return {
-    ...rect,
-    top,
-    height: Math.max(viewport.height - CARD_ROOM - top, 0),
-  };
+  const floor = viewport.height - CARD_ROOM;
+  if (top >= CARD_ROOM || bottom <= floor) return rect;
+  return { ...rect, top, height: Math.max(floor - top, MIN_CUT) };
 }
 
 function viewportOf(): Viewport {
@@ -180,9 +193,8 @@ export default function Tour() {
   return null;
 }
 
-type Box = { top: number; left: number; width: number; height: number };
-
-function boxOf(el: HTMLElement): Box {
+/** The hole's box: the anchor's, inflated by `HOLE_PAD` on every side. */
+function boxOf(el: HTMLElement): Rect {
   const r = rectOf(el);
   return {
     top: r.top - HOLE_PAD,
@@ -190,6 +202,15 @@ function boxOf(el: HTMLElement): Box {
     width: r.width + 2 * HOLE_PAD,
     height: r.height + 2 * HOLE_PAD,
   };
+}
+
+function sameRect(a: Rect, b: Rect): boolean {
+  return (
+    a.top === b.top &&
+    a.left === b.left &&
+    a.width === b.width &&
+    a.height === b.height
+  );
 }
 
 function prefersReducedMotion(): boolean {
@@ -211,11 +232,26 @@ function prefersReducedMotion(): boolean {
  *  found while its list is still loading, a short box scrolled to the
  *  middle, and fills the screen a moment later. */
 function TourVeil({ anchorEl, side }: { anchorEl: HTMLElement; side: Side }) {
-  const [box, setBox] = useState<Box>(() => boxOf(anchorEl));
+  const [box, setBox] = useState<Rect>(() => boxOf(anchorEl));
 
   useLayoutEffect(() => {
-    const measure = () => setBox(boxOf(anchorEl));
-    measure();
+    // No render when the box has not moved; one measurement per frame
+    // however many scroll events a burst brings.
+    const take = () => {
+      const next = boxOf(anchorEl);
+      setBox((prev) => (sameRect(prev, next) ? prev : next));
+    };
+    let frame = 0;
+    const measure = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        take();
+      });
+    };
+    // On mount this repeats the state initialiser and changes nothing; it
+    // is here for a veil handed a new anchor while mounted.
+    take();
     anchorEl.setAttribute("data-tour-active", "");
     let block: ScrollLogicalPosition | null = null;
     const bring = () => {
@@ -242,6 +278,7 @@ function TourVeil({ anchorEl, side }: { anchorEl: HTMLElement; side: Side }) {
         : null;
     observer?.observe(anchorEl);
     return () => {
+      if (frame) cancelAnimationFrame(frame);
       anchorEl.removeAttribute("data-tour-active");
       window.removeEventListener("scroll", measure, { capture: true });
       window.removeEventListener("resize", measure);
