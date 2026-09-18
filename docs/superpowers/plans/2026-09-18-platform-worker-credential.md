@@ -822,7 +822,7 @@ Back the migration up first (`cp` to the scratch directory — never `git checko
 
 1. In `claim_job`, change `where (w is null or q.workspace_id = w)` to `where q.workspace_id = w` and run the suite: the claim case must fail (nothing claimed for a null `w`). Restore from the backup; run again: green.
 2. In `claim_job`, change the platform sighting to the single-row form (`values (w, now())`): the sighting case must fail (no rows: `w` is null) and the connected case must fail. Restore; green.
-3. In `worker_job`, change `if w is not null and owner <> w` back to `if owner <> w`: the heartbeat case must fail with `forbidden`. Restore; green.
+3. In `worker_job`, change `return owner;` to `return w;`: the end-to-end case must fail at the catalogue commit (`null value in column "workspace_id" of relation "videos"`). Restore; green. (Reverting the comparison alone raises nothing — `null <> uuid` is null — so it is not the mutation to run.)
 
 Record the three results (red → restored green) for `docs/verification.md`.
 

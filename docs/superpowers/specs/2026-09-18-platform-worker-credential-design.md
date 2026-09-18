@@ -101,9 +101,10 @@ row. The six direct callers are rebuilt to read null as "any workspace":
   workspace_id = w)`.
 - **`worker_tick`** (`20260915132000:196-199`): a scoped credential still returns
   `schedule_due_work(w)`; a platform credential loops over the workspaces of active
-  subscriptions — the same set `schedule_all()` walks — summing the two counters, and
-  returns `{discover, collect, workspaces}`. `schedule_all()` and its `pg_cron` schedule
-  are untouched.
+  subscriptions — the same set `schedule_all()` walks — summing the three counters
+  `schedule_due_work` keeps (`discover`, `collect`, and `analyse` since `20260916011000`),
+  and returns `{discover, collect, analyse, workspaces}`. `schedule_all()` and its
+  `pg_cron` schedule are untouched.
 
 ### Registration and retirement
 
@@ -147,9 +148,10 @@ service-role entry point, one revoked platform credential):
 4. `worker_channel_grant` with the platform credential returns B's connection for B's
    job; `worker_mark_revoked` marks B's channel; a job whose channel has no connection
    is `channel_not_connected`.
-5. `worker_tick` with the platform credential returns `{discover, collect, workspaces}`
-   with `workspaces` equal to the number of active subscriptions; with the scoped
-   credential it returns `{discover, collect}` as before.
+5. `worker_tick` with the platform credential returns `{discover, collect, analyse,
+   workspaces}` with `workspaces` equal to the number of active subscriptions and the
+   three totals equal to the jobs the tick enqueued; with the scoped credential it returns
+   `{discover, collect, analyse}` as before.
 6. `dashboard_snapshot` read as B's owner reports `worker.connected` true after the
    platform claim, with no scoped credential for B in existence.
 7. The revoked platform credential is `invalid_worker_credential`;
@@ -161,8 +163,12 @@ service-role entry point, one revoked platform credential):
    revoked is `keep_at_least_one`.
 
 Mutation, recorded in `docs/verification.md`: with `(w is null or …)` reverted to
-`workspace_id = w` in the claim predicate, case 2 must fail; with the all-workspaces
-sighting reverted to the single row, case 2's C assertion and case 6 must fail.
+`workspace_id = w` in the claim predicate, case 2 must fail; with the platform poll
+leaving no sighting, the sighting assertion and case 6 must fail; with `worker_job`
+answering the credential's workspace instead of the job's, case 3's catalogue commit
+must fail (a null reaches `videos.workspace_id`). Reverting the guard's `owner <> w`
+comparison alone is *not* a mutation the suite can see — `null <> uuid` is null and
+raises nothing — which is why case 3 commits a catalogue rather than only heartbeating.
 
 The existing suites (`worker_gateway`, `worker_catalogue`, `worker_video_counts`,
 `worker_topics`, `lease_recovery`, `end_to_end`, `workspace_lifecycle`) must stay
