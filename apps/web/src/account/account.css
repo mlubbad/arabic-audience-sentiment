@@ -69,8 +69,8 @@
 
 /* ---------------- doors row ---------------- */
 /* Shared by every card on this page that offers more than one action: the
-   plan's upgrade/manage/topup/contact doors here, a workspace's own
-   sync/connect/disconnect/retire doors in a later task. */
+   plan's upgrade/manage/topup/contact doors here, and a workspace's own
+   sync/connect/disconnect/retire doors in `WorkspaceCard`. */
 .db-actions {
   display: flex;
   flex-wrap: wrap;
@@ -79,9 +79,9 @@
 }
 
 /* ---------------- a workspace card ---------------- */
-/* The list of cards, for the page to wear on its `<ul role="list">` once it
-   is recomposed: no bullet, no indent, one column with the section's gap.
-   The `li` itself is the card (`Card asChild`). */
+/* The list of cards, worn on the page's `<ul role="list">`: no bullet, no
+   indent, one column with the section's gap. The `li` itself is the card
+   (`Card asChild`). */
 .db-ws-list {
   list-style: none;
   margin: 0;

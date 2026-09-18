@@ -73,7 +73,12 @@ export function ConfirmDialog({
       <DialogContent
         className="db-confirm"
         data-testid={`${kind}-dialog-${workspaceId}`}
-        closeLabel={words.keep}
+        // The corner ✕ and the keep button below both end the dialog without
+        // confirming, but they need two different accessible names —
+        // `S.adminDeleteClose` is the same "إغلاق" `DeleteWorkspaceDialog.tsx`
+        // and `ReviewDialog.tsx` already reuse for this exact corner, not a
+        // new word.
+        closeLabel={S.adminDeleteClose}
         closeTestId={`${kind}-cancel-${workspaceId}`}
       >
         <DialogTitle>{words.title}</DialogTitle>

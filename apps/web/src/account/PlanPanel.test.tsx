@@ -153,7 +153,7 @@ describe("PlanPanelView", () => {
     expect(analysis).toHaveTextContent(ar.planUsedOf("2,500", "10,000"));
   });
 
-  it("still draws a meter for an unlimited budget, with no ceiling to report", () => {
+  it("draws no meter for an unlimited budget — just the name and the line", () => {
     mountView({
       usage: summary({
         budgets: [
@@ -168,9 +168,8 @@ describe("PlanPanelView", () => {
       }),
     });
     const row = screen.getByTestId("plan-comment_analysis");
-    const bar = within(row).getByRole("progressbar");
-    expect(bar).not.toHaveAttribute("aria-valuenow");
-    expect(bar).not.toHaveAttribute("aria-valuemax");
+    expect(within(row).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(row).toHaveTextContent(ar.budgetAnalysis);
   });
 
   it("shows the plan's own notice as a status line", () => {

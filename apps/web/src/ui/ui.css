@@ -777,3 +777,15 @@
 .ui-meter-bar > i[data-state="exhausted"] {
   background: var(--color-danger);
 }
+.ui-meter small[data-state="ok"] {
+  color: var(--text-2);
+}
+.ui-meter small[data-state="warning"] {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+.ui-meter small[data-state="critical"],
+.ui-meter small[data-state="exhausted"] {
+  color: var(--color-danger);
+  font-weight: 700;
+}

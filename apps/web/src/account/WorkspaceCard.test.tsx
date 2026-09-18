@@ -30,11 +30,6 @@ type Props = Parameters<typeof WorkspaceCard>[0];
 /** The card is the outer `li`; the setup path inside it is a list too, so
  *  the role query would find four. */
 const card = () => document.querySelector("ul > li") as HTMLElement;
-/** The dialog's own doors row — the corner ✕ shares the keep button's
- *  accessible name (it is labelled with the same keep word), so the two are
- *  told apart by where they sit, not by what they are called. */
-const doors = (dialog: HTMLElement) =>
-  within(dialog.querySelector(".db-actions") as HTMLElement);
 
 function mount(over: Partial<Props> = {}) {
   const props: Props = {
@@ -47,14 +42,14 @@ function mount(over: Partial<Props> = {}) {
     onConnect: vi.fn(),
     ...over,
   };
-  render(
+  const result = render(
     <MemoryRouter initialEntries={["/account"]}>
       <ul>
         <WorkspaceCard {...props} />
       </ul>
     </MemoryRouter>,
   );
-  return props;
+  return { ...props, unmount: result.unmount };
 }
 
 describe("WorkspaceCard", () => {
@@ -69,7 +64,7 @@ describe("WorkspaceCard", () => {
   });
 
   describe("rename", () => {
-    it("the door opens the form with the name already in it, and save carries the new name", async () => {
+    it("the door opens the form", async () => {
       const onRename = vi.fn();
       mount({ onRename });
       await userEvent.click(screen.getByTestId(`rename-${W}`));
@@ -130,10 +125,17 @@ describe("WorkspaceCard", () => {
       );
     });
 
-    it("says what a seeded public channel is, and what a broken one needs", () => {
+    it("says what a seeded public channel is", () => {
       mount({ channel: { ...connected, status: "public_unverified" } });
       expect(screen.getByTestId(`channel-${W}`)).toHaveTextContent(
         ar.channelSeeded,
+      );
+    });
+
+    it("says what a broken one needs", () => {
+      mount({ channel: { ...connected, status: "reconnect_required" } });
+      expect(screen.getByTestId(`channel-${W}`)).toHaveTextContent(
+        ar.channelNeedsRelink("reconnect_required"),
       );
     });
 
@@ -196,7 +198,7 @@ describe("WorkspaceCard", () => {
     });
 
     it("every door waits while the card is pending", () => {
-      mount({
+      const round1 = mount({
         channel: { ...connected, title: null, handle: null },
         pending: true,
         onDisconnect: vi.fn(),
@@ -205,6 +207,44 @@ describe("WorkspaceCard", () => {
       });
       for (const id of ["rename", "relink", "disconnect", "retire"])
         expect(screen.getByTestId(`${id}-${W}`)).toBeDisabled();
+      round1.unmount();
+
+      // The rename form's own save/cancel, while it is open.
+      const round2 = mount({
+        pending: true,
+        renaming: true,
+        onRename: vi.fn(),
+      });
+      expect(
+        screen.getByRole("button", { name: ar.renameSave }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: ar.renameCancel }),
+      ).toBeDisabled();
+      round2.unmount();
+
+      // The connect door itself, before it has been pressed.
+      const round3 = mount({
+        channel: null,
+        hasClient: true,
+        pending: true,
+        onConnect: vi.fn(),
+      });
+      expect(screen.getByTestId(`connect-${W}`)).toBeDisabled();
+      round3.unmount();
+
+      // The consent step's own continue and cancel, once the door was pressed.
+      mount({
+        channel: null,
+        hasClient: true,
+        pending: true,
+        onConnect: vi.fn(),
+        confirmingConnect: true,
+      });
+      expect(screen.getByTestId(`connect-continue-${W}`)).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: ar.renameCancel }),
+      ).toBeDisabled();
     });
   });
 
@@ -274,7 +314,7 @@ describe("WorkspaceCard", () => {
       );
       expect(onDisconnect).toHaveBeenCalledWith("confirm");
       await userEvent.click(
-        doors(dialog).getByRole("button", { name: ar.disconnectKeep }),
+        within(dialog).getByRole("button", { name: ar.disconnectKeep }),
       );
       expect(onDisconnect).toHaveBeenCalledWith("keep");
     });
@@ -303,7 +343,7 @@ describe("WorkspaceCard", () => {
         within(dialog).getByTestId(`disconnect-confirm-${W}`),
       ).toBeDisabled();
       expect(
-        doors(dialog).getByRole("button", { name: ar.disconnectKeep }),
+        within(dialog).getByRole("button", { name: ar.disconnectKeep }),
       ).toBeDisabled();
       await userEvent.keyboard("{Escape}");
       expect(onDisconnect).not.toHaveBeenCalled();
@@ -333,7 +373,7 @@ describe("WorkspaceCard", () => {
       await userEvent.click(confirm);
       expect(onRetire).toHaveBeenCalledWith("confirm");
       await userEvent.click(
-        doors(dialog).getByRole("button", { name: ar.retireKeep }),
+        within(dialog).getByRole("button", { name: ar.retireKeep }),
       );
       expect(onRetire).toHaveBeenCalledWith("keep");
       await userEvent.click(screen.getByTestId(`retire-cancel-${W}`));

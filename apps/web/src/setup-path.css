@@ -1,10 +1,10 @@
 /**
  * `SetupPath`'s own sheet, on `brand.css`'s tokens — no colour, spacing or
- * radius value invented here. Replaces `account-steps`/`setup-steps` (still
- * in `app.css`, styling `Account.tsx`'s own separate static list until that
- * page is rebuilt): a numbered marker like the visitor's list carried, and a
- * state word on each line like the owner's list carried separately, in one
- * component instead of two.
+ * radius value invented here. Replaces `account-steps`/`setup-steps`, the
+ * rules `app.css` used to carry for `Account.tsx`'s own separate static
+ * list before it was recomposed onto this component: a numbered marker
+ * like the visitor's list carried, and a state word on each line like the
+ * owner's list carried separately, in one component instead of two.
  *
  * Every child is placed explicitly rather than left to grid auto-flow, so
  * the layout does not depend on `SetupPath.tsx`'s children staying in a

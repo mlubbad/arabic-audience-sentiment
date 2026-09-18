@@ -1003,12 +1003,16 @@ session now has a demo a visitor, a screenshot tool, or a reviewer with no accou
 `WorkspaceCard.tsx`'s disconnect and retire actions used to open an inline confirmation block in
 the card's own flow, styled by the old `report.css`-derived sheet's `.disconnect-confirm` rule;
 task 3 replaced both with the shared `ConfirmDialog` component wrapping `ui/Dialog`, the same
-portal-rendered, focus-trapped pattern `admin/DeleteWorkspaceDialog` already established last
-phase. A destructive action now always opens a modal the rest of the page cannot be interacted
-through, rather than an inline block that pushes surrounding content around and can be dismissed
-by a stray click outside it. `Account.setup.test.ts`'s two open-dialog assertions moved into
-`WorkspaceCard.test.tsx` for exactly this reason: a portal renders outside the page's own static
-markup, so an assertion that the dialog is open has to run against the component that owns it.
+portal-rendered, focus-trapped pattern `apps/web/src/DeleteWorkspaceDialog.tsx` (consumed from
+`admin/WorkspaceRow.tsx`) already established last phase. A destructive action now always opens
+a modal the rest of the page cannot be interacted through, rather than an inline block that
+pushes surrounding content around and could not be dismissed except by pressing one of its own
+buttons — the dialog's advantage is the focus trap and the detachment from the page's layout, not
+click-outside safety: an overlay press dismisses the Radix dialog too (`onOpenChange(false)` →
+`onClose` → `keep`), same as the inline block's own keep button did. `Account.setup.test.ts`'s
+two open-dialog assertions moved into `WorkspaceCard.test.tsx` for exactly this reason: a portal
+renders outside the page's own static markup, so an assertion that the dialog is open has to run
+against the component that owns it.
 
 **`BudgetMeter` lives in `ui/` and is the one meter.** Moved out of `ops/` this phase (where it
 had been `/sync`'s own component since the ops/admin redesign) so `/account`'s `PlanPanel` could

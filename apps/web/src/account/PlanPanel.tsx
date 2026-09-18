@@ -168,13 +168,15 @@ export function PlanPanelView({
               <li key={b.event_type} data-testid={`plan-${b.event_type}`}>
                 <strong>{row.label}</strong>
                 <span className="db-plan-budget-line">{row.line}</span>
-                <BudgetMeter
-                  used={b.used}
-                  allowance={b.allowance}
-                  state={state}
-                  label={row.label}
-                  sentence={S.opsShare(share, S.budgetMessages[state])}
-                />
+                {finite && (
+                  <BudgetMeter
+                    used={b.used}
+                    allowance={b.allowance}
+                    state={state}
+                    label={row.label}
+                    sentence={S.opsShare(share, S.budgetMessages[state])}
+                  />
+                )}
               </li>
             );
           })}

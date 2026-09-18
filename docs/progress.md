@@ -1618,8 +1618,8 @@ markup, only in the card component that owns it. `PlanPanel`'s `<article>` picke
 `db-plan-body` class and a five-property reset once `style.css`'s bare `article` rule was found
 painting it a bordered white box it never asked for.
 
-**The verbatim `account.css` (494 lines) is deleted**, and `app.css` shrank 1286 → 755 lines
-(−531): every `.app-shell .rp-*` block plus the account/workspace-list/setup-steps/history rule
+**The verbatim `account.css` (494 lines) is deleted**, and `app.css` shrank 1314 → 755 lines
+(−559): every `.app-shell .rp-*` block plus the account/workspace-list/setup-steps/history rule
 families that had no reader left once `account/` composed its own page. `locale.css` and
 `pageStates/page-states.css` each lost a few dead rules pointing at the same retired classes.
 `noReportCss.test.ts` lost its allow-list entirely (it used to name the four files still
@@ -1641,6 +1641,7 @@ caveat against the e2e counts above, is in `docs/verification.md`'s dated entry.
 **Parked for a later fix wave**, confirmed rather than re-asserted from task 7's report: `grep`
 against `apps/web/src --include='*.tsx'` shows no component wearing `style.css`'s bare
 `.workspace-list`/`.link-button*`/`.budgets`/`.rename-form`/`.disconnect-confirm`/`.history`
-selectors any more — `WorkspaceCard.tsx` and its siblings wear the namespaced `db-budgets`/
-`db-plan-budgets` classes instead. These rules are dead weight, pending the final fix wave, not
-yet deleted.
+selectors any more — `ops/PlanBudgets.tsx` wears the namespaced `db-budgets` class and
+`account/PlanPanel.tsx` wears `db-plan-budgets`. These rules were dead weight, pending the
+final fix wave; the fix wave (`.superpowers/sdd/2026-09-17-account-redesign/final-fix-report.md`)
+deleted them from `style.css`.

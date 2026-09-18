@@ -7,11 +7,13 @@ import { test, expect, type Locator, type Page } from "@playwright/test";
  * in the same shape — so the sentence a card says here is the sentence the
  * live page would say.
  *
- * The signed-out page (`AuthEntry`) is covered elsewhere (`app-shell.spec.ts`,
- * `Account.entry.test.ts`); this file drives the page behind the session,
- * plus the one test that keeps the demo gate honest — `/account` with no
- * `?demo` on a build with no Supabase client, which is what this suite runs
- * against, shows `Unavailable` instead.
+ * `AuthEntry`'s only coverage is `Account.entry.test.ts` (static markup
+ * against a mocked client) — the e2e build has no Supabase client, so
+ * `/account` here never reaches it; `app-shell.spec.ts` exercises the same
+ * no-client build and finds `Unavailable`, not `AuthEntry`. This file
+ * drives the page behind the session, plus the one test that keeps the
+ * demo gate honest — `/account` with no `?demo` on this build shows
+ * `Unavailable` instead.
  */
 
 /** Fixture ids: `public/fixtures/account.json`, three rows «a1..a3». */

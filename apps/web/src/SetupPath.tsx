@@ -9,8 +9,9 @@
  *
  * Restyled on tokens in its own sheet (phase 5): `setup-path` on the `ol`,
  * `setup-step` + `data-status` on each `li`, `setup-step-state` on the state
- * word — replacing `account-steps`/`setup-steps`, whose rules stay in
- * `app.css` for `Account.tsx`'s own static list until that page is rebuilt.
+ * word — replacing `account-steps`/`setup-steps`, the rules `app.css` used
+ * to carry for `account/Account.tsx`'s own static list before it was
+ * recomposed.
  */
 import "./setup-path.css";
 import type { SetupStep } from "./setup";

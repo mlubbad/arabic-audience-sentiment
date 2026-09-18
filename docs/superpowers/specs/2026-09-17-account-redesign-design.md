@@ -204,3 +204,27 @@ illustrative copy."). Nothing else changes in copy; `dashDemoTag` is reused.
 Paddle flows themselves (sandbox rule stands); `PlanCard` in the rail; the
 pricing page; auth providers' configuration; Google One Tap behaviour; the
 dashboard's empty state beyond `SetupPath`'s restyle; phase 6 (the tour).
+
+## As shipped
+
+A few places where the build diverged from this design, worth recording
+rather than treating as bugs:
+
+- The story card renders a plain `ol.db-steps` (`AuthEntry.tsx`), not
+  `SetupPath` — `SetupPath` needs per-step statuses the signed-out story
+  never has. `Account.setup.test.ts` asserts `setupSteps.map(` there.
+- `Unavailable` keeps the old page's four strings
+  (`accountTryDashboardTitle`/`Lead`, `openDashboard`, plus the two this
+  design called out), not two new ones.
+- The fixture's second channel (`apps/web/public/fixtures/account.json`) is
+  `reconnect_required`, not `needs_relink` — the real enum
+  (`foundation.sql:22`). It has no disconnect door, so
+  `tests/e2e/account.spec.ts` disconnects the **first** workspace, not the
+  second.
+- `reduceAccountDemo.disconnect` removes only the channel row; the client
+  row stays, which is what keeps the connect door offered afterwards — not
+  "the client's connection" as this design's demo-mode section put it.
+- `app-shell.spec.ts` never renders `AuthEntry`: the e2e build carries no
+  Supabase client, so `/account` there shows `Unavailable`, the same as the
+  no-`?demo` case this file's own Tests section describes. `AuthEntry`'s
+  only coverage is `Account.entry.test.ts`.

@@ -568,7 +568,6 @@ function DemoAccount() {
   const fixture = useQuery({
     queryKey: ["account", "demo"],
     queryFn: ({ signal }) => loadAccountDemo(signal),
-    enabled: true,
   });
   return (
     <div className="db-page">
@@ -600,18 +599,21 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
   const [name, setName] = useState("");
   const [asking, setAsking] = useState<Asking>(null);
   /** One action over the current rows; `onRefused` maps the reducer's
-   *  refusal to the sentence the live page would print for the RPC's. */
+   *  refusal to the sentence the live page would print for the RPC's.
+   *  Optional: `reduceAccountDemo` only ever throws for `rename` and
+   *  `retire`, so a call site for an action that never refuses has nothing
+   *  to pass. */
   function act(
     action: AccountDemoAction,
     onDone: () => void,
-    onRefused: (message: string) => void,
+    onRefused?: (message: string) => void,
   ) {
     setNote(null);
     try {
       setState(reduceAccountDemo(state, action));
       onDone();
     } catch (e) {
-      onRefused(String((e as { message?: unknown })?.message ?? ""));
+      onRefused?.(String((e as { message?: unknown })?.message ?? ""));
     }
     setAsking(null);
   }
@@ -669,10 +671,8 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
                   );
                   return;
                 }
-                act(
-                  { type: "disconnect", w: w.id },
-                  () => say(scope, S.disconnectDone),
-                  () => say(scope, S.disconnectFailed),
+                act({ type: "disconnect", w: w.id }, () =>
+                  say(scope, S.disconnectDone),
                 );
               }}
               renaming={asking?.ws === w.id && asking.what === "rename"}
@@ -724,10 +724,8 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
                 // Google's consent screen is a full navigation the demo
                 // cannot make; the card says so where the redirect would
                 // have started, and the question closes.
-                act(
-                  { type: "connect", w: w.id },
-                  () => say(scope, S.demoExternalNote),
-                  () => say(scope, S.demoExternalNote),
+                act({ type: "connect", w: w.id }, () =>
+                  say(scope, S.demoExternalNote),
                 );
               }}
             />
