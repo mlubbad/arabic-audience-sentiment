@@ -224,6 +224,40 @@ describe("the catalogue, driven", () => {
     expect(screen.getByTestId("cat-save")).toBeDisabled();
   });
 
+  it("a plan with no ceiling never exceeds: the bar says so, the save is offered, and the fit takes everything priceable", async () => {
+    // The owner's plan as usage_summary reports it: -1 on both sides.
+    const owner: UsageSummary = {
+      ...plan(0),
+      plan_key: "owner",
+      budgets: [
+        {
+          event_type: "comment_analysis",
+          used: 68,
+          allowance: -1,
+          granted: 0,
+          remaining: -1,
+        },
+      ],
+    };
+    render(<Catalogue {...props({ stored, plan: owner })} />);
+    const bar = screen.getByTestId("cat-estimate");
+    expect(bar).toHaveTextContent(ar.pricingUnlimited);
+    expect(bar).not.toHaveTextContent(ar.catExceeds);
+    await userEvent.click(box("video-3"));
+    expect(bar).toHaveTextContent(ar.catSelected(3, 21));
+    expect(bar).toHaveAttribute("data-exceeds", "false");
+    expect(screen.getByTestId("cat-save")).toBeEnabled();
+    // Fit: with no ceiling everything that can be priced fits — video-3 comes
+    // back on; the disabled video-4 and the unpriced video-5 stay off.
+    await userEvent.click(box("video-3"));
+    expect(box("video-3")).not.toBeChecked();
+    await userEvent.click(screen.getByTestId("cat-fit"));
+    expect(box("video-3")).toBeChecked();
+    expect(box("video-4")).not.toBeChecked();
+    expect(box("video-5")).not.toBeChecked();
+    expect(screen.getByTestId("cat-save")).toBeEnabled();
+  });
+
   it("with no plan there is no quota to measure against, and the fit is off", () => {
     render(<Catalogue {...props({ stored })} />);
     expect(screen.getByTestId("cat-estimate")).toHaveTextContent(ar.catNoPlan);

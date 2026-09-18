@@ -35,6 +35,7 @@ describe("selectionEstimate", () => {
       unknownCount: 1,
       outstanding: 0,
       remainingAfter: 6,
+      unlimited: false,
       exceeds: false,
     });
   });
@@ -79,6 +80,27 @@ describe("selectionEstimate", () => {
     expect(
       selectionEstimate([v({ id: "a" })], new Set(["a"]), null),
     ).toMatchObject({ remainingAfter: null, exceeds: false });
+  });
+  it("a plan with no ceiling — -1, as BudgetSchema spells it — never exceeds and has no remainder to report", () => {
+    // The owner's plan: analysis_remaining answers the largest int for it in
+    // SQL, so select_videos never refuses; here the remainder is not a number.
+    const rows = [
+      v({
+        id: "a",
+        selected: true,
+        reported_comment_count: 100,
+        collected: 90,
+      }),
+      v({ id: "b", reported_comment_count: 31 }),
+    ];
+    expect(selectionEstimate(rows, new Set(["a", "b"]), -1)).toEqual({
+      estimate: 31,
+      unknownCount: 0,
+      outstanding: 10,
+      remainingAfter: null,
+      unlimited: true,
+      exceeds: false,
+    });
   });
 });
 
@@ -172,6 +194,32 @@ describe("fitNewest", () => {
       v({ id: "have", published_at: "2026-06-02T00:00:00Z", selected: true }),
     ];
     expect(fitNewest(rows, 26)).toEqual(["new", "old"]);
+  });
+  it("with no ceiling, every video that can be priced fits", () => {
+    const rows = [
+      v({
+        id: "old",
+        published_at: "2026-01-01T00:00:00Z",
+        reported_comment_count: 5,
+      }),
+      v({
+        id: "new",
+        published_at: "2026-05-01T00:00:00Z",
+        reported_comment_count: 20,
+      }),
+      v({
+        id: "off",
+        published_at: "2026-06-01T00:00:00Z",
+        comments_state: "disabled",
+      }),
+      v({ id: "have", published_at: "2026-06-02T00:00:00Z", selected: true }),
+      v({
+        id: "blank",
+        published_at: "2026-06-03T00:00:00Z",
+        reported_comment_count: null,
+      }),
+    ];
+    expect(fitNewest(rows, Infinity)).toEqual(["new", "old"]);
   });
 });
 

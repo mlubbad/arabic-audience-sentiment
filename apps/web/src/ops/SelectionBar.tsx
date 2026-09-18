@@ -26,7 +26,8 @@ export function SelectionBar({
   /** How many boxes are ticked, stored or new. */
   ticked: number;
   est: ReturnType<typeof selectionEstimate>;
-  /** The plan's remaining analysis units; null with no plan. */
+  /** The plan's remaining analysis units: null with no plan, -1 with no
+   *  ceiling — which the estimate carries as `unlimited`. */
   remaining: number | null;
   busy: boolean;
   saveDisabled: boolean;
@@ -50,9 +51,11 @@ export function SelectionBar({
         {" · "}
         {remaining === null
           ? S.catNoPlan
-          : est.exceeds
-            ? S.catExceeds
-            : S.catRemainingAfter(est.remainingAfter ?? 0)}
+          : est.unlimited
+            ? S.pricingUnlimited
+            : est.exceeds
+              ? S.catExceeds
+              : S.catRemainingAfter(est.remainingAfter ?? 0)}
       </p>
       <Button data-testid="cat-save" disabled={saveDisabled} onClick={onSave}>
         {busy ? S.catSaving : S.catSave}

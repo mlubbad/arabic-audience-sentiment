@@ -40,6 +40,13 @@ const cost = (r: CatalogueVideo) =>
  * against the same remainder before the server counted the second. A
  * selection being removed is not outstanding; an unknown count is nothing
  * here, as it is in the estimate, and is reported apart there.
+ *
+ * `remaining` is the budget's own figure: null with no plan, and -1 for a
+ * plan with no ceiling (`BudgetSchema` in usage.ts, `unlimited()`), which is
+ * how the owner's plan arrives. The database answers the largest int for
+ * that plan in analysis_remaining, so select_videos never refuses it; here
+ * there is no remainder to report and nothing to exceed. Subtracting from
+ * the -1 as if it were a count is what once refused the owner every video.
  */
 export function selectionEstimate(
   videos: CatalogueVideo[],
@@ -47,6 +54,7 @@ export function selectionEstimate(
   remaining: number | null,
   removing: Set<string> = new Set(),
 ) {
+  const unlimited = remaining === -1;
   let estimate = 0;
   let unknownCount = 0;
   let outstanding = 0;
@@ -61,12 +69,13 @@ export function selectionEstimate(
     else estimate += c;
   }
   const remainingAfter =
-    remaining === null ? null : remaining - outstanding - estimate;
+    remaining === null || unlimited ? null : remaining - outstanding - estimate;
   return {
     estimate,
     unknownCount,
     outstanding,
     remainingAfter,
+    unlimited,
     exceeds: remainingAfter !== null && remainingAfter < 0,
   };
 }

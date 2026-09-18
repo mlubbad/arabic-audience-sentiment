@@ -120,6 +120,8 @@ export function Catalogue({
   const [previewing, setPreviewing] = useState<CatalogueVideo | null>(null);
   const previewTrigger = useRef<HTMLButtonElement | null>(null);
 
+  // The budget's own figure, -1 included: that is a plan with no ceiling,
+  // and `selectionEstimate` reads it as such rather than as a count.
   const remaining =
     plan?.budgets.find((b) => b.event_type === "comment_analysis")?.remaining ??
     null;
@@ -349,7 +351,12 @@ export function Catalogue({
                   setTicked(
                     new Set([
                       ...rows.filter((r) => r.selected).map((r) => r.id),
-                      ...fitNewest(rows, Math.max(0, (remaining ?? 0) - owed)),
+                      ...fitNewest(
+                        rows,
+                        est.unlimited
+                          ? Infinity
+                          : Math.max(0, (remaining ?? 0) - owed),
+                      ),
                     ]),
                   )
                 }

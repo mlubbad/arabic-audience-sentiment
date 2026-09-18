@@ -1796,6 +1796,38 @@ test("the catalogue stops at the quota and says why", async ({ page }) => {
   await expect(page.getByTestId("cat-check-video-3")).not.toBeChecked();
 });
 
+test("a plan with no ceiling never exceeds, and the save is offered", async ({
+  page,
+}) => {
+  await page.route("**/fixtures/e2e-dashboard.json", async (route) => {
+    const fixture = await (await route.fetch()).json();
+    // The owner's plan as usage_summary reports it: -1 on both sides
+    // (BudgetSchema). Subtracting from that -1 once refused every video.
+    fixture.plan.budgets[0] = {
+      event_type: "comment_analysis",
+      used: 68,
+      allowance: -1,
+      remaining: -1,
+    };
+    await route.fulfill({ json: fixture });
+  });
+  await page.goto("/sync?demo=1");
+  const bar = page.getByTestId("cat-estimate");
+  await expect(bar).toContainText("بلا حدود");
+  await expect(bar).not.toContainText("يتجاوز ما تبقى");
+  await page.getByTestId("cat-check-video-3").check();
+  await expect(bar).toContainText("حتى 21 تعليقًا");
+  await expect(bar).toHaveAttribute("data-exceeds", "false");
+  await expect(page.getByTestId("cat-save")).toBeEnabled();
+  // Fit: with no ceiling everything that can be priced fits — video-3 comes
+  // back on; the disabled video-4 and the unpriced video-5 stay off.
+  await page.getByTestId("cat-check-video-3").uncheck();
+  await page.getByTestId("cat-fit").click();
+  await expect(page.getByTestId("cat-check-video-3")).toBeChecked();
+  await expect(page.getByTestId("cat-check-video-4")).not.toBeChecked();
+  await expect(page.getByTestId("cat-check-video-5")).not.toBeChecked();
+});
+
 test("a disabled video cannot be selected and says so", async ({ page }) => {
   await page.goto("/sync?demo=1");
   await expect(page.getByTestId("cat-check-video-4")).toBeDisabled();
