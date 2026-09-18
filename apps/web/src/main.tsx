@@ -296,7 +296,11 @@ function AppLayout() {
             34px bar, so at the top of the page its foot is 34px below the fold
             and a control there is the first thing clipped. The bar is on every
             screen size, above the fold, and on a phone needs no menu opened. */}
-        <div className="app-announcement">
+        <div
+          className="app-announcement"
+          role="region"
+          aria-label={S.announcementLabel}
+        >
           <span>{S.announcementLead}</span>
           <LanguageSwitch />
         </div>
@@ -321,6 +325,7 @@ function AppLayout() {
         <aside
           id="app-rail"
           ref={railRef}
+          aria-label={S.railLabel}
           className={menuOpen ? "app-rail is-open" : "app-rail"}
           onKeyDown={(e) => {
             // A popup opened from the rail (the session menu, the workspace

@@ -285,12 +285,12 @@ function SyncBody({
           prints its provenance on: in the demo, a fixture, and the sentence
           says so before the panels below can be read as a machine's state. */}
       {mode !== "live" && (
-        <aside className="db-provenance" data-testid="ops-demo-note">
+        <div role="note" className="db-provenance" data-testid="ops-demo-note">
           <Badge tone="neutral">
             <strong>{S.dashDemoTag}</strong>
           </Badge>
           <p>{S.opsDemoNote}</p>
-        </aside>
+        </div>
       )}
 
       {snapshot.isPending ? (

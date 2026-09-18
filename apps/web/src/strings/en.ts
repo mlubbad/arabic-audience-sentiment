@@ -15,6 +15,8 @@ export const en: Strings = {
   brandHomeLabel: "Audience Sentiment — home",
   skipToContent: "Skip to content",
   announcementLead: "Your audience's voice, more clearly",
+  announcementLabel: "Language bar",
+  railLabel: "Sidebar",
   menuLabel: "App menu",
   menuOpen: "Menu ☰",
   menuClose: "Close ×",

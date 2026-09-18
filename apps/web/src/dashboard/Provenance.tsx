@@ -12,7 +12,8 @@ import type { SourceDescription } from "../dataSource";
 
 export function Provenance({ source }: { source: SourceDescription }) {
   return (
-    <aside
+    <div
+      role="note"
       className="db-provenance"
       data-testid="source"
       data-mode={source.mode}
@@ -27,6 +28,6 @@ export function Provenance({ source }: { source: SourceDescription }) {
       {source.freshness && (
         <p data-testid="source-freshness">{source.freshness}</p>
       )}
-    </aside>
+    </div>
   );
 }

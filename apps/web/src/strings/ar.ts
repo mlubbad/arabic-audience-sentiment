@@ -24,6 +24,8 @@ export const ar = {
   brandHomeLabel: "مشاعر الجمهور — الرئيسية",
   skipToContent: "انتقل إلى المحتوى",
   announcementLead: "صوت جمهورك، بوضوح أكبر",
+  announcementLabel: "شريط اللغة",
+  railLabel: "الشريط الجانبي",
   menuLabel: "قائمة التطبيق",
   menuOpen: "القائمة ☰",
   menuClose: "إغلاق ×",

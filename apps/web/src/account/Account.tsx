@@ -391,9 +391,9 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
               would put two controls with one name on the same screen — which
               is one name too few, and which a strict locator reads as an
               ambiguity rather than a convenience. */}
-          <aside className="db-provenance">
+          <div role="note" className="db-provenance">
             <p>{S.insideAccount}</p>
-          </aside>
+          </div>
           {/* The plan before the workspaces: what the chosen workspace may
               do, and the doors to change it. It reads the same session and
               list this page already holds. */}
@@ -629,12 +629,16 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
   return (
     <>
       {feedback("page")}
-      <aside className="db-provenance" data-testid="account-demo-note">
+      <div
+        role="note"
+        className="db-provenance"
+        data-testid="account-demo-note"
+      >
         <Badge tone="neutral">
           <strong>{S.dashDemoTag}</strong>
         </Badge>
         <p>{S.insideAccount}</p>
-      </aside>
+      </div>
       {/* The first workspace stands in for the reader's choice: the demo
           bypasses `useWorkspaceSelection` and the plan read alike. */}
       <DemoPlanPanel

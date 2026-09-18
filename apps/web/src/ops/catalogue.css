@@ -307,3 +307,10 @@
     flex-basis: 100%;
   }
 }
+
+/* While the list is read the section keeps roughly a page's height, so the
+   panels under it do not jump up and back down when the rows arrive
+   (a 0.15 layout shift on the desktop read). */
+.db-cat-reading {
+  min-block-size: 24rem;
+}

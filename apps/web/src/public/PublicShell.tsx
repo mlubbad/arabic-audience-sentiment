@@ -94,7 +94,11 @@ export function PublicShell({
       <a className="lp-skip" href={`#${mainId}`}>
         {S.skipToContent}
       </a>
-      <div className="lp-announcement">
+      <div
+        className="lp-announcement"
+        role="region"
+        aria-label={S.announcementLabel}
+      >
         {S.announcementLead}
         <LanguageSwitch
           locale={locale}

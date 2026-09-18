@@ -1,7 +1,8 @@
 /**
  * The browser's side of Paddle checkout and the billing portal.
  *
- * Checkout is Paddle.js's overlay (`index.html` loads it from Paddle's CDN),
+ * Checkout is Paddle.js's overlay (`paddleScript.load` fetches it from Paddle's
+ * CDN the first time it is needed),
  * opened on a **transaction id**, not on a price and a customData this side
  * builds itself. The price id still comes from the tables
  * (`plans.provider_prices[interval]` for a plan, `addon_prices.
@@ -92,11 +93,42 @@ export function checkoutParams(
 // Paddle.js initialises once per page; a second `Initialize` is an error.
 let initialised = false;
 
+/** Paddle's script, fetched the first time a checkout or the portal is
+ *  asked for — not from `index.html` on every page. Loaded eagerly it set a
+ *  Cloudflare cookie on the landing page for a visitor who never buys, and
+ *  cost every page 17 KiB it might never use. One in-flight promise, so two
+ *  presses before the first load resolves inject one tag; a failed load
+ *  clears it so the next press tries again. */
+export const PADDLE_SRC = "https://cdn.paddle.com/paddle/v2/paddle.js";
+let loading: Promise<void> | null = null;
+export const paddleScript = {
+  load(): Promise<void> {
+    if (typeof window !== "undefined" && window.Paddle)
+      return Promise.resolve();
+    if (typeof document === "undefined") return Promise.reject(unavailable());
+    loading ??= new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = PADDLE_SRC;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => {
+        loading = null;
+        script.remove();
+        reject(unavailable());
+      };
+      document.head.appendChild(script);
+    });
+    return loading;
+  },
+};
+
 export async function initPaddle(): Promise<void> {
   if (initialised) return;
-  const paddle = typeof window === "undefined" ? undefined : window.Paddle;
   const token = import.meta.env.VITE_PADDLE_CLIENT_TOKEN as string | undefined;
-  if (!paddle || !token) throw unavailable();
+  if (!token) throw unavailable();
+  await paddleScript.load();
+  const paddle = typeof window === "undefined" ? undefined : window.Paddle;
+  if (!paddle) throw unavailable();
   paddle.Environment.set(
     import.meta.env.VITE_PADDLE_ENV === "live" ? "production" : "sandbox",
   );

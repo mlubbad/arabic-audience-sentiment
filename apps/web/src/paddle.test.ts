@@ -17,7 +17,14 @@ vi.mock("./planCatalogue", () => ({
     ]),
 }));
 
-import { checkoutParams, initPaddle, openCheckout, priceIdFor } from "./paddle";
+import {
+  checkoutParams,
+  initPaddle,
+  openCheckout,
+  priceIdFor,
+  PADDLE_SRC,
+  paddleScript,
+} from "./paddle";
 
 const session = {
   user: { id: "u1", email: "a@b.c" },
@@ -76,10 +83,33 @@ describe("paddle checkout", () => {
 });
 
 describe("initPaddle", () => {
-  it("refuses without Paddle.js on the page", async () => {
+  it("refuses when Paddle.js cannot be fetched", async () => {
     vi.stubGlobal("window", {});
     vi.stubEnv("VITE_PADDLE_CLIENT_TOKEN", "test_abc");
+    const load = vi
+      .spyOn(paddleScript, "load")
+      .mockRejectedValueOnce(new Error("checkout_unavailable"));
     await expect(initPaddle()).rejects.toThrow("checkout_unavailable");
+    expect(load).toHaveBeenCalledOnce();
+    load.mockRestore();
+  });
+  it("fetches Paddle.js on demand, once, and resolves when the tag loads", async () => {
+    vi.stubGlobal("window", {});
+    const tags: { src?: string; onload?: () => void }[] = [];
+    vi.stubGlobal("document", {
+      createElement: () => {
+        const tag: { src?: string; onload?: () => void } = {};
+        return tag;
+      },
+      head: { appendChild: (tag: { src?: string }) => void tags.push(tag) },
+    });
+    const first = paddleScript.load();
+    const second = paddleScript.load();
+    expect(tags).toHaveLength(1);
+    expect(tags[0].src).toBe(PADDLE_SRC);
+    tags[0].onload?.();
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).resolves.toBeUndefined();
   });
   it("refuses without a client token", async () => {
     const paddle = fakePaddle();

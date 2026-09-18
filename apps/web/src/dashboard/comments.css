@@ -46,12 +46,12 @@
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
-/* The score beside an unreviewed label's chip — muted relative to the
-   chip's own tone, not a second colour. */
+/* The score beside an unreviewed label's chip — the chip's own ink, one
+   step lighter in weight, not faded: at 12px the 0.85 opacity it used to
+   carry took the positive chip to 3.8:1, under the 4.5:1 small text needs. */
 .db-chip-score {
-  opacity: 0.85;
   font-size: 0.85em;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   margin-inline-start: 3px;
 }

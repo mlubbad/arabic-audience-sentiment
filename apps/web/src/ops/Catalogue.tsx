@@ -250,7 +250,7 @@ export function Catalogue({
         <p className="db-lead">{S.catLead}</p>
       </header>
       {read.isPending ? (
-        <p role="status" className="db-muted">
+        <p role="status" className="db-muted db-cat-reading">
           {S.opsReading}
         </p>
       ) : read.isError ? (
