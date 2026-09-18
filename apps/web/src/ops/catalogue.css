@@ -136,9 +136,13 @@
   content: "";
   width: 0;
   height: 0;
-  /* A triangle pointing the reading direction's way: play is play. */
-  border-block: 7px solid transparent;
-  border-inline-start: 12px solid var(--ink-on-dark);
+  /* A triangle pointing right in every language: the play glyph is a
+     player's control, not text, and a reader of Arabic sees it pointing
+     right on YouTube itself. Physical `border-left`, deliberately, so the
+     RTL document does not mirror it. */
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 12px solid var(--ink-on-dark);
   filter: drop-shadow(
     0 1px 1px color-mix(in srgb, var(--text-1) 60%, transparent)
   );
