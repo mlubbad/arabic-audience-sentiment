@@ -184,4 +184,56 @@ describe("a platform worker credential", () => {
       ).rows[0].status,
     ).toBe("revoked");
   });
+
+  it("claims across workspaces, oldest due first, and each claim is the job's own workspace", async () => {
+    const first = await claim(PLATFORM);
+    expect(first.rows[0].workspace_id).toBe(A);
+    expect(
+      (
+        await db.query<{ dedupe_key: string }>(
+          "select dedupe_key from jobs where id=$1",
+          [first.rows[0].id],
+        )
+      ).rows[0].dedupe_key,
+    ).toBe("a1");
+    const second = await claim(PLATFORM);
+    expect(second.rows[0].workspace_id).toBe(B);
+    // Nothing left: a third poll is an empty answer, not an error.
+    expect((await claim(PLATFORM)).rows).toHaveLength(0);
+  });
+
+  it("records the poll as a sighting of every workspace, including one with no work at all", async () => {
+    // Every workspace row, not only the three seeded here: the migrations
+    // seed workspaces of their own, and the poll asked all of them.
+    const seen = await db.query<{ workspace_id: string }>(
+      "select workspace_id from worker_seen where last_seen_at > now() - interval '1 minute' order by workspace_id",
+    );
+    const ids = seen.rows.map((r) => r.workspace_id);
+    expect(ids).toEqual(expect.arrayContaining([A, B, C]));
+    expect(ids).toHaveLength(
+      await scalar("select count(*)::int as n from workspaces"),
+    );
+  });
+
+  it("reads as connected on a workspace that has no scoped credential of its own", async () => {
+    await as(ownerB);
+    try {
+      const snap = (
+        await db.query<{
+          dashboard_snapshot: { sync: { worker: { connected: boolean } } };
+        }>("select public.dashboard_snapshot($1)", [B])
+      ).rows[0].dashboard_snapshot;
+      expect(snap.sync.worker.connected).toBe(true);
+    } finally {
+      // One connection for the whole suite: a role left set by a failing
+      // assertion would refuse every later call for the wrong reason.
+      await db.exec("reset role");
+    }
+  });
+
+  it("refuses a revoked platform credential like any other", async () => {
+    await expect(claim(PLATFORM_REVOKED)).rejects.toThrow(
+      /invalid_worker_credential/,
+    );
+  });
 });

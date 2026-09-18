@@ -72,3 +72,89 @@ grant execute on function private.register_platform_worker_credential(text,text)
   public.svc_register_platform_worker_credential(text,text),
   private.retire_platform_worker_credentials(uuid[]),
   public.svc_retire_platform_worker_credentials(uuid[]) to service_role;
+
+-- 3. worker_workspace, rebuilt from 20260913160000:22-30 with one change: an
+-- active row whose workspace is null is a platform credential and answers
+-- null, so "no row" and "a platform row" are told apart by a marker rather
+-- than by the workspace being null.
+create or replace function private.worker_workspace(token_hash text) returns uuid
+language plpgsql security invoker set search_path='' as $$
+declare w uuid; matched boolean; begin
+  update private.worker_credentials c set last_seen_at = now()
+  where c.token_hash = worker_workspace.token_hash and c.status = 'active'
+  returning c.workspace_id, true into w, matched;
+  if matched is not true then raise exception 'invalid_worker_credential' using errcode='42501'; end if;
+  return w;
+end $$;
+
+-- 4. claim_job, rebuilt from 20260915132000:4-60 with two changes: a null
+-- workspace means every workspace — the reaper and the claim read
+-- (w is null or workspace_id = w), and the order across tenants is the one
+-- already used within one, oldest due first — and the sighting a platform
+-- poll leaves is a row for every workspace, because that poll asked them
+-- all. worker_seen's own comment stays true: the last time a worker asked
+-- this workspace for work.
+create or replace function private.claim_job(w uuid) returns setof public.jobs
+language plpgsql security invoker set search_path='' as $$
+declare claimed public.jobs;
+begin
+  if w is null then
+    insert into public.worker_seen(workspace_id, last_seen_at)
+    select ws.id, now() from public.workspaces ws
+    on conflict (workspace_id) do update set last_seen_at = now();
+  else
+    insert into public.worker_seen(workspace_id, last_seen_at)
+    values (w, now())
+    on conflict (workspace_id) do update set last_seen_at = now();
+  end if;
+
+  update public.jobs set
+      status = 'failed',
+      error_code = case
+        when reclaims >= 20
+          then 'lease_thrashing:' || reclaims::text
+        else 'retry_exhausted:' || coalesce(last_error, 'no_error_recorded')
+      end,
+      lease_token = null,
+      lease_expires_at = null
+   where (w is null or workspace_id = w)
+     and status in ('queued', 'running')
+     and (attempt >= 3 or reclaims >= 20)
+     and (lease_expires_at is null or lease_expires_at <= now());
+
+  update public.jobs j set
+      status = 'running',
+      attempt = j.attempt + case when j.status = 'queued' then 1 else 0 end,
+      reclaims = j.reclaims + case when j.status = 'running' then 1 else 0 end,
+      not_before = case
+        when j.status = 'running' and j.reclaims >= 1
+          then now() + least(interval '30 seconds' * (2 ^ least(j.reclaims, 5)),
+                             interval '10 minutes')
+        else j.not_before end,
+      lease_token = gen_random_uuid(),
+      lease_expires_at = now() + interval '5 minutes'
+   where j.id = (
+     select q.id from public.jobs q
+      where (w is null or q.workspace_id = w)
+        and q.attempt < 3
+        and q.reclaims < 20
+        and q.not_before <= now()
+        and (q.status = 'queued'
+             or (q.status = 'running' and q.lease_expires_at <= now()))
+      order by q.not_before, q.id
+      for update skip locked limit 1)
+  returning j.* into claimed;
+
+  if claimed.id is null then return; end if;
+
+  insert into public.sync_runs(workspace_id, channel_id, job_id, mode, source,
+                               status)
+  values (claimed.workspace_id, claimed.channel_id, claimed.id,
+          case when claimed.type in ('discover','collect','analyse','import')
+               then claimed.type else 'collect' end,
+          'unknown', 'running')
+  on conflict (workspace_id, job_id) do update
+    set status = 'running', ended_at = null, error_code = null;
+
+  return next claimed;
+end $$;
