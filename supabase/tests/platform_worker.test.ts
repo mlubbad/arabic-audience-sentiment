@@ -383,4 +383,37 @@ describe("a platform worker credential", () => {
     ).rows[0].t;
     expect(scoped).toEqual({ discover: 0, collect: 0, analyse: 0 });
   });
+
+  it("lets a workspace's last scoped credential go while a platform credential is live, and not otherwise", async () => {
+    // The retirement case above revoked every platform credential; register
+    // a live one, then the scoped door may empty the workspace.
+    await db.query(
+      "select public.svc_register_platform_worker_credential($1,'platform-3')",
+      ["third-" + "z".repeat(58)],
+    );
+    expect(
+      await scalar(
+        "select public.svc_retire_worker_credentials($1,$2::uuid[]) as n",
+        [A, []],
+      ),
+    ).toBe(1);
+    expect(
+      (
+        await db.query<{ status: string }>(
+          "select status from private.worker_credentials where token_hash=$1",
+          [CRED_A],
+        )
+      ).rows[0].status,
+    ).toBe("revoked");
+    // With no platform credential live, the old guard holds.
+    await db.query(
+      "update private.worker_credentials set status='revoked' where workspace_id is null",
+    );
+    await expect(
+      db.query("select public.svc_retire_worker_credentials($1,$2::uuid[])", [
+        B,
+        [],
+      ]),
+    ).rejects.toThrow(/keep_at_least_one/);
+  });
 });

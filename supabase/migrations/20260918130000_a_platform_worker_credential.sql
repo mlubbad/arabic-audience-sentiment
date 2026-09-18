@@ -232,3 +232,28 @@ declare w uuid; ws uuid; r jsonb; d int := 0; k int := 0; a int := 0; n int := 0
   end loop;
   return jsonb_build_object('discover', d, 'collect', k, 'analyse', a, 'workspaces', n);
 end $$;
+
+-- 8. retire_worker_credentials, rebuilt from 20260915160000:12-30 with one
+-- change: an empty keep is refused only while no platform credential is
+-- active — with one, a workspace without a scoped credential is not a
+-- workspace without a worker, which is what the guard protects.
+create or replace function private.retire_worker_credentials(w uuid, keep uuid[])
+returns integer language plpgsql security definer set search_path='' as $$
+declare n integer; begin
+  if not exists(select 1 from public.workspaces where id = w) then
+    raise exception 'invalid_workspace' using errcode='23503'; end if;
+  keep := coalesce(keep, '{}'::uuid[]);
+  if cardinality(keep) = 0
+     and not exists(select 1 from private.worker_credentials c
+                     where c.workspace_id is null and c.status = 'active') then
+    raise exception 'keep_at_least_one' using errcode='22023'; end if;
+  if exists(select 1 from unnest(keep) k(id)
+             where not exists(select 1 from private.worker_credentials c
+                               where c.id = k.id and c.workspace_id = w and c.status = 'active')) then
+    raise exception 'unknown_credential' using errcode='23503'; end if;
+  update private.worker_credentials
+     set status = 'revoked'
+   where workspace_id = w and status = 'active' and not (id = any(keep));
+  get diagnostics n = row_count;
+  return n;
+end $$;

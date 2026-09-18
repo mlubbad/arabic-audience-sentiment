@@ -30,11 +30,20 @@ GEMINI_API_KEY=<the Gemini key, for topic classification>
 
 Without it the worker still collects and labels sentiment; topic jobs are reported blocked with `no_topic_classifier`.
 
-A credential is scoped to one workspace and is the only kind of secret on the
-host. It is not a Supabase key and cannot read anything but its own queue.
+The credential is the only kind of secret on the host. It is not a Supabase
+key and cannot read anything but the queue it is allowed to see.
 
-To serve more than one workspace from one machine, list their credentials
-comma-separated:
+Since 2026-09-18 the recommended credential is a **platform** one: registered
+with `svc_register_platform_worker_credential(secret, label)`, it serves every
+workspace — a workspace created by a signup is collected without anyone
+touching the host. The claim takes the oldest due job across workspaces, and
+every poll counts as a sighting of every workspace, so each tenant's operations
+page reads «متصل» while the worker is up. One `WORKER_CREDENTIAL` is the whole
+configuration. Rotate with register-then-`svc_retire_platform_worker_credentials(keep)`.
+
+A **scoped** credential (`svc_register_worker_credential(secret, label,
+workspace)`) still works and still sees only its workspace. To run several
+scoped ones from one machine, list them comma-separated:
 
 ```
 WORKER_CREDENTIAL=<first>,<second>
