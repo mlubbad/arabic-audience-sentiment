@@ -1684,3 +1684,73 @@ verification entry: the worker holds one scoped credential per workspace
 all until the operator mints one; and one of those two credentials has been refused
 (`invalid_worker_credential`) every minute since 2026-09-17 01:23 local. The fix — a
 platform-wide credential, or per-workspace provisioning — is the owner's decision, pending.
+
+## 2026-09-18 — the onboarding tour: a browser suite closes phase 6
+
+`apps/web/src/tour/` (tasks 1–4 of `docs/superpowers/plans/2026-09-18-onboarding-tour.md`):
+`tourSteps.ts` (`TOUR_VERSION`, `TOUR_STEPS`, `stepsFor(phone)`), `tourState.ts`
+(`readTour`/`writeTour`/`clearTour`/`wantsTour`), `useTour.ts` (the machine),
+`TourProvider.tsx` (context, auto-start, the lazy layer), `TourWelcome.tsx`, `Tour.tsx`
+(veil + Radix `Popover` card, room-aware placement), `TourEntry.tsx` (the rail's replay
+button), `tour.css`, plus their tests; 24 string keys in `strings/{ar,en}.ts`; `data-tour`
+attributes on `main.tsx` (`rail`, `rail-menu`), `account/WorkspaceCard.tsx` /
+`account/CreateWorkspace.tsx` (`workspace`), `SetupPath.tsx` (`setup`), `ops/Catalogue.tsx`
+(`catalogue`), `ops/SelectionBar.tsx` (`selection`), `dashboard/FilterBar.tsx` (`filters`),
+`dashboard/SectionNav.tsx` (`sections`) — no other page behaviour changed, no existing
+`data-testid` moved.
+
+**The seven steps**, in order: the rail (`rail`, or `rail-menu` under 900px, on whichever
+page the tour started on) → the first workspace card (`workspace`, `/account`) → that
+workspace's setup path (`setup`, `/account`) → the video catalogue (`catalogue`, `/sync`) →
+the selection bar (`selection`, `/sync`) → the filter bar (`filters`, `/dashboard`) → the
+section nav (`sections`, `/dashboard`). A step whose anchor never appears within 1.5s is
+skipped forward rather than shown against nothing; the last step missing ends the tour as
+"seen" the same way finishing does.
+
+**The storage rule.** One `localStorage` key, `tour:v${TOUR_VERSION}` (`tour:v1`), holding
+`"seen"` (finished or skipped) or `"dismissed"` (`tour-later`/✕/Escape from the welcome);
+anything else — wrong shape, a foreign version, a throwing store — reads back as `null`, the
+same "ask again" degradation `locale.ts` already uses. A signed-in or demo visitor on one of
+the three tour pages with `readTour() === null` meets the welcome once, automatically;
+`?tour=1` clears the memory and starts regardless, then drops itself from the address so a
+reload does not restart it; the rail's «الجولة التعريفية» starts it from any memory state.
+`playwright.config.ts` seeds every project's `storageState` with `tour:v1=seen` so the
+welcome never sits over what an unrelated test came to press — `tests/e2e/tour.spec.ts` is
+the one file that opts back out.
+
+**The lazy chunk**, measured off the real build (task 2's own number was against a
+placeholder `Tour.tsx` standing in for the chunk before task 3 built the actual layer):
+`dist/static/Tour-*.js` 4.59 kB (gzip 2.01) + `Tour-*.css` 1.09 kB (gzip 0.56), a separate
+chunk fetched only once the machine leaves `idle`; the eager `index-*.js` sits at 776.90 kB
+(gzip 235.42), matching task 2's own measured delta for the provider + entry + storage
+(+4.43 kB / +1.42 gzip over the pre-tour baseline) — the welcome/card/veil never rode the
+main bundle.
+
+**`tests/e2e/tour.spec.ts`** (task 4, four tests, `storageState` reset to empty and
+`reducedMotion: "reduce"` so the veil's smooth `scrollIntoView` never races an assertion):
+the full walk — welcome → start → all seven steps across `/dashboard`, `/account`, `/sync`
+and back, each step awaited on `tour-progress`'s text and the lit `[data-tour-active]`
+element rather than counted clicks — → finish → `tour:v1 === "seen"` → a fresh visit opens no
+welcome → the rail's replay reopens it; dismissing the auto-started welcome with `tour-later`
+→ `"dismissed"`, and a reload still shows no welcome; at 390×844, step 1 lights
+`rail-menu` and the card fits the screen (`boundingBox().width ≤ 358`, `scrollWidth ≤ 390`);
+Escape on step 3 ends the tour as `"seen"` with no card left open. No page or tour code
+needed a fix — all four passed on the first run against tasks 1–3's code.
+
+**e2e totals.** `tests/e2e/tour.spec.ts` alone: 4/4. Full `npm run test:e2e`: 128/128 (124
+carried + 4 new) — one run surfaced 8 failures, every one the first, heaviest test of its
+spec file (`account`, `admin`, `app-shell`, two in `dashboard`, two in `demo`, `landing`),
+the same cold-compile-under-host-load pattern `docs/verification.md`'s 2026-09-18
+account-redesign entry already documents; a clean rerun (load average down from ~20–32 to
+~7–20) passed 128/128 in 2.5 minutes, and every one of the eight also passed in isolation
+before that. `npm run test:e2e:build`: 6/6, unchanged.
+
+**`npm run check`**, one clean foreground run: lint (eslint + worker `ruff`) clean;
+`format:check` clean; `typecheck` clean; `check:functions` (deno) clean; unit (`vitest run
+--exclude "supabase/tests/**"`) 110 files / 860 tests; `test:db` 33 files / 316 tests;
+`worker:test` 195 passed; `build` 8 prerendered pages; `check:secrets` 642 source files plus
+built assets, clean.
+
+**Phase 6 (the in-app onboarding tour) is closed — the eight-phase pre-launch redesign is
+complete.** See `docs/coordination/ACTIVE.md`'s dated entry for what, if anything, is still
+open from earlier phases.

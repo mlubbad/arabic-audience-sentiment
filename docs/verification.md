@@ -2474,3 +2474,62 @@ code and the service log, not fixed.**
   was refused by the auto-mode guard ("Production Reads") and left to the operator.
 - The worker's Python is unchanged since its checkout (`88a918b`; no commits under `workers/`
   since), so a restart with a corrected credential list needs no code update.
+
+## 2026-09-18 — the onboarding tour: the browser suite, the full e2e, the build, and `npm run check`
+
+`docs/superpowers/plans/2026-09-18-onboarding-tour.md`, task 4, on top of tasks 1–3's
+`6649c60`…`51b5b2e`. New file `tests/e2e/tour.spec.ts` (four tests, `storageState` reset to
+empty and `reducedMotion: "reduce"` per task 3's own note); no tour or page code needed a fix
+— all four tests passed the first time they were run against the existing implementation.
+
+**`npx playwright test tests/e2e/tour.spec.ts` alone: 4/4 passed** (19.9s) — the full walk
+(welcome → seven steps across `/dashboard`, `/account`, `/sync` and back → finish → replay),
+the auto-started welcome dismissed as "dismissed" and staying closed on reload, the 390×844
+phone layout (`rail-menu` lit, card ≤ 358px wide, `scrollWidth` ≤ 390), and Escape on step 3
+ending the tour as "seen" with no card left open.
+
+**Full `npm run test:e2e`, three foreground runs.** First run: 120 passed, 8 failed — every
+failure the first, heaviest test dispatched to its spec file (`account.spec.ts`,
+`admin.spec.ts`, `app-shell.spec.ts`, two in `dashboard.spec.ts`, two in `demo.spec.ts`,
+`landing.spec.ts`), none of them `tour.spec.ts`, none of them touching tour code. `uptime` at
+the time read a load average of 18–32 on this 16-core machine — the same
+cold-compile-under-host-load pattern the account-redesign entry above already documents (there
+it was an external LLVM build; here nothing was identified beyond the load figure itself, but
+the signature — always the dispatch-first test of a file, never a repeat, never a tour test —
+matches). All eight were rerun and passed: six of them (`account`, `admin`, `app-shell`, both
+`dashboard` ones) in one `--workers=1` pass across their five files before it was stopped
+partway through (all five files' first tests had already passed by then); the other two
+(`demo.spec.ts`, `landing.spec.ts`) in a second, separate run, 7/7. A third, clean full run
+with load back down to 7–20 reached **128 passed, 0 failed, in 2.5 minutes** — the number this
+entry stands on. 128 = 124 carried from the account-redesign close (`docs/verification.md`'s
+2026-09-18 entry above cites 123 at that point; one more test landed somewhere in the interval
+between sessions, not investigated here since nothing in this task's diff touches an existing
+spec file) + 4 new in `tour.spec.ts`.
+
+**`npm run test:e2e:build`: 6/6 passed** (12.5s), unchanged from before this task.
+
+**`npm run check`, one clean foreground run, no isolation needed:**
+
+- `npm run lint` — clean (eslint + worker `ruff check`).
+- `npm run format:check` — clean, `tests/e2e/tour.spec.ts` included in the glob (no scoped
+  prettier run was needed; the file was already Prettier-formatted as written).
+- `npm run typecheck` (`tsc --noEmit`) — clean.
+- `npm run check:functions` (`deno check`, six functions) — clean.
+- `npm test` (`vitest run --exclude "supabase/tests/**"`) — **110 files / 860 tests**, green.
+- `npm run test:db` (`vitest run supabase/tests`) — **33 files / 316 tests**, green (no
+  timeout this run).
+- `npm run worker:test` (`uv run pytest`) — **195 passed**.
+- `npm run build` — **8 prerendered pages** (`/`, `/en`, `/pricing`, `/en/pricing`,
+  `/privacy-policy`, `/en/privacy-policy`, `/terms`, `/en/terms`), no build errors.
+- `npm run check:secrets` — **642 source files plus built assets**, clean.
+
+**The lazy chunk, measured off a real build** (task 2's own figure was against a placeholder
+`Tour.tsx` standing in for the chunk before task 3 built the actual veil/card/welcome):
+`dist/static/Tour-*.js` 4.59 kB (gzip 2.01) + `Tour-*.css` 1.09 kB (gzip 0.56); the eager
+`index-*.js` sits at 776.90 kB (gzip 235.42), consistent with task 2's measured
+provider+entry+storage delta (+4.43 kB / +1.42 gzip) over the pre-tour baseline — the welcome,
+card and veil never rode the main bundle.
+
+**Not touched, not needed for this task:** `supabase/**` (a different session is mid-work
+there — `488bcd2`…`900b83d`, a platform-worker-credential redesign, unrelated to the tour);
+`.screenshots/`; `docs/oauth-*`; `apps/web/src/legal/*`.

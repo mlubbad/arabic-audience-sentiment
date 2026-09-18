@@ -1030,3 +1030,62 @@ files "permitted… until phase 5") and gained a second, unconditional assertion
 anywhere under `apps/web/src` may contain the substring `.rp-`, in a selector or inside a
 comment. The class family that named the old report page is not just unused now; it cannot be
 reintroduced without failing a test.
+
+## 2026-09-18 — the onboarding tour: what was decided, and why
+
+**Browser-side memory, not a server flag.** Whether this reader has met the tour lives in one
+`localStorage` key (`tour:v1`), the same tier `locale.ts` and the workspace-selection
+preference already use, not a column on the account. The cost, accepted up front and named in
+the spec's own "Out of scope": a second device or a cleared profile meets the welcome again.
+The alternative — an RPC and a migration to remember one boolean per account — buys nothing a
+tour actually needs: nobody is paying to see it once and only once, and a server round trip
+before the first paint of a shell that already waits on a session would be a worse trade than
+an occasional repeat welcome. Revisit only if per-account tour state is ever needed for a
+reason unrelated to this feature.
+
+**The layer is a separate lazy chunk, not part of the eager shell bundle.** `TourProvider`
+(context, the auto-start rule, `useTour`) is small enough to live in `main.tsx`'s own bundle —
+task 2 measured its cost at +4.43 kB (+1.42 gzip); the veil, the card and the welcome
+(`Tour.tsx`, `TourWelcome.tsx`, `tour.css`) are `lazy()`-imported only once the machine leaves
+`idle`, so a reader who never opens the tour never fetches them. Task 4's real build puts that
+chunk at 4.59 kB JS (gzip 2.01) + 1.09 kB CSS (gzip 0.56) — small, but the point was never the
+size; it is that a feature most readers meet once, briefly, does not sit in the bundle every
+reader downloads to see the dashboard.
+
+**Anchors are a `data-tour="…"` attribute, not a `data-testid`.** The seven places the tour
+points at (`rail`, `rail-menu`, `workspace`, `setup`, `catalogue`, `selection`, `filters`,
+`sections`) already carry, or gained, their own `data-testid`s for their own pages' suites;
+overloading those for the tour would have coupled two unrelated concerns — a page's own test
+hooks, and where a guided tour happens to point this version — so that renaming a page's test
+id could silently break the tour, or retargeting the tour could silently break a page's suite.
+A second, tour-only attribute keeps the two vocabularies from colliding, and doubles as the
+tour's own "is this anchor lit" signal (`data-tour-active`) without touching the page's markup
+beyond one attribute per anchor.
+
+**A step whose anchor never appears is skipped, not shown broken.** `useTour` polls for
+`[data-tour="…"]` up to 1.5s per step and moves on if it never arrives — an empty dashboard
+has no section nav yet, a brand-new account no workspace card — rather than opening a card
+pointed at nothing or leaving the tour stuck. The same clock governs a step whose route never
+loads (a page that refuses the reader), so a broken page cannot hang the tour either; the last
+step missing ends the tour as "seen", the same door finishing opens, since a tour that could
+not finish itself should not keep offering to.
+
+**Card placement is room-aware, not a fixed side-per-step map.** The straight spec-table
+mapping (`placement: "end"` → Radix `side: "right"`/`"left"` by direction) put the workspace
+and setup cards half off a 1280px viewport, because their anchors fill the whole content
+column and Radix's own flip has nowhere better to go. `Tour.tsx` now decides the side once per
+anchor (`fitSide`), scrolls a tall anchor to the top instead of centring it when a card needs
+room only on one side (`scrollBlockFor`), and — only for an anchor too tall for either side to
+hold a card, never a short one — cuts the box the card is placed against down to its visible
+top, never below 24px (`cardAnchorRect`). The hole is never cut; it always follows the anchor's
+real box. Full reasoning and the measured placements at both breakpoints are in
+`.superpowers/sdd/2026-09-18-onboarding-tour/task-3-report.md`.
+
+**`playwright.config.ts` seeds `tour:v1=seen` into every project's `storageState`, and
+`tests/e2e/tour.spec.ts` is the one file that opts back out.** The welcome auto-opens over
+the first signed-in or demo visit to `/dashboard`, `/account` or `/sync` this browser has no
+memory of — which, without the seed, is every existing test's first visit, sitting a modal
+over whatever that test came to press. Seeding "seen" once, centrally, keeps the tour's own
+first-visit behaviour out of every unrelated suite without those suites doing anything
+tour-aware; the tour's own suite resets `storageState` to empty and drives the real
+first-visit path instead.

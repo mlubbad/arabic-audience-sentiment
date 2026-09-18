@@ -64,6 +64,7 @@ Claimed as of 2026-09-14, by message between the two live Claude sessions:
 | `apps/web/src/googleOneTap.ts` (+ `.test.ts`), `apps/web/src/google-gsi.d.ts`, `apps/web/vite-env.d.ts`, the Google door's slice of `Account.tsx`/`Account.entry.test.ts`, `.env.example` | **done** — Google sign-in and One Tap (`docs/superpowers/plans/2026-09-17-google-signin.md`) landed as `0102bea`…`5c2f9ca`, plus this task's hardening (`6e2ac2e`) and records commit; the door opens on `VITE_AUTH_PROVIDERS=google`, One Tap prompts a signed-out `/account` visitor via GIS + `signInWithIdToken`; free | 2026-09-17 |
 | `apps/web/src/pages.css`, `apps/web/src/pageStates/**`, `apps/web/src/ops/**`, `apps/web/src/admin/**`, `apps/web/src/account.css`, `apps/web/src/noReportCss.test.ts` | **done** — the operations and admin redesign (`docs/superpowers/plans/2026-09-17-ops-admin-redesign.md`, tasks 1–8) landed as `0d6f51f`…`e3642af`, plus this task's records commit; `/sync` and `/admin` are on the shared `db-*` rhythm and `ui/` primitives now, `report.css` is deleted, `/account` carries the last of its rules verbatim in `account.css` until phase 5; free | 2026-09-17 |
 | `apps/web/src/account/**`, `apps/web/src/ui/BudgetMeter.tsx`, `apps/web/src/setup-path.css`, `apps/web/public/fixtures/account.json`, `tests/e2e/account.spec.ts` | **done** — the account redesign (`docs/superpowers/plans/2026-09-17-account-redesign.md`, tasks 1–8) landed as `dc7b513`…`b95f7a2`, plus this task's records commit; `/account` is on `ui/` now, the verbatim `account.css` and every remaining `.app-shell .rp-*` block in `app.css` are deleted, `BudgetMeter` moved into `ui/`; free | 2026-09-18 |
+| `apps/web/src/tour/**`, `apps/web/src/strings/{ar,en}.ts`'s tour keys, `data-tour` attributes on `main.tsx`/`account/{Account,WorkspaceCard,CreateWorkspace}.tsx`/`SetupPath.tsx`/`ops/{Catalogue,SelectionBar}.tsx`/`dashboard/{FilterBar,SectionNav}.tsx`, `playwright.config.ts`'s `tourSeen` storageState, `tests/e2e/tour.spec.ts` | **done** — the onboarding tour (`docs/superpowers/plans/2026-09-18-onboarding-tour.md`, tasks 1–4) landed as `6649c60`…`c7d96b5`…`847c369`…`51b5b2e`, plus this task's browser suite and records commit; a once-per-browser welcome plus seven anchored steps across `/account`, `/sync`, `/dashboard`, replayable from the rail and via `?tour=1`; free | 2026-09-18 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
@@ -432,3 +433,28 @@ change it silently carried. Mitigation, unchanged from the 2026-09-16 entry and 
 since it recurred: stage and commit in one command (`git add <exact paths> && git commit`, or
 `git commit -- <paths>`), and check `git status` for a foreign `RM`/`A` before committing from
 whatever the index already holds.
+
+2026-09-18, closing the note above: phase 6 (`docs/superpowers/plans/2026-09-18-onboarding-tour.md`,
+tasks 1–4) landed the in-app onboarding tour — `apps/web/src/tour/**`, the 24 string keys, the
+`data-tour` anchors, and `tests/e2e/tour.spec.ts` (row added to the table above) — commits
+`6649c60`…`51b5b2e` plus this task's browser suite and records commit. Phase 6 was the last
+of this file's numbered phases (ops/admin was 4, account 5); **the eight-phase pre-launch
+redesign is complete.** `npm run check` green at the close:
+lint, format:check, typecheck, `check:functions` (deno), unit (110 files / 860 tests), db (33
+files / 316 tests), worker (195 tests), build (8 prerendered pages), secrets (642 source files
+plus built assets); full `npm run test:e2e` is 128 (124 carried + 4 new in `tour.spec.ts`),
+`test:e2e:build` stays 6. `docs/verification.md`'s dated entry below carries the full detail,
+including a host-load flake this task hit and cleared on rerun (unrelated to the tour).
+`.screenshots/` (untracked) was never touched; this feature's own screenshots live under
+`.superpowers/sdd/2026-09-18-onboarding-tour/shots/`.
+
+**What is still open, carried from earlier entries in this file — none of it part of the
+redesign, and none of it blocked on anything this task could do:** the operator has not yet
+verified Google sign-in and One Tap on the deployed host (line ~243 above); the landing's LCP
+regression is waived, not fixed (line ~335 above); the owner-plan selection fix (`699bbba`)
+is built and waiting for the operator to run `scripts/deploy-preview.sh` or grant the
+permission (`docs/progress.md`'s 2026-09-18 entry); and the `creator_plus` tenant's dead
+worker credential is diagnosed but not resolved — a separate session is actively working a
+platform-wide-credential redesign for it as of this writing (`488bcd2`…`900b83d`, untouched
+here). Nothing above is this task's to fix; each is named here only so the next reader does
+not have to re-derive it from scattered entries.
