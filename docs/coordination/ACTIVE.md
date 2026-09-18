@@ -468,3 +468,9 @@ credential with `svc_register_platform_worker_credential`; `.env.local` down to 
 owner's scoped credential (`rotated-2026-09-15`, id `14b189c0-…`). Until then the worker serves
 the owner's workspace alone and every self-serve workspace reads «الجمع متوقّف». No web deploy
 is involved: nothing above SQL changed.
+
+2026-09-18, closing the note above: the platform worker credential is live — migration applied,
+credential `7abfe195-…` registered, the service on `277913a` with `tenants=1` since 12:59:53,
+the owner's scoped credential retired. `.env.local` holds one `WORKER_CREDENTIAL` and no
+`_WS2`; `scripts/worker-service.sh` is unchanged. Open: read back the `creator_plus` tenant's
+discover job (`docs/progress.md`, same date).

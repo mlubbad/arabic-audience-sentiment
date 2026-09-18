@@ -1751,6 +1751,10 @@ before that. `npm run test:e2e:build`: 6/6, unchanged.
 `worker:test` 195 passed; `build` 8 prerendered pages; `check:secrets` 642 source files plus
 built assets, clean.
 
+**After the records:** `b88c8e8` — the catalogue's play glyph (`catalogue.css`) keeps a
+physical `border-left` so the triangle points right in Arabic too; a player's control is not
+mirrored with the text.
+
 **Phase 6 (the in-app onboarding tour) is closed — the eight-phase pre-launch redesign is
 complete.** See `docs/coordination/ACTIVE.md`'s dated entry for what, if anything, is still
 open from earlier phases.
@@ -1790,3 +1794,29 @@ credential continue.
 **Closing the morning's entry:** the owner-plan selection fix (`699bbba`) is on the live host,
 shipped by the operator's hand from the worktree at `46ec419` + `699bbba` — the host serves
 `static/index-CxI1oaAs.js`, verified; the worktree is removed. Detail in the verification entry.
+
+## 2026-09-18 — the platform worker credential is live
+
+Rolled out by the operator's hand, in the order the entry above lists, between 12:5x and 13:00
+local: `npx supabase db push --linked` applied `20260918130000` («Finished supabase db push»);
+`svc_register_platform_worker_credential(…, 'platform-2026-09-18')` answered
+`7abfe195-b3d4-4fe6-9527-7d4f4b022bf2`; `.env.local` now holds that one `WORKER_CREDENTIAL`
+(`_WS2` and the id lines gone); `scripts/worker-service-update.sh` moved the service checkout
+to `277913a` and restarted it — `worker up, model=camelbert-da, tenants=1, topics=gemini` at
+12:59:53, and not one `invalid_worker_credential` since, where the log had carried one a minute
+for a day and a half; `svc_retire_worker_credentials('d0c3b9fc…', '{}')` retired the owner's
+scoped credential (`1`) — the empty keep the new guard allows while a platform credential is
+active, exercised live. The two scoped credentials are history: the deleted workspace's never
+had a row to retire.
+
+**One mishap on the way, recorded because the next rollout can meet it:** the step-4 `sed` was
+run with the literal placeholder `<السر>`, then the service was restarted on it; the `<` broke
+`. ./.env.local` in the service script and launchd spun on `syntax error near unexpected token
+'newline'` for about three minutes, with the live scoped credential already deleted from both
+copies. The registered secret was recovered from the terminal's own scrollback, written into
+`.env.local`, and the service restarted on it. Lesson, now in the notes: hand the operator one
+command that generates, registers and writes the secret, never a placeholder to fill by hand.
+
+**Not yet read back:** the `creator_plus` tenant's discover job as `succeeded`, and its page
+reading «متصل» — a read-only query is with the operator; the runner logs nothing on a
+successful discover, so the log's silence after «worker up» is the expected shape.

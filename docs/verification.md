@@ -2502,9 +2502,9 @@ partway through (all five files' first tests had already passed by then); the ot
 (`demo.spec.ts`, `landing.spec.ts`) in a second, separate run, 7/7. A third, clean full run
 with load back down to 7–20 reached **128 passed, 0 failed, in 2.5 minutes** — the number this
 entry stands on. 128 = 124 carried from the account-redesign close (`docs/verification.md`'s
-2026-09-18 entry above cites 123 at that point; one more test landed somewhere in the interval
-between sessions, not investigated here since nothing in this task's diff touches an existing
-spec file) + 4 new in `tour.spec.ts`.
+2026-09-18 entry above cites 123 at that point; the one more is `699bbba`'s
+`tests/e2e/dashboard.spec.ts` test — the owner's plan with no ceiling, «بلا حدود» in the
+selection bar — from the other session's owner-plan fix) + 4 new in `tour.spec.ts`.
 
 **`npm run test:e2e:build`: 6/6 passed** (12.5s), unchanged from before this task.
 
@@ -2592,3 +2592,23 @@ every file up with `226` and swept 22 stale assets. Fetched afterwards: the host
 old entry address answers the shell's HTML (`text/html`, `cf-cache-status: BYPASS`), not the old
 bundle. The worktree is removed. Still not verified: the owner ticking and saving on the live
 host — their own session.
+
+## 2026-09-18 — the platform worker credential rolled out: what the log and the doors answered
+
+- `supabase db push --linked`: «Applying migration 20260918130000_a_platform_worker_credential.sql… Finished».
+- `svc_register_platform_worker_credential` over `supabase db query --linked`: first call with the
+  literal placeholder refused `weak_credential` (the 32-character floor, working as designed);
+  second call with the 64-hex secret answered id `7abfe195-b3d4-4fe6-9527-7d4f4b022bf2`.
+- Service log after `scripts/worker-service-update.sh` on the corrected env: `worker up,
+  model=camelbert-da, tenants=1, topics=gemini` at 12:59:53 local; `invalid_worker_credential`
+  count since then: 0 (it was ~1/minute since 2026-09-17 01:23).
+- `svc_retire_worker_credentials('d0c3b9fc-b813-439e-a32b-71dd357f0bb4', '{}')` → `1`: the
+  empty keep accepted live because an active platform credential exists — the guard rebuilt in
+  section 8 of the migration, seen on the real project.
+- The mishap in between (placeholder written into `.env.local`, service restarted on it,
+  `syntax error near unexpected token 'newline'` in launchd's loop, `last exit code = 2`) and
+  its repair are in `docs/progress.md`'s entry of the same date.
+
+**Not verified here:** a claim of the `creator_plus` tenant's discover job and «متصل» on its
+operations page — the read-only query is with the operator; the runner writes no log line for
+a successful claim or discover, only `comment counts` lines during a collect.
