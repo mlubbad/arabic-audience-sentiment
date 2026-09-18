@@ -158,3 +158,77 @@ begin
 
   return next claimed;
 end $$;
+
+-- 5. worker_job, rebuilt from 20260913160000:40-49 with one change: a
+-- platform credential (w null) owns any live lease, and the function
+-- answers the job's own workspace either way — which for a scoped
+-- credential is w, as before. Every job-bound call keys on that value.
+create or replace function private.worker_job(token_hash text, j uuid, t uuid) returns uuid
+language plpgsql security invoker set search_path='' as $$
+declare w uuid; owner uuid; begin
+  w := private.worker_workspace(token_hash);
+  select workspace_id into owner from public.jobs
+  where id = j and lease_token = t and status = 'running' and lease_expires_at > now();
+  if owner is null then raise exception 'lease_lost' using errcode='40001'; end if;
+  if w is not null and owner <> w then raise exception 'forbidden' using errcode='42501'; end if;
+  return owner;
+end $$;
+
+-- 6. The three grant functions, rebuilt from 20260914010000:14-50, each
+-- with one change: (w is null or …) where the credential's workspace was
+-- compared. The job still binds the connection to its own workspace.
+create or replace function private.worker_channel_grant(token_hash text, j uuid)
+returns table(connection_id uuid, encrypted_tokens bytea, key_version text)
+language plpgsql security invoker set search_path='' as $$
+declare w uuid; begin
+  w := private.worker_workspace(token_hash);
+  return query
+  select c.id, c.encrypted_tokens, c.key_version
+  from private.oauth_connections c
+  join public.jobs jb on jb.channel_id = c.channel_id and jb.workspace_id = c.workspace_id
+  where jb.id = j and (w is null or c.workspace_id = w) and c.status = 'connected'
+  order by c.id desc limit 1;
+  if not found then
+    -- A job on a channel nobody has connected is not an error to retry: there
+    -- is nothing to collect with until someone authorises it.
+    raise exception 'channel_not_connected' using errcode='42501'; end if;
+end $$;
+
+create or replace function private.worker_store_grant(token_hash text, connection uuid, tokens bytea)
+returns void language plpgsql security invoker set search_path='' as $$
+declare w uuid; begin
+  w := private.worker_workspace(token_hash);
+  update private.oauth_connections set encrypted_tokens = tokens
+  where id = connection and (w is null or workspace_id = w) and status = 'connected';
+  if not found then raise exception 'forbidden' using errcode='42501'; end if;
+end $$;
+
+create or replace function private.worker_mark_revoked(token_hash text, j uuid)
+returns void language plpgsql security invoker set search_path='' as $$
+declare w uuid; ch uuid; begin
+  w := private.worker_workspace(token_hash);
+  select channel_id into ch from public.jobs where id = j and (w is null or workspace_id = w);
+  if ch is null then raise exception 'forbidden' using errcode='42501'; end if;
+  perform private.oauth_mark_revoked(ch);
+end $$;
+
+-- 7. worker_tick, rebuilt from 20260915132000:196-199 (a one-line sql
+-- function) as plpgsql: a scoped credential still answers
+-- schedule_due_work(w); a platform one walks the workspaces of active
+-- subscriptions — the set schedule_all() walks for pg_cron — and answers
+-- the three totals schedule_due_work keeps (discover, collect, analyse since
+-- 20260916011000) plus how many workspaces it walked.
+create or replace function private.worker_tick(token_hash text) returns jsonb
+language plpgsql security invoker set search_path='' as $$
+declare w uuid; ws uuid; r jsonb; d int := 0; k int := 0; a int := 0; n int := 0; begin
+  w := private.worker_workspace(token_hash);
+  if w is not null then return private.schedule_due_work(w); end if;
+  for ws in select workspace_id from public.subscriptions where status = 'active' loop
+    r := private.schedule_due_work(ws);
+    d := d + coalesce((r->>'discover')::int, 0);
+    k := k + coalesce((r->>'collect')::int, 0);
+    a := a + coalesce((r->>'analyse')::int, 0);
+    n := n + 1;
+  end loop;
+  return jsonb_build_object('discover', d, 'collect', k, 'analyse', a, 'workspaces', n);
+end $$;

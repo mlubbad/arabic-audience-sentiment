@@ -236,4 +236,151 @@ describe("a platform worker credential", () => {
       /invalid_worker_credential/,
     );
   });
+
+  it("runs another workspace's job end to end with the platform credential, while a scoped one is still refused", async () => {
+    const b = (
+      await db.query<{ id: string; lease_token: string }>(
+        "select id, lease_token from jobs where workspace_id=$1 and status='running'",
+        [B],
+      )
+    ).rows[0];
+    await expect(
+      db.query("select private.worker_heartbeat($1,$2,$3)", [
+        CRED_A,
+        b.id,
+        b.lease_token,
+      ]),
+    ).rejects.toThrow(/forbidden/);
+    await db.query("select private.worker_heartbeat($1,$2,$3)", [
+      PLATFORM,
+      b.id,
+      b.lease_token,
+    ]);
+    // A write keyed on the workspace the guard answers: the catalogue lands
+    // in B, under B's channel.
+    const committed = (
+      await db.query<{ r: { videos: number } }>(
+        "select private.worker_commit_catalogue($1,$2,$3,$4) as r",
+        [
+          PLATFORM,
+          b.id,
+          b.lease_token,
+          JSON.stringify([
+            {
+              external_video_id: "bbbbbbbbbbb",
+              title: "B1",
+              kind: "video",
+              reported_comment_count: 4,
+            },
+          ]),
+        ],
+      )
+    ).rows[0].r;
+    expect(committed).toEqual({ videos: 1 });
+    expect(
+      await scalar(
+        "select count(*)::int as n from videos where workspace_id=$1 and channel_id=$1 and external_video_id='bbbbbbbbbbb'",
+        [B],
+      ),
+    ).toBe(1);
+    // The grant path: B's connection for B's job, and a renewed grant
+    // written back.
+    const grant = await db.query<{ connection_id: string }>(
+      "select connection_id from private.worker_channel_grant($1,$2)",
+      [PLATFORM, b.id],
+    );
+    expect(grant.rows).toHaveLength(1);
+    // The renewed grant as a bytea literal: the driver takes bytes, not a
+    // string, for a bytea parameter.
+    await db.query("select private.worker_store_grant($1,$2,'\\x01'::bytea)", [
+      PLATFORM,
+      grant.rows[0].connection_id,
+    ]);
+    expect(
+      (
+        await db.query<{ t: string }>(
+          "select encode(encrypted_tokens,'hex') as t from private.oauth_connections where id=$1",
+          [grant.rows[0].connection_id],
+        )
+      ).rows[0].t,
+    ).toBe("01");
+    await db.query("select private.worker_finish($1,$2,$3,$4,$5)", [
+      PLATFORM,
+      b.id,
+      b.lease_token,
+      "succeeded",
+      null,
+    ]);
+    expect(
+      (
+        await db.query<{ status: string }>(
+          "select status from jobs where id=$1",
+          [b.id],
+        )
+      ).rows[0].status,
+    ).toBe("succeeded");
+  });
+
+  it("answers channel_not_connected for a job whose channel has no grant, and marks a revoked one", async () => {
+    const a = (
+      await db.query<{ id: string }>(
+        "select id from jobs where workspace_id=$1 and status='running'",
+        [A],
+      )
+    ).rows[0];
+    await expect(
+      db.query("select * from private.worker_channel_grant($1,$2)", [
+        PLATFORM,
+        a.id,
+      ]),
+    ).rejects.toThrow(/channel_not_connected/);
+    const b = (
+      await db.query<{ id: string }>(
+        "select id from jobs where workspace_id=$1",
+        [B],
+      )
+    ).rows[0];
+    await db.query("select private.worker_mark_revoked($1,$2)", [
+      PLATFORM,
+      b.id,
+    ]);
+    expect(
+      (
+        await db.query<{ status: string }>(
+          "select status from channels where id=$1",
+          [B],
+        )
+      ).rows[0].status,
+    ).toBe("reconnect_required");
+  });
+
+  it("ticks every active workspace for the platform credential, and one for a scoped one", async () => {
+    const before = await scalar("select count(*)::int as n from jobs");
+    const platform = (
+      await db.query<{ t: Record<string, number> }>(
+        "select private.worker_tick($1) as t",
+        [PLATFORM],
+      )
+    ).rows[0].t;
+    // One workspace per active subscription — the migrations seed some of
+    // their own — and every job the tick enqueued is counted in its totals.
+    expect(platform.workspaces).toBe(
+      await scalar(
+        "select count(*)::int as n from subscriptions where status='active'",
+      ),
+    );
+    const after = await scalar("select count(*)::int as n from jobs");
+    expect(after - before).toBe(
+      platform.discover + platform.collect + platform.analyse,
+    );
+    // A's channel is not connected: a scoped tick finds nothing and answers
+    // the two counters alone, as before.
+    const scoped = (
+      await db.query<{ t: Record<string, number> }>(
+        "select private.worker_tick($1) as t",
+        [CRED_A],
+      )
+    ).rows[0].t;
+    expect(scoped).toEqual({ discover: 0, collect: 0, analyse: 0 });
+  });
 });
