@@ -1065,10 +1065,14 @@ beyond one attribute per anchor.
 **A step whose anchor never appears is skipped, not shown broken.** `useTour` polls for
 `[data-tour="…"]` up to 1.5s per step and moves on if it never arrives — an empty dashboard
 has no section nav yet, a brand-new account no workspace card — rather than opening a card
-pointed at nothing or leaving the tour stuck. The same clock governs a step whose route never
-loads (a page that refuses the reader), so a broken page cannot hang the tour either; the last
-step missing ends the tour as "seen", the same door finishing opens, since a tour that could
-not finish itself should not keep offering to.
+pointed at nothing or leaving the tour stuck. That clock starts when the step's page arrives,
+not when the step is entered: the router holds the old location while a lazy chunk loads, so
+a slow chunk or the account page's first fetch is not charged against the anchor's wait (with
+one clock from entry, a 1.7s chunk skipped step 2 silently). A separate, longer bound (5s,
+`routeWait`) governs a step whose route never loads (a page that refuses the reader), so a
+broken page cannot hang the tour either; the last step missing ends the tour as "seen", the
+same door finishing opens, since a tour that could not finish itself should not keep offering
+to.
 
 **Card placement is room-aware, not a fixed side-per-step map.** The straight spec-table
 mapping (`placement: "end"` → Radix `side: "right"`/`"left"` by direction) put the workspace

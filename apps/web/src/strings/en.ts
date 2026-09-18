@@ -1085,7 +1085,7 @@ export const en: Strings = {
   tourReplay: "Guided tour",
   tourStepRailTitle: "Navigation",
   tourStepRailBody:
-    "Three destinations: Overview, Operations, and Sources and account. The workspace switch at the top of the rail decides what each page shows.",
+    "Three destinations: Overview, Operations, and Sources & account. The workspace switch at the top of the rail decides what each page shows.",
   tourStepWorkspaceTitle: "Workspace",
   tourStepWorkspaceBody:
     "Each channel or client has its own workspace; its data is never read from another. From here you rename it, connect its channel, or retire it.",

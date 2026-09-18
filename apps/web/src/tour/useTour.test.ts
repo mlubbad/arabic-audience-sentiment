@@ -8,12 +8,14 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOUR_STEPS, TOUR_VERSION, type TourStep } from "./tourSteps";
-import { dropTour, keepDemo, useTour } from "./useTour";
+import { dropTour, keepDemo, useTour, type TourNavigate } from "./useTour";
 
 const KEY = `tour:v${TOUR_VERSION}`;
 
+const REPLACE = { replace: true };
+
 function mount(over: { pathname?: string; search?: string } = {}) {
-  const navigate = vi.fn<(to: { pathname: string; search: string }) => void>();
+  const navigate = vi.fn<TourNavigate>();
   const hook = renderHook(
     (props: { pathname: string; search: string }) =>
       useTour({ steps: TOUR_STEPS, navigate, ...props }),
@@ -262,7 +264,7 @@ describe("useTour: anchors and routes", () => {
     expect(result.current.status).toBe("done");
   });
 
-  it("asks for the step's route when the page is another, keeping demo and dropping tour", () => {
+  it("asks for the step's route when the page is another, keeping demo and dropping tour, replacing the history entry", () => {
     anchor("rail");
     const { result, navigate, rerender } = mount({
       pathname: "/dashboard",
@@ -272,10 +274,10 @@ describe("useTour: anchors and routes", () => {
     act(() => result.current.begin());
     act(() => result.current.next());
     expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith({
-      pathname: "/account",
-      search: "?demo=1",
-    });
+    expect(navigate).toHaveBeenCalledWith(
+      { pathname: "/account", search: "?demo=1" },
+      REPLACE,
+    );
     expect(result.current.anchorEl).toBeNull();
     // The page arrives, with its anchor: the step lights it.
     const ws = anchor("workspace");
@@ -298,30 +300,53 @@ describe("useTour: anchors and routes", () => {
     expect(result.current.index).toBe(1);
   });
 
-  it("skips forward when the route it asked for never arrives", () => {
+  it("skips forward when the route it asked for never arrives — after the route bound, not the anchor wait", () => {
     anchor("rail");
     const { result, navigate } = mount({ pathname: "/dashboard" });
     act(() => result.current.start());
     act(() => result.current.begin());
     act(() => result.current.next());
     expect(navigate).toHaveBeenCalledTimes(1);
-    act(() => vi.advanceTimersByTime(1400));
+    // The anchor wait alone (1.5 s) is not enough to give up on a page.
+    act(() => vi.advanceTimersByTime(1600));
+    expect(result.current.index).toBe(1);
+    act(() => vi.advanceTimersByTime(3300));
     expect(result.current.index).toBe(1);
     act(() => vi.advanceTimersByTime(200));
     // Step 3 is on /account too: asked for again, once, with its own clock.
     expect(result.current.index).toBe(2);
     expect(result.current.status).toBe("running");
     expect(navigate).toHaveBeenCalledTimes(2);
-    act(() => vi.advanceTimersByTime(1600));
+    act(() => vi.advanceTimersByTime(5100));
     expect(result.current.index).toBe(3);
     expect(navigate).toHaveBeenCalledTimes(3);
-    expect(navigate).toHaveBeenLastCalledWith({
-      pathname: "/sync",
-      search: "",
-    });
+    expect(navigate).toHaveBeenLastCalledWith(
+      { pathname: "/sync", search: "" },
+      REPLACE,
+    );
   });
 
-  it("the clock starts on entering the step: a late page has only what is left", () => {
+  it("the anchor clock starts when the page arrives: a page that comes at 1.7 s still has its whole wait", () => {
+    anchor("rail");
+    const { result, rerender } = mount({ pathname: "/dashboard" });
+    act(() => result.current.start());
+    act(() => result.current.begin());
+    act(() => result.current.next());
+    // The router holds the old location while the account chunk loads.
+    act(() => vi.advanceTimersByTime(1700));
+    expect(result.current.index).toBe(1);
+    rerender({ pathname: "/account", search: "" });
+    // The page's first fetch: the anchor comes half a second after it.
+    act(() => vi.advanceTimersByTime(500));
+    expect(result.current.index).toBe(1);
+    expect(result.current.anchorEl).toBeNull();
+    const ws = anchor("workspace");
+    act(() => vi.advanceTimersByTime(40));
+    expect(result.current.index).toBe(1);
+    expect(result.current.anchorEl).toBe(ws);
+  });
+
+  it("a page that arrives without its anchor is skipped one anchor wait after arriving", () => {
     anchor("rail");
     const { result, rerender } = mount({ pathname: "/dashboard" });
     act(() => result.current.start());
@@ -329,7 +354,7 @@ describe("useTour: anchors and routes", () => {
     act(() => result.current.next());
     act(() => vi.advanceTimersByTime(1200));
     rerender({ pathname: "/account", search: "" });
-    act(() => vi.advanceTimersByTime(200));
+    act(() => vi.advanceTimersByTime(1400));
     expect(result.current.index).toBe(1);
     act(() => vi.advanceTimersByTime(200));
     expect(result.current.index).toBe(2);

@@ -92,11 +92,13 @@ describe("Tour — the welcome", () => {
     expect(m.begin).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByTestId("tour-later"));
     expect(m.later).toHaveBeenCalledTimes(1);
-    // The corner ✕ carries the same name and the same meaning.
-    const closes = screen.getAllByRole("button", { name: ar.tourLater });
-    expect(closes).toHaveLength(2);
+    // The corner ✕ carries the same meaning under its own name: «إغلاق»,
+    // so the dialog does not hold two buttons called «ليس الآن».
+    expect(screen.getAllByRole("button", { name: ar.tourLater })).toHaveLength(
+      1,
+    );
     await userEvent.click(
-      closes.find((b) => b !== screen.getByTestId("tour-later"))!,
+      screen.getByRole("button", { name: ar.adminDeleteClose }),
     );
     expect(m.later).toHaveBeenCalledTimes(2);
   });
@@ -143,10 +145,23 @@ describe("Tour — running", () => {
     expect(screen.getByTestId("tour-next")).toHaveTextContent(ar.tourNext);
     expect(screen.getByTestId("tour-skip")).toHaveTextContent(ar.tourSkip);
     expect(screen.getByTestId("tour-skip")).toHaveClass("ui-btn--link");
-    // Focus lands inside the card when it mounts.
-    await waitFor(() =>
-      expect(card).toContainElement(document.activeElement as HTMLElement),
+    // Focus lands on the primary door when the card mounts.
+    await waitFor(() => expect(screen.getByTestId("tour-next")).toHaveFocus());
+  });
+
+  it("on a step with a back button, mount focus still lands on next, not back", async () => {
+    const el = anchor();
+    renderTour(
+      machine({
+        status: "running",
+        index: 3,
+        step: TOUR_STEPS[3],
+        anchorEl: el,
+      }),
     );
+    await screen.findByTestId("tour-back");
+    await waitFor(() => expect(screen.getByTestId("tour-next")).toHaveFocus());
+    expect(screen.getByTestId("tour-back")).not.toHaveFocus();
   });
 
   it("on the last step: back is there and next reads finish", async () => {

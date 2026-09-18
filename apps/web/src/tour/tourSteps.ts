@@ -15,6 +15,11 @@ import type { StringKey } from "../strings";
 
 export const TOUR_VERSION = 1;
 
+/** The phone breakpoint — the one the rail collapses at (`app.css`), so
+ *  `stepsFor(phone)`, the provider's viewport watch and the card's
+ *  placement all turn on the same width. */
+export const TOUR_PHONE_QUERY = "(max-width: 900px)";
+
 export type TourStepId =
   | "rail"
   | "workspace"

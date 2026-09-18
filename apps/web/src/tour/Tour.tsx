@@ -1,8 +1,9 @@
 /**
  * The tour's layer — see the design doc's "Structure" (`Tour.tsx`) and
- * "Keyboard". The default export `TourProvider` loads lazily once the
- * machine leaves `idle`; the stylesheet is imported here so it rides the
- * same chunk and a reader who never takes the tour never downloads either.
+ * "Keyboard". The default export `Tour` is what `TourProvider` (eager, in
+ * the shell) `lazy()`-imports once the machine leaves `idle`; the
+ * stylesheet is imported here so it rides the same chunk and a reader who
+ * never takes the tour never downloads either.
  *
  * Three things, by the machine's state. `welcome`: the dialog
  * (`TourWelcome`). `running` with the step's anchor found: the veil and the
@@ -16,13 +17,15 @@
  * route, polling for the element) nothing is rendered: a hole has nowhere
  * to be yet.
  *
- * Focus moves into the card on each step (Radix's own mount focus). It is
+ * Focus moves into the card on each step, onto «التالي» — the primary
+ * door, so Enter continues rather than going back (`tour-back` is first in
+ * DOM order, which is where Radix's own mount focus would land). It is
  * not trapped there: `modal={false}` is what keeps the page scrollable, and
  * the spec's "trapped" was ruled a nice-to-have — Tab can leave the card
  * and walk the page, Escape from anywhere skips.
  */
 import "./tour.css";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStrings } from "../strings";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -30,20 +33,18 @@ import { Popover, PopoverAnchor, PopoverContent } from "../ui/Popover";
 import { useMediaQuery } from "../ui/useMediaQuery";
 import { useTourMachine } from "./TourProvider";
 import { TourWelcome } from "./TourWelcome";
-import type { TourStep } from "./tourSteps";
+import { TOUR_PHONE_QUERY, type TourStep } from "./tourSteps";
 
 /** How far the hole reaches past the anchor's own box, on every side. */
-export const HOLE_PAD = 8;
+const HOLE_PAD = 8;
 /** The card's widest (`tour.css`), and the room a card needs past an
  *  anchor's edge: its tallest body (~260px) plus the gap to the hole and
  *  the viewport's own padding. Used to decide where a card can go before
- *  Radix is asked to place it there. */
-export const CARD_WIDTH = 360;
-export const CARD_GAP = HOLE_PAD + 8;
+ *  Radix is asked to place it there. `CARD_ROOM` and `MIN_CUT` are
+ *  exported for the placement tests; the rest are this file's own. */
+const CARD_WIDTH = 360;
+const CARD_GAP = HOLE_PAD + 8;
 export const CARD_ROOM = 300;
-
-/** The phone breakpoint — the rail's own, `stepsFor(phone)`'s own. */
-const PHONE = "(max-width: 900px)";
 
 export type Side = "top" | "bottom" | "left" | "right";
 export type Rect = { top: number; left: number; width: number; height: number };
@@ -152,7 +153,7 @@ function toDOMRect(r: Rect): DOMRect {
 
 export default function Tour() {
   const m = useTourMachine();
-  const phone = useMediaQuery(PHONE);
+  const phone = useMediaQuery(TOUR_PHONE_QUERY);
   // The app writes the locale's direction on `<html>` (`locale.ts`); read
   // it at render, so a language switch mid-tour places the next card right.
   const dir =
@@ -340,6 +341,7 @@ function TourCard({
     [anchorEl],
   );
   const last = index >= total - 1;
+  const nextRef = useRef<HTMLButtonElement>(null);
 
   return (
     <Popover open modal={false}>
@@ -357,6 +359,10 @@ function TourCard({
         collisionPadding={16}
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={skip}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          nextRef.current?.focus();
+        }}
       >
         <Badge data-testid="tour-progress" numeric>
           {S.tourProgress(index + 1, total)}
@@ -373,7 +379,7 @@ function TourCard({
               {S.tourBack}
             </Button>
           )}
-          <Button data-testid="tour-next" onClick={next}>
+          <Button ref={nextRef} data-testid="tour-next" onClick={next}>
             {last ? S.tourFinish : S.tourNext}
           </Button>
           <Button variant="link" data-testid="tour-skip" onClick={skip}>

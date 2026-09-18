@@ -32,7 +32,10 @@ import { writeTour, type TourMemory } from "./tourState";
 
 export type TourStatus = "idle" | "welcome" | "running" | "done";
 
-export type TourNavigate = (to: { pathname: string; search: string }) => void;
+export type TourNavigate = (
+  to: { pathname: string; search: string },
+  options?: { replace?: boolean },
+) => void;
 
 export type UseTourOptions = {
   steps: readonly TourStep[];
@@ -41,8 +44,13 @@ export type UseTourOptions = {
   search: string;
   /** The document the anchors live in; the page's own by default. */
   doc?: Document;
-  /** How long a step waits for its anchor before it is skipped, in ms. */
+  /** How long a step waits for its anchor, once on its page, before it is
+   *  skipped, in ms. */
   anchorWait?: number;
+  /** How long a step waits for the route it asked for before it is
+   *  skipped, in ms — a lazy chunk on a slow network takes longer than an
+   *  anchor on a page that has arrived. */
+  routeWait?: number;
 };
 
 export type TourMachine = {
@@ -67,7 +75,8 @@ export type TourMachine = {
   later: () => void;
 };
 
-export const ANCHOR_WAIT_MS = 1500;
+const ANCHOR_WAIT_MS = 1500;
+const ROUTE_WAIT_MS = 5000;
 
 /** The search a tour navigation carries: the demo flag if it was there,
  *  never the `tour` flag (a support link that starts the tour must not
@@ -95,6 +104,7 @@ export function useTour({
   search,
   doc,
   anchorWait = ANCHOR_WAIT_MS,
+  routeWait = ROUTE_WAIT_MS,
 }: UseTourOptions): TourMachine {
   const [status, setStatus] = useState<TourStatus>("idle");
   const [index, setIndex] = useState(0);
@@ -102,13 +112,16 @@ export function useTour({
   const total = steps.length;
   const last = total - 1;
   const step = status === "running" ? (steps[index] ?? null) : null;
-  // The step whose route was asked for, and the deadline that started when
-  // it was — one request per step, however many times the effect re-runs
-  // (StrictMode runs it twice), and one clock from entering the step.
+  // The step being waited on: whether its route was asked for (one request
+  // per step, however many times the effect re-runs — StrictMode runs it
+  // twice), whether its page has arrived (the anchor clock starts once,
+  // then), and the deadline the current wait runs to — the route bound
+  // from entering the step, the anchor wait from arriving on the page.
   const entered = useRef<{
     index: number;
     deadline: number;
     asked: boolean;
+    arrived: boolean;
   } | null>(null);
 
   const goTo = useCallback((i: number) => {
@@ -170,8 +183,9 @@ export function useTour({
     if (entered.current?.index !== index)
       entered.current = {
         index,
-        deadline: Date.now() + anchorWait,
+        deadline: Date.now() + routeWait,
         asked: false,
+        arrived: false,
       };
     const clock = entered.current;
     const advance = () => {
@@ -181,11 +195,20 @@ export function useTour({
     if (current.route && current.route !== pathname) {
       if (!clock.asked) {
         clock.asked = true;
-        navigate({ pathname: current.route, search: keepDemo(search) });
+        navigate(
+          { pathname: current.route, search: keepDemo(search) },
+          { replace: true },
+        );
       }
-      // The page may never come: skip forward when the clock runs out.
+      // The page may never come: skip forward when the route bound runs out.
       const t = setTimeout(advance, Math.max(0, clock.deadline - Date.now()));
       return () => clearTimeout(t);
+    }
+    // On the step's page — from the start, or once the route it asked for
+    // has arrived: the anchor's own clock starts here, whole.
+    if (!clock.arrived) {
+      clock.arrived = true;
+      clock.deadline = Date.now() + anchorWait;
     }
     const d = doc ?? globalThis.document;
     if (!d) return;
@@ -216,7 +239,18 @@ export function useTour({
     };
     // `search` is read, not watched: a search change alone (the tour flag
     // being dropped, a workspace switch) is not a page change.
-  }, [status, index, pathname, steps, doc, anchorWait, last, finish, goTo]);
+  }, [
+    status,
+    index,
+    pathname,
+    steps,
+    doc,
+    anchorWait,
+    routeWait,
+    last,
+    finish,
+    goTo,
+  ]);
 
   // Browser back while running: end, rather than light a stale hole.
   useEffect(() => {

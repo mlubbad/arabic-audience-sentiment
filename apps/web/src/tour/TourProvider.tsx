@@ -29,7 +29,7 @@ import {
 import { useLocation, useNavigate } from "react-router";
 import type { Session } from "@supabase/supabase-js";
 import { useMediaQuery } from "../ui/useMediaQuery";
-import { stepsFor } from "./tourSteps";
+import { stepsFor, TOUR_PHONE_QUERY } from "./tourSteps";
 import { clearTour, readTour, wantsTour } from "./tourState";
 import { dropTour, useTour, type TourMachine } from "./useTour";
 
@@ -67,7 +67,7 @@ export function TourProvider({
 }) {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-  const phone = useMediaQuery("(max-width: 900px)");
+  const phone = useMediaQuery(TOUR_PHONE_QUERY);
   // `stepsFor(true)` builds a fresh array; the machine watches `steps`, so
   // it must be the same array across renders on the same viewport.
   const steps = useMemo(() => stepsFor(phone), [phone]);
@@ -105,5 +105,6 @@ export function TourProvider({
   );
 }
 
-/** For a test that renders a consumer with a hand-made machine. */
+/** A test seam: for a test that renders a consumer (`Tour`, `TourEntry`)
+ *  with a hand-made machine instead of a router and a provider. */
 export const TourContextForTests = TourContext;

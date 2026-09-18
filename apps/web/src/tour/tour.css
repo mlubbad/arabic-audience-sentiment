@@ -54,6 +54,15 @@
   scroll-margin-top: calc(var(--db-pinned-h, 0px) + var(--space-5));
   scroll-margin-bottom: var(--space-5);
 }
+/* On the dark plane the brand indigo is ~2:1 against the rail's ground —
+   under the 3:1 a non-text indicator needs — so an anchor on the rail is
+   lit with the brand's light indigo instead (the rule `app.css` states for
+   the rail's dots). The phone's menu button is not on the rail: it sits on
+   the light page, where the brand indigo reads and the light one would
+   not. */
+.app-rail [data-tour-active] {
+  outline-color: var(--ml-indigo-300);
+}
 
 /* The card: `ui-popover-content`'s surface (the same tokens, inherited by
    sharing the class), wider than a menu, and above the veil. The compound

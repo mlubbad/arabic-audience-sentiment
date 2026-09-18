@@ -375,8 +375,13 @@ function AppLayout() {
             <RailState part="collection" />
             <RailState part="plan" />
             {/* The tour's way back in, above the session: a reader who has
-                met it once finds it here on every page. */}
-            <TourEntry onActivate={() => setMenuOpen(false)} />
+                met it once finds it here on every page — a signed-in one,
+                or the demo's; signed out, the tour's pages refuse the
+                walk, and a door onto six skipped steps would only write
+                "seen" on a browser that never saw it. */}
+            {(session || wantsDemo) && (
+              <TourEntry onActivate={() => setMenuOpen(false)} />
+            )}
             <SessionControl />
           </div>
         </aside>

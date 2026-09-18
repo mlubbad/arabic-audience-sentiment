@@ -642,6 +642,19 @@
 .app-plan[data-tone="exhausted"] .app-plan-note {
   color: var(--ml-rose-300);
 }
+/* A `ui/Button` ghost in the rail — the tour's replay door above the
+   session control — takes the same light ink: `.ui-btn--ghost` paints
+   `--text-1` for the light page, ~1:1 on the rail's ground. The hover is
+   the session control's, a lift of white, not the page's `--bg-muted`. */
+.app-shell .app-rail .ui-btn--ghost {
+  color: var(--ink-on-dark);
+}
+.app-shell .app-rail .ui-btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+.app-shell .app-rail .ui-btn--ghost:focus-visible {
+  outline-color: var(--focus-halo);
+}
 /* The session control sits on the dark plane now, so it takes the light ink. */
 .app-rail .app-session {
   border-inline-start: 0;
