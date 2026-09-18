@@ -92,6 +92,7 @@ export function SectionNav({
       className="db-nav"
       aria-label={S.reportSectionsLabel}
       data-testid="section-nav"
+      data-tour="sections"
     >
       {show && (
         <div className="db-nav-links">

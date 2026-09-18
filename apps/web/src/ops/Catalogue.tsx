@@ -241,6 +241,7 @@ export function Catalogue({
       className="db-section db-catalogue"
       aria-labelledby="cat-heading"
       data-testid="catalogue"
+      data-tour="catalogue"
     >
       <header>
         <h2 id="cat-heading">{S.catTitle}</h2>

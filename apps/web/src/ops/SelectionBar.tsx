@@ -35,7 +35,7 @@ export function SelectionBar({
   S: Strings;
 }) {
   return (
-    <Card className="db-selection-bar">
+    <Card className="db-selection-bar" data-tour="selection">
       <p
         className="db-selection-line"
         data-testid="cat-estimate"

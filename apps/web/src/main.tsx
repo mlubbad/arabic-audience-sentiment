@@ -53,6 +53,8 @@ import { LegalLinks } from "./LegalLinks";
 import { publicPath, resolvePublicPath } from "./publicPaths";
 import { publicRoutes } from "./publicRoutes";
 import { SessionControl } from "./SessionControl";
+import { TourProvider } from "./tour/TourProvider";
+import { TourEntry } from "./tour/TourEntry";
 const Dashboard = lazy(() =>
   import("./dashboard/Dashboard").then((m) => ({ default: m.Dashboard })),
 );
@@ -250,6 +252,9 @@ function AppLayout() {
   }, [menuOpen]);
   const { pathname, search } = useLocation();
   const carried = carriedSearch(search);
+  // The same test `ops/Sync.tsx` and `account/Account.tsx` make: the demo
+  // is a signed-in shell for the tour's purposes.
+  const wantsDemo = new URLSearchParams(search).has("demo");
   const locale = useLocale();
   const S = useStrings();
   // Signed out, nothing is asked; signed in, one query the admin page shares.
@@ -277,122 +282,128 @@ function AppLayout() {
     setMenuOpen(false);
   }, [pathname, S]);
   return (
-    <div className="app-shell" dir={direction(locale)}>
-      {/* The product is never indexed, whatever the public pages say. The
-          static HTML the shell boots from (`app.html`) carries the same
-          directive; this is the one that reaches a crawler running React. */}
-      <meta name="robots" content="noindex, nofollow" />
-      <a className="skip app-skip" href="#content">
-        {S.skipToContent}
-      </a>
-      {/* The switch lives in the announcement bar, not the rail foot where it
-          was first put. Measured: the rail is a sticky 100vh plane under a
-          34px bar, so at the top of the page its foot is 34px below the fold
-          and a control there is the first thing clipped. The bar is on every
-          screen size, above the fold, and on a phone needs no menu opened. */}
-      <div className="app-announcement">
-        <span>{S.announcementLead}</span>
-        <LanguageSwitch />
+    <TourProvider session={session} wantsDemo={wantsDemo}>
+      <div className="app-shell" dir={direction(locale)}>
+        {/* The product is never indexed, whatever the public pages say. The
+            static HTML the shell boots from (`app.html`) carries the same
+            directive; this is the one that reaches a crawler running React. */}
+        <meta name="robots" content="noindex, nofollow" />
+        <a className="skip app-skip" href="#content">
+          {S.skipToContent}
+        </a>
+        {/* The switch lives in the announcement bar, not the rail foot where it
+            was first put. Measured: the rail is a sticky 100vh plane under a
+            34px bar, so at the top of the page its foot is 34px below the fold
+            and a control there is the first thing clipped. The bar is on every
+            screen size, above the fold, and on a phone needs no menu opened. */}
+        <div className="app-announcement">
+          <span>{S.announcementLead}</span>
+          <LanguageSwitch />
+        </div>
+        {/* A rail, not a bar.
+            Four links across the top said "this is a page with some links on
+            it"; a standing rail says "this is a product, and these are its
+            parts". It also gives the two things a top bar had nowhere to put:
+            which workspace you are in, and what your plan has left — both true
+            on every screen and previously buried inside one page each. */}
+        <button
+          className="app-menu"
+          type="button"
+          ref={menuRef}
+          data-tour="rail-menu"
+          aria-label={S.menuLabel}
+          aria-expanded={menuOpen}
+          aria-controls="app-rail"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? S.menuClose : S.menuOpen}
+        </button>
+        <aside
+          id="app-rail"
+          ref={railRef}
+          className={menuOpen ? "app-rail is-open" : "app-rail"}
+          onKeyDown={(e) => {
+            // A popup opened from the rail (the session menu, the workspace
+            // listbox) handles its own Escape: Radix dismisses it and marks
+            // the event defaultPrevented on a document-capture listener, and
+            // the synthetic event still bubbles here through the React tree
+            // even though the popup is portaled to <body>. One Escape must
+            // close one layer, not both.
+            if (e.key === "Escape" && menuOpen && !e.defaultPrevented) {
+              setMenuOpen(false);
+              menuRef.current?.focus();
+            }
+          }}
+        >
+          <Link
+            className="app-brand"
+            to={publicPath("home", locale)}
+            aria-label={S.brandHomeLabel}
+          >
+            <BrandMark />
+            <span>
+              <b>
+                {S.brand}
+                <span className="app-brand-dot">.</span>
+              </b>
+              <small>{S.brandOwner}</small>
+            </span>
+          </Link>
+
+          <RailState part="workspace" />
+
+          <nav className="app-nav" aria-label={S.navLabel} data-tour="rail">
+            {/* A heading for the group, not decoration: the rail carries three
+                kinds of thing — where you are, what your plan has left, and who
+                you are — and unlabelled they read as one undifferentiated list. */}
+            <p className="app-rail-caption">{S.navCaption}</p>
+            {destinations.map((d) => (
+              <NavLink
+                key={d.to}
+                to={{ pathname: d.to, search: d.scoped ? carried : "" }}
+                onClick={() => setMenuOpen(false)}
+              >
+                <span className="app-nav-mark" aria-hidden="true">
+                  <NavIcon to={d.to} />
+                </span>
+                {S[d.label]}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="app-rail-foot">
+            <RailState part="collection" />
+            <RailState part="plan" />
+            {/* The tour's way back in, above the session: a reader who has
+                met it once finds it here on every page. */}
+            <TourEntry onActivate={() => setMenuOpen(false)} />
+            <SessionControl />
+          </div>
+        </aside>
+        <main id="content" className="app-main">
+          <Suspense
+            fallback={
+              <div className="app-state" role="status">
+                <span className="app-state-symbol" aria-hidden="true">
+                  ◌
+                </span>
+                <p>{S.pageOpening}</p>
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
+        </main>
+        <footer className="app-footer">
+          <div>
+            <Link to={publicPath("home", locale)}>{S.brand}.</Link>
+            <span>{S.footerTagline}</span>
+          </div>
+          <p>{S.footerNote}</p>
+          <LegalLinks className="app-legal" />
+        </footer>
       </div>
-      {/* A rail, not a bar.
-          Four links across the top said "this is a page with some links on
-          it"; a standing rail says "this is a product, and these are its
-          parts". It also gives the two things a top bar had nowhere to put:
-          which workspace you are in, and what your plan has left — both true
-          on every screen and previously buried inside one page each. */}
-      <button
-        className="app-menu"
-        type="button"
-        ref={menuRef}
-        aria-label={S.menuLabel}
-        aria-expanded={menuOpen}
-        aria-controls="app-rail"
-        onClick={() => setMenuOpen((open) => !open)}
-      >
-        {menuOpen ? S.menuClose : S.menuOpen}
-      </button>
-      <aside
-        id="app-rail"
-        ref={railRef}
-        className={menuOpen ? "app-rail is-open" : "app-rail"}
-        onKeyDown={(e) => {
-          // A popup opened from the rail (the session menu, the workspace
-          // listbox) handles its own Escape: Radix dismisses it and marks
-          // the event defaultPrevented on a document-capture listener, and
-          // the synthetic event still bubbles here through the React tree
-          // even though the popup is portaled to <body>. One Escape must
-          // close one layer, not both.
-          if (e.key === "Escape" && menuOpen && !e.defaultPrevented) {
-            setMenuOpen(false);
-            menuRef.current?.focus();
-          }
-        }}
-      >
-        <Link
-          className="app-brand"
-          to={publicPath("home", locale)}
-          aria-label={S.brandHomeLabel}
-        >
-          <BrandMark />
-          <span>
-            <b>
-              {S.brand}
-              <span className="app-brand-dot">.</span>
-            </b>
-            <small>{S.brandOwner}</small>
-          </span>
-        </Link>
-
-        <RailState part="workspace" />
-
-        <nav className="app-nav" aria-label={S.navLabel}>
-          {/* A heading for the group, not decoration: the rail carries three
-              kinds of thing — where you are, what your plan has left, and who
-              you are — and unlabelled they read as one undifferentiated list. */}
-          <p className="app-rail-caption">{S.navCaption}</p>
-          {destinations.map((d) => (
-            <NavLink
-              key={d.to}
-              to={{ pathname: d.to, search: d.scoped ? carried : "" }}
-              onClick={() => setMenuOpen(false)}
-            >
-              <span className="app-nav-mark" aria-hidden="true">
-                <NavIcon to={d.to} />
-              </span>
-              {S[d.label]}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="app-rail-foot">
-          <RailState part="collection" />
-          <RailState part="plan" />
-          <SessionControl />
-        </div>
-      </aside>
-      <main id="content" className="app-main">
-        <Suspense
-          fallback={
-            <div className="app-state" role="status">
-              <span className="app-state-symbol" aria-hidden="true">
-                ◌
-              </span>
-              <p>{S.pageOpening}</p>
-            </div>
-          }
-        >
-          <Outlet />
-        </Suspense>
-      </main>
-      <footer className="app-footer">
-        <div>
-          <Link to={publicPath("home", locale)}>{S.brand}.</Link>
-          <span>{S.footerTagline}</span>
-        </div>
-        <p>{S.footerNote}</p>
-        <LegalLinks className="app-legal" />
-      </footer>
-    </div>
+    </TourProvider>
   );
 }
 

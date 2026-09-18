@@ -347,6 +347,7 @@ export function FilterBar({
       id="report-filters"
       aria-label={S.filtersLabel}
       className="db-filterbar"
+      data-tour="filters"
       onSubmit={submit}
       ref={barRef}
     >

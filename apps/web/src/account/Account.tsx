@@ -120,7 +120,8 @@ function Workspaces({
 }: {
   loading: boolean;
   workspaces: Workspace[];
-  card: (w: Workspace) => ReactNode;
+  /** The index is the card's position: the first card carries the tour's anchor. */
+  card: (w: Workspace, i: number) => ReactNode;
 }) {
   const S = useStrings();
   return (
@@ -404,7 +405,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
           <Workspaces
             loading={loadedWorkspaceUserId !== session.user.id}
             workspaces={workspaces}
-            card={(w) => {
+            card={(w, i) => {
               const workspaceClient = clients.find(
                 (c) => c.workspace_id === w.id,
               );
@@ -413,6 +414,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                 <WorkspaceCard
                   key={w.id}
                   workspace={w}
+                  tourAnchor={i === 0 ? "workspace" : undefined}
                   hasClient={!!workspaceClient}
                   channel={
                     channels.find((c) => c.workspace_id === w.id) ?? null
@@ -552,6 +554,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
             pending={pending}
             feedback={feedback("create")}
             onSubmit={createWorkspace}
+            tourAnchor={workspaces.length === 0 ? "workspace" : undefined}
           />
         </>
       )}
@@ -645,13 +648,14 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
       <Workspaces
         loading={false}
         workspaces={state.workspaces}
-        card={(w) => {
+        card={(w, i) => {
           const scope: Scope = `ws:${w.id}`;
           const hasClient = state.clients.some((c) => c.workspace_id === w.id);
           return (
             <WorkspaceCard
               key={w.id}
               workspace={w}
+              tourAnchor={i === 0 ? "workspace" : undefined}
               hasClient={hasClient}
               channel={
                 state.channels.find((c) => c.workspace_id === w.id) ?? null
@@ -737,6 +741,7 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
         setName={setName}
         pending={pending}
         feedback={feedback("create")}
+        tourAnchor={state.workspaces.length === 0 ? "workspace" : undefined}
         onSubmit={(e) => {
           e.preventDefault();
           act({ type: "create", name }, () => {

@@ -18,6 +18,7 @@ export function CreateWorkspace({
   pending,
   feedback,
   onSubmit,
+  tourAnchor,
 }: {
   name: string;
   setName: (name: string) => void;
@@ -26,10 +27,13 @@ export function CreateWorkspace({
   /** The page's answer to the last press — its `feedback("create")`. */
   feedback: ReactNode;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  /** The onboarding tour's `data-tour` name: this card stands in for the
+   *  workspace card when the reader has none yet. */
+  tourAnchor?: string;
 }) {
   const S = useStrings();
   return (
-    <Card asChild className="db-create">
+    <Card asChild className="db-create" data-tour={tourAnchor}>
       <form onSubmit={onSubmit}>
         <h2>{S.anotherWorkspaceTitle}</h2>
         <p className="db-lead">{S.anotherWorkspaceLead}</p>

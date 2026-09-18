@@ -28,13 +28,22 @@ const stepWords: Record<SetupStep["status"], StringKey> = {
 export function SetupPath({
   steps,
   testId,
+  tourAnchor,
 }: {
   steps: SetupStep[];
   testId?: string;
+  /** The onboarding tour's `data-tour` name for this list, when it is the
+   *  one the tour lights. */
+  tourAnchor?: string;
 }) {
   const S = useStrings();
   return (
-    <ol className="setup-path" data-testid={testId} aria-label={S.stepsLabel}>
+    <ol
+      className="setup-path"
+      data-testid={testId}
+      data-tour={tourAnchor}
+      aria-label={S.stepsLabel}
+    >
       {steps.map((step) => (
         <li
           key={step.key}

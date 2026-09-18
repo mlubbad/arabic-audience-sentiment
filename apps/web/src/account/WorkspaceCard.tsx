@@ -55,6 +55,7 @@ export function WorkspaceCard({
   onRename,
   confirmingRetire = false,
   onRetire,
+  tourAnchor,
 }: {
   workspace: { id: string; name: string };
   /** A workspace cannot be connected without the client it owns. */
@@ -79,6 +80,9 @@ export function WorkspaceCard({
   onRename?: (step: "open" | "cancel" | "save", name?: string) => void;
   confirmingRetire?: boolean;
   onRetire?: (step: "ask" | "confirm" | "keep") => void;
+  /** The onboarding tour's `data-tour` name for this card — the page gives
+   *  it to the first card only, and that card's setup path is lit too. */
+  tourAnchor?: string;
 }) {
   const S = useStrings();
   const steps = setupProgress({ channel, latestJob }, S);
@@ -95,7 +99,7 @@ export function WorkspaceCard({
 
   return (
     <Card asChild className="db-ws">
-      <li>
+      <li data-tour={tourAnchor}>
         {/* The name, and the way to change it: the form opens in the name's
             place with the current name already in it, so the reader edits
             rather than retypes. */}
@@ -184,7 +188,11 @@ export function WorkspaceCard({
         )}
         {/* Where this workspace is on the three steps: the visitor's list,
             with a state on each line. */}
-        <SetupPath steps={steps} testId={`setup-${workspace.id}`} />
+        <SetupPath
+          steps={steps}
+          testId={`setup-${workspace.id}`}
+          tourAnchor={tourAnchor ? "setup" : undefined}
+        />
         <div className="db-actions">
           {/* Connected: the next thing to do is choose what to collect.
               Collection is per video, chosen on the operations page, so the
