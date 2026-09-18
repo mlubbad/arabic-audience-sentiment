@@ -1754,3 +1754,39 @@ built assets, clean.
 **Phase 6 (the in-app onboarding tour) is closed — the eight-phase pre-launch redesign is
 complete.** See `docs/coordination/ACTIVE.md`'s dated entry for what, if anything, is still
 open from earlier phases.
+
+## 2026-09-18 — a platform worker credential: one credential serves every workspace
+
+Design `488bcd2` (`docs/superpowers/specs/2026-09-18-platform-worker-credential-design.md`),
+plan `58b092f`, two corrections `12e8658`; the work `3a42c1c`, `900b83d`, `4afd4fc`, `aae712e`.
+One new migration, `supabase/migrations/20260918130000_a_platform_worker_credential.sql`:
+`worker_credentials.workspace_id` may be null, and null is a platform credential;
+`worker_workspace` answers null for it; `claim_job(null)` claims across workspaces oldest-first
+and records the poll as a `worker_seen` row for every workspace; `worker_job` answers the job's
+own workspace and refuses only a scoped mismatch; the three grant functions and `worker_tick`
+read null as every workspace (the platform tick sums `discover`, `collect` and `analyse` over
+every active subscription and adds `workspaces`); `svc_register_platform_worker_credential`
+and `svc_retire_platform_worker_credentials` are the service-role doors; a workspace's last
+scoped credential may be retired while a platform one is live. Nothing above SQL changed —
+gateway, Edge Function, Python worker, service script, contract, UI. A new PGlite suite,
+`supabase/tests/platform_worker.test.ts` (10 cases, pgcrypto installed in `extensions` as
+Supabase has it, so the registration door hashes for real), each case watched red first, and
+three mutation proofs — in `docs/verification.md`'s entry of the same date.
+`workers/deploy/README.md` and `.env.example` now recommend the platform credential.
+
+**Not yet on the live project.** The migration is committed and pushed to the repository
+only. The rollout is the operator's, in this order: `npx supabase db push --linked`; register
+with `select public.svc_register_platform_worker_credential('<openssl rand -hex 32>',
+'platform-2026-09-18')` over `npx supabase db query --linked`; `.env.local` →
+`WORKER_CREDENTIAL=<that secret>`, delete `WORKER_CREDENTIAL_WS2` and
+`WORKER_CREDENTIAL_NEW_ID`; `sh scripts/worker-service-update.sh` (the log should say
+`tenants=1`, then claim the `creator_plus` tenant's discover job within a minute); retire the
+owner's scoped credential with `select
+public.svc_retire_worker_credentials('d0c3b9fc-b813-439e-a32b-71dd357f0bb4', '{}')`. Until
+then the worker serves the owner's workspace alone on `WORKER_CREDENTIAL_WS2`, the
+`creator_plus` tenant's discover job stays queued, and the refusals on the deleted workspace's
+credential continue.
+
+**Closing the morning's entry:** the owner-plan selection fix (`699bbba`) is on the live host,
+shipped by the operator's hand from the worktree at `46ec419` + `699bbba` — the host serves
+`static/index-CxI1oaAs.js`, verified; the worktree is removed. Detail in the verification entry.

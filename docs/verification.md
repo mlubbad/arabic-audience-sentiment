@@ -2533,3 +2533,62 @@ card and veil never rode the main bundle.
 **Not touched, not needed for this task:** `supabase/**` (a different session is mid-work
 there — `488bcd2`…`900b83d`, a platform-worker-credential redesign, unrelated to the tour);
 `.screenshots/`; `docs/oauth-*`; `apps/web/src/legal/*`.
+
+## 2026-09-18 — the platform worker credential: red then green per task, three mutations, the check; the owner-plan fix live
+
+**The suite** `supabase/tests/platform_worker.test.ts` runs on PGlite with pgcrypto installed
+in an `extensions` schema, as Supabase installs it, so `svc_register_platform_worker_credential`
+hashes for real rather than the suite inserting digests by hand. Per task, watched red first:
+
+- Task 1 (the column and the doors): red in `beforeAll` — `function
+  public.svc_register_platform_worker_credential(unknown, unknown) does not exist`; once the
+  migration existed, `schema "extensions" does not exist` — the suite's own gap, closed by
+  loading `@electric-sql/pglite/contrib/pgcrypto`; 2/2 green.
+- Task 2 (the claim and the sighting): 4 red on `invalid_worker_credential` — the fourth an
+  artefact: a failing assertion had left `set role authenticated` on the suite's one connection,
+  now reset in a `finally`; after the two rewrites the sighting case was still red on six
+  workspaces where three were expected, because the migrations seed workspaces of their own —
+  the assertion now says *every* workspace; 6/6 green.
+- Task 3 (the guard, the grants, the tick): 3 red — `null value in column "workspace_id" of
+  relation "videos"` (the guard's null reaching a catalogue commit), `forbidden`
+  (`worker_mark_revoked`), `no_active_plan` (the tick pricing a null workspace); after the
+  rewrites 2 red — `Invalid input for bytea type` (the driver takes bytes; the test now passes a
+  `::bytea` literal) and the scoped tick answering `{discover, collect, analyse}`:
+  `schedule_due_work` had gained a third counter in `20260916011000` that the spec had missed,
+  so the platform tick now sums all three; 9/9 green. The spec and plan were corrected
+  (`12e8658`).
+- Task 4 (the retire guard): red on `keep_at_least_one`; 10/10 green, and
+  `worker_catalogue.test.ts`'s own empty-keep refusal still green — its database holds no
+  platform credential.
+
+**Mutations**, the migration backed up to the scratch directory and restored by copy (`cmp`
+identical afterwards), each followed by a 10/10 rerun: (M1) the claim predicate without
+`w is null or` → 3 failed — the claim case and the two that need a claimed job; (M2) the
+platform poll leaving no sighting → 2 failed — the sighting and the connected read; (M3)
+`worker_job` answering the credential's workspace instead of the job's → 1 failed — the
+end-to-end case, at the catalogue commit. Reverting the guard's comparison alone raises
+nothing (`null <> uuid` is null), which is why the suite commits a catalogue rather than only
+heartbeating; the spec records this.
+
+**Neighbouring suites** after each task — `worker_gateway`, `worker_catalogue`,
+`worker_video_counts`, `worker_topics`, `oauth`, `lease_recovery`, `end_to_end`,
+`workspace_lifecycle` — 93 tests, green and unchanged: scoped credentials behave as before.
+
+**`npm run check`**, chained, exit 0: lint, format:check, typecheck, `check:functions`; unit
+110 files / 860 tests; db 33 files / 320 tests (the new file's 10 included); worker 195; build 8
+prerendered pages; secrets 642 source files plus built assets.
+
+**Not verified:** a live claim by a platform credential, a live platform tick, and «متصل» on the
+`creator_plus` tenant's page — all need the rollout (migration push, registration, the service's
+env and restart), which is the operator's hand and is listed in `docs/progress.md`.
+
+**The owner-plan fix is live.** The morning's entry left `scripts/deploy-preview.sh` refused by
+the auto-mode guard. The operator ran it from the worktree (`46ec419` + `699bbba`). The first
+run failed inside `check-secrets.mjs` with `EISDIR`: the worktree's `apps/web/node_modules` was
+a symlink, which `git ls-files --others` lists as an untracked file (a directory pattern never
+matches a symlink) and the scanner then tried to read; the link removed, the second run put
+every file up with `226` and swept 22 stale assets. Fetched afterwards: the host serves
+`static/index-CxI1oaAs.js`, `static/Sync-B7Lhs7Qv.js` carries the `unlimited` branch, and the
+old entry address answers the shell's HTML (`text/html`, `cf-cache-status: BYPASS`), not the old
+bundle. The worktree is removed. Still not verified: the owner ticking and saving on the live
+host — their own session.

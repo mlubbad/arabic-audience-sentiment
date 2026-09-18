@@ -458,3 +458,13 @@ worker credential is diagnosed but not resolved — a separate session is active
 platform-wide-credential redesign for it as of this writing (`488bcd2`…`900b83d`, untouched
 here). Nothing above is this task's to fix; each is named here only so the next reader does
 not have to re-derive it from scattered entries.
+
+**PENDING, the operator's: the platform worker credential rollout (2026-09-18).** Migration
+`supabase/migrations/20260918130000_a_platform_worker_credential.sql` is committed and pushed
+to the repository and NOT applied to the live project. The steps, in order, are in
+`docs/progress.md`'s entry of the same date: `supabase db push --linked`; register a platform
+credential with `svc_register_platform_worker_credential`; `.env.local` down to one
+`WORKER_CREDENTIAL` (drop `_WS2` and `_NEW_ID`); `scripts/worker-service-update.sh`; retire the
+owner's scoped credential (`rotated-2026-09-15`, id `14b189c0-…`). Until then the worker serves
+the owner's workspace alone and every self-serve workspace reads «الجمع متوقّف». No web deploy
+is involved: nothing above SQL changed.

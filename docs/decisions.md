@@ -1089,3 +1089,17 @@ over whatever that test came to press. Seeding "seen" once, centrally, keeps the
 first-visit behaviour out of every unrelated suite without those suites doing anything
 tour-aware; the tour's own suite resets `storageState` to empty and drives the real
 first-visit path instead.
+
+## 2026-09-18 — the worker's credential is the platform's, not a workspace's
+
+A worker credential was bound to one workspace (`20260913160000`), and the launchd worker
+carried one per tenant. That model needed an operator for every new workspace and broke
+silently when a deleted test workspace took a live credential with it on 2026-09-17. Chosen,
+over provisioning a scoped credential per signup: a **platform credential** —
+`worker_credentials.workspace_id` null — that resolves to every workspace
+(`20260918130000`). The claim crosses workspaces oldest-first, the poll is a sighting of every
+workspace in the `worker_seen` table that already decides «متصل», and the job-bound guard
+answers the job's own workspace. Nothing above SQL changed: the wire contract never carried a
+workspace, which is exactly what made this a one-migration change. Scoped credentials keep
+working; a workspace's last one may be retired once a platform one is live. Design:
+`docs/superpowers/specs/2026-09-18-platform-worker-credential-design.md`.
