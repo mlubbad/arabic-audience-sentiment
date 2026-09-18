@@ -739,14 +739,10 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
         feedback={feedback("create")}
         onSubmit={(e) => {
           e.preventDefault();
-          act(
-            { type: "create", name },
-            () => {
-              setName("");
-              say("create", S.createWorkspaceDone);
-            },
-            () => say("create", S.createWorkspaceFailed),
-          );
+          act({ type: "create", name }, () => {
+            setName("");
+            say("create", S.createWorkspaceDone);
+          });
         }}
       />
     </>

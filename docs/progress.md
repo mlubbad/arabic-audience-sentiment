@@ -1618,8 +1618,8 @@ markup, only in the card component that owns it. `PlanPanel`'s `<article>` picke
 `db-plan-body` class and a five-property reset once `style.css`'s bare `article` rule was found
 painting it a bordered white box it never asked for.
 
-**The verbatim `account.css` (494 lines) is deleted**, and `app.css` shrank 1314 → 755 lines
-(−559): every `.app-shell .rp-*` block plus the account/workspace-list/setup-steps/history rule
+**The verbatim `account.css` (494 lines) is deleted**, and `app.css` shrank 1286 → 755 lines
+(−531): every `.app-shell .rp-*` block plus the account/workspace-list/setup-steps/history rule
 families that had no reader left once `account/` composed its own page. `locale.css` and
 `pageStates/page-states.css` each lost a few dead rules pointing at the same retired classes.
 `noReportCss.test.ts` lost its allow-list entirely (it used to name the four files still

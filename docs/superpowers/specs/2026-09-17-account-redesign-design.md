@@ -213,7 +213,7 @@ rather than treating as bugs:
 - The story card renders a plain `ol.db-steps` (`AuthEntry.tsx`), not
   `SetupPath` — `SetupPath` needs per-step statuses the signed-out story
   never has. `Account.setup.test.ts` asserts `setupSteps.map(` there.
-- `Unavailable` keeps the old page's four strings
+- `Unavailable` keeps the old page's five strings
   (`accountTryDashboardTitle`/`Lead`, `openDashboard`, plus the two this
   design called out), not two new ones.
 - The fixture's second channel (`apps/web/public/fixtures/account.json`) is

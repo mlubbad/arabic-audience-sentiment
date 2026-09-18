@@ -47,9 +47,10 @@ export type PlanPanelViewProps = {
  *  are open. The rail card carries one figure so a reader can start work;
  *  this is where the plan is managed, so it carries all of them.
  *
- *  Every budget gets a `BudgetMeter` — the same component `/sync` renders,
- *  so the two pages can never disagree about what a given share or state
- *  looks like — and the meter's sentence is built the same way this panel
+ *  Every bounded budget gets a `BudgetMeter` — the same component `/sync`
+ *  renders, so the two pages can never disagree about what a given share or
+ *  state looks like; an unlimited one prints its line with no bar, as this
+ *  panel always did — and the meter's sentence is built the same way this panel
  *  always built it (`S.opsShare` over `budgetState`), not `PlanBudgets`'s own
  *  `S.opsBudgetLine`: the two pages agree on the widget, not on every word
  *  around it. */
