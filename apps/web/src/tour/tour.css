@@ -1,0 +1,93 @@
+/*
+ * The tour's paint — the veil, the hole, the lit anchor, the card, the
+ * welcome's doors. Loaded with the tour's chunk (`Tour.tsx` imports it), so
+ * a page that never runs the tour never carries it. Tokens only; the veil's
+ * colour is the dialog overlay's recipe (`ui.css`, `.ui-dialog-overlay`) a
+ * shade deeper, so the one lit box reads as the only bright thing.
+ *
+ * Stacking (the scale beside `.app-rail` in `app.css`): the veil at 58 sits
+ * over the rail (55) and the phone's menu button (56) — a step that lights
+ * the rail dims everything else — and under a dialog (60/61); the card at
+ * 66 sits over any popover or select (65) the page may hold open.
+ */
+
+.tour-veil {
+  --tour-veil: color-mix(in srgb, var(--fg-1) 55%, transparent);
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  /* The layer never takes a pointer: the page stays scrollable and the
+     lit anchor stays clickable. The dimming is the hole's shadow. */
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.tour-hole {
+  position: fixed;
+  border-radius: var(--radius-2);
+  box-shadow: 0 0 0 200vmax var(--tour-veil);
+  transition:
+    top var(--dur-2) var(--ease-glass),
+    left var(--dur-2) var(--ease-glass),
+    width var(--dur-2) var(--ease-glass),
+    height var(--dur-2) var(--ease-glass);
+}
+
+/* The anchor itself, while lit. An outline only — no position or z-index
+   change, which would break a sticky filter bar or a fixed rail. */
+[data-tour-active] {
+  outline: 2px solid var(--ml-indigo);
+  outline-offset: 4px;
+  /* A tall anchor is scrolled to the top of the view (`Tour.tsx`): this
+     keeps its outline and the hole's edge off the viewport's edge. */
+  scroll-margin-block: var(--space-5);
+}
+
+/* The card: `ui-popover-content`'s surface (the same tokens, inherited by
+   sharing the class), wider than a menu, and above the veil. The compound
+   selector outranks `.ui-popover-content`'s own `z-index: 65`. */
+.ui-popover-content.tour-card {
+  z-index: 66;
+  max-width: 360px;
+  /* Never scrolls inside: the card is short, and `Tour.tsx` chooses a side
+     and cuts a tall anchor's box so the whole card has room. The menu
+     popover's `max-height` would otherwise squeeze it to whatever Radix
+     measured beside an anchor it could not fit around. */
+  max-height: none;
+  padding: var(--space-4);
+}
+.tour-card .ui-badge {
+  margin-bottom: var(--space-2);
+}
+.tour-title {
+  font-size: var(--fs-h3);
+  color: var(--text-1);
+  margin: 0 0 var(--space-2);
+}
+.tour-body {
+  color: var(--text-2);
+  margin: 0;
+}
+/* The doors row — the account page's `.db-actions`, redrawn here because
+   that sheet travels with the account chunk and the card opens on every
+   page. */
+.tour-actions,
+.tour-welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .ui-popover-content.tour-card {
+    max-width: calc(100vw - 32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-hole {
+    transition: none;
+  }
+}

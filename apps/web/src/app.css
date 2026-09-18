@@ -712,9 +712,12 @@
     inset-inline-end: 0;
     width: min(82vw, 300px);
     /* The shell's band of the stacking scale: header 50 < rail 55 < menu
-       button 56 < ui dialog 60/61 < tooltip 62 < popover/select 65 < toast
-       70. The rail used to sit at 80 and its button at 90, above every
-       dialog — a phone's filter sheet opened under the «القائمة» button. */
+       button 56 < tour veil 58 < ui dialog 60/61 < tooltip 62 <
+       popover/select 65 < tour card 66 < toast 70 (the tour's two are in
+       `tour/tour.css`: the veil dims the rail and the menu button, the card
+       clears any popover the page holds open). The rail used to sit at 80
+       and its button at 90, above every dialog — a phone's filter sheet
+       opened under the «القائمة» button. */
     z-index: 55;
     /* Hidden past the edge it is anchored to. `transform` is physical and this
        document is right-to-left, so `inset-inline-end: 0` puts the sheet

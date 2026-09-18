@@ -37,9 +37,26 @@ const env = {
   VITE_FIXTURE_DASHBOARD: "/fixtures/e2e-dashboard.json",
 };
 
+// The onboarding tour opens its welcome dialog on the first visit to a
+// signed-in or demo page that this browser has no memory of — which is every
+// test's first visit, and the dialog would sit over whatever the test came to
+// press. Every project therefore starts with the tour already "seen" in the
+// origin's localStorage (`apps/web/src/tour/tourState.ts`, key `tour:v1`);
+// the tour's own suite opts back out with `test.use({ storageState: ... })`.
+const tourSeen = (forOrigin: string) => ({
+  cookies: [],
+  origins: [
+    { origin: forOrigin, localStorage: [{ name: "tour:v1", value: "seen" }] },
+  ],
+});
+
 export default defineConfig({
   testDir: "tests/e2e",
-  use: { baseURL: origin, viewport: { width: 1280, height: 800 } },
+  use: {
+    baseURL: origin,
+    viewport: { width: 1280, height: 800 },
+    storageState: tourSeen(origin),
+  },
   projects: [
     {
       name: "default",
@@ -50,7 +67,10 @@ export default defineConfig({
           {
             name: "public-build",
             testMatch: /public-build\.spec\.ts/,
-            use: { baseURL: previewOrigin },
+            use: {
+              baseURL: previewOrigin,
+              storageState: tourSeen(previewOrigin),
+            },
           },
         ]
       : []),
