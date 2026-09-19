@@ -175,10 +175,20 @@ def main() -> None:
     if args.backfill:
         # Which videos to read is the server's decision, carried on the
         # lease — this only has to build a collector for the claimed token.
+        # A lease without one is a public channel: with the project's API key
+        # in the environment the by-hand run can read it too; without it the
+        # None the runner receives ends the job blocked with the code that
+        # names the gap.
+        def backfill_build(token, expires_at=None, renew=None, channel_id=None):
+            if token:
+                return YouTubeAPI(None, client, access_token=token,
+                                  expires_at=expires_at, renew=renew)
+            if channel_id and os.environ.get("YOUTUBE_API_KEY"):
+                return YouTubeAPI(os.environ["YOUTUBE_API_KEY"], client)
+            return None
         worked = run_backfill(
             control,
-            lambda token, expires_at=None, renew=None: YouTubeAPI(
-                None, client, access_token=token, expires_at=expires_at, renew=renew),
+            backfill_build,
             analyzer=analyzer,
         )
     else:

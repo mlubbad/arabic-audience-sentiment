@@ -250,6 +250,15 @@ export async function handleWorkerRequest(
         checkpoint: claimed.checkpoint ?? null,
         access_token: granted?.access_token ?? null,
         access_token_expires_at: granted?.access_token_expires_at ?? null,
+        // Present only for a public channel — one whose row says
+        // public_unverified — so a key-carrying worker can name what it reads
+        // without a grant. Absent means "no token and no public identity":
+        // the worker reports the channel unconnected, as before.
+        external_channel_id:
+          typeof claimed.external_channel_id === "string" &&
+          claimed.external_channel_id
+            ? claimed.external_channel_id
+            : null,
         type,
         videos,
       });

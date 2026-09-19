@@ -264,17 +264,35 @@ class YouTubeAPI:
             if not page:
                 return ids
 
-    def catalogue(self) -> Catalogue:
+    def catalogue(self, channel_id: str | None = None) -> Catalogue:
         """The channel's videos across its three tabs, with the source's counts.
 
         Cost: about two quota units per fifty videos. The tab playlists are the
         uploads id with LF/SH/LV inserted after UU; a 404 on one is an empty
         tab. If all three are absent the plain uploads list stands in and the
         kind is recorded as unclassified rather than guessed.
+
+        With `channel_id` the channel is named, not inferred: this is the
+        public path, where the lease carries the platform id and the credential
+        is a project API key with no channel of its own. It requires that key —
+        an OAuth collector is bound to the channel the grant names, and taking
+        an id on that path would read a channel the token was never granted
+        for — and an id that names no channel is a blocked dead end, not an
+        empty catalogue.
         """
-        data = self._get("channels", {"part": "contentDetails", "mine": "true"})
+        if channel_id is not None:
+            if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id):
+                raise ValueError("invalid_channel_id")
+            if self.token:
+                raise ValueError("channel_id_needs_api_key")
+            params = {"part": "contentDetails", "id": channel_id}
+        else:
+            params = {"part": "contentDetails", "mine": "true"}
+        data = self._get("channels", params)
         if not data["items"]:
-            raise CollectionError("no_channel_for_credential", "blocked")
+            raise CollectionError(
+                "channel_not_found" if channel_id else "no_channel_for_credential", "blocked"
+            )
         try:
             uploads = data["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
         except (KeyError, TypeError):

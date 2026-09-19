@@ -402,4 +402,70 @@ describe("WorkspaceCard", () => {
       sync.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
+
+  describe("add channel by link or search", () => {
+    const candidate = {
+      external_channel_id: "UCTPIL6f7yNpK8yc-H3cEtFg",
+      handle: "@alaa_jaber_official",
+      title: "علاء جابر",
+      thumbnail_url: "https://i.ytimg.com/a.jpg",
+    };
+
+    it("the door is offered while no channel is named, and not otherwise", () => {
+      const onAddChannel = vi.fn();
+      const open = mount({ onAddChannel });
+      expect(screen.getByTestId(`addchannel-${W}`)).toBeInTheDocument();
+      open.unmount();
+      // A workspace that already names a channel — public or connected — has
+      // no second one to add: the server would refuse.
+      const named = mount({ onAddChannel, channel: connected });
+      expect(screen.queryByTestId(`addchannel-${W}`)).not.toBeInTheDocument();
+      named.unmount();
+      mount({ channel: connected });
+      expect(screen.queryByTestId(`addchannel-${W}`)).not.toBeInTheDocument();
+    });
+
+    it("the form's search hands the typed query back", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      const form = screen.getByTestId(`addchannel-form-${W}`);
+      const field = within(form).getByLabelText(ar.addChannel);
+      await userEvent.type(field, "youtube.com/@alaa_jaber_official");
+      await userEvent.click(
+        within(form).getByRole("button", { name: ar.addChannelSearch }),
+      );
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "youtube.com/@alaa_jaber_official",
+      );
+    });
+
+    it("each candidate carries its own add door", async () => {
+      const onAddChannel = vi.fn();
+      mount({
+        onAddChannel,
+        addingChannel: true,
+        channelCandidates: [candidate],
+      });
+      await userEvent.click(
+        screen.getByTestId(`addchannel-add-${candidate.external_channel_id}`),
+      );
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, candidate);
+    });
+
+    it("an empty answer and a refusal each read as their own sentence", () => {
+      mount({
+        onAddChannel: vi.fn(),
+        addingChannel: true,
+        channelCandidates: [],
+      });
+      expect(screen.getByText(ar.addChannelNone)).toBeInTheDocument();
+      mount({
+        onAddChannel: vi.fn(),
+        addingChannel: true,
+        channelLookupError: ar.addChannelFailed,
+      });
+      expect(screen.getByText(ar.addChannelFailed)).toBeInTheDocument();
+    });
+  });
 });

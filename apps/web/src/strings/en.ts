@@ -138,6 +138,24 @@ export const en: Strings = {
   connectContinueToGoogle: "Continue to Google",
   connectChannel: "Connect a YouTube channel",
   relinkForName: "Reconnect to store the channel's name",
+  addChannel: "Add a channel by link or search",
+  addChannelLead:
+    "Paste the channel's link, its handle (@handle), or type a name to search. Public data is collected without linking the channel's account, which can be linked later.",
+  addChannelPlaceholder: "youtube.com/@channel, @handle, or a name to search",
+  addChannelSearch: "Search",
+  addChannelNone: "No matching channels found. Try another id form or name.",
+  addChannelAdd: "Add",
+  addChannelCancel: "Cancel",
+  addChannelDone:
+    "The channel was added as public data. The next step is listing its videos.",
+  addChannelExists: "This channel is already added to this workspace.",
+  addChannelFailed: "The channel search failed. Try again.",
+  addChannelQueryInvalid:
+    "Enter a valid channel link, a handle, or a name to search.",
+  addChannelNotConfigured:
+    "Channel lookup is not configured on the server yet.",
+  addChannelQuota:
+    "YouTube's daily search quota is spent. Try tomorrow, or enter the channel id directly.",
 
   gateResolvingAccount: "Identifying your account…",
   gateLoadingWorkspaces: "Loading workspaces…",

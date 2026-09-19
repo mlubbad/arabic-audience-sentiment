@@ -74,12 +74,46 @@ describe("what a claim hands the worker", () => {
       "access_token",
       "access_token_expires_at",
       "checkpoint",
+      "external_channel_id",
       "job_id",
       "lease_token",
       "type",
       "videos",
     ]);
     expect(JSON.stringify(body)).not.toContain("refresh");
+  });
+
+  it("hands the platform id only for a public channel", async () => {
+    // A channel registered as public data has no grant to open; its id is
+    // what lets a key-carrying worker know what it was sent to read. A
+    // connected channel's id never travels: a failed grant is the worker's
+    // signal to report the channel unconnected, not a door to public
+    // collection nobody decided on.
+    const db: WorkerDb = {
+      ...base(),
+      claim: async () => ({
+        id: "job-2",
+        lease_token: "l",
+        checkpoint: null,
+        type: "discover",
+        external_channel_id: "UCTPIL6f7yNpK8yc-H3cEtFg",
+      }),
+      accessTokenFor: async () => null,
+    };
+    const first = (await (await post(db)).json()) as Record<string, unknown>;
+    expect(first.access_token).toBeNull();
+    expect(first.external_channel_id).toBe("UCTPIL6f7yNpK8yc-H3cEtFg");
+
+    const connected: WorkerDb = {
+      ...base(),
+      claim: async () => ({ id: "job-3", lease_token: "l", checkpoint: null }),
+      accessTokenFor: async () => null,
+    };
+    const second = (await (await post(connected)).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(second.external_channel_id).toBeNull();
   });
 
   it("asks for the token against the claimed job, not against anything sent", async () => {

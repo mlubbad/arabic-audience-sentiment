@@ -17,6 +17,10 @@
 import { useState, useEffect, type FormEvent, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ChannelLookupResponseSchema,
+  type ChannelCandidate,
+} from "@sentiment/contracts";
 import { supabase } from "../supabase";
 import {
   authErrorMessage,
@@ -60,8 +64,25 @@ type Workspace = { id: string; name: string };
  *  one reader, and two open confirmations would be two ways to press wrong. */
 type Asking = {
   ws: string;
-  what: "connect" | "disconnect" | "rename" | "retire";
+  what: "connect" | "disconnect" | "rename" | "retire" | "addchannel";
 } | null;
+
+/** The lookup refusal's own code, however the client wrapped it. The function
+ *  answers `{code}` in the body; the relay puts its refusal elsewhere, and a
+ *  network failure puts it nowhere. */
+async function lookupCode(error: unknown): Promise<string> {
+  const e = error as { context?: Response; code?: unknown; message?: unknown };
+  if (e?.context && typeof e.context.json === "function") {
+    try {
+      const body = (await e.context.json()) as { code?: unknown };
+      if (typeof body?.code === "string") return body.code;
+    } catch {
+      // The body had no code; the fallbacks decide.
+    }
+  }
+  if (typeof e?.code === "string" && e.code) return e.code;
+  return "";
+}
 
 /** The page's notes and its "working…" — one place per message, shared by
  *  the live body and the demo body so both print through the same line. */
@@ -251,6 +272,14 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
     { id: string; workspace_id: string }[]
   >([]);
   const [channels, setChannels] = useState<ChannelRow[]>([]);
+  // The public-channel lookup's answers, held for the card whose form is
+  // open. The registration itself is the database's to refuse; what arrives
+  // here has already passed the contract's check on its shape.
+  const [lookup, setLookup] = useState<{
+    ws: string;
+    candidates: ChannelCandidate[] | null;
+    error: string | null;
+  }>({ ws: "", candidates: null, error: null });
   // The newest job per workspace is enough to place it on the three steps.
   // Row-level security scopes the table to this account's workspaces.
   const [jobs, setJobs] = useState<JobRow[]>([]);
@@ -342,6 +371,17 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
       setBusy(null);
     }
   }
+  /** The lookup refusal, in the reader's language. The server's codes are
+   *  the ones the lookup function raises; anything else is a failure to
+   *  reach it, which reads as the same sentence the other doors use. */
+  const lookupErrorMessage = (code: string) =>
+    code === "lookup_not_configured"
+      ? S.addChannelNotConfigured
+      : code === "quota_exceeded"
+        ? S.addChannelQuota
+        : code === "invalid_query"
+          ? S.addChannelQueryInvalid
+          : S.addChannelFailed;
   async function createWorkspace(e: FormEvent) {
     e.preventDefault();
     setBusy("create");
@@ -543,6 +583,102 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                       // popup: a popup here is blocked as often as not.
                       else window.location.assign(out.url);
                     });
+                  }}
+                  addingChannel={
+                    asking?.ws === w.id && asking.what === "addchannel"
+                  }
+                  channelCandidates={
+                    lookup.ws === w.id ? lookup.candidates : null
+                  }
+                  channelLookupError={lookup.ws === w.id ? lookup.error : null}
+                  onAddChannel={(step, value, candidate) => {
+                    if (step === "open") {
+                      setAsking({ ws: w.id, what: "addchannel" });
+                      return;
+                    }
+                    if (step === "cancel") {
+                      setAsking(null);
+                      setLookup({ ws: w.id, candidates: null, error: null });
+                      return;
+                    }
+                    if (step === "search") {
+                      const q = (value ?? "").trim();
+                      if (!q) {
+                        setLookup({
+                          ws: w.id,
+                          candidates: null,
+                          error: S.addChannelQueryInvalid,
+                        });
+                        return;
+                      }
+                      setBusy(scope);
+                      setNote(null);
+                      void client.functions
+                        .invoke("channel-lookup", {
+                          body: { workspace_id: w.id, query: q },
+                        })
+                        .then(async ({ data, error }) => {
+                          setBusy(null);
+                          if (error) {
+                            setLookup({
+                              ws: w.id,
+                              candidates: null,
+                              error: lookupErrorMessage(
+                                await lookupCode(error),
+                              ),
+                            });
+                            return;
+                          }
+                          const parsed =
+                            ChannelLookupResponseSchema.safeParse(data);
+                          setLookup({
+                            ws: w.id,
+                            candidates: parsed.success
+                              ? parsed.data.candidates
+                              : null,
+                            error: parsed.success ? null : S.addChannelFailed,
+                          });
+                        });
+                      return;
+                    }
+                    // step === "add": file the candidate. The RPC re-checks
+                    // the role and the tenant and re-validates the id; the
+                    // conflict paths — the same channel again, or one this
+                    // workspace already holds under another client — read as
+                    // "already added" rather than as a failure.
+                    if (!workspaceClient || !candidate) return;
+                    setBusy(scope);
+                    setNote(null);
+                    void client
+                      .rpc("register_public_channel", {
+                        w: w.id,
+                        c: workspaceClient.id,
+                        external: candidate.external_channel_id,
+                        handle: candidate.handle,
+                        title: candidate.title,
+                      })
+                      .then(({ error }) => {
+                        setBusy(null);
+                        if (error) {
+                          say(
+                            scope,
+                            /channel_claimed_by_other_client/.test(
+                              error.message,
+                            )
+                              ? S.addChannelExists
+                              : S.addChannelFailed,
+                          );
+                          return;
+                        }
+                        setAsking(null);
+                        setLookup({
+                          ws: "",
+                          candidates: null,
+                          error: null,
+                        });
+                        say(scope, S.addChannelDone);
+                        setReloads((n) => n + 1);
+                      });
                   }}
                 />
               );

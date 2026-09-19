@@ -15,7 +15,9 @@
  * its handlers did not move.
  */
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
+import type { ChannelCandidate } from "@sentiment/contracts";
 import { setupProgress } from "../setup";
 import { SetupPath } from "../SetupPath";
 import { useStrings } from "../strings";
@@ -51,6 +53,10 @@ export function WorkspaceCard({
   confirmingConnect = false,
   confirmingDisconnect = false,
   onDisconnect,
+  onAddChannel,
+  addingChannel = false,
+  channelCandidates = null,
+  channelLookupError = null,
   renaming = false,
   onRename,
   confirmingRetire = false,
@@ -70,6 +76,21 @@ export function WorkspaceCard({
   onConnect: (step: "ask" | "continue" | "cancel") => void;
   /** The connect/relink question is open; the page holds this state per card. */
   confirmingConnect?: boolean;
+  /** The public-data door: `open` shows the form, `cancel` closes it,
+   *  `search` looks a query up on the server, `add` files the candidate.
+   *  The page owns the lookup and the registration; this card only shows
+   *  what came back. Optional: the demo body has no server to ask. */
+  onAddChannel?: (
+    step: "open" | "cancel" | "search" | "add",
+    value?: string,
+    candidate?: ChannelCandidate,
+  ) => void;
+  /** The add-channel form is open; the page holds that per card. */
+  addingChannel?: boolean;
+  /** The lookup's answers, or null while none have come back. */
+  channelCandidates?: ChannelCandidate[] | null;
+  /** Why the last lookup said no, in the reader's language. */
+  channelLookupError?: string | null;
   /** The first press only asks; the page holds that state per card. */
   confirmingDisconnect?: boolean;
   /** `ask` opens the question, `confirm` disconnects, `keep` closes it. */
@@ -87,6 +108,8 @@ export function WorkspaceCard({
   const S = useStrings();
   const steps = setupProgress({ channel, latestJob }, S);
   const nameId = `rename-name-${workspace.id}`;
+  const addChannelQueryId = `addchannel-query-${workspace.id}`;
+  const [query, setQuery] = useState("");
   const connected = channel?.status === "connected";
   // A channel connected before the callback asked Google for a name has
   // none stored, and a connected channel had no way back through consent
@@ -221,6 +244,26 @@ export function WorkspaceCard({
               {S.connectChannel}
             </Button>
           )}
+          {/* The public-data door, beside the OAuth one: a channel added by
+              its link or by a search collects public data with no grant and
+              no Google visit, and can be linked for real at any time later.
+              Offered only while the workspace names no channel — the
+              registration refuses a second one — and only with a handler,
+              which the demo body passes none of. */}
+          {hasClient &&
+            !connected &&
+            !channel &&
+            onAddChannel &&
+            !addingChannel && (
+              <Button
+                variant="secondary"
+                disabled={pending}
+                data-testid={`addchannel-${workspace.id}`}
+                onClick={() => onAddChannel("open")}
+              >
+                {S.addChannel}
+              </Button>
+            )}
           {hasClient && unnamed && !confirmingConnect && (
             <Button
               variant="secondary"
@@ -294,6 +337,103 @@ export function WorkspaceCard({
           </Card>
         )}
         {feedback}
+        {/* The public-data door's form: a query in, candidates out, one add
+            button per candidate. Inline like the Google consent card above —
+            an explanation and a way back, not a dialog. The thumbnail and the
+            name are what the reader recognises the channel by; the id is
+            shown only when the source gave neither a name nor a handle. */}
+        {addingChannel && onAddChannel && (
+          <Card
+            className="db-ws-consent"
+            role="group"
+            aria-label={S.addChannel}
+          >
+            <p>{S.addChannelLead}</p>
+            <form
+              className="db-ws-rename"
+              data-testid={`addchannel-form-${workspace.id}`}
+              onSubmit={(e) => {
+                e.preventDefault();
+                onAddChannel("search", query);
+              }}
+            >
+              <label htmlFor={addChannelQueryId}>{S.addChannel}</label>
+              <Input
+                id={addChannelQueryId}
+                name="query"
+                required
+                maxLength={300}
+                placeholder={S.addChannelPlaceholder}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+              />
+              <div className="db-actions">
+                <Button
+                  type="submit"
+                  disabled={pending || !query.trim()}
+                  data-testid={`addchannel-search-${workspace.id}`}
+                >
+                  {S.addChannelSearch}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={pending}
+                  data-testid={`addchannel-close-${workspace.id}`}
+                  onClick={() => onAddChannel("cancel")}
+                >
+                  {S.addChannelCancel}
+                </Button>
+              </div>
+            </form>
+            {channelLookupError && (
+              <p className="db-feedback db-feedback--note" role="status">
+                {channelLookupError}
+              </p>
+            )}
+            {channelCandidates && channelCandidates.length === 0 && (
+              <p className="db-muted">{S.addChannelNone}</p>
+            )}
+            {channelCandidates && channelCandidates.length > 0 && (
+              <ul className="db-candidates" role="list">
+                {channelCandidates.map((c) => (
+                  <li
+                    key={c.external_channel_id}
+                    className="db-candidate"
+                    data-testid={`addchannel-result-${c.external_channel_id}`}
+                  >
+                    {c.thumbnail_url && (
+                      <img
+                        src={c.thumbnail_url}
+                        alt=""
+                        width={40}
+                        height={40}
+                        loading="lazy"
+                      />
+                    )}
+                    <span className="db-candidate-name">
+                      <bdi>{c.title ?? c.handle ?? c.external_channel_id}</bdi>
+                      {c.handle && (
+                        <small>
+                          <bdi>{c.handle}</bdi>
+                        </small>
+                      )}
+                    </span>
+                    <Button
+                      size="sm"
+                      disabled={pending}
+                      data-testid={`addchannel-add-${c.external_channel_id}`}
+                      onClick={() => onAddChannel("add", undefined, c)}
+                    >
+                      {S.addChannelAdd}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
         {/* The two questions, asked in a dialog. The page holds the "asking"
             state; every way out of the dialog reports `keep`, the same step
             the inline block's keep button reported. */}

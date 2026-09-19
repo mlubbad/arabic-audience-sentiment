@@ -1171,3 +1171,25 @@ rate limits on the browser-facing functions (`oauth-start`, `oauth-callback`) ar
 setting, not code. A `statement_timeout` on the authenticated role was considered and deferred:
 as a last-resort cap it would first bite the snapshot RPC itself, punishing the read before the
 fix that makes it light.
+
+2026-09-19 — A channel can be added by link or search: the public-data path beside OAuth. The
+spec always held both doors (`youtube_data_api_public` beside `youtube_oauth`; A4: "Public
+API-key collection can precede creator OAuth"), but only OAuth was wired: the UI's only channel
+door left for Google, the worker's discover was hardwired to `mine=true`, and a lease carried no
+channel identity. The whole path now exists: `register_public_channel` (new migration,
+`20260919180000`) files a channel with the metadata the lookup found and never writes a status —
+`connected` stays reserved for a completed OAuth flow, unchanged; a new `channel-lookup` Edge
+Function names candidates from a link, `@handle`, `/user/`, bare UC id or a search, via
+`YOUTUBE_API_KEY`; the claim carries `external_channel_id` — only for channels whose row says
+`public_unverified`, so a connected channel whose grant fails to open is still reported
+unconnected, never silently re-read as public data (the "no silent source switch" rule); and the
+worker, given `YOUTUBE_API_KEY`, runs discover/collect for public channels by id
+(`catalogue(channel_id=...)`, provenance `youtube_data_api_public`). The lookup needed a new Edge
+Function rather than an RPC because the key must stay server-side and resolution needs YouTube
+round trips — in-stack (Deno, same CORS/JWT pattern as `oauth-start`), no new infrastructure. It
+does only the naming; the row is written by the browser calling `register_public_channel` with
+its own JWT, so the role and tenant checks stay in the database. Cost, recorded for the operator:
+naming a channel costs 1 quota unit; `search.list` costs 100 of the project's daily 10,000 — the
+UI's empty/refused states say so rather than hiding the quota behind a generic failure. The demo
+body deliberately gets no add-channel door (no server to ask), matching the existing
+no-handler-no-door pattern.

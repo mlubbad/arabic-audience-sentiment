@@ -2798,3 +2798,35 @@ sign in as the platform admin and walk:**
 - Not verified here: no live claim was taken (that would consume a real job),
   so the renewal route was not exercised against the deployed function with a
   real credential; the first long collection run will.
+
+2026-09-19, the channel-lookup lane (public-data channel addition): every gate run
+locally, all green.
+
+- **Gates:** lint ✓ · format:check ✓ · typecheck ✓ · check:functions (deno) ✓ ·
+  unit 110 files / 867 tests ✓ · **test:db 37 files / 353 tests ✓** · python
+  worker 227 tests ✓ (incl. the new `test_public_channel.py`) · build ✓ (8
+  prerendered pages) · check:secrets ✓ (672 files + built assets).
+- **New coverage:** `channel_query.test.ts` (the link/handle/id/search parser),
+  `public_channel.test.ts` (register: metadata filed, public status only,
+  re-add idempotent, non-member/viewer/other-client refusals, blank-null,
+  overlong refused, discovery reachable without a plan gap), gateway handler
+  public-id presence/absence, worker public discover/collect/blocked paths and
+  key-only catalogue by id.
+- **Repaired on first execution** (the Bionic lane's 2026-09-19 files, recorded
+  there as never run; fixture fixes only, no product SQL): `scoped_claim.test.ts`
+  — jobs bled across tests into `jobs_one_outstanding_collect`, and the ordering
+  test raced on same-microsecond `not_before` (now strictly ordered, and the
+  order is asserted across two claims, since one claim hands out one job);
+  `end_to_end.test.ts` — the pinned claim key list predated
+  `access_token_expires_at` (token-renewal lane) and `external_channel_id` (this
+  lane), and the topics-due failure was its cascade (the commit under test never
+  ran); `worker_video_counts.test.ts` — due-list order asserted over random
+  video uuids, now seeded ordered.
+- **Not verified (blocked on credentials/deploy):** no live Data API call was
+  made — `YOUTUBE_API_KEY` is not set in this environment, so the lookup
+  function and the worker's public path are fixture-tested only; the migration
+  is not applied to the live project; the `channel-lookup` function is not
+  deployed (`supabase secrets set YOUTUBE_API_KEY`, then `supabase functions
+  deploy channel-lookup`, then `db push` — operator steps, in that order); and
+  the door was not walked in a browser signed in, because the browser suite
+  runs signed out. The e2e gap is the account page's standing one, not new.

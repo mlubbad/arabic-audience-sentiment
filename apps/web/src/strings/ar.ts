@@ -140,6 +140,22 @@ export const ar = {
   connectContinueToGoogle: "متابعة إلى Google",
   connectChannel: "ربط قناة يوتيوب",
   relinkForName: "إعادة الربط لحفظ اسم القناة",
+  addChannel: "إضافة قناة بالرابط أو بالبحث",
+  addChannelLead:
+    "ألصق رابط القناة أو معرّفها (@المعرّف) أو اكتب اسمًا للبحث. تُجمع البيانات العامة دون ربط حساب القناة، ويمكن ربطه لاحقًا.",
+  addChannelPlaceholder: "youtube.com/@القناة أو @المعرّف أو اسم للبحث",
+  addChannelSearch: "بحث",
+  addChannelNone:
+    "لم يُعثر على قنوات مطابقة. جرّب صيغة أخرى للمعرّف أو اسمًا آخر.",
+  addChannelAdd: "إضافة",
+  addChannelCancel: "إلغاء",
+  addChannelDone: "أُضيفت القناة كبيانات عامة. الخطوة التالية حصر الفيديوهات.",
+  addChannelExists: "هذه القناة مضافة في هذه المساحة بالفعل.",
+  addChannelFailed: "تعذّر البحث عن القنوات. حاول من جديد.",
+  addChannelQueryInvalid: "أدخل رابط قناة صالحًا أو معرّفًا أو اسمًا للبحث.",
+  addChannelNotConfigured: "البحث عن القنوات غير مهيأ على الخادم بعد.",
+  addChannelQuota:
+    "حصة البحث اليومية من يوتيوب منتهية. جرّب غدًا أو أدخل معرّف القناة مباشرة.",
 
   // ---- the gate (WorkspaceGate.tsx) ----
   gateResolvingAccount: "جارٍ تحديد حسابك…",

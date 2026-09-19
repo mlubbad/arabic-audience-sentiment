@@ -165,7 +165,30 @@ Deno.serve((request) =>
           : { credential_hash: hash };
       const { data, error } = await db.rpc("svc_worker_claim", rpcArgs);
       if (error) failed(error);
-      return data?.[0] ?? null;
+      const claimed = data?.[0] ?? null;
+      if (!claimed) return null;
+      // A public channel has no grant to open, and until now that made it
+      // uncollectable: the worker saw no token and no identity, and could
+      // only report the job blocked. When the claimed job's channel is
+      // registered as public data, its platform id travels with the lease so
+      // a key-carrying worker can read the public catalogue and comments by
+      // id. A connected channel's id deliberately does not travel — a grant
+      // that failed to open is the worker's signal to report the channel
+      // unconnected, not an invitation to fall back to public collection
+      // without anyone deciding that.
+      if (claimed.channel_id) {
+        const { data: channel } = await db
+          .from("channels")
+          .select("external_channel_id,status")
+          .eq("id", claimed.channel_id)
+          .maybeSingle();
+        if (
+          channel?.status === "public_unverified" &&
+          channel.external_channel_id
+        )
+          claimed.external_channel_id = channel.external_channel_id;
+      }
+      return claimed;
     },
     heartbeat: async (hash, j, t) => {
       const { error } = await db.rpc("svc_worker_heartbeat", {

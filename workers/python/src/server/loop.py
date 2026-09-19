@@ -47,10 +47,25 @@ def _log(message: str) -> None:
     print(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}", flush=True)
 
 
-def build_collector(client: httpx.Client):
-    def build(token: str, expires_at: str | None = None, renew=None):
-        return YouTubeAPI(None, client, access_token=token,
-                          expires_at=expires_at, renew=renew)
+def build_collector(client: httpx.Client, api_key: str | None = None):
+    """The collector builder the runner is handed.
+
+    A token builds the OAuth collector, as it always has. A lease for a public
+    channel arrives with `channel_id` and no token: with the project's API key
+    that builds the public collector, without it the builder answers None —
+    which the runner reports as a blocking configuration gap on this worker,
+    never as a fault in the channel.
+    """
+
+    def build(token: str | None, expires_at: str | None = None, renew=None,
+              channel_id: str | None = None):
+        if token:
+            return YouTubeAPI(None, client, access_token=token,
+                              expires_at=expires_at, renew=renew)
+        if channel_id and api_key:
+            return YouTubeAPI(api_key, client)
+        return None
+
     return build
 
 
@@ -182,8 +197,13 @@ def main() -> None:
 
     credentials = [c.strip() for c in args.credential.split(",") if c.strip()]
     controls = [ControlPlane(args.base, c, client) for c in credentials]
-    build = build_collector(client)
-    _log(f"worker up, model={args.model}, tenants={len(controls)}, topics={args.topics}")
+    # Public channels are collected with the project's API key. Absent, this
+    # worker still serves connected channels; a public job it claims ends
+    # blocked with a code that names the gap.
+    api_key = os.environ.get("YOUTUBE_API_KEY") or None
+    build = build_collector(client, api_key)
+    _log(f"worker up, model={args.model}, tenants={len(controls)}, "
+         f"topics={args.topics}, public={'yes' if api_key else 'no'}")
     why = serve(
         controls,
         build,

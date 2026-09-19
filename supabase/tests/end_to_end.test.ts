@@ -221,7 +221,13 @@ describe("worker to database, through the real handler", () => {
       // reads these exact keys, and a rename would raise KeyError at the first
       // call after the claim — which no mock-based test would catch.
       "access_token",
+      // access_token_expires_at travels with the token so the worker can ask
+      // for a fresh one before it lapses mid-run (20260919170000).
+      "access_token_expires_at",
       "checkpoint",
+      // external_channel_id names a public channel — one with no grant — so
+      // a key-carrying worker knows what to read (20260919180000).
+      "external_channel_id",
       "job_id",
       "lease_token",
       // type and videos joined the claim so a collect job is handed its due

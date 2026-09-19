@@ -12,7 +12,10 @@ class Lister:
     def __init__(self, result):
         self.result = result
 
-    def catalogue(self):
+    def catalogue(self, channel_id=None):
+        # channel_id travels only on the public path, where the collector is
+        # told which channel it was built for; the OAuth path leaves it None.
+        self.asked = channel_id
         if isinstance(self.result, Exception):
             raise self.result
         return self.result

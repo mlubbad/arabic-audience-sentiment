@@ -153,6 +153,37 @@
 .db-ws-consent .db-actions {
   margin-top: var(--space-3);
 }
+/* The lookup's answers, under the query form: one row per candidate, the
+   face and name that identify the channel, then its add door. The form's
+   own rhythm is reused above; these only lay the rows out. */
+.db-candidates {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.db-candidate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.db-candidate img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: none;
+}
+.db-candidate-name {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  font-size: var(--fs-small);
+}
+.db-candidate-name small {
+  color: var(--text-2);
+  font-size: var(--fs-micro);
+}
 
 /* ---------------- the disconnect / retire dialog ---------------- */
 .db-confirm-name {

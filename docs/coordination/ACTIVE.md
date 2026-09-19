@@ -548,3 +548,21 @@ Supabase CLI 2.117.0 now live under `~/.local/share/{nodejs,supabase-cli}` —
 this machine still has no global node/npm/supabase on PATH. `test:db` remains
 red with 5 failures in the Bionic session's `scoped_claim`/`end_to_end` files
 (written 2026-09-19, never executed) — that lane's to fix.
+
+2026-09-19, the channel-lookup lane (public-data channel addition): claimed
+`supabase/migrations/20260919180000_*`, `supabase/functions/channel-lookup/**`,
+`supabase/functions/_shared/channel-query.ts`, `supabase/functions/{worker/index.ts,
+_shared/worker-gateway.ts}` (claim payload only), `workers/python/src/{collectors/
+youtube_api.py, server/runner.py, server/loop.py, server/manual_run.py}`,
+`workers/python/tests/{test_public_channel.py, test_discover.py}`,
+`packages/contracts/src/{channelLookup.ts, index.ts}`, `apps/web/src/account/{Account,
+WorkspaceCard, WorkspaceCard.test}.tsx`, `apps/web/src/account/account.css`,
+`apps/web/src/strings/{ar,en}.ts` — all landed and committed; see docs/progress.md's
+entry of this date. Also repaired, with fixture-only changes, the never-executed
+`supabase/tests/{scoped_claim,end_to_end,worker_video_counts}.test.ts` files the
+2026-09-19 Bionic session recorded as unrun (test:db is now green, 353). Free now.
+**Operator steps, in order:** `supabase db push --linked` for `20260919180000`;
+`supabase secrets set YOUTUBE_API_KEY`; `supabase functions deploy channel-lookup`;
+restart the worker service with `YOUTUBE_API_KEY` in its environment (`public=yes`
+in its startup log line confirms). Until then the new door looks up nothing and a
+claimed public job ends blocked `public_collection_not_configured`.

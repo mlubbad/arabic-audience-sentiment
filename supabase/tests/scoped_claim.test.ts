@@ -9,7 +9,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 const W = "00000000-0000-4000-8000-000000000001";
 const OWNER = "10000000-0000-4000-8000-000000000001";
@@ -72,6 +72,13 @@ describe("a claim scoped to the work its caller can run", () => {
       [W, `UC${"b".repeat(22)}`],
     );
   });
+  // The one outstanding collect per channel is a real constraint, and the
+  // jobs each test enqueues stay outstanding after its claim runs. Without a
+  // clean slate the second collect job any later test enqueues is refused —
+  // a failure about the previous test's rows, not about the claim.
+  afterEach(async () => {
+    await db.exec("delete from sync_runs; delete from jobs;");
+  });
 
   it("never hands a collection run the topics job that is older", async () => {
     const analyse = await enqueue("analyse", "k-analyse-1");
@@ -95,9 +102,19 @@ describe("a claim scoped to the work its caller can run", () => {
 
   it("orders what it can run by due time, not by type", async () => {
     const first = await enqueue("discover", "k-discover-1");
+    // Due time decides, so the earlier job is made strictly earlier: two
+    // inserts in the same microsecond would order by id, which is random.
+    await db.query(
+      "update jobs set not_before = now() - interval '1 minute' where id=$1",
+      [first.id],
+    );
     const second = await enqueue("collect", "k-collect-3");
-    const got = await claim(["collect", "discover"]);
-    expect(got.map((j) => j.id)).toEqual([first.id, second.id]);
+    // One claim hands out one job — the oldest due one it can run — so the
+    // order shows across two claims: the discover job was due first, and the
+    // collect job must not jump it merely because the caller asked for both.
+    const gotFirst = await claim(["collect", "discover"]);
+    const gotSecond = await claim(["collect", "discover"]);
+    expect([gotFirst[0].id, gotSecond[0].id]).toEqual([first.id, second.id]);
   });
 
   it("claims everything when no kind is named", async () => {

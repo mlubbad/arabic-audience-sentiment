@@ -193,21 +193,44 @@ def run_once(
     return True
 
 
+def _collector_for(control: ControlPlane, lease: dict, build_collector):
+    """The collector the lease can support, or a reason it cannot be built.
+
+    A token names the OAuth path, as it always has. A lease without one but
+    with an `external_channel_id` is a public channel: the builder decides
+    with the project API key whether this worker can read public data, and
+    None there is a configuration gap on the worker, not a fault in the
+    channel. Neither token nor id is the old answer, unchanged: nobody has
+    connected this channel.
+    """
+    token = lease.get("access_token")
+    if token:
+        return build_collector(
+            token, lease.get("access_token_expires_at"), _renew_for(control, lease)
+        ), None, None
+    channel_id = lease.get("external_channel_id")
+    if not channel_id:
+        return None, "channel_not_connected", None
+    collector = build_collector(None, None, None, channel_id=channel_id)
+    if collector is None:
+        return None, "public_collection_not_configured", None
+    return collector, None, channel_id
+
+
 def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
     """List the channel's videos and commit the list. The lease is already claimed.
 
     An incomplete listing is partial: the videos it did find are real, the
     claim that this is the whole channel is not.
     """
-    token = lease.get("access_token")
-    if not token:
-        control.finish(lease, "blocked", "channel_not_connected")
+    collector, reason, channel_id = _collector_for(control, lease, build_collector)
+    if collector is None:
+        control.finish(lease, "blocked", reason)
         return True
     try:
-        collector = build_collector(
-            token, lease.get("access_token_expires_at"), _renew_for(control, lease)
-        )
-        result = collector.catalogue()
+        # The OAuth collector reads the channel its grant names; the public
+        # collector is told which id it was built for.
+        result = collector.catalogue(channel_id)
         control.heartbeat(lease)
         control.commit_catalogue(lease, result.videos)
         control.finish(lease, "exhausted" if result.complete else "partial",
@@ -242,9 +265,9 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     A video whose comments are switched off is reported and skipped; anything
     else that stops early leaves the run partial with the cursor held.
     """
-    token = lease.get("access_token")
-    if not token:
-        control.finish(lease, "blocked", "channel_not_connected")
+    collector, reason, _ = _collector_for(control, lease, build_collector)
+    if collector is None:
+        control.finish(lease, "blocked", reason)
         return True
     # An explicit empty list is a channel with nothing due. No list at all is a
     # gateway that never computed one, and a run that read nothing because it
@@ -252,9 +275,6 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     if "videos" not in lease:
         control.finish(lease, "blocked", "no_due_list")
         return True
-    collector = build_collector(
-        token, lease.get("access_token_expires_at"), _renew_for(control, lease)
-    )
     videos = [v for v in (lease.get("videos") or []) if isinstance(v, dict)]
 
     done, current = _resume_progress(lease)

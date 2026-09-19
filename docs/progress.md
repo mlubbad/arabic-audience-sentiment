@@ -2013,3 +2013,38 @@ work; the Bionic session's never-executed test:db files).
   and the claim-scope test now expects the hashed credential), `b3c3b95`
   (`check-secrets` skips tracked directory symlinks — `.agents/skills` made
   it throw EISDIR).
+
+2026-09-19, the channel-lookup lane (public-data channel addition): the alternative
+door to OAuth — add a channel by its link or by searching YouTube, collect public
+data with the project's API key, link the account later for real. Landed:
+
+- `supabase/migrations/20260919180000_a_public_channel_registers_by_metadata.sql` —
+  `register_public_channel(w,c,external,handle,title)`: role-checked, tenant-checked,
+  UC-id-validated, conflict-safe (same channel again is the existing row; another
+  client's is the standing refusal). Writes no status.
+- `supabase/functions/channel-lookup/` + `_shared/channel-query.ts` — naming only:
+  parse (pure, tested) and call the Data API by id/forHandle/forUsername/search.
+  Needs `YOUTUBE_API_KEY` as a function secret (not yet set — operator's step).
+- Claim carries `external_channel_id` for `public_unverified` channels only
+  (`worker/index.ts`, `_shared/worker-gateway.ts`).
+- Worker: `YouTubeAPI.catalogue(channel_id=...)` (id path, key-only, public
+  provenance); `_collector_for` in `runner.py` builds the public collector from the
+  lease when there is no token and ends the job `blocked`
+  `public_collection_not_configured` when the worker has no key; `loop.py` reads
+  `YOUTUBE_API_KEY` and logs `public=yes/no`; `manual_run.py`'s backfill builder
+  follows the same shape.
+- UI: a secondary door on `WorkspaceCard` while no channel is named —
+  `addchannel-*` test ids — with an inline lookup form and candidate list;
+  `Account.tsx` (live body only) drives `channel-lookup` then
+  `register_public_channel`; 17 string keys in both languages; contracts gained
+  `channelLookup.ts`; `account.css` the candidate rows.
+- Tests: `supabase/tests/{channel_query,public_channel}.test.ts` (new), gateway
+  handler public-id case, `workers/python/tests/test_public_channel.py` (new),
+  `test_discover.py`'s Lister extended with the `channel_id` argument. Also
+  repaired the never-executed 2026-09-19 test files this lane found red on its
+  first full `test:db` run — `scoped_claim` (outstanding jobs bled across tests;
+  the ordering test raced on same-microsecond `now()`), `end_to_end` (claim key
+  list predated `access_token_expires_at` and `external_channel_id`; the
+  topics-due failure was its cascade), `worker_video_counts` (due-list order
+  asserted over random video uuids) — fixture/never-run repairs only, no
+  product SQL changed; recorded in `docs/verification.md`.
