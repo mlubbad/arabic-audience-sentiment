@@ -29,13 +29,38 @@ export interface WorkerDb {
    * worker that is compromised loses an hour of read access to one channel,
    * not the ability to renew it indefinitely.
    *
+   * The expiry travels with the token, so the worker can ask for a fresh one
+   * before the current lapses mid-run instead of losing the run to it.
+   *
    * Null when the channel has no usable grant — which is a fact about the
    * channel, not a failure to retry.
    */
   accessTokenFor?(
     credentialHash: string,
     jobId: string,
-  ): Promise<string | null>;
+  ): Promise<
+    | {
+        access_token: string;
+        access_token_expires_at: string;
+      }
+    | null
+  >;
+  /**
+   * A fresh channel credential mid-run, against a lease the worker still
+   * holds. Optional: a gateway without it answers 404 and the worker falls
+   * back to ending a lapsed run as a retryable credential lapse, as before.
+   */
+  renewToken?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+  ): Promise<
+    | {
+        access_token: string;
+        access_token_expires_at: string;
+      }
+    | null
+  >;
   heartbeat(
     credentialHash: string,
     jobId: string,
@@ -213,7 +238,7 @@ export async function handleWorkerRequest(
       // grant needs the service role and the worker has neither that nor the
       // key. A channel with no usable grant still returns the job: the worker
       // can report it as blocked, which is more useful than a silent refusal.
-      const accessToken = db.accessTokenFor
+      const granted = db.accessTokenFor
         ? await db.accessTokenFor(credential, String(claimed.id))
         : null;
       const type = String(claimed.type ?? "collect");
@@ -229,7 +254,8 @@ export async function handleWorkerRequest(
         job_id: claimed.id,
         lease_token: claimed.lease_token,
         checkpoint: claimed.checkpoint ?? null,
-        access_token: accessToken,
+        access_token: granted?.access_token ?? null,
+        access_token_expires_at: granted?.access_token_expires_at ?? null,
         type,
         videos,
       });
@@ -242,6 +268,7 @@ export async function handleWorkerRequest(
     // typo is never reported as a malformed request.
     const leased = [
       "/worker/heartbeat",
+      "/worker/renew-token",
       "/worker/commit-batch",
       "/worker/finish",
       "/worker/commit-catalogue",
@@ -260,6 +287,13 @@ export async function handleWorkerRequest(
     if (path.endsWith("/worker/heartbeat")) {
       await db.heartbeat(credential, job, lease);
       return json(200, {});
+    }
+    if (path.endsWith("/worker/renew-token") && db.renewToken) {
+      // The lease check lives in the data layer, the same seam as every
+      // other leased call: a lost lease is refused, not honoured with a
+      // token. Null on success means the channel's grant is gone — the
+      // worker stops asking, and the retry path reports the channel.
+      return json(200, await db.renewToken(credential, job, lease));
     }
     if (path.endsWith("/worker/commit-batch")) {
       const key = str(body, "batch_key");

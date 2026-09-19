@@ -164,3 +164,36 @@ def test_video_counts_refusals_stay_refusals():
     with pytest.raises(ControlPlaneError) as raised:
         plane(lambda r: httpx.Response(404, json={"code": "not_found"})).video_counts(lease, {})
     assert raised.value.code == "not_found"
+
+
+def test_renew_token_posts_under_the_lease_and_returns_the_fresh_pair():
+    seen = {}
+    def handler(request):
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={
+            "access_token": "ya29.renewed",
+            "access_token_expires_at": "2026-09-19T17:00:00Z",
+        })
+
+    lease = {"job_id": "j", "lease_token": "t"}
+    answer = plane(handler).renew_token(lease)
+    assert seen["path"].endswith("/worker/renew-token")
+    assert seen["body"] == {"job_id": "j", "lease_token": "t"}
+    assert "workspace_id" not in seen["body"]
+    assert answer == {
+        "access_token": "ya29.renewed",
+        "access_token_expires_at": "2026-09-19T17:00:00Z",
+    }
+
+
+def test_renew_token_loses_the_lease_loudly_and_falls_back_on_an_older_gateway():
+    lease = {"job_id": "j", "lease_token": "t"}
+    # Someone else holds the job now. A refusal, not a quiet None: ending
+    # quietly would write over the other worker's result.
+    with pytest.raises(LeaseLost):
+        plane(lambda r: httpx.Response(409, json={"code": "lease_lost"})).renew_token(lease)
+    # An older gateway without the route: an error the caller falls back from.
+    with pytest.raises(ControlPlaneError) as raised:
+        plane(lambda r: httpx.Response(404, json={"code": "not_found"})).renew_token(lease)
+    assert raised.value.code == "not_found"

@@ -66,7 +66,7 @@ def drive(pages, videos, checkpoint=None, access_token="ya29.ok"):
     collector = Plan(pages)
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
-    worked = run_backfill(plane, lambda token: collector)
+    worked = run_backfill(plane, lambda token, expires_at=None, renew=None: collector)
     return worked, sent, collector
 
 
@@ -196,7 +196,7 @@ def test_a_disabled_video_is_reported_and_skipped_not_the_whole_run():
 
     collector = Refusing({"on": [Batch([comment("c", "on")], None, "exhausted")]})
     plane = ControlPlane("https://c.invalid", "cred", httpx.Client(transport=httpx.MockTransport(handler)))
-    assert run_backfill(plane, lambda token: collector) is True
+    assert run_backfill(plane, lambda token, expires_at=None, renew=None: collector) is True
     assert sent["video_finished"] == [("u-off", "blocked", "comments_disabled"), ("u-on", "exhausted", None)]
     assert sent["finish"] == "succeeded"
 
@@ -225,7 +225,7 @@ def test_a_plan_refusal_ends_the_job_blocked_rather_than_dropping_the_lease():
     collector = Plan({"v1": [Batch([comment("c1")], None, "exhausted")]})
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
-    assert run_backfill(plane, lambda token: collector) is True
+    assert run_backfill(plane, lambda token, expires_at=None, renew=None: collector) is True
     assert sent["commits"] == 1
     assert (sent["finish"], sent["error_code"]) == ("blocked", "quota_exceeded")
 
@@ -248,7 +248,7 @@ def test_a_transient_control_plane_failure_still_escapes():
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
     with pytest.raises(ControlPlaneError):
-        run_backfill(plane, lambda token: collector)
+        run_backfill(plane, lambda token, expires_at=None, renew=None: collector)
 
 
 class Counting(Plan):
@@ -289,7 +289,7 @@ def drive_counts(collector, videos, counts_response=None, counts_status=200):
 
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
-    worked = run_backfill(plane, lambda token: collector)
+    worked = run_backfill(plane, lambda token, expires_at=None, renew=None: collector)
     return worked, sent
 
 

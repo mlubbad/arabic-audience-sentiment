@@ -175,3 +175,104 @@ def test_comment_counts_refuses_an_id_it_would_not_read():
     with _responding(200, {"items": []}) as client:
         with pytest.raises(ValueError):
             YouTubeAPI("fixture-key", client).comment_counts(["https://internal"])
+
+
+def _token_source(requests, responses):
+    """A renew callable that answers from a list, recording the ask."""
+    def renew():
+        requests.append("renew")
+        answer = responses[len([r for r in requests if r == "renew"]) - 1]
+        return answer if isinstance(answer, dict) else None
+    return renew
+
+
+def test_a_lapsed_token_is_swapped_mid_run_and_the_request_is_repeated():
+    # The whole run used to end at the first 401. With a renewal route the
+    # very request is repeated under the fresh token, and the batch completes.
+    state = {"calls": 0}
+    def handler(request):
+        state["calls"] += 1
+        if state["calls"] == 1:
+            return httpx.Response(401, json={"error": {"errors": []}})
+        return httpx.Response(200, json={"items": []})
+
+    renews = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.stale",
+                             renew=_token_source(renews, [{"access_token": "ya29.fresh",
+                                                           "access_token_expires_at": None}]))
+        batch = next(adapter.batches("abcdefghijk", None))
+    assert batch.outcome == "exhausted"
+    assert renews == ["renew"]
+    assert adapter.token == "ya29.fresh"
+
+
+def test_a_renewal_that_comes_back_empty_is_a_retryable_credential_lapse():
+    def handler(request):
+        return httpx.Response(401, json={"error": {"errors": []}})
+
+    renews = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.stale",
+                             renew=_token_source(renews, [None]))
+        with pytest.raises(CollectionError) as e:
+            next(adapter.batches("abcdefghijk", None))
+    assert e.value.code == "credential_expired"
+    assert e.value.outcome == "failed" and e.value.retryable is True
+    assert renews == ["renew"]
+
+
+def test_a_token_nearing_its_end_is_renewed_before_the_source_is_asked():
+    # Without the proactive swap the first request would spend the run's
+    # remaining seconds collecting a page it then loses to the lapse.
+    import datetime
+    nearly_gone = (datetime.datetime.now(datetime.timezone.utc)
+                   + datetime.timedelta(seconds=30)).isoformat()
+    fresh = (datetime.datetime.now(datetime.timezone.utc)
+             + datetime.timedelta(hours=1)).isoformat()
+
+    seen_auth = []
+    def handler(request):
+        seen_auth.append(request.headers.get("authorization"))
+        return httpx.Response(200, json={"items": []})
+
+    renews = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.old", expires_at=nearly_gone,
+                             renew=_token_source(renews, [{"access_token": "ya29.new",
+                                                           "access_token_expires_at": fresh}]))
+        next(adapter.batches("abcdefghijk", None))
+    assert renews == ["renew"]
+    assert seen_auth == ["Bearer ya29.new"]
+
+
+def test_a_token_with_time_left_is_not_renewed_at_all():
+    import datetime
+    fine = (datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(hours=1)).isoformat()
+
+    seen_auth = []
+    def handler(request):
+        seen_auth.append(request.headers.get("authorization"))
+        return httpx.Response(200, json={"items": []})
+
+    renews = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.kept", expires_at=fine,
+                             renew=_token_source(renews, [{"access_token": "ya29.other"}]))
+        next(adapter.batches("abcdefghijk", None))
+    assert renews == []
+    assert seen_auth == ["Bearer ya29.kept"]
+
+
+def test_without_a_renewal_route_a_lapse_stays_a_retryable_credential_lapse():
+    # The old behaviour, kept for a gateway that predates the route.
+    def handler(request):
+        return httpx.Response(401, json={"error": {"errors": []}})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.stale")
+        with pytest.raises(CollectionError) as e:
+            next(adapter.batches("abcdefghijk", None))
+    assert e.value.code == "credential_expired"
+    assert e.value.retryable is True

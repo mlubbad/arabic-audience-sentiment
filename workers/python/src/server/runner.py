@@ -58,6 +58,24 @@ def _still_to_read(control: ControlPlane, collector, lease: dict, videos: list[d
     return kept
 
 
+def _renew_for(control: ControlPlane, lease: dict):
+    """The renewal the collector may ask for, narrowed to what it may learn.
+
+    A control-plane refusal — an older gateway without the route, a blip —
+    becomes "no renewal", which ends the run as the retryable credential
+    lapse it would have been anyway. A lost lease is not narrowed: someone
+    else holds the job, and ending quietly would write over their result.
+    """
+    def renew():
+        try:
+            return control.renew_token(lease)
+        except LeaseLost:
+            raise
+        except ControlPlaneError:
+            return None
+    return renew
+
+
 def _resume_cursor(lease: dict) -> str | None:
     """Unwrap the stored checkpoint.
 
@@ -119,7 +137,9 @@ def run_once(
         # The callback returns both, because which video to collect can only
         # be answered with the token: the channel's uploads are not public
         # knowledge to the worker until it has one.
-        collector, video_id = build_collector(token)
+        collector, video_id = build_collector(
+            token, lease.get("access_token_expires_at"), _renew_for(control, lease)
+        )
         # The builder is the only thing that knows which video it chose, so it
         # is also the only thing that knows the title. Without this the server
         # stored the platform id as the title — correct as a fallback, wrong
@@ -184,7 +204,9 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
         control.finish(lease, "blocked", "channel_not_connected")
         return True
     try:
-        collector = build_collector(token)
+        collector = build_collector(
+            token, lease.get("access_token_expires_at"), _renew_for(control, lease)
+        )
         result = collector.catalogue()
         control.heartbeat(lease)
         control.commit_catalogue(lease, result.videos)
@@ -230,7 +252,9 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     if "videos" not in lease:
         control.finish(lease, "blocked", "no_due_list")
         return True
-    collector = build_collector(token)
+    collector = build_collector(
+        token, lease.get("access_token_expires_at"), _renew_for(control, lease)
+    )
     videos = [v for v in (lease.get("videos") or []) if isinstance(v, dict)]
 
     done, current = _resume_progress(lease)

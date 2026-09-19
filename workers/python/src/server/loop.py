@@ -48,8 +48,9 @@ def _log(message: str) -> None:
 
 
 def build_collector(client: httpx.Client):
-    def build(token: str):
-        return YouTubeAPI(None, client, access_token=token)
+    def build(token: str, expires_at: str | None = None, renew=None):
+        return YouTubeAPI(None, client, access_token=token,
+                          expires_at=expires_at, renew=renew)
     return build
 
 

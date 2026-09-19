@@ -1,5 +1,21 @@
 # Implementation decisions
 
+2026-09-19 — A collection run could outlive the access token it was handed, and ended
+`credential_expired` mid-run, losing everything it had not yet committed; the UI then told
+the operator to reconnect a channel that was never disconnected. The fix keeps the token's
+renewal on the server and gives the worker a question instead of a credential: the claim
+payload now carries `access_token_expires_at` beside the token, the gateway renews at claim
+time whenever less than a quarter of an hour remains (was one minute), and a new
+`/worker/renew-token` route — validated in SQL by the same lease check every other worker
+call makes (`svc_worker_renew_grant`) — answers a held lease with a fresh short-lived token.
+The collector renews proactively inside a two-minute margin and, if the source answers 401
+anyway, swaps the token and repeats the very request once before reporting the lapse. A
+renewal that comes back empty (grant gone, older gateway, blip) degrades to the same
+retryable `credential_expired` as before, and a lost lease still travels as `LeaseLost`.
+The dashboard's failure copy for `credential_expired` now says the permission renews itself
+on retry rather than asking for a reconnection. Migrations are immutable, so the new RPC
+lives in `20260919170000_worker_renews_its_token.sql`.
+
 2026-09-14 — Internal UX follows one scoped application shell, using the landing's existing
 mark and visual tokens. The analytical report's data and label rules are unchanged; a CSS
 layer corrects the old global `header` layout and aligns account, operations and recovery

@@ -181,6 +181,22 @@ class ControlPlane:
         body = {"types": job_types} if job_types else {}
         return self._post("/worker/claim", body)
 
+    def renew_token(self, lease: dict[str, Any]) -> dict[str, Any] | None:
+        """A fresh access token for this job's channel, mid-run.
+
+        The claim handed down a token that can lapse before the run ends. This
+        asks the server for a new one against the lease still held, so a long
+        collection does not lose everything to an hour-old credential. A lost
+        lease travels as LeaseLost, exactly as every other leased call; a
+        channel whose grant is gone answers with no token at all, which the
+        collector turns into the same retryable credential lapse as before.
+        None also covers an older gateway without the route, whose 404 keeps
+        the run's fallback behaviour intact.
+        """
+        return self._post("/worker/renew-token", {
+            "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+        })
+
     def heartbeat(self, lease: dict[str, Any]) -> None:
         self._post("/worker/heartbeat", {"job_id": lease["job_id"], "lease_token": lease["lease_token"]})
 

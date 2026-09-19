@@ -506,7 +506,7 @@ export const en: Strings = {
   jobChannelNotConnected:
     "No channel is connected to this job. Connect a YouTube channel first.",
   jobCredentialExpired:
-    "The granted permission has expired. Reconnect the channel to renew it.",
+    "The access token lapsed mid-collection. No need to reconnect the channel — retry, and the permission renews itself.",
   jobQuotaExceeded:
     "The daily YouTube quota is used up. It renews automatically, and the attempt is retried afterwards.",
   jobKindTopics: "Topic classification",

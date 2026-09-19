@@ -8,36 +8,97 @@ directly.
 import json
 import re
 from collections.abc import Iterator
+from datetime import datetime, timezone
 import httpx
 from .protocol import Batch, Catalogue, CollectionError, RawComment
+
+# How soon before expiry the token is swapped for a fresh one. An access
+# token that lapses mid-collection costs the whole run, so anything inside
+# this margin is renewed before the next request is sent rather than after
+# the source refuses it.
+_RENEW_MARGIN_SECONDS = 120
 
 
 class YouTubeAPI:
     source = "youtube_data_api_public"
     revision = "api-v3-adapter-v1"
 
-    def __init__(self, api_key: str | None, client: httpx.Client, access_token: str | None = None):
+    def __init__(self, api_key: str | None, client: httpx.Client,
+                 access_token: str | None = None, expires_at: str | None = None,
+                 renew=None):
         # Exactly one. Sending both would let a stale key silently answer for a
         # revoked token, and the row would record the wrong provenance.
         if bool(api_key) == bool(access_token):
             raise ValueError("need_exactly_one_credential")
         self.key, self.token, self.client = api_key, access_token, client
+        # When the token lapses and who can hand over a fresh one. The renewal
+        # itself happens on the server — the refresh token and the sealing key
+        # never leave it — so this is a question asked against a lease, not a
+        # credential held here.
+        self.renew = renew
+        self._expiry = self._parse_expiry(expires_at)
         # The provenance travels with every row, so a comment read on the
         # owner's authority is never filed as public data.
         self.source = "youtube_oauth" if access_token else "youtube_data_api_public"
 
+    @staticmethod
+    def _parse_expiry(value: str | None):
+        """RFC 3339 to an aware datetime, or None when the source said nothing."""
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    def _refresh(self):
+        """Swap in a fresh token, or say the credential lapsed.
+
+        The renewal is a question to the server, answered against the lease
+        this run still holds. An empty answer means the channel's grant is
+        gone — the next claim hands the job back unconnected, which is the
+        operator's signal to reconnect — so the run ends as the same retryable
+        credential lapse it would have hit at the next request anyway.
+        """
+        fresh = self.renew() if self.renew else None
+        token = fresh.get("access_token") if isinstance(fresh, dict) else None
+        if not token:
+            raise CollectionError("credential_expired", "failed", retryable=True)
+        self.token = token
+        self._expiry = self._parse_expiry(fresh.get("access_token_expires_at"))
+
+    def _bearer(self) -> str:
+        """The credential for the next request, renewed when it is about to lapse."""
+        if self.token and self._expiry is not None and self.renew is not None:
+            remaining = (self._expiry - datetime.now(timezone.utc)).total_seconds()
+            if remaining < _RENEW_MARGIN_SECONDS:
+                self._refresh()
+        return self.token
+
+    def _send(self, resource, query, headers):
+        return self.client.get(f"https://www.googleapis.com/youtube/v3/{resource}",
+                               params=query, headers=headers,
+                               timeout=20, follow_redirects=False)
+
     def _get(self, resource, params, allow_404=False):
-        headers = {"authorization": f"Bearer {self.token}"} if self.token else {}
+        headers = {"authorization": f"Bearer {self._bearer()}"} if self.token else {}
         query = params if self.token else {**params, "key": self.key}
         try:
-            response = self.client.get(f"https://www.googleapis.com/youtube/v3/{resource}",
-                                       params=query, headers=headers,
-                                       timeout=20, follow_redirects=False)
+            response = self._send(resource, query, headers)
         except httpx.HTTPError:
             raise CollectionError("network_failure", retryable=True) from None
         # An expired access token is not a refusal; it is a credential that
         # needs renewing. Reported as retryable so the caller refreshes rather
         # than marking the channel blocked and stopping collection for good.
+        # With a renewal route, the run swaps the token and repeats the very
+        # request, so a lapse mid-collection no longer costs the run.
+        if response.status_code == 401 and self.token and self.renew is not None:
+            self._refresh()
+            try:
+                response = self._send(resource, query,
+                                      {"authorization": f"Bearer {self.token}"})
+            except httpx.HTTPError:
+                raise CollectionError("network_failure", retryable=True) from None
         if response.status_code == 401:
             raise CollectionError("credential_expired", "failed", retryable=True)
         if response.status_code in (403, 429):

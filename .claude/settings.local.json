@@ -1,0 +1,10 @@
+{
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(git show *)"
+    ]
+  }
+}

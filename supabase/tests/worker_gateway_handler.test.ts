@@ -45,12 +45,19 @@ describe("what a claim hands the worker", () => {
         checkpoint: null,
         type: "collect",
       }),
-      accessTokenFor: async () => "ya29.short-lived",
+      accessTokenFor: async () => ({
+        access_token: "ya29.short-lived",
+        access_token_expires_at: "2026-09-19T17:00:00Z",
+      }),
     };
     const body = (await (await post(db)).json()) as Record<string, unknown>;
     expect(body.access_token).toBe("ya29.short-lived");
+    // The expiry travels with the token, so the worker can ask for a fresh
+    // one before the current lapses mid-run instead of losing the run to it.
+    expect(body.access_token_expires_at).toBe("2026-09-19T17:00:00Z");
     expect(Object.keys(body).sort()).toEqual([
       "access_token",
+      "access_token_expires_at",
       "checkpoint",
       "job_id",
       "lease_token",
@@ -63,7 +70,10 @@ describe("what a claim hands the worker", () => {
   it("asks for the token against the claimed job, not against anything sent", async () => {
     // The lookup is keyed on the credential and the job, so a worker cannot
     // request a grant belonging to a workspace it does not own.
-    const accessTokenFor = vi.fn(async () => "t");
+    const accessTokenFor = vi.fn(async () => ({
+      access_token: "t",
+      access_token_expires_at: "2026-09-19T17:00:00Z",
+    }));
     const db: WorkerDb = {
       ...base(),
       claim: async () => ({ id: "job-7", lease_token: "l", checkpoint: null }),
@@ -94,7 +104,10 @@ describe("what a claim hands the worker", () => {
   });
 
   it("says there is no work without asking for a token at all", async () => {
-    const accessTokenFor = vi.fn(async () => "t");
+    const accessTokenFor = vi.fn(async () => ({
+      access_token: "t",
+      access_token_expires_at: "2026-09-19T17:00:00Z",
+    }));
     const response = await post({ ...base(), accessTokenFor });
     expect(response.status).toBe(204);
     expect(accessTokenFor).not.toHaveBeenCalled();
@@ -317,5 +330,79 @@ describe("the due list and the catalogue", () => {
     expect(db.claim).toHaveBeenCalledWith("cred", null);
     await send(db, "/worker/claim", {});
     expect(db.claim).toHaveBeenCalledWith("cred", null);
+  });
+});
+
+describe("the mid-run token renewal", () => {
+  const renew = (db: WorkerDb, body: Record<string, unknown>) =>
+    post(db, "/worker/renew-token", body);
+
+  it("hands a fresh token and its expiry against a held lease", async () => {
+    const renewToken = vi.fn(async () => ({
+      access_token: "ya29.renewed",
+      access_token_expires_at: "2026-09-19T18:00:00Z",
+    }));
+    const r = await renew({ ...base(), renewToken }, {
+      job_id: "j",
+      lease_token: "l",
+    });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({
+      access_token: "ya29.renewed",
+      access_token_expires_at: "2026-09-19T18:00:00Z",
+    });
+  });
+
+  it("carries the hashed credential and the lease the request named", async () => {
+    const renewToken = vi.fn(async () => null);
+    await renew({ ...base(), renewToken }, {
+      job_id: "job-2",
+      lease_token: "lease-2",
+      workspace_id: "forged",
+    });
+    expect(renewToken).toHaveBeenCalledWith(
+      expect.any(String),
+      "job-2",
+      "lease-2",
+    );
+    // The workspace is derived inside the data layer, never read from the body.
+    const [passedHash] = renewToken.mock.calls[0] as unknown as [string];
+    expect(passedHash).not.toBe("cred");
+  });
+
+  it("answers without a token when the channel's grant is gone", async () => {
+    // A fact about the channel, not a fault to retry: the worker stops
+    // asking, and the retry path reports the channel to the operator.
+    const r = await renew(
+      { ...base(), renewToken: async () => null },
+      { job_id: "j", lease_token: "l" },
+    );
+    expect(r.status).toBe(200);
+    expect(await r.json()).toBeNull();
+  });
+
+  it("maps a lost lease to its own refusal, not a 500", async () => {
+    // Someone else holds the job. Minting them no tokens, and telling the
+    // worker which refusal it was, ends the run without overwriting results.
+    const r = await renew(
+      {
+        ...base(),
+        renewToken: async () => {
+          throw { message: "lease_lost" };
+        },
+      },
+      { job_id: "j", lease_token: "l" },
+    );
+    expect(r.status).toBe(409);
+    expect(await r.json()).toEqual({ code: "lease_lost" });
+  });
+
+  it("a gateway without the binding answers the route as not found", async () => {
+    // A worker built after this route against a gateway built before it:
+    // the 404 the worker's renewal step treats as "no renewal", and the run
+    // falls back to the retryable credential lapse it always reported.
+    const r = await renew(base(), { job_id: "j", lease_token: "l" });
+    expect(r.status).toBe(404);
+    expect(await r.json()).toEqual({ code: "not_found" });
   });
 });
