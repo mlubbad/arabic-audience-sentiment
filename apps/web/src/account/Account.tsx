@@ -643,7 +643,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                         handle: candidate.handle,
                         title: candidate.title,
                       })
-                      .then(({ error }) => {
+                      .then(({ data, error }) => {
                         setBusy(null);
                         if (error) {
                           say(
@@ -655,6 +655,16 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                               : S.addChannelFailed,
                           );
                           return;
+                        }
+                        const newChannelId = (data as { id?: string } | null)
+                          ?.id;
+                        if (newChannelId) {
+                          void client
+                            .rpc("request_discovery", {
+                              w: w.id,
+                              c: newChannelId,
+                            })
+                            .then(() => {});
                         }
                         setAsking(null);
                         setLookup({

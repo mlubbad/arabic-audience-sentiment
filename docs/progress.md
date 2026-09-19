@@ -2078,3 +2078,21 @@ service**, and deploy the web bundle when convenient.
 
 2026-09-19: Removed intermediate Google OAuth unverified warning note and confirmation card from the Account page (`WorkspaceCard.tsx`, `Account.tsx`, `strings/ar.ts`, `strings/en.ts`, `docs/oauth-connect-flow.md`). Following Google OAuth verification approval in production, connecting or relinking a channel navigates directly to Google OAuth without intermediate warning screens. All test suites (110 vitest files / 865 unit tests, 38 db test files / 361 tests, 128 playwright e2e tests, 229 worker pytest tests, Deno check, linter, formatting, build, secrets check) pass green.
 
+## 2026-09-19 — platform reader grants and immediate discovery for public channels
+
+Google Cloud rejected standard API keys for YouTube Data API v3 on modern GCP projects with `403 API keys are not supported by this API`. Rather than blocking on Google API key quirks, the public channel addition path was connected to the platform OAuth reader architecture (`private.platform_reader`):
+- `supabase/migrations/20260919230000_platform_reader_grants.sql`:
+  - Granted `select, update` on `private.platform_reader` to `service_role` so the worker gateway can read and renew platform reader access tokens.
+  - Updated `private.schedule_due_work` to include `status in ('connected', 'public_unverified')` channels, ensuring recurring synchronization processes public channels alongside connected ones.
+  - Removed premature `enqueue_scheduled` call from channel registration (`register_public_channel`) to maintain atomic registration across all subscription states without triggering `no_active_plan` errors.
+- `supabase/functions/channel-lookup/` and `worker`:
+  - Deployed to Supabase with transparent OAuth token decryption and refresh via `TOKEN_ENCRYPTION_KEY` and Google OAuth token endpoint when `YOUTUBE_API_KEY` is not present.
+  - `channel-lookup` live tested against YouTube Data API: resolved `@alaa_jaber_official` and search query "علاء جابر" with 5 candidate channels.
+  - Worker gateway supplies the platform reader token to worker leases for public channels.
+- `apps/web/src/account/Account.tsx`:
+  - Added immediate trigger of `client.rpc("request_discovery")` upon successful `register_public_channel`, queuing initial catalogue discovery without requiring manual navigation or scheduled ticks.
+  - Built and deployed preview site via `npm run deploy:preview`.
+- Live validation:
+  - Channel `ebb2cff8-58eb-4228-ab9c-3daa2e66d123` registered under workspace `d0c3b9fc-34bf-4ec6-8fef-93c4a22ad31e`.
+  - Discovered 194 videos via platform reader and successfully saved into the catalogue.
+

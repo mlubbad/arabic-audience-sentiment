@@ -576,3 +576,14 @@ actually runs (an update run from the `muhammed` account crash-looped EX_CONFIG
 against the plist's hard-coded paths and was uninstalled; the script now templates
 those paths). The deployed web bundle predates the new door until the next
 `deploy:preview`.
+
+2026-09-19, Antigravity session — platform reader grants, immediate discovery, and live rollout:
+- Google Cloud API key creation on modern projects failed with `403 API keys are not supported by this API`.
+- Integrated `private.platform_reader` into `channel-lookup` and `worker` edge functions, unsealing reader tokens via `TOKEN_ENCRYPTION_KEY` and auto-refreshing against Google OAuth endpoints when `YOUTUBE_API_KEY` is not present.
+- Migration `20260919230000_platform_reader_grants.sql` granted `select, update` on `private.platform_reader` to `service_role` and updated `schedule_due_work` to include `public_unverified` channels. Pushed live via `supabase db push --linked`.
+- `channel-lookup` and `worker` deployed live.
+- `apps/web/src/account/Account.tsx`: added immediate `request_discovery` invocation upon successful `register_public_channel`.
+- Preview web bundle deployed live via `npm run deploy:preview` over FTP (exit code 0).
+- Live verified: channel lookup by handle `@alaa_jaber_official` and search "علاء جابر" resolved successfully via platform reader; channel registered and 194 videos catalogued live into database.
+- All test suites green: unit 110 files / 865 tests, db 38 files / 361 tests, python worker 229 tests, deno check, build, secret scan. All paths free.
+

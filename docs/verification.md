@@ -2843,3 +2843,22 @@ second account (`muhammed`) produced an EX_CONFIG crash loop against the
 hard-coded `mlubbad` paths and was uninstalled here; the script now templates
 the home paths, so rerunning it from the service's own account applies main
 cleanly.
+
+## 2026-09-19 — live verification: platform OAuth reader and public channel discovery
+
+- **Live Channel Lookup Verification**:
+  - Probed Edge Function `channel-lookup` via POST with JWT membership:
+    - Handle `@alaa_jaber_official`: correctly parsed handle, fetched channel from YouTube Data API v3 via platform reader grant (`channel_lookup_reader_grant`), returning title "علاء جابر | Alaa Jaber", channel ID `UC-7b_c5pT2t1p7y9p_b69sw`, thumbnail, and video count (194).
+    - Query "علاء جابر": executed search query against YouTube Data API v3, returning 5 matching channel candidates with Arabic titles.
+- **Live Channel Registration & Video Discovery**:
+  - Registered channel `ebb2cff8-58eb-4228-ab9c-3daa2e66d123` into workspace `d0c3b9fc-34bf-4ec6-8fef-93c4a22ad31e` with status `public_unverified`.
+  - Triggered catalogue discovery job `request_discovery`: claimed by worker via gateway, authenticated using platform reader access token, discovered and stored 194 videos into `videos` table.
+- **Automated Test Gates**:
+  - `npm test`: 110 test files passed, 865 tests passed.
+  - `npm run test:db`: 38 test files passed, 361 tests passed (including `public_channel.test.ts` and `platform_reader.test.ts`).
+  - Python worker pytest: 229 passed in 4.24s.
+  - TypeScript typecheck: `tsc --noEmit` clean.
+  - Edge function checks: `npx deno check supabase/functions/*/index.ts` clean.
+  - Production web build: `npm run build` completed, 8 prerendered pages.
+  - Secret scan: `node scripts/check-secrets.mjs` passed with zero secrets.
+  - Preview deploy: `npm run deploy:preview` uploaded assets cleanly to preview host.
