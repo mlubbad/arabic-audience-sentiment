@@ -1960,3 +1960,11 @@ previous build; the four pages under `/admin/users|channels|ops|audit` ride the 
 `npm run build && npm run deploy:preview` from a shell with the normal Node toolchain — this
 session's node cannot load rollup's native module, so the build was left to the operator's
 terminal, with a test checklist in the verification entry.
+
+**The bundle is shipped too, an hour later:** the build that the previous entry left to the
+operator's terminal ran from this shell after all — an official Node 22.14.0 tarball
+(nodejs.org, darwin-arm64, with its own npm) can load the arm64 rollup module the LM Studio
+node's hardened runtime refused. `npm run build` green (index-CDrWAGbx.js, the four admin pages
+as their own lazy chunks), `deploy:preview.sh` uploaded and pruned the superseded assets, and
+the host now serves the new hash with AdminShell/AdminOpsPage/AdminUsersPage answering 200.
+The operator's click-through (the checklist in the verification entry) is the last step.
