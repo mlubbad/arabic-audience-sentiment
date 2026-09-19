@@ -39,11 +39,12 @@ create unique index one_active_platform_reader
 -- 2. Promotion: the platform admin copies a live, connected grant — their own
 -- — into the reader slot. The original connection is untouched; from here the
 -- two seals renew independently, which is why the reader carries its own copy
--- rather than pointing at the connection.
-create function private.promote_platform_reader_impl(w uuid, c uuid) returns void
+-- rather than pointing at the connection. The platform-admin functions' own
+-- pattern: definer in public, deciding for itself who may call it.
+create function public.promote_platform_reader(w uuid, c uuid) returns void
 language plpgsql security definer set search_path='' as $$
 declare conn record; begin
-  if not exists (select 1 from private.platform_admins where user_id = auth.uid()) then
+  if not public.is_platform_admin() then
     raise exception 'forbidden' using errcode='42501'; end if;
   select id, encrypted_tokens, key_version, granted_scopes, connected_by into conn
     from private.oauth_connections
@@ -57,9 +58,6 @@ declare conn record; begin
   values (conn.id, conn.encrypted_tokens, conn.key_version, conn.granted_scopes,
           conn.connected_by);
 end $$;
-create function public.promote_platform_reader(w uuid, c uuid) returns void
-language sql security invoker set search_path='' as $$
-  select private.promote_platform_reader_impl(w, c) $$;
 
 -- 3. The worker's read seam, credential-gated exactly like the channel one:
 -- any valid worker credential may read the reader, because every tenant's
@@ -118,10 +116,6 @@ language sql security definer set search_path='' as $$
    where r.status = 'active' order by r.created_at desc limit 1 $$;
 
 do $$ declare f text; begin
-  -- promote_platform_reader_impl is deliberately absent: the public wrapper
-  -- runs as the invoking admin, so the impl must stay executable by the
-  -- caller. The private schema is not exposed through the Data API, which is
-  -- what keeps it unreachable for everyone else.
   foreach f in array array[
     'private.worker_reader_grant(text)',
     'private.worker_store_reader_grant(text,uuid,bytea)',

@@ -50,18 +50,21 @@ def _log(message: str) -> None:
 def build_collector(client: httpx.Client, api_key: str | None = None):
     """The collector builder the runner is handed.
 
-    A token builds the OAuth collector, as it always has. A lease for a public
-    channel arrives with `channel_id` and no token: with the project's API key
-    that builds the public collector, without it the builder answers None —
-    which the runner reports as a blocking configuration gap on this worker,
-    never as a fault in the channel.
+    A token with no channel id builds the OAuth collector, as it always has —
+    the grant is the channel. A token beside a channel id is the platform
+    reader: the operator's own grant reading a public channel by id, its rows
+    filed as public data. An id with no token asks for the project's API key;
+    without it the builder answers None — which the runner reports as a
+    blocking configuration gap on this worker, never as a fault in the
+    channel.
     """
 
     def build(token: str | None, expires_at: str | None = None, renew=None,
               channel_id: str | None = None):
         if token:
             return YouTubeAPI(None, client, access_token=token,
-                              expires_at=expires_at, renew=renew)
+                              expires_at=expires_at, renew=renew,
+                              public_reader=bool(channel_id))
         if channel_id and api_key:
             return YouTubeAPI(api_key, client)
         return None

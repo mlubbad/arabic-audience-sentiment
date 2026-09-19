@@ -62,12 +62,28 @@ def test_catalogue_by_id_refuses_an_id_it_would_not_read():
             YouTubeAPI("fixture-key", client).catalogue(channel_id="not-an-id")
 
 
-def test_catalogue_by_id_is_not_the_oauth_path():
+def test_an_owner_token_never_reads_by_id():
     # A token is bound to the channel its grant names; taking an id on that
     # path would read a channel the token was never granted for.
     with httpx.Client() as client:
         with pytest.raises(ValueError):
             YouTubeAPI(None, client, access_token="tok").catalogue(channel_id=CHANNEL_ID)
+
+
+def test_the_platform_reader_reads_by_id_and_records_public_provenance():
+    # Reader mode: an OAuth token whose authority is the platform's, not the
+    # channel owner's. The request goes out under the Bearer, and the rows it
+    # reads are still filed as public data — with the credential kind named.
+    seen = []
+    with httpx.Client(transport=httpx.MockTransport(_youtube_handler(seen))) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.reader",
+                             public_reader=True)
+        result = adapter.catalogue(channel_id=CHANNEL_ID)
+    assert seen[0].headers["authorization"] == "Bearer ya29.reader"
+    assert "key=" not in str(seen[0].url)
+    assert [v["external_video_id"] for v in result.videos] == ["abcdefghijk"]
+    assert result.videos[0]["field_provenance"]["source"] == "youtube_data_api_public"
+    assert result.videos[0]["field_provenance"]["credential_kind"] == "platform_reader"
 
 
 def test_an_id_that_names_no_channel_is_blocked_not_empty():
@@ -127,6 +143,19 @@ def test_a_public_discover_job_lists_by_id():
     assert sent["finish"] == "succeeded"
 
 
+def test_a_reader_backed_lease_lists_by_id_with_its_token():
+    # A lease that carries BOTH a token and the channel id is the platform
+    # reader path: the token is the operator's grant, the id is the channel.
+    sent, lister = {}, Lister()
+    assert run_discover(
+        plane(sent, token="ya29.reader", external=CHANNEL_ID),
+        lambda tok, expires_at=None, renew=None, channel_id=None:
+        lister if channel_id else Lister(Catalogue([], True)),
+    ) is True
+    assert lister.asked == [CHANNEL_ID]
+    assert sent["finish"] == "succeeded"
+
+
 def test_a_public_discover_job_without_a_key_names_the_gap():
     sent = {}
     run_discover(
@@ -173,12 +202,15 @@ def test_a_public_collect_job_reads_the_due_list():
     assert sent["finish"] == "succeeded"
 
 
-def test_the_loop_builds_a_public_collector_only_with_a_key():
+def test_the_loop_builds_the_right_collector_for_each_lease_shape():
     with httpx.Client() as client:
         build = build_collector(client)
         assert build(None, None, None, channel_id=CHANNEL_ID) is None
-        # A token never needed the key, and still does not.
+        # A token without a channel id is the owner grant.
         assert build("tok").source == "youtube_oauth"
+        # A token beside a channel id is the platform reader: same build, the
+        # provenance is what names the difference.
+        assert build("tok", channel_id=CHANNEL_ID).source == "youtube_data_api_public"
         keyed = build_collector(client, "fixture-key")
         collector = keyed(None, None, None, channel_id=CHANNEL_ID)
         assert collector.source == "youtube_data_api_public"

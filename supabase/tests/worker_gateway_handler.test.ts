@@ -116,6 +116,46 @@ describe("what a claim hands the worker", () => {
     expect(second.external_channel_id).toBeNull();
   });
 
+  it("a public claim without a grant reads through the platform reader", async () => {
+    // The chain at claim time: the channel's own grant first (none here),
+    // then the platform reader — the operator's one grant that reads any
+    // public channel. Its token answers in the same field the owner's would;
+    // the id travels beside it either way.
+    const readerTokenFor = vi.fn(async () => ({
+      access_token: "ya29.platform-reader",
+      access_token_expires_at: "2026-09-19T17:00:00Z",
+    }));
+    const db: WorkerDb = {
+      ...base(),
+      claim: async () => ({
+        id: "job-4",
+        lease_token: "l",
+        checkpoint: null,
+        type: "discover",
+        external_channel_id: "UCTPIL6f7yNpK8yc-H3cEtFg",
+      }),
+      accessTokenFor: async () => null,
+      readerTokenFor,
+    };
+    const body = (await (await post(db)).json()) as Record<string, unknown>;
+    expect(body.access_token).toBe("ya29.platform-reader");
+    expect(body.external_channel_id).toBe("UCTPIL6f7yNpK8yc-H3cEtFg");
+    expect(readerTokenFor).toHaveBeenCalledWith(expect.any(String));
+    // A connected channel never reaches for the reader — its grant decides.
+    const connected: WorkerDb = {
+      ...base(),
+      claim: async () => ({ id: "job-5", lease_token: "l", checkpoint: null }),
+      accessTokenFor: async () => null,
+      readerTokenFor,
+    };
+    const second = (await (await post(connected)).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(second.access_token).toBeNull();
+    expect(readerTokenFor).toHaveBeenCalledTimes(1);
+  });
+
   it("asks for the token against the claimed job, not against anything sent", async () => {
     // The lookup is keyed on the credential and the job, so a worker cannot
     // request a grant belonging to a workspace it does not own.

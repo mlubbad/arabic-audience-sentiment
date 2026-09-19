@@ -204,11 +204,21 @@ def _collector_for(control: ControlPlane, lease: dict, build_collector):
     connected this channel.
     """
     token = lease.get("access_token")
+    channel_id = lease.get("external_channel_id")
     if token:
+        # The token is the channel owner's when the lease names no channel —
+        # and the platform reader's when it does: same build, and the collector
+        # files its rows as public data only in the reader case. The id is
+        # passed only when present, so builders that only ever see owner
+        # grants keep their old shape.
+        if channel_id:
+            return build_collector(
+                token, lease.get("access_token_expires_at"),
+                _renew_for(control, lease), channel_id=channel_id,
+            ), None, channel_id
         return build_collector(
             token, lease.get("access_token_expires_at"), _renew_for(control, lease)
         ), None, None
-    channel_id = lease.get("external_channel_id")
     if not channel_id:
         return None, "channel_not_connected", None
     collector = build_collector(None, None, None, channel_id=channel_id)

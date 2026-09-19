@@ -51,6 +51,7 @@ const RENEW_MARGIN_MS = 15 * 60_000;
 async function issueToken(
   credentialHash: string,
   grant: { connection_id: string; encrypted_tokens: string; job_id: string },
+  kind: "channel" | "reader" = "channel",
 ): Promise<{
   access_token: string;
   access_token_expires_at: string;
@@ -87,23 +88,38 @@ async function issueToken(
     );
     const { sealTokens } = await import("../_shared/oauth-callback.ts");
     const resealed = await sealTokens(key, renewed);
-    await db.rpc("svc_worker_store_grant", {
-      credential_hash: credentialHash,
-      connection: grant.connection_id,
-      tokens:
-        "\\x" +
-        [...resealed].map((b) => b.toString(16).padStart(2, "0")).join(""),
-    });
+    const hexToken =
+      "\\x" +
+      [...resealed].map((b) => b.toString(16).padStart(2, "0")).join("");
+    // The reader's renewal is written back to the reader's own row, never to
+    // the connection its seal was copied from.
+    await db.rpc(
+      kind === "reader"
+        ? "svc_worker_store_reader_grant"
+        : "svc_worker_store_grant",
+      {
+        credential_hash: credentialHash,
+        connection: grant.connection_id,
+        tokens: hexToken,
+      },
+    );
     return {
       access_token: renewed.access_token,
       access_token_expires_at: renewed.expires_at,
     };
   } catch (e) {
-    if (e instanceof RevokedError)
-      await db.rpc("svc_worker_mark_revoked", {
-        credential_hash: credentialHash,
-        j: grant.job_id,
-      });
+    if (e instanceof RevokedError) {
+      if (kind === "reader")
+        await db.rpc("svc_worker_reader_revoked", {
+          credential_hash: credentialHash,
+          connection: grant.connection_id,
+        });
+      else
+        await db.rpc("svc_worker_mark_revoked", {
+          credential_hash: credentialHash,
+          j: grant.job_id,
+        });
+    }
     return null;
   }
 }
@@ -120,6 +136,24 @@ async function accessTokenFor(
   if (error || !data?.length) return null;
   const grant = data[0] as { connection_id: string; encrypted_tokens: string };
   return issueToken(credentialHash, { ...grant, job_id: jobId });
+}
+
+/**
+ * The platform reader's token, for a public channel whose job has no grant of
+ * its own. Any valid worker credential may ask: every tenant's public jobs
+ * are collected with this one grant. Null when no active reader — the claim
+ * then answers with the channel's id alone, and a key-carrying worker (or
+ * none) takes it from there.
+ */
+async function readerTokenFor(
+  credentialHash: string,
+): Promise<{ access_token: string; access_token_expires_at: string } | null> {
+  const { data, error } = await db.rpc("svc_worker_reader_grant", {
+    credential_hash: credentialHash,
+  });
+  if (error || !data?.length) return null;
+  const grant = data[0] as { connection_id: string; encrypted_tokens: string };
+  return issueToken(credentialHash, { ...grant, job_id: "" }, "reader");
 }
 
 /**
@@ -148,14 +182,35 @@ async function renewToken(
       return null;
     failed(error);
   }
-  if (!data?.length) return null;
-  const grant = data[0] as { connection_id: string; encrypted_tokens: string };
-  return issueToken(credentialHash, { ...grant, job_id: jobId });
+  if (data?.length) {
+    const grant = data[0] as {
+      connection_id: string;
+      encrypted_tokens: string;
+    };
+    return issueToken(credentialHash, { ...grant, job_id: jobId });
+  }
+  // A public job has no channel grant to renew; its run renews the platform
+  // reader instead, but only when the job's channel really is public — the
+  // reader is never handed to a connected channel's run.
+  const { data: job } = await db
+    .from("jobs")
+    .select("channel_id")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (!job?.channel_id) return null;
+  const { data: channel } = await db
+    .from("channels")
+    .select("status")
+    .eq("id", job.channel_id)
+    .maybeSingle();
+  if (channel?.status !== "public_unverified") return null;
+  return readerTokenFor(credentialHash);
 }
 
 Deno.serve((request) =>
   handleWorkerRequest(request, {
     accessTokenFor,
+    readerTokenFor,
     renewToken,
     claim: async (hash, jobTypes) => {
       // A null/empty list calls the single-argument RPC: an unscoped claim.
@@ -171,9 +226,9 @@ Deno.serve((request) =>
       // uncollectable: the worker saw no token and no identity, and could
       // only report the job blocked. When the claimed job's channel is
       // registered as public data, its platform id travels with the lease so
-      // a key-carrying worker can read the public catalogue and comments by
-      // id. A connected channel's id deliberately does not travel — a grant
-      // that failed to open is the worker's signal to report the channel
+      // the worker can read the public catalogue and comments by id. A
+      // connected channel's id deliberately does not travel — a grant that
+      // failed to open is the worker's signal to report the channel
       // unconnected, not an invitation to fall back to public collection
       // without anyone deciding that.
       if (claimed.channel_id) {

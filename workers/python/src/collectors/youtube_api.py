@@ -25,7 +25,7 @@ class YouTubeAPI:
 
     def __init__(self, api_key: str | None, client: httpx.Client,
                  access_token: str | None = None, expires_at: str | None = None,
-                 renew=None):
+                 renew=None, public_reader: bool = False):
         # Exactly one. Sending both would let a stale key silently answer for a
         # revoked token, and the row would record the wrong provenance.
         if bool(api_key) == bool(access_token):
@@ -38,8 +38,21 @@ class YouTubeAPI:
         self.renew = renew
         self._expiry = self._parse_expiry(expires_at)
         # The provenance travels with every row, so a comment read on the
-        # owner's authority is never filed as public data.
-        self.source = "youtube_oauth" if access_token else "youtube_data_api_public"
+        # owner's authority is never filed as public data. Reader mode is the
+        # reverse case, and it matters just as much: a channel read by id
+        # through the platform's own grant is public data — the credential
+        # opened the door, it does not own the channel — so the OAuth token
+        # must not file the rows as `youtube_oauth` either.
+        self.public_reader = bool(public_reader and access_token)
+        self.source = ("youtube_data_api_public"
+                       if (api_key or self.public_reader) else "youtube_oauth")
+
+    @property
+    def credential_kind(self) -> str:
+        """Which kind of credential opened the door, for field provenance."""
+        if self.public_reader:
+            return "platform_reader"
+        return "api_key" if self.key else "owner_grant"
 
     @staticmethod
     def _parse_expiry(value: str | None):
@@ -154,7 +167,8 @@ class YouTubeAPI:
                               published_time_raw=s.get("publishedAt"), published_at=s.get("publishedAt"),
                               timestamp_precision="second" if s.get("publishedAt") else "unknown",
                               likes_value=s.get("likeCount"), source=self.source,
-                              field_provenance={"source": self.source, "adapter_revision": self.revision})
+                              field_provenance={"source": self.source, "adapter_revision": self.revision,
+                                                "credential_kind": self.credential_kind})
         except (KeyError, TypeError, AttributeError):
             raise CollectionError("invalid_comment") from None
 
@@ -272,19 +286,20 @@ class YouTubeAPI:
         tab. If all three are absent the plain uploads list stands in and the
         kind is recorded as unclassified rather than guessed.
 
-        With `channel_id` the channel is named, not inferred: this is the
-        public path, where the lease carries the platform id and the credential
-        is a project API key with no channel of its own. It requires that key —
-        an OAuth collector is bound to the channel the grant names, and taking
-        an id on that path would read a channel the token was never granted
-        for — and an id that names no channel is a blocked dead end, not an
-        empty catalogue.
+        With `channel_id` the channel is named, not inferred. Two credentials
+        can carry that request: the project API key, or the platform's reader
+        grant (`public_reader=True`) — an OAuth token whose authority is the
+        platform's, not the channel owner's, so the rows it reads are still
+        public data. What is refused is the one combination that would read a
+        channel its credential was never granted for: an owner token plus an
+        id. An id that names no channel is a blocked dead end, not an empty
+        catalogue.
         """
         if channel_id is not None:
             if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id):
                 raise ValueError("invalid_channel_id")
-            if self.token:
-                raise ValueError("channel_id_needs_api_key")
+            if self.token and not self.public_reader:
+                raise ValueError("owner_token_reads_mine_only")
             params = {"part": "contentDetails", "id": channel_id}
         else:
             params = {"part": "contentDetails", "mine": "true"}
@@ -329,6 +344,7 @@ class YouTubeAPI:
                     s = item.get("snippet", {})
                     raw = item.get("statistics", {}).get("commentCount")
                     provenance = {"source": self.source, "adapter_revision": self.revision,
+                                  "credential_kind": self.credential_kind,
                                   "discovered_in_tabs": found[vid]["tabs"]}
                     if unclassified:
                         provenance["kind_unclassified"] = True

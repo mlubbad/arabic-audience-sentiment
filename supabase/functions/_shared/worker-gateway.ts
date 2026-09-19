@@ -43,6 +43,17 @@ export interface WorkerDb {
     access_token_expires_at: string;
   } | null>;
   /**
+   * The platform reader's token — one operator-granted OAuth grant that reads
+   * any public channel by id. Asked for only when a claim named a public
+   * channel (`external_channel_id`) and the channel's own grant came back
+   * empty. Optional: without it, a public job still travels with its id, and
+   * a key-carrying worker takes it from there.
+   */
+  readerTokenFor?(credentialHash: string): Promise<{
+    access_token: string;
+    access_token_expires_at: string;
+  } | null>;
+  /**
    * A fresh channel credential mid-run, against a lease the worker still
    * holds. Optional: a gateway without it answers 404 and the worker falls
    * back to ending a lapsed run as a retryable credential lapse, as before.
@@ -232,9 +243,15 @@ export async function handleWorkerRequest(
       // grant needs the service role and the worker has neither that nor the
       // key. A channel with no usable grant still returns the job: the worker
       // can report it as blocked, which is more useful than a silent refusal.
-      const granted = db.accessTokenFor
+      let granted = db.accessTokenFor
         ? await db.accessTokenFor(credential, String(claimed.id))
         : null;
+      // A public channel's job carries its platform id instead of a grant of
+      // its own; when the claim named one and no grant opened, the platform
+      // reader is the reading credential. An id with neither reader nor key
+      // is still an honest claim: the worker reports the configuration gap.
+      if (!granted && claimed.external_channel_id && db.readerTokenFor)
+        granted = await db.readerTokenFor(credential);
       const type = String(claimed.type ?? "collect");
       const videos =
         type === "collect" && db.dueVideos

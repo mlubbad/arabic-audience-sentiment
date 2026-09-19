@@ -15,7 +15,15 @@
  * to know — the lookup returns a `quota_exceeded` refusal when Google says
  * the day's allowance is spent.
  */
-import { createClient } from "npm:@supabase/supabase-js@2.58.0";
+import {
+  createClient,
+  type SupabaseClient,
+} from "npm:@supabase/supabase-js@2.58.0";
+import {
+  importSealingKey,
+  openTokens,
+  refreshAccessToken,
+} from "../_shared/oauth-callback.ts";
 import { corsHeaders, parseOrigins, preflight } from "../_shared/cors.ts";
 import { parseChannelQuery } from "../_shared/channel-query.ts";
 
@@ -39,21 +47,35 @@ class LookupError extends Error {
   }
 }
 
-/** One YouTube Data API call. Refusals become our own codes, with Google's
- *  reason where it names the problem (quota, key, availability). */
+/**
+ * The credential for one YouTube Data API call: a project API key passed as
+ * the `key` parameter, or a bearer token — the platform reader's grant — in
+ * the authorization header. Refusals become our own codes, with Google's
+ * reason where it names the problem (quota, key, availability).
+ */
 async function ytGet(
-  key: string,
+  credential: { key?: string; token?: string },
   resource: string,
   params: Record<string, string>,
 ) {
   const url = new URL(`https://www.googleapis.com/youtube/v3/${resource}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  url.searchParams.set("key", key);
+  if (credential.key) url.searchParams.set("key", credential.key);
+  const headers: Record<string, string> = {};
+  if (credential.token) headers["authorization"] = `Bearer ${credential.token}`;
   let response: Response;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    response = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
   } catch {
     throw new LookupError("source_unavailable", 502);
+  }
+  if (response.status === 401) {
+    // The reader's access token lapsed; its holder refreshes before the next
+    // call. Here it is a dead credential for this request.
+    throw new LookupError("reader_token_lapsed", 502);
   }
   if (response.status === 403 || response.status === 429) {
     // A quota refusal and a key refusal both arrive as 403; the reason is
@@ -99,14 +121,17 @@ function candidate(item: Record<string, unknown>): Candidate | null {
   };
 }
 
-async function lookup(key: string, raw: string): Promise<Candidate[]> {
+async function lookup(
+  credential: { key?: string; token?: string },
+  raw: string,
+): Promise<Candidate[]> {
   const query = parseChannelQuery(raw);
   if (!query) throw new LookupError("invalid_query", 400);
 
   if (query.kind === "search") {
     // search.list names ids only; the details call fills in handle and face,
     // one unit for up to fifty — small beside the search's hundred.
-    const found = await ytGet(key, "search", {
+    const found = await ytGet(credential, "search", {
       part: "snippet",
       type: "channel",
       maxResults: "5",
@@ -121,7 +146,7 @@ async function lookup(key: string, raw: string): Promise<Candidate[]> {
       .filter((v: unknown): v is string => typeof v === "string")
       .slice(0, 5);
     if (!ids.length) return [];
-    const details = await ytGet(key, "channels", {
+    const details = await ytGet(credential, "channels", {
       part: "snippet",
       id: ids.join(","),
     });
@@ -136,7 +161,7 @@ async function lookup(key: string, raw: string): Promise<Candidate[]> {
     // The API reads the handle with its @; the parser strips it.
     params.forHandle = `@${query.value}`;
   } else params.forUsername = query.value;
-  const data = await ytGet(key, "channels", params);
+  const data = await ytGet(credential, "channels", params);
   return data.items
     .map(candidate)
     .filter((c: Candidate | null): c is Candidate => c !== null);
@@ -182,14 +207,68 @@ Deno.serve(async (request) => {
   if (memberError) return json(403, { code: "forbidden" });
   if (!memberships?.length) return json(403, { code: "forbidden" });
 
+  // The reading credential: the project API key when one is set, otherwise
+  // the platform reader — the operator's own OAuth grant, sealed in the
+  // database and opened here with the platform's key. Google's new key
+  // format is refused by the YouTube endpoint (20260919200000's header tells
+  // the story), so the reader is what makes this door work at all.
   const key = env("YOUTUBE_API_KEY");
-  if (!key) return json(500, { code: "lookup_not_configured" });
+  const credential: { key?: string; token?: string } = key
+    ? { key }
+    : { token: await readerToken(db) };
+  if (!credential.key && !credential.token)
+    return json(500, { code: "lookup_not_configured" });
 
   try {
-    return json(200, { candidates: await lookup(key, body.query) });
+    return json(200, { candidates: await lookup(credential, body.query) });
   } catch (error) {
     if (error instanceof LookupError)
       return json(error.status, { code: error.code });
     return json(500, { code: "control_plane_error" });
   }
 });
+
+/**
+ * The platform reader's access token, unsealed and freshened in memory.
+ *
+ * A lapsed access token is refreshed here but never written back — the
+ * worker's claim path owns the stored seal's renewal, and lookups are
+ * sporadic enough that an occasional extra refresh costs nothing. No reader
+ * row, no token: the door then says it is not configured.
+ */
+async function readerToken(db: SupabaseClient): Promise<string | undefined> {
+  const sealingKey = env("TOKEN_ENCRYPTION_KEY");
+  if (!sealingKey) return undefined;
+  const { data, error } = (await db.rpc(
+    "channel_lookup_reader_grant",
+  )) as unknown as {
+    data: { encrypted_tokens: string }[] | null;
+    error: { message?: string } | null;
+  };
+  if (error || !data?.length) return undefined;
+  const grant = data[0] as { encrypted_tokens: string };
+  const hex = grant.encrypted_tokens.replace(/^\\x/, "");
+  const sealed = new Uint8Array(
+    hex.match(/../g)?.map((b) => parseInt(b, 16)) ?? [],
+  );
+  const key = await importSealingKey(sealingKey);
+  const tokens = (await openTokens(key, sealed)) as {
+    access_token: string;
+    refresh_token: string;
+    expires_at: string;
+  };
+  if (Date.parse(tokens.expires_at) - Date.now() > 60_000)
+    return tokens.access_token;
+  const renewed = await refreshAccessToken(
+    tokens.refresh_token,
+    {
+      client_id: env("GOOGLE_CLIENT_ID"),
+      client_secret: env("GOOGLE_CLIENT_SECRET"),
+      redirect_uri: env("GOOGLE_REDIRECT_URI"),
+      token_uri: "https://oauth2.googleapis.com/token",
+      key_version: env("TOKEN_ENCRYPTION_KEY_VERSION") || "k1",
+    },
+    (u, init) => fetch(u, init),
+  );
+  return renewed.access_token;
+}
