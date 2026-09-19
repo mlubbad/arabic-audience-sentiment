@@ -1,0 +1,90 @@
+# Security checks — supply chain, secrets, and static analysis.
+# Every third-party action is pinned to a full commit SHA so a repointed tag
+# cannot inject code into CI (mutable-tag supply-chain attack).
+#
+# Licensing note: dependency-review-action and gitleaks-action wrappers require
+# GitHub Advanced Security or a commercial license on private repositories.
+# This workflow uses the free equivalents instead: npm/pip-audit for dependency
+# review and the gitleaks CLI directly for secret scanning.
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-audit:
+    # Fails when production dependencies carry known HIGH+ CVEs.
+    # npm: production deps only (dev deps are audited by dependabot weekly).
+    # pip: the Python worker's locked runtime via pip-audit.
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: npm audit (production)
+        run: npm audit --omit=dev --audit-level=high
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          version: 0.11.11
+      - name: Export locked Python requirements
+        run: uv export --directory workers/python --frozen --no-dev --no-emit-project -o /tmp/requirements.txt
+      - name: pip-audit (locked runtime)
+        run: uv run --no-project --with pip-audit pip-audit -r /tmp/requirements.txt --strict
+
+  secrets:
+    # Scans the full history for committed credentials via the gitleaks CLI
+    # (pinned binary, no wrapper action needed).
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks
+        run: |
+          BASE=https://github.com/gitleaks/gitleaks/releases/download/v8.30.1
+          curl -sSL --fail -o /tmp/gitleaks.tar.gz "$BASE/gitleaks_8.30.1_linux_x64.tar.gz"
+          curl -sSL --fail -o /tmp/checksums.txt "$BASE/gitleaks_8.30.1_checksums.txt"
+          EXPECTED=$(grep 'linux_x64.tar.gz' /tmp/checksums.txt | awk '{print $1}')
+          echo "$EXPECTED  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          gitleaks version
+      - name: Scan full history
+        run: gitleaks detect --source . --redact --exit-code 1 --no-banner
+
+  semgrep:
+    # Same high-confidence security ruleset run locally; blocks on ERROR severity.
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      # Digest-pinned: a repointed Docker tag is the same supply-chain risk as
+      # a repointed action tag. sha256:acaac22f… = semgrep/semgrep:1.177.0
+      image: semgrep/semgrep@sha256:acaac22ffc7b7cc5926de0751b223bce0b2491c33d18422fa72f632c78d81198
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Scan
+        run: >-
+          semgrep scan --metrics=off --severity ERROR
+          --config p/typescript --config p/react --config p/nodejs
+          --config p/python --config p/security-audit --config p/secrets
+          --config p/owasp-top-ten

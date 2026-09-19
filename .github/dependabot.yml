@@ -1,0 +1,21 @@
+# Automated dependency updates.
+# NOTE: the Python worker uses uv (uv.lock) which Dependabot does not support
+# yet — refresh it manually with `uv lock --upgrade` reviewed through CI.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-minor-patch:
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
