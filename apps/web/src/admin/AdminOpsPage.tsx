@@ -120,7 +120,8 @@ function Metric({
 }) {
   return (
     <div className={`admin-metric${warn ? " admin-metric-warn" : ""}`}>
-      <span className="admin-metric-value">{value}</span>
+      {/* A figure wears the numeric face: brand.css's rule for every count. */}
+      <span className="admin-metric-value ui-num">{value}</span>
       <span className="admin-metric-label">{label}</span>
     </div>
   );
