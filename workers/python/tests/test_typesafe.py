@@ -4,8 +4,8 @@ import json
 import httpx
 import pytest
 
-from topics.typesafe import CHUNK, PROMPT_VERSION, TypeSafeTopicClassifier
-from topics.protocol import TopicError, TopicItem
+from topics.typesafe import CHUNK, TypeSafeTopicClassifier
+from topics.protocol import TopicItem
 
 TAXONOMY = [{"key": "question", "description": "asks"}, {"key": "praise", "description": "thanks"}]
 
