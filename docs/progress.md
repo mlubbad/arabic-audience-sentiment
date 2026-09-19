@@ -1894,3 +1894,47 @@ the LM Studio binary, and rollup's native module cannot dlopen under it), so the
 a standalone PGlite script mirroring the vitest file — 30/30 assertions, including the gate
 refusals, the counts, the ops overview, the audit bounds, and the reads-stay-reads close. See the
 verification entry of the same date.
+
+## 2026-09-19 — a TypeSafe topic classifier, verified live but not yet wired
+
+`workers/python/src/topics/typesafe.py` — a `TopicClassifier` backed by the TypeSafe
+System One API (`jev-latest`), built as a drop-in beside `gemini.py`: same constructor
+shape, same verdict discipline (purged text is `skipped` and never sent; a chunk-level
+failure fails whole with `typesafe_*` codes; a choice outside the taxonomy fails that
+item only; 429/5xx retried with backoff). The key travels in the Authorization header;
+no code path logs a URL or a body. `classification_key` carries it with no migration
+(`topics:v<N>+jev-latest+jev1`); `PROMPT_VERSION = "jev1"` bumps with any instruction
+or state-shape change. Tests: `workers/python/tests/test_typesafe.py`, 13 cases in the
+`test_gemini.py` fake-client style.
+
+Live verification (Bionic session, 2026-09-19): head-to-head against
+`gemini-3.6-flash` on the default 10-topic taxonomy and 12 realistic Arabic comments —
+11/12 agreement, the one disagreement a genuinely ambiguous comment TypeSafe reported
+at 0.68 while Gemini claimed 0.95; sub-second response. A routing pass (parallel
+`noul` judgments before classification) skipped 5/14 emoji/reaction comments in one
+request while preserving the documented "آمين"-without-parent semantics. The adapter
+itself was smoke-tested live through the project venv: 7 items, correct verdicts,
+purged text skipped.
+
+**Deliberately NOT done in this pass:** the `--topics typesafe` wiring in
+`server/loop.py`. The token-renewal work has uncommitted changes in `loop.py` right
+now (per docs/coordination/ACTIVE.md); committing the wiring would sweep that
+in-flight work into a foreign commit. The six-line branch is ready in
+`docs/` notes below and in the adapter's README; apply it once that lane commits.
+
+Wiring, when the lane is clear — `server/loop.py`, beside the `--topics gemini` branch:
+
+```python
+elif args.topics == "typesafe":
+    from topics.typesafe import TypeSafeTopicClassifier
+
+    key = os.environ.get("TYPESAFE_API_KEY", "")
+    if not key:
+        raise SystemExit("--topics typesafe needs TYPESAFE_API_KEY")
+    classifier = TypeSafeTopicClassifier(key, client)
+```
+
+and `"typesafe"` added to the `--topics` choices. The host `.env` then needs
+`TYPESAFE_API_KEY=` and `run-worker.sh` passes `--topics typesafe`. Not the default:
+calibration on a real channel comes first (thresholds and escalation reviewed on
+real verdicts, not the 12-comment sample).

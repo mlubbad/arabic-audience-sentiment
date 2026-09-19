@@ -2725,3 +2725,28 @@ a successful claim or discover, only `comment counts` lines during a collect.
   Verified created in the bootstrap; the standalone 30/30 run re-passed on top of them.
 - Known, deliberate: admin reads write no audit rows (phase four's writes will, each with its
   own guard); the reads are platform-wide by design, which is what the page is for.
+
+## 2026-09-19 — the TypeSafe topic classifier: what was actually run
+
+- Unit: `pytest tests/test_typesafe.py` under the project venv, 13/13, plus the
+  existing `tests/test_gemini.py` and `tests/test_topics.py` (24) green on the same
+  tree — 37 passed in one run against the current dirty worktree.
+- Live, through the adapter (not a mock): `TypeSafeTopicClassifier(key, httpx.Client())`
+  against the real `api.typesafe.ai/v1/systemone` with the default taxonomy and 7 items
+  (including the "آمين"-with-parent reply and a purged text). Verdicts correct on all
+  classifiable items, the purged text returned `skipped` and its bytes were confirmed
+  absent from the request state, total wall time under one second.
+- Head-to-head, same batch of 12 comments to both providers: Gemini `gemini-3.6-flash`
+  with the exact production request shape from `topics/gemini.py` (temperature 0,
+  thinkingBudget 0, responseSchema enum, BLOCK_NONE safety settings) vs TypeSafe
+  `jev-latest` — 11/12 same topic; the disagreement is a genuinely ambiguous comment
+  (criticism vs discussion) where TypeSafe's distribution said 0.68/0.30 and Gemini's
+  self-reported confidence said 0.95. Router variant: one request with 15 parallel
+  `noul` questions over 14 comments classified 5 as no-topic skips and preserved the
+  project's reply-context semantics (0.77 interpretable → passed, matching what the
+  Gemini prompt does today).
+- Honest limits: 12 comments is a demonstration, not a benchmark; thresholds (0.5
+  routing, escalation confidence) are uncalibrated until run over a real channel's
+  comments. Token counts are not comparable across the two providers' tokenizers;
+  cost depends on each provider's pricing. The loop.py wiring is pending, see the
+  progress entry of the same date.

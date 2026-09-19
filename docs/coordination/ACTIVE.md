@@ -522,3 +522,10 @@ zeroed (platform-retry noise, would have buried it).
 executed; this machine lacks the pinned Node); a signed-in dashboard walkthrough against the v2
 key; the analyse job `99cfa273` needs a classifier-capable worker to actually classify; and the
 monitor's `ALERT_WEBHOOK_URL` is unset, so alerts are log-only until the operator adds one.
+
+2026-09-19, a Bionic (LM Studio) session, TypeSafe topic classifier: added
+`workers/python/src/topics/typesafe.py` and `tests/test_typesafe.py` (the topics lane
+was free), plus progress/verification entries. **Did not touch `server/loop.py`** even
+though the wiring needs a six-line branch there — the token-renewal lane has uncommitted
+`loop.py` changes in flight and a commit of mine would have swept them up. The wiring
+snippet is in `docs/progress.md` under the same date; apply it after that lane commits.
