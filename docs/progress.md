@@ -2116,3 +2116,11 @@ Google Cloud rejected standard API keys for YouTube Data API v3 on modern GCP pr
   - Channel `ebb2cff8-58eb-4228-ab9c-3daa2e66d123` registered under workspace `d0c3b9fc-34bf-4ec6-8fef-93c4a22ad31e`.
   - Discovered 194 videos via platform reader and successfully saved into the catalogue.
 
+## 2026-09-19 — browser CORS preflight fix for channel lookup
+
+While `channel-lookup` responded successfully to backend and curl requests, in-browser requests from `https://app.sky-develop.net` were failing during the preflight `OPTIONS` handshake with `TypeError: Failed to fetch`, displaying `تعذّر البحث عن القنوات. حاول من جديد.` to the user.
+- **Root cause**: The Supabase browser client sends `x-client-info` (and SDK headers) within `Access-Control-Request-Headers`. `supabase/functions/_shared/cors.ts` previously only allowed `authorization, content-type, apikey`, causing browsers to refuse the preflight.
+- **Resolution**: Updated `corsHeaders()` in `supabase/functions/_shared/cors.ts` to allow `x-client-info, x-retry-count, traceparent, tracestate, baggage` and echo `access-control-request-headers` for allowed origins (`https://app.sky-develop.net` and local origins).
+- **Edge Functions redeployed**: `channel-lookup`, `billing-portal`, `oauth-start`, and `paddle-checkout` redeployed to Supabase project `ykqugctewsqvevhyqtbi`.
+- **Frontend logging**: Enhanced `apps/web/src/account/Account.tsx` to log channel lookup errors and schema mismatches to the browser console.
+- **Deployed preview**: Built and uploaded preview build via `npm run deploy:preview`.

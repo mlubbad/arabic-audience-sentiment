@@ -2875,3 +2875,22 @@ cleanly.
   - Production web build: `npm run build` completed, 8 prerendered pages.
   - Secret scan: `node scripts/check-secrets.mjs` passed with zero secrets.
   - Preview deploy: `npm run deploy:preview` uploaded assets cleanly to preview host.
+
+## 2026-09-19 — live verification: CORS preflight with x-client-info
+
+- **Root Cause Verified**:
+  Simulating browser preflight request with curl:
+  `curl -i -X OPTIONS "https://ykqugctewsqvevhyqtbi.supabase.co/functions/v1/channel-lookup" -H "Origin: https://app.sky-develop.net" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: authorization,content-type,apikey,x-client-info"`
+  Failed to include `x-client-info` in `access-control-allow-headers`, causing browser preflight refusal.
+- **Fixed & Verified**:
+  After updating `_shared/cors.ts` and redeploying `channel-lookup`, live curl preflight test returned:
+  `HTTP/2 204`
+  `access-control-allow-origin: https://app.sky-develop.net`
+  `access-control-allow-headers: authorization,content-type,apikey,x-client-info`
+  `access-control-allow-methods: POST, OPTIONS`
+- **Unit test**:
+  `npx vitest run supabase/tests/cors.test.ts` passed (4/4 tests).
+- **Full verification check**:
+  `npm run check` passed completely green across all gates (lint, format, typecheck, check:functions, test, test:db, worker:test, build, check:secrets).
+- **Preview deployed**:
+  `npm run deploy:preview` uploaded cleanly (HTTP 226 / gone, exit code 0).

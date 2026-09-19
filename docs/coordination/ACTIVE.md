@@ -587,3 +587,10 @@ those paths). The deployed web bundle predates the new door until the next
 - Live verified: channel lookup by handle `@alaa_jaber_official` and search "علاء جابر" resolved successfully via platform reader; channel registered and 194 videos catalogued live into database.
 - All test suites green: unit 110 files / 865 tests, db 38 files / 361 tests, python worker 229 tests, deno check, build, secret scan. All paths free.
 
+2026-09-19 (evening), Antigravity session — browser CORS preflight fix for channel-lookup and edge functions:
+- Problem: Browser fetch from `apps/web` (`https://app.sky-develop.net`) failed during preflight `OPTIONS` with `Failed to fetch` / `تعذّر البحث عن القنوات. حاول من جديد.` because the browser Supabase client sends `x-client-info` in `Access-Control-Request-Headers`, while `_shared/cors.ts` only permitted `authorization, content-type, apikey`.
+- Fix: Updated `supabase/functions/_shared/cors.ts` so `corsHeaders()` allows `x-client-info, x-retry-count, traceparent, tracestate, baggage` and reflects `access-control-request-headers` on preflight for allowed origins.
+- Tests: Added test in `supabase/tests/cors.test.ts` verifying `x-client-info` and requested headers reflection.
+- Client logging: Added `console.error` in `apps/web/src/account/Account.tsx` for lookup error diagnostics.
+- Deployed: Edge functions `channel-lookup`, `billing-portal`, `oauth-start`, `paddle-checkout` redeployed to Supabase project `ykqugctewsqvevhyqtbi`. Live preflight curl verified returning `access-control-allow-headers: authorization,content-type,apikey,x-client-info`.
+- Preview deployed: `npm run build && npm run deploy:preview` uploaded cleanly. Full verification suite `npm run check` passed 100% green. All paths free.

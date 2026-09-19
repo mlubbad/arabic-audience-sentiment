@@ -26,18 +26,24 @@ export function parseOrigins(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+const DEFAULT_ALLOWED_HEADERS =
+  "authorization, content-type, apikey, x-client-info, x-retry-count, traceparent, tracestate, baggage";
+
 export function corsHeaders(
   request: Request,
   allowed: string[],
 ): Record<string, string> {
   const origin = request.headers.get("origin");
   if (!origin || !allowed.includes(origin)) return {};
+  const requestedHeaders = request.headers.get(
+    "access-control-request-headers",
+  );
   return {
     "access-control-allow-origin": origin,
     // Echoing the origin means the response differs per origin, so a cache
     // must not serve one origin's response to another.
     vary: "Origin",
-    "access-control-allow-headers": "authorization, content-type, apikey",
+    "access-control-allow-headers": requestedHeaders ?? DEFAULT_ALLOWED_HEADERS,
     "access-control-allow-methods": "POST, OPTIONS",
     "access-control-max-age": "600",
   };

@@ -614,6 +614,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                         .then(async ({ data, error }) => {
                           setBusy(null);
                           if (error) {
+                            console.error("Channel lookup failed:", error);
                             setLookup({
                               ws: w.id,
                               candidates: null,
@@ -625,6 +626,13 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                           }
                           const parsed =
                             ChannelLookupResponseSchema.safeParse(data);
+                          if (!parsed.success) {
+                            console.error(
+                              "Channel lookup schema mismatch:",
+                              parsed.error,
+                              data,
+                            );
+                          }
                           setLookup({
                             ws: w.id,
                             candidates: parsed.success
