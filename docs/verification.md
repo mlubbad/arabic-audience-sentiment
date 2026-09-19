@@ -2707,3 +2707,21 @@ a successful claim or discover, only `comment counts` lines during a collect.
   blocked by the toolchain above; the vitest file `supabase/tests/admin_observability.test.ts`
   mirrors the standalone script and is the one the repo gate runs. The browser pages were not
   exercised live against the hosted project either — no session here.
+
+**Addendum, same day — the security and technical review:**
+- Secrets scan (`scripts/check-secrets.mjs`) passed over 661 source files.
+- No `dangerouslySetInnerHTML`/`innerHTML` anywhere in the new admin code; errors surface as
+  codes only, rows render through React's escaping.
+- All four RPCs: `security definer` + `set search_path=''` + fully qualified names, the
+  `is_platform_admin()` raise at the head, `revoke all` then `grant execute to authenticated` —
+  four for four, matching the house pattern. No dynamic SQL; the one parameter (`p_limit`) is an
+  int range-checked at both ends. PII (emails) flows only through the gated RPCs and from
+  `auth.users` columns alone — no raw_user_meta_data, no tokens.
+- Performance: three indexes added to `20260919160000` before it applies anywhere —
+  `sync_runs_channel_started` (the per-channel lateral was a full sync_runs scan per channel;
+  `sync_runs_recent` leads with workspace_id and cannot serve it), `sync_runs_failed_recent`
+  (partial, the failed-runs list and phase two's health tick), `comments_first_seen` (the weekly
+  count was a full scan of a grow-only table; phase two's scheduled signals ask the same).
+  Verified created in the bootstrap; the standalone 30/30 run re-passed on top of them.
+- Known, deliberate: admin reads write no audit rows (phase four's writes will, each with its
+  own guard); the reads are platform-wide by design, which is what the page is for.
