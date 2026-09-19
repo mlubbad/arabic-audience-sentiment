@@ -141,7 +141,9 @@ async function readLive(workspaceId: string): Promise<CatalogueRead> {
       .eq("workspace_id", workspaceId),
   ]);
   if (channel.error) throw new Error("catalogue_unavailable");
-  const connected = (channel.data ?? []).find((c) => c.status === "connected");
+  const connected = (channel.data ?? []).find(
+    (c) => c.status === "connected" || c.status === "public_unverified",
+  );
   return {
     videos,
     selections,

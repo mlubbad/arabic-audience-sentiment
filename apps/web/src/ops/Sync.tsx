@@ -216,7 +216,7 @@ function SyncBody({
       .then(({ data }) => {
         if (!active) return;
         const connectedChannel = (data ?? []).find(
-          (c) => c.status === "connected",
+          (c) => c.status === "connected" || c.status === "public_unverified",
         );
         setChannelId(connectedChannel?.channel_id ?? null);
       });

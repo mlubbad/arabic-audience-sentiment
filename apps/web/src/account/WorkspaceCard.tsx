@@ -107,6 +107,7 @@ export function WorkspaceCard({
   const addChannelQueryId = `addchannel-query-${workspace.id}`;
   const [query, setQuery] = useState("");
   const connected = channel?.status === "connected";
+  const hasPublicChannel = channel?.status === "public_unverified";
   // A channel connected before the callback asked Google for a name has
   // none stored, and a connected channel had no way back through consent
   // — the only door it showed was "collect". Going through consent again
@@ -218,7 +219,7 @@ export function WorkspaceCard({
               card points there — a link, not an action, because the choice
               is the action and it needs the catalogue in front of the
               reader. */}
-          {connected && (
+          {(connected || hasPublicChannel) && (
             <Button asChild>
               <Link
                 to={`/sync?ws=${workspace.id}`}
@@ -276,7 +277,7 @@ export function WorkspaceCard({
               "choose videos" would be pressed by mistake. What YouTube's
               audit asks for is that a user can withdraw access from inside
               the application; this is it. */}
-          {connected && (
+          {(connected || hasPublicChannel) && (
             <Button
               variant="ghost"
               disabled={pending}
