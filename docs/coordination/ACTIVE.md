@@ -566,3 +566,13 @@ entry of this date. Also repaired, with fixture-only changes, the never-executed
 restart the worker service with `YOUTUBE_API_KEY` in its environment (`public=yes`
 in its startup log line confirms). Until then the new door looks up nothing and a
 claimed public job ends blocked `public_collection_not_configured`.
+
+2026-09-19, same lane, live rollout correction: db push applied `20260919180000`;
+`channel-lookup` v1 and `worker` v18 are deployed; the operator steps in the entry
+above are now only — create the API key (restricted to YouTube Data API v3),
+`supabase secrets set YOUTUBE_API_KEY=…`, the same value in `.env.local`, then
+`scripts/worker-service-update.sh` **from the `mlubbad` login**, where the service
+actually runs (an update run from the `muhammed` account crash-looped EX_CONFIG
+against the plist's hard-coded paths and was uninstalled; the script now templates
+those paths). The deployed web bundle predates the new door until the next
+`deploy:preview`.

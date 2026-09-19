@@ -2054,3 +2054,24 @@ data with the project's API key, link the account later for real. Landed:
 in `.env.local` (the same conditional pattern as `GEMINI_API_KEY`), so the
 service actually reaches the `public=yes` state the ACTIVE.md operator steps
 name. Without this the key in `.env.local` would never have reached the loop.
+
+2026-09-19, same lane, live rollout executed (the operator asked for the steps to
+be run in this turn): `supabase db push --linked` applied
+`20260919180000` (read back registered in `supabase_migrations.schema_migrations`
+via the Management API); `channel-lookup` deployed v1 (verify_jwt=true — probes
+without/bad JWT answer 401/UNAUTHORIZED); `worker` redeployed v18 from main, so
+the deployed claim now carries `external_channel_id` for public channels (v17
+predated the change); `ALLOWED_ORIGINS` confirmed present in the secrets list,
+`YOUTUBE_API_KEY` confirmed absent — the one remaining input, the operator's to
+create. **Worker service**: `worker-service-update.sh` was run from this
+checkout — but this account (`muhammed`) is not the account the service runs
+under (`mlubbad`; the tracked plist hard-codes its home), so the bootstrapped
+agent crash-looped EX_CONFIG and was booted out and uninstalled here, leaving
+the service exactly where it was: running under the operator's login, still at
+the pre-public code. The trap is fixed at the source: `worker-service-update.sh`
+now rewrites the home paths in the installed plist to the running account (a
+no-op on `mlubbad`). Remaining operator steps: create the YouTube API key
+(Enable YouTube Data API v3, then an API key restricted to it), then
+`supabase secrets set YOUTUBE_API_KEY=…`, add the same value to `.env.local`,
+run `scripts/worker-service-update.sh` **from the account that runs the
+service**, and deploy the web bundle when convenient.

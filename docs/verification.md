@@ -2830,3 +2830,16 @@ locally, all green.
   deploy channel-lookup`, then `db push` — operator steps, in that order); and
   the door was not walked in a browser signed in, because the browser suite
   runs signed out. The e2e gap is the account page's standing one, not new.
+
+2026-09-19, live rollout of the public-channel path: `20260919180000` applied
+and read back via the Management API migration table; `channel-lookup` v1 and
+`worker` v18 ACTIVE (channel-lookup verify_jwt=true: no/bad JWT → 401 /
+UNAUTHORIZED_INVALID_JWT, probed live; worker verify_jwt=false as before);
+`ALLOWED_ORIGINS` present, `YOUTUBE_API_KEY` absent in the secrets list. The
+lookup function has not answered a real lookup yet — that needs the operator's
+API key — so `YOUTUBE_API_KEY`-dependent behaviour remains fixture-tested only.
+The worker service itself was left untouched: the update script run from this
+second account (`muhammed`) produced an EX_CONFIG crash loop against the
+hard-coded `mlubbad` paths and was uninstalled here; the script now templates
+the home paths, so rerunning it from the service's own account applies main
+cleanly.
