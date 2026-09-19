@@ -31,13 +31,12 @@ export function useAdminShell(): {
   const { session, loading } = useSession();
   const access = useIsPlatformAdmin(session);
   const admin = !!(session && access.data === true);
-  const shell = (body: ReactNode) => (
-    <div className="db-page">
-      {body}
-    </div>
-  );
+  const shell = (body: ReactNode) => <div className="db-page">{body}</div>;
   if (loading || (session && access.isPending))
-    return { admin: false, shell: () => shell(<Loading S={S} label={S.pageOpening} shape="ops" />) };
+    return {
+      admin: false,
+      shell: () => shell(<Loading S={S} label={S.pageOpening} shape="ops" />),
+    };
   if (access.isError)
     return {
       admin: false,

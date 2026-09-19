@@ -44,7 +44,9 @@ export async function readAdminOps(): Promise<AdminOps> {
 export const AUDIT_LIMITS = [100, 300, 500] as const;
 export type AuditLimit = (typeof AUDIT_LIMITS)[number];
 
-export async function readAdminAudit(limit: AuditLimit = 100): Promise<AdminAuditEvent[]> {
+export async function readAdminAudit(
+  limit: AuditLimit = 100,
+): Promise<AdminAuditEvent[]> {
   const { data, error } = await supabase!.rpc("admin_audit", {
     p_limit: limit,
   });

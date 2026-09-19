@@ -7,12 +7,15 @@ import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useStrings } from "../strings";
 import { failureCode } from "../failure";
+import { ChartEmpty, LoadError, Loading } from "../pageStates/PageStates";
 import {
-  ChartEmpty,
-  LoadError,
-  Loading,
-} from "../pageStates/PageStates";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "../ui/Table";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "../ui/Table";
 import { AUDIT_LIMITS, readAdminAudit, type AuditLimit } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
 
@@ -40,13 +43,19 @@ export function AdminAuditPage() {
       />
     );
   else if (list.data.length === 0)
-    body = <ChartEmpty testId="admin-audit-empty">{S.adminAuditEmpty}</ChartEmpty>;
+    body = (
+      <ChartEmpty testId="admin-audit-empty">{S.adminAuditEmpty}</ChartEmpty>
+    );
   else
     body = (
       <section className="db-section" aria-labelledby="admin-audit-heading">
         <header className="admin-audit-head">
           <h2 id="admin-audit-heading">{S.adminAuditHeading}</h2>
-          <div className="admin-audit-limits" role="group" aria-label={S.adminAuditLimitLabel}>
+          <div
+            className="admin-audit-limits"
+            role="group"
+            aria-label={S.adminAuditLimitLabel}
+          >
             {AUDIT_LIMITS.map((n) => (
               <button
                 key={n}
@@ -74,7 +83,9 @@ export function AdminAuditPage() {
             <TableBody>
               {list.data.map((e) => (
                 <TableRow key={e.id}>
-                  <TableCell>{e.created_at.slice(0, 16).replace("T", " ")}</TableCell>
+                  <TableCell>
+                    {e.created_at.slice(0, 16).replace("T", " ")}
+                  </TableCell>
                   <TableCell>{e.workspace_name}</TableCell>
                   <TableCell>{e.actor_email ?? "—"}</TableCell>
                   <TableCell>

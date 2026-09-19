@@ -342,10 +342,13 @@ describe("the mid-run token renewal", () => {
       access_token: "ya29.renewed",
       access_token_expires_at: "2026-09-19T18:00:00Z",
     }));
-    const r = await renew({ ...base(), renewToken }, {
-      job_id: "j",
-      lease_token: "l",
-    });
+    const r = await renew(
+      { ...base(), renewToken },
+      {
+        job_id: "j",
+        lease_token: "l",
+      },
+    );
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({
       access_token: "ya29.renewed",
@@ -355,11 +358,14 @@ describe("the mid-run token renewal", () => {
 
   it("carries the hashed credential and the lease the request named", async () => {
     const renewToken = vi.fn(async () => null);
-    await renew({ ...base(), renewToken }, {
-      job_id: "job-2",
-      lease_token: "lease-2",
-      workspace_id: "forged",
-    });
+    await renew(
+      { ...base(), renewToken },
+      {
+        job_id: "job-2",
+        lease_token: "lease-2",
+        workspace_id: "forged",
+      },
+    );
     expect(renewToken).toHaveBeenCalledWith(
       expect.any(String),
       "job-2",

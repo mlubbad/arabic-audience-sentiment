@@ -38,13 +38,10 @@ export interface WorkerDb {
   accessTokenFor?(
     credentialHash: string,
     jobId: string,
-  ): Promise<
-    | {
-        access_token: string;
-        access_token_expires_at: string;
-      }
-    | null
-  >;
+  ): Promise<{
+    access_token: string;
+    access_token_expires_at: string;
+  } | null>;
   /**
    * A fresh channel credential mid-run, against a lease the worker still
    * holds. Optional: a gateway without it answers 404 and the worker falls
@@ -54,13 +51,10 @@ export interface WorkerDb {
     credentialHash: string,
     jobId: string,
     leaseToken: string,
-  ): Promise<
-    | {
-        access_token: string;
-        access_token_expires_at: string;
-      }
-    | null
-  >;
+  ): Promise<{
+    access_token: string;
+    access_token_expires_at: string;
+  } | null>;
   heartbeat(
     credentialHash: string,
     jobId: string,

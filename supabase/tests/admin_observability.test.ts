@@ -51,9 +51,18 @@ const bootstrap = async () => {
   await db.query("insert into private.platform_admins(user_id) values ($1)", [
     ADMIN,
   ]);
-  await db.query("insert into workspaces(id,name,created_by) values ($1,'أ', $2)", [W, OWNER]);
-  await db.query("insert into memberships values ($1,$2,'workspace_owner')", [W, OWNER]);
-  await db.query("insert into clients(id,workspace_id,name) values ($1,$1,'أ')", [W]);
+  await db.query(
+    "insert into workspaces(id,name,created_by) values ($1,'أ', $2)",
+    [W, OWNER],
+  );
+  await db.query("insert into memberships values ($1,$2,'workspace_owner')", [
+    W,
+    OWNER,
+  ]);
+  await db.query(
+    "insert into clients(id,workspace_id,name) values ($1,$1,'أ')",
+    [W],
+  );
   await db.query(
     "insert into channels(id,workspace_id,client_id,external_channel_id,handle,title,status) values ($1,$2,$2,'UC_x','@x','قناة أ','connected')",
     [C, W],
@@ -76,7 +85,10 @@ const bootstrap = async () => {
     "insert into jobs(workspace_id,channel_id,type,dedupe_key,status) values ($1,$2,'discover','k','queued')",
     [W, C],
   );
-  await db.query("insert into worker_seen(workspace_id,last_seen_at) values ($1,now())", [W]);
+  await db.query(
+    "insert into worker_seen(workspace_id,last_seen_at) values ($1,now())",
+    [W],
+  );
   await db.query(
     `insert into audit_events(workspace_id,actor_id,action,target_type,target_id)
      values ($1,$2,'plan_set','plan','pilot')`,
@@ -114,7 +126,9 @@ describe("admin observability reads", () => {
         email: string | null;
         workspace_count: number;
         owner_count: number;
-      }>("select (admin_users() ->> 'id')::uuid as id, admin_users() ->> 'email' as email, (admin_users() ->> 'workspace_count')::int as workspace_count, (admin_users() ->> 'owner_count')::int as owner_count")
+      }>(
+        "select (admin_users() ->> 'id')::uuid as id, admin_users() ->> 'email' as email, (admin_users() ->> 'workspace_count')::int as workspace_count, (admin_users() ->> 'owner_count')::int as owner_count",
+      )
     ).rows;
     // One row per auth.users row, even the admin who owns no workspace.
     expect(rows).toHaveLength(3);
@@ -176,8 +190,12 @@ describe("admin observability reads", () => {
     expect(rows[0].action).toBe("plan_set");
     expect(rows[0].actor_email).toContain("@");
     expect(rows[0].workspace_name).toBe("أ");
-    await expect(db.query("select admin_audit(0)")).rejects.toThrow(/invalid_limit/);
-    await expect(db.query("select admin_audit(501)")).rejects.toThrow(/invalid_limit/);
+    await expect(db.query("select admin_audit(0)")).rejects.toThrow(
+      /invalid_limit/,
+    );
+    await expect(db.query("select admin_audit(501)")).rejects.toThrow(
+      /invalid_limit/,
+    );
   });
 
   it("the reads stay reads: no function may write what it refuses to change", async () => {
@@ -193,7 +211,9 @@ describe("admin observability reads", () => {
     await db.query("select admin_audit(100)");
     await db.exec("reset role");
     const n = (
-      await db.query<{ n: number }>("select count(*)::int as n from audit_events")
+      await db.query<{ n: number }>(
+        "select count(*)::int as n from audit_events",
+      )
     ).rows[0].n;
     expect(n).toBe(1);
   });

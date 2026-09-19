@@ -301,7 +301,8 @@ export const ar = {
   adminTabAudit: "سجل التدقيق",
   // users
   adminUsersTitle: "المستخدمون",
-  adminUsersLead: "كل من سجّل في المنصة، ومتى آخر ظهور له، وكيف توزّع على مساحات العمل.",
+  adminUsersLead:
+    "كل من سجّل في المنصة، ومتى آخر ظهور له، وكيف توزّع على مساحات العمل.",
   adminUsersLoading: "جارٍ قراءة المستخدمين…",
   adminUsersEmpty: "لا مستخدمين بعد.",
   adminUsersHeading: "المستخدمون",
@@ -315,7 +316,8 @@ export const ar = {
     "البريد بيانات شخصية: يظهر هنا لأن القاعدة تتحقق من صفتك كمشغّل، ويُسجّل في السجل كل استخدام إداري قادم.",
   // channels
   adminChannelsTitle: "القنوات",
-  adminChannelsLead: "كل قناة مرتبطة، والمساحة التي تخدمها، وحصادها من الفيديوهات والتعليقات، وحالة آخر مزامنة.",
+  adminChannelsLead:
+    "كل قناة مرتبطة، والمساحة التي تخدمها، وحصادها من الفيديوهات والتعليقات، وحالة آخر مزامنة.",
   adminChannelsLoading: "جارٍ قراءة القنوات…",
   adminChannelsEmpty: "لا قنوات بعد.",
   adminChannelsHeading: "القنوات",
@@ -332,7 +334,8 @@ export const ar = {
   adminChannelsNeverSynced: "لم تُزامن بعد",
   // ops
   adminOpsTitle: "التشغيل",
-  adminOpsLead: "أرقام المنصة اليوم، وآخر المزامنات الفاشلة — ما ينبغي أن تُشعر به الإشعارات لاحقًا قبل المستخدم.",
+  adminOpsLead:
+    "أرقام المنصة اليوم، وآخر المزامنات الفاشلة — ما ينبغي أن تُشعر به الإشعارات لاحقًا قبل المستخدم.",
   adminOpsLoading: "جارٍ قراءة حالة التشغيل…",
   adminOpsHeading: "حالة المنصة",
   adminOpsWorkspaces: "مساحات العمل",
@@ -356,7 +359,8 @@ export const ar = {
   adminOpsFailedNoChannel: "قناة محذوفة",
   // audit
   adminAuditTitle: "سجل التدقيق",
-  adminAuditLead: "ما فُعل من يد المشغّل: على أي مساحة، ومن أي حساب، ومتى — والسجل لا يُعدَّل ولا يُحذف.",
+  adminAuditLead:
+    "ما فُعل من يد المشغّل: على أي مساحة، ومن أي حساب، ومتى — والسجل لا يُعدَّل ولا يُحذف.",
   adminAuditLoading: "جارٍ قراءة السجل…",
   adminAuditEmpty: "السجل فارغ.",
   adminAuditHeading: "السجل",

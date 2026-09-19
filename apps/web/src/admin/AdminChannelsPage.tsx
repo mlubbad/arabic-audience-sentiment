@@ -10,13 +10,16 @@ import { useQuery } from "@tanstack/react-query";
 import type { AdminChannel } from "@sentiment/contracts";
 import { useStrings } from "../strings";
 import { failureCode } from "../failure";
-import {
-  ChartEmpty,
-  LoadError,
-  Loading,
-} from "../pageStates/PageStates";
+import { ChartEmpty, LoadError, Loading } from "../pageStates/PageStates";
 import { Badge } from "../ui/Badge";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "../ui/Table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "../ui/Table";
 import { readAdminChannels } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
 
@@ -26,7 +29,8 @@ const NONE = "—";
  *  it. The first two are fine; the last two are the operator's work. */
 function statusTone(status: string): "success" | "danger" | "neutral" {
   if (status === "connected") return "success";
-  if (status === "reconnect_required" || status === "disconnected") return "danger";
+  if (status === "reconnect_required" || status === "disconnected")
+    return "danger";
   return "neutral";
 }
 
@@ -53,7 +57,11 @@ export function AdminChannelsPage() {
       />
     );
   else if (list.data.length === 0)
-    body = <ChartEmpty testId="admin-channels-empty">{S.adminChannelsEmpty}</ChartEmpty>;
+    body = (
+      <ChartEmpty testId="admin-channels-empty">
+        {S.adminChannelsEmpty}
+      </ChartEmpty>
+    );
   else
     body = (
       <section className="db-section" aria-labelledby="admin-channels-heading">
@@ -101,7 +109,9 @@ function ChannelRow({ channel }: { channel: AdminChannel }) {
     <TableRow>
       <TableCell>
         <span className="admin-channel-name">{name}</span>
-        {channel.handle ? <span className="admin-channel-sub">{channel.handle}</span> : null}
+        {channel.handle ? (
+          <span className="admin-channel-sub">{channel.handle}</span>
+        ) : null}
         {channel.last_sync_error ? (
           <span className="admin-channel-error">{channel.last_sync_error}</span>
         ) : null}
@@ -119,7 +129,10 @@ function ChannelRow({ channel }: { channel: AdminChannel }) {
   );
 }
 
-function channelStatus(status: string, S: ReturnType<typeof useStrings>): string {
+function channelStatus(
+  status: string,
+  S: ReturnType<typeof useStrings>,
+): string {
   switch (status) {
     case "connected":
       return S.adminChannelsConnected;
