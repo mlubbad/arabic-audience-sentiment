@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 const files = execFileSync(
   "git",
   ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
@@ -22,6 +22,9 @@ for (const file of files) {
   if (/(?:^|\/)\.env(?:\.|$)/.test(file) && !file.endsWith(".env.example"))
     violations.push(file);
   if (!existsSync(file)) continue;
+  // A tracked symlink can name a directory (e.g. .agents/skills); a
+  // directory has no content to scan and readFileSync on one throws.
+  if (statSync(file).isDirectory()) continue;
   const content = readFileSync(file, "utf8");
   if (forbidden.some((pattern) => pattern.test(content))) violations.push(file);
   if (
