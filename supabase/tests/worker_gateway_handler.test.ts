@@ -19,7 +19,12 @@ const base = (): WorkerDb => ({
   commitTopics: vi.fn(async () => ({})),
   tick: vi.fn(async () => ({ discover: 0, collect: 0 })),
 });
-const post = (db: WorkerDb, path = "/worker/claim", bearer = "cred") =>
+const post = (
+  db: WorkerDb,
+  path = "/worker/claim",
+  bearer = "cred",
+  body: unknown = {},
+) =>
   handleWorkerRequest(
     new Request(`https://edge.invalid${path}`, {
       method: "POST",
@@ -27,10 +32,20 @@ const post = (db: WorkerDb, path = "/worker/claim", bearer = "cred") =>
         authorization: `Bearer ${bearer}`,
         "content-type": "application/json",
       },
-      body: "{}",
+      body: JSON.stringify(body),
     }),
     db,
   );
+
+const sha256Hex = async (value: string) => {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+};
 
 describe("what a claim hands the worker", () => {
   it("gives a short-lived token, and never the refresh token", async () => {
@@ -318,24 +333,26 @@ describe("the due list and the catalogue", () => {
   it("passes the requested kinds of work to the data layer, cleaned", async () => {
     // A collection-only run asks for collections. A body whose types are
     // malformed asks for anything: an unparseable scope must never become a
-    // narrower one by accident.
+    // narrower one by accident. The data layer sees the hashed credential,
+    // never the bearer as sent.
+    const hash = await sha256Hex("cred");
     const db = base();
     await send(db, "/worker/claim", { types: ["collect"] });
-    expect(db.claim).toHaveBeenCalledWith("cred", ["collect"]);
+    expect(db.claim).toHaveBeenCalledWith(hash, ["collect"]);
     await send(db, "/worker/claim", { types: ["collect", 7, "discover"] });
-    expect(db.claim).toHaveBeenCalledWith("cred", ["collect", "discover"]);
+    expect(db.claim).toHaveBeenCalledWith(hash, ["collect", "discover"]);
     await send(db, "/worker/claim", { types: [] });
-    expect(db.claim).toHaveBeenCalledWith("cred", null);
+    expect(db.claim).toHaveBeenCalledWith(hash, null);
     await send(db, "/worker/claim", { types: "collect" });
-    expect(db.claim).toHaveBeenCalledWith("cred", null);
+    expect(db.claim).toHaveBeenCalledWith(hash, null);
     await send(db, "/worker/claim", {});
-    expect(db.claim).toHaveBeenCalledWith("cred", null);
+    expect(db.claim).toHaveBeenCalledWith(hash, null);
   });
 });
 
 describe("the mid-run token renewal", () => {
   const renew = (db: WorkerDb, body: Record<string, unknown>) =>
-    post(db, "/worker/renew-token", body);
+    post(db, "/worker/renew-token", "cred", body);
 
   it("hands a fresh token and its expiry against a held lease", async () => {
     const renewToken = vi.fn(async () => ({
