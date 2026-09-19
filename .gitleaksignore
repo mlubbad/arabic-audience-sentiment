@@ -1,0 +1,9 @@
+# Gitleaks allowlist — fingerprints verified as synthetic test data.
+#
+# workers/python/tests/fixtures/golden_batch.json holds deterministic test
+# fixtures (sequential UUIDs and a hash-derived batch_key), which the
+# generic-api-key heuristic flags. Each entry pins the exact commit, file,
+# rule, and line so any NEW secret in the same file is still caught.
+9f204f8d78ef034eff82a9ab95bceecc6cad0234:workers/python/tests/fixtures/golden_batch.json:generic-api-key:5
+f3632add10924762f00962006f0b669319d41c79:workers/python/tests/fixtures/golden_batch.json:generic-api-key:3
+c675bda2d35d40b82ddaabfd9bc4bad4826bee32:workers/python/tests/fixtures/golden_batch.json:generic-api-key:3
