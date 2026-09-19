@@ -2750,3 +2750,26 @@ a successful claim or discover, only `comment counts` lines during a collect.
   comments. Token counts are not comparable across the two providers' tokenizers;
   cost depends on each provider's pricing. The loop.py wiring is pending, see the
   progress entry of the same date.
+
+## 2026-09-19 — the live push and what the operator should click through
+
+- `supabase db push --linked` (CLI v2.117.0, downloaded release binary): applied
+  `20260919160000_admin_observability` + `20260919170000_worker_renews_its_token`; "Finished".
+- REST probe with the service-role key: `admin_users`, `admin_channels`, `admin_ops`,
+  `admin_audit(p_limit:0)` → HTTP 403 `42501 forbidden` × 4. Existence + gate, both live. (A
+  signed-in-as-admin probe was deliberately not attempted — minting an admin `sub` token would
+  forge the identity the row-based gate exists to honour.)
+- Host `app.sky-develop.net` HTTP 200; serving the previous bundle still.
+
+**Operator checklist, once `npm run build && npm run deploy:preview` ships the new bundle —
+sign in as the platform admin and walk:**
+1. `/admin` — the tab strip appears under the head (demo mode keeps it hidden, as designed).
+2. `/admin/users` — one row per signed-up user; the owner's counts include their personal
+   workspace (bootstrap trigger); the PII note under the table.
+3. `/admin/channels` — AJ360's real counts, its last run verdict; a channel whose last run
+   failed shows the error code under its name.
+4. `/admin/ops` — the seven cards; `worker_fresh` says «العامل يعمل» while the worker service
+   polls; the failed-runs table lists the last two weeks, «قناة محذوفة» if a handle is gone.
+5. `/admin/audit` — the trail with actor emails; the 100/300/500 rungs re-query.
+6. Signed out, or signed in as a non-admin: every one of the five screens says one sentence and
+   shows no table (`admin-forbidden`), and the rail's «الإدارة» link is absent.

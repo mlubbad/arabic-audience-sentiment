@@ -1938,3 +1938,25 @@ and `"typesafe"` added to the `--topics` choices. The host `.env` then needs
 `TYPESAFE_API_KEY=` and `run-worker.sh` passes `--topics typesafe`. Not the default:
 calibration on a real channel comes first (thresholds and escalation reviewed on
 real verdicts, not the 12-comment sample).
+
+## 2026-09-19 — the observability migration is live
+
+`supabase db push --linked` applied the two pending migrations to the linked project
+(`ykqugctewsqvevhyqtbi`) in one push: `20260919160000_admin_observability` (the four admin reads
+and the three review indexes) and `20260919170000_worker_renews_its_token` (another lane's worker
+renewal, committed on main). The CLI in this session came as a downloaded release binary
+(v2.117.0) — no npm in the shell — running on the `SUPABASE_ACCESS_TOKEN` from `.env.local`.
+
+**Live verification, from the outside:** a `POST /rest/v1/rpc/<fn>` for `admin_users`,
+`admin_channels`, `admin_ops` and `admin_audit` with the service-role key answers
+`HTTP 403 {"code":"42501","message":"forbidden"}` for all four. That is the shape wanted twice
+over: the functions exist (a missing one would be PGRST202/404, not 403), and the gate refuses a
+principal that holds no row in `private.platform_admins` — the service role included. No
+admin-signed-in test was possible from here: minting a token with an admin's `sub` would be
+forging exactly the identity claim the design refuses to honour, so it was not done.
+
+**Not yet shipped:** the web bundle. `app.sky-develop.net` is up (HTTP 200) but still serves the
+previous build; the four pages under `/admin/users|channels|ops|audit` ride the next
+`npm run build && npm run deploy:preview` from a shell with the normal Node toolchain — this
+session's node cannot load rollup's native module, so the build was left to the operator's
+terminal, with a test checklist in the verification entry.
