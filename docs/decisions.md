@@ -1107,3 +1107,51 @@ answers the job's own workspace. Nothing above SQL changed: the wire contract ne
 workspace, which is exactly what made this a one-migration change. Scoped credentials keep
 working; a workspace's last one may be retired once a platform one is live. Design:
 `docs/superpowers/specs/2026-09-18-platform-worker-credential-design.md`.
+
+2026-09-19 — A lease's reclaim evidence is a heartbeat, not a lapse; and a claim is scoped to the
+kinds of work its caller can run. The 2026-09-19 incident had one root: `claim_job` read more out
+of the world than the world had said. A platform replay re-claiming a lapsed lease counted as a
+worker fight and drove a collect job to `reclaims=20`, one claim from permanent burial; and an
+operator's collection run claimed whatever job was oldest, consuming a queued topics job and
+finishing it «succeeded» with nothing classified. The fix is in the semantics, not the tuning:
+`jobs.heartbeats` separates "nobody held this" (resume free — a replay or a pre-first-heartbeat
+death) from "a live holder went silent" (a real takeover — counts, backs off, and at twenty still
+buries the job as `lease_thrashing`). The heartbeat's renewal is a five-minute floor, fixing a
+latent bug where an early heartbeat shortened a five-minute lease to sixty seconds. Claims carry
+`job_types` end to end (worker → gateway → SQL), so a collection-only run can never be handed a
+topics job, and a loop without a classifier never holds one for five idle minutes. Unscoped claims
+remain the contract for a worker able to run everything. Verified transactionally on the live
+engine, then applied; the scoped RPC's parameter name had to match the gateway's exactly
+(`credential_hash`), which PostgREST enforces by name at the RPC boundary — a second migration
+corrected the name, and both migrations are registered in `supabase_migrations`.
+
+Known limits recorded honestly: the rewritten SQL tests (`lease_recovery.test.ts`, new
+`scoped_claim.test.ts`) and the TS handler test need a `npm run test:db` under pinned Node 22,
+which this machine does not have. The wedged-PostgREST failure class is detectable only from
+outside the database; an external uptime probe against the worker gateway is the remaining gap
+between this state and near-zero maintenance, alongside the missing git remote.
+
+2026-09-19 — Resource protection: what guards the platform, and what is deliberately not built
+yet. Already standing: analysis metering charges once per unique verdict and refuses an unpaid
+batch outright (402, never a silent overrun); one outstanding collection per channel with
+selection backoff and unchanged-count deferral bounds YouTube quota; batch size caps and lease
+semantics bound the queue; RLS bounds every read to the caller's membership; prediction reads are
+keyed to the active analysis, so history is stored but never re-served. Fixed this round: the
+dashboard's per-comment review lookups were sequential scans — two tables walked top-to-bottom
+once per comment, ~37,700 scans per page load at the current size — now indexed. Monitoring
+(`scripts/monitor.sh`, cron every 5 minutes) is the outside-the-database alarm the wedged
+PostgREST of 2026-09-18 proved necessary.
+
+The one structural decision still open, recorded so it is made with data rather than in an
+incident: `dashboard_snapshot(w)` returns every comment of the workspace in one response, and the
+derived filters run in the browser. At 18,875 rows that is seconds of Postgres JSON build and a
+multi-megabyte transfer per visitor page load; it scales with the workspace, not with the page.
+The trigger for splitting it — an aggregates RPC beside a paged comments RPC, with
+`packages/contracts` `filteredRows` remaining the single filter implementation both paths mirror
+— is a workspace passing ~50k comments or a page load p95 past two to three seconds, whichever
+comes first. Exports, when built for live mode, must write to the private storage bucket as a
+background job (the design already says so); never assembled in edge-function memory. Platform
+rate limits on the browser-facing functions (`oauth-start`, `oauth-callback`) are a dashboard
+setting, not code. A `statement_timeout` on the authenticated role was considered and deferred:
+as a last-resort cap it would first bite the snapshot RPC itself, punishing the read before the
+fix that makes it light.

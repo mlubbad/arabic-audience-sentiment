@@ -1,5 +1,54 @@
 # Progress
 
+## 2026-09-19 (2) — The claim can no longer misread the world
+
+Three fault classes from the 2026-09-19 incident are closed at the source, not patched around:
+
+1. **A replayed platform request is not a worker fight.** `jobs.heartbeats` records whether a lease's
+ holder ever proved alive. A lapsed lease with zero heartbeats — a platform retry, or a worker that
+ died before its first batch — resumes without counting a reclaim and without backoff. A lease that
+ was heartbeated and then lapsed is a real takeover: it counts and backs off, and twenty of those
+ still bury the job as `lease_thrashing`. The collect job that reached `reclaims=20` from pure
+ platform retries could never reach that state again.
+2. **A claim names the work its caller can run.** `claim_job` takes `job_types`; the gateway passes
+ the body's `types`; `run_backfill` claims `collect`, `run_discover` claims `discover`, and the loop
+ claims unscoped only when it has a topic classifier, else `collect`+`discover`. The one-shot run
+ that consumed a queued topics job and finished it «succeeded» with nothing classified cannot
+ happen again — verified live: a scoped collect claim returns 204 while a topics job waits.
+3. **A heartbeat can no longer shorten the lease.** The renewal is a five-minute floor, not a
+ sixty-second reset, so a fast first batch followed by a slow one cannot lose the lease mid-run.
+
+The scoped RPC's first parameter was deployed once named `token_hash` and corrected in a following
+migration (PostgREST matches RPCs by parameter name; the mismatch surfaced as PGRST202 — see the
+schema-cache notes at the top of `docs/verification.md`).
+
+Still open for true near-zero maintenance: a `vitest`/`npm run test:db` run under pinned Node 22 to
+execute the rewritten SQL tests, a signed-in dashboard walkthrough against the v2 key, and an
+external uptime monitor — the wedged PostgREST of 2026-09-18 was invisible from inside the
+database, so only something outside it can raise that alarm. A git remote remains the other
+single point of failure.
+
+## 2026-09-19 — Arabic normalization reaches the model; live pilot re-analysed under v2
+
+The sentiment pipeline now analyses what it claimed it analyses. `LogitsAdapter.predict` sends the
+normalized text (tatweel, tashkeel, elongation collapsed; emoji and negation particles preserved) to
+the model, and `PREPROCESSING_VERSION` moved to `strip-html-arabic-norm-v2` in the same change, per
+the ACTIVE.md rule that the key and the behaviour must move together. A guard test now fails if the
+adapter and the version drift apart again.
+
+The live pilot channel (AJ360) was re-collected and re-analysed through the product path:
+18,850 v2 predictions committed (v1 history kept), 1,223+ new comments picked up along the way, and
+`channels.active_analysis_key` switched to the v2 key, so the dashboard's effective labels are the
+normalized-pipeline measurements. Human reviews continue to supersede model output unchanged.
+
+Two operational faults were found and fixed on the way: the deployed project's PostgREST had wedged
+(504 after 60s on every request; every worker call dead since 2026-09-18) and was recovered by a
+project restart; and the collect job carried 20 stale reclaims from that outage, which the next
+claim would have converted into a permanent failure — zeroed by operator SQL before requeueing.
+See `docs/verification.md` for the commands and results. The signed-in dashboard walkthrough against
+the v2 key is still outstanding, as is a `vitest`/`npm run test:db` run on a machine with pinned
+Node 22.
+
 ## 2026-09-14 — Private preview deployment and origin verification
 
 The updated production front-end bundle (including the new Arabic sentiment engine wiring, confidence scores display, and sidebar navigation) was deployed to private hosting (`app.sky-develop.net`, origin `91.204.209.217`) via `npm run deploy:preview`. All files uploaded successfully over FTP, and 8 obsolete asset chunks were cleanly removed. Probing the origin over HTTP confirmed that HTTP Basic Auth is strictly enforced (401 without auth, 200 with credentials), all static assets and fixtures return 200 with exact sizes, SPA fallback functions on all routes (`/dashboard`, `/sync`, `/account`), and `.htaccess` remains blocked with 403.

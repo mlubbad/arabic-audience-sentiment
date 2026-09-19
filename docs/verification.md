@@ -1,5 +1,79 @@
 # Verification
 
+## 2026-09-19 (3) — External monitoring live; review lookups indexed
+
+| Command / observation | Actual result |
+| --- | --- |
+| `scripts/monitor.sh` (7 probes, 2.4s) | All OK: rest 200 · gateway 204 (claims nothing — the probe's job type cannot exist) · leases none · failures none · worker seen 0m ago · newest prediction 0h · site 200 |
+| crontab | Installed: `*/5 * * * * cd … && ./scripts/monitor.sh >> .worker-logs/monitor.log 2>&1` — edge-triggered alerts (state in `.cache/monitor-state.*`), optional `ALERT_WEBHOOK_URL` in `.env.local`, exit codes 0/1/2 |
+| Migration `20260919140000_reviews_are_looked_up_not_scanned.sql` | Applied and registered: `comment_reviews(workspace_id, comment_id)` and `topic_reviews(workspace_id, comment_id)`. Before: the dashboard's per-comment review lookup seq-scanned both tables — 18,875 scans per page load. `EXPLAIN` with seqscan off confirms Index Scan on the new indexes |
+| PostgREST schema cache | Reloaded on its own after the index DDL (no restart needed for indexes; functions needed one earlier today) |
+
+## 2026-09-19 (2) — Lease semantics and scoped claims hardened
+
+The 2026-09-19 incident class is closed at the source: a replayed platform request no longer reads
+as a worker fight, and a claim can no longer take work its caller cannot run.
+
+| Command / observation | Actual result |
+| --- | --- |
+| Migration `20260919120000_a_replayed_claim_is_not_a_fight.sql` | Applied and registered. Adds `jobs.heartbeats`, rebuilt `claim_job` (reclaims count only leases that were heartbeated and then lapsed; silent lapses resume free), heartbeat lease floor raised to 5 minutes (was 60s — an early heartbeat used to shorten the lease), and `private.claim_job(w, job_types)` plus `public.svc_worker_claim(text, text[])` |
+| Transactional dry-run on live Postgres (BEGIN → DDL → 6 behavioural probes → ROLLBACK) | All probes correct: scoped claim returns only the asked type; silent lapse → `reclaims=0`, no backoff; heartbeated lapse → `reclaims=1`; early heartbeat leaves 300s lease; unscoped claim unchanged |
+| Migration `20260919130000_the_rpc_argument_is_named_for_the_gateway.sql` | Applied and registered. The scoped RPC's first parameter was named `token_hash` while the gateway sends `credential_hash`; PostgREST resolves RPCs by parameter name, so every scoped claim answered PGRST202. Overload dropped and rebuilt with the gateway's name |
+| `pytest` (workers/python) | 198 passed (scoped-claim body tests added to `test_gateway.py` and `test_backfill.py`) |
+| `ruff check .` | Pass |
+| `tsc --noEmit` | Pass |
+| Edge function `worker` redeployed (Management API, `verify_jwt=false`) | v16 ACTIVE; a stray duplicate function created by the first deploy attempt was deleted |
+| Live differential: `POST /worker/claim` `{"types":["collect"]}` | **204** — no collect job exists, and the queued analyse job is left untouched (the exact theft this prevents) |
+| Live differential: `POST /worker/claim` `{"types":["analyse"]}` | 200 with the analyse job; the orphan lease this probe left lapses and resumes without penalty under the new semantics |
+| `vitest` / `npm run test:db` | **Not run in this session** — no pinned Node 22 on this machine. `lease_recovery.test.ts` was rewritten for the new contract (silent lapse never counts; heartbeated lapse counts; heartbeats reset per lease), and `scoped_claim.test.ts` added. Run under `nvm use` before the next deploy |
+
+PostgREST schema-cache notes, for the next schema change: `NOTIFY pgrst, 'reload schema'` did not
+refresh the cache through the Management API path, but functions created there did appear without a
+restart after a few minutes — the restart was what made it immediate. A parameter-name mismatch
+surfaces as PGRST202, not as a SQL error; check `pg_get_function_identity_arguments` first.
+
+## 2026-09-19 — Arabic normalization wired into inference; live re-analysis under v2
+
+Node not available in this session (pinned Node 22 not installed on this machine); Python work verified
+with uv-managed 3.12 (`uv sync --frozen`, plus `--group inference` for the live run).
+
+| Command / observation | Actual result |
+| --- | --- |
+| `tsc --noEmit` | Pass (exit 0) |
+| `node scripts/check-secrets.mjs` | Pass (643 source files + built assets) |
+| `pytest` (workers/python) | 196 passed in 0.24s |
+| `ruff check .` (workers/python) | All checks passed |
+| `vitest` / `npm run test:db` | **Not run in this session** — the machine lacks pinned Node 22; run under `nvm use` before the next deploy |
+
+### Code change
+
+- `sentiment/transformer.py`: `LogitsAdapter.predict` now calls `normalize_arabic_text` — the
+  normalization helpers (tatweel, tashkeel, elongation) existed and were tested but were never in the
+  inference path, exactly the drift `docs/coordination/ACTIVE.md` warned about.
+- `sentiment/preprocess.py`: `normalize_arabic_text` now strips tashkeel too (it previously did not,
+  despite the helper existing), and `PREPROCESSING_VERSION` bumped to `strip-html-arabic-norm-v2` in
+  the same change so stored v1 predictions remain attributable to the pipeline that made them.
+- New guard test `test_the_model_is_asked_about_the_normalized_text_not_the_raw_one` in
+  `tests/test_transformer.py`; `test_sentiment.py` expectations updated for v2 (tanwīn stripped,
+  negation particles and emoji preserved).
+- `tests/fixtures/golden_batch.json` regenerated through `test_golden_batch.rebuild()` (never
+  hand-edited); new payload hash `6cdd7f81…`. The TS seam test reads the fixture dynamically.
+
+### Live re-analysis (pilot workspace “الجزيرة 360”, channel UCWxc7ue-jGlL5ypOHX_i0Bg)
+
+| Step | Actual result |
+| --- | --- |
+| Supabase PostgREST | Found returning 504 after 60s for every request (worker path dead since 2026-09-18 ~16:00). `POST /v1/projects/…/restart` (200) restored it; claim answered in 2.4s |
+| Selection reset (operator SQL) | 459 comment-bearing videos due, 4,009 empty videos deferred 2h; collect job checkpoint reset, reclaims zeroed |
+| `manual_run --backfill --model camelbert-da` | Comment counts survey: 0 unchanged, 459 to read; job finished **succeeded** |
+| Predictions under v2 | **18,850** succeeded (v1 history preserved at 17,627); 1,223+ comments were new since the first collection; total comments now 18,875 |
+| Label distribution v1 → v2 | negative 45.6% → 47.4%, neutral 17.9% → 17.9%, positive 36.5% → 34.8% (same model; shift from normalization + new rows) |
+| `channels.active_analysis_key` | Switched to `…@b0df630d…+strip-html-arabic-norm-v2+a272ec5cfcf7` — the dashboard's effective labels now come from v2 |
+| Effective-label coverage | 18,850 of 18,875 comments carry a v2 verdict |
+| Incidental: analyse job `99cfa273` | Claimed and finished by the first (mis-aimed) backfill attempt; reset to queued so topics classification still runs |
+| Incidental: Supabase restart | Project restarted (~1 min) to clear a wedged PostgREST/pool; data untouched |
+| Signed-in dashboard walkthrough | **Not done** — needs a browser session with a real user token; the `forbidden` response to a no-JWT snapshot call confirms tenant isolation is intact |
+
 ## 2026-09-14 — Private preview deployment and live origin verification
 
 Deployed to private preview hosting (`app.sky-develop.net`, origin `91.204.209.217`) via `npm run deploy:preview`:

@@ -474,3 +474,46 @@ credential `7abfe195-…` registered, the service on `277913a` with `tenants=1` 
 the owner's scoped credential retired. `.env.local` holds one `WORKER_CREDENTIAL` and no
 `_WS2`; `scripts/worker-service.sh` is unchanged. Open: read back the `creator_plus` tenant's
 discover job (`docs/progress.md`, same date).
+
+2026-09-19, a Bionic desktop-agent session (review → hardening → live re-analysis): worked the
+migrations, `workers/python/src/server/**`, `supabase/functions/{_shared/worker-gateway.ts,
+worker/index.ts}`, `supabase/tests/**` and `workers/python/src/sentiment/**` lanes — all idle
+per this file's own one-day rule — plus `scripts/monitor.sh` (new) and append-only records in
+`docs/{progress,verification,decisions}.md` (three dated entries each). Landed, in three
+commits on `main` pushed to `origin`:
+
+1. **Arabic normalization reaches the model.** `LogitsAdapter.predict` now calls
+ `normalize_arabic_text`; `PREPROCESSING_VERSION` → `strip-html-arabic-norm-v2` in the same
+ change (the wiring gap this file warned about on 2026-09-14 is closed, with a guard test).
+ Golden fixture regenerated via `test_golden_batch.rebuild()`.
+2. **Lease/claim semantics** (`20260919120000` + `20260919130000`): `jobs.heartbeats` — a lapsed
+ lease with zero heartbeats resumes free (platform replays are not worker fights); heartbeated-then-
+ lapsed counts and backs off; heartbeat renewal is a 5-minute floor (was 60s — an early heartbeat
+ shortened the lease). Claims carry `job_types` end to end; a collect-scoped run can no longer
+ consume a topics job (verified live: scoped claim → 204 while a topics job waits).
+3. **Resource guard + monitor** (`20260919140000` + `scripts/monitor.sh`): `comment_reviews` and
+ `topic_reviews` indexed on (workspace_id, comment_id) — the dashboard's per-comment review
+ lookups were seq scans, ~37,700 per page load; and an external monitor probing rest/gateway/
+ leases/failures/worker/freshness/site, installed in this machine's crontab every 5 minutes
+ (edge-triggered alerts, `ALERT_WEBHOOK_URL` optional).
+
+**Live-project operations another agent must know about** (all on `ykqugctewsqvevhyqtbi`):
+migrations `20260919120000`, `20260919130000`, `20260919140000` applied via the Management API
+query endpoint AND registered in `supabase_migrations.schema_migrations`; edge function `worker`
+redeployed to v16 (verify_jwt=false, same as before); the project was **restarted twice** to
+recover a PostgREST wedge (504 on every request from ~2026-09-18 16:00) and again to reload the
+function-overload schema cache; the pilot workspace «الجزيرة 360» was **re-collected and
+re-analysed** — `channels.active_analysis_key` now points at the v2 key, 18,850 v2 predictions
+exist beside the 17,627 v1 history, and the dashboard's effective labels come from v2. Two
+queued jobs were consumed and honestly restored: analyse `99cfa273` reset to queued (my first
+backfill ran before claim scoping existed — its own motive), and the collect job's `reclaims=20`
+zeroed (platform-retry noise, would have buried it).
+
+**Left untouched, seen uncommitted on disk:** `.github/workflows/ci.yml` and
+`apps/web/index.html` — another session's in-flight work; not staged, not reverted.
+
+**Open, this session's:** `npm run test:db` under pinned Node 22 (rewritten
+`lease_recovery.test.ts`, new `scoped_claim.test.ts`, updated handler test — written but never
+executed; this machine lacks the pinned Node); a signed-in dashboard walkthrough against the v2
+key; the analyse job `99cfa273` needs a classifier-capable worker to actually classify; and the
+monitor's `ALERT_WEBHOOK_URL` is unset, so alerts are log-only until the operator adds one.
