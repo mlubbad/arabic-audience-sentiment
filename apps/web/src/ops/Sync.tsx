@@ -16,9 +16,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   configuredMode,
-  deriveSnapshot,
   fixtureWorkspace,
-  loadSource,
+  loadOpsSource,
   resolveMode,
 } from "../data";
 import { supabase } from "../supabase";
@@ -31,7 +30,6 @@ import { useLocale } from "../locale";
 import { useStrings } from "../strings";
 import { describeJob, type JobEntry, type JobRow } from "../jobFeed";
 import { failureCode } from "../failure";
-import { storedPerVideo } from "../catalogue";
 import { Badge } from "../ui/Badge";
 import { EmptyState, Loading, LoadError } from "../pageStates/PageStates";
 import { Catalogue } from "./Catalogue";
@@ -155,14 +153,12 @@ function SyncBody({
 }) {
   const S = useStrings();
   const lang = useLocale();
-  // The same cache entry the overview reads, under the same key. This page
-  // used to fetch the whole source again under a key of its own, so the rail
-  // — which now shows collection state on every screen — would have been a
-  // third reader of one 600KB read. One entry, three readers; the sync state
-  // is a field of the source, and the derivation is pure.
+  // The operations page reads the lightweight ops snapshot: worker health,
+  // sync state, quota usage and comment counts per video. Shared with the
+  // rail indicator under the "ops-source" key.
   const snapshot = useQuery({
-    queryKey: ["dashboard-source", userId, mode, workspaceId],
-    queryFn: ({ signal }) => loadSource(mode, workspaceId, signal),
+    queryKey: ["ops-source", userId, mode, workspaceId],
+    queryFn: ({ signal }) => loadOpsSource(mode, workspaceId, signal),
   });
 
   // The attempt log is a live-only thing: the fixture has no job table, and
@@ -240,24 +236,17 @@ function SyncBody({
     };
   }, [mode, workspaceId, tick]);
 
-  const s = useMemo(
-    () =>
-      snapshot.data
-        ? deriveSnapshot(snapshot.data, mode, { workspace_id: workspaceId })
-        : undefined,
-    [snapshot.data, mode, workspaceId],
-  );
-  // What is stored per video, for the catalogue's price. From the source's
-  // comments, not from `s.videos`: that aggregate has already dropped the
-  // channel's own replies, and the server counts them (see `storedPerVideo`).
+  const sync = snapshot.data?.sync ?? null;
+  const plan = snapshot.data?.plan ?? null;
+  // What is stored per video, for the catalogue's price. Counted on the server
+  // inside `workspace_ops_snapshot` without loading comment rows.
   const stored = useMemo(
-    () =>
-      snapshot.data ? storedPerVideo(snapshot.data.comments, workspaceId) : [],
-    [snapshot.data, workspaceId],
+    () => snapshot.data?.video_counts ?? [],
+    [snapshot.data],
   );
-  const health = syncHealth(s?.sync ?? null, new Date());
-  const run = s?.sync?.last_run ?? null;
-  const connected = !!s?.sync?.worker.connected;
+  const health = syncHealth(sync, new Date());
+  const run = sync?.last_run ?? null;
+  const connected = !!sync?.worker.connected;
   const entries: JobEntry[] = (jobs ?? []).map((j) =>
     describeJob(j, { workerConnected: connected }, S),
   );
@@ -312,7 +301,7 @@ function SyncBody({
           <Catalogue
             mode={mode}
             workspaceId={workspaceId}
-            plan={s?.plan ?? null}
+            plan={plan}
             stored={stored}
             jobs={jobs}
             workerConnected={connected}
@@ -323,7 +312,7 @@ function SyncBody({
               phone. */}
           <div className="db-grid db-grid--2">
             <SyncHealth
-              s={s}
+              sync={sync}
               health={health}
               run={run}
               mode={mode}
@@ -331,7 +320,7 @@ function SyncBody({
               lang={lang}
               S={S}
             />
-            <PlanBudgets plan={s?.plan} lang={lang} S={S} />
+            <PlanBudgets plan={plan} lang={lang} S={S} />
           </div>
           <Attempts
             mode={mode}

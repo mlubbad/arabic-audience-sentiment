@@ -25,7 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession, useWorkspaces } from "./session";
 import { useWorkspaceSelection } from "./workspaceSelection";
 import { workspaceState } from "./workspace";
-import { configuredMode, fixtureWorkspace, loadSource } from "./data";
+import { configuredMode, fixtureWorkspace, loadOpsSource } from "./data";
 import { syncHealth } from "./syncHealth";
 import { useStrings } from "./strings";
 import {
@@ -103,16 +103,16 @@ export function CollectionState() {
     selectedId: chosen,
   });
   const workspaceId = place.kind === "ready" ? place.id : null;
-  // The overview's and the operations page's entry, under their key: whichever
-  // of the three asks first pays for the read, the others find it in cache.
+  // The rail reads the lightweight ops snapshot: worker health, sync state and quotas,
+  // without loading the heavy comment history. Shared with the operations page.
   const source = useQuery({
     queryKey: [
-      "dashboard-source",
+      "ops-source",
       session?.user.id ?? "visitor",
       "live",
       workspaceId,
     ],
-    queryFn: ({ signal }) => loadSource("live", workspaceId!, signal),
+    queryFn: ({ signal }) => loadOpsSource("live", workspaceId!, signal),
     enabled: !!session && configuredMode === "live" && !!workspaceId,
   });
   if (!session || configuredMode !== "live" || !workspaceId) return null;

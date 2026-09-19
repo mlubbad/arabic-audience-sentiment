@@ -10,7 +10,6 @@
  */
 import { Card } from "../ui/Card";
 import { Badge, type BadgeProps } from "../ui/Badge";
-import type { deriveSnapshot } from "../data";
 import type { Health } from "../syncHealth";
 import type { SyncState } from "@sentiment/contracts";
 import { displayDate } from "../i18n";
@@ -27,6 +26,7 @@ const SEVERITY_TONE: Record<Health["severity"], BadgeProps["tone"]> = {
 
 export function SyncHealth({
   s,
+  sync,
   health,
   run,
   mode,
@@ -34,7 +34,8 @@ export function SyncHealth({
   lang,
   S,
 }: {
-  s: ReturnType<typeof deriveSnapshot> | undefined;
+  s?: { sync: SyncState | null } | undefined;
+  sync?: SyncState | null;
   health: Health;
   run: SyncState["last_run"] | null;
   mode: "live" | "sanitized_fixture";
@@ -44,6 +45,7 @@ export function SyncHealth({
   lang: Locale;
   S: Strings;
 }) {
+  const currentSync = sync !== undefined ? sync : s?.sync;
   return (
     <section
       className="db-section"
@@ -70,9 +72,9 @@ export function SyncHealth({
         )}
         <p data-testid="sync-worker">
           {S.opsWorkerLabel}{" "}
-          {s?.sync?.worker.connected
+          {currentSync?.worker.connected
             ? S.opsWorkerConnected(
-                displayDate(s.sync.worker.last_heartbeat_at, lang),
+                displayDate(currentSync.worker.last_heartbeat_at, lang),
               )
             : S.opsWorkerDisconnected}
         </p>

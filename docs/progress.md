@@ -1,6 +1,26 @@
 # Progress
 
-## 2026-09-19 (2) — The claim can no longer misread the world
+## 2026-09-20 — Operational views decoupled from comment payloads; dashboard snapshot optimized
+
+Resolved the root cause of `read:live_unavailable` on `/sync` and `RailState`:
+1. **Lightweight Operational Snapshot (`workspace_ops_snapshot`)**:
+   Created `public.workspace_ops_snapshot(w uuid)` (with SECURITY DEFINER `private.workspace_ops_snapshot_impl`)
+   to serve `/sync` and the sidebar rail. Instead of streaming 28,000+ comment records (55.6 MB) just
+   to check sync health and video counts, the new RPC computes video counts using an indexed GROUP BY
+   and returns `{ sync, plan, video_counts }` in **386 ms** and ~250 KB payload (a 99.5% reduction in transfer size).
+2. **Web Client Integration**:
+   - Added `readOpsLive`, `readOpsFixture`, `loadOpsSource` in `apps/web/src/data.ts`.
+   - Updated `RailState.tsx` to query `loadOpsSource` under `['ops-source', mode, workspace]`.
+   - Updated `Sync.tsx` and `SyncHealth.tsx` to read `loadOpsSource` and pass precomputed `video_counts`
+     directly into `Catalogue`, avoiding loading comment JSON arrays into client browser memory.
+3. **Optimized Analytical Dashboard Snapshot**:
+   - Rewrote `dashboard_snapshot_impl` using set-based CTEs for deduplicated reviews, predictions,
+     and topic reviews.
+   - Raised statement timeout to 30s (`set statement_timeout = '30s'`) to safeguard against heavy
+     analytical queries timing out under load.
+4. **Deployed and Verified**:
+   - Applied migration `20260920000000_ops_snapshot_and_dashboard_optimization.sql` to local and remote Supabase databases.
+   - 100% test pass: 111 web unit test files (871 tests), 39 db test files (364 tests), 229 python tests.
 
 Three fault classes from the 2026-09-19 incident are closed at the source, not patched around:
 

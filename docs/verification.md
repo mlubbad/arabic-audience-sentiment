@@ -1,6 +1,19 @@
 # Verification
 
-## 2026-09-19 (3) — External monitoring live; review lookups indexed
+## 2026-09-20 — Operational views decoupled from comment payloads; dashboard snapshot optimized
+
+| Command / observation | Actual result |
+| --- | --- |
+| Migration `20260920000000_ops_snapshot_and_dashboard_optimization.sql` | Applied locally and deployed remotely to Supabase project `ykqugctewsqvevhyqtbi`. Added `workspace_ops_snapshot(w uuid)` and optimized `dashboard_snapshot(w uuid)`. |
+| Remote query benchmark: `workspace_ops_snapshot` on AJ360 workspace (`d0c3b9fc-b813-439e-a32b-71dd357f0bb4`) | **386.9 ms** total execution time, payload ~252 KB. Returns `{ sync, plan, video_counts }` with 2,423 videos counted across 28,244 comments. |
+| Remote query benchmark: `dashboard_snapshot` on AJ360 workspace | Returned full 55.6 MB payload in **10.2s** without timing out (protected by `set statement_timeout = '30s'`). |
+| Contracts test: `npx vitest run packages/contracts/src/ops.test.ts` | 3 passed (100% green) |
+| Database test suite: `npm run test:db` | 39 test files passed, 364 tests passed (100% green) |
+| Web unit tests: `npm test` | 111 test files passed, 871 tests passed (100% green) |
+| Worker tests: `npm run worker:test` | 229 tests passed in 4.29s (100% green) |
+| Linter & Typecheck: `npm run lint && npm run typecheck` | Passed cleanly (exit 0) |
+| Secret check: `npm run check:secrets` | Passed on 679 source files (exit 0) |
+| Security audit: `npm audit --omit=dev --audit-level=high` | 0 vulnerabilities found |
 
 | Command / observation | Actual result |
 | --- | --- |

@@ -343,3 +343,48 @@ describe("a topic correction in fixture mode", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("loadOpsSource operational snapshot", () => {
+  it("computes video counts and returns ops state in fixture mode", async () => {
+    const { loadOpsSource, fixtureWorkspace } = await loadModule();
+    const ops = await loadOpsSource("sanitized_fixture", fixtureWorkspace);
+    expect(ops.sync).toBeDefined();
+    expect(ops.plan).toBeDefined();
+    expect(ops.video_counts.length).toBeGreaterThan(0);
+    expect(ops.video_counts[0]).toHaveProperty("id");
+    expect(ops.video_counts[0]).toHaveProperty("total");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("calls workspace_ops_snapshot RPC in live mode", async () => {
+    const { loadOpsSource } = await loadModule();
+    const mockOps = {
+      sync: {
+        worker: { connected: true, last_heartbeat_at: null, busy: false },
+        queued_jobs: 0,
+        last_run: null,
+      },
+      plan: null,
+      video_counts: [{ id: "vid-1", total: 42 }],
+    };
+    rpc.mockResolvedValueOnce({ data: mockOps, error: null });
+
+    const ops = await loadOpsSource(
+      "live",
+      "00000000-0000-4000-8000-000000000001",
+    );
+    expect(rpc).toHaveBeenCalledWith("workspace_ops_snapshot", {
+      w: "00000000-0000-4000-8000-000000000001",
+    });
+    expect(ops.video_counts).toEqual([{ id: "vid-1", total: 42 }]);
+  });
+
+  it("throws live_unavailable when RPC returns error", async () => {
+    const { loadOpsSource } = await loadModule();
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "timeout" } });
+
+    await expect(
+      loadOpsSource("live", "00000000-0000-4000-8000-000000000001"),
+    ).rejects.toThrow("live_unavailable");
+  });
+});

@@ -27,35 +27,44 @@ export function parseChannelQuery(raw: string): ChannelQuery | null {
   // A bare UC id is unambiguous, and it must be decided before the URL
   // attempt: `https://` + an id parses as a URL whose host is the id.
   if (CHANNEL_ID.test(input)) return { kind: "id", value: input };
-  if (HANDLE.test(input)) return { kind: "handle", value: input.slice(1) };
+  if (input.startsWith("@")) {
+    return HANDLE.test(input) ? { kind: "handle", value: input.slice(1) } : null;
+  }
 
   // Anything URL-shaped that is not a YouTube channel URL is a wrong input,
   // not a search: searching a pasted video link would return channels the
-  // reader never meant.
-  let url: URL | null = null;
-  try {
-    url = new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`);
-  } catch {
-    url = null;
-  }
-  if (url) {
-    if (!/(^|\.)youtube\.com$/i.test(url.hostname)) return null;
-    const byId = url.pathname.match(/^\/channel\/(UC[A-Za-z0-9_-]{22})\/?$/);
-    if (byId) return { kind: "id", value: byId[1] };
-    const byHandle = url.pathname.match(/^\/@([^/?#]+)/);
-    if (byHandle) {
-      const value = decodeURIComponent(byHandle[1]);
-      return HANDLE.test(`@${value}`) ? { kind: "handle", value } : null;
+  // reader never meant. Plain words (even single Latin words without dots)
+  // are queries, not hostnames.
+  const isExplicitUrl = /^https?:\/\//i.test(input);
+  const isYoutubePath = /^(?:www\.|m\.)?youtube\.com\//i.test(input);
+  const isDomainLike = /^(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/.*)?$/i.test(input);
+
+  if (isExplicitUrl || isYoutubePath || isDomainLike) {
+    let url: URL | null = null;
+    try {
+      url = new URL(isExplicitUrl ? input : `https://${input}`);
+    } catch {
+      url = null;
     }
-    const byUser = url.pathname.match(/^\/user\/([^/?#]+)/);
-    if (byUser)
-      return { kind: "username", value: decodeURIComponent(byUser[1]) };
-    const byVanity = url.pathname.match(/^\/c\/([^/?#]+)/);
-    if (byVanity)
-      return { kind: "search", value: decodeURIComponent(byVanity[1]) };
-    // A YouTube URL that names no channel — a video watch page, the home
-    // page — cannot be answered by naming a channel.
-    return null;
+    if (url) {
+      if (!/(^|\.)youtube\.com$/i.test(url.hostname)) return null;
+      const byId = url.pathname.match(/^\/channel\/(UC[A-Za-z0-9_-]{22})\/?$/);
+      if (byId) return { kind: "id", value: byId[1] };
+      const byHandle = url.pathname.match(/^\/@([^/?#]+)/);
+      if (byHandle) {
+        const value = decodeURIComponent(byHandle[1]);
+        return HANDLE.test(`@${value}`) ? { kind: "handle", value } : null;
+      }
+      const byUser = url.pathname.match(/^\/user\/([^/?#]+)/);
+      if (byUser)
+        return { kind: "username", value: decodeURIComponent(byUser[1]) };
+      const byVanity = url.pathname.match(/^\/c\/([^/?#]+)/);
+      if (byVanity)
+        return { kind: "search", value: decodeURIComponent(byVanity[1]) };
+      // A YouTube URL that names no channel — a video watch page, the home
+      // page — cannot be answered by naming a channel.
+      return null;
+    }
   }
 
   // Words: the search path. The quota cost is the lookup function's to

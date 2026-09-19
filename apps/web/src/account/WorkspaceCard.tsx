@@ -77,7 +77,7 @@ export function WorkspaceCard({
    *  The page owns the lookup and the registration; this card only shows
    *  what came back. Optional: the demo body has no server to ask. */
   onAddChannel?: (
-    step: "open" | "cancel" | "search" | "add",
+    step: "open" | "cancel" | "search" | "add" | "clear-error",
     value?: string,
     candidate?: ChannelCandidate,
   ) => void;
@@ -330,7 +330,10 @@ export function WorkspaceCard({
                 maxLength={300}
                 placeholder={S.addChannelPlaceholder}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  if (channelLookupError) onAddChannel("clear-error");
+                }}
                 autoFocus
               />
               <div className="db-actions">
@@ -346,7 +349,10 @@ export function WorkspaceCard({
                   variant="ghost"
                   disabled={pending}
                   data-testid={`addchannel-close-${workspace.id}`}
-                  onClick={() => onAddChannel("cancel")}
+                  onClick={() => {
+                    setQuery("");
+                    onAddChannel("cancel");
+                  }}
                 >
                   {S.addChannelCancel}
                 </Button>

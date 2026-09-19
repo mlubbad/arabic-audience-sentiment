@@ -1,6 +1,19 @@
 # Implementation decisions
 
-2026-09-19 — A collection run could outlive the access token it was handed, and ended
+2026-09-20 — Operational views (/sync, RailState) must never couple their availability to the analytical
+payload size. When comments grow into the tens of thousands (e.g. 28,244 comments producing a 55.6 MB
+JSON snapshot), reading the full `dashboard_snapshot` to display sync health, job queue counters, or
+video comment tallies caused PostgREST statement timeouts (504 / read:live_unavailable) on operational
+pages.
+We decoupled operational reads into a dedicated lightweight RPC: `public.workspace_ops_snapshot(w uuid)`.
+It returns only `{ sync: SyncState, plan: UsageSummary, video_counts: Array<{ id: string, total: number }> }`
+directly from indexed tables (`sync_state`, `jobs`, `subscriptions`, `comments`), reducing payload size
+from 55.6 MB down to ~250 KB and execution time to ~380 ms.
+On the main dashboard route, `dashboard_snapshot_impl` was rewritten from correlated subqueries to
+set-based CTEs aggregating text into JSON objects (`json_build_object`/`json_agg`), and equipped with
+an explicit `set statement_timeout = '30s'` to guarantee heavy analytical reads complete without timing out.
+Migrations are immutable, so the new RPC and optimized dashboard snapshot live in
+`supabase/migrations/20260920000000_ops_snapshot_and_dashboard_optimization.sql`.
 `credential_expired` mid-run, losing everything it had not yet committed; the UI then told
 the operator to reconnect a channel that was never disconnected. The fix keeps the token's
 renewal on the server and gives the worker a question instead of a credential: the claim

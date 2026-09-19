@@ -45,6 +45,19 @@ describe("parseChannelQuery", () => {
       kind: "search",
       value: "علاء جابر",
     });
+    // Single-word names must search, not parse as fake URL hostnames
+    expect(parseChannelQuery("Asharqnews")).toEqual({
+      kind: "search",
+      value: "Asharqnews",
+    });
+    expect(parseChannelQuery("AlJazeera")).toEqual({
+      kind: "search",
+      value: "AlJazeera",
+    });
+    expect(parseChannelQuery("BBC")).toEqual({
+      kind: "search",
+      value: "BBC",
+    });
   });
 
   it("refuses what cannot name a channel", () => {
@@ -54,6 +67,7 @@ describe("parseChannelQuery", () => {
       parseChannelQuery("https://www.youtube.com/watch?v=DGA2hlrwB8g"),
     ).toBeNull();
     expect(parseChannelQuery("https://example.com/@someone")).toBeNull();
+    expect(parseChannelQuery("example.com/@someone")).toBeNull();
     expect(parseChannelQuery("")).toBeNull();
     expect(parseChannelQuery("   ")).toBeNull();
     expect(parseChannelQuery("@ab")).toBeNull(); // handles run 3–30

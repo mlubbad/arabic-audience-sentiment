@@ -429,5 +429,18 @@ describe("WorkspaceCard", () => {
       });
       expect(screen.getByText(ar.addChannelFailed)).toBeInTheDocument();
     });
+
+    it("typing in the query field clears a displayed lookup error", async () => {
+      const onAddChannel = vi.fn();
+      mount({
+        onAddChannel,
+        addingChannel: true,
+        channelLookupError: ar.addChannelFailed,
+      });
+      const form = screen.getByTestId(`addchannel-form-${W}`);
+      const field = within(form).getByLabelText(ar.addChannel);
+      await userEvent.type(field, "a");
+      expect(onAddChannel).toHaveBeenCalledWith("clear-error");
+    });
   });
 });

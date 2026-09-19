@@ -4,6 +4,8 @@ import {
   LiveSnapshotSchema,
   PlanCatalogueSchema,
   TopicReviewInputSchema,
+  OpsSnapshotSchema,
+  type OpsSnapshot,
   applyReview,
   applyTopicReview,
   exportObjectPath,
@@ -237,6 +239,52 @@ export async function loadSource(
 
 /** Everything one read of the source answers, before any filter is applied. */
 export type Source = Awaited<ReturnType<typeof loadSource>>;
+
+/**
+ * Reads lightweight operational status for a workspace: sync health, quota usage,
+ * and comments stored per video.
+ */
+async function readOpsLive(workspace: string): Promise<OpsSnapshot> {
+  const { data, error } = await supabase!.rpc("workspace_ops_snapshot", {
+    w: workspace,
+  });
+  if (error) throw new Error("live_unavailable");
+  return OpsSnapshotSchema.parse(data);
+}
+
+/**
+ * Derives operational status from fixture data for offline/test mode.
+ */
+async function readOpsFixture(signal?: AbortSignal): Promise<OpsSnapshot> {
+  const fixture = await readFixture(signal);
+  const countsMap = new Map<string, number>();
+  for (const c of fixture.comments) {
+    countsMap.set(c.video_id, (countsMap.get(c.video_id) ?? 0) + 1);
+  }
+  const video_counts = Array.from(countsMap.entries()).map(([id, total]) => ({
+    id,
+    total,
+  }));
+  return OpsSnapshotSchema.parse({
+    sync: fixture.sync,
+    plan: fixture.plan,
+    video_counts,
+  });
+}
+
+/**
+ * Loads lightweight operational state for the rail indicator and /sync page.
+ */
+export async function loadOpsSource(
+  mode: DataMode,
+  workspace: string,
+  signal?: AbortSignal,
+): Promise<OpsSnapshot> {
+  if (mode === "live") return readOpsLive(workspace);
+  return readOpsFixture(signal);
+}
+
+export type OpsSource = Awaited<ReturnType<typeof loadOpsSource>>;
 
 /**
  * The whole of the dashboard, derived from one read. Pure, and deliberately

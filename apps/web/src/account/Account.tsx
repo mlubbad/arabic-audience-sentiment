@@ -394,13 +394,15 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
         say("create", S.createWorkspaceFailed);
         return;
       }
-      const { data, error: loadError } = await client
-        .from("workspaces")
-        .select("id,name");
-      if (loadError) say("create", S.createWorkspaceListFailed);
+      const [wRes, cRes] = await Promise.all([
+        client.from("workspaces").select("id,name"),
+        client.from("clients").select("id,workspace_id"),
+      ]);
+      if (wRes.error || cRes.error) say("create", S.createWorkspaceListFailed);
       else {
-        setWorkspaces(data ?? []);
-        void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+        setWorkspaces(wRes.data ?? []);
+        setClients(cRes.data ?? []);
+        workspacesChanged();
         setName("");
         say("create", S.createWorkspaceDone);
       }
@@ -580,11 +582,16 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                   onAddChannel={(step, value, candidate) => {
                     if (step === "open") {
                       setAsking({ ws: w.id, what: "addchannel" });
+                      setLookup({ ws: w.id, candidates: null, error: null });
                       return;
                     }
                     if (step === "cancel") {
                       setAsking(null);
                       setLookup({ ws: w.id, candidates: null, error: null });
+                      return;
+                    }
+                    if (step === "clear-error") {
+                      setLookup((prev) => ({ ...prev, error: null }));
                       return;
                     }
                     if (step === "search") {
@@ -597,6 +604,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                         });
                         return;
                       }
+                      setLookup({ ws: w.id, candidates: null, error: null });
                       setBusy(scope);
                       setNote(null);
                       void client.functions
