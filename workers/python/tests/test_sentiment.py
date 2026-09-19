@@ -86,6 +86,9 @@ def test_arabic_normalization_tatweel_tashkeel_and_elongation():
     assert strip_tatweel("شــــكـــراً") == "شكراً"
     # Elongation reduction: 3+ repeated chars -> 2
     assert reduce_elongation("راااااائع جدااااا") == "راائع جداا"
-    # Combined normalization
-    assert normalize_arabic_text("<b>شـــــكراً</b><br>رااااائع جداً 👏") == "شكراً\nراائع جداً 👏"
+    # Combined normalization: tanwīn travels with the tashkeel that v2 strips,
+    # so "شكراً" and "جداً" lose their diacritic mark.
+    assert normalize_arabic_text("<b>شـــــكراً</b><br>رااااائع جداً 👏") == "شكرا\nراائع جدا 👏"
+    # Negation particles and emoji are normalization's protected vocabulary.
+    assert normalize_arabic_text("ما أعجبني هـــذا 👎") == "ما أعجبني هذا 👎"
 

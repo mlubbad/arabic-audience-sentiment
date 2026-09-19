@@ -10,7 +10,12 @@ _BLANK = re.compile(r"\n{3,}")
 _AROUND_NEWLINE = re.compile(r" *\n *")
 _ARABIC = re.compile(r"[؀-ۿݐ-ݿ]")
 
-PREPROCESSING_VERSION = "strip-html-normalize-space-v1"
+# Part of the analysis key. Bumping it must travel with the change that makes
+# the preprocessing behave differently, or stored predictions stop meaning the
+# same thing as new ones while carrying an identical key (docs/coordination/
+# ACTIVE.md). v2 wires Arabic normalization — tatweel, tashkeel, elongation —
+# into the model-facing text; v1 stripped HTML and normalized whitespace only.
+PREPROCESSING_VERSION = "strip-html-arabic-norm-v2"
 
 _TASHKEEL = re.compile(r"[\u064B-\u0652\u0670]")
 _TATWEEL = re.compile(r"\u0640+")
@@ -33,9 +38,17 @@ def reduce_elongation(text: str) -> str:
 
 
 def normalize_arabic_text(text: str) -> str:
-    """Cleans and normalizes Arabic text while preserving emoji, dialect, and negation."""
+    """The text a model is asked about: HTML gone, Arabic normalized.
+
+    Tatweel, diacritics and 3+ repeated characters are collapsed so that
+    "راااائـــع جداً" reaches the tokenizer the way it was written in the
+    training data. Emoji, dialect spellings and negation particles (مش، ما،
+    لم، لن، لا، ليس) are preserved untouched — removing a negation particle
+    would invert the sentence it governs.
+    """
     plain = to_plain_text(text)
     plain = strip_tatweel(plain)
+    plain = strip_tashkeel(plain)
     plain = reduce_elongation(plain)
     return plain
 

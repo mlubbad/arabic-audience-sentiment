@@ -26,7 +26,11 @@ testable without downloading half a gigabyte of weights, and `torch` and
 import math
 import os
 
-from .preprocess import PREPROCESSING_VERSION, is_analysable, to_plain_text
+from .preprocess import (
+    PREPROCESSING_VERSION,
+    is_analysable,
+    normalize_arabic_text,
+)
 from .protocol import Label, Prediction
 from .registry import ModelCard
 
@@ -147,7 +151,11 @@ class LogitsAdapter:
         self.parameters = card.parameters
 
     def predict(self, texts: list[str]) -> list[Prediction]:
-        plains = [to_plain_text(t) for t in texts]
+        # The model-facing text is the normalized one, and PREPROCESSING_VERSION
+        # must describe exactly this. It described to_plain_text alone for a
+        # while while the normalization helpers sat beside it uncalled — the
+        # exact drift docs/coordination/ACTIVE.md warns about.
+        plains = [normalize_arabic_text(t) for t in texts]
         # Only analysable rows are sent to the model. An empty or emoji-only
         # comment is skipped rather than pushed through and labelled, because a
         # label on nothing is a label about nothing.

@@ -1,94 +1,94 @@
 {
   "envelope": {
-    "batch_key": "9150e03c976e3937541f5f4daca7e128",
     "job_id": "20000000-0000-4000-8000-000000000001",
     "lease_token": "30000000-0000-4000-8000-000000000001",
+    "batch_key": "6cdd7f8144afba16146bca378c1ee9da",
+    "payload_hash": "6cdd7f8144afba16146bca378c1ee9daaea3e65c4f41243bfebf0a56a0fd8136",
     "payload": {
+      "external_video_id": "abcdefghijk",
+      "video_title": "حلقة تجريبية",
       "checkpoint": {
         "cursor": "page-2-token"
       },
+      "outcome": "exhausted",
       "comments": [
         {
-          "author_channel_id": "UCauthor1",
-          "author_name": "مؤلف ١",
-          "content_hash": "c680851dc7a72ce4068a2a7ea3450fef8464cbc52ca7321a204ae08230eb54c0",
           "external_comment_id": "cmt-1",
           "external_parent_id": null,
-          "field_provenance": {
-            "source": "api"
-          },
           "is_reply": false,
+          "parent_source": "unknown",
+          "author_channel_id": "UCauthor1",
+          "author_name": "مؤلف ١",
+          "text_raw": "المحتوى واضح ومفيد ﹢",
+          "text_plain": "المحتوى واضح ومفيد ﹢",
+          "content_hash": "c680851dc7a72ce4068a2a7ea3450fef8464cbc52ca7321a204ae08230eb54c0",
+          "published_time_raw": "2026-09-01T09:00:00Z",
+          "published_at": "2026-09-01T09:00:00Z",
+          "timestamp_precision": "second",
           "likes_raw": "12",
           "likes_value": 12,
-          "parent_source": "unknown",
-          "published_at": "2026-09-01T09:00:00Z",
-          "published_time_raw": "2026-09-01T09:00:00Z",
           "source": "youtube_data_api_public",
-          "text_plain": "المحتوى واضح ومفيد ﹢",
-          "text_raw": "المحتوى واضح ومفيد ﹢",
-          "timestamp_precision": "second"
-        },
-        {
-          "author_channel_id": "UCauthor2",
-          "author_name": "مؤلف ٢",
-          "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
-          "external_comment_id": "cmt-2",
-          "external_parent_id": "cmt-1",
           "field_provenance": {
             "source": "api"
-          },
-          "is_reply": true,
-          "likes_raw": null,
-          "likes_value": null,
-          "parent_source": "api",
-          "published_at": "2026-09-02T09:00:00Z",
-          "published_time_raw": "2026-09-02T09:00:00Z",
-          "source": "youtube_data_api_public",
-          "text_plain": "أتمنى تحسين الصوت",
-          "text_raw": "أتمنى تحسين الصوت",
-          "timestamp_precision": "second"
-        }
-      ],
-      "external_video_id": "abcdefghijk",
-      "outcome": "exhausted",
-      "predictions": [
-        {
-          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1+a272ec5cfcf7",
-          "class_scores": {
-            "mixed": 0.0,
-            "negative": 0.0,
-            "neutral": 0.0,
-            "positive": 1.0
-          },
-          "content_hash": "c680851dc7a72ce4068a2a7ea3450fef8464cbc52ca7321a204ae08230eb54c0",
-          "external_comment_id": "cmt-1",
-          "label": "positive",
-          "model_id": "deterministic-test-analyzer",
-          "parameters": {
-            "max_length": 256
-          },
-          "preprocessing_version": "strip-html-normalize-space-v1",
-          "revision": "not-a-model-v1",
-          "status": "succeeded"
+          }
         },
         {
-          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-normalize-space-v1+a272ec5cfcf7",
-          "class_scores": {},
-          "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
           "external_comment_id": "cmt-2",
-          "label": null,
-          "model_id": "deterministic-test-analyzer",
-          "parameters": {
-            "max_length": 256
-          },
-          "preprocessing_version": "strip-html-normalize-space-v1",
-          "revision": "not-a-model-v1",
-          "status": "unsupported"
+          "external_parent_id": "cmt-1",
+          "is_reply": true,
+          "parent_source": "api",
+          "author_channel_id": "UCauthor2",
+          "author_name": "مؤلف ٢",
+          "text_raw": "أتمنى تحسين الصوت",
+          "text_plain": "أتمنى تحسين الصوت",
+          "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
+          "published_time_raw": "2026-09-02T09:00:00Z",
+          "published_at": "2026-09-02T09:00:00Z",
+          "timestamp_precision": "second",
+          "likes_raw": null,
+          "likes_value": null,
+          "source": "youtube_data_api_public",
+          "field_provenance": {
+            "source": "api"
+          }
         }
       ],
-      "video_title": "حلقة تجريبية"
-    },
-    "payload_hash": "9150e03c976e3937541f5f4daca7e128634e3614413278a66ade03630829ed33"
+      "predictions": [
+        {
+          "external_comment_id": "cmt-1",
+          "content_hash": "c680851dc7a72ce4068a2a7ea3450fef8464cbc52ca7321a204ae08230eb54c0",
+          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-arabic-norm-v2+a272ec5cfcf7",
+          "status": "succeeded",
+          "label": "positive",
+          "class_scores": {
+            "positive": 1.0,
+            "negative": 0.0,
+            "neutral": 0.0,
+            "mixed": 0.0
+          },
+          "model_id": "deterministic-test-analyzer",
+          "revision": "not-a-model-v1",
+          "preprocessing_version": "strip-html-arabic-norm-v2",
+          "parameters": {
+            "max_length": 256
+          }
+        },
+        {
+          "external_comment_id": "cmt-2",
+          "content_hash": "eb881f9043e7ab3d84a4e4de94cebc6f40a6bf3b717eca1b339c51ec63f5e71b",
+          "analysis_key": "deterministic-test-analyzer@not-a-model-v1+strip-html-arabic-norm-v2+a272ec5cfcf7",
+          "status": "unsupported",
+          "label": null,
+          "class_scores": {},
+          "model_id": "deterministic-test-analyzer",
+          "revision": "not-a-model-v1",
+          "preprocessing_version": "strip-html-arabic-norm-v2",
+          "parameters": {
+            "max_length": 256
+          }
+        }
+      ]
+    }
   },
-  "payload_hash": "9150e03c976e3937541f5f4daca7e128634e3614413278a66ade03630829ed33"
+  "payload_hash": "6cdd7f8144afba16146bca378c1ee9daaea3e65c4f41243bfebf0a56a0fd8136"
 }

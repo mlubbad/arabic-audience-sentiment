@@ -85,6 +85,24 @@ def test_empty_text_is_skipped_and_never_sent_to_the_model():
     assert out[0].label is None and out[0].scores == {}
 
 
+def test_the_model_is_asked_about_the_normalized_text_not_the_raw_one():
+    # The wiring guard for PREPROCESSING_VERSION. The helpers once existed beside
+    # an adapter that never called them, so the version described a pipeline that
+    # was not the one running. If this assertion breaks, the version and the
+    # behaviour have drifted apart again.
+    seen = []
+
+    def infer(texts):
+        seen.extend(texts)
+        return [[1.0, 0.0, 0.0]]
+
+    out = LogitsAdapter(CARD, infer).predict(["رااااائـــع جداً 👏"])
+    assert out[0].status == "succeeded"
+    # Tatweel, elongation and the tanwīn are gone before the tokenizer; the
+    # emoji is not preprocessing's to remove.
+    assert seen == ["راائع جدا 👏"]
+
+
 def test_nothing_analysable_means_the_model_is_not_called_at_all():
     def infer(texts):  # pragma: no cover - must never run
         raise AssertionError("the model was asked about nothing")
