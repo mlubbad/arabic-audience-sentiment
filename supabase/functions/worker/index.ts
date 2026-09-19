@@ -176,13 +176,14 @@ async function renewToken(
   });
   // A channel whose grant vanished mid-run answers the same thing the claim
   // path does — no token — rather than a 500 the worker would have to guess
-  // at. A lost lease is left to travel as its own refusal: the run ends.
+  // at. For a public channel that refusal is the expected answer (there is no
+  // channel grant to renew), and the public branch below takes it from there;
+  // anything else is a real failure. A lost lease is left to travel as its
+  // own refusal: the run ends.
   if (error) {
-    if ((error as { message?: string }).message === "channel_not_connected")
-      return null;
-    failed(error);
-  }
-  if (data?.length) {
+    if ((error as { message?: string }).message !== "channel_not_connected")
+      failed(error);
+  } else if (data?.length) {
     const grant = data[0] as {
       connection_id: string;
       encrypted_tokens: string;
