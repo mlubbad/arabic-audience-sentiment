@@ -480,7 +480,12 @@ migrations, `workers/python/src/server/**`, `supabase/functions/{_shared/worker-
 worker/index.ts}`, `supabase/tests/**` and `workers/python/src/sentiment/**` lanes — all idle
 per this file's own one-day rule — plus `scripts/monitor.sh` (new) and append-only records in
 `docs/{progress,verification,decisions}.md` (three dated entries each). Landed, in three
-commits on `main` pushed to `origin`:
+commits on `main` — `9f204f8`, `3adf257`, `49bd352` — **not yet on `origin`:** the push from
+this machine was refused (403; the cached GitHub credentials have no write access to
+`mlubbad/arabic-audience-sentiment`). The operator should `git push origin main` from a
+session that can, or grant this machine's credential write access — until then these three
+commits exist on this disk only, which is exactly the situation the rules above were written
+for.
 
 1. **Arabic normalization reaches the model.** `LogitsAdapter.predict` now calls
  `normalize_arabic_text`; `PREPROCESSING_VERSION` → `strip-html-arabic-norm-v2` in the same
