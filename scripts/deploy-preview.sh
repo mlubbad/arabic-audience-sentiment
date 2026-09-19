@@ -56,10 +56,11 @@ DIR=static
 # chunks are named after their entry point — matching index-* alone left a
 # Dashboard-*.js and an Account-*.js behind on each deploy.
 keep=" $(find "./$DIR" -type f 2>/dev/null | sed "s|^\./$DIR/||" | tr '\n' ' ') "
-for remote in $(curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
+remotes=$(curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
   -u "$PREVIEW_FTP_USER:$PREVIEW_FTP_PASSWORD" "ftp://$PREVIEW_FTP_HOST/$DIR/" \
   --connect-timeout 25 --max-time 120 | awk '{print $NF}' \
-  | grep -vE '^\.\.?$' || true); do
+  | grep -vE '^\.\.?$' || true)
+[ -z "$remotes" ] || for remote in $remotes; do
   case "$keep" in
     *" $remote "*) ;;
     *)
@@ -67,7 +68,7 @@ for remote in $(curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
       curl -sS --ftp-ssl-control --ftp-pasv --disable-epsv \
         -u "$PREVIEW_FTP_USER:$PREVIEW_FTP_PASSWORD" "ftp://$PREVIEW_FTP_HOST/" \
         -Q "-DELE $DIR/$remote" -o /dev/null -w 'gone\n' \
-        --connect-timeout 25 --max-time 120
+        --connect-timeout 25 --max-time 120 || true
       ;;
   esac
 done
