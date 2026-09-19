@@ -534,3 +534,17 @@ snippet is in `docs/progress.md` under the same date; apply it after that lane c
 token-renewal lane finished — committed via `git apply --cached` with only my two
 hunks (argparse choices + the classifier branch). That lane's `build_collector`
 change in loop.py is still uncommitted on disk, untouched, exactly as it left it.
+
+2026-09-19, the session that executed the token-renewal lane's leftover steps
+(check, deploy): touched only `workers/python/tests/test_typesafe.py`,
+`supabase/tests/worker_gateway_handler.test.ts`, `scripts/check-secrets.mjs`,
+ten prettier-only reformats, and the three shared docs — all committed
+(`7df9f56`, `1fc5a9b`, `87ff30a`, `b3c3b95`). The channel-lookup lane's
+uncommitted work (gateway, worker/index, python, account/**, strings,
+migration `20260919180000`) was seen on disk, left byte-for-byte alone, and
+deliberately EXCLUDED from the deploy (done from a worktree at `b3c3b95`;
+worker is now v17). Two machine notes for the next session: Node 22.14.0 and
+Supabase CLI 2.117.0 now live under `~/.local/share/{nodejs,supabase-cli}` —
+this machine still has no global node/npm/supabase on PATH. `test:db` remains
+red with 5 failures in the Bionic session's `scoped_claim`/`end_to_end` files
+(written 2026-09-19, never executed) — that lane's to fix.

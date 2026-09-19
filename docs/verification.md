@@ -2773,3 +2773,28 @@ sign in as the platform admin and walk:**
 5. `/admin/audit` — the trail with actor emails; the 100/300/500 rungs re-query.
 6. Signed out, or signed in as a non-admin: every one of the five screens says one sentence and
    shows no table (`admin-forbidden`), and the rail's «الإدارة» link is absent.
+
+## 2026-09-19 — token-renewal lane: check gates and the worker v17 deploy
+
+- **Live project, via Management API:** `20260919170000_worker_renews_its_token`
+  is present in `supabase_migrations.schema_migrations` (queried, not assumed
+  from `db push` output — no push was needed).
+- **Deployed `worker` v17** (`supabase functions deploy worker
+  --project-ref ykqugctewsqvevhyqtbi --no-verify-jwt`, run from a clean
+  worktree at `b3c3b95` so only committed code shipped). Function API reads
+  back `version 17, verify_jwt false, status ACTIVE`.
+- **Live probe:** `POST /functions/v1/worker/claim` with a bogus credential →
+  `HTTP 401 {"code":"invalid_worker_credential"}` — the request reaches the
+  gateway's own auth layer (Supabase JWT verification is off, as before) and
+  the function executes. The renewal route itself is covered by its five
+  handler tests, now actually executed (`87ff30a`).
+- **Gates at `b3c3b95`:** lint ✓ · format:check ✓ · typecheck ✓ ·
+  check:functions ✓ · unit 110 files / 863 tests ✓ · python worker 218 ✓ ·
+  build ✓ · check:secrets ✓ (671 files + built assets). **Not green:
+  `npm run test:db` = 334 passed / 5 failed** — `scoped_claim.test.ts` (3,
+  incl. the `jobs_one_outstanding_collect` constraint violation) and
+  `end_to_end.test.ts` (2). Those files are the Bionic session's 2026-09-19
+  work, recorded there as never executed; not this lane's to rewrite.
+- Not verified here: no live claim was taken (that would consume a real job),
+  so the renewal route was not exercised against the deployed function with a
+  real credential; the first long collection run will.

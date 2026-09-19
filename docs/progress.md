@@ -1980,3 +1980,36 @@ see the ACTIVE.md note. Verification: 37/37 topic tests, `--topics typesafe` wit
 the key exits with the expected message, an invalid choice is refused with the full
 list. The default is still gemini; making typesafe the default awaits calibration on
 a real channel.
+
+## 2026-09-19 — the token-renewal lane's remaining steps are executed
+
+The lane that landed the mid-run token renewal (`652d00e`) left three steps its
+session could not run: `npm run check`, `supabase db push`, and the `worker`
+Edge Function deploy. A follow-up session executed them without touching the
+two lanes then in flight (channel-lookup's uncommitted gateway/worker/python
+work; the Bionic session's never-executed test:db files).
+
+- **Node 22.14.0 installed locally** (`~/.local/share/nodejs/`, official
+  tarball — no system change) and **Supabase CLI 2.117.0** (`~/.local/share/
+  supabase-cli/`); this machine still has no global node/npm/supabase.
+- **`supabase db push`: nothing to push.** The Management API's migration list
+  shows `20260919170000_worker_renews_its_token` already applied to the live
+  project (with `20260919120000`–`140000`, `160000`). `20260919180000` (the
+  channel-lookup lane's, uncommitted) is correctly NOT applied.
+- **Deployed `worker` v17** from a clean worktree pinned at the lane's final
+  commit — the working tree carries the channel-lookup lane's uncommitted
+  changes to `worker/index.ts`/`worker-gateway.ts`, and deploying from it
+  would have shipped unfinished foreign work. `verify_jwt=false`, preserved.
+- Check gates, run at `b3c3b95` (three fix commits below): lint ✓,
+  format:check ✓, typecheck ✓, check:functions (deno) ✓, unit 110/863 ✓,
+  worker python 218 ✓, build ✓ (8 prerendered pages), check:secrets ✓ (after
+  fix). **test:db is red: 5 failures** (`scoped_claim` 3, `end_to_end` 2) —
+  the Bionic session's SQL tests, written 2026-09-19 and never executed;
+  left to that lane on purpose.
+- Fix commits: `7df9f56` (two unused ruff imports in `test_typesafe.py`),
+  `1fc5a9b` (prettier over ten committed files the format gate flagged),
+  `87ff30a` (the renewal tests posted real bodies through the shared `post`
+  helper — they had passed the JSON body into the bearer slot and sent `{}`;
+  and the claim-scope test now expects the hashed credential), `b3c3b95`
+  (`check-secrets` skips tracked directory symlinks — `.agents/skills` made
+  it throw EISDIR).
