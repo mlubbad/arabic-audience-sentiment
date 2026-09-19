@@ -28,7 +28,9 @@ export function parseChannelQuery(raw: string): ChannelQuery | null {
   // attempt: `https://` + an id parses as a URL whose host is the id.
   if (CHANNEL_ID.test(input)) return { kind: "id", value: input };
   if (input.startsWith("@")) {
-    return HANDLE.test(input) ? { kind: "handle", value: input.slice(1) } : null;
+    return HANDLE.test(input)
+      ? { kind: "handle", value: input.slice(1) }
+      : null;
   }
 
   // Anything URL-shaped that is not a YouTube channel URL is a wrong input,
