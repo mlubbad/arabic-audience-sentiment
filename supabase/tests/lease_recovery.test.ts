@@ -63,6 +63,21 @@ const lapse = (id: string) =>
     "update jobs set lease_expires_at=now()-interval '1 second' where id=$1",
     [id],
   );
+/** Prove the holder alive: one heartbeat against the live lease. */
+const beat = async (id: string) => {
+  const { rows } = await db.query<{ lease_token: string }>(
+    "select lease_token from jobs where id=$1",
+    [id],
+  );
+  await db.query("select private.heartbeat($1, $2)", [id, rows[0].lease_token]);
+};
+/** Count how many heartbeats the current lease has received. */
+const beats = async (id: string) =>
+  (
+    await db.query<{ n: number }>("select heartbeats n from jobs where id=$1", [
+      id,
+    ])
+  ).rows[0].n;
 
 describe("a lapsed lease is a recovery", () => {
   beforeAll(async () => {
@@ -100,22 +115,52 @@ describe("a lapsed lease is a recovery", () => {
     );
   });
 
-  it("does not spend an attempt when it takes over an abandoned lease", async () => {
+  it("resumes a lease nobody ever proved alive without counting it", async () => {
     const id = await job();
     await claim();
     expect(await row(id)).toMatchObject({ attempt: 1, reclaims: 0 });
 
-    // The worker is alive and working; it simply has not reached its next
-    // heartbeat. Under the old rule this was indistinguishable from a failure.
-    for (let i = 1; i <= 5; i++) {
+    // A replayed platform request, or a worker that died before its first
+    // batch, leaves a lease with no heartbeat against it. Resuming it is not
+    // a takeover — nobody was ever fighting for it — so it never counts, and
+    // never backs the job off. Twenty replays later the job is still exactly
+    // as claimable as it started: this is what happened on 2026-09-19, when
+    // twenty platform retries drove a collect job to `reclaims=20` and the
+    // next claim would have buried it as lease_thrashing.
+    for (let i = 0; i < 20; i++) {
       await abandon(id);
       await claim();
-      expect((await row(id)).reclaims).toBe(i);
+      expect((await row(id)).reclaims).toBe(0);
     }
     const after = await row(id);
     expect(after.attempt).toBe(1);
     expect(after.status).toBe("running");
     expect(after.error_code).toBeNull();
+  });
+
+  it("counts a takeover only when the holder proved alive and went silent", async () => {
+    const id = await job();
+    await claim();
+    await beat(id);
+    expect(await beats(id)).toBe(1);
+    await lapse(id);
+    await claim();
+    // A lease that was heartbeated and then lapsed means a live worker was
+    // really disturbed. That is a takeover, and it counts.
+    expect((await row(id)).reclaims).toBe(1);
+  });
+
+  it("resets the heartbeat count with each new lease", async () => {
+    const id = await job();
+    await claim();
+    await beat(id);
+    await beat(id);
+    await lapse(id);
+    await claim();
+    // The count belongs to the lease, not to the job: a fresh claim hands out
+    // a lease nobody has spoken on yet, and the next silent lapse must read
+    // as silence again, not as the previous holder's activity.
+    expect(await beats(id)).toBe(0);
   });
 
   it("gives a lease long enough to outlive a batch", async () => {
@@ -134,10 +179,15 @@ describe("a lapsed lease is a recovery", () => {
   it("names thrashing as thrashing, and keeps the cause where there is one", async () => {
     const id = await job();
     await claim();
+    // Real thrash: a holder proves alive (heartbeats), goes silent (lapse),
+    // and the job is taken over — twenty times. Silent lapses do not count,
+    // so this loop is the only way to reach the burial, which is the point.
     for (let i = 0; i < 20; i++) {
+      await beat(id);
       await abandon(id);
       await claim();
     }
+    await beat(id);
     await abandon(id);
     await claim();
     const dead = await row(id);
@@ -245,9 +295,15 @@ describe("a run that never committed still ran", () => {
     await lapse(id);
     await claim();
     expect(await at()).toBeLessThanOrEqual(0);
-    // The second is not. A job being handed round is a different situation
-    // from a worker that crashed once. Nothing winds the clock here — that is
-    // the whole point of this test.
+    // A proven-alive holder going silent is a real takeover. The first one
+    // still does not wind the clock — one lapse is evidence, not a pattern —
+    // but it counts, so the next one backs off. Nothing winds the clock here —
+    // that is the whole point of this test.
+    await beat(id);
+    await lapse(id);
+    await claim();
+    expect(await at()).toBeLessThanOrEqual(0);
+    await beat(id);
     await lapse(id);
     await claim();
     expect(await at()).toBeGreaterThan(30);

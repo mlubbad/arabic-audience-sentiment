@@ -301,4 +301,21 @@ describe("the due list and the catalogue", () => {
     expect(r.status).toBe(400);
     expect(await r.json()).toEqual({ code: "invalid_catalogue" });
   });
+
+  it("passes the requested kinds of work to the data layer, cleaned", async () => {
+    // A collection-only run asks for collections. A body whose types are
+    // malformed asks for anything: an unparseable scope must never become a
+    // narrower one by accident.
+    const db = base();
+    await send(db, "/worker/claim", { types: ["collect"] });
+    expect(db.claim).toHaveBeenCalledWith("cred", ["collect"]);
+    await send(db, "/worker/claim", { types: ["collect", 7, "discover"] });
+    expect(db.claim).toHaveBeenCalledWith("cred", ["collect", "discover"]);
+    await send(db, "/worker/claim", { types: [] });
+    expect(db.claim).toHaveBeenCalledWith("cred", null);
+    await send(db, "/worker/claim", { types: "collect" });
+    expect(db.claim).toHaveBeenCalledWith("cred", null);
+    await send(db, "/worker/claim", {});
+    expect(db.claim).toHaveBeenCalledWith("cred", null);
+  });
 });

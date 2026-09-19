@@ -11,7 +11,16 @@
  * without a deployed Supabase project.
  */
 export interface WorkerDb {
-  claim(credentialHash: string): Promise<Record<string, unknown> | null>;
+  /**
+   * `jobTypes` scopes the claim to the kinds of work the caller can run —
+   * a collection-only run is never handed a topics job to finish half-done.
+   * Null or empty means no preference, which is what a worker able to run
+   * everything still asks for.
+   */
+  claim(
+    credentialHash: string,
+    jobTypes?: string[] | null,
+  ): Promise<Record<string, unknown> | null>;
   /**
    * The channel credential for a claimed job, opened and renewed if needed.
    *
@@ -186,7 +195,15 @@ export async function handleWorkerRequest(
   const path = new URL(request.url).pathname.replace(/\/+$/, "");
   try {
     if (path.endsWith("/worker/claim")) {
-      const claimed = await db.claim(credential);
+      // The kinds of work this caller can run, or nothing for no preference.
+      // Only well-formed string arrays reach the database; anything else is
+      // an unscoped claim rather than an error, because a claim that cannot
+      // be parsed is a claim for anything.
+      const types =
+        Array.isArray(body.types) && body.types.length
+          ? body.types.filter((t): t is string => typeof t === "string")
+          : null;
+      const claimed = await db.claim(credential, types);
       // No work is not a failure, and 204 keeps that unambiguous.
       if (!claimed) return new Response(null, { status: 204 });
       // Normalised on purpose. The data layer returns a jobs row whose key is

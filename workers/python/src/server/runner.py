@@ -201,7 +201,7 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
 
 def run_discover(control: ControlPlane, build_collector) -> bool:
     """Claim one discover job: list the channel's videos and commit the list."""
-    lease = control.claim()
+    lease = control.claim(["discover"])
     if lease is None:
         return False
     return _discover(control, lease, build_collector)
@@ -308,8 +308,14 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
 
 
 def run_backfill(control: ControlPlane, build_collector, analyzer=None) -> bool:
-    """Claim one collect job and walk the videos the server handed it. False means no work."""
-    lease = control.claim()
+    """Claim one collect job and walk the videos the server handed it. False means no work.
+
+    The claim is scoped to collect deliberately. A run that meant to collect
+    once claimed whatever was oldest, and an operator's backfill consumed a
+    queued topics job that way, finishing it succeeded with nothing classified
+    — recorded as work done that no one had done.
+    """
+    lease = control.claim(["collect"])
     if lease is None:
         return False
     return _backfill(control, lease, build_collector, analyzer)
@@ -414,7 +420,12 @@ def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=No
     The claim is consumed here; the lease is handed down rather than claiming
     twice — a job must never be claimed twice.
     """
-    lease = control.claim()
+    # The loop can run what it is configured to run, and says so. A worker
+    # without a topic classifier claiming unscoped would take a topics job,
+    # hold its lease, and finish it blocked — five minutes the queue waited
+    # for nothing. Scope the claim to what can actually be dispatched.
+    job_types = None if classifier is not None else ["collect", "discover"]
+    lease = control.claim(job_types)
     if lease is None:
         return False
     if lease.get("type") == "discover":

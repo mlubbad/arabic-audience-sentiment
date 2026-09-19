@@ -111,6 +111,26 @@ def test_a_full_run_claims_commits_and_finishes_explicitly():
     assert [c.rsplit("/", 1)[-1] for c in calls] == ["claim", "heartbeat", "commit-batch", "finish"]
 
 
+def test_the_claim_names_the_kinds_of_work_the_caller_can_run():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content) if request.content else {}
+        return httpx.Response(204)
+
+    control = plane(handler)
+    # Scoped: a collection-only run asks for collections, and the body says so.
+    control.claim(["collect"])
+    assert seen["body"] == {"types": ["collect"]}
+    control.claim(["collect", "discover"])
+    assert seen["body"] == {"types": ["collect", "discover"]}
+    # Unscoped: a worker that can run everything sends an empty body, which the
+    # gateway reads as no preference. It never sends types=null as a string or
+    # a half-formed list for the server to guess at.
+    control.claim()
+    assert seen["body"] == {}
+
+
 def test_video_counts_posts_each_count_under_the_lease_and_returns_the_answer():
     seen = {}
 

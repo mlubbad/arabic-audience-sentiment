@@ -169,9 +169,17 @@ class ControlPlane:
             raise ControlPlaneError(code, retryable=response.status_code >= 500)
         return data
 
-    def claim(self) -> dict[str, Any] | None:
-        """None means there was no work, which is not a failure."""
-        return self._post("/worker/claim")
+    def claim(self, job_types: list[str] | None = None) -> dict[str, Any] | None:
+        """None means there was no work, which is not a failure.
+
+        `job_types` scopes the claim to work this caller can run. A collection-
+        only run asking unscoped would be handed a topics job, claim its lease,
+        and have nothing to do with it — the work waits five minutes for a
+        worker that can. The server never finishes a job it did not run: the
+        caller says what it can run, and the oldest matching job comes back.
+        """
+        body = {"types": job_types} if job_types else {}
+        return self._post("/worker/claim", body)
 
     def heartbeat(self, lease: dict[str, Any]) -> None:
         self._post("/worker/heartbeat", {"job_id": lease["job_id"], "lease_token": lease["lease_token"]})

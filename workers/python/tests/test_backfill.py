@@ -36,9 +36,12 @@ def drive(pages, videos, checkpoint=None, access_token="ya29.ok"):
     """Run a backfill against a synthetic control plane; return what it sent."""
     sent = {"commits": [], "finish": None, "error_code": None, "video_finished": []}
 
+    sent["claim_body"] = None
+
     def handler(request):
         path = request.url.path.rsplit("/", 1)[-1]
         if path == "claim":
+            sent["claim_body"] = json.loads(request.content) if request.content else {}
             return httpx.Response(200, json={
                 "job_id": "j1", "lease_token": "t1", "type": "collect",
                 "checkpoint": checkpoint,
@@ -80,6 +83,19 @@ def test_walks_every_video_and_ends_exhausted():
     assert [c[0] for c in sent["commits"]] == ["v1", "v2"]
     assert [c[1] for c in sent["commits"]] == ["الأولى", "الثانية"]
     assert sent["finish"] == "succeeded"
+
+
+def test_the_backfill_claims_collect_and_nothing_else():
+    # An operator's one-shot run once claimed whatever job was oldest and ran
+    # it as a collection, consuming a queued topics job and finishing it
+    # «succeeded» with nothing classified. The claim now names its kind, and
+    # the server never hands the run work it cannot run.
+    worked, sent, _ = drive(
+        {"v1": [Batch([comment("c1")], None, "exhausted")]},
+        [{"video_id": "v1", "external_video_id": "v1", "title": "الأولى"}],
+    )
+    assert worked is True
+    assert sent["claim_body"] == {"types": ["collect"]}
 
 
 def test_a_finished_video_is_recorded_and_never_read_again():

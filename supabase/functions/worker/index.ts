@@ -99,10 +99,13 @@ async function accessTokenFor(
 Deno.serve((request) =>
   handleWorkerRequest(request, {
     accessTokenFor,
-    claim: async (hash) => {
-      const { data, error } = await db.rpc("svc_worker_claim", {
-        credential_hash: hash,
-      });
+    claim: async (hash, jobTypes) => {
+      // A null/empty list calls the single-argument RPC: an unscoped claim.
+      const rpcArgs =
+        jobTypes && jobTypes.length
+          ? { credential_hash: hash, job_types: jobTypes }
+          : { credential_hash: hash };
+      const { data, error } = await db.rpc("svc_worker_claim", rpcArgs);
       if (error) failed(error);
       return data?.[0] ?? null;
     },
