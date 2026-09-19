@@ -1968,3 +1968,15 @@ node's hardened runtime refused. `npm run build` green (index-CDrWAGbx.js, the f
 as their own lazy chunks), `deploy:preview.sh` uploaded and pruned the superseded assets, and
 the host now serves the new hash with AdminShell/AdminOpsPage/AdminUsersPage answering 200.
 The operator's click-through (the checklist in the verification entry) is the last step.
+
+## 2026-09-19 — the TypeSafe classifier is wired
+
+The pending six-line branch landed in `server/loop.py`: `--topics typesafe` joins the
+choices (help text names `TYPESAFE_API_KEY`), and the selection block builds
+`TypeSafeTopicClassifier` the same way the gemini branch does. Committed by git-hunk
+surgery (`git apply --cached` over a two-hunk patch) so the token-renewal lane's
+still-uncommitted `build_collector` change in the same file stayed exactly as it was —
+see the ACTIVE.md note. Verification: 37/37 topic tests, `--topics typesafe` without
+the key exits with the expected message, an invalid choice is refused with the full
+list. The default is still gemini; making typesafe the default awaits calibration on
+a real channel.

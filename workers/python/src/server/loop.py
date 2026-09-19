@@ -131,8 +131,8 @@ def main() -> None:
     p.add_argument("--model", default="none",
                    choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())])
     p.add_argument("--topics", default="gemini" if os.environ.get("GEMINI_API_KEY") else "none",
-                   choices=["none", "deterministic-test", "gemini"],
-                   help="topic classifier; gemini needs GEMINI_API_KEY")
+                   choices=["none", "deterministic-test", "gemini", "typesafe"],
+                   help="topic classifier; gemini needs GEMINI_API_KEY, typesafe needs TYPESAFE_API_KEY")
     p.add_argument("--idle-seconds", type=float, default=60.0,
                    help="pause after an empty queue")
     p.add_argument("--max-idle", type=int, default=30,
@@ -165,6 +165,14 @@ def main() -> None:
         if not key:
             raise SystemExit("--topics gemini needs GEMINI_API_KEY")
         classifier = GeminiTopicClassifier(key, client)
+        _log(f"topic classifier: {classifier.model_id}")
+    elif args.topics == "typesafe":
+        from topics.typesafe import TypeSafeTopicClassifier
+
+        key = os.environ.get("TYPESAFE_API_KEY", "")
+        if not key:
+            raise SystemExit("--topics typesafe needs TYPESAFE_API_KEY")
+        classifier = TypeSafeTopicClassifier(key, client)
         _log(f"topic classifier: {classifier.model_id}")
     elif args.topics == "deterministic-test":
         from topics.deterministic import DeterministicTestClassifier

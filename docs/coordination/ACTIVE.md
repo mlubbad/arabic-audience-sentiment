@@ -529,3 +529,8 @@ was free), plus progress/verification entries. **Did not touch `server/loop.py`*
 though the wiring needs a six-line branch there — the token-renewal lane has uncommitted
 `loop.py` changes in flight and a commit of mine would have swept them up. The wiring
 snippet is in `docs/progress.md` under the same date; apply it after that lane commits.
+
+2026-09-19, same Bionic session, follow-up: the loop.py wiring landed after the
+token-renewal lane finished — committed via `git apply --cached` with only my two
+hunks (argparse choices + the classifier branch). That lane's `build_collector`
+change in loop.py is still uncommitted on disk, untouched, exactly as it left it.
