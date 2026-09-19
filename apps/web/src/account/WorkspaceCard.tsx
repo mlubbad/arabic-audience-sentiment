@@ -50,7 +50,6 @@ export function WorkspaceCard({
   pending,
   feedback,
   onConnect,
-  confirmingConnect = false,
   confirmingDisconnect = false,
   onDisconnect,
   onAddChannel,
@@ -71,11 +70,8 @@ export function WorkspaceCard({
   pending: boolean;
   /** What this card has to say for itself — its own note, or that it is working. */
   feedback: ReactNode;
-  /** `ask` opens the "you're about to leave for Google" question; `continue`
-   *  actually starts the redirect; `cancel` closes the question without one. */
-  onConnect: (step: "ask" | "continue" | "cancel") => void;
-  /** The connect/relink question is open; the page holds this state per card. */
-  confirmingConnect?: boolean;
+  /** Starts the OAuth connect or relink redirect to Google. */
+  onConnect: () => void;
   /** The public-data door: `open` shows the form, `cancel` closes it,
    *  `search` looks a query up on the server, `add` files the candidate.
    *  The page owns the lookup and the registration; this card only shows
@@ -235,11 +231,11 @@ export function WorkspaceCard({
           {/* Shown only when it can actually work: without a client the
               server would refuse, and a button that always fails is worse
               than no button. */}
-          {hasClient && !connected && !confirmingConnect && (
+          {hasClient && !connected && (
             <Button
               disabled={pending}
               data-testid={`connect-${workspace.id}`}
-              onClick={() => onConnect("ask")}
+              onClick={onConnect}
             >
               {S.connectChannel}
             </Button>
@@ -264,12 +260,12 @@ export function WorkspaceCard({
                 {S.addChannel}
               </Button>
             )}
-          {hasClient && unnamed && !confirmingConnect && (
+          {hasClient && unnamed && (
             <Button
               variant="secondary"
               disabled={pending}
               data-testid={`relink-${workspace.id}`}
-              onClick={() => onConnect("ask")}
+              onClick={onConnect}
             >
               {S.relinkForName}
             </Button>
@@ -305,37 +301,6 @@ export function WorkspaceCard({
             </Button>
           )}
         </div>
-        {/* Both connect doors lead to the same redirect and the same two
-            Google warning screens (the app is pending Google's own review of
-            the scope it asks for); the question is asked once, here, rather
-            than split across two copies of the same panel. It stays inline
-            — an explanation before leaving the page, not a confirmation —
-            so it is a nested card, not a dialog. */}
-        {confirmingConnect && (
-          <Card
-            className="db-ws-consent"
-            role="group"
-            aria-label={S.connectChannel}
-          >
-            <p>{S.connectAboutGoogle}</p>
-            <div className="db-actions">
-              <Button
-                disabled={pending}
-                data-testid={`connect-continue-${workspace.id}`}
-                onClick={() => onConnect("continue")}
-              >
-                {S.connectContinueToGoogle}
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={pending}
-                onClick={() => onConnect("cancel")}
-              >
-                {S.renameCancel}
-              </Button>
-            </div>
-          </Card>
-        )}
         {feedback}
         {/* The public-data door's form: a query in, candidates out, one add
             button per candidate. Inline like the Google consent card above —

@@ -135,9 +135,6 @@ export const ar = {
   retireDone: "انتهت المساحة وانتقلت إلى مشغّل الخدمة.",
   retireLast: "لا يمكن إنهاء آخر مساحة لك؛ أنشئ أخرى أولًا.",
   retireFailed: "تعذّر إنهاء المساحة.",
-  connectAboutGoogle:
-    "يفتح هذا صفحة Google. لأن هذا التطبيق قيد مراجعة أمنية من Google، قد تظهر رسالة تحذير تقول إن التطبيق غير موثَّق — هذا متوقَّع ولا يعني وجود خطر. اضغط «Advanced» ثم «Go to … (unsafe)»، وبعدها «Continue» لإكمال ربط القناة.",
-  connectContinueToGoogle: "متابعة إلى Google",
   connectChannel: "ربط قناة يوتيوب",
   relinkForName: "إعادة الربط لحفظ اسم القناة",
   addChannel: "إضافة قناة بالرابط أو بالبحث",

@@ -64,7 +64,7 @@ type Workspace = { id: string; name: string };
  *  one reader, and two open confirmations would be two ways to press wrong. */
 type Asking = {
   ws: string;
-  what: "connect" | "disconnect" | "rename" | "retire" | "addchannel";
+  what: "disconnect" | "rename" | "retire" | "addchannel";
 } | null;
 
 /** The lookup refusal's own code, however the client wrapped it. The function
@@ -556,21 +556,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                         }
                       : undefined
                   }
-                  confirmingConnect={
-                    asking?.ws === w.id && asking.what === "connect"
-                  }
-                  onConnect={(step) => {
-                    // The redirect goes to Google, which shows its own two
-                    // warnings while this application is pending Google's
-                    // review — the question here says so before the reader
-                    // ever leaves this page, rather than after they land on
-                    // an alarming screen with no context.
-                    if (step !== "continue") {
-                      setAsking(
-                        step === "ask" ? { ws: w.id, what: "connect" } : null,
-                      );
-                      return;
-                    }
+                  onConnect={() => {
                     if (!workspaceClient) return;
                     setBusy(scope);
                     setNote(null);
@@ -860,19 +846,10 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
                     ),
                 );
               }}
-              confirmingConnect={
-                asking?.ws === w.id && asking.what === "connect"
-              }
-              onConnect={(step) => {
-                if (step !== "continue") {
-                  setAsking(
-                    step === "ask" ? { ws: w.id, what: "connect" } : null,
-                  );
-                  return;
-                }
+              onConnect={() => {
                 // Google's consent screen is a full navigation the demo
                 // cannot make; the card says so where the redirect would
-                // have started, and the question closes.
+                // have started.
                 act({ type: "connect", w: w.id }, () =>
                   say(scope, S.demoExternalNote),
                 );

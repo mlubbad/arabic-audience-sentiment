@@ -158,16 +158,12 @@ test("creating a workspace adds a fourth card", async ({ page }) => {
   await expect(page.getByRole("status").last()).toHaveText(CREATE_DONE);
 });
 
-test("continuing a connect in the demo opens the external-service note instead of leaving", async ({
+test("pressing connect in the demo opens the external-service note instead of leaving", async ({
   page,
 }) => {
   const r = card(page, 2);
   await r.getByTestId(`connect-${id(2)}`).click();
-  const consent = r.getByRole("group");
-  await expect(consent).toBeVisible();
-  await consent.getByTestId(`connect-continue-${id(2)}`).click();
 
-  await expect(consent).toHaveCount(0);
   await expect(r.getByRole("status")).toHaveText(DEMO_EXTERNAL_NOTE);
 });
 

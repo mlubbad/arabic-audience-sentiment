@@ -174,34 +174,18 @@ describe("a workspace card", () => {
     }
   });
 
-  it("asks before it leaves for Google, on both the connect and the relink door", () => {
-    // Not connected yet: the connect button asks first; the redirect itself
-    // never fires from a bare render (onConnect only ever receives the step).
-    const asking = render({ hasClient: true, channel: null });
-    expect(asking).toContain(`data-testid="connect-${W1}"`);
-    expect(asking).not.toContain(ar.connectAboutGoogle);
-    const confirmingConnect = render({
-      hasClient: true,
-      channel: null,
-      confirmingConnect: true,
-    });
-    expect(confirmingConnect).toContain(ar.connectAboutGoogle);
-    expect(confirmingConnect).toContain(ar.connectContinueToGoogle);
-    expect(confirmingConnect).toContain(ar.renameCancel);
-    // The relink door goes through the same question — it is the same
-    // redirect, and the same two Google warnings wait on the other side.
-    // The relink door hides behind the same question, and reappears once
-    // the reader steps back from it.
-    const relinkAsking = render({
+  it("offers the connect and relink doors directly without an intermediate warning", () => {
+    // Not connected yet: the connect button renders directly.
+    const notConnected = render({ hasClient: true, channel: null });
+    expect(notConnected).toContain(`data-testid="connect-${W1}"`);
+    expect(notConnected).toContain(ar.connectChannel);
+
+    // The relink door is offered when a connected channel has no stored name.
+    const relink = render({
       channel: { ...connected, handle: null, title: null },
     });
-    expect(relinkAsking).toContain(`data-testid="relink-${W1}"`);
-    const relinking = render({
-      channel: { ...connected, handle: null, title: null },
-      confirmingConnect: true,
-    });
-    expect(relinking).not.toContain("relink-");
-    expect(relinking).toContain(ar.connectAboutGoogle);
+    expect(relink).toContain(`data-testid="relink-${W1}"`);
+    expect(relink).toContain(ar.relinkForName);
   });
 
   it("offers to disconnect exactly while a channel is connected, and asks first", () => {

@@ -2075,3 +2075,6 @@ no-op on `mlubbad`). Remaining operator steps: create the YouTube API key
 `supabase secrets set YOUTUBE_API_KEY=…`, add the same value to `.env.local`,
 run `scripts/worker-service-update.sh` **from the account that runs the
 service**, and deploy the web bundle when convenient.
+
+2026-09-19: Removed intermediate Google OAuth unverified warning note and confirmation card from the Account page (`WorkspaceCard.tsx`, `Account.tsx`, `strings/ar.ts`, `strings/en.ts`, `docs/oauth-connect-flow.md`). Following Google OAuth verification approval in production, connecting or relinking a channel navigates directly to Google OAuth without intermediate warning screens. All test suites (110 vitest files / 865 unit tests, 38 db test files / 361 tests, 128 playwright e2e tests, 229 worker pytest tests, Deno check, linter, formatting, build, secrets check) pass green.
+

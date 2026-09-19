@@ -232,63 +232,25 @@ describe("WorkspaceCard", () => {
       });
       expect(screen.getByTestId(`connect-${W}`)).toBeDisabled();
       round3.unmount();
-
-      // The consent step's own continue and cancel, once the door was pressed.
-      mount({
-        channel: null,
-        hasClient: true,
-        pending: true,
-        onConnect: vi.fn(),
-        confirmingConnect: true,
-      });
-      expect(screen.getByTestId(`connect-continue-${W}`)).toBeDisabled();
-      expect(
-        screen.getByRole("button", { name: ar.renameCancel }),
-      ).toBeDisabled();
     });
   });
 
   describe("connect", () => {
-    it("the door asks first; the consent step is inline and continues to Google", async () => {
+    it("connects directly to Google when the connect door is clicked", async () => {
       const onConnect = vi.fn();
       mount({ channel: null, onConnect });
       await userEvent.click(screen.getByTestId(`connect-${W}`));
-      expect(onConnect).toHaveBeenCalledWith("ask");
-      expect(screen.queryByText(ar.connectAboutGoogle)).not.toBeInTheDocument();
+      expect(onConnect).toHaveBeenCalledTimes(1);
     });
 
-    it("while asking, the sentence and the continue door replace the connect door", async () => {
-      const onConnect = vi.fn();
-      mount({ channel: null, onConnect, confirmingConnect: true });
-      expect(screen.queryByTestId(`connect-${W}`)).not.toBeInTheDocument();
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      const group = screen.getByRole("group", { name: ar.connectChannel });
-      expect(group).toHaveTextContent(ar.connectAboutGoogle);
-      await userEvent.click(screen.getByTestId(`connect-continue-${W}`));
-      expect(onConnect).toHaveBeenCalledWith("continue");
-      await userEvent.click(
-        within(group).getByRole("button", { name: ar.renameCancel }),
-      );
-      expect(onConnect).toHaveBeenCalledWith("cancel");
-    });
-
-    it("the relink door asks through the same step", async () => {
+    it("relinks directly to Google when the relink door is clicked", async () => {
       const onConnect = vi.fn();
       mount({
         channel: { ...connected, title: null, handle: null },
         onConnect,
       });
       await userEvent.click(screen.getByTestId(`relink-${W}`));
-      expect(onConnect).toHaveBeenCalledWith("ask");
-    });
-
-    it("the relink door hides while the question is open", () => {
-      mount({
-        channel: { ...connected, title: null, handle: null },
-        confirmingConnect: true,
-      });
-      expect(screen.queryByTestId(`relink-${W}`)).not.toBeInTheDocument();
-      expect(screen.getByTestId(`connect-continue-${W}`)).toBeInTheDocument();
+      expect(onConnect).toHaveBeenCalledTimes(1);
     });
   });
 
