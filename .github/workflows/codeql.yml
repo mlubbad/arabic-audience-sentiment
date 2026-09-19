@@ -1,4 +1,4 @@
-# Cross-file (interprocedural) taint analysis via the official CodeQL action.
+# Cross-file (interprocedural) taint analysis via the official CodeQL engine.
 #
 # Licensing note: code scanning upload requires GitHub Code Security on private
 # repos, so the analysis runs with `upload: never` — the same official engine
@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: read
+  security-events: write
+  actions: read
 
 concurrency:
   group: codeql-${{ github.ref }}
@@ -36,6 +38,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: security-extended
+          build-mode: none
       - uses: github/codeql-action/analyze@ed1a0fa18ac745d017ca370dd4ef08bba3b4f504 # v3
         with:
           upload: never
