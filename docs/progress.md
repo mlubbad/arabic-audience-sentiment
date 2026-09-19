@@ -1869,3 +1869,28 @@ command that generates, registers and writes the secret, never a placeholder to 
 **Not yet read back:** the `creator_plus` tenant's discover job as `succeeded`, and its page
 reading «متصل» — a read-only query is with the operator; the runner logs nothing on a
 successful discover, so the log's silence after «worker up» is the expected shape.
+
+## 2026-09-19 — admin observability, phase one of the admin roadmap
+
+Phase one (`admin-dashboard-roadmap.md` in the session workspace) landed: four read-only RPCs and
+four pages beside the operator's workspace table, one room with tabs. New migration
+`20260919160000_admin_observability.sql` — `admin_users()`, `admin_channels()`, `admin_ops()`
+(overview numbers + the last two weeks' failed/partial runs, capped at 25), `admin_audit(p_limit)`
+(1–500) — every one gated at its head by `is_platform_admin()`, same as the existing hand levers,
+no writes anywhere. Web side: `admin/AdminShell.tsx` (shared gate + tabs), `admin/adminRead.ts`
+(reads + zod contracts in `packages/contracts/src/admin.ts`), `Admin{Users,Channels,Ops,Audit}Page.tsx`,
+routes `/admin/users|channels|ops|audit`, strings for both languages, tabs added to `AdminPage.tsx`
+(non-demo only). Typed check and eslint pass clean.
+
+**Found while testing, for the migrations lane:** `20260919130000` ends with three
+`drop function public.__pgrst_probe…` statements for functions that exist only on the live
+database (operator's debugging leftovers) and in no migration — a fresh database, including the
+PGlite bootstrap, fails on that drop, so `npm run test:db` cannot bootstrap at all until it is
+revised (a `drop function if exists`, or the drops moved behind a guard). The new test's bootstrap
+recreates the probes so the suite can run; the fix itself is that lane's call.
+
+**Verification environment note:** this session's shell has no npm/vitest (Node is present only as
+the LM Studio binary, and rollup's native module cannot dlopen under it), so the suite ran through
+a standalone PGlite script mirroring the vitest file — 30/30 assertions, including the gate
+refusals, the counts, the ops overview, the audit bounds, and the reads-stay-reads close. See the
+verification entry of the same date.

@@ -2686,3 +2686,24 @@ host — their own session.
 **Not verified here:** a claim of the `creator_plus` tenant's discover job and «متصل» on its
 operations page — the read-only query is with the operator; the runner writes no log line for
 a successful claim or discover, only `comment counts` lines during a collect.
+
+## 2026-09-19 — admin observability RPCs, phase one
+
+- `tsc --noEmit` clean (whole repo, includes the four new pages and the extended contracts).
+- `eslint` clean on `apps/web/src/admin/**`, `packages/contracts/src/admin.ts`,
+  `supabase/tests/admin_observability.test.ts`, `main.tsx`, `strings/**`.
+- The PGlite suite could not run under vitest in this shell (no npm; rollup's darwin-arm64 native
+  module cannot load into the available Node build). Instead: a standalone script running the same
+  migrations on PGlite with the same fixture and the same assertions — **30/30 pass**: the gate
+  refuses all four RPCs to a non-admin and answers the admin; `admin_users` returns one row per
+  user with workspace/owner counts (owner 2/2 counting the bootstrap personal workspace, admin 1/1);
+  `admin_channels` carries the counts and the failed run's verdict and error code; `admin_ops`
+  reports 4 workspaces (three bootstrap-personal, one named), the failed-runs list with its error
+  code, `worker_fresh` true, the queue length; `admin_audit` attaches actor email and workspace
+  name and refuses limits 0 and 501; and after all reads, `audit_events` still holds exactly one
+  row, counted as the superuser (as `authenticated` the table's RLS hides the trail from a reader
+  who is not a member — the RPC is the admin's only window, by design).
+- **Not run here:** the vitest suite itself (`npm run test:db`) and the Playwright suite — both
+  blocked by the toolchain above; the vitest file `supabase/tests/admin_observability.test.ts`
+  mirrors the standalone script and is the one the repo gate runs. The browser pages were not
+  exercised live against the hosted project either — no session here.

@@ -124,3 +124,102 @@
 .db-admin-card .db-row-actions {
   margin-top: var(--space-4);
 }
+
+/* ---------------- the room's tabs ---------------- */
+/* One rail entry, five screens: the strip under every admin page head.
+   The audit page reuses the same classes for its row-count rungs. */
+.admin-tabs,
+.admin-audit-limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.admin-tab {
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  background: var(--bg-card);
+  color: var(--text-1);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-small);
+  text-decoration: none;
+  cursor: pointer;
+}
+.admin-tab:hover {
+  background: var(--bg-muted);
+}
+.admin-tab-active {
+  background: var(--bg-muted);
+  border-color: var(--text-3);
+  font-weight: 600;
+}
+
+/* ---------------- the ops cards ---------------- */
+/* One number each, and the worker's verdict; the failed-sync card warns
+   without shouting — the runs table below it carries the detail. */
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+}
+.admin-metric {
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  background: var(--bg-card);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.admin-metric-value {
+  font-size: var(--fs-title, 1.5rem);
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.2;
+}
+.admin-metric-label {
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.admin-metric-warn {
+  border-color: var(--text-3);
+}
+
+/* ---------------- the two quiet notes ---------------- */
+/* A channel's name, its handle under it, its last error under that; and
+   the PII sentence under the users table. */
+.admin-channel-name {
+  display: block;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.admin-channel-sub,
+.admin-channel-error {
+  display: block;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.admin-channel-error {
+  color: var(--text-1);
+}
+.admin-audit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.admin-audit-head h2 {
+  margin: 0;
+}
+.admin-audit-action {
+  font-weight: 600;
+}
+.admin-note {
+  margin-top: var(--space-3);
+}
+.admin-note p {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}

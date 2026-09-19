@@ -76,6 +76,22 @@ const Pricing = lazy(() =>
 const AdminPage = lazy(() =>
   import("./admin/AdminPage").then((m) => ({ default: m.AdminPage })),
 );
+// The observability pages the roadmap's phase one adds: read-only screens
+// beside the operator's workspace table, one room in the rail's map.
+const AdminUsers = lazy(() =>
+  import("./admin/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })),
+);
+const AdminChannels = lazy(() =>
+  import("./admin/AdminChannelsPage").then((m) => ({
+    default: m.AdminChannelsPage,
+  })),
+);
+const AdminOps = lazy(() =>
+  import("./admin/AdminOpsPage").then((m) => ({ default: m.AdminOpsPage })),
+);
+const AdminAudit = lazy(() =>
+  import("./admin/AdminAuditPage").then((m) => ({ default: m.AdminAuditPage })),
+);
 // The legal documents share one page; the address decides which. The
 // documents themselves load with it, not with the shell.
 const LegalPage = lazy(() =>
@@ -467,6 +483,10 @@ const app = (
               <Route path="/sync" element={<Sync />} />
               <Route path="/connected" element={<Connected />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/channels" element={<AdminChannels />} />
+              <Route path="/admin/ops" element={<AdminOps />} />
+              <Route path="/admin/audit" element={<AdminAudit />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
