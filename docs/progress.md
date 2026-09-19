@@ -2048,3 +2048,9 @@ data with the project's API key, link the account later for real. Landed:
   topics-due failure was its cascade), `worker_video_counts` (due-list order
   asserted over random video uuids) — fixture/never-run repairs only, no
   product SQL changed; recorded in `docs/verification.md`.
+
+2026-09-19, same lane, one line of wiring this entry's deploy note depends on:
+`scripts/worker-service.sh` now exports `YOUTUBE_API_KEY` to the loop when set
+in `.env.local` (the same conditional pattern as `GEMINI_API_KEY`), so the
+service actually reaches the `public=yes` state the ACTIVE.md operator steps
+name. Without this the key in `.env.local` would never have reached the loop.
