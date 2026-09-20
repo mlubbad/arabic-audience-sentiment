@@ -68,6 +68,23 @@ describe("sync health", () => {
     }
   });
 
+  it("treats queued work with a connected worker as queued rather than a fatal blocker", () => {
+    const retrying = state({
+      queued_jobs: 2,
+      last_run: {
+        ...state().last_run!,
+        status: "blocked",
+        error_code: "quota_exceeded",
+      },
+    });
+    expect(syncHealth(retrying, now)).toMatchObject({
+      severity: "warning",
+      key: "queued",
+      queued: 2,
+      errorCode: "quota_exceeded",
+    });
+  });
+
   it("treats queued work with no worker as stalled, whatever the last run said", () => {
     const stalled = state({
       queued_jobs: 4,

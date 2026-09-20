@@ -475,6 +475,7 @@ export const ar = {
   syncMessages: {
     healthy: "آخر مزامنة اكتملت حديثًا",
     running: "مزامنة قيد التنفيذ الآن؛ النتيجة غير معروفة بعد",
+    queued: "توجد مهام في الانتظار؛ بانتظار دورها في المعالجة",
     stale: "مضى وقت طويل على آخر مزامنة؛ قد تكون البيانات قديمة",
     partial: "آخر مزامنة توقفت قبل نهايتها؛ التغطية جزئية وليست اكتمالًا",
     incomplete_coverage:
@@ -529,6 +530,11 @@ export const ar = {
   jobQuotaExceeded:
     "استُنفدت حصة يوتيوب اليومية. تتجدد تلقائيًا، وتُعاد المحاولة بعدها.",
   jobKindTopics: "تصنيف الموضوعات",
+  jobKindCatalogue: "فهرسة القناة",
+  jobCatalogueQueuedWithWorker: "في الطابور، بانتظار بدء فهرسة القناة.",
+  jobCatalogueRunningDetail: "فهرسة فيديوهات القناة قيد التنفيذ الآن.",
+  jobCatalogueSucceededDetail:
+    "تم استكشاف فيديوهات القناة وتحديث القائمة بنجاح.",
   jobNoTopicClassifier:
     "لا يوجد مصنِّف موضوعات مهيّأ لدى العامل. أضف مفتاح Gemini إلى إعدادات العامل ليعمل التصنيف.",
   jobTopicModelNotActive:

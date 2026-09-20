@@ -137,4 +137,78 @@ describe("a claim scoped to the work its caller can run", () => {
       ]),
     ).rejects.toThrow(/invalid_worker_credential/);
   });
+
+  it("interleaves claims fairly across tenants so one workspace does not starve others", async () => {
+    const W2 = "00000000-0000-4000-8000-000000000002";
+    await db.query(
+      "insert into workspaces(id,name,created_by) values ($1,'w2',$2) on conflict do nothing",
+      [W2, OWNER],
+    );
+    await db.query(
+      "insert into clients(id,workspace_id,name) values ($1,$1,'c2') on conflict do nothing",
+      [W2],
+    );
+    await db.query(
+      "insert into channels(id,workspace_id,client_id,external_channel_id,status) values ($1,$1,$1,$2,'connected') on conflict do nothing",
+      [W2, `UC${"c".repeat(22)}`],
+    );
+
+    const CH1_2 = "00000000-0000-4000-8000-000000000012";
+    await db.query(
+      "insert into channels(id,workspace_id,client_id,external_channel_id,status) values ($1,$2,$2,$3,'connected') on conflict do nothing",
+      [CH1_2, W, `UC${"d".repeat(22)}`],
+    );
+
+    // Tenant 1 enqueues 2 collect jobs across its 2 channels
+    const t1_job1 = (
+      await db.query<{ id: string }>(
+        `insert into jobs(workspace_id,channel_id,type,dedupe_key,status,not_before)
+         values ($1,$1,'collect','k-fair-1','queued',now() - interval '2 minutes') returning id`,
+        [W],
+      )
+    ).rows[0];
+    const t1_job2 = (
+      await db.query<{ id: string }>(
+        `insert into jobs(workspace_id,channel_id,type,dedupe_key,status,not_before)
+         values ($1,$2,'collect','k-fair-2','queued',now() - interval '1 minute') returning id`,
+        [W, CH1_2],
+      )
+    ).rows[0];
+
+    // Tenant 2 enqueues 1 collect job (slightly newer)
+    const t2_job1 = (
+      await db.query<{ id: string }>(
+        `insert into jobs(workspace_id,channel_id,type,dedupe_key,status,not_before)
+         values ($1,$1,'collect','k-fair-3','queued',now()) returning id`,
+        [W2],
+      )
+    ).rows[0];
+
+    // Platform worker claims without tenant constraint (w = null)
+    // Claim 1 should get t1_job1 (oldest)
+    const claim1 = (
+      await db.query<{ id: string }>(
+        "select * from private.claim_job(null, null)",
+      )
+    ).rows;
+    expect(claim1[0].id).toBe(t1_job1.id);
+
+    // Now Tenant 1 has 1 job 'running' (lease active).
+    // Tenant 2 has 0 running jobs.
+    // Claim 2 MUST claim Tenant 2's job instead of Tenant 1's second job!
+    const claim2 = (
+      await db.query<{ id: string }>(
+        "select * from private.claim_job(null, null)",
+      )
+    ).rows;
+    expect(claim2[0].id).toBe(t2_job1.id);
+
+    // Claim 3 will then claim Tenant 1's second job
+    const claim3 = (
+      await db.query<{ id: string }>(
+        "select * from private.claim_job(null, null)",
+      )
+    ).rows;
+    expect(claim3[0].id).toBe(t1_job2.id);
+  });
 });

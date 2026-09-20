@@ -1,6 +1,28 @@
 # Progress
 
-## 2026-09-20 — Operational views decoupled from comment payloads; dashboard snapshot optimized
+## 2026-09-20 — Real-Time Adaptive Sync UX, Catalogue Discovery Differentiation, and Fair Multi-Tenant Job Scheduling
+
+Addressed user confusion and friction around job progress and sync status:
+1. **Accurate Catalogue Discovery Differentiation in Job Feed (`jobFeed.ts`, `ar.ts`, `en.ts`)**:
+   - Differentiated channel cataloguing (`type === 'discover'`) from comment collection (`collect`).
+   - Replaced misleading «0 تعليق» and generic comments-centric copy with explicit catalogue metadata:
+     «فهرسة القناة — اكتملت» / «انتهت فهرسة فيديوهات القناة وبياناتها الوصفية بنجاح» and queued/running indicators.
+2. **Context-Aware Sync Health (`syncHealth.ts`, `syncHealth.test.ts`)**:
+   - When jobs are queued or running and a worker is connected, health reports `{ key: "queued", severity: "warning" }`
+     «المزامنة قيد المعالجة — العمليات قيد التنفيذ أو مجدولة» instead of pinning users with historical fatal errors
+     (e.g., historical `quota_exceeded` from a previous day) while current jobs are actively waiting in queue.
+3. **Adaptive Live Polling in Sync Dashboard (`Sync.tsx`)**:
+   - Eliminated painful manual page refreshes when syncing by introducing reactive 4-second polling that activates
+     only when jobs are queued or running (`(sync?.queued_jobs ?? 0) > 0`, running job status).
+   - Automatically idles and clears intervals when the queue is clear to preserve resources.
+4. **Fair Multi-Tenant Round-Robin Job Claim Scheduling (`claim_job`)**:
+   - Added migration `20260920120000_fair_multitenant_claim_scheduling.sql`.
+   - Updated `private.claim_job(w uuid, job_types text[])` to interleave platform worker claims across tenants:
+     workspaces with fewer currently running active leases are claimed before workspaces that already have running jobs,
+     preventing any single active workspace from starving other tenants' urgent sync tasks.
+   - Verified via unit test in `supabase/tests/scoped_claim.test.ts`.
+5. **Full Repository Verification**:
+   - 100% test pass: 111 web test files (874 tests), 39 db test files (365 tests), 229 python tests, clean build, clean types, clean linters.
 
 Resolved the root cause of `read:live_unavailable` on `/sync` and `RailState`:
 1. **Lightweight Operational Snapshot (`workspace_ops_snapshot`)**:

@@ -247,6 +247,28 @@ function SyncBody({
   const health = syncHealth(sync, new Date());
   const run = sync?.last_run ?? null;
   const connected = !!sync?.worker.connected;
+
+  // Adaptive polling: when work is in progress or waiting in the queue, poll
+  // every 4 seconds so the operator sees progress live without manual refreshing.
+  // When the queue is quiet and nothing is running, no interval is set.
+  const hasActiveWork = useMemo(() => {
+    if (mode !== "live") return false;
+    if ((sync?.queued_jobs ?? 0) > 0) return true;
+    if (sync?.last_run?.status === "running") return true;
+    return (jobs ?? []).some(
+      (j) => j.status === "queued" || j.status === "running",
+    );
+  }, [mode, sync?.queued_jobs, sync?.last_run?.status, jobs]);
+
+  useEffect(() => {
+    if (!hasActiveWork) return;
+    const interval = setInterval(() => {
+      setTick((t) => t + 1);
+      void snapshot.refetch();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [hasActiveWork, snapshot]);
+
   const entries: JobEntry[] = (jobs ?? []).map((j) =>
     describeJob(j, { workerConnected: connected }, S),
   );

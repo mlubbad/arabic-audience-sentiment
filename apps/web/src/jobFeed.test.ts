@@ -137,6 +137,21 @@ describe("describeJob", () => {
       ar.jobTopicModelNotActive,
     );
   });
+
+  it("names a discover job as catalogue and does not promise comments", () => {
+    const discover = describeJob(
+      {
+        ...row(),
+        type: "discover",
+        status: "succeeded",
+      },
+      { workerConnected: true },
+      ar,
+    );
+    expect(discover.headline).toContain(ar.jobKindCatalogue);
+    expect(discover.detail).toBe(ar.jobCatalogueSucceededDetail);
+    expect(discover.detail).not.toContain("تعليق");
+  });
 });
 
 describe("what an operator may do with a job", () => {

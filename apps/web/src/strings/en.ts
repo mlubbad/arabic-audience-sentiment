@@ -468,6 +468,7 @@ export const en: Strings = {
   syncMessages: {
     healthy: "The last sync completed recently",
     running: "A sync is running now; the outcome is not known yet",
+    queued: "Work is in the queue; waiting for its turn to process",
     stale: "It has been a long time since the last sync; the data may be old",
     partial:
       "The last sync stopped before its end; coverage is partial, not complete",
@@ -525,6 +526,12 @@ export const en: Strings = {
   jobQuotaExceeded:
     "The daily YouTube quota is used up. It renews automatically, and the attempt is retried afterwards.",
   jobKindTopics: "Topic classification",
+  jobKindCatalogue: "Channel cataloguing",
+  jobCatalogueQueuedWithWorker:
+    "In the queue, waiting for channel cataloguing to start.",
+  jobCatalogueRunningDetail: "Channel cataloguing is running now.",
+  jobCatalogueSucceededDetail:
+    "Channel videos catalogued and list updated successfully.",
   jobNoTopicClassifier:
     "The worker has no topic classifier configured. Add the Gemini key to the worker's settings for classification to run.",
   jobTopicModelNotActive:

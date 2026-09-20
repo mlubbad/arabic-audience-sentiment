@@ -1,5 +1,16 @@
 # Implementation decisions
 
+2026-09-20 — Fair multi-tenant job claim scheduling and real-time operational polling.
+When multiple tenants queue jobs, platform workers claiming across workspaces (`w is null`) must not
+allow an active workspace with many jobs to monopolize worker leases and starve other workspaces.
+We updated `private.claim_job` in `supabase/migrations/20260920120000_fair_multitenant_claim_scheduling.sql`
+to prioritize workspaces with fewer actively running jobs before falling back to `not_before` time.
+Urgent channel discovery jobs (`type = 'discover'`) continue to jump the queue ahead of collection/analysis.
+On the client side, operational views on `/sync` employ adaptive 4-second live polling while jobs are
+queued or running, and automatically idle when the queue clears. Job feed entries and sync health indicators
+explicitly differentiate channel cataloguing (`discover`) from comment collection (`collect`) and suppress
+stale historical error banners while active work is actively queued.
+
 2026-09-20 — Operational views (/sync, RailState) must never couple their availability to the analytical
 payload size. When comments grow into the tens of thousands (e.g. 28,244 comments producing a 55.6 MB
 JSON snapshot), reading the full `dashboard_snapshot` to display sync health, job queue counters, or

@@ -288,7 +288,7 @@ describe("the catalogue before it exists", () => {
     const html = markup({ jobs: [job()] });
     expect(html).toContain('data-testid="cat-discovering"');
     expect(html).toContain(ar.jobQueuedHeadline);
-    expect(html).toContain(ar.jobQueuedWithWorker);
+    expect(html).toContain(ar.jobCatalogueQueuedWithWorker);
     expect(html).not.toContain(ar.catEmpty);
     // With no worker the same job reads as the log reads it: stalled.
     const stalled = markup({ jobs: [job()], workerConnected: false });

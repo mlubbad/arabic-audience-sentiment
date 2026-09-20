@@ -16,6 +16,7 @@ export type { SyncState };
 export type HealthKey =
   | "healthy"
   | "running"
+  | "queued"
   | "stale"
   | "partial"
   | "incomplete_coverage"
@@ -56,6 +57,8 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
   const errorCode = run.error_code;
   if (run.status === "running")
     return { ...base, severity: "ok", key: "running", queued };
+  if (queued > 0)
+    return { ...base, severity: "warning", key: "queued", queued, errorCode };
   if (run.status === "failed" || run.status === "blocked")
     return {
       ...base,

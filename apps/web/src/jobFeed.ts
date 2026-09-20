@@ -159,11 +159,15 @@ export function describeJob(
   S: Strings,
 ): JobEntry {
   const entry = describeJobStatus(job, opts, S);
-  // A topic job is a different kind of work and is named as such in the log,
-  // so a blocked topic job is not read as a stalled collection.
-  return job.type === "analyse"
-    ? { ...entry, headline: `${S.jobKindTopics} — ${entry.headline}` }
-    : entry;
+  // A topic or catalogue job is a different kind of work and is named as such in the log,
+  // so a catalogue or topic job is not read as a comment collection.
+  if (job.type === "analyse") {
+    return { ...entry, headline: `${S.jobKindTopics} — ${entry.headline}` };
+  }
+  if (job.type === "discover") {
+    return { ...entry, headline: `${S.jobKindCatalogue} — ${entry.headline}` };
+  }
+  return entry;
 }
 
 /** The status half: the same sentences for every kind of job. */
@@ -198,7 +202,9 @@ function describeJobStatus(
         severity: opts.workerConnected ? "warning" : "critical",
         headline: S.jobQueuedHeadline,
         detail: opts.workerConnected
-          ? S.jobQueuedWithWorker
+          ? job.type === "discover"
+            ? S.jobCatalogueQueuedWithWorker
+            : S.jobQueuedWithWorker
           : S.jobQueuedNoWorker,
       };
     case "running":
@@ -206,7 +212,10 @@ function describeJobStatus(
         ...base,
         severity: "ok",
         headline: S.jobRunningHeadline,
-        detail: S.jobRunningDetail,
+        detail:
+          job.type === "discover"
+            ? S.jobCatalogueRunningDetail
+            : S.jobRunningDetail,
       };
     case "succeeded":
       return {
@@ -216,7 +225,10 @@ function describeJobStatus(
         // Deliberately not "جُمعت التعليقات": a run can end successfully having
         // read a video that has none, and claiming otherwise would put a
         // success next to an empty table.
-        detail: S.jobSucceededDetail,
+        detail:
+          job.type === "discover"
+            ? S.jobCatalogueSucceededDetail
+            : S.jobSucceededDetail,
       };
     case "partial":
       return {
