@@ -540,8 +540,11 @@ export const ar = {
   jobKindCatalogue: "فهرسة القناة",
   jobCatalogueQueuedWithWorker: "في الطابور، بانتظار بدء فهرسة القناة.",
   jobCatalogueRunningDetail: "فهرسة فيديوهات القناة قيد التنفيذ الآن.",
+  jobCatalogueRunningDetailTelegram: "فهرسة منشورات القناة قيد التنفيذ الآن.",
   jobCatalogueSucceededDetail:
     "تم استكشاف فيديوهات القناة وتحديث القائمة بنجاح.",
+  jobChannelNotPublic:
+    "هذه القناة غير عامة على تليجرام أو لا تتيح المعاينة المباشرة. تأكد من أن المعرّف لقناة عامة (Public Channel).",
   jobNoTopicClassifier:
     "لا يوجد مصنِّف موضوعات مهيّأ لدى العامل. أضف مفتاح Gemini إلى إعدادات العامل ليعمل التصنيف.",
   jobTopicModelNotActive:
@@ -702,6 +705,8 @@ export const ar = {
   opsNoAttemptsStrong: "لا توجد محاولات بعد",
   opsNoAttemptsLead: "اختر فيديوهات من القائمة أعلاه لتبدأ محاولة.",
   opsAttemptN: (n: number) => ` · المحاولة ${n}`,
+  opsRunningDuration: (duration: string) => ` · مستمرة منذ ${duration}`,
+  opsCompletedDuration: (duration: string) => ` · استغرقت ${duration}`,
   opsCancel: "سحب من الطابور",
   refresh: "تحديث",
   opsCancelFailed: "تعذّر سحب المهمة — قد يكون عامل قد بدأها بالفعل.",
@@ -718,6 +723,8 @@ export const ar = {
   catNeverRefreshed: "لم تُبنَ القائمة بعد.",
   catRequested: "طُلب بناء القائمة؛ تظهر النتيجة عند اكتمالها.",
   catRequestFailed: "تعذّر طلب بناء القائمة.",
+  catDiscoveringRunning: (elapsed: string, estimated: string) =>
+    `جارية منذ ${elapsed} · الوقت التقديري عادة: ${estimated}`,
   catSearch: "ابحث في العناوين",
   catKindAll: "الكل",
   catKindVideo: "فيديو",
@@ -733,6 +740,7 @@ export const ar = {
   catNext: "التالية",
   catJump: "انتقل إلى صفحة",
   catOpenYouTube: "فتح في يوتيوب",
+  catOpenTelegram: "فتح في تليجرام",
   catPreview: (title: string) => `معاينة: ${title}`,
   catPreviewHint:
     "المشاهدة داخل المنصة عبر مشغّل يوتيوب؛ لا يحفظ ملفات تعريف قبل الضغط على تشغيل.",

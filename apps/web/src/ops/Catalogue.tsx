@@ -37,7 +37,7 @@ import {
   type StoredCount,
 } from "../catalogue";
 import { supabase } from "../supabase";
-import { displayDate } from "../i18n";
+import { displayDate, formatElapsed } from "../i18n";
 import { useLocale } from "../locale";
 import { useStrings, type Strings } from "../strings";
 import { describeJob, explainCode, type JobRow } from "../jobFeed";
@@ -147,6 +147,12 @@ export function Catalogue({
         j.type === "discover" &&
         (j.status === "queued" || j.status === "running"),
     ) ?? null;
+  const [, setTimerTick] = useState(0);
+  useEffect(() => {
+    if (discovering?.status !== "running") return;
+    const interval = setInterval(() => setTimerTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [discovering?.status]);
   const dirty = adding.size > 0 || removing.length > 0;
   const kindWord = (k: CatalogueVideo["kind"]) =>
     k === "video"
@@ -381,9 +387,19 @@ export function Catalogue({
                 </Button>
               </div>
               <p className="db-note db-cat-refreshed">
-                {read.data?.cataloguedAt
-                  ? S.catRefreshed(displayDate(read.data.cataloguedAt, lang))
-                  : S.catNeverRefreshed}
+                {discovering?.status === "running" ? (
+                  <span style={{ color: "var(--color-primary, #0284c7)" }}>
+                    ⏱️{" "}
+                    {S.catDiscoveringRunning(
+                      formatElapsed(discovering.created_at, lang),
+                      lang === "ar" ? "15–30 ثانية" : "15–30s",
+                    )}
+                  </span>
+                ) : read.data?.cataloguedAt ? (
+                  S.catRefreshed(displayDate(read.data.cataloguedAt, lang))
+                ) : (
+                  S.catNeverRefreshed
+                )}
               </p>
             </div>
           </div>
@@ -391,15 +407,37 @@ export function Catalogue({
           {rows.length === 0 && discovering ? (
             (() => {
               const e = describeJob(discovering, { workerConnected }, S);
+              const detail =
+                read.data?.platform === "telegram" &&
+                e.detail === S.jobCatalogueRunningDetail
+                  ? S.jobCatalogueRunningDetailTelegram
+                  : e.detail;
               return (
-                <p
+                <div
                   className="db-missing"
                   data-testid="cat-discovering"
                   data-severity={e.severity}
                 >
-                  <strong>{e.headline}</strong>
-                  {e.detail}
-                </p>
+                  <p>
+                    <strong>{e.headline}</strong>
+                    {detail}
+                  </p>
+                  {discovering.status === "running" ? (
+                    <p
+                      style={{
+                        marginTop: "0.5rem",
+                        fontSize: "0.9em",
+                        opacity: 0.9,
+                      }}
+                    >
+                      ⏱️{" "}
+                      {S.catDiscoveringRunning(
+                        formatElapsed(discovering.created_at, lang),
+                        lang === "ar" ? "15–30 ثانية" : "15–30s",
+                      )}
+                    </p>
+                  ) : null}
+                </div>
               );
             })()
           ) : rows.length === 0 ? (
@@ -458,10 +496,17 @@ export function Catalogue({
                       <a
                         className="db-cat-link"
                         data-testid={`cat-link-${r.id}`}
-                        href={videoLinks(r.external_video_id, r.kind).watch}
+                        href={
+                          videoLinks(
+                            r.external_video_id,
+                            r.kind,
+                            r.platform ?? read.data?.platform,
+                            read.data?.handle,
+                          ).watch
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
-                        aria-label={`${S.catOpenYouTube}: ${r.title}`}
+                        aria-label={`${(r.platform ?? read.data?.platform) === "telegram" ? S.catOpenTelegram : S.catOpenYouTube}: ${r.title}`}
                       >
                         ↗
                       </a>

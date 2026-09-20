@@ -23,6 +23,7 @@ export type RawVideo = {
   thumbnail_url: string | null;
   reported_comment_count: number | null;
   comments_state: string;
+  platform?: string | null;
 };
 export type RawSelection = {
   video_id: string;
@@ -34,6 +35,8 @@ export type RawCatalogue = { videos: RawVideo[]; selections: RawSelection[] };
 export type CatalogueRead = RawCatalogue & {
   channelId: string | null;
   cataloguedAt: string | null;
+  platform?: string | null;
+  handle?: string | null;
 };
 
 /** How many rows of a video are in the database. */
@@ -125,7 +128,7 @@ async function readLive(workspaceId: string): Promise<CatalogueRead> {
   const [videos, selections, channel] = await Promise.all([
     readAll<RawVideo>(
       "videos",
-      "id,external_video_id,title,kind,published_at,thumbnail_url,reported_comment_count,comments_state",
+      "id,external_video_id,title,kind,published_at,thumbnail_url,reported_comment_count,comments_state,platform",
       "id",
       workspaceId,
     ),
@@ -137,7 +140,7 @@ async function readLive(workspaceId: string): Promise<CatalogueRead> {
     ),
     db
       .from("connection_status")
-      .select("channel_id,status,catalogued_at")
+      .select("channel_id,status,catalogued_at,platform,handle")
       .eq("workspace_id", workspaceId),
   ]);
   if (channel.error) throw new Error("catalogue_unavailable");
@@ -149,6 +152,8 @@ async function readLive(workspaceId: string): Promise<CatalogueRead> {
     selections,
     channelId: connected?.channel_id ?? null,
     cataloguedAt: connected?.catalogued_at ?? null,
+    platform: (connected?.platform as string | undefined) ?? null,
+    handle: (connected?.handle as string | undefined) ?? null,
   };
 }
 
@@ -174,9 +179,23 @@ export function pageOf<T>(
   return { rows: rows.slice(start, start + size), page: current, pages };
 }
 
-/** Where a video lives on YouTube, and where it embeds. The privacy-enhanced
+/** Where a video lives on YouTube/Telegram, and where it embeds. The privacy-enhanced
  *  host sets no cookies until the viewer presses play. */
-export function videoLinks(external_video_id: string, kind: string) {
+export function videoLinks(
+  external_video_id: string,
+  kind: string,
+  platform?: string | null,
+  handle?: string | null,
+) {
+  if (platform === "telegram") {
+    const clean = (handle ?? "").replace(/^@/, "");
+    return {
+      watch: clean
+        ? `https://t.me/${clean}/${external_video_id}`
+        : `https://t.me/c/${external_video_id}`,
+      embed: null,
+    };
+  }
   const id = encodeURIComponent(external_video_id);
   return {
     watch:

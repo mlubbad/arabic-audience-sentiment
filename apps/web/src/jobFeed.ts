@@ -33,6 +33,7 @@ export type JobRow = {
   attempt: number;
   error_code: string | null;
   created_at: string;
+  counters?: Record<string, unknown> | null;
 };
 
 export type JobEntry = {
@@ -45,6 +46,7 @@ export type JobEntry = {
   detail: string;
   attempt: number;
   createdAt: string;
+  durationSeconds?: number | null;
   /** Queued work can be withdrawn; a leased job belongs to its worker. */
   cancellable: boolean;
   /** Finished without success — worth another attempt. */
@@ -93,6 +95,8 @@ function explain(code: string, S: Strings): string | null {
       return S.catStateUnchanged;
     case "channel_not_connected":
       return S.jobChannelNotConnected;
+    case "channel_not_public":
+      return S.jobChannelNotPublic;
     case "credential_expired":
       return S.jobCredentialExpired;
     case "quota_exceeded":
@@ -179,11 +183,19 @@ function describeJobStatus(
   opts: { workerConnected: boolean },
   S: Strings,
 ): JobEntry {
+  const durationSeconds =
+    typeof job.counters?.duration_seconds === "number"
+      ? (job.counters.duration_seconds as number)
+      : typeof job.counters?.duration_ms === "number"
+        ? Math.round((job.counters.duration_ms as number) / 1000)
+        : null;
+
   const base = {
     id: job.id,
     status: job.status,
     attempt: job.attempt,
     createdAt: job.created_at,
+    durationSeconds,
     // Mirrors what cancel_job and retry_job will accept. The database decides;
     // this only avoids offering a button that is going to be refused.
     cancellable: job.status === "queued",

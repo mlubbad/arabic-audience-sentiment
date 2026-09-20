@@ -9,7 +9,8 @@ import { Badge } from "../ui/Badge";
 import type { Strings } from "../strings";
 import type { Locale } from "../locale";
 import type { JobEntry, JobRow } from "../jobFeed";
-import { displayDate } from "../i18n";
+import { displayDate, formatDuration, formatElapsed } from "../i18n";
+import { useEffect } from "react";
 
 type AttemptFilter = "all" | "running" | "succeeded" | "failed";
 
@@ -40,6 +41,14 @@ export function Attempts({
 }) {
   const [filter, setFilter] = useState<AttemptFilter>("all");
   const [page, setPage] = useState(1);
+  const [, setTimerTick] = useState(0);
+
+  const hasRunning = entries.some((e) => e.status === "running");
+  useEffect(() => {
+    if (!hasRunning) return;
+    const interval = setInterval(() => setTimerTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [hasRunning]);
 
   const counts = useMemo(() => {
     let running = 0;
@@ -239,6 +248,13 @@ export function Attempts({
                     <small>
                       {displayDate(e.createdAt, lang)}
                       {e.attempt > 0 ? S.opsAttemptN(e.attempt) : ""}
+                      {e.status === "running"
+                        ? S.opsRunningDuration(formatElapsed(e.createdAt, lang))
+                        : e.durationSeconds != null
+                          ? S.opsCompletedDuration(
+                              formatDuration(e.durationSeconds, lang),
+                            )
+                          : ""}
                     </small>
                     {(e.cancellable || e.retryable) && (
                       <div className="db-row-actions">

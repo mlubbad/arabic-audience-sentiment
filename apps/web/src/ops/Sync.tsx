@@ -222,7 +222,7 @@ function SyncBody({
       });
     void db
       .from("jobs")
-      .select("id,type,status,attempt,error_code,created_at")
+      .select("id,type,status,attempt,error_code,created_at,counters")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(50)

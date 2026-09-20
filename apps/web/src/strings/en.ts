@@ -537,8 +537,11 @@ export const en: Strings = {
   jobCatalogueQueuedWithWorker:
     "In the queue, waiting for channel cataloguing to start.",
   jobCatalogueRunningDetail: "Channel cataloguing is running now.",
+  jobCatalogueRunningDetailTelegram: "Channel post cataloguing is running now.",
   jobCatalogueSucceededDetail:
     "Channel videos catalogued and list updated successfully.",
+  jobChannelNotPublic:
+    "This channel is not public on Telegram or does not allow public preview. Ensure the handle belongs to a public channel.",
   jobNoTopicClassifier:
     "The worker has no topic classifier configured. Add the Gemini key to the worker's settings for classification to run.",
   jobTopicModelNotActive:
@@ -705,6 +708,8 @@ export const en: Strings = {
   opsNoAttemptsStrong: "No attempts yet",
   opsNoAttemptsLead: "Choose videos from the catalogue above to start one.",
   opsAttemptN: (n: number) => ` · attempt ${n}`,
+  opsRunningDuration: (duration: string) => ` · running for ${duration}`,
+  opsCompletedDuration: (duration: string) => ` · completed in ${duration}`,
   opsCancel: "Withdraw from the queue",
   refresh: "Refresh",
   opsCancelFailed:
@@ -723,6 +728,8 @@ export const en: Strings = {
   catRequested:
     "A list build was requested; the result appears once it completes.",
   catRequestFailed: "Could not request a list build.",
+  catDiscoveringRunning: (elapsed: string, estimated: string) =>
+    `running for ${elapsed} · typical estimated time: ${estimated}`,
   catSearch: "Search titles",
   catKindAll: "All",
   catKindVideo: "Video",
@@ -736,8 +743,9 @@ export const en: Strings = {
   catPage: (n: number, of: number) => `Page ${n} of ${of}`,
   catPrev: "Previous",
   catNext: "Next",
-  catJump: "Go to page",
+  catJump: "Jump to page",
   catOpenYouTube: "Open on YouTube",
+  catOpenTelegram: "Open on Telegram",
   catPreview: (title: string) => `Preview: ${title}`,
   catPreviewHint:
     "Watched here through YouTube's player; it sets no cookies until you press play.",

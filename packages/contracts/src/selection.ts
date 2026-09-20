@@ -44,6 +44,7 @@ export const CatalogueVideoSchema = z
     last_collected_at: z.string().nullable(),
     last_outcome: z.string().nullable(),
     next_check_at: z.string().nullable(),
+    platform: z.string().optional().nullable(),
   })
   .strict();
 export type CatalogueVideo = z.infer<typeof CatalogueVideoSchema>;

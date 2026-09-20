@@ -3,6 +3,7 @@
 Collects public posts (channel_post) and their reply comments from Telegram channels.
 Hermetically testable with synthetic HTTP responses and fixture data.
 """
+import html
 import json
 import re
 from collections.abc import Iterator
@@ -71,7 +72,7 @@ class TelegramCollector:
                 resp = self.client.get(
                     f"https://t.me/s/{clean_handle}",
                     timeout=20,
-                    follow_redirects=False,
+                    follow_redirects=True,
                 )
             except httpx.HTTPError:
                 raise CollectionError("network_failure", retryable=True) from None
@@ -85,6 +86,10 @@ class TelegramCollector:
             if resp.status_code != 200:
                 raise CollectionError(f"http_{resp.status_code}", "failed")
 
+            # Check if Telegram redirected to a user profile or private channel join page
+            if "<title>Telegram: Contact @" in resp.text:
+                raise CollectionError("channel_not_public", "blocked")
+
             # Parse posts from response JSON (if mocked API) or HTML
             if "application/json" in resp.headers.get("content-type", ""):
                 data = resp.json()
@@ -93,7 +98,7 @@ class TelegramCollector:
                 for item in items:
                     videos.append({
                         "external_video_id": str(item["id"]),
-                        "title": (item.get("text") or item.get("title") or f"Post {item['id']}")[:100],
+                        "title": (item.get("text") or item.get("title") or f"Post {item['id']}")[:120],
                         "kind": "channel_post",
                         "published_at": item.get("date"),
                         "reported_comment_count": item.get("replies_count"),
@@ -101,22 +106,62 @@ class TelegramCollector:
                     })
                 return Catalogue(videos=videos, complete=True)
 
-            # HTML fallback: extracts message ids from public t.me/s/ previews
+            # HTML fallback: extracts message divs from public t.me/s/ previews
             # Pattern matches message post divs: data-post="handle/123"
-            matches = re.findall(rf'data-post="{re.escape(clean_handle)}/(\d+)"', resp.text)
+            blocks = re.findall(
+                r'(<div class="tgme_widget_message [^>]*data-post="[^"]+/(\d+)".*?)(?=<div class="tgme_widget_message |$)',
+                resp.text,
+                re.DOTALL,
+            )
             videos = []
             seen = set()
-            for msg_id in matches:
+            for block, msg_id in blocks:
                 if msg_id not in seen:
                     seen.add(msg_id)
+                    text_m = re.search(
+                        r'class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+                        block,
+                        re.DOTALL,
+                    )
+                    raw_text = text_m.group(1) if text_m else ""
+                    clean_text = re.sub(r'<[^>]+>', ' ', raw_text).strip()
+                    clean_text = html.unescape(clean_text)
+                    title = clean_text[:120].strip() if clean_text else f"منشور {msg_id}"
+
+                    time_m = re.search(r'<time datetime="([^"]+)"', block)
+                    pub_time = time_m.group(1) if time_m else datetime.now(timezone.utc).isoformat()
+
+                    replies_m = re.search(
+                        r'class="tgme_widget_message_subtext"[^>]*>(\d+)\s+(?:comment|repl)',
+                        block,
+                        re.IGNORECASE,
+                    )
+                    count = int(replies_m.group(1)) if replies_m else None
+
                     videos.append({
                         "external_video_id": msg_id,
-                        "title": f"منشور {msg_id}",
+                        "title": title,
                         "kind": "channel_post",
-                        "published_at": datetime.now(timezone.utc).isoformat(),
-                        "reported_comment_count": None,
+                        "published_at": pub_time,
+                        "reported_comment_count": count,
                         "field_provenance": {"source": self.source, "channel": clean_handle},
                     })
+
+            # If block parsing yielded nothing but data-post is present (minimal HTML)
+            if not videos:
+                matches = re.findall(rf'data-post="{re.escape(clean_handle)}/(\d+)"', resp.text)
+                for msg_id in matches:
+                    if msg_id not in seen:
+                        seen.add(msg_id)
+                        videos.append({
+                            "external_video_id": msg_id,
+                            "title": f"منشور {msg_id}",
+                            "kind": "channel_post",
+                            "published_at": datetime.now(timezone.utc).isoformat(),
+                            "reported_comment_count": None,
+                            "field_provenance": {"source": self.source, "channel": clean_handle},
+                        })
+
             return Catalogue(videos=videos, complete=True)
 
         # 3. No client or credentials configured

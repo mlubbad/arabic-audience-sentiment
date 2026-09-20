@@ -75,7 +75,10 @@ export function CataloguePreview({
           <iframe
             className="db-preview-frame"
             data-testid="cat-preview-frame"
-            src={videoLinks(video.external_video_id, video.kind).embed}
+            src={
+              videoLinks(video.external_video_id, video.kind, video.platform)
+                .embed ?? undefined
+            }
             title={video.title}
             allow="autoplay; encrypted-media; picture-in-picture"
             allowFullScreen
@@ -90,11 +93,17 @@ export function CataloguePreview({
                 : video.reported_comment_count}
             </span>
             <a
-              href={videoLinks(video.external_video_id, video.kind).watch}
+              href={
+                videoLinks(video.external_video_id, video.kind, video.platform)
+                  .watch
+              }
               target="_blank"
               rel="noopener noreferrer"
             >
-              {S.catOpenYouTube} ↗
+              {video.platform === "telegram"
+                ? S.catOpenTelegram
+                : S.catOpenYouTube}{" "}
+              ↗
             </a>
             <small className="db-note">{S.catPreviewHint}</small>
           </footer>

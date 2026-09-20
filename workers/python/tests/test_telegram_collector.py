@@ -251,3 +251,64 @@ def test_telegram_runner_discover_and_backfill():
     assert cmt["external_comment_id"] == "9991"
     assert cmt["text_raw"] == "تعليق تليجرام اختباري"
 
+
+def test_telegram_collector_contact_redirect_raises_channel_not_public():
+    def handler(request: httpx.Request):
+        return httpx.Response(
+            200,
+            text="""<!DOCTYPE html>
+<html><head><title>Telegram: Contact @private_or_user</title></head>
+<body><div class="tgme_page_action"><a href="tg://resolve?domain=private_or_user">Send Message</a></div></body>
+</html>""",
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    col = TelegramCollector(client=client)
+    with pytest.raises(CollectionError) as exc:
+        col.catalogue("private_or_user")
+    assert exc.value.code == "channel_not_public"
+    assert exc.value.outcome == "blocked"
+
+
+def test_telegram_collector_html_blocks_parsing():
+    html_content = """
+    <div class="tgme_widget_message_wrap">
+      <div class="tgme_widget_message js-widget_message" data-post="news_channel/100">
+        <div class="tgme_widget_message_bubble">
+          <div class="tgme_widget_message_text">خبر عاجل: &quot;تطورات جديدة في المنطقة&quot; &amp; تفاصيل إضافية</div>
+          <div class="tgme_widget_message_footer">
+            <time datetime="2026-09-20T18:00:00+00:00">18:00</time>
+          </div>
+          <div class="tgme_widget_message_subtext">42 comments</div>
+        </div>
+      </div>
+      <div class="tgme_widget_message js-widget_message" data-post="news_channel/101">
+        <div class="tgme_widget_message_bubble">
+          <div class="tgme_widget_message_text">منشور ثانٍ بدون تعليقات</div>
+          <div class="tgme_widget_message_footer">
+            <time datetime="2026-09-20T19:00:00+00:00">19:00</time>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+
+    def handler(request: httpx.Request):
+        return httpx.Response(200, text=html_content)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    col = TelegramCollector(client=client)
+    cat = col.catalogue("news_channel")
+    assert cat.complete is True
+    assert len(cat.videos) == 2
+    v1, v2 = cat.videos
+    assert v1["external_video_id"] == "100"
+    assert v1["title"] == 'خبر عاجل: "تطورات جديدة في المنطقة" & تفاصيل إضافية'
+    assert v1["published_at"] == "2026-09-20T18:00:00+00:00"
+    assert v1["reported_comment_count"] == 42
+
+    assert v2["external_video_id"] == "101"
+    assert v2["title"] == "منشور ثانٍ بدون تعليقات"
+    assert v2["reported_comment_count"] is None
+
+
