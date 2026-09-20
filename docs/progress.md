@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-09-20 — Real-Time Catalogue Elapsed Duration & Enhanced Telegram Collector
+
+1. **Real-Time Duration & Time Estimation Display**:
+   - Added precise Arabic grammatical duration formatting in `apps/web/src/i18n.ts` (`formatDuration` & `formatElapsed`).
+   - Integrated live running ticker in `apps/web/src/ops/Catalogue.tsx` displaying:
+     `⏱️ جارية منذ X ثانية · الوقت التقديري عادة: 15–30 ثانية`.
+   - Updated `apps/web/src/ops/Attempts.tsx` to display live elapsed seconds for active jobs (`· مستمرة منذ X ثانية`) and total completed duration for finished jobs (`· استغرقت X ثانية`).
+   - Added platform-aware messaging for Telegram post cataloguing in `ar.ts` and `en.ts`.
+2. **Enhanced Telegram Public Collector (`workers/python/src/collectors/telegram_collector.py`)**:
+   - Enabled redirect following (`follow_redirects=True`) for Telegram web endpoints.
+   - Added detection for non-public channels and user contacts (`<title>Telegram: Contact @...`) raising `channel_not_public`.
+   - Enhanced block-level HTML parsing to extract Arabic post titles, exact timestamps, and comment counts.
+   - Added full unit test coverage in `tests/test_telegram_collector.py`.
+3. **Verification**:
+   - All 240 python tests passing.
+   - All 112 vitest test files passing.
+   - Clean types, formatting, lint, build, and secrets checks.
+   - Committed and pushed to `main` with local background worker daemon updated.
+
 ## 2026-09-20 — Omnichannel Multi-Platform Expansion: Telegram Support & Universal Abstraction Layer
 
 Architected and implemented full multi-platform capability across the entire stack, accommodating YouTube, Telegram, X (Twitter), TikTok, Facebook, and Instagram, with Telegram fully operational as the first non-YouTube platform:
