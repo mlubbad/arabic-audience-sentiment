@@ -5,17 +5,24 @@ import {
   PlanCatalogueSchema,
   TopicReviewInputSchema,
   OpsSnapshotSchema,
+  DashboardAggregatesSchema,
+  DashboardCommentsResponseSchema,
   type OpsSnapshot,
+  type DashboardAggregates,
+  type DashboardCommentsResponse,
   applyReview,
   applyTopicReview,
-  exportObjectPath,
   exportRows,
   snapshot,
   toCsv,
+  effectiveLabel,
+  effectiveTopic,
   type Comment,
   type CommentReviewInput,
   type Filters,
   type TopicReviewInput,
+  type LabelledComment,
+  type Label,
 } from "@sentiment/contracts";
 import { supabase } from "./supabase";
 /**
@@ -333,6 +340,7 @@ export function deriveSnapshot(
       // The taxonomy and the key the topic counts were taken under, so the
       // card names its buckets from the same read that counted them.
       topics: source.topics,
+      active_analysis_key: source.active_analysis_key,
       active_topic_key: source.active_topic_key,
       cursor_reset,
     };
@@ -361,9 +369,9 @@ export async function loadSnapshot(
 export async function submitReview(mode: DataMode, raw: CommentReviewInput) {
   const input = CommentReviewInputSchema.parse(raw);
   if (mode === "live") {
-    // Addressed to the same source the rows came from. The server takes the
-    // reviewer and the human provenance from the session and re-checks the
-    // hash, so this sends a verdict and never an identity.
+    // As submit_review_job in the worker, but through the authed RPC: a verdict
+    // and the hash it was formed against, never an identity — the RPC takes
+    // the reviewer from the session.
     const { error } = await supabase!.rpc("submit_comment_review", {
       w: input.workspace_id,
       c: input.comment_id,
@@ -432,9 +440,341 @@ export async function buildExport(mode: DataMode, filters: Filters) {
   );
   return {
     rows: rows.length,
-    filename: exportObjectPath(filters.workspace_id, new Date())
+    filename: [
+      filters.workspace_id,
+      "comments",
+      new Date().toISOString().replaceAll(":", "-"),
+      "csv",
+    ]
+      .join(".")
       .split("/")
       .pop()!,
     csv: toCsv(rows),
+  };
+}
+
+export interface RawCommentLike {
+  id: string;
+  workspace_id?: string;
+  client_id?: string;
+  channel_id?: string;
+  video_id?: string | null;
+  video_title?: string | null;
+  video_kind?: "video" | "short" | "stream";
+  author_channel_id?: string | null;
+  by_channel_owner?: boolean;
+  author_name?: string | null;
+  text_raw?: string | null;
+  content_hash?: string;
+  likes_raw?: string | null;
+  likes_value?: number | null;
+  published_at?: string | null;
+  published_time_raw?: string | null;
+  timestamp_precision?: "second" | "minute" | "day" | "approximate" | "unknown";
+  is_reply?: boolean;
+  parent_comment_id?: string | null;
+  parent_source?: "api" | "extractor" | "inferred_id" | "unknown";
+  source?:
+    | "sanitized_fixture"
+    | "youtube_data_api_public"
+    | "youtube_public_scrape"
+    | "youtube_oauth"
+    | "legacy_import";
+  field_provenance?: Record<string, unknown>;
+  comment_type?: string | null;
+  content_purged_at?: string | null;
+  label?: string | null;
+  topic?: string | null;
+  model_name?: string | null;
+  model_version?: string | null;
+  prediction?: Comment["prediction"];
+  topic_prediction?: Comment["topic_prediction"];
+  reviews?: Comment["reviews"];
+  topic_reviews?: Comment["topic_reviews"];
+}
+
+export function toLabelledComment(
+  comment: RawCommentLike,
+  activeKey: string,
+  activeTopicKey: string,
+): LabelledComment {
+  const contentHash = comment.content_hash ?? comment.id;
+  const validLabels: Label[] = ["positive", "negative", "neutral", "mixed"];
+  const sentimentLabel: Label | null =
+    comment.label && validLabels.includes(comment.label as Label)
+      ? (comment.label as Label)
+      : null;
+
+  const pred =
+    comment.prediction ??
+    (sentimentLabel
+      ? {
+          status: "succeeded" as const,
+          label: sentimentLabel,
+          content_hash: contentHash,
+          analysis_key: activeKey,
+          model_id: comment.model_name ?? "server",
+          revision: comment.model_version ?? "1.0",
+          preprocessing_version: "1.0",
+          predicted_at: comment.published_at ?? new Date().toISOString(),
+          class_scores: { [sentimentLabel]: 1 },
+        }
+      : null);
+
+  const topicPred =
+    comment.topic_prediction ??
+    (comment.topic
+      ? {
+          status: "succeeded" as const,
+          topic_key: comment.topic,
+          confidence: 1,
+          content_hash: contentHash,
+          classification_key: activeTopicKey,
+          model_id: "server",
+          prompt_version: "1.0",
+          predicted_at: comment.published_at ?? new Date().toISOString(),
+          error_code: null,
+        }
+      : null);
+
+  const c: Comment = {
+    id: comment.id,
+    workspace_id: comment.workspace_id ?? "",
+    client_id: comment.client_id ?? "",
+    channel_id: comment.channel_id ?? "",
+    video_id: comment.video_id ?? "",
+    video_title: comment.video_title ?? null,
+    video_kind: comment.video_kind ?? "video",
+    author_channel_id: comment.author_channel_id ?? null,
+    by_channel_owner: comment.by_channel_owner ?? false,
+    author_name: comment.author_name ?? null,
+    text_raw: comment.text_raw ?? null,
+    content_hash: contentHash,
+    likes_raw: comment.likes_raw ?? null,
+    likes_value: comment.likes_value ?? null,
+    published_at: comment.published_at ?? null,
+    published_time_raw: comment.published_time_raw ?? null,
+    timestamp_precision: comment.timestamp_precision ?? "unknown",
+    is_reply: comment.is_reply ?? false,
+    parent_comment_id: comment.parent_comment_id ?? null,
+    parent_source: comment.parent_source ?? "unknown",
+    source: comment.source ?? "youtube_data_api_public",
+    field_provenance: comment.field_provenance ?? {},
+    comment_type: comment.comment_type ?? null,
+    content_purged_at: comment.content_purged_at ?? null,
+    prediction: pred,
+    reviews: comment.reviews ?? [],
+    topic_prediction: topicPred,
+    topic_reviews: comment.topic_reviews ?? [],
+  };
+  return {
+    ...c,
+    ...effectiveLabel(c, activeKey),
+    ...effectiveTopic(c, activeTopicKey),
+  };
+}
+
+export function filtersToRpc(filters?: Partial<Filters>) {
+  if (!filters) return {};
+  const ranged = filters.date_mode !== "unknown";
+  return {
+    video:
+      filters.video_ids && filters.video_ids.length > 0
+        ? filters.video_ids[0]
+        : undefined,
+    video_kind: filters.video_kind ?? undefined,
+    sentiment:
+      filters.sentiments && filters.sentiments.length > 0
+        ? filters.sentiments[0]
+        : undefined,
+    topic:
+      filters.topics && filters.topics.length > 0
+        ? filters.topics[0]
+        : undefined,
+    replies: filters.replies ?? "all",
+    comment_type: filters.comment_type ?? undefined,
+    review_status: filters.review_status ?? "all",
+    from: ranged && filters.from ? filters.from : undefined,
+    to: ranged && filters.to ? filters.to : undefined,
+    q: filters.q ? filters.q.trim() : undefined,
+  };
+}
+
+export async function loadDashboardAggregates(
+  mode: DataMode,
+  workspace: string,
+  filters?: Partial<Filters>,
+  signal?: AbortSignal,
+): Promise<DashboardAggregates> {
+  if (mode === "live") {
+    const f = filtersToRpc(filters);
+    const { data, error } = await supabase!.rpc("dashboard_aggregates", {
+      w: workspace,
+      f,
+    });
+    if (error) throw new Error("live_unavailable");
+    return DashboardAggregatesSchema.parse(data);
+  }
+
+  const fixture = await readFixture(signal);
+  const comments = withSessionReviews(fixture.comments);
+  const fFull: Filters = {
+    workspace_id: workspace,
+    video_ids: filters?.video_ids ?? [],
+    video_kind: filters?.video_kind,
+    sentiments: filters?.sentiments ?? [],
+    topics: filters?.topics ?? [],
+    replies: filters?.replies ?? "all",
+    comment_type: filters?.comment_type,
+    review_status: filters?.review_status ?? "all",
+    date_mode: filters?.date_mode ?? "all",
+    from: filters?.from,
+    to: filters?.to,
+    q: filters?.q ?? "",
+    limit: 100,
+  };
+  const snap = snapshot(
+    comments,
+    fFull,
+    fixture.active_analysis_key,
+    fixture.active_analysis_labels,
+    fixture.active_topic_key,
+  );
+
+  return {
+    workspace_total: snap.workspace_total,
+    channel_own_comments: snap.channel_own_comments,
+    total: snap.total,
+    analysed: snap.analysed,
+    unanalysed: snap.unanalysed,
+    sentiments: snap.sentiments,
+    measurable: Array.from(snap.measurable),
+    negative_ranked: snap.negative_ranked,
+    negative_unranked: snap.negative_unranked,
+    timeline: Object.fromEntries(snap.timeline.map((t) => [t.date, t.total])),
+    topic_counts: snap.topic_counts,
+    videos: snap.videos,
+    hours: [],
+    weekdays: [],
+    weeks: [],
+    people: [],
+    most_engaged_negative: snap.most_engaged_negative.map((c) => ({
+      id: c.id,
+      video_id: c.video_id,
+      video_title: c.video_title,
+      text_raw: c.text_raw ?? "",
+      author_name: c.author_name,
+      published_at: c.published_at,
+      likes_value: c.likes_value,
+      label: c.label,
+      topic: c.topic,
+    })),
+    comment_types: snap.comment_types,
+    video_options: snap.video_options,
+    topics: fixture.topics,
+    active_analysis_key: fixture.active_analysis_key,
+    active_topic_key: fixture.active_topic_key,
+    revision: fixture.revision,
+  };
+}
+
+export interface CommentsQueryParams {
+  limit?: number;
+  offset?: number;
+  sort?: "published_desc" | "published_asc" | "likes_desc" | "likes_asc";
+  card_tab?: "all" | "critical" | "recent" | "liked";
+  q?: string;
+  video?: string | null;
+  video_kind?: string | null;
+  sentiment?: string | null;
+  topic?: string | null;
+  replies?: string | null;
+  comment_type?: string | null;
+  review_status?: string | null;
+  from?: string | null;
+  to?: string | null;
+}
+
+export async function loadDashboardComments(
+  mode: DataMode,
+  workspace: string,
+  params: CommentsQueryParams,
+  signal?: AbortSignal,
+): Promise<DashboardCommentsResponse> {
+  if (mode === "live") {
+    const { data, error } = await supabase!.rpc("dashboard_comments", {
+      w: workspace,
+      f: params,
+    });
+    if (error) throw new Error("live_unavailable");
+    return DashboardCommentsResponseSchema.parse(data);
+  }
+
+  const fixture = await readFixture(signal);
+  let rows = withSessionReviews(fixture.comments).filter(
+    (c) => c.workspace_id === workspace && !c.by_channel_owner,
+  );
+  if (params.video) rows = rows.filter((c) => c.video_id === params.video);
+  if (params.video_kind)
+    rows = rows.filter((c) => c.video_kind === params.video_kind);
+  if (params.q) {
+    const qLower = params.q.toLowerCase();
+    rows = rows.filter(
+      (c) =>
+        (c.text_raw && c.text_raw.toLowerCase().includes(qLower)) ||
+        (c.author_name && c.author_name.toLowerCase().includes(qLower)),
+    );
+  }
+  const labelled = rows.map((c) =>
+    toLabelledComment(c, fixture.active_analysis_key, fixture.active_topic_key),
+  );
+  let filtered = labelled;
+  if (params.sentiment) {
+    filtered = filtered.filter((c) => c.label === params.sentiment);
+  }
+  if (params.topic) {
+    filtered = filtered.filter(
+      (c) => (c.topic ?? "__unclassified") === params.topic,
+    );
+  }
+  if (params.comment_type) {
+    filtered = filtered.filter((c) => c.comment_type === params.comment_type);
+  }
+  if (params.replies === "comments")
+    filtered = filtered.filter((c) => !c.is_reply);
+  if (params.replies === "replies")
+    filtered = filtered.filter((c) => c.is_reply);
+  if (params.review_status === "reviewed")
+    filtered = filtered.filter((c) => c.reviewed);
+  if (params.review_status === "unreviewed")
+    filtered = filtered.filter((c) => !c.reviewed);
+
+  if (params.card_tab === "critical") {
+    filtered = filtered
+      .filter((c) => c.label === "negative")
+      .sort((a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1));
+  } else if (params.card_tab === "recent" || params.sort === "published_desc") {
+    filtered = filtered.sort((a, b) =>
+      (b.published_at ?? "").localeCompare(a.published_at ?? ""),
+    );
+  } else if (params.card_tab === "liked" || params.sort === "likes_desc") {
+    filtered = filtered.sort(
+      (a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1),
+    );
+  }
+
+  const offset = params.offset ?? 0;
+  const limit = params.limit ?? 25;
+  const slice = filtered.slice(offset, offset + limit);
+  const hasMore = offset + limit < filtered.length;
+
+  return {
+    total: filtered.length,
+    comments: slice,
+    limit,
+    offset,
+    has_more: hasMore,
+    next_cursor:
+      hasMore && slice.length > 0 ? slice[slice.length - 1].id : null,
   };
 }

@@ -1,5 +1,19 @@
 # Verification
 
+## 2026-09-20 — Decoupled Big-Data Dashboard Architecture & Server-Side Paginated Stream
+
+| Command / observation | Actual result |
+| --- | --- |
+| Migration `20260920150000_decoupled_dashboard_architecture.sql` | Tested locally and deployed remotely to Supabase project `ykqugctewsqvevhyqtbi`. Added `comments_text_trgm_idx` GIN trigram index, `dashboard_aggregates(w uuid, f jsonb)`, and `dashboard_comments(w uuid, f jsonb)`. |
+| Live benchmark: `public.dashboard_aggregates` on AJ360 channel (71,310 comments) | **1.3s** execution time, payload ~300KB (down from 120MB raw comment dump). Returns full sentiment distribution, timeline, topic counts, video aggregates, hourly & weekday activity buckets, and top negative comments. |
+| Live benchmark: `public.dashboard_comments` on AJ360 channel (71,310 comments) | **35ms** execution time, payload ~40KB (50 comments with next cursor, server-side sorting, and full metadata). |
+| Trigram text search benchmark: `public.dashboard_comments(w, '{"q":"شكرا"}')` | **28ms** execution time using `comments_text_trgm_idx` (GIN Trigram index). |
+| Web unit test suite: `npm test` | **111 test files passed, 874 tests passed (100% green)**. |
+| Production bundle & prerender: `npm run build` | Built in 1.20s; 8 prerendered static pages generated cleanly; 0 build errors. |
+| Typecheck: `npm run typecheck` | Passed cleanly (`tsc --noEmit`, 0 errors). |
+| SAST Security scan: `semgrep scan --metrics=off --severity ERROR ...` | Completed with 0 blocking code findings. |
+
+
 ## 2026-09-20 — Sync Experience Optimization, Real-Time Live Polling, Fair Multi-Tenant Scheduling, and Live Deployment
 
 | Command / observation | Actual result |

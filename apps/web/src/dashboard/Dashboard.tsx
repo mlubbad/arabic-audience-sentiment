@@ -13,7 +13,16 @@ import {
   Tooltip,
 } from "chart.js";
 import "../pages.css";
-import { byHour, byWeek, byWeekday, commenters } from "../analytics";
+import {
+  byHour,
+  byWeek,
+  byWeekday,
+  commenters,
+  hoursToBucketed,
+  weekdaysToBucketed,
+  weeksToBucketed,
+  peopleToCommenters,
+} from "../analytics";
 import { pageSlice } from "../videoPaging";
 import {
   type Filters,
@@ -26,6 +35,10 @@ import {
   deriveSnapshot,
   fixtureWorkspace,
   loadSource,
+  loadDashboardAggregates,
+  loadDashboardComments,
+  filtersToRpc,
+  toLabelledComment,
   reviewsArePersisted,
   configuredMode,
   resolveMode,
@@ -185,6 +198,9 @@ function DashboardBody({
   // for the filtered set it was produced from.
   const [cursors, setCursors] = useState<string[]>([]);
   const [limit, setLimit] = useState(25);
+  const [cardTab, setCardTab] = useState<"liked" | "recent" | "critical">(
+    "liked",
+  );
   // The videos section's own page, 0-based. It is a slice of a list already
   // in memory, not a cursor, so it is not part of `page` below and does not
   // reach the read. Cleared with the cursors: a page into a filtered list is
@@ -198,22 +214,90 @@ function DashboardBody({
   };
   // Keyed on exactly what the read depends on, and on nothing else.
   //
-  // `dashboard_snapshot(w)` takes a workspace. The filters below are applied
-  // afterwards, here, to rows already in memory — so a filter cannot change
-  // what this request returns. The key used to carry the whole filter object
-  // anyway, which made every filter change a fresh 611KB read of the same
-  // bytes, and every one of those an independent chance to fail while nothing
-  // about the data had changed.
-  //
-  // The identity part is load-bearing and stays: user, mode and workspace are
-  // in the key, so one tenant's rows can never be served from another's cache
-  // entry. That was previously enforced by a placeholder callback comparing
-  // old keys against new; it is now a property of the key itself, which cannot
-  // be got wrong by a later edit to a callback.
+  // In fixture mode (and unit tests where shared cache provides the source),
+  // loadSource provides the full fixture dataset. In live mode, read is disabled
+  // in favour of decoupled RPC aggregations and paginated comment stream.
   const read = useQuery({
     queryKey: ["dashboard-source", userId, mode, workspaceId],
     queryFn: ({ signal }) => loadSource(mode, workspaceId, signal),
+    enabled: mode !== "live",
   });
+
+  const filterParamsKey = useMemo(
+    () => JSON.stringify(filtersToRpc(page)),
+    [page],
+  );
+  const aggregatesQuery = useQuery({
+    queryKey: [
+      "dashboard-aggregates",
+      userId,
+      mode,
+      workspaceId,
+      filterParamsKey,
+    ],
+    queryFn: ({ signal }) =>
+      loadDashboardAggregates(mode, workspaceId, page, signal),
+    enabled: mode === "live" && !read.data,
+  });
+
+  const pageOffset = cursors.length * limit;
+  const commentsParamsKey = useMemo(
+    () =>
+      JSON.stringify({
+        ...filtersToRpc(page),
+        offset: pageOffset,
+        limit,
+      }),
+    [page, pageOffset, limit],
+  );
+  const commentsQuery = useQuery({
+    queryKey: [
+      "dashboard-comments",
+      userId,
+      mode,
+      workspaceId,
+      commentsParamsKey,
+    ],
+    queryFn: ({ signal }) =>
+      loadDashboardComments(
+        mode,
+        workspaceId,
+        {
+          ...filtersToRpc(page),
+          offset: pageOffset,
+          limit,
+        },
+        signal,
+      ),
+    enabled: mode === "live" && !read.data,
+  });
+
+  const cardsParamsKey = useMemo(
+    () =>
+      JSON.stringify({
+        ...filtersToRpc(page),
+        card_tab: cardTab,
+        limit: 12,
+      }),
+    [page, cardTab],
+  );
+  const cardsQuery = useQuery({
+    queryKey: ["dashboard-cards", userId, mode, workspaceId, cardsParamsKey],
+    queryFn: ({ signal }) =>
+      loadDashboardComments(
+        mode,
+        workspaceId,
+        {
+          ...filtersToRpc(page),
+          card_tab: cardTab,
+          limit: 12,
+          offset: 0,
+        },
+        signal,
+      ),
+    enabled: mode === "live" && !read.data,
+  });
+
   // For the empty state's setup path only; live only, and cheap.
   const channel = useChannelStatus(mode, workspaceId);
   // Filters are a pure function of a read, so they are computed rather than
@@ -234,27 +318,124 @@ function DashboardBody({
       // notice with a way out.
       return { ok: false as const, error: error as Error };
     }
-    // `page` is deliberately absent: `pageKey` is its serialisation, and
-    // listing the object as well would defeat the memo it was serialised for —
-    // `page` is a fresh object on every render.
   }, [read.data, mode, pageKey]);
+
+  const isLiveServer = mode === "live" && !read.data;
+
+  const liveSnapshot = useMemo(() => {
+    if (
+      !isLiveServer ||
+      !aggregatesQuery.data ||
+      !aggregatesQuery.data.timeline
+    )
+      return null;
+    const agg = aggregatesQuery.data;
+    const commentsRes = commentsQuery.data;
+    const commentsList = (commentsRes?.comments ?? []).map((c) =>
+      toLabelledComment(
+        c,
+        agg.active_analysis_key ?? "",
+        agg.active_topic_key ?? "",
+      ),
+    );
+    const totalCount = agg.total;
+    const offset = pageOffset;
+    const hasMore = commentsRes
+      ? commentsRes.has_more
+      : offset + limit < totalCount;
+    const nextCursor = hasMore
+      ? (commentsRes?.next_cursor ?? String(cursors.length + 1))
+      : null;
+
+    return {
+      workspace_total: agg.workspace_total,
+      channel_own_comments: agg.channel_own_comments,
+      total: agg.total,
+      analysed: agg.analysed,
+      unanalysed: agg.unanalysed,
+      sentiments: agg.sentiments,
+      measurable: new Set((agg.measurable ?? []) as Label[]),
+      negative_ranked: agg.negative_ranked ?? 0,
+      negative_unranked: agg.negative_unranked ?? 0,
+      timeline: Object.entries(agg.timeline ?? {})
+        .map(([date, total]) => ({ date, total }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      topic_counts: agg.topic_counts ?? {},
+      videos: agg.videos ?? [],
+      hours: agg.hours ?? [],
+      weekdays: agg.weekdays ?? [],
+      weeks: agg.weeks ?? [],
+      people: agg.people ?? [],
+      most_engaged_negative: (agg.most_engaged_negative ?? []).map((c) =>
+        toLabelledComment(
+          c,
+          agg.active_analysis_key ?? "",
+          agg.active_topic_key ?? "",
+        ),
+      ),
+      comment_types: agg.comment_types ?? [],
+      video_options: agg.video_options ?? [],
+      topics: agg.topics ?? [],
+      active_analysis_key: agg.active_analysis_key ?? "",
+      active_topic_key: agg.active_topic_key ?? "",
+      revision: agg.revision ?? "",
+      mode,
+      plan: null,
+      sync: null,
+      comments: commentsList,
+      filtered: commentsList,
+      next_cursor: nextCursor,
+      cursor_reset: false,
+      replies: 0,
+      unknown_dates: 0,
+      unique_authors: 0,
+      comparison: (agg.videos ?? []).slice(0, 10),
+      comparison_truncated: (agg.videos ?? []).length > 10,
+    } as Snapshot;
+  }, [
+    isLiveServer,
+    aggregatesQuery.data,
+    commentsQuery.data,
+    mode,
+    read.data,
+    pageOffset,
+    limit,
+    cursors.length,
+  ]);
+
   const result = {
-    data: derived?.ok ? derived.value : undefined,
-    isPending: read.isPending,
-    isFetching: read.isFetching,
-    // A read that failed and a filter that cannot be applied are both "this
-    // screen has no answer", and both are recovered from the same button.
-    isError: read.isError || derived?.ok === false,
-    refetch: read.refetch,
-    // Which half failed, and how. Without this the notice is the same sentence
-    // for a lost connection, a server that changed shape and a filter that
-    // cannot be applied — three problems with three different answers, and the
-    // reader is told to try again for all of them.
-    failure: read.isError
-      ? failureCode("read", read.error)
-      : derived?.ok === false
-        ? failureCode("view", derived.error)
-        : null,
+    data: isLiveServer
+      ? (liveSnapshot ?? undefined)
+      : derived?.ok
+        ? derived.value
+        : undefined,
+    isPending: isLiveServer ? aggregatesQuery.isPending : read.isPending,
+    isFetching: isLiveServer
+      ? aggregatesQuery.isFetching || commentsQuery.isFetching
+      : read.isFetching,
+    isError: isLiveServer
+      ? aggregatesQuery.isError || commentsQuery.isError
+      : read.isError || derived?.ok === false,
+    refetch: () => {
+      if (isLiveServer) {
+        aggregatesQuery.refetch();
+        commentsQuery.refetch();
+        cardsQuery.refetch();
+      } else {
+        read.refetch();
+      }
+    },
+    failure: isLiveServer
+      ? aggregatesQuery.isError
+        ? failureCode("read", aggregatesQuery.error)
+        : commentsQuery.isError
+          ? failureCode("read", commentsQuery.error)
+          : null
+      : read.isError
+        ? failureCode("read", read.error)
+        : derived?.ok === false
+          ? failureCode("view", derived.error)
+          : null,
   };
   // A topic is stored by key and shown by name, in the reader's language. The
   // key is the fallback so a retired or unknown key is still visible as itself
@@ -308,7 +489,12 @@ function DashboardBody({
       // sentiment denominator and the review filter all move together. Keep
       // the form open until the refreshed read is ready: closing it first
       // allowed an immediate reopen to show the old review history.
-      await client.invalidateQueries({ queryKey: ["dashboard-source"] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["dashboard-source"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-aggregates"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-comments"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-cards"] }),
+      ]);
       closeReview();
       setReason("");
     },
@@ -325,7 +511,12 @@ function DashboardBody({
     onSuccess: async () => {
       // The same re-read as a sentiment correction, for the same reason: the
       // chip, the topic chart and the topic filter must move together.
-      await client.invalidateQueries({ queryKey: ["dashboard-source"] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["dashboard-source"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-aggregates"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-comments"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-cards"] }),
+      ]);
       closeReview();
       setReason("");
     },
@@ -572,15 +763,52 @@ function DashboardBody({
   // Aggregations for the charts, over every row the filters admit rather than
   // the page on screen. Memoised on the filtered array itself: it is a new
   // array only when the read or the filters actually changed.
+  interface PrecomputedDashboardState {
+    hours?: number[];
+    weekdays?: number[];
+    weeks?: Array<{ week: string; count: number }>;
+    people?: Array<{
+      name: string;
+      channel_id: string | null;
+      comments_count: number;
+      likes_count: number;
+    }>;
+  }
   const rows = s?.filtered ?? [];
-  const hours = useMemo(() => byHour(rows), [rows]);
-  const weekdays = useMemo(() => byWeekday(rows, S.weekdays), [rows, S]);
-  const weeks = useMemo(() => byWeek(rows), [rows]);
+  const pre = s as (Snapshot & PrecomputedDashboardState) | undefined;
+  const hours = useMemo(() => {
+    if (pre?.hours && Array.isArray(pre.hours) && pre.hours.length === 24) {
+      return hoursToBucketed(pre.hours);
+    }
+    return byHour(rows);
+  }, [pre, rows]);
+
+  const weekdays = useMemo(() => {
+    if (
+      pre?.weekdays &&
+      Array.isArray(pre.weekdays) &&
+      pre.weekdays.length === 7
+    ) {
+      return weekdaysToBucketed(pre.weekdays, S.weekdays);
+    }
+    return byWeekday(rows, S.weekdays);
+  }, [pre, rows, S]);
+
+  const weeks = useMemo(() => {
+    if (pre?.weeks && Array.isArray(pre.weeks) && pre.weeks.length > 0) {
+      return weeksToBucketed(pre.weeks);
+    }
+    return byWeek(rows);
+  }, [pre, rows]);
+
   const [peopleBy, setPeopleBy] = useState<"comments" | "likes">("comments");
-  const people = useMemo(() => commenters(rows, peopleBy), [rows, peopleBy]);
-  const [cardTab, setCardTab] = useState<"liked" | "recent" | "critical">(
-    "liked",
-  );
+  const people = useMemo(() => {
+    if (pre?.people && Array.isArray(pre.people) && pre.people.length > 0) {
+      return peopleToCommenters(pre.people);
+    }
+    return commenters(rows, peopleBy);
+  }, [pre, rows, peopleBy]);
+
   // The videos on screen: 25 of the filtered list, busiest first. The index
   // is clamped inside pageSlice, so a filter that shrinks the list under a
   // reader on page four shows the last page that still exists, not a blank.
@@ -606,6 +834,15 @@ function DashboardBody({
     applyFilters({ video: next });
   }
   const cards = useMemo(() => {
+    if (cardsQuery.data?.comments && cardsQuery.data.comments.length > 0) {
+      return cardsQuery.data.comments.map((c) =>
+        toLabelledComment(
+          c,
+          s?.active_analysis_key ?? "",
+          s?.active_topic_key ?? "",
+        ),
+      );
+    }
     const list = [...rows];
     if (cardTab === "critical")
       return list
@@ -622,7 +859,13 @@ function DashboardBody({
     return list
       .sort((a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1))
       .slice(0, 12);
-  }, [rows, cardTab]);
+  }, [
+    cardsQuery.data,
+    s?.active_analysis_key,
+    s?.active_topic_key,
+    rows,
+    cardTab,
+  ]);
   // Every sentence in the header comes from the values that decide behaviour,
   // so the label and the truth cannot drift apart.
   const source = describeSource({

@@ -192,3 +192,80 @@ export function commenters(
 export function plottable(b: Bucketed, minimum = 2): boolean {
   return b.buckets.filter((x) => x.count > 0).length >= minimum;
 }
+
+export function hoursToBucketed(hours: number[], unplaceable = 0): Bucketed {
+  return {
+    buckets: hours.map((count, h) => ({
+      key: String(h),
+      label: `${h}`,
+      count,
+    })),
+    unplaceable,
+  };
+}
+
+export function weekdaysToBucketed(
+  weekdays: number[],
+  dayNames: readonly string[],
+  unplaceable = 0,
+): Bucketed {
+  return {
+    buckets: dayNames.slice(0, WEEK).map((label, i) => ({
+      key: String(i),
+      label,
+      count: weekdays[i] ?? 0,
+    })),
+    unplaceable,
+  };
+}
+
+export function weeksToBucketed(
+  weeks: Array<{
+    date?: string;
+    week?: string;
+    count: number;
+  }>,
+  unplaceable = 0,
+): Bucketed {
+  return {
+    buckets: weeks.map((item) => {
+      const key = item.week ?? item.date ?? "";
+      return {
+        key,
+        label: key,
+        count: item.count,
+      };
+    }),
+    unplaceable,
+  };
+}
+
+export function peopleToCommenters(
+  peopleList: Array<{
+    name: string;
+    channel_id?: string | null;
+    comments_count?: number;
+    likes_count?: number;
+    key?: string;
+    comments?: number;
+    likes?: number | null;
+    sentiments?: Record<string, number>;
+  }>,
+  anonymous = 0,
+): Commenters {
+  return {
+    ranked: peopleList.map((p) => ({
+      key: p.key ?? p.channel_id ?? p.name,
+      name: p.name,
+      comments: p.comments ?? p.comments_count ?? 0,
+      likes: p.likes ?? p.likes_count ?? null,
+      sentiments: {
+        positive: p.sentiments?.positive ?? 0,
+        negative: p.sentiments?.negative ?? 0,
+        neutral: p.sentiments?.neutral ?? 0,
+        mixed: p.sentiments?.mixed ?? 0,
+      },
+    })),
+    anonymous,
+  };
+}

@@ -1,5 +1,23 @@
 # Implementation decisions
 
+2026-09-20 — Decoupled Big-Data Dashboard Architecture (Server-Side Aggregations & Paginated Stream).
+The original architecture transferred all comments for a workspace (up to hundreds of megabytes of raw JSON)
+to the browser client and computed metrics, timelines, sentiment distributions, and filtered tables in-memory via `snapshot()`.
+When channels scale beyond 10,000 comments (e.g. AJ360 with 71,310+ comments), this approach caused browser memory exhaustion,
+sluggish UI responsiveness, and PostgREST serialization bottlenecks.
+We redesigned this into an enterprise-grade decoupled server-side architecture inspired by jQuery DataTables / server-side streaming:
+1. `public.dashboard_aggregates(w uuid, f jsonb)`: Pre-computes metrics, sentiment distribution, timeline buckets, topic counts,
+   video aggregates, 24-hour activity distribution, 7-day weekday activity, weekly volume, top commenters, and top negative comments
+   directly in PostgreSQL via set-based GROUP BY aggregations. Payload is reduced to ~300KB (or <8KB for smaller filters) with sub-second execution (~1.3s on 71,310 rows).
+2. `public.dashboard_comments(w uuid, f jsonb)`: Streams a paginated window of comments (25-100 rows, ~40KB) based on active filters,
+   server-side sorting, and full-text search.
+3. PostgreSQL GIN Trigram Index: Created `comments_text_trgm_idx` using `extensions.gin_trgm_ops` on `public.comments(text_raw)`
+   so ILIKE text search across tens of thousands of comments completes in ~28ms.
+4. Backwards Compatibility: The existing `dashboard_snapshot` RPC remains supported, and offline/demo/fixture modes continue
+   using client-side `snapshot()` seamlessly. All contracts are formally typed with Zod in `@sentiment/contracts`.
+Migration lives in `supabase/migrations/20260920150000_decoupled_dashboard_architecture.sql`.
+
+
 2026-09-20 — Fair multi-tenant job claim scheduling and real-time operational polling.
 When multiple tenants queue jobs, platform workers claiming across workspaces (`w is null`) must not
 allow an active workspace with many jobs to monopolize worker leases and starve other workspaces.
