@@ -11,11 +11,13 @@
 # fixture. Never send anything else through it.
 set -eu
 cd "$(dirname "$0")/.."
-. ./.env.local
+if [ -f ./.env.local ]; then
+  . ./.env.local
+fi
 
-: "${PREVIEW_FTP_HOST:?set PREVIEW_FTP_HOST in .env.local}"
-: "${PREVIEW_FTP_USER:?set PREVIEW_FTP_USER in .env.local}"
-: "${PREVIEW_FTP_PASSWORD:?set PREVIEW_FTP_PASSWORD in .env.local}"
+: "${PREVIEW_FTP_HOST:?set PREVIEW_FTP_HOST in environment or .env.local}"
+: "${PREVIEW_FTP_USER:?set PREVIEW_FTP_USER in environment or .env.local}"
+: "${PREVIEW_FTP_PASSWORD:?set PREVIEW_FTP_PASSWORD in environment or .env.local}"
 
 if [ ! -f apps/web/dist/index.html ]; then
   echo "no build found; run: npm run build" >&2

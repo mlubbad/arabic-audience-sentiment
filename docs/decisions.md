@@ -1227,3 +1227,11 @@ As live comment collection on active workspaces scaled past 60,000 comments, the
 - **Payload & Latency reduction**: Reduced payload size from > 120MB to 1.9MB and RPC execution time from > 20s (timeout) to 762ms, completely resolving live dashboard availability while remaining 100% compliant with `LiveSnapshotSchema`.
 - **Polling stabilization**: Fixed TanStack Query `snapshot.refetch` dependency churn in `apps/web/src/ops/Sync.tsx`.
 
+## 2026-09-20 — Continuous Deployment (CD) with GitHub Actions, FTPS, and Remote Migrations
+
+- **Workflow Architecture**: Created `.github/workflows/deploy.yml` triggered on push to `main` and `workflow_dispatch`.
+- **Security & Supply Chain Compliance**: Follows all security rules in `AGENTS.md`: every action is pinned to a full commit SHA (`actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2`, `actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0`), `permissions: contents: read`, `concurrency: group: deploy-preview-${{ github.ref }}, cancel-in-progress: true`, `timeout-minutes: 20`, and `persist-credentials: false`.
+- **Decoupled Environment Credentials**: Updated `scripts/deploy-preview.sh` to source `.env.local` conditionally so environment variables injected by GitHub Secrets (`PREVIEW_FTP_HOST`, `PREVIEW_FTP_USER`, `PREVIEW_FTP_PASSWORD`) are seamlessly respected in CI runners.
+- **Automated Remote Database Migrations**: Added `scripts/apply-migrations-remote.mjs` (`npm run db:migrate:remote`), executing pending migrations transactionally against the remote Supabase Management API (`https://api.supabase.com/v1/projects/{ref}/database/query`) and recording versions in `supabase_migrations.schema_migrations`.
+- **Graceful Secret Detection**: The workflow checks for required repository secrets and logs helpful GitHub notices instead of blocking PRs or failing unconfigured runs if secrets are pending setup in GitHub Settings.
+

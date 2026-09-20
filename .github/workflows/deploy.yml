@@ -1,0 +1,81 @@
+# Continuous Deployment pipeline for preview host and remote database migrations.
+# Every third-party action is pinned to a full commit SHA with the version in a comment.
+# Least-privilege permissions, timeout-minutes, concurrency, and persist-credentials: false.
+name: Deploy Preview
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy preview & migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend distribution
+        run: npm run build
+
+      - name: Check FTP deployment credentials
+        id: ftp-check
+        env:
+          FTP_HOST: ${{ secrets.PREVIEW_FTP_HOST }}
+          FTP_USER: ${{ secrets.PREVIEW_FTP_USER }}
+          FTP_PASS: ${{ secrets.PREVIEW_FTP_PASSWORD }}
+        run: |
+          if [ -n "$FTP_HOST" ] && [ -n "$FTP_USER" ] && [ -n "$FTP_PASS" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "FTP credentials present in GitHub Secrets."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Deployment Notice::PREVIEW_FTP_* secrets are not set in GitHub Secrets. Skipping FTP upload."
+          fi
+
+      - name: Deploy frontend to preview host via FTPS
+        if: steps.ftp-check.outputs.configured == 'true'
+        env:
+          PREVIEW_FTP_HOST: ${{ secrets.PREVIEW_FTP_HOST }}
+          PREVIEW_FTP_USER: ${{ secrets.PREVIEW_FTP_USER }}
+          PREVIEW_FTP_PASSWORD: ${{ secrets.PREVIEW_FTP_PASSWORD }}
+        run: sh scripts/deploy-preview.sh
+
+      - name: Check Supabase database migration credentials
+        id: db-check
+        env:
+          SUPABASE_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -n "$SUPABASE_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Supabase access token present in GitHub Secrets."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Migration Notice::SUPABASE_ACCESS_TOKEN secret is not set in GitHub Secrets. Skipping remote migration."
+          fi
+
+      - name: Apply remote database migrations
+        if: steps.db-check.outputs.configured == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npm run db:migrate:remote

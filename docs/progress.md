@@ -2162,3 +2162,11 @@ While `channel-lookup` responded successfully to backend and curl requests, in-b
   - All 111 test files and 874 unit tests passed. `npm run check` (typecheck + eslint) passed clean.
   - Deployed preview bundle to `https://app.sky-develop.net`.
 
+## 2026-09-20 — Continuous Deployment (CD) pipeline with GitHub Actions, FTPS upload, and remote migrations
+
+- **Automated Workflow**: Added `.github/workflows/deploy.yml` triggered on push to `main` and `workflow_dispatch`.
+- **Security compliance**: Pinned all actions to full commit SHAs (`actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2`, `actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0`), least-privilege `permissions: contents: read`, `concurrency`, `timeout-minutes: 20`, and `persist-credentials: false`.
+- **Environment flexibility**: Decoupled `scripts/deploy-preview.sh` from local `.env.local`, allowing it to consume GitHub Secrets passed into the runner environment.
+- **Remote database migrations**: Added `scripts/apply-migrations-remote.mjs` (`npm run db:migrate:remote`) to query applied versions from `supabase_migrations.schema_migrations` and apply any pending `.sql` files in chronological order inside atomic transactions via the Supabase Management API.
+- **Verification**: Local execution of `npm run db:migrate:remote` verified 78 migrations applied cleanly with 0 pending. Full `npm run check` suite passed green across all 111 web test files (874 tests), 39 db test files (365 tests), 229 python tests, clean build, and clean secret scanning.
+

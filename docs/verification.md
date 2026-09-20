@@ -2908,3 +2908,26 @@ cleanly.
   `npm run check` passed completely green across all gates (lint, format, typecheck, check:functions, test, test:db, worker:test, build, check:secrets).
 - **Preview deployed**:
   `npm run deploy:preview` uploaded cleanly (HTTP 226 / gone, exit code 0).
+
+## 2026-09-20 — verification: Continuous Deployment with GitHub Actions, FTPS, and Remote Migrations
+
+- **Workflow Syntax Validation**:
+  - Python YAML safe_load check: `.github/workflows/deploy.yml` parsed valid with keys `['name', True, 'permissions', 'concurrency', 'jobs']`.
+- **Security & SHA Pinning Audit**:
+  - Actions pinned to commit SHAs: `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683` (v4.2.2), `actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020` (v4.4.0).
+  - Security gates: Semgrep SAST completed without new blocking findings; `check-secrets.mjs` confirmed zero committed secrets in source and built bundles.
+- **Local Remote Migration Validation (`npm run db:migrate:remote`)**:
+  - Executed against live Supabase project `ykqugctewsqvevhyqtbi`:
+    `Connecting to Supabase project [ykqugctewsqvevhyqtbi]...`
+    `Database is up to date (78 migrations applied, 0 pending).`
+  - Exit code 0, 0 pending.
+- **Full Gate Verification (`npm run check`)**:
+  - ESLint + Ruff: clean.
+  - Prettier formatting: clean.
+  - TypeScript typecheck: clean (0 errors).
+  - Edge Functions: Deno check clean.
+  - Web unit tests: 111 test files, 874 passed.
+  - DB tests (PGlite): 39 test files, 365 passed.
+  - Worker tests (pytest): 229 passed in 4.27s.
+  - Production build: Vite + prerender 8 pages clean.
+  - Secret scan: 688 source files + built assets clean.
