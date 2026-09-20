@@ -10,12 +10,17 @@
 /* ---------------- toolbar ---------------- */
 .db-cat-toolbar {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.db-cat-toolbar-row {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-3);
-  margin-bottom: var(--space-4);
 }
-.db-cat-toolbar .db-cat-search {
+.db-cat-toolbar-filters .db-cat-search {
   flex: 1 1 14rem;
   min-width: 0;
 }
@@ -29,8 +34,10 @@
   padding-inline: var(--space-3);
   font-size: var(--fs-small);
 }
+.db-cat-toolbar-actions {
+  justify-content: space-between;
+}
 .db-cat-refreshed {
-  flex-basis: 100%;
   margin: 0;
 }
 

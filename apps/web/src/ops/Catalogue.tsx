@@ -125,8 +125,9 @@ export function Catalogue({
   const remaining =
     plan?.budgets.find((b) => b.event_type === "comment_analysis")?.remaining ??
     null;
+  const CATALOGUE_PAGE_SIZE = 15;
   const shown = filterCatalogue(rows, { search, kind, sort });
-  const paged = pageOf(shown, page);
+  const paged = pageOf(shown, page, CATALOGUE_PAGE_SIZE);
   const saved = new Map(rows.map((r) => [r.id, r.selected]));
   const adding = new Set([...ticked].filter((id) => !saved.get(id)));
   const removing = rows
@@ -267,120 +268,124 @@ export function Catalogue({
       ) : (
         <>
           <div className="db-cat-toolbar">
-            <Input
-              type="search"
-              className="db-cat-search"
-              aria-label={S.catSearch}
-              placeholder={S.catSearch}
-              data-testid="cat-search"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-            />
-            {/* Filters, not panels: the list below is the one view, so the
-                tabs carry no content of their own and point at none. */}
-            <Tabs
-              value={kind}
-              onValueChange={(v) => {
-                setKind(v as CatalogueKind);
-                setPage(1);
-              }}
-            >
-              <TabsList aria-label={S.videoKindLabel}>
-                {KINDS.map((k) => (
-                  <TabsTrigger
-                    key={k}
-                    value={k}
-                    data-testid={`cat-kind-${k}`}
-                    aria-controls={undefined}
-                  >
-                    {k === "all" ? S.catKindAll : kindWord(k)} (
-                    {k === "all"
-                      ? rows.length
-                      : rows.filter((r) => r.kind === k).length}
-                    )
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-            <Labelled
-              id="cat-sort"
-              label={S.catSortLabel}
-              labelHidden
-              testId="cat-sort"
-              value={sort}
-              onValueChange={(v) => {
-                setSort(v as CatalogueSort);
-                setPage(1);
-              }}
-            >
-              <SelectItem value="newest">{S.catSortNewest}</SelectItem>
-              <SelectItem value="oldest">{S.catSortOldest}</SelectItem>
-              <SelectItem value="most_commented">{S.catSortMost}</SelectItem>
-            </Labelled>
-            <div className="db-row-actions">
-              <Button
-                variant="secondary"
-                size="sm"
-                data-testid="cat-select-page"
-                onClick={() =>
-                  paged.rows.forEach(
-                    (r) =>
-                      r.comments_state !== "disabled" && toggle(r.id, true),
-                  )
-                }
+            <div className="db-cat-toolbar-row db-cat-toolbar-filters">
+              <Input
+                type="search"
+                className="db-cat-search"
+                aria-label={S.catSearch}
+                placeholder={S.catSearch}
+                data-testid="cat-search"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+              />
+              {/* Filters, not panels: the list below is the one view, so the
+                  tabs carry no content of their own and point at none. */}
+              <Tabs
+                value={kind}
+                onValueChange={(v) => {
+                  setKind(v as CatalogueKind);
+                  setPage(1);
+                }}
               >
-                {S.catSelectPage}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                data-testid="cat-clear"
-                onClick={() => setTicked(new Set())}
+                <TabsList aria-label={S.videoKindLabel}>
+                  {KINDS.map((k) => (
+                    <TabsTrigger
+                      key={k}
+                      value={k}
+                      data-testid={`cat-kind-${k}`}
+                      aria-controls={undefined}
+                    >
+                      {k === "all" ? S.catKindAll : kindWord(k)} (
+                      {k === "all"
+                        ? rows.length
+                        : rows.filter((r) => r.kind === k).length}
+                      )
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              <Labelled
+                id="cat-sort"
+                label={S.catSortLabel}
+                labelHidden
+                testId="cat-sort"
+                value={sort}
+                onValueChange={(v) => {
+                  setSort(v as CatalogueSort);
+                  setPage(1);
+                }}
               >
-                {S.catClear}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                data-testid="cat-fit"
-                disabled={remaining === null}
-                onClick={() =>
-                  setTicked(
-                    new Set([
-                      ...rows.filter((r) => r.selected).map((r) => r.id),
-                      ...fitNewest(
-                        rows,
-                        est.unlimited
-                          ? Infinity
-                          : Math.max(0, (remaining ?? 0) - owed),
-                      ),
-                    ]),
-                  )
-                }
-              >
-                {S.catFit}
-              </Button>
-              {/* The same guard as the save button: live with no connected
-                  channel would call the server to be refused, so the button
-                  says so by being off. Fixture mode has no server at all. */}
-              <Button
-                variant="secondary"
-                size="sm"
-                data-testid="cat-refresh"
-                disabled={busy || mode !== "live" || !read.data?.channelId}
-                onClick={refresh}
-              >
-                {S.catRefresh}
-              </Button>
+                <SelectItem value="newest">{S.catSortNewest}</SelectItem>
+                <SelectItem value="oldest">{S.catSortOldest}</SelectItem>
+                <SelectItem value="most_commented">{S.catSortMost}</SelectItem>
+              </Labelled>
             </div>
-            <p className="db-note db-cat-refreshed">
-              {read.data?.cataloguedAt
-                ? S.catRefreshed(displayDate(read.data.cataloguedAt, lang))
-                : S.catNeverRefreshed}
-            </p>
+            <div className="db-cat-toolbar-row db-cat-toolbar-actions">
+              <div className="db-row-actions">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  data-testid="cat-select-page"
+                  onClick={() =>
+                    paged.rows.forEach(
+                      (r) =>
+                        r.comments_state !== "disabled" && toggle(r.id, true),
+                    )
+                  }
+                >
+                  {S.catSelectPage}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  data-testid="cat-clear"
+                  onClick={() => setTicked(new Set())}
+                >
+                  {S.catClear}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  data-testid="cat-fit"
+                  disabled={remaining === null}
+                  onClick={() =>
+                    setTicked(
+                      new Set([
+                        ...rows.filter((r) => r.selected).map((r) => r.id),
+                        ...fitNewest(
+                          rows,
+                          est.unlimited
+                            ? Infinity
+                            : Math.max(0, (remaining ?? 0) - owed),
+                        ),
+                      ]),
+                    )
+                  }
+                >
+                  {S.catFit}
+                </Button>
+                {/* The same guard as the save button: live with no connected
+                    channel would call the server to be refused, so the button
+                    says so by being off. Fixture mode has no server at all. */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  data-testid="cat-refresh"
+                  disabled={busy || mode !== "live" || !read.data?.channelId}
+                  onClick={refresh}
+                >
+                  {S.catRefresh}
+                </Button>
+              </div>
+              <p className="db-note db-cat-refreshed">
+                {read.data?.cataloguedAt
+                  ? S.catRefreshed(displayDate(read.data.cataloguedAt, lang))
+                  : S.catNeverRefreshed}
+              </p>
+            </div>
           </div>
 
           {rows.length === 0 && discovering ? (

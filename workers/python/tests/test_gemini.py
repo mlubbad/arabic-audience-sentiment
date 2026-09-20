@@ -125,6 +125,13 @@ def test_nothing_raised_carries_the_url():
     assert v.error_code == "gemini_refused"
 
 
+def test_depleted_credits_returns_gemini_credits_depleted():
+    fake = Fake([(402, {"error": {"code": 402, "message": "Your prepayment credits are depleted."}})])
+    [v] = fake.classifier().classify(TAXONOMY, items(1))
+    assert v.status == "failed"
+    assert v.error_code == "gemini_credits_depleted"
+
+
 def test_prompt_version_is_declared():
     assert PROMPT_VERSION == "p1"
     assert GeminiTopicClassifier("k", httpx.Client()).prompt_version == "p1"

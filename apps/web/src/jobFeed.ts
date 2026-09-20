@@ -37,6 +37,7 @@ export type JobRow = {
 
 export type JobEntry = {
   id: string;
+  status: JobRow["status"];
   severity: "ok" | "warning" | "critical" | "muted";
   /** The state, in two or three words. */
   headline: string;
@@ -139,6 +140,8 @@ function explain(code: string, S: Strings): string | null {
       return S.jobGeminiBadResponse;
     case "gemini_refused":
       return S.jobGeminiRefused;
+    case "gemini_credits_depleted":
+      return S.jobGeminiCreditsDepleted;
     default:
       // The shared table, before giving up.
       //
@@ -178,6 +181,7 @@ function describeJobStatus(
 ): JobEntry {
   const base = {
     id: job.id,
+    status: job.status,
     attempt: job.attempt,
     createdAt: job.created_at,
     // Mirrors what cancel_job and retry_job will accept. The database decides;

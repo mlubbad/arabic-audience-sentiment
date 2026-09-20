@@ -316,23 +316,8 @@ function SyncBody({
         />
       ) : (
         <>
-          {/* The action first, the diagnosis after it: what the channel has
-              and what is chosen, then whether collection is running and what
-              it costs. The catalogue reads the plan's remaining figure from
-              the same snapshot the plan panel prints, so its estimate and the
-              meter below it can never disagree. */}
-          <Catalogue
-            mode={mode}
-            workspaceId={workspaceId}
-            plan={plan}
-            stored={stored}
-            jobs={jobs}
-            workerConnected={connected}
-            onChanged={refresh}
-          />
-          {/* Health and allowance are parallel questions: side by side on
-              the dashboard's two-column grid, one under the other on a
-              phone. */}
+          {/* Health and allowance first: the operator sees system connectivity
+              and remaining quota before picking videos to collect. */}
           <div className="db-grid db-grid--2">
             <SyncHealth
               sync={sync}
@@ -345,6 +330,15 @@ function SyncBody({
             />
             <PlanBudgets plan={plan} lang={lang} S={S} />
           </div>
+          <Catalogue
+            mode={mode}
+            workspaceId={workspaceId}
+            plan={plan}
+            stored={stored}
+            jobs={jobs}
+            workerConnected={connected}
+            onChanged={refresh}
+          />
           <Attempts
             mode={mode}
             jobsFailed={jobsFailed}

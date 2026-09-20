@@ -150,7 +150,17 @@ class GeminiTopicClassifier:
                     continue
                 raise TopicError("gemini_rate_limited" if response.status_code == 429
                                  else "gemini_unavailable")
+            if response.status_code == 402:
+                raise TopicError("gemini_credits_depleted")
             if response.status_code >= 400:
+                try:
+                    err_msg = str(response.json().get("error", {}).get("message", "")).lower()
+                    if "prepayment credits are depleted" in err_msg or "resource_exhausted" in err_msg:
+                        raise TopicError("gemini_credits_depleted")
+                except TopicError:
+                    raise
+                except Exception:
+                    pass
                 raise TopicError("gemini_refused")
             try:
                 text = response.json()["candidates"][0]["content"]["parts"][0]["text"]

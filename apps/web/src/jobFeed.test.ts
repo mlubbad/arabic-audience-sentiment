@@ -133,6 +133,9 @@ describe("describeJob", () => {
       ar.jobGeminiBadResponse,
     );
     expect(explainCode("gemini_refused", ar)).toBe(ar.jobGeminiRefused);
+    expect(explainCode("gemini_credits_depleted", ar)).toBe(
+      ar.jobGeminiCreditsDepleted,
+    );
     expect(explainCode("topic_model_not_active", ar)).toBe(
       ar.jobTopicModelNotActive,
     );

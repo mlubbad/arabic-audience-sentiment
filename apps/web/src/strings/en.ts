@@ -543,6 +543,8 @@ export const en: Strings = {
     "Gemini answered in an unexpected shape for some comments; they will be retried.",
   jobGeminiRefused:
     "Gemini refused the request. Check the Gemini key and its restrictions in the worker's settings.",
+  jobGeminiCreditsDepleted:
+    "Gemini prepayment credits are depleted in Google AI Studio. Add credits to enable topic classification (core sentiment analysis remains active).",
   jobInsufficientPermissions:
     "The granted permission is not enough to read comments. Reconnect the channel to renew the scope.",
   jobAccessDeniedWith: (reason: string) =>
@@ -676,6 +678,17 @@ export const en: Strings = {
   opsAttemptsTitle: "Attempt log",
   opsAttemptsLead:
     "Every collection attempt, newest first, with the reason for what happened.",
+  opsAttemptsFilterAll: "All",
+  opsAttemptsFilterRunning: "Running",
+  opsAttemptsFilterSucceeded: "Succeeded",
+  opsAttemptsFilterFailed: "Needs Attention",
+  opsAttemptsCountTotal: "Total Attempts",
+  opsAttemptsCountRunning: "Running",
+  opsAttemptsCountSucceeded: "Succeeded",
+  opsAttemptsCountAttention: "Needs Attention",
+  opsAttemptsPageOf: (page: number, pages: number) =>
+    `Page ${page} of ${pages}`,
+  opsAttemptsNoMatch: "No attempts match this filter.",
   opsDemoNoLogStrong: "The demo carries no job log",
   opsDemoNoLogLead:
     "Jobs belong to a real account and a connected channel. No invented log is shown here to make the place look full.",

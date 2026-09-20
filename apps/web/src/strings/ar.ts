@@ -546,6 +546,8 @@ export const ar = {
     "أجاب Gemini بصيغة غير متوقعة لبعض التعليقات؛ ستُعاد محاولتها.",
   jobGeminiRefused:
     "رفض Gemini الطلب. تحقق من مفتاح Gemini وقيوده في إعدادات العامل.",
+  jobGeminiCreditsDepleted:
+    "استُنفد رصيد حساب Gemini في Google AI Studio. اشحن رصيد الحساب لتفعيل تصنيف الموضوعات (تحليل المشاعر الأساسي يعمل بشكل طبيعي).",
   jobInsufficientPermissions:
     "الإذن الممنوح لا يكفي لقراءة التعليقات. أعد ربط القناة لتجديد النطاق.",
   jobAccessDeniedWith: (reason: string) => `رفض يوتيوب الوصول (${reason}).`,
@@ -673,6 +675,17 @@ export const ar = {
   opsShare: (share: number, message: string) => `${share}٪ — ${message}`,
   opsAttemptsTitle: "سجل المحاولات",
   opsAttemptsLead: "كل محاولة جمع بترتيب زمني عكسي، ومعها سبب ما حدث.",
+  opsAttemptsFilterAll: "الكل",
+  opsAttemptsFilterRunning: "قيد التشغيل",
+  opsAttemptsFilterSucceeded: "مكتملة بنجاح",
+  opsAttemptsFilterFailed: "بحاجة انتباه",
+  opsAttemptsCountTotal: "إجمالي المحاولات",
+  opsAttemptsCountRunning: "قيد التنفيذ",
+  opsAttemptsCountSucceeded: "ناجحة",
+  opsAttemptsCountAttention: "واجهت مشكلة",
+  opsAttemptsPageOf: (page: number, pages: number) =>
+    `صفحة ${page} من ${pages}`,
+  opsAttemptsNoMatch: "لا توجد محاولات تطابق هذا التصنيف.",
   opsDemoNoLogStrong: "العرض التجريبي لا يحمل سجل مهام",
   opsDemoNoLogLead:
     "المهام تخص حسابًا حقيقيًا وقناة مرتبطة. لن يُعرض هنا سجل مُختلق ليبدو المكان ممتلئًا.",

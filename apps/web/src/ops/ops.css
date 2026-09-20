@@ -28,8 +28,64 @@
 }
 
 /* ---------------- attempt log ---------------- */
-/* No margin of its own above the log: it is one child of `.db-page`, whose
-   gap spaces it from the health/plan grid as it spaces every section. */
+.db-attempts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.db-attempts-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.db-attempts-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-2);
+}
+.db-attempts-metric-label {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.db-attempts-metric-val {
+  font-family: var(--font-numeric);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.db-attempts-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.db-attempts-pill {
+  border: 1px solid var(--border-1);
+  background: var(--bg-card);
+  color: var(--text-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  transition: all 120ms ease;
+  font-family: inherit;
+}
+.db-attempts-pill:hover {
+  color: var(--text-1);
+  border-color: var(--border-2);
+}
+.db-attempts-pill.is-active {
+  background: var(--text-1);
+  color: var(--bg-page);
+  border-color: var(--text-1);
+  font-weight: 600;
+}
 .db-attempts {
   list-style: none;
   margin: var(--space-4) 0 0;
@@ -42,6 +98,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+.db-attempt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 .db-attempt strong {
   color: var(--text-1);
@@ -62,4 +124,10 @@ li[data-severity="muted"] .db-attempt strong {
 .db-attempt small {
   color: var(--text-3);
   font-size: var(--fs-micro);
+}
+.db-attempts-pager {
+  margin-top: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
