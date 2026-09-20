@@ -1,6 +1,38 @@
 # Progress
 
-## 2026-09-20 — Real-Time Catalogue Elapsed Duration & Enhanced Telegram Collector
+## 2026-09-20 — Full End-to-End X (Twitter) & TikTok Channel Support
+
+1. **X (Twitter) Collector (`workers/python/src/collectors/x_collector.py`)**:
+   - Implemented `XCollector` supporting handle sanitization (`@handle`, `https://x.com/handle`, `https://twitter.com/handle`).
+   - Supports 3 modes: Fixture mode (for hermetic testing), Bearer token API v2 (`X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`), and resilient zero-key public syndication fallback via `https://syndication.twitter.com/srv/timeline-profile/screen-name/...`.
+   - Produces canonical items with kind `"tweet"` and maps comments and interactions into `RawComment` schemas.
+   - Comprehensive unit test suite in `tests/test_x_collector.py`.
+
+2. **TikTok Collector (`workers/python/src/collectors/tiktok_collector.py`)**:
+   - Implemented `TikTokCollector` supporting handle sanitization (`@handle`, `https://www.tiktok.com/@handle`).
+   - Supports 3 modes: Fixture mode (for hermetic testing), Display API v2 (`TIKTOK_ACCESS_TOKEN`), and resilient zero-key public web profile fallback parsing `__UNIVERSAL_DATA_FOR_REHYDRATION__`.
+   - Produces canonical items with kind `"video"` and maps comments into `RawComment` schemas.
+   - Comprehensive unit test suite in `tests/test_tiktok_collector.py`.
+
+3. **Collector Router & Worker Daemon Integration**:
+   - Extended `CollectorRouter` (`router.py`) to dispatch `"x"` and `"tiktok"` platforms to their respective collectors.
+   - Updated `loop.py` and `build_collector()` to ingest `X_BEARER_TOKEN` and `TIKTOK_ACCESS_TOKEN` environment variables.
+   - Updated `test_router.py` to assert routing and lease handling for both platforms.
+
+4. **Frontend UI & Localization (`apps/web`)**:
+   - Enabled X and TikTok buttons in channel addition UI in `WorkspaceCard.tsx`.
+   - Added interactive input forms for direct handle or profile URL entry for both platforms.
+   - Added platform badges for connected X and TikTok channels.
+   - Added localized strings in Arabic (`ar.ts`) and English (`en.ts`) for input labels, placeholders, errors, running status, and external links.
+   - Updated `videoLinks()` in `catalogue.ts` to generate direct links for X tweets (`x.com/{handle}/status/{id}`) and TikTok videos (`tiktok.com/@{handle}/video/{id}`).
+   - Added full unit test coverage for X and TikTok in `WorkspaceCard.test.tsx` and `catalogue.test.ts`.
+
+5. **Full Repository Verification**:
+   - All 248 pytest unit tests passing.
+   - All 112 vitest test suites passing (including 41 tests in `WorkspaceCard.test.tsx` and 14 tests in `catalogue.test.ts`).
+   - Database tests (40 suites / 370 tests) passing against Postgres.
+   - Types (`tsc --noEmit`), linter (`eslint` + `ruff`), prettier, functions check (`deno check`), and build + prerender passing.
+   - Secret scan passing (701 source files + built assets).
 
 1. **Real-Time Duration & Time Estimation Display**:
    - Added precise Arabic grammatical duration formatting in `apps/web/src/i18n.ts` (`formatDuration` & `formatElapsed`).

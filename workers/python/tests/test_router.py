@@ -1,4 +1,5 @@
 """Unit tests for CollectorRouter and multi-platform runner resolution."""
+
 import pytest
 from collectors.protocol import CollectionError
 from collectors.router import CollectorRouter, SUPPORTED_PLATFORMS
@@ -17,10 +18,14 @@ def test_supported_platforms_coverage():
 def test_collector_router_routing():
     yt_called = []
     tg_called = []
+    x_called = []
+    tt_called = []
 
     router = CollectorRouter(
         youtube_builder=lambda **kwargs: yt_called.append(kwargs) or "fake_youtube",
         telegram_builder=lambda **kwargs: tg_called.append(kwargs) or "fake_telegram",
+        x_builder=lambda **kwargs: x_called.append(kwargs) or "fake_x",
+        tiktok_builder=lambda **kwargs: tt_called.append(kwargs) or "fake_tiktok",
     )
 
     # Route YouTube
@@ -33,10 +38,20 @@ def test_collector_router_routing():
     assert col_tg == "fake_telegram"
     assert len(tg_called) == 1
 
+    # Route X
+    col_x = router.get_collector("x", channel_id="@x_channel")
+    assert col_x == "fake_x"
+    assert len(x_called) == 1
+
+    # Route TikTok
+    col_tt = router.get_collector("tiktok", channel_id="@tiktok_creator")
+    assert col_tt == "fake_tiktok"
+    assert len(tt_called) == 1
+
     # Route downstream platforms raises not yet configured error
     with pytest.raises(CollectionError) as exc:
-        router.get_collector("x")
-    assert exc.value.code == "platform_x_collector_not_configured"
+        router.get_collector("facebook")
+    assert exc.value.code == "platform_facebook_collector_not_configured"
 
     # Route unknown platform raises ValueError
     with pytest.raises(ValueError, match="unsupported_platform"):
@@ -80,3 +95,35 @@ def test_runner_collector_for_platform_resolution():
     assert col == "built_tg"
     assert reason is None
     assert ch == "@aljazeera"
+
+    # X lease
+    x_lease = {
+        "external_channel_id": "@elonmusk",
+        "platform": "x",
+    }
+    col, reason, ch = _collector_for(
+        plane,
+        x_lease,
+        build_collector=lambda tok, exp=None, ren=None, channel_id=None, platform="youtube": (
+            "built_x" if platform == "x" else None
+        ),
+    )
+    assert col == "built_x"
+    assert reason is None
+    assert ch == "@elonmusk"
+
+    # TikTok lease
+    tt_lease = {
+        "external_channel_id": "@khaby.lame",
+        "platform": "tiktok",
+    }
+    col, reason, ch = _collector_for(
+        plane,
+        tt_lease,
+        build_collector=lambda tok, exp=None, ren=None, channel_id=None, platform="youtube": (
+            "built_tt" if platform == "tiktok" else None
+        ),
+    )
+    assert col == "built_tt"
+    assert reason is None
+    assert ch == "@khaby.lame"

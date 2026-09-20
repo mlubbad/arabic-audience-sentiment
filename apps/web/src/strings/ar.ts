@@ -160,6 +160,18 @@ export const ar = {
   addTelegramPlaceholder: "@اسم_القناة أو t.me/اسم_القناة",
   addTelegramInvalidHandle:
     "أدخل معرّف قناة تليجرام صالحًا (مثال: @channel أو رابط t.me/channel).",
+  addXChannel: "إضافة حساب X (تويتر) عام",
+  addXLead:
+    "أدخل اسم المستخدم (@المعرّف) أو رابط الحساب على X (تويتر). يتم جمع التغريدات والردود عليها تلقائيًا.",
+  addXPlaceholder: "@username أو x.com/username",
+  addXInvalidHandle:
+    "أدخل اسم مستخدم صالحًا على X (مثال: @username أو رابط x.com/username).",
+  addTikTokChannel: "إضافة حساب تيك توك عام",
+  addTikTokLead:
+    "أدخل اسم المستخدم (@المعرّف) أو رابط الحساب على تيك توك. يتم جمع المقاطع والتعليقات تلقائيًا.",
+  addTikTokPlaceholder: "@username أو tiktok.com/@username",
+  addTikTokInvalidHandle:
+    "أدخل اسم مستخدم صالحًا على تيك توك (مثال: @username أو رابط tiktok.com/@username).",
 
   // ---- the gate (WorkspaceGate.tsx) ----
   gateResolvingAccount: "جارٍ تحديد حسابك…",
@@ -541,6 +553,8 @@ export const ar = {
   jobCatalogueQueuedWithWorker: "في الطابور، بانتظار بدء فهرسة القناة.",
   jobCatalogueRunningDetail: "فهرسة فيديوهات القناة قيد التنفيذ الآن.",
   jobCatalogueRunningDetailTelegram: "فهرسة منشورات القناة قيد التنفيذ الآن.",
+  jobCatalogueRunningDetailX: "فهرسة تغريدات الحساب قيد التنفيذ الآن.",
+  jobCatalogueRunningDetailTikTok: "فهرسة مقاطع الحساب قيد التنفيذ الآن.",
   jobCatalogueSucceededDetail:
     "تم استكشاف فيديوهات القناة وتحديث القائمة بنجاح.",
   jobChannelNotPublic:
@@ -741,6 +755,8 @@ export const ar = {
   catJump: "انتقل إلى صفحة",
   catOpenYouTube: "فتح في يوتيوب",
   catOpenTelegram: "فتح في تليجرام",
+  catOpenX: "فتح في X",
+  catOpenTikTok: "فتح في تيك توك",
   catPreview: (title: string) => `معاينة: ${title}`,
   catPreviewHint:
     "المشاهدة داخل المنصة عبر مشغّل يوتيوب؛ لا يحفظ ملفات تعريف قبل الضغط على تشغيل.",

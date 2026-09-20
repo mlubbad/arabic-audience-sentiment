@@ -407,10 +407,16 @@ export function Catalogue({
           {rows.length === 0 && discovering ? (
             (() => {
               const e = describeJob(discovering, { workerConnected }, S);
+              const curPlatform = read.data?.platform;
               const detail =
-                read.data?.platform === "telegram" &&
                 e.detail === S.jobCatalogueRunningDetail
-                  ? S.jobCatalogueRunningDetailTelegram
+                  ? curPlatform === "telegram"
+                    ? S.jobCatalogueRunningDetailTelegram
+                    : curPlatform === "x"
+                      ? S.jobCatalogueRunningDetailX
+                      : curPlatform === "tiktok"
+                        ? S.jobCatalogueRunningDetailTikTok
+                        : e.detail
                   : e.detail;
               return (
                 <div
@@ -506,7 +512,15 @@ export function Catalogue({
                         }
                         target="_blank"
                         rel="noopener noreferrer"
-                        aria-label={`${(r.platform ?? read.data?.platform) === "telegram" ? S.catOpenTelegram : S.catOpenYouTube}: ${r.title}`}
+                        aria-label={`${
+                          (r.platform ?? read.data?.platform) === "telegram"
+                            ? S.catOpenTelegram
+                            : (r.platform ?? read.data?.platform) === "x"
+                              ? S.catOpenX
+                              : (r.platform ?? read.data?.platform) === "tiktok"
+                                ? S.catOpenTikTok
+                                : S.catOpenYouTube
+                        }: ${r.title}`}
                       >
                         ↗
                       </a>

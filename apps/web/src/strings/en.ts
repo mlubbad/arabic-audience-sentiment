@@ -160,6 +160,18 @@ export const en: Strings = {
   addTelegramPlaceholder: "@channel_name or t.me/channel_name",
   addTelegramInvalidHandle:
     "Please enter a valid Telegram channel handle or link (e.g. @channel or t.me/channel).",
+  addXChannel: "Add a public X (Twitter) account",
+  addXLead:
+    "Enter the X (Twitter) handle (@username) or profile link. Tweets and replies are collected automatically.",
+  addXPlaceholder: "@username or x.com/username",
+  addXInvalidHandle:
+    "Please enter a valid X handle or profile link (e.g. @username or x.com/username).",
+  addTikTokChannel: "Add a public TikTok account",
+  addTikTokLead:
+    "Enter the TikTok handle (@username) or profile link. Videos and comments are collected automatically.",
+  addTikTokPlaceholder: "@username or tiktok.com/@username",
+  addTikTokInvalidHandle:
+    "Please enter a valid TikTok handle or profile link (e.g. @username or tiktok.com/@username).",
 
   gateResolvingAccount: "Identifying your account…",
   gateLoadingWorkspaces: "Loading workspaces…",
@@ -538,6 +550,8 @@ export const en: Strings = {
     "In the queue, waiting for channel cataloguing to start.",
   jobCatalogueRunningDetail: "Channel cataloguing is running now.",
   jobCatalogueRunningDetailTelegram: "Channel post cataloguing is running now.",
+  jobCatalogueRunningDetailX: "Account tweet cataloguing is running now.",
+  jobCatalogueRunningDetailTikTok: "Account video cataloguing is running now.",
   jobCatalogueSucceededDetail:
     "Channel videos catalogued and list updated successfully.",
   jobChannelNotPublic:
@@ -746,6 +760,8 @@ export const en: Strings = {
   catJump: "Jump to page",
   catOpenYouTube: "Open on YouTube",
   catOpenTelegram: "Open on Telegram",
+  catOpenX: "Open on X",
+  catOpenTikTok: "Open on TikTok",
   catPreview: (title: string) => `Preview: ${title}`,
   catPreviewHint:
     "Watched here through YouTube's player; it sets no cookies until you press play.",

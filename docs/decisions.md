@@ -1,4 +1,15 @@
 # Implementation decisions
+ 
+2026-09-20 — X (Twitter) & TikTok Collectors with Dual-Mode (API Token + Zero-Key Public Fallback).
+To provide seamless support for X and TikTok channels without requiring operators or end-users to navigate developer portals or restrictive API registration (which are blocked by automated CAPTCHAs and mobile OTPs):
+1. Both `XCollector` and `TikTokCollector` implement a resilient dual-mode strategy:
+   - When API credentials (`X_BEARER_TOKEN`, `TIKTOK_ACCESS_TOKEN`) are configured in the environment, the collectors use the official API v2 endpoints.
+   - When credentials are absent or in zero-configuration mode, the collectors fall back to public web endpoints:
+     - X uses the public syndication timeline service (`https://syndication.twitter.com/srv/timeline-profile/screen-name/...`) which extracts tweets and engagement without tokens.
+     - TikTok parses the server-rendered profile page and extracts initial state from `__UNIVERSAL_DATA_FOR_REHYDRATION__`.
+   - Hermetic fixture mode (`x_fixture`, `tiktok_fixture`) is provided for deterministic unit and CI testing.
+2. The user experience in `WorkspaceCard.tsx` allows entering handles either with `@`, bare handle, or full URL (`x.com/user`, `tiktok.com/@user`), and normalizes them uniformly into canonical external IDs.
+3. Content items are mapped to `"tweet"` for X and `"video"` for TikTok, fully aligning with the `CONTENT_KINDS` check constraint in the database.
 
 2026-09-20 — Omnichannel Multi-Platform Architecture (Telegram, X, TikTok, Facebook, Instagram).
 The system was originally built strictly around YouTube (using YouTube Data API v3 channels, videos, comments, and IDs).

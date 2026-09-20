@@ -490,5 +490,97 @@ describe("WorkspaceCard", () => {
       });
       expect(screen.getByText(ar.platformTelegram)).toBeInTheDocument();
     });
+
+    it("switches to X and adds an account by handle or URL", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(screen.getByRole("button", { name: ar.platformX }));
+      const form = screen.getByTestId(`addx-form-${W}`);
+      const field = within(form).getByLabelText(ar.addXChannel);
+      await userEvent.type(field, "https://x.com/aljazeera");
+      await userEvent.click(screen.getByTestId(`addx-submit-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "aljazeera",
+        handle: "@aljazeera",
+        title: "@aljazeera",
+        thumbnail_url: null,
+        platform: "x",
+      });
+    });
+
+    it("validates X handle and shows error for invalid input", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(screen.getByRole("button", { name: ar.platformX }));
+      const form = screen.getByTestId(`addx-form-${W}`);
+      const field = within(form).getByLabelText(ar.addXChannel);
+      await userEvent.type(field, "invalid handle with spaces!");
+      await userEvent.click(screen.getByTestId(`addx-submit-${W}`));
+      expect(screen.getByText(ar.addXInvalidHandle)).toBeInTheDocument();
+      expect(onAddChannel).not.toHaveBeenCalledWith(
+        "add",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("displays X badge on connected X channel", () => {
+      mount({
+        channel: {
+          ...connected,
+          platform: "x",
+          title: "@aljazeera",
+        },
+      });
+      expect(screen.getByText(ar.platformX)).toBeInTheDocument();
+    });
+
+    it("switches to TikTok and adds an account by handle or URL", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTikTok }),
+      );
+      const form = screen.getByTestId(`addtiktok-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTikTokChannel);
+      await userEvent.type(field, "https://www.tiktok.com/@khaby.lame");
+      await userEvent.click(screen.getByTestId(`addtiktok-submit-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "khaby.lame",
+        handle: "@khaby.lame",
+        title: "@khaby.lame",
+        thumbnail_url: null,
+        platform: "tiktok",
+      });
+    });
+
+    it("validates TikTok handle and shows error for invalid input", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTikTok }),
+      );
+      const form = screen.getByTestId(`addtiktok-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTikTokChannel);
+      await userEvent.type(field, "a"); // too short (<2 chars)
+      await userEvent.click(screen.getByTestId(`addtiktok-submit-${W}`));
+      expect(screen.getByText(ar.addTikTokInvalidHandle)).toBeInTheDocument();
+      expect(onAddChannel).not.toHaveBeenCalledWith(
+        "add",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("displays TikTok badge on connected TikTok channel", () => {
+      mount({
+        channel: {
+          ...connected,
+          platform: "tiktok",
+          title: "@khaby.lame",
+        },
+      });
+      expect(screen.getByText(ar.platformTikTok)).toBeInTheDocument();
+    });
   });
 });

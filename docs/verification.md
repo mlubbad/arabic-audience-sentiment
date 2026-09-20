@@ -1,6 +1,18 @@
 # Verification
 
-## 2026-09-20 — Omnichannel Multi-Platform Support & Telegram Integration
+## 2026-09-20 — Full End-to-End X (Twitter) & TikTok Channel Support
+
+| Command / observation | Actual result |
+| --- | --- |
+| Python worker test suite: `uv run pytest -v` | **248 tests passed in 4.39s (100% green)**, including all tests in `test_x_collector.py`, `test_tiktok_collector.py`, and `test_router.py`. |
+| Python worker linter: `uv run ruff check .` | All checks passed cleanly (0 errors). |
+| Web unit tests: `npm test` | **112 test files passed, 887 tests passed (100% green)**, including 41 tests in `WorkspaceCard.test.tsx` and 14 tests in `catalogue.test.ts`. |
+| Database test suite: `npm run test:db` | **40 test files passed, 370 tests passed (100% green)**. |
+| Typecheck: `npm run typecheck` | Passed cleanly (`tsc --noEmit`, 0 errors). |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`. |
+| Production build & prerender: `npm run build` | Built in 1.19s; 8 prerendered static pages generated cleanly; 0 build errors. |
+| Secrets scan: `npm run check:secrets` | Secret-pattern checks passed across 701 source files and built assets (0 secrets detected). |
+| Repository check gate: `npm run check` | **100% green exit code 0**. |
 
 | Command / observation | Actual result |
 | --- | --- |

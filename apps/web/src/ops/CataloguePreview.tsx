@@ -102,7 +102,11 @@ export function CataloguePreview({
             >
               {video.platform === "telegram"
                 ? S.catOpenTelegram
-                : S.catOpenYouTube}{" "}
+                : video.platform === "x"
+                  ? S.catOpenX
+                  : video.platform === "tiktok"
+                    ? S.catOpenTikTok
+                    : S.catOpenYouTube}{" "}
               ↗
             </a>
             <small className="db-note">{S.catPreviewHint}</small>

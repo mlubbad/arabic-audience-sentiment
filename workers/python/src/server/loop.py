@@ -20,6 +20,7 @@ has already recorded an outcome; anything that escapes it is logged and the
 loop continues, because a worker that dies on one bad job stops collecting for
 every tenant it serves.
 """
+
 import argparse
 import os
 import signal
@@ -30,6 +31,8 @@ import httpx
 
 from collectors.youtube_api import YouTubeAPI
 from collectors.telegram_collector import TelegramCollector
+from collectors.tiktok_collector import TikTokCollector
+from collectors.x_collector import XCollector
 
 from .gateway import ControlPlane, ControlPlaneError, LeaseLost
 from .runner import run_job
@@ -53,6 +56,10 @@ def build_collector(
     api_key: str | None = None,
     telegram_bot_token: str | None = None,
     telegram_fixture: dict | None = None,
+    x_bearer_token: str | None = None,
+    x_fixture: dict | None = None,
+    tiktok_access_token: str | None = None,
+    tiktok_fixture: dict | None = None,
 ):
     """The collector builder the runner is handed.
 
@@ -65,6 +72,8 @@ def build_collector(
     channel.
 
     For platform == 'telegram', returns a TelegramCollector adapter.
+    For platform == 'x', returns an XCollector adapter.
+    For platform == 'tiktok', returns a TikTokCollector adapter.
     """
 
     def build(
@@ -81,6 +90,20 @@ def build_collector(
                 client=client,
                 bot_token=telegram_bot_token,
                 fixture_data=telegram_fixture,
+            )
+        if p == "x":
+            return XCollector(
+                channel_id=channel_id,
+                client=client,
+                bearer_token=token or x_bearer_token,
+                fixture_data=x_fixture,
+            )
+        if p == "tiktok":
+            return TikTokCollector(
+                channel_id=channel_id,
+                client=client,
+                access_token=token or tiktok_access_token,
+                fixture_data=tiktok_fixture,
             )
         if token:
             return YouTubeAPI(
@@ -171,17 +194,22 @@ def main() -> None:
     # Comma-separated: one scoped credential per workspace this worker serves.
     from sentiment.transformer import CANDIDATES
 
-    p.add_argument("--credential", default=os.environ.get("WORKER_CREDENTIAL", ""),
-                   help="one or more scoped worker credentials, comma-separated")
-    p.add_argument("--model", default="none",
-                   choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())])
-    p.add_argument("--topics", default="gemini" if os.environ.get("GEMINI_API_KEY") else "none",
-                   choices=["none", "deterministic-test", "gemini", "typesafe"],
-                   help="topic classifier; gemini needs GEMINI_API_KEY, typesafe needs TYPESAFE_API_KEY")
-    p.add_argument("--idle-seconds", type=float, default=60.0,
-                   help="pause after an empty queue")
-    p.add_argument("--max-idle", type=int, default=30,
-                   help="exit after this many consecutive empty cycles")
+    p.add_argument(
+        "--credential",
+        default=os.environ.get("WORKER_CREDENTIAL", ""),
+        help="one or more scoped worker credentials, comma-separated",
+    )
+    p.add_argument(
+        "--model", default="none", choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())]
+    )
+    p.add_argument(
+        "--topics",
+        default="gemini" if os.environ.get("GEMINI_API_KEY") else "none",
+        choices=["none", "deterministic-test", "gemini", "typesafe"],
+        help="topic classifier; gemini needs GEMINI_API_KEY, typesafe needs TYPESAFE_API_KEY",
+    )
+    p.add_argument("--idle-seconds", type=float, default=60.0, help="pause after an empty queue")
+    p.add_argument("--max-idle", type=int, default=30, help="exit after this many consecutive empty cycles")
     args = p.parse_args()
     if not args.base or not args.credential:
         raise SystemExit("need WORKER_API_BASE_URL and WORKER_CREDENTIAL")
@@ -230,9 +258,20 @@ def main() -> None:
     # worker still serves connected channels; a public job it claims ends
     # blocked with a code that names the gap.
     api_key = os.environ.get("YOUTUBE_API_KEY") or None
-    build = build_collector(client, api_key)
-    _log(f"worker up, model={args.model}, tenants={len(controls)}, "
-         f"topics={args.topics}, public={'yes' if api_key else 'no'}")
+    telegram_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN") or None
+    x_bearer_token = os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or None
+    tiktok_access_token = os.environ.get("TIKTOK_ACCESS_TOKEN") or None
+    build = build_collector(
+        client,
+        api_key=api_key,
+        telegram_bot_token=telegram_bot_token,
+        x_bearer_token=x_bearer_token,
+        tiktok_access_token=tiktok_access_token,
+    )
+    _log(
+        f"worker up, model={args.model}, tenants={len(controls)}, "
+        f"topics={args.topics}, public={'yes' if api_key else 'no'}"
+    )
     why = serve(
         controls,
         build,

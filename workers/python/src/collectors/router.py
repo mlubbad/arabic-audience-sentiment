@@ -3,9 +3,12 @@
 Maps lease platform ('youtube', 'telegram', 'x', 'tiktok', etc.)
 to the corresponding collector implementation.
 """
+
 from typing import Any, Callable
 from .protocol import Collector, CollectionError
 from .telegram_collector import TelegramCollector
+from .tiktok_collector import TikTokCollector
+from .x_collector import XCollector
 
 SUPPORTED_PLATFORMS = ("youtube", "telegram", "x", "tiktok", "facebook", "instagram")
 
@@ -17,9 +20,13 @@ class CollectorRouter:
         self,
         youtube_builder: Callable[..., Any] | None = None,
         telegram_builder: Callable[..., Any] | None = None,
+        x_builder: Callable[..., Any] | None = None,
+        tiktok_builder: Callable[..., Any] | None = None,
     ):
         self.youtube_builder = youtube_builder
         self.telegram_builder = telegram_builder
+        self.x_builder = x_builder
+        self.tiktok_builder = tiktok_builder
 
     def get_collector(
         self,
@@ -51,6 +58,22 @@ class CollectorRouter:
                     token=token,
                 )
             return TelegramCollector(channel_id=channel_id)
+
+        if target_platform == "x":
+            if self.x_builder:
+                return self.x_builder(
+                    channel_id=channel_id,
+                    token=token,
+                )
+            return XCollector(channel_id=channel_id, bearer_token=token)
+
+        if target_platform == "tiktok":
+            if self.tiktok_builder:
+                return self.tiktok_builder(
+                    channel_id=channel_id,
+                    token=token,
+                )
+            return TikTokCollector(channel_id=channel_id, access_token=token)
 
         # Omnichannel scaffolding: platform known, but collector adapter not yet active
         raise CollectionError(f"platform_{target_platform}_collector_not_configured", "blocked")

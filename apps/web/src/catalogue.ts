@@ -196,6 +196,24 @@ export function videoLinks(
       embed: null,
     };
   }
+  if (platform === "x") {
+    const clean = (handle ?? "").replace(/^@/, "");
+    return {
+      watch: clean
+        ? `https://x.com/${clean}/status/${external_video_id}`
+        : `https://x.com/i/status/${external_video_id}`,
+      embed: null,
+    };
+  }
+  if (platform === "tiktok") {
+    const clean = (handle ?? "").replace(/^@/, "");
+    return {
+      watch: clean
+        ? `https://www.tiktok.com/@${clean}/video/${external_video_id}`
+        : `https://www.tiktok.com/video/${external_video_id}`,
+      embed: null,
+    };
+  }
   const id = encodeURIComponent(external_video_id);
   return {
     watch:

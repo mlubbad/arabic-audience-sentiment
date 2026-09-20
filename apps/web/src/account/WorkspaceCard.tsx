@@ -107,12 +107,18 @@ export function WorkspaceCard({
   const nameId = `rename-name-${workspace.id}`;
   const addChannelQueryId = `addchannel-query-${workspace.id}`;
   const addTelegramInputId = `addtelegram-handle-${workspace.id}`;
+  const addXInputId = `addx-handle-${workspace.id}`;
+  const addTikTokInputId = `addtiktok-handle-${workspace.id}`;
   const [query, setQuery] = useState("");
-  const [addPlatform, setAddPlatform] = useState<"youtube" | "telegram">(
-    "youtube",
-  );
+  const [addPlatform, setAddPlatform] = useState<
+    "youtube" | "telegram" | "x" | "tiktok"
+  >("youtube");
   const [telegramHandle, setTelegramHandle] = useState("");
   const [telegramError, setTelegramError] = useState<string | null>(null);
+  const [xHandle, setXHandle] = useState("");
+  const [xError, setXError] = useState<string | null>(null);
+  const [tikTokHandle, setTikTokHandle] = useState("");
+  const [tikTokError, setTikTokError] = useState<string | null>(null);
 
   function handleTelegramSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,6 +143,48 @@ export function WorkspaceCard({
       title: s,
       thumbnail_url: null,
       platform: "telegram",
+    });
+  }
+
+  function handleXSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    let s = xHandle.trim();
+    s = s.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i, "");
+    s = s.replace(/^(twitter|x)\.com\//i, "");
+    s = s.replace(/^\/?@?/, "");
+    s = s.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
+    if (!s || !/^[A-Za-z0-9_]{1,15}$/.test(s)) {
+      setXError(S.addXInvalidHandle);
+      return;
+    }
+    setXError(null);
+    onAddChannel?.("add", undefined, {
+      external_channel_id: s,
+      handle: "@" + s,
+      title: "@" + s,
+      thumbnail_url: null,
+      platform: "x",
+    });
+  }
+
+  function handleTikTokSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    let s = tikTokHandle.trim();
+    s = s.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, "");
+    s = s.replace(/^tiktok\.com\/@?/i, "");
+    s = s.replace(/^\/?@?/, "");
+    s = s.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
+    if (!s || !/^[A-Za-z0-9_.-]{2,30}$/.test(s)) {
+      setTikTokError(S.addTikTokInvalidHandle);
+      return;
+    }
+    setTikTokError(null);
+    onAddChannel?.("add", undefined, {
+      external_channel_id: s,
+      handle: "@" + s,
+      title: "@" + s,
+      thumbnail_url: null,
+      platform: "tiktok",
     });
   }
   const connected = channel?.status === "connected";
@@ -224,7 +272,11 @@ export function WorkspaceCard({
               >
                 {channel.platform === "telegram"
                   ? S.platformTelegram
-                  : channel.platform}
+                  : channel.platform === "x"
+                    ? S.platformX
+                    : channel.platform === "tiktok"
+                      ? S.platformTikTok
+                      : channel.platform}
               </span>
             )}
             {channel.status === "connected"
@@ -375,6 +427,8 @@ export function WorkspaceCard({
                 onClick={() => {
                   setAddPlatform("youtube");
                   setTelegramError(null);
+                  setXError(null);
+                  setTikTokError(null);
                 }}
               >
                 {S.platformYouTube}
@@ -386,15 +440,37 @@ export function WorkspaceCard({
                 onClick={() => {
                   setAddPlatform("telegram");
                   setTelegramError(null);
+                  setXError(null);
+                  setTikTokError(null);
                 }}
               >
                 {S.platformTelegram}
               </Button>
-              <Button type="button" size="sm" variant="secondary" disabled>
-                {`${S.platformX} (${S.platformSoon})`}
+              <Button
+                type="button"
+                size="sm"
+                variant={addPlatform === "x" ? "primary" : "secondary"}
+                onClick={() => {
+                  setAddPlatform("x");
+                  setTelegramError(null);
+                  setXError(null);
+                  setTikTokError(null);
+                }}
+              >
+                {S.platformX}
               </Button>
-              <Button type="button" size="sm" variant="secondary" disabled>
-                {`${S.platformTikTok} (${S.platformSoon})`}
+              <Button
+                type="button"
+                size="sm"
+                variant={addPlatform === "tiktok" ? "primary" : "secondary"}
+                onClick={() => {
+                  setAddPlatform("tiktok");
+                  setTelegramError(null);
+                  setXError(null);
+                  setTikTokError(null);
+                }}
+              >
+                {S.platformTikTok}
               </Button>
             </div>
 
@@ -493,7 +569,7 @@ export function WorkspaceCard({
                   </ul>
                 )}
               </>
-            ) : (
+            ) : addPlatform === "telegram" ? (
               <>
                 <p>{S.addTelegramLead}</p>
                 <form
@@ -533,7 +609,7 @@ export function WorkspaceCard({
                       onClick={() => {
                         setTelegramHandle("");
                         setTelegramError(null);
-                        onAddChannel("cancel");
+                        onAddChannel?.("cancel");
                       }}
                     >
                       {S.addChannelCancel}
@@ -543,6 +619,108 @@ export function WorkspaceCard({
                 {telegramError && (
                   <p className="db-feedback db-feedback--note" role="status">
                     {telegramError}
+                  </p>
+                )}
+              </>
+            ) : addPlatform === "x" ? (
+              <>
+                <p>{S.addXLead}</p>
+                <form
+                  className="db-ws-rename"
+                  data-testid={`addx-form-${workspace.id}`}
+                  onSubmit={handleXSubmit}
+                >
+                  <label htmlFor={addXInputId}>{S.addXChannel}</label>
+                  <Input
+                    id={addXInputId}
+                    name="handle"
+                    required
+                    maxLength={100}
+                    placeholder={S.addXPlaceholder}
+                    value={xHandle}
+                    onChange={(e) => {
+                      setXHandle(e.target.value);
+                      if (xError) setXError(null);
+                    }}
+                    autoFocus
+                  />
+                  <div className="db-actions">
+                    <Button
+                      type="submit"
+                      disabled={pending || !xHandle.trim()}
+                      data-testid={`addx-submit-${workspace.id}`}
+                    >
+                      {S.addChannelAdd}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={pending}
+                      data-testid={`addx-close-${workspace.id}`}
+                      onClick={() => {
+                        setXHandle("");
+                        setXError(null);
+                        onAddChannel?.("cancel");
+                      }}
+                    >
+                      {S.addChannelCancel}
+                    </Button>
+                  </div>
+                </form>
+                {xError && (
+                  <p className="db-feedback db-feedback--note" role="status">
+                    {xError}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p>{S.addTikTokLead}</p>
+                <form
+                  className="db-ws-rename"
+                  data-testid={`addtiktok-form-${workspace.id}`}
+                  onSubmit={handleTikTokSubmit}
+                >
+                  <label htmlFor={addTikTokInputId}>{S.addTikTokChannel}</label>
+                  <Input
+                    id={addTikTokInputId}
+                    name="handle"
+                    required
+                    maxLength={100}
+                    placeholder={S.addTikTokPlaceholder}
+                    value={tikTokHandle}
+                    onChange={(e) => {
+                      setTikTokHandle(e.target.value);
+                      if (tikTokError) setTikTokError(null);
+                    }}
+                    autoFocus
+                  />
+                  <div className="db-actions">
+                    <Button
+                      type="submit"
+                      disabled={pending || !tikTokHandle.trim()}
+                      data-testid={`addtiktok-submit-${workspace.id}`}
+                    >
+                      {S.addChannelAdd}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={pending}
+                      data-testid={`addtiktok-close-${workspace.id}`}
+                      onClick={() => {
+                        setTikTokHandle("");
+                        setTikTokError(null);
+                        onAddChannel?.("cancel");
+                      }}
+                    >
+                      {S.addChannelCancel}
+                    </Button>
+                  </div>
+                </form>
+                {tikTokError && (
+                  <p className="db-feedback db-feedback--note" role="status">
+                    {tikTokError}
                   </p>
                 )}
               </>

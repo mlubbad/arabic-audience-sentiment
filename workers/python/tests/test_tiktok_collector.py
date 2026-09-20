@@ -1,0 +1,208 @@
+"""Unit tests for TikTokCollector adapter."""
+
+import json
+import httpx
+import pytest
+from collectors.protocol import CollectionError
+from collectors.tiktok_collector import TikTokCollector
+
+
+def test_tiktok_collector_validates_handle():
+    c = TikTokCollector()
+    with pytest.raises(ValueError, match="missing_channel_id"):
+        c.catalogue(None)
+
+    with pytest.raises(ValueError, match="invalid_channel_id"):
+        c.catalogue("bad!channel@123")
+
+    with pytest.raises(ValueError, match="invalid_video_id"):
+        list(c.batches("bad!id", None))
+
+    assert TikTokCollector._clean_handle("https://www.tiktok.com/@khaby.lame") == "khaby.lame"
+    assert TikTokCollector._clean_handle("https://tiktok.com/@khaby.lame") == "khaby.lame"
+    assert TikTokCollector._clean_handle("@khaby.lame") == "khaby.lame"
+    assert TikTokCollector._clean_handle("khaby.lame") == "khaby.lame"
+
+
+def test_tiktok_collector_fixture_catalogue_and_batches():
+    fixture = {
+        "videos": [
+            {
+                "id": 7384950192837465,
+                "desc": "مقطع فيديو تيك توك تحليلي للمشاعر والآراء",
+                "create_time": "2026-09-20T12:00:00Z",
+                "comment_count": 3,
+                "cover_image_url": "https://example.com/cover1.jpg",
+            },
+            {
+                "id": 7384950192837466,
+                "desc": "مقطع فيديو قصير ثانٍ",
+                "create_time": "2026-09-20T13:00:00Z",
+                "comment_count": 0,
+            },
+        ],
+        "comments": {
+            "7384950192837465": [
+                {
+                    "id": 9182736450,
+                    "text": "محتوى ممتاز وطرح قيم جداً",
+                    "create_time": "2026-09-20T12:10:00Z",
+                    "digg_count": 15,
+                    "user": {"unique_id": "user_arab_1", "nickname": "فاطمة"},
+                },
+                {
+                    "id": 9182736451,
+                    "text": "شكراً لمشاركة هذه التفاصيل",
+                    "parent_id": 9182736450,
+                    "create_time": "2026-09-20T12:15:00Z",
+                    "digg_count": 2,
+                    "user": {"unique_id": "user_arab_2", "nickname": "عمر"},
+                },
+            ]
+        },
+    }
+
+    collector = TikTokCollector(channel_id="@aljazeera", fixture_data=fixture)
+    cat = collector.catalogue()
+    assert cat.complete is True
+    assert len(cat.videos) == 2
+    assert cat.videos[0]["external_video_id"] == "7384950192837465"
+    assert cat.videos[0]["kind"] == "video"
+    assert cat.videos[0]["reported_comment_count"] == 3
+    assert cat.videos[0]["thumbnail_url"] == "https://example.com/cover1.jpg"
+    assert cat.videos[0]["field_provenance"]["handle"] == "aljazeera"
+
+    batches = list(collector.batches("7384950192837465"))
+    assert len(batches) == 1
+    assert batches[0].outcome == "exhausted"
+    comments = batches[0].comments
+    assert len(comments) == 2
+    assert comments[0].text == "محتوى ممتاز وطرح قيم جداً"
+    assert comments[0].platform == "tiktok"
+    assert comments[0].source == "tiktok_display_api"
+    assert comments[0].is_reply is False
+    assert comments[1].is_reply is True
+    assert comments[1].parent_id == "9182736450"
+
+
+def test_tiktok_collector_access_token_mode():
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        assert request.headers.get("authorization") == "Bearer test_tiktok_token"
+        if "video/list" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "videos": [
+                            {
+                                "id": "1122334455",
+                                "title": "عنوان المقطع عبر API",
+                                "video_description": "وصف الفيديو الرسمي من تيك توك",
+                                "create_time": 1726830000,
+                                "comment_count": 8,
+                                "cover_image_url": "https://example.com/api_cover.jpg",
+                            }
+                        ]
+                    }
+                },
+            )
+        if "comment/list" in url:
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "comments": [
+                            {
+                                "id": "998811",
+                                "text": "تعليق عبر واجهة تيك توك المعتمدة",
+                                "author_name": "متابع_1",
+                                "create_time": 1726830500,
+                                "likes_count": 9,
+                                "parent_comment_id": None,
+                            }
+                        ],
+                        "cursor": None,
+                        "has_more": False,
+                    }
+                },
+            )
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    collector = TikTokCollector(
+        channel_id="arab_creator",
+        client=client,
+        access_token="test_tiktok_token",
+    )
+
+    cat = collector.catalogue()
+    assert len(cat.videos) == 1
+    assert cat.videos[0]["external_video_id"] == "1122334455"
+    assert cat.videos[0]["reported_comment_count"] == 8
+
+    batches = list(collector.batches("1122334455"))
+    assert len(batches) == 1
+    assert len(batches[0].comments) == 1
+    assert batches[0].comments[0].text == "تعليق عبر واجهة تيك توك المعتمدة"
+
+
+def test_tiktok_collector_public_web_fallback():
+    rehydration_data = {
+        "__DEFAULT_SCOPE__": {
+            "webapp.user-detail": {
+                "itemList": ["7001002003004005"],
+                "ItemModule": {
+                    "7001002003004005": {
+                        "desc": "فيديو تيك توك مستخرج من صفحة الويب العامة",
+                        "createTime": 1726830000,
+                        "stats": {"commentCount": 14},
+                        "video": {"cover": "https://example.com/web_cover.jpg"},
+                    }
+                },
+            }
+        }
+    }
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">
+          {json.dumps(rehydration_data)}
+        </script>
+      </head>
+      <body></body>
+    </html>
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "/@aljazeera" in url:
+            return httpx.Response(200, text=html_body)
+        if "/@private_account" in url:
+            return httpx.Response(200, text="<html><body>Private Account</body></html>")
+        if "/@not_found_account" in url:
+            return httpx.Response(404)
+        return httpx.Response(500)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    # Success public profile extraction
+    col = TikTokCollector(channel_id="@aljazeera", client=client)
+    cat = col.catalogue()
+    assert len(cat.videos) == 1
+    assert cat.videos[0]["external_video_id"] == "7001002003004005"
+    assert cat.videos[0]["title"] == "فيديو تيك توك مستخرج من صفحة الويب العامة"
+    assert cat.videos[0]["reported_comment_count"] == 14
+
+    # Private account
+    col_priv = TikTokCollector(channel_id="@private_account", client=client)
+    with pytest.raises(CollectionError) as exc_priv:
+        col_priv.catalogue()
+    assert exc_priv.value.code == "channel_not_public"
+
+    # Not found
+    col_nf = TikTokCollector(channel_id="@not_found_account", client=client)
+    with pytest.raises(CollectionError) as exc_nf:
+        col_nf.catalogue()
+    assert exc_nf.value.code == "channel_not_found"
