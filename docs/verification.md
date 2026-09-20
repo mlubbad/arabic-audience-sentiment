@@ -1,6 +1,20 @@
 # Verification
 
-## 2026-09-20 — Operational views decoupled from comment payloads; dashboard snapshot optimized
+## 2026-09-20 — Sync Experience Optimization, Real-Time Live Polling, Fair Multi-Tenant Scheduling, and Live Deployment
+
+| Command / observation | Actual result |
+| --- | --- |
+| Migration `20260920120000_fair_multitenant_claim_scheduling.sql` | Tested locally with PGlite and deployed remotely to Supabase project `ykqugctewsqvevhyqtbi` via Management API. Applied in transaction, registered in `supabase_migrations.schema_migrations`. |
+| Git remote push: `git push origin main` | Pushed commits `f1626e8` and `fd0b788` to `https://github.com/mlubbad/arabic-audience-sentiment.git`. Branch `main` is clean and up-to-date. |
+| Production preview deployment: `npm run deploy:preview` | 100% uploaded cleanly to preview host `app.sky-develop.net` over FTP. Cleaned orphaned chunks. Site answers HTTP 200. |
+| Live health monitoring: `./scripts/monitor.sh` | Rest 200 · Gateway 204 · Leases none · Worker seen 0m ago · Predictions fresh · Site 200 OK. |
+| Web unit tests: `npm test` | 111 test files passed, 874 tests passed (100% green). |
+| Database test suite: `npm run test:db` | 39 test files passed, 365 tests passed (100% green, including `scoped_claim.test.ts` fair interleaving). |
+| Worker tests: `npm run worker:test` | 229 tests passed in 4.26s (100% green). |
+| Linter & Typecheck: `npm run lint && npm run typecheck` | Passed cleanly (0 errors). |
+| Secret check: `npm run check:secrets` | Passed on 685 source files and built assets (0 secrets detected). |
+| Build: `npm run build` | 8 prerendered pages + SPA template generated cleanly. |
+
 
 | Command / observation | Actual result |
 | --- | --- |
