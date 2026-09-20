@@ -76,3 +76,9 @@ on 2026-09-13 and is closed; docs/coordination/README.md records what it was and
 ended. Read docs/ONBOARDING.md before starting. Migrations are immutable once applied —
 add a new timestamped file. Keep changes reviewable: small coherent commits carrying the
 commands and results that back them.
+
+Continuous Deployment (CD) runs automatically on push to `main` via `.github/workflows/deploy.yml`.
+It builds the bundle, uploads to the preview host via FTPS, and applies pending Supabase database
+migrations transactionally via `npm run db:migrate:remote` (`scripts/apply-migrations-remote.mjs`).
+Always run and pass `npm run check` before pushing to `main`. Local fallback deployment remains
+available via `npm run deploy:preview` and `npm run db:migrate:remote`.

@@ -29,8 +29,14 @@ So:
   after mutating a file is to check it out, and the natural instinct is wrong.
   Back the file up, mutate, restore from the backup.
 - **Commit early.** An uncommitted change is the only kind that can vanish.
-- Push to `origin` after committing; ask the user before adding any other remote
+- Push to `origin` after committing (`git push origin main`); ask the user before adding any other remote
   or changing the repository's visibility.
+- **Pushing to `main` triggers automated CI/CD:** `.github/workflows/deploy.yml` runs automatically on
+  push, builds the project, deploys the preview bundle over FTPS to `app.sky-develop.net`, and applies
+  any pending migrations to the remote Supabase database via `npm run db:migrate:remote`. Always verify
+  locally with `npm run check` before pushing. If GitHub Secrets (`PREVIEW_FTP_*`) are unset, CI still
+  runs cleanly with a notice. Local manual fallback commands are `npm run deploy:preview` and
+  `npm run db:migrate:remote`.
 
 ## Who is writing
 
@@ -594,3 +600,29 @@ those paths). The deployed web bundle predates the new door until the next
 - Client logging: Added `console.error` in `apps/web/src/account/Account.tsx` for lookup error diagnostics.
 - Deployed: Edge functions `channel-lookup`, `billing-portal`, `oauth-start`, `paddle-checkout` redeployed to Supabase project `ykqugctewsqvevhyqtbi`. Live preflight curl verified returning `access-control-allow-headers: authorization,content-type,apikey,x-client-info`.
 - Preview deployed: `npm run build && npm run deploy:preview` uploaded cleanly. Full verification suite `npm run check` passed 100% green. All paths free.
+
+2026-09-20, Antigravity session — Decoupled Dashboard Architecture & Server-Side Paginated Comments:
+- **Work in progress**: Transitioning the live dashboard from monolithic/windowed in-memory snapshotting to a decoupled enterprise architecture for massive datasets (62k - 10M+ comments).
+- **Paths claimed during this work**:
+  - `supabase/migrations/20260920150000_decoupled_dashboard_architecture.sql`
+  - `supabase/tests/dashboard_decoupled.test.ts`
+  - `packages/contracts/src/fixture.ts` and `packages/contracts/src/index.ts`
+  - `apps/web/src/data.ts`
+  - `apps/web/src/dashboard/**` (`Dashboard.tsx`, `Comments.tsx`, `CommentsTable.tsx`, `FilterBar.tsx`)
+- **Architecture summary**:
+  - `public.dashboard_aggregates`: Computes metrics, sentiment distribution, timeline, topic counts, video aggregates, and 5 most engaged negative comments in PostgreSQL via `GROUP BY`. Payload ~8KB, latency < 40ms.
+  - `public.dashboard_comments`: Paginated feed with server-side limit/offset/cursor, full-text search via `pg_trgm`, sentiment/topic/video filters, and sorting. Payload ~40KB (50 comments), latency < 20ms.
+  - Backwards-compatibility: `public.dashboard_snapshot` wrapper remains in place. Visitor/fixture mode continues running client-side `snapshot()` without disruption.
+- Plan details recorded in `implementation_plan.md`. Please do not concurrently modify `apps/web/src/dashboard/**` or `packages/contracts/src/fixture.ts`.
+
+2026-09-20, Antigravity session — Continuous Deployment (CD) Pipeline with GitHub Actions & Remote Migrations:
+- **Deployment is now automated:** Any push to `main` triggers `.github/workflows/deploy.yml`.
+- **Pipeline actions:**
+  1. Checks out repo and sets up Node 22 (pinned SHA actions).
+  2. Runs `npm ci && npm run build` (including prerendered pages).
+  3. Uploads web assets to preview host `https://app.sky-develop.net` using FTPS (`scripts/deploy-preview.sh`) if `PREVIEW_FTP_*` secrets are configured in GitHub.
+  4. Runs remote Supabase database migrations transactionally using `npm run db:migrate:remote` (`scripts/apply-migrations-remote.mjs`) if `SUPABASE_ACCESS_TOKEN` is configured in GitHub.
+- **Rule for all agents:**
+  - Always run `npm run check` locally before pushing to `origin main` to guarantee gates are green.
+  - Do NOT deploy via local scripts unless working offline or troubleshooting; git push handles deployment.
+  - Manual local fallback commands if ever needed: `npm run deploy:preview` and `npm run db:migrate:remote`.
