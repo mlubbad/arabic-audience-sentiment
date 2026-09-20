@@ -8,13 +8,15 @@
  * door, before any registration is attempted with it.
  */
 import { z } from "zod";
+import { SOURCE_PLATFORMS } from "./selection";
 
 export const ChannelCandidateSchema = z
   .object({
-    external_channel_id: z.string().regex(/^UC[A-Za-z0-9_-]{22}$/),
+    external_channel_id: z.string().min(1).max(200),
     handle: z.string().nullable(),
     title: z.string().nullable(),
     thumbnail_url: z.string().nullable(),
+    platform: z.enum(SOURCE_PLATFORMS).optional(),
   })
   .strict();
 export type ChannelCandidate = z.infer<typeof ChannelCandidateSchema>;

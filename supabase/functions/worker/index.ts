@@ -235,7 +235,7 @@ Deno.serve((request) =>
       if (claimed.channel_id) {
         const { data: channel } = await db
           .from("channels")
-          .select("external_channel_id,status")
+          .select("external_channel_id,status,platform")
           .eq("id", claimed.channel_id)
           .maybeSingle();
         if (
@@ -243,6 +243,9 @@ Deno.serve((request) =>
           channel.external_channel_id
         )
           claimed.external_channel_id = channel.external_channel_id;
+        if (channel?.platform) {
+          claimed.platform = channel.platform;
+        }
       }
       return claimed;
     },

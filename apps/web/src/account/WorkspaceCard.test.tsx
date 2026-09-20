@@ -442,5 +442,53 @@ describe("WorkspaceCard", () => {
       await userEvent.type(field, "a");
       expect(onAddChannel).toHaveBeenCalledWith("clear-error");
     });
+
+    it("switches to Telegram and adds a channel by handle or URL", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTelegram }),
+      );
+      const form = screen.getByTestId(`addtelegram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTelegramChannel);
+      await userEvent.type(field, "https://t.me/tech_news_arabic");
+      await userEvent.click(screen.getByTestId(`addtelegram-submit-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "@tech_news_arabic",
+        handle: "@tech_news_arabic",
+        title: "@tech_news_arabic",
+        thumbnail_url: null,
+        platform: "telegram",
+      });
+    });
+
+    it("validates Telegram handle and shows error for invalid input", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTelegram }),
+      );
+      const form = screen.getByTestId(`addtelegram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTelegramChannel);
+      await userEvent.type(field, "???");
+      await userEvent.click(screen.getByTestId(`addtelegram-submit-${W}`));
+      expect(screen.getByText(ar.addTelegramInvalidHandle)).toBeInTheDocument();
+      expect(onAddChannel).not.toHaveBeenCalledWith(
+        "add",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("displays Telegram badge on connected Telegram channel", () => {
+      mount({
+        channel: {
+          ...connected,
+          platform: "telegram",
+          title: "@tech_news_arabic",
+        },
+      });
+      expect(screen.getByText(ar.platformTelegram)).toBeInTheDocument();
+    });
   });
 });

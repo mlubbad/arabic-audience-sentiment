@@ -1,5 +1,20 @@
 # Verification
 
+## 2026-09-20 — Omnichannel Multi-Platform Support & Telegram Integration
+
+| Command / observation | Actual result |
+| --- | --- |
+| Database migration `20260920190000_omnichannel_multi_platform_support.sql` | Tested locally with PGlite. Expanded platform domain check, content kinds, connection status view, stored procedures (`register_public_channel`, `dashboard_aggregates`, `dashboard_comments`, `commit_batch`, `worker_commit_catalogue`). |
+| Database test suite: `npm run test:db` | **40 test files passed, 370 tests passed (100% green)**, including all tests in `omnichannel_migration.test.ts`. |
+| Python worker test suite: `uv run pytest -v` | **238 tests passed in 4.26s (100% green)**, including `test_router.py` and `test_telegram_collector.py`. |
+| Python worker linter: `uv run ruff check .` | All checks passed cleanly. |
+| Web unit tests: `npm test` | **112 test files passed, 881 tests passed (100% green)**, including WorkspaceCard and FilterBar omnichannel tests. |
+| Typecheck: `npm run typecheck` | Passed cleanly (`tsc --noEmit`, 0 errors). |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`. |
+| Production build: `npm run build` | Built in 1.25s; 8 prerendered static pages generated cleanly; 0 build errors. |
+| Secrets scan: `npm run check:secrets` | Secret-pattern checks passed across 697 source files and built assets (0 secrets detected). |
+| Repository check: `npm run check` | **100% green exit code 0**. |
+
 ## 2026-09-20 — Decoupled Big-Data Dashboard Architecture & Server-Side Paginated Stream
 
 | Command / observation | Actual result |

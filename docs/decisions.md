@@ -1,5 +1,19 @@
 # Implementation decisions
 
+2026-09-20 — Omnichannel Multi-Platform Architecture (Telegram, X, TikTok, Facebook, Instagram).
+The system was originally built strictly around YouTube (using YouTube Data API v3 channels, videos, comments, and IDs).
+To support expanding audience sentiment analysis to other major social platforms in the Arab world, we designed a unified, platform-agnostic architecture while implementing Telegram as the first live non-YouTube platform:
+1. Universal Content Abstraction:
+   - Channels and comments now store `platform` (`'youtube' | 'telegram' | 'x' | 'tiktok' | 'facebook' | 'instagram'`).
+   - Content items use generalized `video_kind` / `content_kind` (`video`, `short`, `stream`, `channel_post`, `tweet`, `status`).
+   - Channel external IDs are generalized from YouTube-only 24-char format to any provider-specific identifier (e.g. `@channel_name` or numeric channel IDs up to 200 chars).
+2. Worker Collector Router:
+   - Python worker implements `CollectorRouter` with standard `ICollector` interface (`discover_channel` and `fetch_batch`).
+   - Separate collectors handle provider-specific logic (`YouTubeCollector` and `TelegramCollector`), while the labelling pipeline, topic assignments, and Supabase commit protocols remain 100% shared and identical.
+3. Database & Dashboard Transparency:
+   - `dashboard_aggregates` and `dashboard_comments` accept `platform` in their filter JSON and return `platform_breakdown` across all active comments.
+   - Database migration `20260920190000_omnichannel_multi_platform_support.sql` preserves all tenant-isolation RLS policies and immutability rules.
+
 2026-09-20 — Decoupled Big-Data Dashboard Architecture (Server-Side Aggregations & Paginated Stream).
 The original architecture transferred all comments for a workspace (up to hundreds of megabytes of raw JSON)
 to the browser client and computed metrics, timelines, sentiment distributions, and filtered tables in-memory via `snapshot()`.

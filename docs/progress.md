@@ -1,6 +1,36 @@
 # Progress
 
-## 2026-09-20 — Radical Architectural Upgrade: Decoupled Big-Data Dashboard Architecture & Server-Side Paginated Stream
+## 2026-09-20 — Omnichannel Multi-Platform Expansion: Telegram Support & Universal Abstraction Layer
+
+Architected and implemented full multi-platform capability across the entire stack, accommodating YouTube, Telegram, X (Twitter), TikTok, Facebook, and Instagram, with Telegram fully operational as the first non-YouTube platform:
+1. **Omnichannel Multi-Platform Database Architecture (`20260920190000_omnichannel_multi_platform_support.sql`)**:
+   - Expanded platform check constraint to support `('youtube', 'telegram', 'x', 'tiktok', 'facebook', 'instagram')`.
+   - Widened content kinds across all platforms: `('video', 'short', 'stream', 'channel_post', 'tweet', 'status')`.
+   - Updated `public.connection_status` view with `security_invoker = true` to surface platform origin.
+   - Upgraded core stored procedures:
+     - `register_public_channel(w, handle, ext_id, title, thumb, p_platform)`: Supports registering public channels across any platform.
+     - `dashboard_aggregates_impl`: Computes omnichannel `platform_breakdown` (counts per platform) and filters by platform.
+     - `dashboard_comments_impl`: Exposes `platform` field in comment payloads and filters by `platform`.
+     - `commit_batch` & `worker_commit_catalogue`: Preserves platform origin and wide content kinds idempotently.
+2. **Type-Safe Omnichannel Contracts (`@sentiment/contracts`)**:
+   - Defined `SOURCE_PLATFORMS` and `CONTENT_KINDS` in `selection.ts`.
+   - Updated `CommentSchema` with `platform: z.enum(SOURCE_PLATFORMS).default("youtube")`.
+   - Updated `ChannelLookupSchema` to support non-YouTube channels (`platform`, flexible handle/ID up to 200 chars).
+   - Added `platform_breakdown` in `DashboardAggregatesSchema`, `DerivedSnapshot`, and `Snapshot`.
+   - Expanded `FilterValues` with `platform: string`.
+3. **Python Worker Collector Router & Telegram Collector (`workers/python`)**:
+   - Created `TelegramCollector` (`telegram_collector.py`) supporting public channel message & comment fetching.
+   - Built `CollectorRouter` (`router.py`) dispatching channel discovery and comment collection based on `channel.platform` (`youtube` vs `telegram`).
+   - Integrated with worker loop (`loop.py`) and single-run runner (`runner.py`).
+   - Added comprehensive pytest test suite covering the router, Telegram collector, and protocol adapters (238 tests passing).
+4. **Web UI & Dashboard Multi-Platform Integration**:
+   - Added platform selector and channel registration UX in `WorkspaceCard.tsx` (YouTube search + Telegram direct handle/URL registration).
+   - Added platform filter dropdown and filter chips in `FilterBar.tsx` and `Dashboard.tsx`.
+   - Displayed non-YouTube platform badges (e.g., Telegram) in workspace connected channel lists.
+   - Complete localized strings in Arabic (`ar.ts`) and English (`en.ts`).
+5. **Full Repository Verification**:
+   - 100% green verification: 112 vitest test files (881 tests passed), 40 database test files (370 tests passed), 238 python tests passed, clean types (`tsc --noEmit`), clean linter, clean build, clean secrets scan.
+
 
 Addressed fundamental scalability bottlenecks for large channels (e.g. AJ360 with 71,310+ comments):
 1. **Server-Side Big-Data Architecture (`public.dashboard_aggregates` & `public.dashboard_comments`)**:

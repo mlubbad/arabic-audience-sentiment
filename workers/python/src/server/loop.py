@@ -29,6 +29,7 @@ import time
 import httpx
 
 from collectors.youtube_api import YouTubeAPI
+from collectors.telegram_collector import TelegramCollector
 
 from .gateway import ControlPlane, ControlPlaneError, LeaseLost
 from .runner import run_job
@@ -47,7 +48,12 @@ def _log(message: str) -> None:
     print(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}", flush=True)
 
 
-def build_collector(client: httpx.Client, api_key: str | None = None):
+def build_collector(
+    client: httpx.Client,
+    api_key: str | None = None,
+    telegram_bot_token: str | None = None,
+    telegram_fixture: dict | None = None,
+):
     """The collector builder the runner is handed.
 
     A token with no channel id builds the OAuth collector, as it always has —
@@ -57,14 +63,34 @@ def build_collector(client: httpx.Client, api_key: str | None = None):
     without it the builder answers None — which the runner reports as a
     blocking configuration gap on this worker, never as a fault in the
     channel.
+
+    For platform == 'telegram', returns a TelegramCollector adapter.
     """
 
-    def build(token: str | None, expires_at: str | None = None, renew=None,
-              channel_id: str | None = None):
+    def build(
+        token: str | None,
+        expires_at: str | None = None,
+        renew=None,
+        channel_id: str | None = None,
+        platform: str | None = "youtube",
+    ):
+        p = (platform or "youtube").lower()
+        if p == "telegram":
+            return TelegramCollector(
+                channel_id=channel_id,
+                client=client,
+                bot_token=telegram_bot_token,
+                fixture_data=telegram_fixture,
+            )
         if token:
-            return YouTubeAPI(None, client, access_token=token,
-                              expires_at=expires_at, renew=renew,
-                              public_reader=bool(channel_id))
+            return YouTubeAPI(
+                None,
+                client,
+                access_token=token,
+                expires_at=expires_at,
+                renew=renew,
+                public_reader=bool(channel_id),
+            )
         if channel_id and api_key:
             return YouTubeAPI(api_key, client)
         return None

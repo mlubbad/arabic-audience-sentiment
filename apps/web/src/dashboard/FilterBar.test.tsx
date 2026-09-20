@@ -75,6 +75,7 @@ describe("FilterBar", () => {
       await screen.findByLabelText(ar.participationLabel),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(ar.reviewStatusLabel)).toBeInTheDocument();
+    expect(screen.getByLabelText(ar.platformFilterLabel)).toBeInTheDocument();
     expect(screen.getByLabelText(ar.videoKindLabel)).toBeInTheDocument();
     expect(screen.getByLabelText(ar.perPageLabel)).toBeInTheDocument();
   });

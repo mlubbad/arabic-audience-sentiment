@@ -205,6 +205,21 @@ def _collector_for(control: ControlPlane, lease: dict, build_collector):
     """
     token = lease.get("access_token")
     channel_id = lease.get("external_channel_id")
+    platform = lease.get("platform") or "youtube"
+
+    def _call(tok, exp=None, ren=None, ch=None):
+        try:
+            return build_collector(
+                tok, exp, ren, channel_id=ch, platform=platform
+            )
+        except TypeError:
+            try:
+                return build_collector(
+                    tok, exp, ren, channel_id=ch
+                )
+            except TypeError:
+                return build_collector(tok, exp, ren)
+
     if token:
         # The token is the channel owner's when the lease names no channel —
         # and the platform reader's when it does: same build, and the collector
@@ -212,16 +227,16 @@ def _collector_for(control: ControlPlane, lease: dict, build_collector):
         # passed only when present, so builders that only ever see owner
         # grants keep their old shape.
         if channel_id:
-            return build_collector(
+            return _call(
                 token, lease.get("access_token_expires_at"),
-                _renew_for(control, lease), channel_id=channel_id,
+                _renew_for(control, lease), ch=channel_id,
             ), None, channel_id
-        return build_collector(
+        return _call(
             token, lease.get("access_token_expires_at"), _renew_for(control, lease)
         ), None, None
     if not channel_id:
         return None, "channel_not_connected", None
-    collector = build_collector(None, None, None, channel_id=channel_id)
+    collector = _call(None, ch=channel_id)
     if collector is None:
         return None, "public_collection_not_configured", None
     return collector, None, channel_id

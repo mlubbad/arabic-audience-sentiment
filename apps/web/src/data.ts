@@ -23,6 +23,8 @@ import {
   type TopicReviewInput,
   type LabelledComment,
   type Label,
+  type SourcePlatform,
+  type ContentKind,
 } from "@sentiment/contracts";
 import { supabase } from "./supabase";
 /**
@@ -460,7 +462,8 @@ export interface RawCommentLike {
   channel_id?: string;
   video_id?: string | null;
   video_title?: string | null;
-  video_kind?: "video" | "short" | "stream";
+  platform?: SourcePlatform;
+  video_kind?: ContentKind;
   author_channel_id?: string | null;
   by_channel_owner?: boolean;
   author_name?: string | null;
@@ -544,6 +547,7 @@ export function toLabelledComment(
     channel_id: comment.channel_id ?? "",
     video_id: comment.video_id ?? "",
     video_title: comment.video_title ?? null,
+    platform: comment.platform ?? "youtube",
     video_kind: comment.video_kind ?? "video",
     author_channel_id: comment.author_channel_id ?? null,
     by_channel_owner: comment.by_channel_owner ?? false,
@@ -653,6 +657,7 @@ export async function loadDashboardAggregates(
     negative_unranked: snap.negative_unranked,
     timeline: Object.fromEntries(snap.timeline.map((t) => [t.date, t.total])),
     topic_counts: snap.topic_counts,
+    platform_breakdown: snap.platform_breakdown,
     videos: snap.videos,
     hours: [],
     weekdays: [],

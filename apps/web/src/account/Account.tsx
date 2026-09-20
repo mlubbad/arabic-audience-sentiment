@@ -658,6 +658,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                         external: candidate.external_channel_id,
                         handle: candidate.handle,
                         title: candidate.title,
+                        p_platform: candidate.platform ?? "youtube",
                       })
                       .then(({ data, error }) => {
                         setBusy(null);

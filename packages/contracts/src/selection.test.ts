@@ -234,5 +234,19 @@ describe("CatalogueVideoSchema", () => {
       CatalogueVideoSchema.safeParse({ ...v({ id: "a" }), kind: "clip" })
         .success,
     ).toBe(false);
+    expect(
+      CatalogueVideoSchema.safeParse({
+        ...v({ id: "tg_1" }),
+        kind: "channel_post",
+        external_video_id: "msg_12345",
+      }).success,
+    ).toBe(true);
+    expect(
+      CatalogueVideoSchema.safeParse({
+        ...v({ id: "tw_1" }),
+        kind: "tweet",
+        external_video_id: "182938491029384",
+      }).success,
+    ).toBe(true);
   });
 });

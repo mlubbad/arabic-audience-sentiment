@@ -77,6 +77,7 @@ describe("what a claim hands the worker", () => {
       "external_channel_id",
       "job_id",
       "lease_token",
+      "platform",
       "type",
       "videos",
     ]);

@@ -298,6 +298,7 @@ describe("billing events", () => {
       plan_key: "creator",
       provider_ref: "sub_3",
     });
+    await new Promise((r) => setTimeout(r, 10));
     expect(
       (
         await db.query<{ apply_billing_event: string }>(

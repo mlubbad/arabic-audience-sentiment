@@ -230,6 +230,7 @@ describe("worker to database, through the real handler", () => {
       "external_channel_id",
       "job_id",
       "lease_token",
+      "platform",
       // type and videos joined the claim so a collect job is handed its due
       // list without a second round trip. The seeded job is a real 'collect'
       // row with no video_selections, so this also exercises the real

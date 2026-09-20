@@ -189,6 +189,7 @@ function DashboardBody({
   const [replies, setReplies] = useState<"all" | "comments" | "replies">("all");
   const [dateMode, setDateMode] = useState<"all" | "known" | "unknown">("all");
   const [videoKind, setVideoKind] = useState("");
+  const [platform, setPlatform] = useState("");
   const [commentType, setCommentType] = useState("");
   const [reviewStatus, setReviewStatus] = useState<
     "all" | "reviewed" | "unreviewed"
@@ -361,6 +362,7 @@ function DashboardBody({
         .map(([date, total]) => ({ date, total }))
         .sort((a, b) => a.date.localeCompare(b.date)),
       topic_counts: agg.topic_counts ?? {},
+      platform_breakdown: agg.platform_breakdown ?? {},
       videos: agg.videos ?? [],
       hours: agg.hours ?? [],
       weekdays: agg.weekdays ?? [],
@@ -584,6 +586,7 @@ function DashboardBody({
       sentiment?: string;
       topic?: string;
       videoKind?: string;
+      platform?: string;
       replies?: "all" | "comments" | "replies";
       commentType?: string;
       reviewStatus?: "all" | "reviewed" | "unreviewed";
@@ -597,6 +600,7 @@ function DashboardBody({
     const chosenSentiment = over.sentiment ?? sentiment;
     const chosenTopic = over.topic ?? topic;
     const chosenVideoKind = over.videoKind ?? videoKind;
+    const chosenPlatform = over.platform ?? platform;
     const chosenReplies = over.replies ?? replies;
     const chosenCommentType = over.commentType ?? commentType;
     const chosenReviewStatus = over.reviewStatus ?? reviewStatus;
@@ -611,6 +615,7 @@ function DashboardBody({
       q: chosenQuery,
       video_ids: chosenVideo ? [chosenVideo] : [],
       video_kind: (chosenVideoKind || undefined) as Filters["video_kind"],
+      platform: (chosenPlatform || undefined) as Filters["platform"],
       sentiments: chosenSentiment ? [chosenSentiment as Label] : [],
       topics: chosenTopic ? [chosenTopic] : [],
       replies: chosenReplies,
@@ -658,6 +663,7 @@ function DashboardBody({
     setReplies("all");
     setDateMode("all");
     setVideoKind("");
+    setPlatform("");
     setCommentType("");
     setReviewStatus("all");
     setCursorNotice(false);
@@ -676,6 +682,7 @@ function DashboardBody({
     sentiment,
     topic,
     videoKind,
+    platform,
     replies,
     commentType,
     reviewStatus,
@@ -690,6 +697,7 @@ function DashboardBody({
     if ("sentiment" in p) setSentiment(p.sentiment!);
     if ("topic" in p) setTopic(p.topic!);
     if ("videoKind" in p) setVideoKind(p.videoKind!);
+    if ("platform" in p) setPlatform(p.platform!);
     if ("replies" in p) setReplies(p.replies!);
     if ("commentType" in p) setCommentType(p.commentType!);
     if ("reviewStatus" in p) setReviewStatus(p.reviewStatus!);
@@ -730,6 +738,10 @@ function DashboardBody({
       case "videoKind":
         setVideoKind(EMPTY_FILTERS.videoKind);
         applyFilters({ videoKind: EMPTY_FILTERS.videoKind });
+        break;
+      case "platform":
+        setPlatform(EMPTY_FILTERS.platform);
+        applyFilters({ platform: EMPTY_FILTERS.platform });
         break;
       case "commentType":
         setCommentType(EMPTY_FILTERS.commentType);

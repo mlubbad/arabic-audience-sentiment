@@ -21,6 +21,7 @@ class RawComment:
     likes_raw: str | None = None
     likes_value: int | None = None
     source: str = "sanitized_fixture"
+    platform: str = "youtube"
     field_provenance: dict = field(default_factory=dict)
 
 

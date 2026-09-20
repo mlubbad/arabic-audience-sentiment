@@ -17,6 +17,7 @@ export type FilterValues = {
   sentiment: string;
   topic: string;
   videoKind: string;
+  platform: string;
   replies: "all" | "comments" | "replies";
   commentType: string;
   reviewStatus: "all" | "reviewed" | "unreviewed";
@@ -32,6 +33,7 @@ export const EMPTY_FILTERS: FilterValues = {
   sentiment: "",
   topic: "",
   videoKind: "",
+  platform: "",
   replies: "all",
   commentType: "",
   reviewStatus: "all",
@@ -46,7 +48,7 @@ export const EMPTY_FILTERS: FilterValues = {
  *  the sheet still knows something in there is narrowing the report. */
 export function extraCount(v: FilterValues): number {
   return (
-    [v.topic, v.videoKind, v.commentType].filter(Boolean).length +
+    [v.topic, v.videoKind, v.platform, v.commentType].filter(Boolean).length +
     (v.replies !== "all" ? 1 : 0) +
     (v.reviewStatus !== "all" ? 1 : 0) +
     (v.limit !== 25 ? 1 : 0)
@@ -88,6 +90,20 @@ export function chipsFor(
       ),
     });
   if (v.videoKind) out.push({ key: "videoKind", label: S.chipVideoKind });
+  if (v.platform) {
+    const pNames: Record<string, string> = {
+      youtube: S.platformYouTube,
+      telegram: S.platformTelegram,
+      x: S.platformX,
+      tiktok: S.platformTikTok,
+      facebook: S.platformFacebook,
+      instagram: S.platformInstagram,
+    };
+    out.push({
+      key: "platform",
+      label: S.chipPlatform(pNames[v.platform] ?? v.platform),
+    });
+  }
   if (v.commentType) out.push({ key: "commentType", label: S.chipCommentType });
   if (v.replies !== "all")
     out.push({

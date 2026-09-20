@@ -54,6 +54,7 @@ function filteredRows(
         (f.channel_id && c.channel_id !== f.channel_id)
       )
         return false;
+      if (f.platform && c.platform !== f.platform) return false;
       if (
         (f.video_ids.length && !f.video_ids.includes(c.video_id)) ||
         (f.video_kind && c.video_kind !== f.video_kind)
@@ -258,6 +259,10 @@ export function snapshot(
     unanalysed: rows.length - analysed,
     sentiments,
     topic_counts,
+    platform_breakdown: rows.reduce<Record<string, number>>((acc, c) => {
+      acc[c.platform] = (acc[c.platform] ?? 0) + 1;
+      return acc;
+    }, {}),
     replies: rows.filter((c) => c.is_reply).length,
     unknown_dates: rows.filter((c) => !c.published_at).length,
     unique_authors: new Set(

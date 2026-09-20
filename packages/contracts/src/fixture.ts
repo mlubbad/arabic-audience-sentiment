@@ -67,6 +67,7 @@ export const DashboardAggregatesSchema = z.object({
   negative_unranked: z.number().int(),
   timeline: z.record(z.string(), z.number().int()),
   topic_counts: z.record(z.string(), z.number().int()),
+  platform_breakdown: z.record(z.string(), z.number().int()).default({}),
   videos: z.array(
     z.object({
       id: z.string(),

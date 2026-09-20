@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { LabelSchema, timestamp, type Label } from "./primitives";
 import { TopicPredictionSchema, TopicReviewSchema } from "./topics";
+import { SOURCE_PLATFORMS, CONTENT_KINDS } from "./selection";
 
 export const PredictionSchema = z
   .object({
@@ -47,7 +48,8 @@ export const CommentSchema = z
     // dashboard fell back to printing the raw id because this was never
     // carried, which reads as a database key where a person expects a name.
     video_title: z.string().nullable().default(null),
-    video_kind: z.enum(["video", "short", "stream"]),
+    platform: z.enum(SOURCE_PLATFORMS).default("youtube"),
+    video_kind: z.enum(CONTENT_KINDS).default("video"),
     author_channel_id: z.string().nullable(),
     // Written by the channel itself rather than by its audience. Derived from
     // the author's channel id and the channel's own, never stored: a derived

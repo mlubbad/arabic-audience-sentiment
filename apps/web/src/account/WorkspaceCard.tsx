@@ -34,6 +34,7 @@ export type ChannelRow = {
   external_channel_id: string;
   handle: string | null;
   title: string | null;
+  platform?: string;
 };
 
 export type JobRow = {
@@ -105,7 +106,39 @@ export function WorkspaceCard({
   const steps = setupProgress({ channel, latestJob }, S);
   const nameId = `rename-name-${workspace.id}`;
   const addChannelQueryId = `addchannel-query-${workspace.id}`;
+  const addTelegramInputId = `addtelegram-handle-${workspace.id}`;
   const [query, setQuery] = useState("");
+  const [addPlatform, setAddPlatform] = useState<"youtube" | "telegram">(
+    "youtube",
+  );
+  const [telegramHandle, setTelegramHandle] = useState("");
+  const [telegramError, setTelegramError] = useState<string | null>(null);
+
+  function handleTelegramSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    let s = telegramHandle.trim();
+    s = s.replace(/^https?:\/\/(www\.)?t\.me\//i, "");
+    s = s.replace(/^t\.me\//i, "");
+    s = s.replace(/^\//, "");
+    s = s.replace(/\/.*$/, "");
+    if (!s) {
+      setTelegramError(S.addTelegramInvalidHandle);
+      return;
+    }
+    if (!s.startsWith("@")) s = "@" + s;
+    if (!/^@[A-Za-z0-9_]{4,64}$/.test(s)) {
+      setTelegramError(S.addTelegramInvalidHandle);
+      return;
+    }
+    setTelegramError(null);
+    onAddChannel?.("add", undefined, {
+      external_channel_id: s,
+      handle: s,
+      title: s,
+      thumbnail_url: null,
+      platform: "telegram",
+    });
+  }
   const connected = channel?.status === "connected";
   const hasPublicChannel = channel?.status === "public_unverified";
   // A channel connected before the callback asked Google for a name has
@@ -184,6 +217,16 @@ export function WorkspaceCard({
             unlabelled one reads as a fault. */}
         {channel ? (
           <p className="db-ws-channel" data-testid={`channel-${workspace.id}`}>
+            {channel.platform && channel.platform !== "youtube" && (
+              <span
+                className="ui-badge ui-badge--neutral"
+                style={{ marginInlineEnd: "0.5rem" }}
+              >
+                {channel.platform === "telegram"
+                  ? S.platformTelegram
+                  : channel.platform}
+              </span>
+            )}
             {channel.status === "connected"
               ? S.channelConnected
               : channel.status === "public_unverified"
@@ -314,95 +357,195 @@ export function WorkspaceCard({
             role="group"
             aria-label={S.addChannel}
           >
-            <p>{S.addChannelLead}</p>
-            <form
-              className="db-ws-rename"
-              data-testid={`addchannel-form-${workspace.id}`}
-              onSubmit={(e) => {
-                e.preventDefault();
-                onAddChannel("search", query);
+            <div
+              className="db-actions"
+              style={{
+                marginBottom: "1rem",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.5rem",
               }}
+              role="tablist"
+              aria-label={S.selectPlatform}
             >
-              <label htmlFor={addChannelQueryId}>{S.addChannel}</label>
-              <Input
-                id={addChannelQueryId}
-                name="query"
-                required
-                maxLength={300}
-                placeholder={S.addChannelPlaceholder}
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  if (channelLookupError) onAddChannel("clear-error");
+              <Button
+                type="button"
+                size="sm"
+                variant={addPlatform === "youtube" ? "primary" : "secondary"}
+                onClick={() => {
+                  setAddPlatform("youtube");
+                  setTelegramError(null);
                 }}
-                autoFocus
-              />
-              <div className="db-actions">
-                <Button
-                  type="submit"
-                  disabled={pending || !query.trim()}
-                  data-testid={`addchannel-search-${workspace.id}`}
-                >
-                  {S.addChannelSearch}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={pending}
-                  data-testid={`addchannel-close-${workspace.id}`}
-                  onClick={() => {
-                    setQuery("");
-                    onAddChannel("cancel");
+              >
+                {S.platformYouTube}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={addPlatform === "telegram" ? "primary" : "secondary"}
+                onClick={() => {
+                  setAddPlatform("telegram");
+                  setTelegramError(null);
+                }}
+              >
+                {S.platformTelegram}
+              </Button>
+              <Button type="button" size="sm" variant="secondary" disabled>
+                {`${S.platformX} (${S.platformSoon})`}
+              </Button>
+              <Button type="button" size="sm" variant="secondary" disabled>
+                {`${S.platformTikTok} (${S.platformSoon})`}
+              </Button>
+            </div>
+
+            {addPlatform === "youtube" ? (
+              <>
+                <p>{S.addChannelLead}</p>
+                <form
+                  className="db-ws-rename"
+                  data-testid={`addchannel-form-${workspace.id}`}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    onAddChannel("search", query);
                   }}
                 >
-                  {S.addChannelCancel}
-                </Button>
-              </div>
-            </form>
-            {channelLookupError && (
-              <p className="db-feedback db-feedback--note" role="status">
-                {channelLookupError}
-              </p>
-            )}
-            {channelCandidates && channelCandidates.length === 0 && (
-              <p className="db-muted">{S.addChannelNone}</p>
-            )}
-            {channelCandidates && channelCandidates.length > 0 && (
-              <ul className="db-candidates" role="list">
-                {channelCandidates.map((c) => (
-                  <li
-                    key={c.external_channel_id}
-                    className="db-candidate"
-                    data-testid={`addchannel-result-${c.external_channel_id}`}
-                  >
-                    {c.thumbnail_url && (
-                      <img
-                        src={c.thumbnail_url}
-                        alt=""
-                        width={40}
-                        height={40}
-                        loading="lazy"
-                      />
-                    )}
-                    <span className="db-candidate-name">
-                      <bdi>{c.title ?? c.handle ?? c.external_channel_id}</bdi>
-                      {c.handle && (
-                        <small>
-                          <bdi>{c.handle}</bdi>
-                        </small>
-                      )}
-                    </span>
+                  <label htmlFor={addChannelQueryId}>{S.addChannel}</label>
+                  <Input
+                    id={addChannelQueryId}
+                    name="query"
+                    required
+                    maxLength={300}
+                    placeholder={S.addChannelPlaceholder}
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      if (channelLookupError) onAddChannel("clear-error");
+                    }}
+                    autoFocus
+                  />
+                  <div className="db-actions">
                     <Button
-                      size="sm"
+                      type="submit"
+                      disabled={pending || !query.trim()}
+                      data-testid={`addchannel-search-${workspace.id}`}
+                    >
+                      {S.addChannelSearch}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
                       disabled={pending}
-                      data-testid={`addchannel-add-${c.external_channel_id}`}
-                      onClick={() => onAddChannel("add", undefined, c)}
+                      data-testid={`addchannel-close-${workspace.id}`}
+                      onClick={() => {
+                        setQuery("");
+                        onAddChannel("cancel");
+                      }}
+                    >
+                      {S.addChannelCancel}
+                    </Button>
+                  </div>
+                </form>
+                {channelLookupError && (
+                  <p className="db-feedback db-feedback--note" role="status">
+                    {channelLookupError}
+                  </p>
+                )}
+                {channelCandidates && channelCandidates.length === 0 && (
+                  <p className="db-muted">{S.addChannelNone}</p>
+                )}
+                {channelCandidates && channelCandidates.length > 0 && (
+                  <ul className="db-candidates" role="list">
+                    {channelCandidates.map((c) => (
+                      <li
+                        key={c.external_channel_id}
+                        className="db-candidate"
+                        data-testid={`addchannel-result-${c.external_channel_id}`}
+                      >
+                        {c.thumbnail_url && (
+                          <img
+                            src={c.thumbnail_url}
+                            alt=""
+                            width={40}
+                            height={40}
+                            loading="lazy"
+                          />
+                        )}
+                        <span className="db-candidate-name">
+                          <bdi>
+                            {c.title ?? c.handle ?? c.external_channel_id}
+                          </bdi>
+                          {c.handle && (
+                            <small>
+                              <bdi>{c.handle}</bdi>
+                            </small>
+                          )}
+                        </span>
+                        <Button
+                          size="sm"
+                          disabled={pending}
+                          data-testid={`addchannel-add-${c.external_channel_id}`}
+                          onClick={() => onAddChannel("add", undefined, c)}
+                        >
+                          {S.addChannelAdd}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <>
+                <p>{S.addTelegramLead}</p>
+                <form
+                  className="db-ws-rename"
+                  data-testid={`addtelegram-form-${workspace.id}`}
+                  onSubmit={handleTelegramSubmit}
+                >
+                  <label htmlFor={addTelegramInputId}>
+                    {S.addTelegramChannel}
+                  </label>
+                  <Input
+                    id={addTelegramInputId}
+                    name="handle"
+                    required
+                    maxLength={100}
+                    placeholder={S.addTelegramPlaceholder}
+                    value={telegramHandle}
+                    onChange={(e) => {
+                      setTelegramHandle(e.target.value);
+                      if (telegramError) setTelegramError(null);
+                    }}
+                    autoFocus
+                  />
+                  <div className="db-actions">
+                    <Button
+                      type="submit"
+                      disabled={pending || !telegramHandle.trim()}
+                      data-testid={`addtelegram-submit-${workspace.id}`}
                     >
                       {S.addChannelAdd}
                     </Button>
-                  </li>
-                ))}
-              </ul>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={pending}
+                      data-testid={`addtelegram-close-${workspace.id}`}
+                      onClick={() => {
+                        setTelegramHandle("");
+                        setTelegramError(null);
+                        onAddChannel("cancel");
+                      }}
+                    >
+                      {S.addChannelCancel}
+                    </Button>
+                  </div>
+                </form>
+                {telegramError && (
+                  <p className="db-feedback db-feedback--note" role="status">
+                    {telegramError}
+                  </p>
+                )}
+              </>
             )}
           </Card>
         )}
