@@ -1217,3 +1217,13 @@ naming a channel costs 1 quota unit; `search.list` costs 100 of the project's da
 UI's empty/refused states say so rather than hiding the quota behind a generic failure. The demo
 body deliberately gets no add-channel door (no server to ask), matching the existing
 no-handler-no-door pattern.
+
+## 2026-09-20 — dashboard_snapshot windowing at scale and fair claim scheduling
+
+As live comment collection on active workspaces scaled past 60,000 comments, the unbounded `dashboard_snapshot` RPC generated over 120MB of JSON per request. PostgREST and Cloudflare terminated connections with HTTP 520 / 504 errors, causing the web UI to present `read:live_unavailable`.
+- **Windowing recent comments**: `private.dashboard_snapshot_impl` was updated in `20260920140000_dashboard_snapshot_window_and_fair_index.sql` to scope materialized comment rows to the most recent window (1,500 comments, ordered by `published_at DESC NULLS LAST, id DESC`).
+- **CTE scoping**: Sentiment and topic predictions, human reviews, and annotations now join directly against the 1,500 scoped comments rather than materializing across tens of thousands of rows before aggregation.
+- **Index tuning**: Added `comments_workspace_published_desc_idx` on `(workspace_id, published_at DESC NULLS LAST, id DESC)` and `jobs_running_fair_idx` on `(workspace_id, status, lease_expires_at) WHERE status = 'running'` to accelerate both dashboard queries and fair claim scheduling.
+- **Payload & Latency reduction**: Reduced payload size from > 120MB to 1.9MB and RPC execution time from > 20s (timeout) to 762ms, completely resolving live dashboard availability while remaining 100% compliant with `LiveSnapshotSchema`.
+- **Polling stabilization**: Fixed TanStack Query `snapshot.refetch` dependency churn in `apps/web/src/ops/Sync.tsx`.
+

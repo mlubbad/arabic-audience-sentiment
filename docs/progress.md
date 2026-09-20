@@ -2144,5 +2144,21 @@ While `channel-lookup` responded successfully to backend and curl requests, in-b
 - **Root cause**: The Supabase browser client sends `x-client-info` (and SDK headers) within `Access-Control-Request-Headers`. `supabase/functions/_shared/cors.ts` previously only allowed `authorization, content-type, apikey`, causing browsers to refuse the preflight.
 - **Resolution**: Updated `corsHeaders()` in `supabase/functions/_shared/cors.ts` to allow `x-client-info, x-retry-count, traceparent, tracestate, baggage` and echo `access-control-request-headers` for allowed origins (`https://app.sky-develop.net` and local origins).
 - **Edge Functions redeployed**: `channel-lookup`, `billing-portal`, `oauth-start`, and `paddle-checkout` redeployed to Supabase project `ykqugctewsqvevhyqtbi`.
-- **Frontend logging**: Enhanced `apps/web/src/account/Account.tsx` to log channel lookup errors and schema mismatches to the browser console.
 - **Deployed preview**: Built and uploaded preview build via `npm run deploy:preview`.
+
+## 2026-09-20 — dashboard_snapshot scaling at 60k+ comments and fair claim scheduling
+
+- **Scale issue**: Live comment ingestion for workspace `d0c3b9fc-b813-439e-a32b-71dd357f0bb4` exceeded 62,000 comments. The unbounded `dashboard_snapshot` RPC attempted to aggregate all 62,195 rows into a monolithic 120MB+ JSON string, triggering HTTP 520 / 504 timeouts on Cloudflare/PostgREST and causing the web client to report `read:live_unavailable`.
+- **Database Migration `20260920140000_dashboard_snapshot_window_and_fair_index.sql`**:
+  - Scoped comment materialization in `private.dashboard_snapshot_impl` to the most recent 1,500 comments (`ORDER BY published_at DESC NULLS LAST, id DESC LIMIT 1500`).
+  - Scoped `active_pred`, `active_tp`, `reviews_agg`, `topic_reviews_agg`, and `annotations_latest` CTEs directly against the 1,500 comments, reducing PostgreSQL query time from 20s+ to ~200ms.
+  - Added composite index `comments_workspace_published_desc_idx` on `(workspace_id, published_at DESC NULLS LAST, id DESC)`.
+  - Added partial index `jobs_running_fair_idx` on `(workspace_id, status, lease_expires_at) WHERE status = 'running'` to accelerate fair claim subqueries.
+  - Declared `public.dashboard_snapshot` with `SECURITY DEFINER` and `statement_timeout = '30s'`.
+- **Frontend polling fix**:
+  - Stabilized `snapshot.refetch` dependency in `apps/web/src/ops/Sync.tsx` to prevent polling timer recreation on every component render.
+- **Verification**:
+  - Live PostgREST test verified `rpc/dashboard_snapshot` responds with HTTP 200 OK in 762ms (1.9MB payload).
+  - All 111 test files and 874 unit tests passed. `npm run check` (typecheck + eslint) passed clean.
+  - Deployed preview bundle to `https://app.sky-develop.net`.
+

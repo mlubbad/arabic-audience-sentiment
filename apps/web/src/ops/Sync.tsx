@@ -260,14 +260,15 @@ function SyncBody({
     );
   }, [mode, sync?.queued_jobs, sync?.last_run?.status, jobs]);
 
+  const refetch = snapshot.refetch;
   useEffect(() => {
     if (!hasActiveWork) return;
     const interval = setInterval(() => {
       setTick((t) => t + 1);
-      void snapshot.refetch();
+      void refetch();
     }, 4000);
     return () => clearInterval(interval);
-  }, [hasActiveWork, snapshot]);
+  }, [hasActiveWork, refetch]);
 
   const entries: JobEntry[] = (jobs ?? []).map((j) =>
     describeJob(j, { workerConnected: connected }, S),
