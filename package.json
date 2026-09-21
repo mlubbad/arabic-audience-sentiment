@@ -30,6 +30,7 @@
     "worker:run-once": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m server.manual_run",
     "label:score": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m labelling.score_cli",
     "worker:collect": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m collectors.cli",
+    "omnichannel:check": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python src/collectors/diagnostics.py",
     "deploy:preview": "sh scripts/deploy-preview.sh",
     "db:migrate:remote": "node scripts/apply-migrations-remote.mjs",
     "demo:fixture": "node apps/web/scripts/make-demo-fixture.mjs",

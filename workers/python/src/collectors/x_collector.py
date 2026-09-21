@@ -326,10 +326,11 @@ class XCollector:
         if self.brightdata_client and self.brightdata_client.api_key and self.preferred_scraper != "brightdata":
             cascade_replies.append(("brightdata", lambda: self.brightdata_client.scrape_x_replies(clean_id, handle=self.channel_id)))
 
+        last_error = None
         for source_name, fn in cascade_replies:
             try:
                 raw_replies = fn()
-                if raw_replies:
+                if isinstance(raw_replies, list):
                     comments = [
                         RawComment(
                             id=r["id"],
@@ -349,7 +350,8 @@ class XCollector:
                     ]
                     yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
                     return
-            except CollectionError:
+            except CollectionError as exc:
+                last_error = exc
                 continue
 
         # 4. Bearer token mode (Twitter API v2)
@@ -406,5 +408,9 @@ class XCollector:
             yield Batch(comments=comments, checkpoint=next_token, outcome=outcome)
             return
 
-        # 5. Public fallback: yields exhausted empty batch
-        yield Batch(comments=[], checkpoint=None, outcome="exhausted")
+        # If any scraper failed with CollectionError, raise it so it's not silently treated as successful empty
+        if last_error:
+            raise last_error
+
+        # If no scraper or bearer token configured, do NOT pretend it's exhausted with 0 comments!
+        raise CollectionError("comments_scraper_not_configured", "blocked")

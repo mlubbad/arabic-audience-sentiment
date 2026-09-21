@@ -219,7 +219,36 @@ def serve(
     return "stopped"
 
 
+def _load_dotenv_if_needed() -> None:
+    """Load local environment variables from .env.local or .env if not already set.
+
+    Safe fallback for development and worker processes running outside Docker/CI.
+    Never overwrites existing environment variables.
+    """
+    candidates = [
+        os.path.join(os.getcwd(), ".env.local"),
+        os.path.join(os.getcwd(), ".env"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.env.local")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.env")),
+    ]
+    for env_path in candidates:
+        if os.path.isfile(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip('"').strip("'")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+
 def main() -> None:
+    _load_dotenv_if_needed()
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--base", default=os.environ.get("WORKER_API_BASE_URL", ""))
     # Comma-separated: one scoped credential per workspace this worker serves.

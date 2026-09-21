@@ -15,7 +15,7 @@ class ApifyClient:
         client: httpx.Client | None = None,
         x_actor: str = "apidojo/tweet-scraper",
         tiktok_actor: str = "clockworks/tiktok-scraper",
-        timeout: float = 60.0,
+        timeout: float = 90.0,
     ):
         if not token:
             raise ValueError("missing_apify_token")
@@ -40,7 +40,7 @@ class ApifyClient:
         params = {"timeout": int(self.timeout)}
 
         try:
-            resp = self.client.post(url, headers=headers, json=run_input, params=params, timeout=self.timeout + 10)
+            resp = self.client.post(url, headers=headers, json=run_input, params=params, timeout=self.timeout + 15)
         except httpx.HTTPError:
             raise CollectionError("network_failure", retryable=True) from None
 
@@ -50,6 +50,8 @@ class ApifyClient:
             raise CollectionError("channel_not_found", "failed")
         if resp.status_code == 429:
             raise CollectionError("rate_limit_exceeded", "failed", retryable=True)
+        if resp.status_code in (502, 504):
+            raise CollectionError("scraper_timeout", "failed", retryable=True)
         if resp.is_error:
             raise CollectionError(f"apify_error_{resp.status_code}", "failed", retryable=True)
 

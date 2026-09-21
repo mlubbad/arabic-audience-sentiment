@@ -153,6 +153,8 @@ class TikTokCollector:
         body = resp.text
         if "private account" in body.lower() or 'isprivate":true' in body.lower():
             raise CollectionError("channel_not_public", "blocked")
+        if "slardar" in body.lower() or "wafchallenge" in body.lower() or "verify-bar" in body.lower():
+            raise CollectionError("tiktok_waf_challenge", "blocked", retryable=True)
 
         videos = []
         # Extract JSON from __UNIVERSAL_DATA_FOR_REHYDRATION__ or SIGI_STATE
@@ -225,6 +227,13 @@ class TikTokCollector:
                         )
                 except (json.JSONDecodeError, KeyError):
                     pass
+
+        if not videos:
+            if "slardar" in body.lower() or "wafchallenge" in body.lower() or "verify-bar" in body.lower():
+                raise CollectionError("tiktok_waf_challenge", "blocked", retryable=True)
+            if "<html" in body.lower() and len(body) < 5000:
+                raise CollectionError("tiktok_antibot_challenge", "blocked", retryable=True)
+            return Catalogue(videos=[], complete=False, reason="no_public_videos_found")
 
         return Catalogue(videos=videos, complete=True)
 
@@ -331,10 +340,11 @@ class TikTokCollector:
         if self.brightdata_client and self.brightdata_client.api_key and self.preferred_scraper != "brightdata":
             cascade_comments.append(("brightdata", lambda: self.brightdata_client.scrape_tiktok_comments(clean_id, handle=self.channel_id)))
 
+        last_error = None
         for source_name, fn in cascade_comments:
             try:
                 raw_comments = fn()
-                if raw_comments:
+                if isinstance(raw_comments, list):
                     comments = [
                         RawComment(
                             id=c["id"],
@@ -354,7 +364,8 @@ class TikTokCollector:
                     ]
                     yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
                     return
-            except CollectionError:
+            except CollectionError as exc:
+                last_error = exc
                 continue
 
         # 4. Access token mode (TikTok Display API)
@@ -416,5 +427,7 @@ class TikTokCollector:
             yield Batch(comments=comments, checkpoint=next_checkpoint, outcome=outcome)
             return
 
-        # 5. Public fallback: yields exhausted empty batch
-        yield Batch(comments=[], checkpoint=None, outcome="exhausted")
+        if last_error:
+            raise last_error
+
+        raise CollectionError("comments_scraper_not_configured", "blocked")

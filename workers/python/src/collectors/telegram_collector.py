@@ -37,9 +37,14 @@ class TelegramCollector:
 
     @staticmethod
     def _clean_handle(channel_id: str) -> str:
-        if not _HANDLE_REGEX.match(channel_id):
+        s = channel_id.strip()
+        s = re.sub(r"^https?://(www\.)?t\.me/(s/)?", "", s, flags=re.IGNORECASE)
+        s = re.sub(r"^t\.me/(s/)?", "", s, flags=re.IGNORECASE)
+        s = s.lstrip("@").strip()
+        s = s.split("/")[0].split("?")[0]
+        if not _HANDLE_REGEX.match(s):
             raise ValueError("invalid_channel_id")
-        return channel_id.lstrip("@")
+        return s
 
     def catalogue(self, channel_id: str | None = None) -> Catalogue:
         """List public channel posts.
@@ -109,7 +114,7 @@ class TelegramCollector:
             # HTML fallback: extracts message divs from public t.me/s/ previews
             # Pattern matches message post divs: data-post="handle/123"
             blocks = re.findall(
-                r'(<div class="tgme_widget_message [^>]*data-post="[^"]+/(\d+)".*?)(?=<div class="tgme_widget_message |$)',
+                r'(<div class="tgme_widget_message\b[^"]*"[^>]*data-post="[^"]+/(\d+)".*?)(?=<div class="tgme_widget_message\b|\Z)',
                 resp.text,
                 re.DOTALL,
             )
@@ -132,7 +137,7 @@ class TelegramCollector:
                     pub_time = time_m.group(1) if time_m else datetime.now(timezone.utc).isoformat()
 
                     replies_m = re.search(
-                        r'class="tgme_widget_message_subtext"[^>]*>(\d+)\s+(?:comment|repl)',
+                        r'class="tgme_widget_message_subtext"[^>]*>(\d+)\s*(?:comment|repl|تعليق|رد|مناقشة)',
                         block,
                         re.IGNORECASE,
                     )
@@ -227,6 +232,8 @@ class TelegramCollector:
             except httpx.HTTPError:
                 raise CollectionError("network_failure", retryable=True) from None
 
+            if resp.status_code == 401:
+                raise CollectionError("telegram_discussion_requires_auth", "blocked")
             if resp.status_code == 404:
                 yield Batch(comments=[], checkpoint=None, outcome="unavailable")
                 return
@@ -234,11 +241,16 @@ class TelegramCollector:
                 raise CollectionError("rate_limited", "blocked")
             if resp.status_code >= 500:
                 raise CollectionError("server_error", "failed", retryable=True)
+            if resp.status_code != 200:
+                raise CollectionError(f"http_{resp.status_code}", "failed")
 
             try:
                 data = resp.json()
             except Exception:
                 raise CollectionError("invalid_response") from None
+
+            if data.get("error") == "UNAUTHORIZED":
+                raise CollectionError("telegram_discussion_requires_auth", "blocked")
 
             if data.get("comments_disabled"):
                 yield Batch(comments=[], checkpoint=None, outcome="explicitly_disabled")
