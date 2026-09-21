@@ -1,10 +1,17 @@
 -- Cross-workspace deduplication and catalogue comment analytics
--- 1. Updates private.workspace_ops_snapshot_impl to include per-video 'analysed' count and 'catalogue_summary'.
--- 2. Adds private.adopt_channel_catalogue, private.adopt_video_comments_and_predictions, and private.adopt_channel_content.
--- 3. Hooks deduplication into register_public_channel_impl and select_videos_impl.
--- 4. Exposes public.adopt_workspace_channel for explicit sync.
--- 5. Backfills existing cross-workspace channels and comments.
+-- 1. Adds performance indexes for cross-workspace unique identity lookups.
+-- 2. Updates private.workspace_ops_snapshot_impl to include per-video 'analysed' count and 'catalogue_summary'.
+-- 3. Adds private.adopt_channel_catalogue, private.adopt_video_comments_and_predictions, and private.adopt_channel_content.
+-- 4. Hooks deduplication into register_public_channel_impl and select_videos_impl.
+-- 5. Exposes public.adopt_workspace_channel for explicit sync.
+-- 6. Backfills existing cross-workspace channels and comments safely.
 
+-- 1. Performance indexes for cross-workspace lookups
+create index if not exists channels_platform_ext_id_idx on public.channels(platform, external_channel_id);
+create index if not exists videos_platform_ext_id_idx on public.videos(platform, external_video_id);
+create index if not exists comments_platform_ext_id_idx on public.comments(platform, external_comment_id);
+
+-- 2. Update workspace_ops_snapshot_impl
 create or replace function private.workspace_ops_snapshot_impl(w uuid)
 returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare
@@ -58,15 +65,8 @@ begin
   -- Usage summary (plan, budgets, quotas)
   select private.usage_summary_impl(w) into plan_summary;
 
-  -- Stored comments count and analysed count per video
-  select coalesce(json_agg(json_build_object(
-    'id', v.id::text,
-    'total', coalesce(c.total, 0),
-    'analysed', coalesce(c.analysed, 0)
-  )), '[]'::json)::jsonb
-  into video_counts
-  from public.videos v
-  left join (
+  -- Single-pass computation of stored comments and analysed count
+  with stats as (
     select c.video_id,
            count(*)::int as total,
            count(sp.comment_id)::int as analysed
@@ -77,28 +77,22 @@ begin
      and sp.status = 'succeeded'
     where c.workspace_id = w
     group by c.video_id
-  ) c on c.video_id = v.id
-  where v.workspace_id = w;
-
-  -- Workspace catalogue summary
-  select jsonb_build_object(
-    'total_comments_collected', coalesce(sum(c.total), 0)::int,
-    'total_comments_analysed', coalesce(sum(c.analysed), 0)::int,
-    'videos_with_comments', count(c.video_id) filter (where c.total > 0)::int
   )
-  into cat_summary
-  from (
-    select c.video_id,
-           count(*)::int as total,
-           count(sp.comment_id)::int as analysed
-    from public.comments c
-    left join public.sentiment_predictions sp
-      on sp.workspace_id = w
-     and sp.comment_id = c.id
-     and sp.status = 'succeeded'
-    where c.workspace_id = w
-    group by c.video_id
-  ) c;
+  select
+    coalesce(json_agg(json_build_object(
+      'id', v.id::text,
+      'total', coalesce(s.total, 0),
+      'analysed', coalesce(s.analysed, 0)
+    )), '[]'::json)::jsonb,
+    jsonb_build_object(
+      'total_comments_collected', coalesce(sum(s.total), 0)::int,
+      'total_comments_analysed', coalesce(sum(s.analysed), 0)::int,
+      'videos_with_comments', count(s.video_id) filter (where s.total > 0)::int
+    )
+  into video_counts, cat_summary
+  from public.videos v
+  left join stats s on s.video_id = v.id
+  where v.workspace_id = w;
 
   return jsonb_build_object(
     'sync', state,
@@ -108,7 +102,7 @@ begin
   );
 end $$;
 
--- 2. Procedure to adopt videos from other workspaces for the same channel
+-- 3. Procedure to adopt videos from other workspaces for the same channel
 create or replace function private.adopt_channel_catalogue(w uuid, c uuid)
 returns int
 language plpgsql security definer set search_path='' as $$
@@ -163,12 +157,14 @@ end $$;
 revoke all on function private.adopt_channel_catalogue(uuid, uuid) from public, anon, authenticated;
 grant execute on function private.adopt_channel_catalogue(uuid, uuid) to service_role;
 
--- 3. Procedure to adopt comments and predictions for a video from other workspaces
+-- 4. Procedure to adopt comments and predictions for a video from other workspaces
 create or replace function private.adopt_video_comments_and_predictions(w uuid, v uuid)
 returns jsonb
 language plpgsql security definer set search_path='' as $$
 declare
   vid public.videos;
+  donor_vid uuid;
+  donor_ws uuid;
   adopted_comments int := 0;
   adopted_sentiment int := 0;
   adopted_topics int := 0;
@@ -179,24 +175,35 @@ begin
     return jsonb_build_object('comments', 0, 'sentiment', 0, 'topics', 0);
   end if;
 
-  -- 1. Adopt comments from donor workspaces for the same (platform, external_video_id)
+  -- Locate donor video with stored comments in another workspace
+  select donor_v.id, donor_v.workspace_id
+    into donor_vid, donor_ws
+  from public.videos donor_v
+  join public.comments c on c.video_id = donor_v.id and c.workspace_id = donor_v.workspace_id
+  where donor_v.platform = vid.platform
+    and donor_v.external_video_id = vid.external_video_id
+    and donor_v.workspace_id <> w
+  limit 1;
+
+  if donor_vid is null then
+    return jsonb_build_object('comments', 0, 'sentiment', 0, 'topics', 0);
+  end if;
+
+  -- 1. Adopt comments from donor workspace
   insert into public.comments (
     workspace_id, video_id, platform, external_comment_id, external_parent_id,
     is_reply, parent_source, author_channel_id, author_name, text_raw, text_plain,
     content_hash, published_time_raw, published_at, timestamp_precision,
     likes_raw, likes_value, source, field_provenance
   )
-  select distinct on (c.external_comment_id)
+  select
     w, v, c.platform, c.external_comment_id, c.external_parent_id,
     c.is_reply, c.parent_source, c.author_channel_id, c.author_name, c.text_raw, c.text_plain,
     c.content_hash, c.published_time_raw, c.published_at, c.timestamp_precision,
     c.likes_raw, c.likes_value, c.source, c.field_provenance
   from public.comments c
-  join public.videos donor_v on donor_v.id = c.video_id and donor_v.workspace_id = c.workspace_id
-  where donor_v.platform = vid.platform
-    and donor_v.external_video_id = vid.external_video_id
-    and c.workspace_id <> w
-  order by c.external_comment_id, c.last_seen_at desc nulls last
+  where c.workspace_id = donor_ws
+    and c.video_id = donor_vid
   on conflict (workspace_id, platform, external_comment_id) do nothing;
 
   get diagnostics adopted_comments = row_count;
@@ -206,11 +213,16 @@ begin
     workspace_id, model_id, revision_sha, preprocessing_version, parameters, status
   )
   select distinct w, ar.model_id, ar.revision_sha, ar.preprocessing_version, ar.parameters, 'succeeded'
-  from public.sentiment_predictions sp
-  join public.analysis_runs ar on ar.workspace_id = sp.workspace_id and ar.id = sp.analysis_run_id
-  join public.comments target_c on target_c.content_hash = sp.content_hash and target_c.workspace_id = w and target_c.video_id = v
-  where sp.status = 'succeeded'
-    and sp.workspace_id <> w
+  from public.comments donor_c
+  join public.sentiment_predictions sp
+    on sp.workspace_id = donor_c.workspace_id
+   and sp.comment_id = donor_c.id
+   and sp.status = 'succeeded'
+  join public.analysis_runs ar
+    on ar.workspace_id = sp.workspace_id
+   and ar.id = sp.analysis_run_id
+  where donor_c.workspace_id = donor_ws
+    and donor_c.video_id = donor_vid
   on conflict (workspace_id, model_id, revision_sha, preprocessing_version, parameters) do nothing;
 
   -- 3. Adopt sentiment predictions
@@ -222,10 +234,15 @@ begin
     w, target_c.id, target_c.content_hash, target_ar.id, sp.analysis_key,
     sp.status, sp.label, sp.class_scores, sp.predicted_at
   from public.comments target_c
+  join public.comments donor_c
+    on donor_c.workspace_id = donor_ws
+   and donor_c.video_id = donor_vid
+   and donor_c.platform = target_c.platform
+   and donor_c.external_comment_id = target_c.external_comment_id
   join public.sentiment_predictions sp
-    on sp.content_hash = target_c.content_hash
+    on sp.workspace_id = donor_c.workspace_id
+   and sp.comment_id = donor_c.id
    and sp.status = 'succeeded'
-   and sp.workspace_id <> w
   join public.analysis_runs donor_ar
     on donor_ar.workspace_id = sp.workspace_id
    and donor_ar.id = sp.analysis_run_id
@@ -251,10 +268,15 @@ begin
     tp.classification_key,
     tp.status, tp.topic_key, tp.confidence, tp.model_id, tp.prompt_version, tp.error_code, tp.predicted_at
   from public.comments target_c
+  join public.comments donor_c
+    on donor_c.workspace_id = donor_ws
+   and donor_c.video_id = donor_vid
+   and donor_c.platform = target_c.platform
+   and donor_c.external_comment_id = target_c.external_comment_id
   join public.topic_predictions tp
-    on tp.content_hash = target_c.content_hash
+    on tp.workspace_id = donor_c.workspace_id
+   and tp.comment_id = donor_c.id
    and tp.status = 'succeeded'
-   and tp.workspace_id <> w
   join public.workspace_topics wt
     on wt.workspace_id = w and wt.key = tp.topic_key and wt.retired_at is null
   where target_c.workspace_id = w
@@ -284,7 +306,7 @@ end $$;
 revoke all on function private.adopt_video_comments_and_predictions(uuid, uuid) from public, anon, authenticated;
 grant execute on function private.adopt_video_comments_and_predictions(uuid, uuid) to service_role;
 
--- 4. Adopt full channel content across workspaces
+-- 5. Adopt full channel content across workspaces
 create or replace function private.adopt_channel_content(w uuid, c uuid)
 returns jsonb
 language plpgsql security definer set search_path='' as $$
@@ -298,7 +320,26 @@ declare
 begin
   vids_adopted := private.adopt_channel_catalogue(w, c);
 
-  for vid_rec in select id from public.videos where workspace_id = w and channel_id = c loop
+  for vid_rec in
+    select v.id
+    from public.videos v
+    join public.videos donor_v
+      on donor_v.platform = v.platform
+     and donor_v.external_video_id = v.external_video_id
+     and donor_v.workspace_id <> v.workspace_id
+    where v.workspace_id = w
+      and v.channel_id = c
+      and exists (
+        select 1 from public.comments donor_c
+        where donor_c.workspace_id = donor_v.workspace_id
+          and donor_c.video_id = donor_v.id
+      )
+      and not exists (
+        select 1 from public.comments target_c
+        where target_c.workspace_id = w
+          and target_c.video_id = v.id
+      )
+  loop
     step_res := private.adopt_video_comments_and_predictions(w, vid_rec.id);
     comments_adopted := comments_adopted + (step_res->>'comments')::int;
     sentiment_adopted := sentiment_adopted + (step_res->>'sentiment')::int;
@@ -316,7 +357,7 @@ end $$;
 revoke all on function private.adopt_channel_content(uuid, uuid) from public, anon, authenticated;
 grant execute on function private.adopt_channel_content(uuid, uuid) to service_role;
 
--- 5. Expose public RPC for authenticated users
+-- 6. Expose public RPC for authenticated users
 create or replace function public.adopt_workspace_channel(w uuid, c uuid)
 returns jsonb language plpgsql security definer set search_path='' as $$
 begin
@@ -329,7 +370,7 @@ end $$;
 revoke all on function public.adopt_workspace_channel(uuid, uuid) from public;
 grant execute on function public.adopt_workspace_channel(uuid, uuid) to authenticated;
 
--- 6. Hook adoption into register_public_channel_impl
+-- 7. Hook adoption into register_public_channel_impl
 create or replace function private.register_public_channel_impl(
   w uuid, c uuid, external text, handle text, title text, p_platform text default 'youtube'
 ) returns public.channels
@@ -374,17 +415,19 @@ declare ch public.channels; begin
     end if;
   end if;
 
-  -- Cross-workspace deduplication: adopt catalogue from existing workspaces if available
+  -- Adopt existing catalogue videos if available from another workspace
   perform private.adopt_channel_catalogue(w, ch.id);
 
   return ch;
 end $$;
 
--- 7. Hook adoption into select_videos_impl
+-- 8. Hook adoption into select_videos_impl
 create or replace function private.select_videos_impl(w uuid, c uuid, add uuid[], remove uuid[])
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare estimate int := 0; unknowns int := 0; outstanding int := 0; remaining int; j uuid;
-        queued boolean := false; deferred boolean := false; running boolean := false; begin
+        queued boolean := false; deferred boolean := false; running boolean := false;
+        rec record;
+begin
   if not private.has_role(w, array['workspace_owner','analyst']) then
     raise exception 'forbidden' using errcode='42501'; end if;
   if not exists(select 1 from public.channels where workspace_id=w and id=c) then
@@ -409,10 +452,9 @@ declare estimate int := 0; unknowns int := 0; outstanding int := 0; remaining in
    where v.workspace_id=w and v.id = any(add)
      and not exists(select 1 from public.video_selections s
                      where s.workspace_id=w and s.video_id=v.id);
+
   -- What is already chosen and not yet stored, priced the same way, across
-  -- the whole workspace and before this call writes anything. Without it two
-  -- selections that each fit alone were both accepted against the same units.
-  -- A selection this call removes is not outstanding.
+  -- the whole workspace and before this call writes anything.
   select coalesce(sum(greatest(0, v.reported_comment_count
            - (select count(*) from public.comments cm
                where cm.workspace_id=w and cm.video_id=v.id))), 0)::int
@@ -420,8 +462,8 @@ declare estimate int := 0; unknowns int := 0; outstanding int := 0; remaining in
     from public.video_selections s
     join public.videos v on v.workspace_id=w and v.id=s.video_id
    where s.workspace_id=w and not (s.video_id = any(remove));
-  -- A removal alone spends nothing and needs no plan: a paused tenant can
-  -- still deselect.
+
+  -- A removal alone spends nothing and needs no plan: a paused tenant can still deselect.
   if cardinality(add) > 0 then
     remaining := private.analysis_remaining(w);
     if estimate + outstanding > remaining then
@@ -433,15 +475,14 @@ declare estimate int := 0; unknowns int := 0; outstanding int := 0; remaining in
   select w, c, x.id, (select auth.uid()) from unnest(add) x(id)
   on conflict (workspace_id, video_id) do nothing;
 
-  -- Cross-workspace deduplication: adopt comments and predictions for added videos
+  -- Adopt comments and predictions from other workspaces for the newly selected videos
   if cardinality(add) > 0 then
-    perform private.adopt_video_comments_and_predictions(w, x.id) from unnest(add) x(id);
+    for rec in select x.id as video_id from unnest(add) x(id) loop
+      perform private.adopt_video_comments_and_predictions(w, rec.video_id);
+    end loop;
   end if;
 
   if cardinality(add) > 0 then
-    -- A collection already under way read its due list when it was claimed;
-    -- the new video waits for the next tick. Saying "queued" here would
-    -- promise that run something it will not do.
     select id into j from public.jobs
      where workspace_id=w and channel_id=c and type='collect' and status='running'
      order by created_at limit 1;
@@ -450,15 +491,14 @@ declare estimate int := 0; unknowns int := 0; outstanding int := 0; remaining in
     else
       begin
         j := private.enqueue_sync_impl(w, c, 'selection-' || gen_random_uuid()::text);
-        -- The job handed back may have been claimed between the two reads.
         select status = 'running' into running from public.jobs where id = j;
         queued := not running;
       exception when sqlstate '53400' then
-        -- sync_too_soon. The selection is written; the tick picks it up.
         deferred := true;
       end;
     end if;
   end if;
+
   return jsonb_build_object('job_id', j, 'queued', queued, 'deferred', deferred,
                             'already_running', running,
                             'estimate', estimate, 'unknown_count', unknowns,
@@ -466,12 +506,41 @@ declare estimate int := 0; unknowns int := 0; outstanding int := 0; remaining in
                             'remaining_after', remaining - outstanding - estimate);
 end $$;
 
--- 8. Backfill existing channels across workspaces
+-- 9. Backfill catalogue and content for duplicate channels safely
 do $$
 declare
   ch record;
+  sel record;
 begin
-  for ch in select workspace_id, id from public.channels loop
-    perform private.adopt_channel_content(ch.workspace_id, ch.id);
+  -- Only adopt catalogue for channels that share platform and external_channel_id across workspaces
+  for ch in (
+    select c1.workspace_id, c1.id
+    from public.channels c1
+    join public.channels c2
+      on c2.platform = c1.platform
+     and c2.external_channel_id = c1.external_channel_id
+     and c2.workspace_id <> c1.workspace_id
+    where c1.status <> 'disconnected'
+  ) loop
+    perform private.adopt_channel_catalogue(ch.workspace_id, ch.id);
+  end loop;
+
+  -- Only adopt comments for empty selections that have a donor video with comments
+  for sel in (
+    select vs.workspace_id, vs.video_id
+    from public.video_selections vs
+    join public.videos v on v.workspace_id = vs.workspace_id and v.id = vs.video_id
+    where not exists (
+      select 1 from public.comments c where c.workspace_id = vs.workspace_id and c.video_id = vs.video_id
+    )
+    and exists (
+      select 1 from public.videos donor_v
+      join public.comments donor_c on donor_c.workspace_id = donor_v.workspace_id and donor_c.video_id = donor_v.id
+      where donor_v.platform = v.platform
+        and donor_v.external_video_id = v.external_video_id
+        and donor_v.workspace_id <> v.workspace_id
+    )
+  ) loop
+    perform private.adopt_video_comments_and_predictions(sel.workspace_id, sel.video_id);
   end loop;
 end $$;
