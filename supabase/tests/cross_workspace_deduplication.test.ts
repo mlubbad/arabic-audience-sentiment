@@ -121,7 +121,7 @@ describe("cross-workspace deduplication", () => {
     const channelBId = regB.rows[0].id;
     expect(channelBId).toBeTruthy();
 
-    // 3. Workspace B should immediately have the video adopted in catalogue
+    // 3. Workspace B should immediately have the video adopted in catalogue AND comments + sentiment adopted
     const bVideos = await db.query<{
       id: string;
       external_video_id: string;
@@ -135,7 +135,46 @@ describe("cross-workspace deduplication", () => {
     expect(bVideos.rows[0].title).toBe("Shared Video");
     const videoBId = bVideos.rows[0].id;
 
-    // 4. Workspace B selects the video -> adoption of comments and predictions occurs
+    // Check comments in Workspace B exist IMMEDIATELY upon registration, even before video selection
+    const bCommentsBeforeSelection = await db.query<{
+      id: string;
+      external_comment_id: string;
+      text_plain: string;
+    }>(
+      "select id, external_comment_id, text_plain from public.comments where workspace_id = $1",
+      [B],
+    );
+    expect(bCommentsBeforeSelection.rows).toHaveLength(1);
+    expect(bCommentsBeforeSelection.rows[0].external_comment_id).toBe(
+      "comm_ext_999",
+    );
+    expect(bCommentsBeforeSelection.rows[0].text_plain).toBe("تعليق رائع");
+
+    // Check sentiment predictions in Workspace B exist IMMEDIATELY
+    const bSentimentBeforeSelection = await db.query<{
+      label: string;
+      status: string;
+    }>(
+      "select label, status from public.sentiment_predictions where workspace_id = $1",
+      [B],
+    );
+    expect(bSentimentBeforeSelection.rows).toHaveLength(1);
+    expect(bSentimentBeforeSelection.rows[0].label).toBe("positive");
+    expect(bSentimentBeforeSelection.rows[0].status).toBe("succeeded");
+
+    // Check dashboard aggregates for Workspace B works immediately
+    const aggBeforeSelection = await db.query<{
+      agg: {
+        total: number;
+        analysed: number;
+        sentiments: { positive: number };
+      };
+    }>("select private.dashboard_aggregates_impl($1, '{}'::jsonb) as agg", [B]);
+    expect(aggBeforeSelection.rows[0].agg.total).toBe(1);
+    expect(aggBeforeSelection.rows[0].agg.analysed).toBe(1);
+    expect(aggBeforeSelection.rows[0].agg.sentiments.positive).toBe(1);
+
+    // 4. Workspace B selects the video -> updates selection status idempotently
     await asUser(ownerB);
     const selResult = await db.query<{ r: Record<string, unknown> }>(
       "select private.select_videos_impl($1, $2, array[$3]::uuid[], array[]::uuid[]) as r",
@@ -143,7 +182,7 @@ describe("cross-workspace deduplication", () => {
     );
     expect(selResult.rows[0].r).toBeDefined();
 
-    // Check comments in Workspace B
+    // Check comments in Workspace B still intact
     const bComments = await db.query<{
       id: string;
       external_comment_id: string;

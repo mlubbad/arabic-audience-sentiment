@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-09-22 — Instant Unified Multi-Workspace Content Adoption (قاعدة البيانات الواحدة الشاملة)
+
+Completed user request for single-database deduplication and immediate analytics visibility across workspaces without requiring video re-selection:
+- **Instant Full Channel Content Adoption**:
+  - Implemented `private.adopt_channel_content(w, c)` in `supabase/migrations/20260922020000_adopt_full_channel_on_registration_and_backfill.sql`:
+    - Adopts catalogue (videos), bulk comments, sentiment predictions, topic predictions, workspace topics, analysis runs, and sync runs from donor workspace in set-based bulk queries.
+    - Hooked directly into `private.register_public_channel_impl` so new workspaces monitoring existing channels instantly inherit all existing data.
+  - Automatic backfill ensures all workspace creators have explicit `memberships` records, fixing RLS access.
+  - Automated migration backfill loop executed across all duplicate channels.
+- **Verification & Deployment**:
+  - `cross_workspace_deduplication.test.ts` updated and verified in Vitest PGlite.
+  - Applied remotely to Supabase project `ykqugctewsqvevhyqtbi` via `npm run db:migrate:remote`.
+  - Live verified workspace "تجربة القارئ" (`04d94f79-a86f-4ece-96a0-cd3cedc56c3f`): immediately reflects 194 videos, 41,816 comments, 41,812 sentiment predictions, and active analysis key with 0 additional YouTube API quota used.
+  - All CI gates green (`npm run check`: 914 web tests, 382 db tests, 262 worker tests).
+
 ## 2026-09-22 — Cross-Workspace Deduplication & Stored Comments Catalogue Visibility
 
 Addressed user requirement for single-database deduplication across workspaces and fixed visibility of collected/classified comments when videos are unselected to conserve YouTube's 10,000 daily API quota:
