@@ -156,7 +156,7 @@ export const en: Strings = {
   selectPlatform: "Select platform",
   addTelegramChannel: "Add a public Telegram channel",
   addTelegramLead:
-    "Enter the public channel handle (@handle) or link (t.me/...). Posts, comments, and replies are collected automatically.",
+    "Enter a public Telegram channel handle (@handle) or link (t.me/...). Note: must be a public broadcast channel; personal user accounts and private groups cannot be imported.",
   addTelegramPlaceholder: "@channel_name or t.me/channel_name",
   addTelegramInvalidHandle:
     "Please enter a valid Telegram channel handle or link (e.g. @channel or t.me/channel).",
@@ -555,7 +555,7 @@ export const en: Strings = {
   jobCatalogueSucceededDetail:
     "Channel videos catalogued and list updated successfully.",
   jobChannelNotPublic:
-    "This channel is not public on Telegram or does not allow public preview. Ensure the handle belongs to a public channel.",
+    "This handle belongs to a personal account, private channel, or another platform without public web preview. Ensure you enter a public Telegram channel handle, or verify that the correct platform was selected (e.g. X or YouTube).",
   jobNoTopicClassifier:
     "The worker has no topic classifier configured. Add the Gemini key to the worker's settings for classification to run.",
   jobTopicModelNotActive:

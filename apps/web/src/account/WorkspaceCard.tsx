@@ -344,7 +344,7 @@ export function WorkspaceCard({
               which the demo body passes none of. */}
           {hasClient &&
             !connected &&
-            !channel &&
+            (!channel || channel.status === "disconnected") &&
             onAddChannel &&
             !addingChannel && (
               <Button
@@ -366,7 +366,7 @@ export function WorkspaceCard({
               {S.relinkForName}
             </Button>
           )}
-          {/* The way out, offered only while there is a grant to withdraw.
+          {/* The way out, offered while there is a grant or public channel to withdraw.
               Two presses on purpose: disconnecting stops every scheduled
               read and revokes the stored grant, and a single button beside
               "choose videos" would be pressed by mistake. What YouTube's
@@ -730,7 +730,7 @@ export function WorkspaceCard({
         {/* The two questions, asked in a dialog. The page holds the "asking"
             state; every way out of the dialog reports `keep`, the same step
             the inline block's keep button reported. */}
-        {connected && (
+        {(connected || hasPublicChannel) && (
           <ConfirmDialog
             kind="disconnect"
             open={confirmingDisconnect}

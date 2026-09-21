@@ -310,6 +310,33 @@ describe("WorkspaceCard", () => {
       await userEvent.keyboard("{Escape}");
       expect(onDisconnect).not.toHaveBeenCalled();
     });
+
+    it("public_unverified channel renders disconnect door and confirm dialog", async () => {
+      const publicChannel: ChannelRow = {
+        workspace_id: W,
+        channel_id: "e4047855-7a05-4ca9-9194-3c95a5e75455",
+        status: "public_unverified",
+        external_channel_id: "SkyNewsArabia_B",
+        title: "Sky News Arabia",
+        handle: "SkyNewsArabia_B",
+        platform: "telegram",
+      };
+      const onDisconnect = vi.fn();
+      mount({ channel: publicChannel, onDisconnect });
+      expect(screen.getByTestId(`disconnect-${W}`)).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId(`disconnect-${W}`));
+      expect(onDisconnect).toHaveBeenCalledWith("ask");
+
+      mount({
+        channel: publicChannel,
+        onDisconnect,
+        confirmingDisconnect: true,
+      });
+      const dialog = await screen.findByRole("dialog", {
+        name: ar.disconnectChannel,
+      });
+      expect(dialog).toBeInTheDocument();
+    });
   });
 
   describe("retire", () => {

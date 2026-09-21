@@ -483,20 +483,19 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                     if (!channel) return;
                     setBusy(scope);
                     setNote(null);
-                    void client
-                      .rpc("oauth_disconnect", {
-                        w: w.id,
-                        channel: channel.channel_id,
-                      })
-                      .then(({ error }) => {
-                        setBusy(null);
-                        setAsking(null);
-                        say(
-                          scope,
-                          error ? S.disconnectFailed : S.disconnectDone,
-                        );
-                        if (!error) setReloads((n) => n + 1);
-                      });
+                    const isOAuth = channel.status === "connected";
+                    const rpcName = isOAuth
+                      ? "oauth_disconnect"
+                      : "remove_channel";
+                    const rpcArgs = isOAuth
+                      ? { w: w.id, channel: channel.channel_id }
+                      : { w: w.id, c: channel.channel_id };
+                    void client.rpc(rpcName, rpcArgs).then(({ error }) => {
+                      setBusy(null);
+                      setAsking(null);
+                      say(scope, error ? S.disconnectFailed : S.disconnectDone);
+                      if (!error) setReloads((n) => n + 1);
+                    });
                   }}
                   renaming={asking?.ws === w.id && asking.what === "rename"}
                   onRename={(step, name) => {

@@ -199,4 +199,64 @@ describe("register_public_channel", () => {
     expect(job.rows[0].type).toBe("discover");
     expect(job.rows[0].status).toBe("queued");
   });
+
+  it("owner can remove a channel, which cleans up jobs and deletes the channel row", async () => {
+    await user(ownerA);
+    const ch = await db.query<{ id: string }>(
+      "select id from channels where workspace_id=$1 and external_channel_id=$2",
+      [A, ID],
+    );
+    const channelId = ch.rows[0].id;
+
+    // Check we have an active job for it
+    const activeJobsBefore = await db.query<{ id: string; status: string }>(
+      "select id, status from jobs where channel_id=$1 and status in ('queued', 'leased')",
+      [channelId],
+    );
+    expect(activeJobsBefore.rows.length).toBeGreaterThan(0);
+
+    // Remove the channel
+    await db.query("select remove_channel($1, $2)", [A, channelId]);
+
+    // Channel should be gone
+    const chAfter = await db.query(
+      "select id from channels where workspace_id=$1 and id=$2",
+      [A, channelId],
+    );
+    expect(chAfter.rows.length).toBe(0);
+
+    // Jobs should also be deleted
+    const jobsAfter = await db.query(
+      "select id, status from jobs where channel_id=$1",
+      [channelId],
+    );
+    expect(jobsAfter.rows.length).toBe(0);
+  });
+
+  it("non-owner is refused from removing a channel", async () => {
+    // Re-register channel
+    await user(ownerA);
+    const { rows } = await db.query<{
+      register_public_channel: { id: string };
+    }>("select register_public_channel($1,$2,$3,$4,$5)", [
+      A,
+      A,
+      ID,
+      "@removetest",
+      "Remove Test",
+    ]);
+    const channelId = rows[0].register_public_channel.id;
+
+    // Viewer tries to remove
+    await user(viewer);
+    await expect(
+      db.query("select remove_channel($1, $2)", [A, channelId]),
+    ).rejects.toThrow(/forbidden/);
+
+    // Other workspace owner tries to remove
+    await user(ownerB);
+    await expect(
+      db.query("select remove_channel($1, $2)", [A, channelId]),
+    ).rejects.toThrow(/forbidden/);
+  });
 });
