@@ -6,7 +6,7 @@
  * means; only the bar moved into `BudgetMeter`, off the native `<progress>`
  * a browser used to paint its own colour onto.
  */
-import { budgetState } from "@sentiment/contracts";
+import { budgetState, unlimited } from "@sentiment/contracts";
 import { Card } from "../ui/Card";
 import { BudgetMeter } from "../ui/BudgetMeter";
 import type { deriveSnapshot } from "../data";
@@ -49,9 +49,12 @@ export function PlanBudgets({
           <ul className="db-budgets">
             {plan.budgets.map((b) => {
               const state = budgetState(b);
-              const share = b.allowance
-                ? Math.min(Math.round((b.used / b.allowance) * 100), 100)
-                : 100;
+              const isUnlimited = unlimited(b);
+              const share = isUnlimited
+                ? 0
+                : b.allowance
+                  ? Math.min(Math.round((b.used / b.allowance) * 100), 100)
+                  : 100;
               const label =
                 b.event_type === "comment_analysis"
                   ? S.budgetAnalysis
@@ -66,15 +69,22 @@ export function PlanBudgets({
                 >
                   <strong>{label}</strong>
                   <span className="db-budget-line">
-                    {S.opsBudgetLine(b.used, b.allowance, b.remaining)}
+                    {isUnlimited
+                      ? S.planUsedUnlimited(
+                          b.used.toLocaleString("en-US"),
+                          S.pricingUnlimited,
+                        )
+                      : S.opsBudgetLine(b.used, b.allowance, b.remaining)}
                   </span>
-                  <BudgetMeter
-                    used={b.used}
-                    allowance={b.allowance}
-                    state={state}
-                    label={label}
-                    sentence={S.opsShare(share, S.budgetMessages[state])}
-                  />
+                  {!isUnlimited && (
+                    <BudgetMeter
+                      used={b.used}
+                      allowance={b.allowance}
+                      state={state}
+                      label={label}
+                      sentence={S.opsShare(share, S.budgetMessages[state])}
+                    />
+                  )}
                 </li>
               );
             })}
