@@ -15,6 +15,7 @@ import {
   Link,
   Outlet,
   useLocation,
+  Navigate,
 } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DirectionProvider } from "@radix-ui/react-direction";
@@ -463,6 +464,11 @@ function DirectionRoot({ children }: { children: React.ReactNode }) {
   );
 }
 
+function OpsRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/sync${location.search}${location.hash}`} replace />;
+}
+
 /** Everything under the router, for either way of mounting it. */
 const app = (
   <React.StrictMode>
@@ -481,6 +487,7 @@ const app = (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/account" element={<Account />} />
               <Route path="/sync" element={<Sync />} />
+              <Route path="/ops" element={<OpsRedirect />} />
               <Route path="/connected" element={<Connected />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/users" element={<AdminUsers />} />
