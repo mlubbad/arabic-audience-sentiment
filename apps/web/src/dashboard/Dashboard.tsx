@@ -348,6 +348,19 @@ function DashboardBody({
       ? (commentsRes?.next_cursor ?? String(cursors.length + 1))
       : null;
 
+    const rawMeasurable = (agg.measurable ?? []) as Label[];
+    // A model cannot measure a class it lacks (see migration 20260914120000).
+    // If the active model does not support mixed (e.g. CAMeLBERT-DA is 3-class)
+    // or if mixed is omitted from measurable, ensure mixed is not treated as measurable.
+    const isThreeClass =
+      Boolean(
+        agg.active_analysis_key &&
+          agg.active_analysis_key.toLowerCase().includes("camelbert"),
+      ) || !rawMeasurable.includes("mixed");
+    const measurableLabels = isThreeClass
+      ? rawMeasurable.filter((l) => l !== "mixed")
+      : rawMeasurable;
+
     return {
       workspace_total: agg.workspace_total,
       channel_own_comments: agg.channel_own_comments,
@@ -355,7 +368,7 @@ function DashboardBody({
       analysed: agg.analysed,
       unanalysed: agg.unanalysed,
       sentiments: agg.sentiments,
-      measurable: new Set((agg.measurable ?? []) as Label[]),
+      measurable: new Set(measurableLabels),
       negative_ranked: agg.negative_ranked ?? 0,
       negative_unranked: agg.negative_unranked ?? 0,
       timeline: Object.entries(agg.timeline ?? {})
