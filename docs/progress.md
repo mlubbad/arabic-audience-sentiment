@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-09-22 — Omnichannel Data Ingestion Audit, Hardening & End-to-End Testing (Twitter, TikTok, Telegram)
+
+Comprehensive inspection, hardening, and hermetic end-to-end testing for Twitter (X), TikTok, and Telegram ingestion:
+- **Collector Hardening & Anti-Silent Failure Protection**:
+  - Bound to golden rule: *"Treat collection failures as partial/failed, never as successful empty datasets."*
+  - **Twitter / X (`x_collector.py`)**: Captured scraper errors, eliminated empty fallback batches (`Batch([], outcome="exhausted")`), and raised `CollectionError("comments_scraper_not_configured", "blocked")`.
+  - **TikTok (`tiktok_collector.py`)**: Added SlardarWAF / anti-bot challenge detection. Blocked empty `complete=True` reports when challenges occur, and raised explicit errors when scraper keys are missing.
+  - **Telegram (`telegram_collector.py`)**: Normalized channel handles, fixed block regex with `\b` word boundary to parse full post bodies with Arabic reply counts (`تعليق`, `رد`), and mapped HTTP 401 discussion endpoint to `telegram_discussion_requires_auth`.
+  - **Apify Scraper (`apify.py`)**: Extended default timeout to 90s and mapped 502/504 errors as retryable.
+  - **Environment (`loop.py`)**: Added automatic loading of `.env.local` and `.env` on worker bootstrap.
+- **Hermetic E2E Test Suite (`test_omnichannel_e2e.py`)**:
+  - Implemented 8 comprehensive end-to-end integration tests covering discovery, backfill, sentiment analysis integration (`DeterministicTestAnalyzer`), and cross-workspace deduplication.
+  - 100% pass rate across all 8 tests (total 270 worker tests passing).
+- **Operator Diagnostic CLI (`npm run omnichannel:check`)**:
+  - Added `src/collectors/diagnostics.py` with CLI command to probe external credentials, APIs, and bot-challenge status across all platforms with clear Arabic/English operator guidance.
+- **Full Verification**:
+  - `npm run check` passed 100% across all gates: lint, types, Prettier, Deno, Vitest web, Vitest DB (382 tests), and secrets.
+
 ## 2026-09-22 — Instant Unified Multi-Workspace Content Adoption (قاعدة البيانات الواحدة الشاملة)
 
 Completed user request for single-database deduplication and immediate analytics visibility across workspaces without requiring video re-selection:
