@@ -40,7 +40,7 @@ export type CatalogueRead = RawCatalogue & {
 };
 
 /** How many rows of a video are in the database. */
-export type StoredCount = { id: string; total: number };
+export type StoredCount = { id: string; total: number; analysed?: number };
 
 /**
  * Rows stored per video, from the source's comments.
@@ -75,13 +75,15 @@ export function mergeCatalogue(
   raw: RawCatalogue,
   collected: StoredCount[],
 ): CatalogueVideo[] {
-  const stored = new Map(collected.map((v) => [v.id, v.total]));
+  const stored = new Map(collected.map((v) => [v.id, v]));
   const chosen = new Map(raw.selections.map((s) => [s.video_id, s]));
   return raw.videos.map((v) => {
     const s = chosen.get(v.id);
+    const countInfo = stored.get(v.id);
     return CatalogueVideoSchema.parse({
       ...v,
-      collected: stored.get(v.id) ?? 0,
+      collected: countInfo?.total ?? 0,
+      analysed: countInfo?.analysed ?? 0,
       selected: !!s,
       last_collected_at: s?.last_collected_at ?? null,
       last_outcome: s?.last_outcome ?? null,

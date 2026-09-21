@@ -1,6 +1,21 @@
 # Verification
 
-## 2026-09-20 — Full End-to-End X (Twitter) & TikTok Channel Support
+## 2026-09-22 — Cross-Workspace Deduplication & Catalogue Stored Counts
+
+| Command / observation | Actual result |
+| --- | --- |
+| Database test suite: `npm run test:db` | **42 test files passed, 382 tests passed (100% green)**, including dedicated multi-tenant adoption test in `cross_workspace_deduplication.test.ts`. |
+| Web unit tests: `npm test` | **117 test files passed, 914 tests passed (100% green)**, verifying `Catalogue.tsx`, `catalogue.ts`, `ops.ts`, `selection.ts`. |
+| Python worker test suite: `npm run worker:test` | **262 tests passed in 4.34s (100% green)**. |
+| Python worker linter: `npm run worker:lint` | All checks passed cleanly (0 errors). |
+| Web linter: `npm run lint` | ESLint passed cleanly with 0 errors, 0 warnings. |
+| Code formatting: `npm run format:check` | 100% verified with Prettier. |
+| TypeScript typecheck: `npm run typecheck` | Passed cleanly (`tsc --noEmit`, 0 errors). |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`. |
+| Production build & prerender: `npm run build` | Built in 1.24s; 8 prerendered static pages generated cleanly; 0 build errors. |
+| Secrets scan: `npm run check:secrets` | Secret-pattern checks passed across 725 source files and built assets (0 secrets detected). |
+| Repository check gate: `npm run check` | **100% green exit code 0**. |
+
 
 | Command / observation | Actual result |
 | --- | --- |

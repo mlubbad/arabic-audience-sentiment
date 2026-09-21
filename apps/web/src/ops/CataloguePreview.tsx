@@ -120,6 +120,15 @@ export function CataloguePreview({
               {video.reported_comment_count === null
                 ? S.catCountUnknown
                 : video.reported_comment_count}
+              {video.collected > 0 && (
+                <>
+                  {" · "}
+                  {S.catPreviewCollectedInfo(
+                    video.collected,
+                    video.analysed ?? 0,
+                  )}
+                </>
+              )}
             </span>
             <a
               href={

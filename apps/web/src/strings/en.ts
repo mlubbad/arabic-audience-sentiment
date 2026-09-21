@@ -852,6 +852,17 @@ export const en: Strings = {
   catStateWaiting: "Waiting to be collected",
   catStateCollecting: "Collecting now",
   catStateCollected: (n: number, when: string) => `Collected ${n} on ${when}`,
+  catStateCollectedOnly: (n: number) => `Collected ${n}`,
+  catStateAnalysedOnly: (n: number) => `Classified ${n}`,
+  catStateCollectedAnalysed: (col: number, ana: number) =>
+    `Collected ${col} (${ana} classified)`,
+  catSummaryTitle: "Saved channel content summary",
+  catTotalCollected: (n: number) => `Total stored: ${n} comments`,
+  catTotalAnalysed: (n: number) => `Classified: ${n}`,
+  catVideosStored: (n: number) => `Stored videos: ${n}`,
+  catNextSyncSelected: (n: number) => `Selected for next sync: ${n}`,
+  catPreviewCollectedInfo: (col: number, ana: number) =>
+    `Stored in database: ${col} comments (${ana} classified)`,
   catStateDisabled: "Comments disabled",
   catStatePartial: "Partial",
   catStateUnchanged: "Unchanged since the last read",

@@ -40,6 +40,7 @@ export const CatalogueVideoSchema = z
     reported_comment_count: z.number().int().nonnegative().nullable(),
     comments_state: z.enum(["unknown", "open", "disabled"]),
     collected: z.number().int().nonnegative(),
+    analysed: z.number().int().nonnegative().optional(),
     selected: z.boolean(),
     last_collected_at: z.string().nullable(),
     last_outcome: z.string().nullable(),

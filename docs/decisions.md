@@ -1,6 +1,23 @@
 # Implementation decisions
  
-2026-09-20 — X (Twitter) & TikTok Collectors with Dual-Mode (API Token + Zero-Key Public Fallback).
+2026-09-22 — Cross-Workspace Deduplication & Unified Database Architecture (قاعدة البيانات الواحدة).
+When multiple workspaces monitor the same public channel (e.g. YouTube `@channel_id`), or when a user unselects videos to preserve their daily YouTube API quota (10,000 units), two critical operational issues arose:
+1. Workspaces re-fetching and re-analysing identical videos and comments wasted limited YouTube quota and compute power.
+2. In the sync catalogue UI, unselecting videos collapsed their visible metrics to "غير محدد" (Unselected) without communicating how many comments had already been gathered and classified in the database for those videos.
+
+To resolve this on the principle of "قاعدة البيانات الواحدة بمعرف واحد فريد لكل من القناة والفيديو والتعليق" (Single Database source of truth with unique external identifiers):
+1. **Cross-Workspace Asset Adoption (`20260922010000_cross_workspace_deduplication.sql`)**:
+   - `private.adopt_channel_catalogue(w uuid, c uuid)`: When a channel is registered or updated, any videos catalogued under identical `(platform, external_channel_id)` in other workspaces are adopted into target workspace `w` without needing YouTube API calls.
+   - `private.adopt_video_comments_and_predictions(w uuid, v uuid)`: When videos are selected in workspace `w`, comments, analysis runs, sentiment predictions, and topic predictions existing for `(platform, external_video_id)` in any donor workspace are adopted into workspace `w`.
+   - Idempotent adoption sets `video_selections.last_outcome = 'exhausted'`, `last_seen_comment_count = count`, and pushes `next_check_at` forward by 24 hours so workers avoid consuming YouTube quota on already-collected content.
+   - Automated backfill migrates existing multi-tenant channels. Exposed authenticated RPC `public.adopt_workspace_channel(w, c)` for workspace owners/analysts.
+2. **Persistent Stored & Classified Visibility for Unselected Videos**:
+   - Updated `private.workspace_ops_snapshot_impl` to compute `analysed` comment count per video and workspace-level `catalogue_summary`.
+   - Updated contracts `@sentiment/contracts` (`OpsVideoCountSchema`, `CatalogueVideoSchema`, `CatalogueSummarySchema`).
+   - Enhanced UI (`Catalogue.tsx`, `CataloguePreview.tsx`):
+     - Displays an executive summary banner showing total collected comments, total classified comments, and count of videos with stored data.
+     - Badges on unselected videos with stored comments display `غير محدد · جُمع X (صُنّف Y)` so creators always know their data is preserved and accessible.
+
 To provide seamless support for X and TikTok channels without requiring operators or end-users to navigate developer portals or restrictive API registration (which are blocked by automated CAPTCHAs and mobile OTPs):
 1. Both `XCollector` and `TikTokCollector` implement a resilient dual-mode strategy:
    - When API credentials (`X_BEARER_TOKEN`, `TIKTOK_ACCESS_TOKEN`) are configured in the environment, the collectors use the official API v2 endpoints.

@@ -1,6 +1,30 @@
 # Progress
 
-## 2026-09-21 — Storytelling with Data Dashboard Transformation
+## 2026-09-22 — Cross-Workspace Deduplication & Stored Comments Catalogue Visibility
+
+Addressed user requirement for single-database deduplication across workspaces and fixed visibility of collected/classified comments when videos are unselected to conserve YouTube's 10,000 daily API quota:
+
+1. **Persistent Stored & Classified Comment Visibility for Unselected Videos**:
+   - When a user unselects videos to preserve API quota, the sync catalogue (`/sync`) previously showed "غير محدد" without any comment metrics, obscuring that the comments were already stored and classified.
+   - Enhanced `private.workspace_ops_snapshot_impl` to calculate per-video `analysed` sentiment count in addition to `total` stored comments, plus workspace-level `catalogue_summary` (`total_comments_collected`, `total_comments_analysed`, `videos_with_comments`).
+   - Extended contracts `@sentiment/contracts` (`OpsVideoCountSchema`, `CatalogueVideoSchema`, `CatalogueSummarySchema`) and `mergeCatalogue`.
+   - Updated `Catalogue.tsx` and `CataloguePreview.tsx`:
+     - Added executive summary statistics bar at the top of the catalogue displaying total comments stored, total classified comments, and count of videos with stored data.
+     - Updated video row badges: unselected videos with stored comments display `غير محدد · جُمع X (صُنّف Y)` with a dedicated subtle badge tone (`unselected_stored`), giving full reassurance of data safety while preventing accidental re-collection.
+
+2. **Cross-Workspace Deduplication Across Channels, Videos, and Comments (قاعدة البيانات الواحدة)**:
+   - Built migration `supabase/migrations/20260922010000_cross_workspace_deduplication.sql`:
+     - Single-database principle using canonical unique keys `(platform, external_channel_id)`, `(platform, external_video_id)`, `(platform, external_comment_id)`.
+     - `private.adopt_channel_catalogue`: Automatically adopts video catalogue rows from any donor workspace monitoring the same channel into target workspace `w`.
+     - `private.adopt_video_comments_and_predictions`: Adopts comments, analysis runs, sentiment predictions, and topic predictions from donor workspaces when a video is selected.
+     - Automatically updates `video_selections` to `last_outcome = 'exhausted'`, `last_seen_comment_count = count`, and delays `next_check_at` by 24 hours to prevent workers from hitting YouTube quota for already-collected videos.
+     - Hooked into `register_public_channel_impl` and `select_videos_impl`, plus exposed authenticated RPC `public.adopt_workspace_channel(w, c)`.
+     - Runs automated backfill loop for existing multi-tenant channels.
+   - Comprehensive test suite in `supabase/tests/cross_workspace_deduplication.test.ts` verifying end-to-end multi-tenant adoption of videos, comments, and sentiment predictions without YouTube API calls.
+
+3. **Full Repository Verification**:
+   - 100% green across all verification gates: 42 database test files (382 tests), 117 web test files (914 tests), 262 Python worker tests, ESLint, Prettier, TypeScript typecheck, Deno check, Vite build, prerendering, and secret scanner.
+
 
 Transformed the Arabic-first analytics dashboard into an executive data narrative guided by the `/storytelling-with-data` framework (Cole Nussbaumer Knaflic), enhancing cognitive clarity, preattentive visual hierarchy, and actionable decision-making:
 

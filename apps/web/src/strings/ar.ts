@@ -844,6 +844,17 @@ export const ar = {
   catStateWaiting: "بانتظار الجمع",
   catStateCollecting: "يُجمع الآن",
   catStateCollected: (n: number, when: string) => `جُمع ${n} في ${when}`,
+  catStateCollectedOnly: (n: number) => `جُمع ${n}`,
+  catStateAnalysedOnly: (n: number) => `صُنّف ${n}`,
+  catStateCollectedAnalysed: (col: number, ana: number) =>
+    `جُمع ${col} (صُنّف ${ana})`,
+  catSummaryTitle: "ملخص المحتوى المحفوظ من القناة",
+  catTotalCollected: (n: number) => `إجمالي المحفوظ: ${n} تعليقاً`,
+  catTotalAnalysed: (n: number) => `المصنّف: ${n}`,
+  catVideosStored: (n: number) => `فيديوهات محفوظة: ${n}`,
+  catNextSyncSelected: (n: number) => `محدد للمزامنة القادمة: ${n}`,
+  catPreviewCollectedInfo: (col: number, ana: number) =>
+    `المحفوظ في القاعدة: ${col} تعليق (صُنّف منها ${ana})`,
   catStateDisabled: "تعليقات معطّلة",
   catStatePartial: "جزئي",
   // The live check found the comment count where the last read left it:

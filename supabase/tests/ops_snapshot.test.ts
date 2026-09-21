@@ -115,6 +115,13 @@ describe("workspace_ops_snapshot RPC", () => {
     await as(ownerA);
     const data = await readOps(A);
     const parsed = OpsSnapshotSchema.parse(data);
-    expect(parsed.video_counts).toEqual([{ id: videoId, total: 2 }]);
+    expect(parsed.video_counts).toEqual([
+      { id: videoId, total: 2, analysed: 0 },
+    ]);
+    expect(parsed.catalogue_summary).toEqual({
+      total_comments_collected: 2,
+      total_comments_analysed: 0,
+      videos_with_comments: 1,
+    });
   });
 });

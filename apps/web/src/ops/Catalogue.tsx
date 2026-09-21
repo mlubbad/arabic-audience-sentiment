@@ -220,7 +220,15 @@ export function Catalogue({
 
   const state = (r: CatalogueVideo) => {
     if (r.comments_state === "disabled") return S.catStateDisabled;
-    if (!r.selected) return S.catStateUnselected;
+    if (!r.selected) {
+      if (r.collected > 0) {
+        if (r.analysed && r.analysed > 0) {
+          return `${S.catStateUnselected} · ${S.catStateCollectedAnalysed(r.collected, r.analysed)}`;
+        }
+        return `${S.catStateUnselected} · ${S.catStateCollectedOnly(r.collected)}`;
+      }
+      return S.catStateUnselected;
+    }
     // The live check compared the source's comment count with the one the
     // last read ended at and found it the same: the read is up to date. It
     // is a healthy state, and filing it under "partial" would make a video
@@ -228,11 +236,22 @@ export function Catalogue({
     if (r.last_outcome === "unchanged") return S.catStateUnchanged;
     if (r.last_outcome && r.last_outcome !== "exhausted")
       return `${S.catStatePartial} · ${explainCode(r.last_outcome, S) ?? r.last_outcome}`;
-    if (r.last_collected_at)
-      return S.catStateCollected(
+    if (r.last_collected_at) {
+      const base = S.catStateCollected(
         r.collected,
         displayDate(r.last_collected_at, lang),
       );
+      if (r.analysed && r.analysed > 0) {
+        return `${base} (${S.catStateAnalysedOnly(r.analysed)})`;
+      }
+      return base;
+    }
+    if (r.collected > 0) {
+      if (r.analysed && r.analysed > 0) {
+        return `${S.catStateCollectedOnly(r.collected)} (${S.catStateAnalysedOnly(r.analysed)})`;
+      }
+      return S.catStateCollectedOnly(r.collected);
+    }
     return collecting ? S.catStateCollecting : S.catStateWaiting;
   };
   // The state badge's tone: a disabled video is a warning the reader can do
@@ -242,9 +261,30 @@ export function Catalogue({
       ? "disabled"
       : r.selected
         ? "selected"
-        : "none";
+        : r.collected > 0
+          ? "unselected_stored"
+          : "none";
   const toneOf = (s: ReturnType<typeof stateOf>) =>
-    s === "disabled" ? "warning" : s === "selected" ? "success" : "neutral";
+    s === "disabled"
+      ? "warning"
+      : s === "selected"
+        ? "success"
+        : s === "unselected_stored"
+          ? "neutral"
+          : "neutral";
+
+  const totalCollectedAcrossRows = useMemo(
+    () => rows.reduce((acc, r) => acc + r.collected, 0),
+    [rows],
+  );
+  const totalAnalysedAcrossRows = useMemo(
+    () => rows.reduce((acc, r) => acc + (r.analysed ?? 0), 0),
+    [rows],
+  );
+  const videosWithStoredComments = useMemo(
+    () => rows.filter((r) => r.collected > 0).length,
+    [rows],
+  );
 
   return (
     <section
@@ -257,6 +297,42 @@ export function Catalogue({
         <h2 id="cat-heading">{S.catTitle}</h2>
         <p className="db-lead">{S.catLead}</p>
       </header>
+      {!read.isPending && !read.isError && totalCollectedAcrossRows > 0 && (
+        <aside
+          className="db-cat-stats"
+          data-testid="cat-stored-stats"
+          aria-label={S.catSummaryTitle}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+            padding: "0.75rem 1rem",
+            background:
+              "var(--color-surface-subtle, rgba(255, 255, 255, 0.03))",
+            border: "1px solid var(--color-border, rgba(255, 255, 255, 0.08))",
+            borderRadius: "8px",
+            marginBottom: "1rem",
+            fontSize: "0.875rem",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>📊 {S.catSummaryTitle}:</span>
+          <Badge tone="success">
+            {S.catTotalCollected(totalCollectedAcrossRows)}
+          </Badge>
+          {totalAnalysedAcrossRows > 0 && (
+            <Badge tone="positive">
+              {S.catTotalAnalysed(totalAnalysedAcrossRows)}
+            </Badge>
+          )}
+          <Badge tone="neutral">
+            {S.catVideosStored(videosWithStoredComments)}
+          </Badge>
+          <Badge tone={ticked.size > 0 ? "success" : "neutral"}>
+            {S.catNextSyncSelected(ticked.size)}
+          </Badge>
+        </aside>
+      )}
       {read.isPending ? (
         <p role="status" className="db-muted db-cat-reading">
           {S.opsReading}
