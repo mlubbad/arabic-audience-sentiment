@@ -17,11 +17,9 @@ import {
   byHour,
   byWeek,
   byWeekday,
-  commenters,
   hoursToBucketed,
   weekdaysToBucketed,
   weeksToBucketed,
-  peopleToCommenters,
 } from "../analytics";
 import { pageSlice } from "../videoPaging";
 import {
@@ -66,9 +64,6 @@ import { Summary } from "./Summary";
 import { Videos } from "./Videos";
 import { Voice } from "./Voice";
 import { Timing } from "./Timing";
-import { People } from "./People";
-import { Compare } from "./Compare";
-import { Engaged } from "./Engaged";
 import { Comments } from "./Comments";
 import { ReviewDialog } from "./ReviewDialog";
 import {
@@ -95,9 +90,10 @@ ChartJS.register(
   Legend,
 );
 
-/** Video cards per page of the videos section. The same size as the comments
- *  pager's default, so the two lists turn at the same rhythm. */
-const VIDEOS_PER_PAGE = 25;
+/** Video cards per page of the videos section. Showing the top 6 busiest
+ *  videos keeps vertical scrolling compact while pagination lets the user
+ *  explore the rest. */
+const VIDEOS_PER_PAGE = 6;
 
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export type Snapshot = ReturnType<typeof deriveSnapshot>;
@@ -853,14 +849,6 @@ function DashboardBody({
     return byWeek(rows);
   }, [pre, rows]);
 
-  const [peopleBy, setPeopleBy] = useState<"comments" | "likes">("comments");
-  const people = useMemo(() => {
-    if (pre?.people && Array.isArray(pre.people) && pre.people.length > 0) {
-      return peopleToCommenters(pre.people);
-    }
-    return commenters(rows, peopleBy);
-  }, [pre, rows, peopleBy]);
-
   // The videos on screen: 25 of the filtered list, busiest first. The index
   // is clamped inside pageSlice, so a filter that shrinks the list under a
   // reader on page four shows the last page that still exists, not a blank.
@@ -900,17 +888,17 @@ function DashboardBody({
       return list
         .filter((c) => c.label === "negative")
         .sort((a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1))
-        .slice(0, 12);
+        .slice(0, 3);
     if (cardTab === "recent")
       return list
         .filter((c) => c.published_at)
         .sort((a, b) => (a.published_at! < b.published_at! ? 1 : -1))
-        .slice(0, 12);
+        .slice(0, 3);
     // Unknown like counts sort last rather than as zero, so a comment whose
     // count could not be read is never presented as the least liked.
     return list
       .sort((a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1))
-      .slice(0, 12);
+      .slice(0, 3);
   }, [
     cardsQuery.data,
     s?.active_analysis_key,
@@ -1055,6 +1043,7 @@ function DashboardBody({
             )
           ) : (
             <>
+              <Voice s={s} S={S} labels={labels} topicName={topicName} />
               <Videos
                 s={s}
                 S={S}
@@ -1063,7 +1052,6 @@ function DashboardBody({
                 onTurn={turnVideoPage}
                 onPick={pickVideo}
               />
-              <Voice s={s} S={S} labels={labels} topicName={topicName} />
               <Timing
                 s={s}
                 S={S}
@@ -1071,9 +1059,6 @@ function DashboardBody({
                 weekdays={weekdays}
                 weeks={weeks}
               />
-              <People S={S} people={people} by={peopleBy} onBy={setPeopleBy} />
-              <Compare s={s} S={S} labels={labels} onPick={pickVideo} />
-              <Engaged s={s} S={S} />
               <Comments
                 s={s}
                 S={S}

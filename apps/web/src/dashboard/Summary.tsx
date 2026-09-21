@@ -175,48 +175,6 @@ export function Summary({
           <small className="db-note">{S.metricAuthorsNote}</small>
         </Card>
       </div>
-      <div className="db-grid" style={{ marginTop: "var(--space-4)" }}>
-        {/* Named, not numbered: these four are independent readings — how
-            much was analysed, how much is audience-to-audience, how
-            concentrated the talk is, how much of it can be placed in time —
-            not steps in a sequence. */}
-        <Card className="db-insight">
-          <p className="db-insight-tag">{S.insightAnalysis}</p>
-          <p>
-            {s.total > 0
-              ? S.insightAnalysed(Math.round((s.analysed / s.total) * 100))
-              : S.insightNoMatches}
-          </p>
-        </Card>
-        <Card className="db-insight">
-          <p className="db-insight-tag">{S.insightReplies}</p>
-          <p>
-            {s.total > 0
-              ? S.insightRepliesShare(Math.round((s.replies / s.total) * 100))
-              : S.insightRepliesNone}
-          </p>
-        </Card>
-        <Card className="db-insight">
-          <p className="db-insight-tag">{S.insightConcentration}</p>
-          <p>
-            {s.videos.length > 0
-              ? S.insightTopVideo(
-                  n(s.videos[0].total),
-                  n(s.total),
-                  Math.round((s.videos[0].total / s.total) * 100),
-                )
-              : S.insightNoVideo}
-          </p>
-        </Card>
-        <Card className="db-insight">
-          <p className="db-insight-tag">{S.insightDates}</p>
-          <p>
-            {s.unknown_dates > 0
-              ? S.insightUndated(n(s.unknown_dates))
-              : S.insightAllDated}
-          </p>
-        </Card>
-      </div>
     </section>
   );
 }

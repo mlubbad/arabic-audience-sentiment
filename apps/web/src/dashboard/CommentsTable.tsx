@@ -61,7 +61,10 @@ function SentimentChip({
 }) {
   const score = confidencePct(c);
   return (
-    <Badge tone={c.label ? SENTIMENT_TONE[c.label] : "neutral"}>
+    <Badge
+      tone={c.label ? SENTIMENT_TONE[c.label] : "neutral"}
+      className={!c.label ? "db-chip-unanalysed" : undefined}
+    >
       {c.label ? labels[c.label] : noLabelText}
       {score !== null && (
         <span className="db-chip-score">
@@ -117,6 +120,7 @@ function RowActions({
       <Button
         variant="ghost"
         size="sm"
+        className="db-action-btn"
         onClick={(e) => onReview(c, e.currentTarget)}
         aria-label={S.correctLabelFor(who)}
       >
@@ -126,6 +130,7 @@ function RowActions({
         <Button
           variant="ghost"
           size="sm"
+          className="db-action-btn"
           onClick={(e) => onTopicReview(c, e.currentTarget)}
           aria-label={S.correctTopicFor(who)}
         >

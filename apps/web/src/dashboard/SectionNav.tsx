@@ -20,12 +20,9 @@ import "./section-nav.css";
 
 export const SECTIONS = [
   { id: "rp-summary", label: "secSummary" },
-  { id: "rp-videos", label: "secVideos" },
   { id: "rp-voice", label: "secVoice" },
+  { id: "rp-videos", label: "secVideos" },
   { id: "rp-timing", label: "secTiming" },
-  { id: "rp-people", label: "secPeople" },
-  { id: "rp-compare", label: "secCompare" },
-  { id: "rp-engaged", label: "secEngaged" },
   { id: "rp-comments", label: "secComments" },
 ] as const satisfies readonly { id: string; label: StringKey }[];
 
