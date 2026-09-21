@@ -44,6 +44,7 @@ import {
   submitTopicReview,
 } from "../data";
 import { failureCode } from "../failure";
+import { supabase } from "../supabase";
 import { useSession, useWorkspaces } from "../session";
 import { useWorkspaceSelection } from "../workspaceSelection";
 import { WorkspaceGate } from "../WorkspaceGate";
@@ -235,6 +236,8 @@ function DashboardBody({
     queryFn: ({ signal }) =>
       loadDashboardAggregates(mode, workspaceId, page, signal),
     enabled: mode === "live" && !read.data,
+    retry: 1,
+    retryDelay: 1000,
   });
 
   const pageOffset = cursors.length * limit;
@@ -267,6 +270,8 @@ function DashboardBody({
         signal,
       ),
     enabled: mode === "live" && !read.data,
+    retry: 1,
+    retryDelay: 1000,
   });
 
   const cardsParamsKey = useMemo(
@@ -293,6 +298,8 @@ function DashboardBody({
         signal,
       ),
     enabled: mode === "live" && !read.data,
+    retry: 1,
+    retryDelay: 1000,
   });
 
   // For the empty state's setup path only; live only, and cheap.
@@ -429,9 +436,17 @@ function DashboardBody({
       : read.isError || derived?.ok === false,
     refetch: () => {
       if (isLiveServer) {
-        aggregatesQuery.refetch();
-        commentsQuery.refetch();
-        cardsQuery.refetch();
+        if (supabase) {
+          void supabase.auth.refreshSession().finally(() => {
+            aggregatesQuery.refetch();
+            commentsQuery.refetch();
+            cardsQuery.refetch();
+          });
+        } else {
+          aggregatesQuery.refetch();
+          commentsQuery.refetch();
+          cardsQuery.refetch();
+        }
       } else {
         read.refetch();
       }

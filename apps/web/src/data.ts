@@ -218,16 +218,67 @@ async function readFixture(signal?: AbortSignal) {
 }
 
 /**
+ * Executes a Supabase RPC call with proactive session verification and automatic
+ * refresh-and-retry on auth/permission errors (42501 / PGRST301 / expired token).
+ */
+async function callRpcWithAuthRetry<T>(
+  rpcName: string,
+  args: Record<string, unknown>,
+): Promise<T> {
+  if (!supabase) throw new Error("live_unavailable");
+
+  // Proactively check if the access token has expired or is expiring in < 15s.
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    if (session?.expires_at && session.expires_at * 1000 < Date.now() + 15000) {
+      await supabase.auth.refreshSession();
+    }
+  } catch {
+    // Non-blocking; proceed to attempt RPC
+  }
+
+  let { data, error } = await supabase.rpc(rpcName, args);
+
+  // If PostgREST returned forbidden or expired token, refresh session and retry once.
+  if (
+    error &&
+    (error.code === "42501" ||
+      error.code === "PGRST301" ||
+      error.message?.includes("JWT") ||
+      error.message?.includes("token") ||
+      error.message?.includes("expired"))
+  ) {
+    try {
+      const { data: refreshData, error: refreshError } =
+        await supabase.auth.refreshSession();
+      if (!refreshError && refreshData.session) {
+        const retryResult = await supabase.rpc(rpcName, args);
+        data = retryResult.data;
+        error = retryResult.error;
+      }
+    } catch {
+      // Continue to error handling
+    }
+  }
+
+  if (error) {
+    console.error(`[RPC ${rpcName}] error:`, error);
+    throw new Error("live_unavailable");
+  }
+
+  return data as T;
+}
+
+/**
  * The live read. Parsed with the schema that shares its field definitions with
  * the fixture, so a server that answers with a different shape is refused here
  * rather than rendered as a half-populated dashboard.
  */
 async function readLive(workspace: string) {
-  const { data, error } = await supabase!.rpc("dashboard_snapshot", {
+  const data = await callRpcWithAuthRetry<unknown>("dashboard_snapshot", {
     w: workspace,
   });
-  // The reason is not surfaced: a PostgREST error can carry the request URL.
-  if (error) throw new Error("live_unavailable");
   return LiveSnapshotSchema.parse(data);
 }
 
@@ -249,17 +300,14 @@ export async function loadSource(
 /** Everything one read of the source answers, before any filter is applied. */
 export type Source = Awaited<ReturnType<typeof loadSource>>;
 
-/**
- * Reads lightweight operational status for a workspace: sync health, quota usage,
- * and comments stored per video.
- */
 async function readOpsLive(workspace: string): Promise<OpsSnapshot> {
-  const { data, error } = await supabase!.rpc("workspace_ops_snapshot", {
+  const data = await callRpcWithAuthRetry<unknown>("workspace_ops_snapshot", {
     w: workspace,
   });
-  if (error) throw new Error("live_unavailable");
   return OpsSnapshotSchema.parse(data);
 }
+
+export const loadWorkspaceOps = readOpsLive;
 
 /**
  * Derives operational status from fixture data for offline/test mode.
@@ -612,11 +660,10 @@ export async function loadDashboardAggregates(
 ): Promise<DashboardAggregates> {
   if (mode === "live") {
     const f = filtersToRpc(filters);
-    const { data, error } = await supabase!.rpc("dashboard_aggregates", {
+    const data = await callRpcWithAuthRetry<unknown>("dashboard_aggregates", {
       w: workspace,
       f,
     });
-    if (error) throw new Error("live_unavailable");
     return DashboardAggregatesSchema.parse(data);
   }
 
@@ -707,11 +754,10 @@ export async function loadDashboardComments(
   signal?: AbortSignal,
 ): Promise<DashboardCommentsResponse> {
   if (mode === "live") {
-    const { data, error } = await supabase!.rpc("dashboard_comments", {
+    const data = await callRpcWithAuthRetry<unknown>("dashboard_comments", {
       w: workspace,
       f: params,
     });
-    if (error) throw new Error("live_unavailable");
     return DashboardCommentsResponseSchema.parse(data);
   }
 

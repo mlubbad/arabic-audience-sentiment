@@ -100,7 +100,12 @@ const LegalPage = lazy(() =>
   import("./LegalPage").then((m) => ({ default: m.LegalPage })),
 );
 const client = new QueryClient({
-  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  defaultOptions: {
+    queries: {
+      retry: (failureCount) => failureCount < 1,
+      refetchOnWindowFocus: false,
+    },
+  },
 });
 
 function NavIcon({ to }: { to: string }) {
