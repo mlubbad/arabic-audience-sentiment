@@ -44,6 +44,27 @@
 .app-announcement span + span {
   color: var(--ml-indigo-300);
 }
+.app-admin-inspection-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+  color: var(--text-1);
+  font-size: var(--fs-small);
+  font-weight: 500;
+}
+.app-admin-inspection-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.app-admin-inspection-btn {
+  font-size: var(--fs-small);
+  height: 2rem;
+}
 .app-shell > .app-header {
   /* Level 2. Pinned, so the page passes behind it rather than under a lid. */
   position: sticky;

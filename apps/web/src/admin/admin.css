@@ -29,6 +29,12 @@
 .db-admin-wrap .ui-table td.db-admin-delete {
   text-align: end;
 }
+.db-admin-cell-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
 .db-admin-wrap .ui-table .db-admin-levers-row td {
   white-space: normal;
   padding-top: 0;

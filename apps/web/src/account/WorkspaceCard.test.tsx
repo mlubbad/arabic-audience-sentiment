@@ -12,6 +12,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ar } from "../strings/ar";
+import type { ChannelCandidate } from "@sentiment/contracts";
 import { WorkspaceCard, type ChannelRow } from "./WorkspaceCard";
 
 const W = "00000000-0000-4000-8000-0000000000a2";
@@ -31,7 +32,10 @@ type Props = Parameters<typeof WorkspaceCard>[0];
  *  the role query would find four. */
 const card = () => document.querySelector("ul > li") as HTMLElement;
 
-function mount(over: Partial<Props> = {}) {
+function mount(
+  over: Partial<Props> = {},
+  customRerender?: (ui: React.ReactElement) => void,
+) {
   const props: Props = {
     workspace: { id: W, name: "مطبخ ريم" },
     hasClient: true,
@@ -42,14 +46,19 @@ function mount(over: Partial<Props> = {}) {
     onConnect: vi.fn(),
     ...over,
   };
-  const result = render(
+  const ui = (
     <MemoryRouter initialEntries={["/account"]}>
       <ul>
         <WorkspaceCard {...props} />
       </ul>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
-  return { ...props, unmount: result.unmount };
+  if (customRerender) {
+    customRerender(ui);
+    return { ...props, unmount: () => {}, rerender: customRerender };
+  }
+  const result = render(ui);
+  return { ...props, unmount: result.unmount, rerender: result.rerender };
 }
 
 describe("WorkspaceCard", () => {
@@ -95,6 +104,16 @@ describe("WorkspaceCard", () => {
       );
       expect(onRename).toHaveBeenCalledWith("cancel");
       expect(onRename).not.toHaveBeenCalledWith("save", expect.anything());
+    });
+  });
+
+  describe("share", () => {
+    it("the share door opens the share workspace dialog", async () => {
+      mount();
+      const shareBtn = screen.getByTestId(`share-${W}`);
+      expect(shareBtn).toHaveTextContent(ar.shareWorkspace);
+      await userEvent.click(shareBtn);
+      expect(screen.getByTestId(`share-dialog-${W}`)).toBeInTheDocument();
     });
   });
 
@@ -426,6 +445,8 @@ describe("WorkspaceCard", () => {
       expect(onAddChannel).toHaveBeenCalledWith(
         "search",
         "youtube.com/@alaa_jaber_official",
+        undefined,
+        "youtube",
       );
     });
 
@@ -608,6 +629,116 @@ describe("WorkspaceCard", () => {
         },
       });
       expect(screen.getByText(ar.platformTikTok)).toBeInTheDocument();
+    });
+
+    it("switches to Telegram, searches channel, sees candidate, and adds it", async () => {
+      const onAddChannel = vi.fn();
+      const telegramCandidate: ChannelCandidate = {
+        external_channel_id: "@tech_news_arabic",
+        handle: "@tech_news_arabic",
+        title: "أخبار التقنية",
+        thumbnail_url: "https://example.com/tg.jpg",
+        platform: "telegram",
+      };
+      const { rerender } = mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTelegram }),
+      );
+      const form = screen.getByTestId(`addtelegram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTelegramChannel);
+      await userEvent.type(field, "https://t.me/tech_news_arabic");
+      await userEvent.click(screen.getByTestId(`addtelegram-search-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "@tech_news_arabic",
+        undefined,
+        "telegram",
+      );
+
+      mount(
+        {
+          onAddChannel,
+          addingChannel: true,
+          channelCandidates: [telegramCandidate],
+        },
+        rerender,
+      );
+      expect(screen.getByText("أخبار التقنية")).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByTestId(
+          `addchannel-add-${telegramCandidate.external_channel_id}`,
+        ),
+      );
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "add",
+        undefined,
+        telegramCandidate,
+      );
+    });
+
+    it("switches to Telegram and shows fallback direct add button on lookup error", async () => {
+      const onAddChannel = vi.fn();
+      const { rerender } = mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTelegram }),
+      );
+      const form = screen.getByTestId(`addtelegram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTelegramChannel);
+      await userEvent.type(field, "telegram_channel");
+
+      mount(
+        {
+          onAddChannel,
+          addingChannel: true,
+          channelLookupError: "حدث خطأ في البحث",
+        },
+        rerender,
+      );
+      expect(screen.getByText("حدث خطأ في البحث")).toBeInTheDocument();
+      const fallbackBtn = screen.getByTestId(`addchannel-direct-fallback-${W}`);
+      expect(fallbackBtn).toBeInTheDocument();
+      await userEvent.click(fallbackBtn);
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "@telegram_channel",
+        handle: "@telegram_channel",
+        title: "@telegram_channel",
+        thumbnail_url: null,
+        platform: "telegram",
+      });
+    });
+
+    it("switches to X and searches account before adding", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(screen.getByRole("button", { name: ar.platformX }));
+      const form = screen.getByTestId(`addx-form-${W}`);
+      const field = within(form).getByLabelText(ar.addXChannel);
+      await userEvent.type(field, "https://x.com/aljazeera");
+      await userEvent.click(screen.getByTestId(`addx-search-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "aljazeera",
+        undefined,
+        "x",
+      );
+    });
+
+    it("switches to TikTok and searches account before adding", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTikTok }),
+      );
+      const form = screen.getByTestId(`addtiktok-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTikTokChannel);
+      await userEvent.type(field, "https://www.tiktok.com/@khaby.lame");
+      await userEvent.click(screen.getByTestId(`addtiktok-search-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "khaby.lame",
+        undefined,
+        "tiktok",
+      );
     });
   });
 });

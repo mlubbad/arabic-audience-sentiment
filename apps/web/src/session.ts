@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
-export type Workspace = { id: string; name: string };
+export type Workspace = { id: string; name: string; created_by?: string };
 
 export function useSession() {
   const [session, setSession] = useState<Session | null>(null);
@@ -56,7 +56,7 @@ export function useWorkspaces(session: Session | null) {
     queryFn: async () => {
       const { data, error } = await supabase!
         .from("workspaces")
-        .select("id,name");
+        .select("id,name,created_by");
       if (error) throw error;
       return (data ?? []) as Workspace[];
     },

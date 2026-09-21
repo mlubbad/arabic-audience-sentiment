@@ -14,10 +14,9 @@
  * step callbacks and every test id are the ones the page always used, so
  * its handlers did not move.
  */
-import type { ReactNode } from "react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import type { ChannelCandidate } from "@sentiment/contracts";
+import type { ChannelCandidate, SourcePlatform } from "@sentiment/contracts";
 import { setupProgress } from "../setup";
 import { SetupPath } from "../SetupPath";
 import { useStrings } from "../strings";
@@ -25,6 +24,7 @@ import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { Input } from "../ui/Input";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { ShareWorkspaceDialog } from "./ShareWorkspaceDialog";
 import "./account.css";
 
 export type ChannelRow = {
@@ -61,6 +61,8 @@ export function WorkspaceCard({
   onRename,
   confirmingRetire = false,
   onRetire,
+  sharing,
+  onShare,
   tourAnchor,
 }: {
   workspace: { id: string; name: string };
@@ -81,6 +83,7 @@ export function WorkspaceCard({
     step: "open" | "cancel" | "search" | "add" | "clear-error",
     value?: string,
     candidate?: ChannelCandidate,
+    platform?: SourcePlatform,
   ) => void;
   /** The add-channel form is open; the page holds that per card. */
   addingChannel?: boolean;
@@ -98,11 +101,19 @@ export function WorkspaceCard({
   onRename?: (step: "open" | "cancel" | "save", name?: string) => void;
   confirmingRetire?: boolean;
   onRetire?: (step: "ask" | "confirm" | "keep") => void;
+  sharing?: boolean;
+  onShare?: (open: boolean) => void;
   /** The onboarding tour's `data-tour` name for this card — the page gives
    *  it to the first card only, and that card's setup path is lit too. */
   tourAnchor?: string;
 }) {
   const S = useStrings();
+  const [internalShareOpen, setInternalShareOpen] = useState(false);
+  const shareOpen = sharing !== undefined ? sharing : internalShareOpen;
+  const setShareOpen = (open: boolean) => {
+    setInternalShareOpen(open);
+    onShare?.(open);
+  };
   const steps = setupProgress({ channel, latestJob }, S);
   const nameId = `rename-name-${workspace.id}`;
   const addChannelQueryId = `addchannel-query-${workspace.id}`;
@@ -120,19 +131,53 @@ export function WorkspaceCard({
   const [tikTokHandle, setTikTokHandle] = useState("");
   const [tikTokError, setTikTokError] = useState<string | null>(null);
 
-  function handleTelegramSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    let s = telegramHandle.trim();
+  function cleanTelegramHandle(raw: string): string | null {
+    let s = raw.trim();
     s = s.replace(/^https?:\/\/(www\.)?t\.me\//i, "");
     s = s.replace(/^t\.me\//i, "");
     s = s.replace(/^\//, "");
     s = s.replace(/\/.*$/, "");
+    if (!s) return null;
+    if (!s.startsWith("@")) s = "@" + s;
+    if (!/^@[A-Za-z0-9_]{4,64}$/.test(s)) return null;
+    return s;
+  }
+
+  function cleanXHandle(raw: string): string | null {
+    let s = raw.trim();
+    s = s.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i, "");
+    s = s.replace(/^(twitter|x)\.com\//i, "");
+    s = s.replace(/^\/?@?/, "");
+    s = s.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
+    if (!s || !/^[A-Za-z0-9_]{1,15}$/.test(s)) return null;
+    return s;
+  }
+
+  function cleanTikTokHandle(raw: string): string | null {
+    let s = raw.trim();
+    s = s.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, "");
+    s = s.replace(/^tiktok\.com\/@?/i, "");
+    s = s.replace(/^\/?@?/, "");
+    s = s.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
+    if (!s || !/^[A-Za-z0-9_.-]{2,30}$/.test(s)) return null;
+    return s;
+  }
+
+  function handleTelegramSearch(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const s = cleanTelegramHandle(telegramHandle);
     if (!s) {
       setTelegramError(S.addTelegramInvalidHandle);
       return;
     }
-    if (!s.startsWith("@")) s = "@" + s;
-    if (!/^@[A-Za-z0-9_]{4,64}$/.test(s)) {
+    setTelegramError(null);
+    onAddChannel?.("search", s, undefined, "telegram");
+  }
+
+  function handleTelegramSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const s = cleanTelegramHandle(telegramHandle);
+    if (!s) {
       setTelegramError(S.addTelegramInvalidHandle);
       return;
     }
@@ -146,14 +191,21 @@ export function WorkspaceCard({
     });
   }
 
+  function handleXSearch(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const s = cleanXHandle(xHandle);
+    if (!s) {
+      setXError(S.addXInvalidHandle);
+      return;
+    }
+    setXError(null);
+    onAddChannel?.("search", s, undefined, "x");
+  }
+
   function handleXSubmit(e: React.FormEvent) {
     e.preventDefault();
-    let s = xHandle.trim();
-    s = s.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i, "");
-    s = s.replace(/^(twitter|x)\.com\//i, "");
-    s = s.replace(/^\/?@?/, "");
-    s = s.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
-    if (!s || !/^[A-Za-z0-9_]{1,15}$/.test(s)) {
+    const s = cleanXHandle(xHandle);
+    if (!s) {
       setXError(S.addXInvalidHandle);
       return;
     }
@@ -167,14 +219,21 @@ export function WorkspaceCard({
     });
   }
 
+  function handleTikTokSearch(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const s = cleanTikTokHandle(tikTokHandle);
+    if (!s) {
+      setTikTokError(S.addTikTokInvalidHandle);
+      return;
+    }
+    setTikTokError(null);
+    onAddChannel?.("search", s, undefined, "tiktok");
+  }
+
   function handleTikTokSubmit(e: React.FormEvent) {
     e.preventDefault();
-    let s = tikTokHandle.trim();
-    s = s.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, "");
-    s = s.replace(/^tiktok\.com\/@?/i, "");
-    s = s.replace(/^\/?@?/, "");
-    s = s.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
-    if (!s || !/^[A-Za-z0-9_.-]{2,30}$/.test(s)) {
+    const s = cleanTikTokHandle(tikTokHandle);
+    if (!s) {
       setTikTokError(S.addTikTokInvalidHandle);
       return;
     }
@@ -186,6 +245,13 @@ export function WorkspaceCard({
       thumbnail_url: null,
       platform: "tiktok",
     });
+  }
+
+  function handleDirectAddForCurrentPlatform() {
+    const fakeEv = { preventDefault: () => {} } as React.FormEvent;
+    if (addPlatform === "telegram") handleTelegramSubmit(fakeEv);
+    else if (addPlatform === "x") handleXSubmit(fakeEv);
+    else if (addPlatform === "tiktok") handleTikTokSubmit(fakeEv);
   }
   const connected = channel?.status === "connected";
   const hasPublicChannel = channel?.status === "public_unverified";
@@ -244,15 +310,26 @@ export function WorkspaceCard({
             <h3 className="db-ws-name">
               <bdi>{workspace.name}</bdi>
             </h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              data-testid={`rename-${workspace.id}`}
-              onClick={() => onRename?.("open")}
-            >
-              {S.renameWorkspace}
-            </Button>
+            <div className="db-ws-head-actions">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pending}
+                data-testid={`share-${workspace.id}`}
+                onClick={() => setShareOpen(true)}
+              >
+                {S.shareWorkspace}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={pending}
+                data-testid={`rename-${workspace.id}`}
+                onClick={() => onRename?.("open")}
+              >
+                {S.renameWorkspace}
+              </Button>
+            </div>
           </div>
         )}
         {/* The channel by its name where one is known: the title it shows,
@@ -429,6 +506,7 @@ export function WorkspaceCard({
                   setTelegramError(null);
                   setXError(null);
                   setTikTokError(null);
+                  onAddChannel?.("clear-error");
                 }}
               >
                 {S.platformYouTube}
@@ -442,6 +520,7 @@ export function WorkspaceCard({
                   setTelegramError(null);
                   setXError(null);
                   setTikTokError(null);
+                  onAddChannel?.("clear-error");
                 }}
               >
                 {S.platformTelegram}
@@ -455,6 +534,7 @@ export function WorkspaceCard({
                   setTelegramError(null);
                   setXError(null);
                   setTikTokError(null);
+                  onAddChannel?.("clear-error");
                 }}
               >
                 {S.platformX}
@@ -468,6 +548,7 @@ export function WorkspaceCard({
                   setTelegramError(null);
                   setXError(null);
                   setTikTokError(null);
+                  onAddChannel?.("clear-error");
                 }}
               >
                 {S.platformTikTok}
@@ -482,7 +563,7 @@ export function WorkspaceCard({
                   data-testid={`addchannel-form-${workspace.id}`}
                   onSubmit={(e) => {
                     e.preventDefault();
-                    onAddChannel("search", query);
+                    onAddChannel?.("search", query, undefined, "youtube");
                   }}
                 >
                   <label htmlFor={addChannelQueryId}>{S.addChannel}</label>
@@ -495,7 +576,7 @@ export function WorkspaceCard({
                     value={query}
                     onChange={(e) => {
                       setQuery(e.target.value);
-                      if (channelLookupError) onAddChannel("clear-error");
+                      if (channelLookupError) onAddChannel?.("clear-error");
                     }}
                     autoFocus
                   />
@@ -514,60 +595,13 @@ export function WorkspaceCard({
                       data-testid={`addchannel-close-${workspace.id}`}
                       onClick={() => {
                         setQuery("");
-                        onAddChannel("cancel");
+                        onAddChannel?.("cancel");
                       }}
                     >
                       {S.addChannelCancel}
                     </Button>
                   </div>
                 </form>
-                {channelLookupError && (
-                  <p className="db-feedback db-feedback--note" role="status">
-                    {channelLookupError}
-                  </p>
-                )}
-                {channelCandidates && channelCandidates.length === 0 && (
-                  <p className="db-muted">{S.addChannelNone}</p>
-                )}
-                {channelCandidates && channelCandidates.length > 0 && (
-                  <ul className="db-candidates" role="list">
-                    {channelCandidates.map((c) => (
-                      <li
-                        key={c.external_channel_id}
-                        className="db-candidate"
-                        data-testid={`addchannel-result-${c.external_channel_id}`}
-                      >
-                        {c.thumbnail_url && (
-                          <img
-                            src={c.thumbnail_url}
-                            alt=""
-                            width={40}
-                            height={40}
-                            loading="lazy"
-                          />
-                        )}
-                        <span className="db-candidate-name">
-                          <bdi>
-                            {c.title ?? c.handle ?? c.external_channel_id}
-                          </bdi>
-                          {c.handle && (
-                            <small>
-                              <bdi>{c.handle}</bdi>
-                            </small>
-                          )}
-                        </span>
-                        <Button
-                          size="sm"
-                          disabled={pending}
-                          data-testid={`addchannel-add-${c.external_channel_id}`}
-                          onClick={() => onAddChannel("add", undefined, c)}
-                        >
-                          {S.addChannelAdd}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </>
             ) : addPlatform === "telegram" ? (
               <>
@@ -575,7 +609,7 @@ export function WorkspaceCard({
                 <form
                   className="db-ws-rename"
                   data-testid={`addtelegram-form-${workspace.id}`}
-                  onSubmit={handleTelegramSubmit}
+                  onSubmit={handleTelegramSearch}
                 >
                   <label htmlFor={addTelegramInputId}>
                     {S.addTelegramChannel}
@@ -590,16 +624,32 @@ export function WorkspaceCard({
                     onChange={(e) => {
                       setTelegramHandle(e.target.value);
                       if (telegramError) setTelegramError(null);
+                      if (channelLookupError) onAddChannel?.("clear-error");
                     }}
                     autoFocus
                   />
+                  <small
+                    className="db-muted"
+                    style={{ display: "block", marginTop: "0.25rem" }}
+                  >
+                    {S.addDirectAvailableDesc}
+                  </small>
                   <div className="db-actions">
                     <Button
                       type="submit"
                       disabled={pending || !telegramHandle.trim()}
-                      data-testid={`addtelegram-submit-${workspace.id}`}
+                      data-testid={`addtelegram-search-${workspace.id}`}
                     >
-                      {S.addChannelAdd}
+                      {S.addChannelSearch}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={pending || !telegramHandle.trim()}
+                      data-testid={`addtelegram-submit-${workspace.id}`}
+                      onClick={handleTelegramSubmit}
+                    >
+                      {S.addDirectAvailable}
                     </Button>
                     <Button
                       type="button"
@@ -616,11 +666,6 @@ export function WorkspaceCard({
                     </Button>
                   </div>
                 </form>
-                {telegramError && (
-                  <p className="db-feedback db-feedback--note" role="status">
-                    {telegramError}
-                  </p>
-                )}
               </>
             ) : addPlatform === "x" ? (
               <>
@@ -628,7 +673,7 @@ export function WorkspaceCard({
                 <form
                   className="db-ws-rename"
                   data-testid={`addx-form-${workspace.id}`}
-                  onSubmit={handleXSubmit}
+                  onSubmit={handleXSearch}
                 >
                   <label htmlFor={addXInputId}>{S.addXChannel}</label>
                   <Input
@@ -641,16 +686,32 @@ export function WorkspaceCard({
                     onChange={(e) => {
                       setXHandle(e.target.value);
                       if (xError) setXError(null);
+                      if (channelLookupError) onAddChannel?.("clear-error");
                     }}
                     autoFocus
                   />
+                  <small
+                    className="db-muted"
+                    style={{ display: "block", marginTop: "0.25rem" }}
+                  >
+                    {S.addDirectAvailableDesc}
+                  </small>
                   <div className="db-actions">
                     <Button
                       type="submit"
                       disabled={pending || !xHandle.trim()}
-                      data-testid={`addx-submit-${workspace.id}`}
+                      data-testid={`addx-search-${workspace.id}`}
                     >
-                      {S.addChannelAdd}
+                      {S.addChannelSearch}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={pending || !xHandle.trim()}
+                      data-testid={`addx-submit-${workspace.id}`}
+                      onClick={handleXSubmit}
+                    >
+                      {S.addDirectAvailable}
                     </Button>
                     <Button
                       type="button"
@@ -667,11 +728,6 @@ export function WorkspaceCard({
                     </Button>
                   </div>
                 </form>
-                {xError && (
-                  <p className="db-feedback db-feedback--note" role="status">
-                    {xError}
-                  </p>
-                )}
               </>
             ) : (
               <>
@@ -679,7 +735,7 @@ export function WorkspaceCard({
                 <form
                   className="db-ws-rename"
                   data-testid={`addtiktok-form-${workspace.id}`}
-                  onSubmit={handleTikTokSubmit}
+                  onSubmit={handleTikTokSearch}
                 >
                   <label htmlFor={addTikTokInputId}>{S.addTikTokChannel}</label>
                   <Input
@@ -692,16 +748,32 @@ export function WorkspaceCard({
                     onChange={(e) => {
                       setTikTokHandle(e.target.value);
                       if (tikTokError) setTikTokError(null);
+                      if (channelLookupError) onAddChannel?.("clear-error");
                     }}
                     autoFocus
                   />
+                  <small
+                    className="db-muted"
+                    style={{ display: "block", marginTop: "0.25rem" }}
+                  >
+                    {S.addDirectAvailableDesc}
+                  </small>
                   <div className="db-actions">
                     <Button
                       type="submit"
                       disabled={pending || !tikTokHandle.trim()}
-                      data-testid={`addtiktok-submit-${workspace.id}`}
+                      data-testid={`addtiktok-search-${workspace.id}`}
                     >
-                      {S.addChannelAdd}
+                      {S.addChannelSearch}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={pending || !tikTokHandle.trim()}
+                      data-testid={`addtiktok-submit-${workspace.id}`}
+                      onClick={handleTikTokSubmit}
+                    >
+                      {S.addDirectAvailable}
                     </Button>
                     <Button
                       type="button"
@@ -718,12 +790,145 @@ export function WorkspaceCard({
                     </Button>
                   </div>
                 </form>
-                {tikTokError && (
-                  <p className="db-feedback db-feedback--note" role="status">
-                    {tikTokError}
-                  </p>
-                )}
               </>
+            )}
+
+            {/* Validation errors for non-youtube platforms */}
+            {addPlatform === "telegram" && telegramError && (
+              <p className="db-feedback db-feedback--note" role="status">
+                {telegramError}
+              </p>
+            )}
+            {addPlatform === "x" && xError && (
+              <p className="db-feedback db-feedback--note" role="status">
+                {xError}
+              </p>
+            )}
+            {addPlatform === "tiktok" && tikTokError && (
+              <p className="db-feedback db-feedback--note" role="status">
+                {tikTokError}
+              </p>
+            )}
+
+            {/* Backend lookup error */}
+            {channelLookupError && (
+              <div style={{ marginTop: "0.75rem" }}>
+                <p className="db-feedback db-feedback--note" role="status">
+                  {channelLookupError}
+                </p>
+                {addPlatform !== "youtube" && (
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleDirectAddForCurrentPlatform}
+                      data-testid={`addchannel-direct-fallback-${workspace.id}`}
+                    >
+                      {S.addDirectAvailableAction}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Zero candidates found */}
+            {channelCandidates && channelCandidates.length === 0 && (
+              <div style={{ marginTop: "0.75rem" }}>
+                <p className="db-muted">{S.addChannelNone}</p>
+                {addPlatform !== "youtube" && (
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleDirectAddForCurrentPlatform}
+                      data-testid={`addchannel-direct-fallback-${workspace.id}`}
+                    >
+                      {S.addDirectAvailableAction}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Candidates list (works for YouTube, Telegram, X, TikTok) */}
+            {channelCandidates && channelCandidates.length > 0 && (
+              <ul className="db-candidates" role="list">
+                {channelCandidates.map((c) => (
+                  <li
+                    key={c.external_channel_id}
+                    className="db-candidate"
+                    data-testid={`addchannel-result-${c.external_channel_id}`}
+                  >
+                    {c.thumbnail_url ? (
+                      <img
+                        src={c.thumbnail_url}
+                        alt=""
+                        width={40}
+                        height={40}
+                        loading="lazy"
+                        style={{
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className="db-candidate-icon"
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "var(--color-surface-sunken, #f1f5f9)",
+                          fontSize: "1.1rem",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {c.platform === "telegram"
+                          ? "✈️"
+                          : c.platform === "x"
+                            ? "𝕏"
+                            : c.platform === "tiktok"
+                              ? "🎵"
+                              : "▶️"}
+                      </div>
+                    )}
+                    <span className="db-candidate-name">
+                      <bdi>{c.title ?? c.handle ?? c.external_channel_id}</bdi>
+                      {c.handle && (
+                        <small>
+                          <bdi>{c.handle}</bdi>
+                        </small>
+                      )}
+                    </span>
+                    {c.platform && c.platform !== "youtube" && (
+                      <span
+                        className="ui-badge ui-badge--neutral"
+                        style={{ marginInlineEnd: "0.5rem" }}
+                      >
+                        {c.platform === "telegram"
+                          ? S.platformTelegram
+                          : c.platform === "x"
+                            ? S.platformX
+                            : c.platform === "tiktok"
+                              ? S.platformTikTok
+                              : c.platform}
+                      </span>
+                    )}
+                    <Button
+                      size="sm"
+                      disabled={pending}
+                      data-testid={`addchannel-add-${c.external_channel_id}`}
+                      onClick={() => onAddChannel?.("add", undefined, c)}
+                    >
+                      {S.addChannelAdd}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             )}
           </Card>
         )}
@@ -752,6 +957,12 @@ export function WorkspaceCard({
             onClose={() => onRetire("keep")}
           />
         )}
+        <ShareWorkspaceDialog
+          open={shareOpen}
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          onClose={() => setShareOpen(false)}
+        />
       </li>
     </Card>
   );

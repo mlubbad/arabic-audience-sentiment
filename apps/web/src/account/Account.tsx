@@ -20,6 +20,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChannelLookupResponseSchema,
   type ChannelCandidate,
+  type SourcePlatform,
 } from "@sentiment/contracts";
 import { supabase } from "../supabase";
 import {
@@ -381,7 +382,9 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
         ? S.addChannelQuota
         : code === "invalid_query"
           ? S.addChannelQueryInvalid
-          : S.addChannelFailed;
+          : code === "channel_not_public" || code === "channel_not_found"
+            ? S.channelNotFoundOnPlatform
+            : S.addChannelFailed;
   async function createWorkspace(e: FormEvent) {
     e.preventDefault();
     setBusy("create");
@@ -578,7 +581,12 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                     lookup.ws === w.id ? lookup.candidates : null
                   }
                   channelLookupError={lookup.ws === w.id ? lookup.error : null}
-                  onAddChannel={(step, value, candidate) => {
+                  onAddChannel={(
+                    step,
+                    value,
+                    candidate,
+                    platform?: SourcePlatform,
+                  ) => {
                     if (step === "open") {
                       setAsking({ ws: w.id, what: "addchannel" });
                       setLookup({ ws: w.id, candidates: null, error: null });
@@ -608,7 +616,11 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                       setNote(null);
                       void client.functions
                         .invoke("channel-lookup", {
-                          body: { workspace_id: w.id, query: q },
+                          body: {
+                            workspace_id: w.id,
+                            query: q,
+                            platform: platform ?? "youtube",
+                          },
                         })
                         .then(async ({ data, error }) => {
                           setBusy(null);

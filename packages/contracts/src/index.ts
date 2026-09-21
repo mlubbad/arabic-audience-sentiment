@@ -23,3 +23,4 @@ export * from "./csv";
 export * from "./selection";
 export * from "./channelLookup";
 export * from "./ops";
+export * from "./workspaceSharing";

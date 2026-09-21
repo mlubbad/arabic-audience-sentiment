@@ -99,6 +99,10 @@ describe("WorkspaceRow", () => {
     expect(row).toHaveTextContent("paddle");
     expect(within(row).getByTestId("admin-plan-form")).toBeInTheDocument();
     expect(within(row).getByTestId("admin-pack-form")).toBeInTheDocument();
+    const inspectLink = within(row).getByRole("link", {
+      name: ar.adminInspectWorkspace,
+    });
+    expect(inspectLink).toHaveAttribute("href", `/dashboard?ws=${W}`);
   });
 
   it("stacked, it is a card with a definition list rather than a table row", () => {
@@ -114,6 +118,10 @@ describe("WorkspaceRow", () => {
     ).toBeInTheDocument();
     expect(within(row).getByTestId("admin-plan-form")).toBeInTheDocument();
     expect(within(row).getByTestId("admin-pack-form")).toBeInTheDocument();
+    const inspectLink = within(row).getByRole("link", {
+      name: ar.adminInspectWorkspace,
+    });
+    expect(inspectLink).toHaveAttribute("href", `/dashboard?ws=${W}`);
   });
 
   it("the plan form sends the chosen plan, the months, a null note for an empty one, and the override", async () => {

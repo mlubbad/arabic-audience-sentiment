@@ -363,7 +363,7 @@ describe("billing events", () => {
     );
     expect(g.rows[0]).toEqual({ source: "paddle", provider_ref: "txn_9" });
     const au = await db.query<{ action: string; target_id: string }>(
-      "select action,target_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
+      "select action,target_id from audit_events where workspace_id=$1 and action='pack_paddle'",
       [W],
     );
     expect(au.rows[0]).toEqual({

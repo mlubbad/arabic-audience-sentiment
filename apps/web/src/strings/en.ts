@@ -133,6 +133,38 @@ export const en: Strings = {
     "The workspace is retired and now belongs to the service operator.",
   retireLast: "Your last workspace cannot be retired; create another first.",
   retireFailed: "The workspace could not be retired.",
+  shareWorkspace: "Share workspace",
+  shareWorkspaceTitle: (name: string) => `Share workspace "${name}"`,
+  shareWorkspaceLead:
+    "Share this workspace with other accounts by email under a specific role.",
+  shareWorkspaceAccountsCount: (count: number, limit: number | null) =>
+    limit
+      ? `${count} of ${limit} accounts used`
+      : `${count} accounts (unlimited)`,
+  shareWorkspaceEmailLabel: "Account email address",
+  shareWorkspaceEmailPlaceholder: "name@example.com",
+  shareWorkspaceRoleLabel: "Role",
+  shareWorkspaceRoleAnalyst: "Analyst (analyze, sync, and review)",
+  shareWorkspaceRoleViewer: "Viewer (read-only access)",
+  shareWorkspaceSubmit: "Share workspace",
+  shareWorkspaceAccountsList: "Accounts with access",
+  shareWorkspaceRoleOwner: "Owner",
+  shareWorkspaceRoleAnalystBadge: "Analyst",
+  shareWorkspaceRoleViewerBadge: "Viewer",
+  shareWorkspaceUnshare: "Remove access",
+  shareWorkspaceUnshareConfirm: (email: string) =>
+    `Are you sure you want to remove access for ${email}?`,
+  shareWorkspaceUserNotFound:
+    "This email is not registered on the platform. Please create an account first.",
+  shareWorkspaceLimitReached:
+    "The maximum number of accounts allowed for your plan has been reached.",
+  shareWorkspaceAlreadyMember:
+    "This account is already a member of this workspace.",
+  shareWorkspaceDone: "Workspace shared successfully.",
+  shareWorkspaceUnsharedDone: "Access removed successfully.",
+  shareWorkspaceRoleUpdatedDone: "Role updated successfully.",
+  shareWorkspaceFailed: (err: string) => `Could not share workspace: ${err}`,
+  shareWorkspaceClose: "Close",
   connectChannel: "Connect a YouTube channel",
   relinkForName: "Reconnect to store the channel's name",
   addChannel: "Add a channel by link or search",
@@ -172,6 +204,14 @@ export const en: Strings = {
   addTikTokPlaceholder: "@username or tiktok.com/@username",
   addTikTokInvalidHandle:
     "Please enter a valid TikTok handle or profile link (e.g. @username or tiktok.com/@username).",
+  addDirectAvailable: "Direct add (based on availability)",
+  addDirectAvailableAction: "Add channel directly based on availability",
+  addDirectAvailableDesc:
+    "If the platform does not permit pre-search by name, you can proceed with direct add using the available handle.",
+  platformSearchNotPermitted:
+    "Pre-search is not permitted or restricted on this platform. The handle was verified and can be added based on availability.",
+  channelNotFoundOnPlatform:
+    "Channel not found via live preview or is not public. You can add it directly based on availability.",
 
   gateResolvingAccount: "Identifying your account…",
   gateLoadingWorkspaces: "Loading workspaces…",
@@ -317,6 +357,13 @@ export const en: Strings = {
   adminFailed: (code: string) => `Could not apply: ${code}`,
   adminDemoLead:
     "An illustrative copy of the admin page: changes stay in this session.",
+  adminInspectWorkspace: "Inspect workspace",
+  adminInspectionBadge: "Supervisor Mode",
+  adminInspectionBanner: (name: string, owner?: string) =>
+    owner
+      ? `Supervisor mode: inspecting workspace "${name}" (Owner: ${owner})`
+      : `Supervisor mode: inspecting workspace "${name}"`,
+  adminInspectionReturn: "Return to Admin",
 
   // ---- the admin observability pages (phase one of the admin roadmap) ----
   // Five screens, one room: tabs under every admin page head.

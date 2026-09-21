@@ -36,6 +36,7 @@ interface Candidate {
   handle: string | null;
   title: string | null;
   thumbnail_url: string | null;
+  platform?: "youtube" | "telegram" | "x" | "tiktok";
 }
 
 class LookupError extends Error {
@@ -185,7 +186,7 @@ Deno.serve(async (request) => {
   const auth = request.headers.get("authorization");
   if (!auth) return json(401, { code: "unauthenticated" });
 
-  let body: { workspace_id?: string; query?: string };
+  let body: { workspace_id?: string; query?: string; platform?: string };
   try {
     body = await request.json();
   } catch {
@@ -194,9 +195,10 @@ Deno.serve(async (request) => {
   if (!body.workspace_id || !body.query)
     return json(400, { code: "invalid_request" });
 
-  // Membership first, before the key is spent: a caller who is not a member
-  // of the named workspace gets the same refusal they would from any other
-  // door, and the project's quota is not the public's to use.
+  const platform = body.platform || "youtube";
+
+  // Membership first, before any external quota/resource is spent:
+  // a caller who is not a member of the named workspace gets 403.
   const db = createClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
     global: { headers: { authorization: auth } },
   });
@@ -206,6 +208,122 @@ Deno.serve(async (request) => {
     .eq("workspace_id", body.workspace_id);
   if (memberError) return json(403, { code: "forbidden" });
   if (!memberships?.length) return json(403, { code: "forbidden" });
+
+  if (platform === "telegram") {
+    let clean = body.query.trim();
+    clean = clean.replace(/^https?:\/\/(www\.)?t\.me\//i, "");
+    clean = clean.replace(/^t\.me\//i, "");
+    clean = clean.replace(/^\/?@?/, "");
+    clean = clean.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
+    if (!clean || !/^[A-Za-z0-9_]{4,64}$/.test(clean)) {
+      return json(400, { code: "invalid_query" });
+    }
+    const handle = `@${clean}`;
+    try {
+      const res = await fetch(`https://t.me/s/${clean}`, {
+        headers: { "user-agent": "Mozilla/5.0 (compatible; SentimentBot/1.0)" },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (res.status === 404) {
+        return json(404, { code: "channel_not_found" });
+      }
+      const html = await res.text();
+      if (
+        html.includes("<title>Telegram: Contact @") &&
+        !html.includes("tgme_channel_info")
+      ) {
+        return json(400, { code: "channel_not_public" });
+      }
+      const titleMatch =
+        html.match(/<meta property="og:title" content="([^"]+)">/) ||
+        html.match(
+          /class="tgme_page_title"[^>]*><span dir="auto">([^<]+)<\/span>/,
+        ) ||
+        html.match(
+          /class="tgme_channel_info_title"[^>]*><span dir="auto">([^<]+)<\/span>/,
+        );
+      const imgMatch =
+        html.match(/<meta property="og:image" content="([^"]+)">/) ||
+        html.match(/class="tgme_page_photo_image" [^>]*src="([^"]+)"/);
+
+      const title = titleMatch ? titleMatch[1].trim() : handle;
+      const thumbnail_url = imgMatch ? imgMatch[1].trim() : null;
+
+      return json(200, {
+        candidates: [
+          {
+            external_channel_id: handle,
+            handle,
+            title,
+            thumbnail_url,
+            platform: "telegram",
+          },
+        ],
+      });
+    } catch {
+      // In case public preview is blocked or network times out, return candidate with fallback indicator
+      return json(200, {
+        candidates: [
+          {
+            external_channel_id: handle,
+            handle,
+            title: handle,
+            thumbnail_url: null,
+            platform: "telegram",
+          },
+        ],
+        fallback_available: true,
+      });
+    }
+  }
+
+  if (platform === "x") {
+    let clean = body.query.trim();
+    clean = clean.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i, "");
+    clean = clean.replace(/^(twitter|x)\.com\//i, "");
+    clean = clean.replace(/^\/?@?/, "");
+    clean = clean.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
+    if (!clean || !/^[A-Za-z0-9_]{1,15}$/.test(clean)) {
+      return json(400, { code: "invalid_query" });
+    }
+    const handle = `@${clean}`;
+    return json(200, {
+      candidates: [
+        {
+          external_channel_id: clean,
+          handle,
+          title: handle,
+          thumbnail_url: null,
+          platform: "x",
+        },
+      ],
+      fallback_available: true,
+    });
+  }
+
+  if (platform === "tiktok") {
+    let clean = body.query.trim();
+    clean = clean.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, "");
+    clean = clean.replace(/^tiktok\.com\/@?/i, "");
+    clean = clean.replace(/^\/?@?/, "");
+    clean = clean.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
+    if (!clean || !/^[A-Za-z0-9_.-]{2,30}$/.test(clean)) {
+      return json(400, { code: "invalid_query" });
+    }
+    const handle = `@${clean}`;
+    return json(200, {
+      candidates: [
+        {
+          external_channel_id: clean,
+          handle,
+          title: handle,
+          thumbnail_url: null,
+          platform: "tiktok",
+        },
+      ],
+      fallback_available: true,
+    });
+  }
 
   // The reading credential: the project API key when one is set, otherwise
   // the platform reader — the operator's own OAuth grant, sealed in the
@@ -220,7 +338,12 @@ Deno.serve(async (request) => {
     return json(500, { code: "lookup_not_configured" });
 
   try {
-    return json(200, { candidates: await lookup(credential, body.query) });
+    const rawCandidates = await lookup(credential, body.query);
+    const ytCandidates = rawCandidates.map((c) => ({
+      ...c,
+      platform: "youtube" as const,
+    }));
+    return json(200, { candidates: ytCandidates });
   } catch (error) {
     if (error instanceof LookupError)
       return json(error.status, { code: error.code });

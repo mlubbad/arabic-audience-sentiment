@@ -54,6 +54,7 @@ import { LegalLinks } from "./LegalLinks";
 import { publicPath, resolvePublicPath } from "./publicPaths";
 import { publicRoutes } from "./publicRoutes";
 import { SessionControl } from "./SessionControl";
+import { AdminInspectionBanner } from "./AdminInspectionBanner";
 import { TourProvider } from "./tour/TourProvider";
 import { TourEntry } from "./tour/TourEntry";
 const Dashboard = lazy(() =>
@@ -321,6 +322,7 @@ function AppLayout() {
           <span>{S.announcementLead}</span>
           <LanguageSwitch />
         </div>
+        <AdminInspectionBanner />
         {/* A rail, not a bar.
             Four links across the top said "this is a page with some links on
             it"; a standing rail says "this is a product, and these are its

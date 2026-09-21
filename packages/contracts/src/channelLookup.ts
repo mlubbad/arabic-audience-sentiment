@@ -24,6 +24,7 @@ export type ChannelCandidate = z.infer<typeof ChannelCandidateSchema>;
 export const ChannelLookupResponseSchema = z
   .object({
     candidates: z.array(ChannelCandidateSchema),
+    fallback_available: z.boolean().optional(),
   })
   .strict();
 export type ChannelLookupResponse = z.infer<typeof ChannelLookupResponseSchema>;

@@ -135,6 +135,37 @@ export const ar = {
   retireDone: "انتهت المساحة وانتقلت إلى مشغّل الخدمة.",
   retireLast: "لا يمكن إنهاء آخر مساحة لك؛ أنشئ أخرى أولًا.",
   retireFailed: "تعذّر إنهاء المساحة.",
+  shareWorkspace: "مشاركة المساحة",
+  shareWorkspaceTitle: (name: string) => `مشاركة مساحة «${name}»`,
+  shareWorkspaceLead:
+    "شارك هذه المساحة مع حسابات أخرى بالبريد الإلكتروني برتبة محددة.",
+  shareWorkspaceAccountsCount: (count: number, limit: number | null) =>
+    limit
+      ? `${count} من ${limit} حسابات مستخدمة`
+      : `${count} حسابات (غير محدود)`,
+  shareWorkspaceEmailLabel: "البريد الإلكتروني للحساب",
+  shareWorkspaceEmailPlaceholder: "name@example.com",
+  shareWorkspaceRoleLabel: "الرتبة",
+  shareWorkspaceRoleAnalyst: "محلل (تحليل ومزامنة ومراجعة)",
+  shareWorkspaceRoleViewer: "مشاهد (قراءة واطلاع فقط)",
+  shareWorkspaceSubmit: "مشاركة المساحة",
+  shareWorkspaceAccountsList: "الحسابات التي تملك وصولًا",
+  shareWorkspaceRoleOwner: "المالك",
+  shareWorkspaceRoleAnalystBadge: "محلل",
+  shareWorkspaceRoleViewerBadge: "مشاهد",
+  shareWorkspaceUnshare: "إلغاء المشاركة",
+  shareWorkspaceUnshareConfirm: (email: string) =>
+    `هل تريد إلغاء مشاركة هذه المساحة مع ${email}؟`,
+  shareWorkspaceUserNotFound:
+    "هذا البريد غير مسجل في المنصة. يرجى تسجيل الحساب أولًا.",
+  shareWorkspaceLimitReached:
+    "تم بلوغ الحد الأقصى للحسابات المسموح بها في خطتك.",
+  shareWorkspaceAlreadyMember: "هذا الحساب مضاف بالفعل إلى هذه المساحة.",
+  shareWorkspaceDone: "تمت مشاركة المساحة بنجاح.",
+  shareWorkspaceUnsharedDone: "تم إلغاء المشاركة بنجاح.",
+  shareWorkspaceRoleUpdatedDone: "تم تعديل رتبة الحساب بنجاح.",
+  shareWorkspaceFailed: (err: string) => `تعذّرت مشاركة المساحة: ${err}`,
+  shareWorkspaceClose: "إغلاق",
   connectChannel: "ربط قناة يوتيوب",
   relinkForName: "إعادة الربط لحفظ اسم القناة",
   addChannel: "إضافة قناة بالرابط أو بالبحث",
@@ -172,6 +203,14 @@ export const ar = {
   addTikTokPlaceholder: "@username أو tiktok.com/@username",
   addTikTokInvalidHandle:
     "أدخل اسم مستخدم صالحًا على تيك توك (مثال: @username أو رابط tiktok.com/@username).",
+  addDirectAvailable: "إضافة مباشرة (بناءً على الإتاحة)",
+  addDirectAvailableAction: "إضافة القناة مباشرة بناءً على الإتاحة",
+  addDirectAvailableDesc:
+    "في حال كانت المنصة لا تدعم البحث المسبق بالاسم، يمكنك المتابعة وإضافة القناة مباشرة بالمعرّف المتاح.",
+  platformSearchNotPermitted:
+    "البحث المسبق غير متاح أو مقيّد على هذه المنصة. تم التحقق من المعرّف ويمكنك إضافته بناءً على الإتاحة.",
+  channelNotFoundOnPlatform:
+    "لم يتم العثور على القناة عبر المعاينة المباشرة أو أنها ليست عامة. يمكنك إضافتها مباشرة بناءً على الإتاحة.",
 
   // ---- the gate (WorkspaceGate.tsx) ----
   gateResolvingAccount: "جارٍ تحديد حسابك…",
@@ -322,6 +361,13 @@ export const ar = {
   adminFailed: (code: string) => `تعذّر التنفيذ: ${code}`,
   adminDemoLead:
     "هذه نسخة توضيحية من صفحة الإدارة: التغييرات تبقى في هذه الجلسة فقط.",
+  adminInspectWorkspace: "استعراض المساحة",
+  adminInspectionBadge: "وضع المشرف",
+  adminInspectionBanner: (name: string, owner?: string) =>
+    owner
+      ? `وضع المشرف: تتصفح مساحة «${name}» (المالك: ${owner})`
+      : `وضع المشرف: تتصفح مساحة «${name}»`,
+  adminInspectionReturn: "العودة للوحة الإدارة",
 
   // ---- the admin observability pages (phase one of the admin roadmap) ----
   // Five screens, one room: tabs under every admin page head.
