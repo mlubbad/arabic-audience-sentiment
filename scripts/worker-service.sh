@@ -20,7 +20,9 @@
 # that should fetch the model.
 set -eu
 cd "$(dirname "$0")/.."
+set -a
 . ./.env.local
+set +a
 : "${WORKER_API_BASE_URL:?set WORKER_API_BASE_URL in .env.local}"
 : "${WORKER_CREDENTIAL:?set WORKER_CREDENTIAL in .env.local}"
 

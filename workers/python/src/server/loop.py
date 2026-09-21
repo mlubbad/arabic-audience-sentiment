@@ -33,6 +33,8 @@ from collectors.youtube_api import YouTubeAPI
 from collectors.telegram_collector import TelegramCollector
 from collectors.tiktok_collector import TikTokCollector
 from collectors.x_collector import XCollector
+from collectors.scrapers.apify import ApifyClient
+from collectors.scrapers.brightdata import BrightDataClient
 
 from .gateway import ControlPlane, ControlPlaneError, LeaseLost
 from .runner import run_job
@@ -60,6 +62,13 @@ def build_collector(
     x_fixture: dict | None = None,
     tiktok_access_token: str | None = None,
     tiktok_fixture: dict | None = None,
+    apify_token: str | None = None,
+    apify_x_actor: str | None = None,
+    apify_tiktok_actor: str | None = None,
+    brightdata_api_key: str | None = None,
+    brightdata_proxy_url: str | None = None,
+    x_scraper_provider: str | None = None,
+    tiktok_scraper_provider: str | None = None,
 ):
     """The collector builder the runner is handed.
 
@@ -75,6 +84,22 @@ def build_collector(
     For platform == 'x', returns an XCollector adapter.
     For platform == 'tiktok', returns a TikTokCollector adapter.
     """
+    apify_client = None
+    if apify_token:
+        apify_kwargs: dict = {"token": apify_token, "client": client}
+        if apify_x_actor:
+            apify_kwargs["x_actor"] = apify_x_actor
+        if apify_tiktok_actor:
+            apify_kwargs["tiktok_actor"] = apify_tiktok_actor
+        apify_client = ApifyClient(**apify_kwargs)
+
+    brightdata_client = None
+    if brightdata_api_key or brightdata_proxy_url:
+        brightdata_client = BrightDataClient(
+            api_key=brightdata_api_key,
+            proxy_url=brightdata_proxy_url,
+            client=client,
+        )
 
     def build(
         token: str | None,
@@ -96,14 +121,20 @@ def build_collector(
                 channel_id=channel_id,
                 client=client,
                 bearer_token=token or x_bearer_token,
+                apify_client=apify_client,
+                brightdata_client=brightdata_client,
                 fixture_data=x_fixture,
+                preferred_scraper=x_scraper_provider,
             )
         if p == "tiktok":
             return TikTokCollector(
                 channel_id=channel_id,
                 client=client,
                 access_token=token or tiktok_access_token,
+                apify_client=apify_client,
+                brightdata_client=brightdata_client,
                 fixture_data=tiktok_fixture,
+                preferred_scraper=tiktok_scraper_provider,
             )
         if token:
             return YouTubeAPI(
@@ -261,16 +292,33 @@ def main() -> None:
     telegram_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN") or None
     x_bearer_token = os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or None
     tiktok_access_token = os.environ.get("TIKTOK_ACCESS_TOKEN") or None
+    apify_token = os.environ.get("APIFY_API_TOKEN") or os.environ.get("APIFY_TOKEN") or None
+    apify_x_actor = os.environ.get("APIFY_X_ACTOR") or None
+    apify_tiktok_actor = os.environ.get("APIFY_TIKTOK_ACTOR") or None
+    brightdata_api_key = os.environ.get("BRIGHTDATA_API_KEY") or None
+    brightdata_proxy_url = os.environ.get("BRIGHTDATA_PROXY_URL") or None
+    x_scraper_provider = os.environ.get("X_SCRAPER_PROVIDER") or None
+    tiktok_scraper_provider = os.environ.get("TIKTOK_SCRAPER_PROVIDER") or None
+
     build = build_collector(
         client,
         api_key=api_key,
         telegram_bot_token=telegram_bot_token,
         x_bearer_token=x_bearer_token,
         tiktok_access_token=tiktok_access_token,
+        apify_token=apify_token,
+        apify_x_actor=apify_x_actor,
+        apify_tiktok_actor=apify_tiktok_actor,
+        brightdata_api_key=brightdata_api_key,
+        brightdata_proxy_url=brightdata_proxy_url,
+        x_scraper_provider=x_scraper_provider,
+        tiktok_scraper_provider=tiktok_scraper_provider,
     )
+    has_scrapers = bool(apify_token or brightdata_api_key or brightdata_proxy_url)
     _log(
         f"worker up, model={args.model}, tenants={len(controls)}, "
-        f"topics={args.topics}, public={'yes' if api_key else 'no'}"
+        f"topics={args.topics}, public={'yes' if api_key else 'no'}, "
+        f"scrapers={'yes' if has_scrapers else 'no'}"
     )
     why = serve(
         controls,

@@ -206,3 +206,99 @@ def test_tiktok_collector_public_web_fallback():
     with pytest.raises(CollectionError) as exc_nf:
         col_nf.catalogue()
     assert exc_nf.value.code == "channel_not_found"
+
+
+def test_tiktok_collector_apify_and_brightdata_integration():
+    from collectors.scrapers.apify import ApifyClient
+    from collectors.scrapers.brightdata import BrightDataClient
+
+    def apify_handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "run-sync-get-dataset-items" in url:
+            content = json.loads(request.content.decode("utf-8"))
+            if "profiles" in content:
+                return httpx.Response(
+                    200,
+                    json=[
+                        {
+                            "id": "7112233445566778899",
+                            "desc": "فيديو تيك توك عبر أبيفاي",
+                            "createTime": 1758410000,
+                            "stats": {"commentCount": 12},
+                        }
+                    ],
+                )
+            if "postURLs" in content:
+                return httpx.Response(
+                    200,
+                    json=[
+                        {
+                            "id": "c_apify_tiktok_1",
+                            "text": "تعليق تيك توك عبر أبيفاي",
+                            "createTime": 1758410100,
+                            "diggCount": 6,
+                            "user": {"nickname": "عمر"},
+                        }
+                    ],
+                )
+        return httpx.Response(404)
+
+    def bd_handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "datasets/v3/scrape" in url:
+            req_json = json.loads(request.content.decode("utf-8"))
+            target_url = req_json[0]["url"]
+            if "/video/" in target_url:
+                return httpx.Response(
+                    200,
+                    json=[
+                        {
+                            "comment_id": "c_bd_tiktok_1",
+                            "comment": "تعليق تيك توك عبر برايت داتا",
+                            "create_time": 1758410200,
+                            "likes": 9,
+                            "user": {"nickname": "ياسمين"},
+                        }
+                    ],
+                )
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "video_id": "7112233445566778898",
+                        "description": "فيديو تيك توك عبر برايت داتا",
+                        "create_time": 1758410000,
+                        "comments": 15,
+                    }
+                ],
+            )
+        return httpx.Response(404)
+
+    apify_c = ApifyClient(token="token_ap", client=httpx.Client(transport=httpx.MockTransport(apify_handler)))
+    bd_c = BrightDataClient(api_key="key_bd", client=httpx.Client(transport=httpx.MockTransport(bd_handler)))
+
+    # Test default cascade: Apify runs first
+    col_apify = TikTokCollector(channel_id="@aljazeera", apify_client=apify_c, brightdata_client=bd_c)
+    cat_ap = col_apify.catalogue()
+    assert len(cat_ap.videos) == 1
+    assert cat_ap.videos[0]["external_video_id"] == "7112233445566778899"
+    batches_ap = list(col_apify.batches("7112233445566778899"))
+    assert len(batches_ap[0].comments) == 1
+    assert batches_ap[0].comments[0].id == "c_apify_tiktok_1"
+    assert batches_ap[0].comments[0].source == "apify"
+
+    # Test preferred scraper = brightdata
+    col_bd = TikTokCollector(
+        channel_id="@aljazeera",
+        apify_client=apify_c,
+        brightdata_client=bd_c,
+        preferred_scraper="brightdata",
+    )
+    cat_bd = col_bd.catalogue()
+    assert len(cat_bd.videos) == 1
+    assert cat_bd.videos[0]["external_video_id"] == "7112233445566778898"
+    batches_bd = list(col_bd.batches("7112233445566778898"))
+    assert len(batches_bd[0].comments) == 1
+    assert batches_bd[0].comments[0].id == "c_bd_tiktok_1"
+    assert batches_bd[0].comments[0].source == "brightdata"
+

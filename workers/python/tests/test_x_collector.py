@@ -210,3 +210,97 @@ def test_x_collector_syndication_public_fallback():
     with pytest.raises(CollectionError) as exc_nf:
         col_nf.catalogue()
     assert exc_nf.value.code == "channel_not_found"
+
+
+def test_x_collector_apify_and_brightdata_integration():
+    from collectors.scrapers.apify import ApifyClient
+    from collectors.scrapers.brightdata import BrightDataClient
+
+    def apify_handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "run-sync-get-dataset-items" in url:
+            content = json.loads(request.content.decode("utf-8"))
+            if "twitterHandles" in content:
+                return httpx.Response(
+                    200,
+                    json=[
+                        {
+                            "id_str": "1922334455667788990",
+                            "full_text": "تغريدة من مشغل أبيفاي",
+                            "replyCount": 4,
+                            "createdAt": "2026-09-21T01:00:00Z",
+                        }
+                    ],
+                )
+            if "conversationIds" in content:
+                return httpx.Response(
+                    200,
+                    json=[
+                        {
+                            "id_str": "1922334455667788999",
+                            "full_text": "رد عبر أبيفاي",
+                            "likeCount": 3,
+                            "createdAt": "2026-09-21T01:10:00Z",
+                        }
+                    ],
+                )
+        return httpx.Response(404)
+
+    def bd_handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "datasets/v3/scrape" in url:
+            req_json = json.loads(request.content.decode("utf-8"))
+            target_url = req_json[0]["url"]
+            if "/status/" in target_url:
+                return httpx.Response(
+                    200,
+                    json=[
+                        {
+                            "id": "1922334455667788998",
+                            "text": "رد عبر برايت داتا",
+                            "likes": 7,
+                            "date_posted": "2026-09-21T01:20:00Z",
+                        }
+                    ],
+                )
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": "1922334455667788991",
+                        "text": "تغريدة عبر برايت داتا",
+                        "replies": 5,
+                        "date_posted": "2026-09-21T01:00:00Z",
+                    }
+                ],
+            )
+        return httpx.Response(404)
+
+    apify_c = ApifyClient(token="token_ap", client=httpx.Client(transport=httpx.MockTransport(apify_handler)))
+    bd_c = BrightDataClient(api_key="key_bd", client=httpx.Client(transport=httpx.MockTransport(bd_handler)))
+
+    # Test default cascade: Apify runs first
+    col_apify = XCollector(channel_id="@aljazeera", apify_client=apify_c, brightdata_client=bd_c)
+    cat_ap = col_apify.catalogue()
+    assert len(cat_ap.videos) == 1
+    assert cat_ap.videos[0]["external_video_id"] == "1922334455667788990"
+    batches_ap = list(col_apify.batches("1922334455667788990"))
+    assert len(batches_ap[0].comments) == 1
+    assert batches_ap[0].comments[0].id == "1922334455667788999"
+    assert batches_ap[0].comments[0].source == "apify"
+
+    # Test preferred scraper = brightdata
+    col_bd = XCollector(
+        channel_id="@aljazeera",
+        apify_client=apify_c,
+        brightdata_client=bd_c,
+        preferred_scraper="brightdata",
+    )
+    cat_bd = col_bd.catalogue()
+    assert len(cat_bd.videos) == 1
+    assert cat_bd.videos[0]["external_video_id"] == "1922334455667788991"
+    batches_bd = list(col_bd.batches("1922334455667788991"))
+    assert len(batches_bd[0].comments) == 1
+    assert batches_bd[0].comments[0].id == "1922334455667788998"
+    assert batches_bd[0].comments[0].source == "brightdata"
+
