@@ -72,18 +72,47 @@ export function CataloguePreview({
           <DialogTitle asChild>
             <h3 className="db-preview-title">{video.title}</h3>
           </DialogTitle>
-          <iframe
-            className="db-preview-frame"
-            data-testid="cat-preview-frame"
-            src={
-              videoLinks(video.external_video_id, video.kind, video.platform)
-                .embed ?? undefined
-            }
-            title={video.title}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+          {videoLinks(video.external_video_id, video.kind, video.platform)
+            .embed ? (
+            <iframe
+              className="db-preview-frame"
+              data-testid="cat-preview-frame"
+              src={
+                videoLinks(video.external_video_id, video.kind, video.platform)
+                  .embed ?? undefined
+              }
+              title={video.title}
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : (
+            <div
+              className="db-preview-fallback"
+              data-testid="cat-preview-fallback"
+            >
+              {video.thumbnail_url ? (
+                <img
+                  src={video.thumbnail_url}
+                  alt={video.title}
+                  className="db-preview-thumb-img"
+                  data-testid="cat-preview-thumb"
+                />
+              ) : (
+                <div className="db-preview-placeholder">
+                  <span>
+                    {video.platform === "telegram"
+                      ? S.catOpenTelegram
+                      : video.platform === "x"
+                        ? S.catOpenX
+                        : video.platform === "tiktok"
+                          ? S.catOpenTikTok
+                          : S.catOpenYouTube}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           <footer className="db-preview-foot">
             <span>
               {kindLabel}

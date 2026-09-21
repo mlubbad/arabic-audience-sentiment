@@ -84,12 +84,27 @@ class ApifyClient:
             if not created_at:
                 created_at = datetime.now(timezone.utc).isoformat()
             comment_count = item.get("replyCount") or item.get("reply_count") or item.get("replies")
+
+            media = item.get("media") or item.get("extendedEntities", {}).get("media") or []
+            photos = item.get("photos") or []
+            profile_image = author_info.get("profilePicture") or author_info.get("profile_image_url_https")
+            thumbnail = None
+            if photos and isinstance(photos, list):
+                first_photo = photos[0]
+                thumbnail = first_photo if isinstance(first_photo, str) else (first_photo.get("url") if isinstance(first_photo, dict) else None)
+            elif media and isinstance(media, list):
+                first_m = media[0]
+                thumbnail = first_m.get("media_url_https") or first_m.get("url") if isinstance(first_m, dict) else None
+            if not thumbnail:
+                thumbnail = profile_image
+
             videos.append(
                 {
                     "external_video_id": tweet_id,
                     "title": text[:100] or f"Tweet {tweet_id}",
                     "kind": "tweet",
                     "published_at": created_at,
+                    "thumbnail_url": thumbnail,
                     "reported_comment_count": comment_count,
                     "field_provenance": {
                         "source": "apify",

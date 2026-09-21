@@ -28,6 +28,7 @@ def test_apify_scrape_x_profile():
                     "full_text": "تقرير حول الرأي العام العربي ومستجدات التقنية",
                     "createdAt": "2026-09-21T02:00:00Z",
                     "replyCount": 14,
+                    "photos": ["https://pbs.twimg.com/media1.jpg"],
                     "author": {"userName": "arab_pulse", "name": "Arab Pulse"},
                 },
                 {
@@ -35,7 +36,7 @@ def test_apify_scrape_x_profile():
                     "text": "تغريدة سريعة للمتابعين",
                     "createdAt": "2026-09-21T03:00:00Z",
                     "reply_count": 0,
-                    "author": {"userName": "arab_pulse"},
+                    "author": {"userName": "arab_pulse", "profilePicture": "https://pbs.twimg.com/avatar.jpg"},
                 },
             ],
         )
@@ -49,8 +50,10 @@ def test_apify_scrape_x_profile():
     assert videos[0]["title"] == "تقرير حول الرأي العام العربي ومستجدات التقنية"
     assert videos[0]["kind"] == "tweet"
     assert videos[0]["reported_comment_count"] == 14
+    assert videos[0]["thumbnail_url"] == "https://pbs.twimg.com/media1.jpg"
     assert videos[0]["field_provenance"]["source"] == "apify"
     assert videos[1]["external_video_id"] == "19002"
+    assert videos[1]["thumbnail_url"] == "https://pbs.twimg.com/avatar.jpg"
 
 
 def test_apify_scrape_x_replies():

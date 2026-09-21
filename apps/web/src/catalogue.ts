@@ -198,11 +198,12 @@ export function videoLinks(
   }
   if (platform === "x") {
     const clean = (handle ?? "").replace(/^@/, "");
+    const id = encodeURIComponent(external_video_id);
     return {
       watch: clean
-        ? `https://x.com/${clean}/status/${external_video_id}`
-        : `https://x.com/i/status/${external_video_id}`,
-      embed: null,
+        ? `https://x.com/${clean}/status/${id}`
+        : `https://x.com/i/status/${id}`,
+      embed: `https://platform.twitter.com/embed/Tweet.html?id=${id}`,
     };
   }
   if (platform === "tiktok") {

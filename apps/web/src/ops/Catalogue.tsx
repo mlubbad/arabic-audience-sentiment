@@ -512,8 +512,17 @@ export function Catalogue({
                         }}
                       >
                         <span className="db-cat-thumb" aria-hidden="true">
-                          {r.thumbnail_url && (
-                            <img src={r.thumbnail_url} alt="" loading="lazy" />
+                          {r.thumbnail_url ? (
+                            <img
+                              src={r.thumbnail_url}
+                              alt=""
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <span className="db-cat-thumb-empty" />
                           )}
                           <span
                             className="db-cat-play"

@@ -130,6 +130,12 @@
   height: 100%;
   object-fit: cover;
 }
+.db-cat-thumb-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-muted);
+}
 .db-cat-play {
   position: absolute;
   inset: 0;
@@ -238,6 +244,30 @@
   border: 0;
   border-radius: var(--r-1);
   background: var(--bg-muted);
+}
+.db-preview-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-1);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.db-preview-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.db-preview-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-2);
+  font-size: var(--fs-small);
 }
 .db-preview-foot {
   display: flex;

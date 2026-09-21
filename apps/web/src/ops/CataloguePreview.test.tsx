@@ -79,4 +79,26 @@ describe("CataloguePreview", () => {
     await userEvent.click(close);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("renders a fallback preview image when embed is not available", () => {
+    const telegramVideo: CatalogueVideo = {
+      ...video,
+      platform: "telegram",
+      thumbnail_url: "https://example.com/telegram-thumb.jpg",
+    };
+    render(
+      <CataloguePreview
+        video={telegramVideo}
+        kindLabel="منشور قناة"
+        onClose={vi.fn()}
+        S={ar}
+      />,
+    );
+    expect(screen.queryByTestId("cat-preview-frame")).not.toBeInTheDocument();
+    expect(screen.getByTestId("cat-preview-fallback")).toBeInTheDocument();
+    expect(screen.getByTestId("cat-preview-thumb")).toHaveAttribute(
+      "src",
+      "https://example.com/telegram-thumb.jpg",
+    );
+  });
 });

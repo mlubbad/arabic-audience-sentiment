@@ -29,17 +29,23 @@ def test_brightdata_scrape_x_profile():
             200,
             json=[
                 {
-                    "id": "tweet_bd_1",
-                    "text": "تحليل أسبوعي للمشاعر في العالم العربي",
-                    "date_posted": "2026-09-21T05:00:00Z",
-                    "replies": 10,
-                },
-                {
-                    "post_id": "tweet_bd_2",
-                    "description": "منشور إخباري سريع",
-                    "date_posted": "2026-09-21T06:00:00Z",
-                    "comments": 3,
-                },
+                    "profile_image_link": "https://pbs.twimg.com/avatar.jpg",
+                    "posts": [
+                        {
+                            "id": "tweet_bd_1",
+                            "text": "تحليل أسبوعي للمشاعر في العالم العربي",
+                            "date_posted": "2026-09-21T05:00:00Z",
+                            "replies": 10,
+                            "photos": ["https://pbs.twimg.com/media1.jpg"],
+                        },
+                        {
+                            "post_id": "tweet_bd_2",
+                            "description": "منشور إخباري سريع",
+                            "date_posted": "2026-09-21T06:00:00Z",
+                            "comments": 3,
+                        },
+                    ],
+                }
             ],
         )
 
@@ -52,9 +58,11 @@ def test_brightdata_scrape_x_profile():
     assert videos[0]["title"] == "تحليل أسبوعي للمشاعر في العالم العربي"
     assert videos[0]["kind"] == "tweet"
     assert videos[0]["reported_comment_count"] == 10
+    assert videos[0]["thumbnail_url"] == "https://pbs.twimg.com/media1.jpg"
     assert videos[0]["field_provenance"]["source"] == "brightdata"
     assert videos[1]["external_video_id"] == "tweet_bd_2"
     assert videos[1]["reported_comment_count"] == 3
+    assert videos[1]["thumbnail_url"] == "https://pbs.twimg.com/avatar.jpg"
 
 
 def test_brightdata_scrape_x_replies():

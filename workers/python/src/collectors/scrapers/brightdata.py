@@ -85,6 +85,12 @@ class BrightDataClient:
         raw_items = self._scrape_dataset(self.dataset_x, [{"url": target_url}])
         videos = []
         for item in raw_items:
+            profile_image = (
+                item.get("profile_image_link")
+                or item.get("profile_image")
+                or item.get("avatar")
+                or item.get("profile_picture")
+            )
             posts = item.get("posts") if isinstance(item.get("posts"), list) else [item]
             for p in posts:
                 tweet_id = str(p.get("post_id") or p.get("id") or p.get("tweet_id") or "")
@@ -95,12 +101,32 @@ class BrightDataClient:
                 if not created_at:
                     created_at = datetime.now(timezone.utc).isoformat()
                 comment_count = p.get("replies") or p.get("comments") or p.get("reply_count") or 0
+
+                # Extract thumbnail: post media if available, fallback to profile avatar
+                photos = p.get("photos")
+                thumbnail = None
+                if isinstance(photos, list) and photos:
+                    first_p = photos[0]
+                    thumbnail = first_p if isinstance(first_p, str) else (first_p.get("url") or first_p.get("src") if isinstance(first_p, dict) else None)
+                elif isinstance(photos, str):
+                    thumbnail = photos
+
+                if not thumbnail:
+                    videos_media = p.get("videos")
+                    if isinstance(videos_media, list) and videos_media:
+                        first_v = videos_media[0]
+                        thumbnail = first_v if isinstance(first_v, str) else (first_v.get("thumbnail") or first_v.get("cover") or first_v.get("url") if isinstance(first_v, dict) else None)
+
+                if not thumbnail:
+                    thumbnail = p.get("thumbnail") or p.get("cover") or profile_image
+
                 videos.append(
                     {
                         "external_video_id": tweet_id,
                         "title": text[:100] or f"Tweet {tweet_id}",
                         "kind": "tweet",
                         "published_at": created_at,
+                        "thumbnail_url": thumbnail,
                         "reported_comment_count": comment_count,
                         "field_provenance": {
                             "source": "brightdata",
@@ -157,6 +183,7 @@ class BrightDataClient:
         raw_items = self._scrape_dataset(self.dataset_tiktok, [{"url": target_url}])
         videos = []
         for item in raw_items:
+            profile_image = item.get("avatar") or item.get("profile_image") or item.get("avatar_larger")
             posts = item.get("posts") or item.get("videos") if isinstance(item.get("posts") or item.get("videos"), list) else [item]
             for p in posts:
                 video_id = str(p.get("id") or p.get("video_id") or p.get("item_id") or "")
@@ -170,7 +197,7 @@ class BrightDataClient:
                     created_at = datetime.now(timezone.utc).isoformat()
 
                 comment_count = p.get("comments") or p.get("comment_count")
-                cover = p.get("cover") or p.get("thumbnail")
+                cover = p.get("cover") or p.get("thumbnail") or p.get("dynamic_cover") or profile_image
                 videos.append(
                     {
                         "external_video_id": video_id,

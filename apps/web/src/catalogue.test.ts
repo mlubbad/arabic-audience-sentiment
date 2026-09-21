@@ -252,8 +252,10 @@ describe("videoLinks", () => {
     ).toBe("https://t.me/news_channel/100");
   });
   it("formats x links correctly", () => {
-    expect(videoLinks("1234567890", "tweet", "x", "@elonmusk").watch).toBe(
-      "https://x.com/elonmusk/status/1234567890",
+    const links = videoLinks("1234567890", "tweet", "x", "@elonmusk");
+    expect(links.watch).toBe("https://x.com/elonmusk/status/1234567890");
+    expect(links.embed).toBe(
+      "https://platform.twitter.com/embed/Tweet.html?id=1234567890",
     );
   });
   it("formats tiktok links correctly", () => {
