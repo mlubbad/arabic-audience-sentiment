@@ -165,10 +165,16 @@
    numbers as text. */
 .db-chart {
   position: relative;
+  width: 100%;
   height: 260px;
 }
 .db-chart--tall {
   height: 320px;
+}
+.db-chart canvas {
+  width: 100% !important;
+  max-width: 100%;
+  display: block;
 }
 /* The numbers a canvas cannot say, folded away by default: a sighted reader
    already has the picture, and a table under every chart would treble the

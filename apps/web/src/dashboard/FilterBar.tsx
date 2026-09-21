@@ -95,13 +95,14 @@ export function FilterBar({
   // observer — so neither can drift from what is actually on screen.
   // Guarded for the prerender (no `window`) and for jsdom (no observer).
   useEffect(() => {
+    if (!onPinnedHeight) return;
     const el = barRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const root = document.documentElement;
     const publish = () => {
       const h = el.getBoundingClientRect().height;
       root.style.setProperty(PINNED_HEIGHT_VAR, `${Math.round(h)}px`);
-      onPinnedHeight?.(h);
+      onPinnedHeight(h);
     };
     publish();
     const observer = new ResizeObserver(publish);

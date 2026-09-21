@@ -9,6 +9,8 @@
  * (they are a pure function of the filtered rows, computed once and passed
  * down) and the chart `data` objects are unchanged.
  */
+import { useEffect, useRef } from "react";
+import type { Chart as ChartJS } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
 import { plottable, type Bucketed } from "../analytics";
 import { Card } from "../ui/Card";
@@ -47,6 +49,16 @@ export function Timing({
     peakHourBucket.count > 0 &&
     peakDayBucket &&
     peakDayBucket.count > 0;
+
+  const weeklyChartRef = useRef<ChartJS<"line"> | null>(null);
+  const hourlyChartRef = useRef<ChartJS<"bar"> | null>(null);
+  const weekdayChartRef = useRef<ChartJS<"bar"> | null>(null);
+
+  useEffect(() => {
+    weeklyChartRef.current?.resize();
+    hourlyChartRef.current?.resize();
+    weekdayChartRef.current?.resize();
+  }, [weeks, hours, weekdays]);
 
   return (
     <section className="db-section" id="rp-timing">
@@ -91,6 +103,7 @@ export function Timing({
               data-testid="chart-weekly"
             >
               <Line
+                ref={weeklyChartRef}
                 data={{
                   labels: weeks.buckets.map((b) => b.label),
                   datasets: [
@@ -135,6 +148,7 @@ export function Timing({
               data-testid="chart-hourly"
             >
               <Bar
+                ref={hourlyChartRef}
                 data={{
                   labels: hours.buckets.map((b) => b.label),
                   datasets: [
@@ -180,6 +194,7 @@ export function Timing({
               data-testid="chart-weekday"
             >
               <Bar
+                ref={weekdayChartRef}
                 data={{
                   labels: weekdays.buckets.map((b) => b.label),
                   datasets: [

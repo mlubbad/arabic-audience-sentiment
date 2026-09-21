@@ -788,10 +788,30 @@ function DashboardBody({
       applyFilters({ sentiment: EMPTY_FILTERS.sentiment });
     }
   }, [sentiment, s?.measurable]);
-  // The pinned bar's height as `FilterBar` last measured it — the section
-  // observer's top edge. Zero until the first measurement lands.
+
+  // The pinned bar's height as `db-sticky-bar` measures it (FilterBar + SectionNav).
+  // Zero until the first measurement lands.
   const [pinnedHeight, setPinnedHeight] = useState(0);
   const active = useActiveSection(!!s && s.total > 0, pinnedHeight);
+  const stickyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = stickyRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const publish = () => {
+      const h = el.getBoundingClientRect().height;
+      root.style.setProperty("--db-pinned-h", `${Math.round(h)}px`);
+      setPinnedHeight(h);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--db-pinned-h");
+    };
+  }, []);
   // Aggregations for the charts, over every row the filters admit rather than
   // the page on screen. Memoised on the filtered array itself: it is a new
   // array only when the read or the filters actually changed.
@@ -936,44 +956,45 @@ function DashboardBody({
         range={range}
         labels={labels}
       />
-      <FilterBar
-        values={values}
-        onChange={onChange}
-        onApply={applyFilters}
-        onReset={reset}
-        onLimitChange={onLimitChange}
-        formError={formError}
-        videoOptions={s?.video_options ?? []}
-        topics={
-          result.data?.active_topic_key ? (result.data?.topics ?? []) : null
-        }
-        commentTypes={result.data?.comment_types ?? []}
-        S={S}
-        lang={lang}
-        labels={effectiveLabels}
-        appliedCount={chips.length}
-        chips={
-          // Only while something is applied: the pinned pane pays for every
-          // row, and the no-filter fallback (the source's scope sentence) is
-          // already on the Provenance strip below.
-          chips.length > 0 ? (
-            <ActiveFilters
-              chips={chips}
-              onClear={onClear}
-              onReset={reset}
-              S={S}
-            />
-          ) : null
-        }
-        onPinnedHeight={setPinnedHeight}
-      />
+      <div className="db-sticky-bar" ref={stickyRef}>
+        <FilterBar
+          values={values}
+          onChange={onChange}
+          onApply={applyFilters}
+          onReset={reset}
+          onLimitChange={onLimitChange}
+          formError={formError}
+          videoOptions={s?.video_options ?? []}
+          topics={
+            result.data?.active_topic_key ? (result.data?.topics ?? []) : null
+          }
+          commentTypes={result.data?.comment_types ?? []}
+          S={S}
+          lang={lang}
+          labels={effectiveLabels}
+          appliedCount={chips.length}
+          chips={
+            // Only while something is applied: the pinned pane pays for every
+            // row, and the no-filter fallback (the source's scope sentence) is
+            // already on the Provenance strip below.
+            chips.length > 0 ? (
+              <ActiveFilters
+                chips={chips}
+                onClear={onClear}
+                onReset={reset}
+                S={S}
+              />
+            ) : null
+          }
+        />
+        {/* Two sections were missing from this list and two more were being
+            offered on a page that had none: at zero rows every section below is
+            unrendered, and the nav went on linking to six of them. A control
+            that does nothing when pressed is worse than an absent one — the
+            reader concludes the page is broken rather than empty. */}
+        <SectionNav active={active} S={S} show={!!s && s.total > 0} />
+      </div>
       <p className="db-note db-filterbar-note">{S.periodNote}</p>
-      {/* Two sections were missing from this list and two more were being
-          offered on a page that had none: at zero rows every section below is
-          unrendered, and the nav went on linking to six of them. A control
-          that does nothing when pressed is worse than an absent one — the
-          reader concludes the page is broken rather than empty. */}
-      <SectionNav active={active} S={S} show={!!s && s.total > 0} />
       <Provenance source={source} />
       {result.isPending && <Loading S={S} />}
       {!result.isPending && result.isFetching && <Updating S={S} />}
