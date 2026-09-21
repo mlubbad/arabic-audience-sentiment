@@ -47,4 +47,18 @@ describe("Compare", () => {
     // decoration of it.
     expect(bar).toHaveAttribute("aria-label", expect.stringContaining("50"));
   });
+
+  it("omits unmeasurable mixed sentiment from video shares when model does not support it", () => {
+    const sNoMixed = {
+      comparison: [video],
+      comparison_truncated: false,
+      measurable: new Set(["positive", "negative", "neutral"]),
+    } as unknown as Snapshot;
+
+    render(
+      <Compare s={sNoMixed} S={ar} labels={ar.labels} onPick={() => {}} />,
+    );
+    const row = screen.getByTestId("compare-v1");
+    expect(row).not.toHaveTextContent(ar.labels.mixed);
+  });
 });

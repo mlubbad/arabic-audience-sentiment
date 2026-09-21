@@ -1,5 +1,50 @@
 # Progress
 
+## 2026-09-21 — Storytelling with Data Dashboard Transformation
+
+Transformed the Arabic-first analytics dashboard into an executive data narrative guided by the `/storytelling-with-data` framework (Cole Nussbaumer Knaflic), enhancing cognitive clarity, preattentive visual hierarchy, and actionable decision-making:
+
+1. **Executive Story Briefing (موجز القصة ونبض الجمهور) in `Summary.tsx`**:
+   - Added 3-act narrative structure immediately following the KPI cards:
+     - **Act 1 (The Pulse / نبض الجمهور)**: Net Sentiment score calculation `((Positive - Negative) / Analysed) * 100` displayed with prominent pulse gauge badge and color-coded status (Very Positive, Healthy, Mixed, Critical Negative).
+     - **Act 2 (The Driver / المحرك الرئيسي)**: Identifies whether the dominant topic or top video is steering audience sentiment, citing exact comment volume and percentages.
+     - **Act 3 (Actionable Next Steps / التوصية العملية)**: Actionable guidance for the creator based on whether sentiment is positive (capitalize on top topic), critical (address concerns in engaged negative comments), or mixed.
+   - Fully tested with `Summary.test.tsx` across positive, negative, and mixed scenarios, with zero `letter-spacing` Arabic typography rules strictly enforced.
+
+2. **Action Titles & Subtitles Across All Sections**:
+   - Replaced passive nouns with actionable, conclusion-first headers:
+     - **Summary**: *موجز الأداء ونبض الجمهور* (*Performance Summary & Audience Pulse*)
+     - **Voice**: *صوت الجمهور وتوزيع المشاعر* (*Audience Voice & Sentiment Distribution*)
+     - **Timing**: *أوقات النشر وذروة التفاعل* (*Publishing Times & Engagement Peaks*)
+     - **Videos**: *أداء المحتوى وتفاعل المشاهدين* (*Content Performance & Viewer Engagement*)
+     - **Compare**: *مقارنة تفاعلية بين الفيديوهات والمحتوى* (*Interactive Content & Video Comparison*)
+     - **Engaged**: *التعليقات الأكثر تأثيراً وتفاعلاً* (*High-Impact & Most Engaged Comments*)
+     - **Comments**: *استكشاف التعليقات والتفاعل التفصيلي* (*Detailed Comments Explorer & Interaction*)
+     - **People**: *أبرز المعلقين ونشاط الجمهور* (*Top Commenters & Audience Activity*)
+   - Preserved `SectionNav` anchor IDs and short button labels to keep navigation clean and familiar.
+
+3. **10% Highlighting Law & Preattentive Visual Hierarchy**:
+   - **Audience Voice (`Voice.tsx`)**: Saturated primary color (`#4b34c9`) applied exclusively to the dominant #1 topic, muting lower topics with transparent tint (`rgba(75, 52, 201, 0.4)`); donut chart features centered Net Sentiment KPI overlay (`.db-donut-center`).
+   - **Posting Windows (`Timing.tsx`)**: Peak weekday and peak hour highlighted prominently; non-peak hours and days muted (`rgba(75, 52, 201, 0.35)`); dynamic peak posting takeaway banner (`.db-timing-takeaways`) informs creators of their highest-engagement window.
+   - **Videos & Outliers (`Videos.tsx`)**: Prominent outlier badges identifying highest negative sentiment, highest volume, and top positive videos to instantly guide focus to anomalies.
+   - **Engaged Negative Comments (`Engaged.tsx`)**: Contextual creator tip callout (`.db-engaged-tip`) advising creators on how to defuse negative sentiment.
+   - **Commenters (`People.tsx`)**: Prominent badge highlight (`.db-rank--top`) for the #1 top commenter.
+
+4. **Bilingual Symmetry & Arabic Typography Safeguards**:
+   - Exact 1:1 symmetry across `ar.ts` and `en.ts` for all action titles, briefing templates, and badges.
+   - Strict adherence to `letter-spacing: 0` for all Arabic typography, verified with automated tests.
+   - Safe optional chaining in `Dashboard.tsx` (`result.data?.topics?.find`) preventing undefined crashes in test fixtures and edge cases.
+
+5. **Conditional Mixed Sentiment Display (استبعاد المشاعر المختلطة للنماذج التي لا تدعمها)**:
+   - When the active sentiment model does not predict mixed sentiment (`!s.measurable.has("mixed")`, e.g. 3-class models like CAMeLBERT-DA):
+     - **Audience Voice (`Voice.tsx`)**: Completely omits "مختلط" from the Doughnut chart slices, data points, and legend list (removed gray unmeasurable row), rendering only measurable classes with full color consistency.
+     - **Video Comparison (`Compare.tsx`)**: Omitted "مختلط" from the breakdown share list and segment bars in the `Distribution` view.
+     - **Filters (`Dashboard.tsx` & `FilterBar.tsx`)**: FilterBar options derived from `effectiveLabels` containing only measurable sentiment classes, preventing users from selecting unsupported labels; automatically resets active filter if an unmeasurable sentiment was selected.
+     - Fully verified with `Voice.test.tsx`, `Compare.test.tsx`, and `FilterBar.test.tsx`.
+
+6. **Verification**:
+   - 100% green across all repository verification gates: 117 Vitest test suites (913 unit/integration tests), 40 database test suites (370 tests), 262 Python pytest tests, ESLint, Prettier, TypeScript typecheck, Deno edge function check, Vite production build, prerendering, and secret scanner.
+
 ## 2026-09-20 — Full End-to-End X (Twitter) & TikTok Channel Support
 
 1. **X (Twitter) Collector (`workers/python/src/collectors/x_collector.py`)**:

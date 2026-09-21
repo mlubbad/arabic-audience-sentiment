@@ -865,6 +865,68 @@ export const ar = {
   secCompare: "المقارنة",
   secEngaged: "الأكثر تفاعلًا",
   secComments: "التعليقات",
+  secSummaryTitle: "الملخص التنفيذي ونبض الجمهور",
+  secVideosTitle: "أداء الفيديوهات: خريطة التفاعل والرضا",
+  secVoiceTitle: "صوت الجمهور: توازن المشاعر ومحركات النقاش",
+  secTimingTitle: "توقيت التفاعل: متى يتفاعل جمهورك بأعلى كثافة؟",
+  secPeopleTitle: "أبرز المعلّقين: الأصوات الأكثر تفاعلاً وتأثيراً",
+  secCompareTitle: "مقارنة الحلقات: كشف التباين في مشاعر المتابعين",
+  secEngagedTitle: "بؤر الاهتمام: أبرز التعليقات التي تحتاج متابعة",
+  secCommentsTitle: "سجل التعليقات والتدقيق البشري: مراجعة دقة التصنيف",
+
+  // Executive Story Briefing
+  storyBriefingEyebrow: "موجز القصة والرؤية التنفيذية",
+  storyBriefingTitle: "نبض الجمهور والخلاصة التحليلية",
+  netSentimentScoreLabel: "صافي مؤشر الرضا",
+  netSentimentScoreDesc: "الفارق النسبي بين الإيجابية والسلبية المحللة",
+  pulseStrongPositive: "نبض إيجابي مرتفع",
+  pulseModeratePositive: "نبض إيجابي معتدل",
+  pulseBalanced: "نبض متوازن / محايد",
+  pulseNegativeAttention: "نبض سلبي ملحوظ",
+  pulseCriticalAlert: "نبض سلبي حاد / أزمة تفاعل",
+  storyAct1Title: "١. النبض والاتجاه العام",
+  storyAct1DominantPos: (posPct: number, negPct: number) =>
+    `المشاعر الإيجابية تُمثّل ${posPct}٪ من التفاعل المحلل مقابل ${negPct}٪ سلبي، مما يعكس رضا وثقة مرتفعة من المتابعين.`,
+  storyAct1DominantNeg: (negPct: number, posPct: number) =>
+    `المشاعر السلبية تُمثّل ${negPct}٪ متفوقة على الإيجابية (${posPct}٪)، مما يشير إلى وجود تحفظات نقدية واسعة تستوجب المتابعة.`,
+  storyAct1Balanced: (posPct: number, negPct: number) =>
+    `المشاعر متقاربة بنسبة ${posPct}٪ إيجابية و${negPct}٪ سلبية، مما يعكس انقساماً أو حواراً متكافئاً في الآراء.`,
+  storyAct2Title: "٢. بؤرة الاهتمام والنقاش",
+  storyAct2DominantTopic: (name: string, count: string, pct: number) =>
+    `الموضوع الأكثر استقطاباً للتفاعل: «${name}» بـ ${count} تعليقاً (${pct}٪ من النقاش المصنَّف).`,
+  storyAct2TopVideo: (title: string, count: string, pct: number) =>
+    `أعلى فيديو استقطاباً: «${title}» بـ ${count} تعليقاً (${pct}٪ من التفاعل).`,
+  storyAct2General: "التفاعل يتوزع عبر عدة محاور دون هيمنة موضوع واحد محدد.",
+  storyAct3Title: "٣. التوصية الإجرائية",
+  storyAct3RecCritical:
+    "يُنصح بالتركيز على الرد على التعليقات النقدية الأكثر تفاعلاً لإزالة اللبس وامتصاص الانتقادات.",
+  storyAct3RecPositive:
+    "الجمهور يظهر تفاعلاً إيجابياً عالياً؛ استثمر هذا الزخم بالاستمرار في نفس وتيرة الطرح ومكافأة تفاعلهم.",
+  storyAct3RecGeneral:
+    "تابع وتيرة النشر وحافظ على مراجعة عينات من التعليقات دورياً لضبط دقة النماذج التحليلية.",
+
+  // Donut & Voice enhancements
+  donutCenterNet: "صافي الرضا",
+
+  // Timing takeaway & highlighting
+  timingPeakHeadline: (day: string, hour: string, count: string) =>
+    `أعلى ذروة للتفاعل: يوم ${day} عند الساعة ${hour}:00 (${count} تعليق).`,
+  timingPeakBadge: "فترة الذروة",
+  timingDayPeak: (day: string) => `اليوم الأكثر تفاعلاً: ${day}`,
+  timingHourPeak: (hour: string) => `الساعة الأكثر نشاطاً: ${hour}:00`,
+
+  // Video performance filters & outlier badges
+  videoFilterAll: "كل الفيديوهات",
+  videoFilterCritical: "الأعلى نقداً",
+  videoFilterPositive: "الأكثر إيجابية",
+  videoFilterVolume: "الأعلى تفاعلاً",
+  videoTagHighNegative: "نقد مرتفع",
+  videoTagTopPositive: "إيجابي متميز",
+  videoTagTopVolume: "أعلى تفاعل",
+
+  // Engaged creator tip
+  engagedCreatorTip:
+    "توصية إجرائية: هذه التعليقات حازت على إعجاب واسع من المتابعين؛ الرد عليها أو توضيحها رسمياً يمتص الجدل ويعزز ثقة الجمهور.",
   dateOrderError: "يجب أن يسبق تاريخ البداية تاريخ النهاية",
   chipSearch: (q: string) => `بحث: «${q}»`,
   chipVideo: "فيديو محدَّد",

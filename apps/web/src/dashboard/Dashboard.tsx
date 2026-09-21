@@ -443,7 +443,7 @@ function DashboardBody({
   // key is the fallback so a retired or unknown key is still visible as itself
   // rather than as nothing.
   const topicName = (key: string) =>
-    result.data?.topics.find((t) => t.key === key)?.[
+    result.data?.topics?.find((t) => t.key === key)?.[
       lang === "ar" ? "name_ar" : "name_en"
     ] ?? key;
   // Sticky, because recovery re-requests page one and that response no longer
@@ -768,6 +768,13 @@ function DashboardBody({
   }
   const chips = chipsFor(values, { S, labels, topicName });
   const s = result.data;
+
+  useEffect(() => {
+    if (sentiment && s?.measurable && !s.measurable.has(sentiment as Label)) {
+      setSentiment(EMPTY_FILTERS.sentiment);
+      applyFilters({ sentiment: EMPTY_FILTERS.sentiment });
+    }
+  }, [sentiment, s?.measurable]);
   // The pinned bar's height as `FilterBar` last measured it — the section
   // observer's top edge. Zero until the first measurement lands.
   const [pinnedHeight, setPinnedHeight] = useState(0);
@@ -895,6 +902,18 @@ function DashboardBody({
     span.length > 0
       ? `${span[0].date} — ${span[span.length - 1].date}`
       : S.noKnownDates;
+
+  const effectiveLabels = useMemo(() => {
+    if (!s?.measurable) return labels;
+    const res: Partial<Record<Label, string>> = {};
+    for (const [k, v] of Object.entries(labels) as [Label, string][]) {
+      if (s.measurable.has(k)) {
+        res[k] = v;
+      }
+    }
+    return res as Record<Label, string>;
+  }, [labels, s?.measurable]);
+
   return (
     <div className="db-page">
       <Hero
@@ -918,7 +937,7 @@ function DashboardBody({
         commentTypes={result.data?.comment_types ?? []}
         S={S}
         lang={lang}
-        labels={labels}
+        labels={effectiveLabels}
         appliedCount={chips.length}
         chips={
           // Only while something is applied: the pinned pane pays for every
@@ -954,7 +973,7 @@ function DashboardBody({
       )}
       {s && (
         <>
-          <Summary s={s} S={S} />
+          <Summary s={s} S={S} topicName={topicName} />
           {s.total === 0 ? (
             /* Two different zeros, and for years one message.
                A workspace whose collection has not run yet and a filter that

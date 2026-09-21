@@ -22,6 +22,10 @@
   font-size: var(--fs-micro);
   font-variant-numeric: tabular-nums;
 }
+.db-rank--top {
+  color: var(--ml-indigo);
+  font-weight: 700;
+}
 .db-person-name {
   font-weight: 600;
   color: var(--text-1);

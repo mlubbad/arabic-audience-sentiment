@@ -631,3 +631,19 @@ those paths). The deployed web bundle predates the new door until the next
   - Always run `npm run check` locally before pushing to `origin main` to guarantee gates are green.
   - Do NOT deploy via local scripts unless working offline or troubleshooting; git push handles deployment.
   - Manual local fallback commands if ever needed: `npm run deploy:preview` and `npm run db:migrate:remote`.
+
+2026-09-21, Antigravity session — Storytelling with Data Transformation (DONE):
+- **Executive Story Briefing in `Summary.tsx`**: Added Net Sentiment score gauge and 3-act narrative (Pulse, Driver, Actionable recommendation) with dedicated `Summary.test.tsx` suite.
+- **Action Titles**: Replaced passive category labels with action-oriented conclusion headers across `Summary`, `Voice`, `Timing`, `Videos`, `Compare`, `Engaged`, `Comments`, and `People`.
+- **10% Highlighting & Preattentive Hierarchy**:
+  - `Voice.tsx`: dominant topic highlighted in saturated brand `#4b34c9`, lower topics muted; donut center Net Sentiment badge overlay.
+  - `Timing.tsx`: peak publishing takeaway banner; peak weekday and peak hour highlighted, off-peaks muted.
+  - `Videos.tsx`: outlier badges for high negative, top volume, and top positive content.
+  - `Engaged.tsx`: creator action tip callout.
+  - `People.tsx`: rank highlight for #1 commenter.
+- **Conditional Mixed Sentiment Display**:
+  - `Voice.tsx`: Omits "مختلط" from donut chart and legend when model does not support it (`!s.measurable.has("mixed")`).
+  - `Compare.tsx`: Excludes "مختلط" from video comparison shares in `Distribution`.
+  - `Dashboard.tsx` & `FilterBar.tsx`: Supplies `effectiveLabels` containing only measurable labels and resets active sentiment filter if unsupported.
+  - Unit tests added in `Voice.test.tsx`, `Compare.test.tsx`, and `FilterBar.test.tsx`.
+- **Verification**: All gates 100% green: 117 Vitest suites (913 tests), 40 DB test suites (370 tests), 262 Python pytest tests, ESLint, Prettier, TypeScript, Deno check, and Vite production build + prerender. All paths free.

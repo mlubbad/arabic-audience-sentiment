@@ -46,16 +46,21 @@ function Distribution({
   v,
   labels,
   S,
+  measurable,
 }: {
   v: ComparedVideo;
   labels: Record<Label, string>;
   S: Strings;
+  measurable?: Set<string>;
 }) {
   if (v.analysed === 0) return <small>{S.noAnalysedInFilters}</small>;
   // Denominator: `analysed`, not `total` — this cell's bar and its printed
   // shares must agree, and the shares beside it are already a share of what
   // was analysed.
-  const segments = splitSegments(v.sentiments, v.analysed);
+  const isMeasurable = (k: string) => (!measurable ? true : measurable.has(k));
+  const segments = splitSegments(v.sentiments, v.analysed).filter((seg) =>
+    isMeasurable(seg.key),
+  );
   // Spoken form matches the printed form exactly: same labels, same counts,
   // same rounded percentage — built from `seg.pct`, which is already
   // `count / analysed * 100`, not recomputed against a different base.
@@ -74,8 +79,9 @@ function Distribution({
         ))}
       </span>
       <ul className="share">
-        {(Object.entries(v.sentiments) as [Label, number][]).map(
-          ([k, count]) => (
+        {(Object.entries(v.sentiments) as [Label, number][])
+          .filter(([k]) => isMeasurable(k))
+          .map(([k, count]) => (
             <li key={k}>
               {S.shareItem(
                 labels[k],
@@ -83,8 +89,7 @@ function Distribution({
                 Math.round((count / v.analysed) * 100),
               )}
             </li>
-          ),
-        )}
+          ))}
       </ul>
     </div>
   );
@@ -109,7 +114,7 @@ export function Compare({
       aria-labelledby="comparison-heading"
     >
       <header>
-        <h2 id="comparison-heading">{S.compareTitle}</h2>
+        <h2 id="comparison-heading">{S.secCompareTitle}</h2>
       </header>
       <p className="db-muted" data-testid="comparison-scope">
         {S.compareScope}
@@ -147,7 +152,12 @@ export function Compare({
                 <div>
                   <dt>{S.colDistribution}</dt>
                   <dd>
-                    <Distribution v={v} labels={labels} S={S} />
+                    <Distribution
+                      v={v}
+                      labels={labels}
+                      S={S}
+                      measurable={s.measurable}
+                    />
                   </dd>
                 </div>
               </dl>
@@ -184,7 +194,12 @@ export function Compare({
                   <TableCell>{v.replies}</TableCell>
                   <TableCell>{v.analysed}</TableCell>
                   <TableCell>
-                    <Distribution v={v} labels={labels} S={S} />
+                    <Distribution
+                      v={v}
+                      labels={labels}
+                      S={S}
+                      measurable={s.measurable}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

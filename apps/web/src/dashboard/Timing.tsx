@@ -34,11 +34,47 @@ export function Timing({
   weekdays: Bucketed;
   weeks: Bucketed;
 }) {
+  const peakHourBucket = [...hours.buckets].sort(
+    (a, b) => b.count - a.count,
+  )[0];
+  const peakDayBucket = [...weekdays.buckets].sort(
+    (a, b) => b.count - a.count,
+  )[0];
+  const maxHour = Math.max(0, ...hours.buckets.map((b) => b.count));
+  const maxDay = Math.max(0, ...weekdays.buckets.map((b) => b.count));
+  const hasTimingData =
+    peakHourBucket &&
+    peakHourBucket.count > 0 &&
+    peakDayBucket &&
+    peakDayBucket.count > 0;
+
   return (
     <section className="db-section" id="rp-timing">
       <header>
-        <h2>{S.timingTitle}</h2>
+        <h2>{S.secTimingTitle}</h2>
         <p className="db-lead">{S.timingLead}</p>
+        {hasTimingData && (
+          <div className="db-timing-takeaways" data-testid="timing-takeaways">
+            <div className="db-timing-pill">
+              <span className="db-timing-pill-badge">{S.timingPeakBadge}</span>
+              <span className="db-timing-pill-text">
+                {S.timingPeakHeadline(
+                  peakDayBucket.label,
+                  peakHourBucket.label,
+                  n(peakHourBucket.count),
+                )}
+              </span>
+            </div>
+            <div className="db-timing-meta-pills">
+              <span className="db-timing-subpill">
+                {S.timingDayPeak(peakDayBucket.label)}
+              </span>
+              <span className="db-timing-subpill">
+                {S.timingHourPeak(peakHourBucket.label)}
+              </span>
+            </div>
+          </div>
+        )}
       </header>
       <div className="db-grid--charts">
         <Card>
@@ -104,7 +140,11 @@ export function Timing({
                   datasets: [
                     {
                       data: hours.buckets.map((b) => b.count),
-                      backgroundColor: VOLUME,
+                      backgroundColor: hours.buckets.map((b) =>
+                        b.count > 0 && b.count === maxHour
+                          ? VOLUME
+                          : "rgba(75, 52, 201, 0.35)",
+                      ),
                       borderRadius: 4,
                     },
                   ],
@@ -145,7 +185,11 @@ export function Timing({
                   datasets: [
                     {
                       data: weekdays.buckets.map((b) => b.count),
-                      backgroundColor: VOLUME,
+                      backgroundColor: weekdays.buckets.map((b) =>
+                        b.count > 0 && b.count === maxDay
+                          ? VOLUME
+                          : "rgba(75, 52, 201, 0.35)",
+                      ),
                       borderRadius: 4,
                     },
                   ],

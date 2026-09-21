@@ -95,7 +95,7 @@ export function Comments({
             fallback target, for when the row that opened it is gone (a
             reviewed row can drop out of the "غير المراجَع" filter on save). */}
         <h2 id="rp-comments-title" tabIndex={-1}>
-          {S.secComments}
+          {S.secCommentsTitle}
         </h2>
         <p className="db-lead">{S.commentsLead}</p>
       </header>

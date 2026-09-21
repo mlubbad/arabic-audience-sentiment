@@ -870,6 +870,70 @@ export const en: Strings = {
   secCompare: "Comparison",
   secEngaged: "Most engaged",
   secComments: "Comments",
+  secSummaryTitle: "Executive Summary & Audience Pulse",
+  secVideosTitle: "Video Performance: Engagement & Sentiment Map",
+  secVoiceTitle: "Audience Voice: Sentiment & Discussion Drivers",
+  secTimingTitle: "Engagement Timing: When Does Your Audience Speak Up?",
+  secPeopleTitle: "Top Commenters: Most Active & Influential Voices",
+  secCompareTitle: "Video Comparison: Variance in Audience Sentiment",
+  secEngagedTitle: "Critical Feedback: High-Impact Comments Needing Attention",
+  secCommentsTitle: "Comments Stream & Human Review Verification",
+
+  // Executive Story Briefing
+  storyBriefingEyebrow: "Executive Story & Narrative Briefing",
+  storyBriefingTitle: "Audience Pulse & Analytical Takeaway",
+  netSentimentScoreLabel: "Net Sentiment Score",
+  netSentimentScoreDesc:
+    "Relative spread between analysed positive and negative sentiment",
+  pulseStrongPositive: "Strong Positive Pulse",
+  pulseModeratePositive: "Moderate Positive Pulse",
+  pulseBalanced: "Balanced / Neutral Pulse",
+  pulseNegativeAttention: "Notable Negative Sentiment",
+  pulseCriticalAlert: "Critical Negative Backlash",
+  storyAct1Title: "1. Overall Sentiment Pulse",
+  storyAct1DominantPos: (posPct: number, negPct: number) =>
+    `Positive sentiment represents ${posPct}% of analysed feedback vs ${negPct}% negative, showing strong audience satisfaction.`,
+  storyAct1DominantNeg: (negPct: number, posPct: number) =>
+    `Negative sentiment represents ${negPct}% outpacing positive (${posPct}%), pointing to widespread critical feedback requiring attention.`,
+  storyAct1Balanced: (posPct: number, negPct: number) =>
+    `Sentiment is closely divided at ${posPct}% positive and ${negPct}% negative, showing balanced opinions.`,
+  storyAct2Title: "2. Topic & Content Focus",
+  storyAct2DominantTopic: (name: string, count: string, pct: number) =>
+    `Primary discussion driver: “${name}” with ${count} comments (${pct}% of classified talk).`,
+  storyAct2TopVideo: (title: string, count: string, pct: number) =>
+    `Top video by engagement: “${title}” with ${count} comments (${pct}% of interactions).`,
+  storyAct2General:
+    "Engagement is distributed across topics without a single dominant theme.",
+  storyAct3Title: "3. Actionable Recommendation",
+  storyAct3RecCritical:
+    "Prioritize responding to top critical comments to clarify misunderstandings and address concerns.",
+  storyAct3RecPositive:
+    "Audience reception is strongly positive; sustain this momentum with similar content and acknowledge top contributors.",
+  storyAct3RecGeneral:
+    "Maintain publishing consistency and periodically review sample comments to ensure model accuracy.",
+
+  // Donut & Voice enhancements
+  donutCenterNet: "Net Pulse",
+
+  // Timing takeaway & highlighting
+  timingPeakHeadline: (day: string, hour: string, count: string) =>
+    `Peak engagement window: ${day} at ${hour}:00 (${count} comments).`,
+  timingPeakBadge: "Peak Window",
+  timingDayPeak: (day: string) => `Busiest day: ${day}`,
+  timingHourPeak: (hour: string) => `Busiest hour: ${hour}:00`,
+
+  // Video performance filters & outlier badges
+  videoFilterAll: "All videos",
+  videoFilterCritical: "Highest criticism",
+  videoFilterPositive: "Most positive",
+  videoFilterVolume: "Most comments",
+  videoTagHighNegative: "High criticism",
+  videoTagTopPositive: "Top positive",
+  videoTagTopVolume: "Top engagement",
+
+  // Engaged creator tip
+  engagedCreatorTip:
+    "Actionable tip: These comments received widespread viewer agreement; replying or clarifying officially mitigates controversy and builds trust.",
   dateOrderError: "The start date must come before the end date",
   chipSearch: (q: string) => `search: “${q}”`,
   chipVideo: "one video",
