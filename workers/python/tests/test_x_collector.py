@@ -304,3 +304,39 @@ def test_x_collector_apify_and_brightdata_integration():
     assert batches_bd[0].comments[0].id == "1922334455667788998"
     assert batches_bd[0].comments[0].source == "brightdata"
 
+
+def test_x_collector_apify_empty_falls_back_to_brightdata():
+    """Verify that when Apify returns 0 results (e.g. free tier limit), XCollector falls back to Bright Data."""
+    from collectors.scrapers.apify import ApifyClient
+    from collectors.scrapers.brightdata import BrightDataClient
+
+    def apify_empty_handler(request: httpx.Request) -> httpx.Response:
+        # Returns empty list (or noResults object)
+        return httpx.Response(200, json=[{"noResults": True}])
+
+    def bd_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "post_id": "tweet_bd_fallback_1",
+                    "description": "تغريدة تم جلبها عبر برايت داتا بعد تعذر أبيفاي",
+                    "replies": 3,
+                    "date_posted": "2026-09-21T06:00:00Z",
+                }
+            ],
+        )
+
+    apify_c = ApifyClient(token="token_ap", client=httpx.Client(transport=httpx.MockTransport(apify_empty_handler)))
+    bd_c = BrightDataClient(api_key="key_bd", client=httpx.Client(transport=httpx.MockTransport(bd_handler)))
+
+    col = XCollector(channel_id="@skynewsarabia", apify_client=apify_c, brightdata_client=bd_c)
+    cat = col.catalogue()
+
+    # Successfully fell back to Bright Data instead of returning an empty catalogue!
+    assert len(cat.videos) == 1
+    assert cat.videos[0]["external_video_id"] == "tweet_bd_fallback_1"
+    assert cat.videos[0]["field_provenance"]["source"] == "brightdata"
+    assert cat.complete is True
+
+

@@ -16,6 +16,19 @@ type AttemptFilter = "all" | "running" | "succeeded" | "failed";
 
 const PAGE_SIZE = 8;
 
+function getEstimatedTime(type: string | undefined, S: Strings): string {
+  switch (type) {
+    case "discover":
+      return S.opsEstimatedTimeDiscover;
+    case "collect":
+      return S.opsEstimatedTimeCollect;
+    case "analyse":
+      return S.opsEstimatedTimeAnalyse;
+    default:
+      return S.opsEstimatedTimeDefault;
+  }
+}
+
 export function Attempts({
   mode,
   jobsFailed,
@@ -43,12 +56,14 @@ export function Attempts({
   const [page, setPage] = useState(1);
   const [, setTimerTick] = useState(0);
 
-  const hasRunning = entries.some((e) => e.status === "running");
+  const hasActive = entries.some(
+    (e) => e.status === "running" || e.status === "queued",
+  );
   useEffect(() => {
-    if (!hasRunning) return;
+    if (!hasActive) return;
     const interval = setInterval(() => setTimerTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
-  }, [hasRunning]);
+  }, [hasActive]);
 
   const counts = useMemo(() => {
     let running = 0;
@@ -248,13 +263,40 @@ export function Attempts({
                     <small>
                       {displayDate(e.createdAt, lang)}
                       {e.attempt > 0 ? S.opsAttemptN(e.attempt) : ""}
-                      {e.status === "running"
-                        ? S.opsRunningDuration(formatElapsed(e.createdAt, lang))
-                        : e.durationSeconds != null
-                          ? S.opsCompletedDuration(
-                              formatDuration(e.durationSeconds, lang),
-                            )
-                          : ""}
+                      {e.status === "queued" ? (
+                        <>
+                          {S.opsQueuedDuration(
+                            formatElapsed(e.createdAt, lang),
+                          )}
+                          {S.opsEstimatedCompletion(
+                            getEstimatedTime(e.type, S),
+                          )}
+                        </>
+                      ) : e.status === "running" ? (
+                        <>
+                          {S.opsRunningDuration(
+                            formatElapsed(e.createdAt, lang),
+                          )}
+                          {S.opsEstimatedCompletion(
+                            getEstimatedTime(e.type, S),
+                          )}
+                        </>
+                      ) : (
+                        S.opsCompletedDuration(
+                          formatDuration(
+                            e.durationSeconds ??
+                              Math.max(
+                                1,
+                                Math.round(
+                                  (Date.now() -
+                                    new Date(e.createdAt).getTime()) /
+                                    1000,
+                                ),
+                              ),
+                            lang,
+                          ),
+                        )
+                      )}
                     </small>
                     {(e.cancellable || e.retryable) && (
                       <div className="db-row-actions">

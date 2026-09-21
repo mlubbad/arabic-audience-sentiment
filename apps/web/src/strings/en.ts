@@ -724,6 +724,16 @@ export const en: Strings = {
   opsAttemptN: (n: number) => ` · attempt ${n}`,
   opsRunningDuration: (duration: string) => ` · running for ${duration}`,
   opsCompletedDuration: (duration: string) => ` · completed in ${duration}`,
+  opsQueuedDuration: (duration: string) => ` · in queue for ${duration}`,
+  opsEstimatedCompletion: (eta: string) => ` · estimated completion: ${eta}`,
+  opsDurationTaken: (duration: string) => `time taken: ${duration}`,
+  opsQueuedWithEta: (n: number, eta: string) =>
+    `queued: ${n} (estimated completion: ${eta})`,
+  opsWorkerBusyEta: (eta: string) => `running (estimated completion: ${eta})`,
+  opsEstimatedTimeDiscover: "~15–30s",
+  opsEstimatedTimeCollect: "~30–60s",
+  opsEstimatedTimeAnalyse: "~20–45s",
+  opsEstimatedTimeDefault: "within ~1 min",
   opsCancel: "Withdraw from the queue",
   refresh: "Refresh",
   opsCancelFailed:
@@ -744,6 +754,8 @@ export const en: Strings = {
   catRequestFailed: "Could not request a list build.",
   catDiscoveringRunning: (elapsed: string, estimated: string) =>
     `running for ${elapsed} · typical estimated time: ${estimated}`,
+  catDiscoveringQueued: (elapsed: string, estimated: string) =>
+    `in queue for ${elapsed} · typical estimated time: ${estimated}`,
   catSearch: "Search titles",
   catKindAll: "All",
   catKindVideo: "Video",

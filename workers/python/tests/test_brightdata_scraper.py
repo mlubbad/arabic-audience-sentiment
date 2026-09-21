@@ -161,3 +161,40 @@ def test_brightdata_error_handling():
         c429.scrape_x_profile("channel")
     assert exc429.value.code == "rate_limit_exceeded"
     assert exc429.value.retryable is True
+
+
+def test_brightdata_scrape_x_profile_nested_posts():
+    """Verify Bright Data parses profile responses containing a nested 'posts' list."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "skynewsarabia",
+                "profile_name": "سكاي نيوز عربية",
+                "posts": [
+                    {
+                        "post_id": "2101908962300002373",
+                        "description": "بعد 25 سنة من الانتظار.. كوفنتري يتذوق الفوز",
+                        "date_posted": "2026-09-21T05:38:42.000Z",
+                        "replies": 15,
+                    },
+                    {
+                        "post_id": "2101909767610589578",
+                        "description": "استهداف مراكز لوجستية ومستودعات",
+                        "date_posted": "2026-09-21T05:41:54.000Z",
+                        "replies": 4,
+                    },
+                ],
+            },
+        )
+
+    mock_client = httpx.Client(transport=httpx.MockTransport(handler))
+    bd = BrightDataClient(api_key="bd_key_123", client=mock_client)
+    videos = bd.scrape_x_profile("skynewsarabia")
+
+    assert len(videos) == 2
+    assert videos[0]["external_video_id"] == "2101908962300002373"
+    assert "كوفنتري" in videos[0]["title"]
+    assert videos[0]["reported_comment_count"] == 15
+    assert videos[1]["external_video_id"] == "2101909767610589578"
+

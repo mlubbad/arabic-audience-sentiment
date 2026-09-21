@@ -721,6 +721,17 @@ export const ar = {
   opsAttemptN: (n: number) => ` · المحاولة ${n}`,
   opsRunningDuration: (duration: string) => ` · مستمرة منذ ${duration}`,
   opsCompletedDuration: (duration: string) => ` · استغرقت ${duration}`,
+  opsQueuedDuration: (duration: string) => ` · في الانتظار منذ ${duration}`,
+  opsEstimatedCompletion: (eta: string) => ` · الوقت المتوقع للإنجاز: ${eta}`,
+  opsDurationTaken: (duration: string) => `المدة المستغرقة: ${duration}`,
+  opsQueuedWithEta: (n: number, eta: string) =>
+    `مهام منتظرة: ${n} (الوقت المتوقع للإنجاز: ${eta})`,
+  opsWorkerBusyEta: (eta: string) =>
+    `قيد التنفيذ (الوقت المتوقع للإنجاز: ${eta})`,
+  opsEstimatedTimeDiscover: "حوالي 15–30 ثانية",
+  opsEstimatedTimeCollect: "حوالي 30–60 ثانية",
+  opsEstimatedTimeAnalyse: "حوالي 20–45 ثانية",
+  opsEstimatedTimeDefault: "خلال دقيقة تقريباً",
   opsCancel: "سحب من الطابور",
   refresh: "تحديث",
   opsCancelFailed: "تعذّر سحب المهمة — قد يكون عامل قد بدأها بالفعل.",
@@ -739,6 +750,8 @@ export const ar = {
   catRequestFailed: "تعذّر طلب بناء القائمة.",
   catDiscoveringRunning: (elapsed: string, estimated: string) =>
     `جارية منذ ${elapsed} · الوقت التقديري عادة: ${estimated}`,
+  catDiscoveringQueued: (elapsed: string, estimated: string) =>
+    `في الانتظار منذ ${elapsed} · الوقت التقديري عادة: ${estimated}`,
   catSearch: "ابحث في العناوين",
   catKindAll: "الكل",
   catKindVideo: "فيديو",

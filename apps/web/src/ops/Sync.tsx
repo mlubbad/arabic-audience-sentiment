@@ -226,10 +226,58 @@ function SyncBody({
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(50)
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (!active) return;
         setJobsFailed(!!error);
-        setJobs(error ? [] : ((data ?? []) as JobRow[]));
+        if (error || !data) {
+          setJobs([]);
+          return;
+        }
+        const rows = data as JobRow[];
+        const missingDurationIds = rows
+          .filter(
+            (j) =>
+              j.status !== "queued" &&
+              j.status !== "running" &&
+              j.counters?.duration_seconds == null,
+          )
+          .map((j) => j.id);
+
+        if (missingDurationIds.length > 0) {
+          const { data: runs } = await db
+            .from("sync_runs")
+            .select("job_id,started_at,ended_at")
+            .in("job_id", missingDurationIds);
+
+          if (runs && runs.length > 0) {
+            const runMap = new Map(
+              runs.map((r) => [
+                r.job_id,
+                r.ended_at && r.started_at
+                  ? Math.max(
+                      1,
+                      Math.round(
+                        (new Date(r.ended_at).getTime() -
+                          new Date(r.started_at).getTime()) /
+                          1000,
+                      ),
+                    )
+                  : null,
+              ]),
+            );
+            for (const row of rows) {
+              const dur = runMap.get(row.id);
+              if (dur != null) {
+                row.counters = {
+                  ...(row.counters ?? {}),
+                  duration_seconds: dur,
+                };
+              }
+            }
+          }
+        }
+        if (!active) return;
+        setJobs(rows);
       });
     return () => {
       active = false;

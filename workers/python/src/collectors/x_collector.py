@@ -65,13 +65,13 @@ class XCollector:
         if not self.apify_client:
             raise CollectionError("apify_not_configured", "failed")
         videos = self.apify_client.scrape_x_profile(clean_handle)
-        return Catalogue(videos=videos, complete=True)
+        return Catalogue(videos=videos, complete=bool(videos))
 
     def _catalogue_brightdata(self, clean_handle: str) -> Catalogue:
         if not self.brightdata_client or not self.brightdata_client.api_key:
             raise CollectionError("brightdata_not_configured", "failed")
         videos = self.brightdata_client.scrape_x_profile(clean_handle)
-        return Catalogue(videos=videos, complete=True)
+        return Catalogue(videos=videos, complete=bool(videos))
 
     def _catalogue_official(self, clean_handle: str) -> Catalogue:
         if not self.bearer_token or not self.client:
@@ -248,27 +248,43 @@ class XCollector:
                 )
             return Catalogue(videos=videos, complete=True)
 
-        # 2. Preferred scraper if configured
-        if self.preferred_scraper == "apify":
-            return self._catalogue_apify(clean_handle)
+        # 2. Build cascade respecting preferred_scraper if configured
+        cascade = []
         if self.preferred_scraper == "brightdata":
-            return self._catalogue_brightdata(clean_handle)
-        if self.preferred_scraper == "official":
-            return self._catalogue_official(clean_handle)
-        if self.preferred_scraper == "public":
-            return self._catalogue_public(clean_handle)
+            cascade.append(("brightdata", lambda: self._catalogue_brightdata(clean_handle)))
+        elif self.preferred_scraper == "apify":
+            cascade.append(("apify", lambda: self._catalogue_apify(clean_handle)))
+        elif self.preferred_scraper == "official":
+            cascade.append(("official", lambda: self._catalogue_official(clean_handle)))
+        elif self.preferred_scraper == "public":
+            cascade.append(("public", lambda: self._catalogue_public(clean_handle)))
 
-        # 3. Default fallback cascade: Apify -> Bright Data -> Official API -> Public Syndication
-        if self.apify_client:
-            return self._catalogue_apify(clean_handle)
-        if self.brightdata_client and self.brightdata_client.api_key:
-            return self._catalogue_brightdata(clean_handle)
-        if self.bearer_token and self.client:
-            return self._catalogue_official(clean_handle)
-        if self.client or (self.brightdata_client and self.brightdata_client.proxy_url):
-            return self._catalogue_public(clean_handle)
+        # Default fallback cascade: Apify -> Bright Data -> Official API -> Public Syndication
+        if self.apify_client and self.preferred_scraper != "apify":
+            cascade.append(("apify", lambda: self._catalogue_apify(clean_handle)))
+        if self.brightdata_client and self.brightdata_client.api_key and self.preferred_scraper != "brightdata":
+            cascade.append(("brightdata", lambda: self._catalogue_brightdata(clean_handle)))
+        if self.bearer_token and self.client and self.preferred_scraper != "official":
+            cascade.append(("official", lambda: self._catalogue_official(clean_handle)))
+        if (self.client or (self.brightdata_client and self.brightdata_client.proxy_url)) and self.preferred_scraper != "public":
+            cascade.append(("public", lambda: self._catalogue_public(clean_handle)))
 
-        raise CollectionError("no_transport_configured", "failed")
+        if not cascade:
+            raise CollectionError("no_transport_configured", "failed")
+
+        last_error = None
+        for name, fn in cascade:
+            try:
+                cat = fn()
+                if cat.videos:
+                    return cat
+            except CollectionError as exc:
+                last_error = exc
+                continue
+
+        if last_error:
+            raise last_error
+        return Catalogue(videos=[], complete=False, reason="no_videos_found")
 
     def batches(self, video_id: str, checkpoint: str | None = None) -> Iterator[Batch]:
         """Collect replies for a given tweet."""
@@ -298,95 +314,43 @@ class XCollector:
             yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
             return
 
-        # 2. Preferred scraper if configured
-        if self.preferred_scraper == "apify" and self.apify_client:
-            raw_replies = self.apify_client.scrape_x_replies(clean_id)
-            comments = [
-                RawComment(
-                    id=r["id"],
-                    video_id=clean_id,
-                    text=r["text"],
-                    parent_id=r.get("parent_id"),
-                    is_reply=r.get("is_reply", True),
-                    parent_source="apify_reply",
-                    published_at=r.get("published_at"),
-                    author_name=r.get("author_name", ""),
-                    author_channel_id=r.get("author_channel_id"),
-                    likes_value=r.get("likes_value", 0),
-                    source="apify",
-                    platform="x",
-                )
-                for r in raw_replies
-            ]
-            yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
-            return
-
+        # 2. Build cascade for replies respecting preferred_scraper
+        cascade_replies = []
         if self.preferred_scraper == "brightdata" and self.brightdata_client and self.brightdata_client.api_key:
-            raw_replies = self.brightdata_client.scrape_x_replies(clean_id, handle=self.channel_id)
-            comments = [
-                RawComment(
-                    id=r["id"],
-                    video_id=clean_id,
-                    text=r["text"],
-                    parent_id=r.get("parent_id"),
-                    is_reply=r.get("is_reply", True),
-                    parent_source="brightdata_reply",
-                    published_at=r.get("published_at"),
-                    author_name=r.get("author_name", ""),
-                    author_channel_id=r.get("author_channel_id"),
-                    likes_value=r.get("likes_value", 0),
-                    source="brightdata",
-                    platform="x",
-                )
-                for r in raw_replies
-            ]
-            yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
-            return
+            cascade_replies.append(("brightdata", lambda: self.brightdata_client.scrape_x_replies(clean_id, handle=self.channel_id)))
+        elif self.preferred_scraper == "apify" and self.apify_client:
+            cascade_replies.append(("apify", lambda: self.apify_client.scrape_x_replies(clean_id)))
 
-        # 3. Automatic fallback cascade: Apify -> Bright Data -> Official API -> Empty Batch
-        if self.apify_client:
-            raw_replies = self.apify_client.scrape_x_replies(clean_id)
-            comments = [
-                RawComment(
-                    id=r["id"],
-                    video_id=clean_id,
-                    text=r["text"],
-                    parent_id=r.get("parent_id"),
-                    is_reply=r.get("is_reply", True),
-                    parent_source="apify_reply",
-                    published_at=r.get("published_at"),
-                    author_name=r.get("author_name", ""),
-                    author_channel_id=r.get("author_channel_id"),
-                    likes_value=r.get("likes_value", 0),
-                    source="apify",
-                    platform="x",
-                )
-                for r in raw_replies
-            ]
-            yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
-            return
+        if self.apify_client and self.preferred_scraper != "apify":
+            cascade_replies.append(("apify", lambda: self.apify_client.scrape_x_replies(clean_id)))
+        if self.brightdata_client and self.brightdata_client.api_key and self.preferred_scraper != "brightdata":
+            cascade_replies.append(("brightdata", lambda: self.brightdata_client.scrape_x_replies(clean_id, handle=self.channel_id)))
 
-        if self.brightdata_client and self.brightdata_client.api_key:
-            raw_replies = self.brightdata_client.scrape_x_replies(clean_id, handle=self.channel_id)
-            comments = [
-                RawComment(
-                    id=r["id"],
-                    video_id=clean_id,
-                    text=r["text"],
-                    parent_id=r.get("parent_id"),
-                    is_reply=r.get("is_reply", True),
-                    parent_source="brightdata_reply",
-                    published_at=r.get("published_at"),
-                    author_name=r.get("author_name", ""),
-                    author_channel_id=r.get("author_channel_id"),
-                    likes_value=r.get("likes_value", 0),
-                    source="brightdata",
-                    platform="x",
-                )
-                for r in raw_replies
-            ]
-            yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
-            return
+        for source_name, fn in cascade_replies:
+            try:
+                raw_replies = fn()
+                if raw_replies:
+                    comments = [
+                        RawComment(
+                            id=r["id"],
+                            video_id=clean_id,
+                            text=r["text"],
+                            parent_id=r.get("parent_id"),
+                            is_reply=r.get("is_reply", True),
+                            parent_source=f"{source_name}_reply",
+                            published_at=r.get("published_at"),
+                            author_name=r.get("author_name", ""),
+                            author_channel_id=r.get("author_channel_id"),
+                            likes_value=r.get("likes_value", 0),
+                            source=source_name,
+                            platform="x",
+                        )
+                        for r in raw_replies
+                    ]
+                    yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
+                    return
+            except CollectionError:
+                continue
 
         # 4. Bearer token mode (Twitter API v2)
         if self.bearer_token and self.client:

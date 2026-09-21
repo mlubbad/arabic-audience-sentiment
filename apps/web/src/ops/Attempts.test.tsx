@@ -9,6 +9,7 @@ import { Attempts } from "./Attempts";
 
 const sampleEntry = (over: Partial<JobEntry> = {}): JobEntry => ({
   id: "entry-1",
+  type: "collect",
   status: "succeeded",
   severity: "ok",
   headline: "مهمة جمع تعليقات",
@@ -194,5 +195,59 @@ describe("Attempts component", () => {
     const retryBtn = screen.getByTestId("retry-e-retry");
     await user.click(retryBtn);
     expect(onAct).toHaveBeenCalledWith("retry_job", "e-retry");
+  });
+
+  it("renders elapsed duration and expected completion time for queued, running, and completed jobs", () => {
+    const entries: JobEntry[] = [
+      sampleEntry({
+        id: "e-queued",
+        type: "discover",
+        status: "queued",
+        headline: "فهرسة القناة",
+      }),
+      sampleEntry({
+        id: "e-running",
+        type: "collect",
+        status: "running",
+        headline: "جمع التعليقات",
+      }),
+      sampleEntry({
+        id: "e-succeeded",
+        type: "analyse",
+        status: "succeeded",
+        headline: "تحليل المشاعر",
+        durationSeconds: 42,
+      }),
+    ];
+
+    render(
+      <Attempts
+        mode="live"
+        jobsFailed={false}
+        jobs={[sampleJob()]}
+        entries={entries}
+        lang="ar"
+        acting={null}
+        actionMessage=""
+        act={() => {}}
+        refresh={() => {}}
+        S={ar}
+      />,
+    );
+
+    // Queued job shows waiting time and expected completion
+    expect(screen.getByText(/في الانتظار منذ/)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(ar.opsEstimatedTimeDiscover)),
+    ).toBeInTheDocument();
+
+    // Running job shows running time and expected completion
+    expect(screen.getByText(/مستمرة منذ/)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(ar.opsEstimatedTimeCollect)),
+    ).toBeInTheDocument();
+
+    // Succeeded job shows duration
+    expect(screen.getByText(/استغرقت 42 ثانية/)).toBeInTheDocument();
   });
 });

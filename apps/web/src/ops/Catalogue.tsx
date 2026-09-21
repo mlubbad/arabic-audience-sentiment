@@ -149,7 +149,8 @@ export function Catalogue({
     ) ?? null;
   const [, setTimerTick] = useState(0);
   useEffect(() => {
-    if (discovering?.status !== "running") return;
+    if (discovering?.status !== "running" && discovering?.status !== "queued")
+      return;
     const interval = setInterval(() => setTimerTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, [discovering?.status]);
@@ -395,6 +396,14 @@ export function Catalogue({
                       lang === "ar" ? "15–30 ثانية" : "15–30s",
                     )}
                   </span>
+                ) : discovering?.status === "queued" ? (
+                  <span style={{ color: "var(--color-warning, #d97706)" }}>
+                    ⏱️{" "}
+                    {S.catDiscoveringQueued(
+                      formatElapsed(discovering.created_at, lang),
+                      lang === "ar" ? "15–30 ثانية" : "15–30s",
+                    )}
+                  </span>
                 ) : read.data?.cataloguedAt ? (
                   S.catRefreshed(displayDate(read.data.cataloguedAt, lang))
                 ) : (
@@ -438,6 +447,20 @@ export function Catalogue({
                     >
                       ⏱️{" "}
                       {S.catDiscoveringRunning(
+                        formatElapsed(discovering.created_at, lang),
+                        lang === "ar" ? "15–30 ثانية" : "15–30s",
+                      )}
+                    </p>
+                  ) : discovering.status === "queued" ? (
+                    <p
+                      style={{
+                        marginTop: "0.5rem",
+                        fontSize: "0.9em",
+                        opacity: 0.9,
+                      }}
+                    >
+                      ⏱️{" "}
+                      {S.catDiscoveringQueued(
                         formatElapsed(discovering.created_at, lang),
                         lang === "ar" ? "15–30 ثانية" : "15–30s",
                       )}

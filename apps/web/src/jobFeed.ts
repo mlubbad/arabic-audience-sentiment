@@ -38,6 +38,7 @@ export type JobRow = {
 
 export type JobEntry = {
   id: string;
+  type: string;
   status: JobRow["status"];
   severity: "ok" | "warning" | "critical" | "muted";
   /** The state, in two or three words. */
@@ -192,6 +193,7 @@ function describeJobStatus(
 
   const base = {
     id: job.id,
+    type: job.type,
     status: job.status,
     attempt: job.attempt,
     createdAt: job.created_at,
