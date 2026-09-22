@@ -24,6 +24,7 @@ import { useSession } from "../session";
 import { useImpersonation } from "../impersonation";
 import { readAdminUsers } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
+import { DEMO_USERS, DEMO_OWNER_ID } from "./adminDemo";
 
 const NONE = "—";
 
@@ -31,13 +32,17 @@ const day = (iso: string | null | undefined) => iso?.slice(0, 10) ?? NONE;
 
 export function AdminUsersPage() {
   const S = useStrings();
+  const demo =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("demo");
   const { admin, shell } = useAdminShell();
   const { session } = useSession();
+  const currentUserId = demo ? DEMO_OWNER_ID : session?.user.id;
   const { startImpersonation, loading: impersonateLoading } =
     useImpersonation();
   const list = useQuery({
-    queryKey: ["admin", "users"],
-    queryFn: readAdminUsers,
+    queryKey: ["admin", "users", demo ? "demo" : "live"],
+    queryFn: () => (demo ? Promise.resolve(DEMO_USERS) : readAdminUsers()),
     enabled: admin,
   });
 
@@ -82,7 +87,7 @@ export function AdminUsersPage() {
                 <UserRow
                   key={u.id}
                   user={u}
-                  isCurrent={session?.user.id === u.id}
+                  isCurrent={currentUserId === u.id}
                   onImpersonate={startImpersonation}
                   disabled={impersonateLoading}
                 />

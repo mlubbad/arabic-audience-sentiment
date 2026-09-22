@@ -487,8 +487,8 @@ const app = (
   <React.StrictMode>
     <QueryClientProvider client={client}>
       <DirectionRoot>
-        <ImpersonationProvider>
-          <BrowserRouter>
+        <BrowserRouter>
+          <ImpersonationProvider>
             <Routes>
               {/* The public pages, beside the landing and not inside the
                   shell: read signed out, in the language their address names,
@@ -512,8 +512,8 @@ const app = (
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
-          </BrowserRouter>
-        </ImpersonationProvider>
+          </ImpersonationProvider>
+        </BrowserRouter>
         <ToastHost />
       </DirectionRoot>
     </QueryClientProvider>

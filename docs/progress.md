@@ -18,9 +18,15 @@ Implemented workspace isolation for the platform administrator/owner and full pe
 - **Auditing & Security**:
   - Added `public.admin_start_impersonation` and `public.admin_stop_impersonation` logging `impersonation_started` and `impersonation_ended` into `public.audit_events`.
   - Migration `20260922170000_user_impersonation_and_workspace_isolation.sql` tested via 24 test cases in `user_impersonation.test.ts` (394/394 DB tests passing) and applied remotely via `npm run db:migrate:remote`.
+- **Demo Mode Support & Navigation**:
+  - Extended `apps/web/src/admin/adminDemo.ts` with `DEMO_USERS` and fixture owner context.
+  - Enabled demo mode query persistence across `AdminTabs` so `/admin/users?demo=1` renders faithfully without credentials.
+  - Placed `<ImpersonationProvider>` inside `<BrowserRouter>` to ensure standard routing context for impersonation redirects.
 - **Verification**:
-  - Added unit tests in `impersonation.test.tsx`, `ImpersonationBanner.test.tsx`, and `AdminUsersPage.test.tsx`.
-  - Full repo verification (`npm run check`): 120 Vitest suites (930 tests), 43 DB test suites (392 tests), 270 worker pytest tests, build, and secret check passed 100% green.
+  - Added unit tests in `impersonation.test.tsx`, `ImpersonationBanner.test.tsx`, `AdminUsersPage.test.tsx`, and `AdminPage.test.tsx`.
+  - Added end-to-end Playwright tests in `tests/e2e/admin.spec.ts` verifying user table rendering, current user tagging, impersonation activation, banner presence, and escape hatch return (8/8 tests passing).
+  - Captured verified visual screenshots of `/admin/users` and active impersonation state (`ui-admin-users.png`, `ui-impersonating-user.png`).
+  - Full repo verification (`npm run check`): 120 Vitest suites (930 tests), 43 DB test suites (419 tests), 270 worker pytest tests, build, and secret check passed 100% green.
 
 ## 2026-09-22 — Channel Setup Mutual Exclusivity & Plan-Gated Public Channel Access
 

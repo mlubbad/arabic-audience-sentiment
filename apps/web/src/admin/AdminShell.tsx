@@ -28,45 +28,50 @@ export function useAdminShell(): {
   shell: (body: ReactNode) => ReactNode;
 } {
   const S = useStrings();
+  const demo =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("demo");
   const { session, loading } = useSession();
-  const access = useIsPlatformAdmin(session);
-  const admin = !!(session && access.data === true);
+  const access = useIsPlatformAdmin(demo ? null : session);
+  const admin = demo || !!(session && access.data === true);
   const shell = (body: ReactNode) => <div className="db-page">{body}</div>;
-  if (loading || (session && access.isPending))
-    return {
-      admin: false,
-      shell: () => shell(<Loading S={S} label={S.pageOpening} shape="ops" />),
-    };
-  if (access.isError)
-    return {
-      admin: false,
-      shell: () =>
-        shell(
-          <LoadError
-            S={S}
-            message={S.serviceUnreachable}
-            failure={failureCode("read", access.error)}
-            onRetry={() => void access.refetch()}
-          />,
-        ),
-    };
-  // Signed out, unconfigured, or signed in and not an admin: one sentence.
-  if (!admin)
-    return {
-      admin: false,
-      shell: () =>
-        shell(
-          <div className="db-hero">
-            <Badge tone="neutral">{S.adminEyebrow}</Badge>
-            <h1>{S.adminTitle}</h1>
-            <Card className="db-error">
-              <p role="alert" data-testid="admin-forbidden">
-                {S.adminForbidden}
-              </p>
-            </Card>
-          </div>,
-        ),
-    };
+  if (!demo) {
+    if (loading || (session && access.isPending))
+      return {
+        admin: false,
+        shell: () => shell(<Loading S={S} label={S.pageOpening} shape="ops" />),
+      };
+    if (access.isError)
+      return {
+        admin: false,
+        shell: () =>
+          shell(
+            <LoadError
+              S={S}
+              message={S.serviceUnreachable}
+              failure={failureCode("read", access.error)}
+              onRetry={() => void access.refetch()}
+            />,
+          ),
+      };
+    // Signed out, unconfigured, or signed in and not an admin: one sentence.
+    if (!admin)
+      return {
+        admin: false,
+        shell: () =>
+          shell(
+            <div className="db-hero">
+              <Badge tone="neutral">{S.adminEyebrow}</Badge>
+              <h1>{S.adminTitle}</h1>
+              <Card className="db-error">
+                <p role="alert" data-testid="admin-forbidden">
+                  {S.adminForbidden}
+                </p>
+              </Card>
+            </div>,
+          ),
+      };
+  }
   return { admin: true, shell };
 }
 
@@ -81,12 +86,15 @@ const TABS = [
 
 export function AdminTabs() {
   const S = useStrings();
+  const demo =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("demo");
   return (
     <nav className="admin-tabs" aria-label={S.adminTabsLabel}>
       {TABS.map((t) => (
         <NavLink
           key={t.to}
-          to={t.to}
+          to={demo ? `${t.to}?demo=1` : t.to}
           end
           className={({ isActive }: { isActive: boolean }) =>
             `admin-tab${isActive ? " admin-tab-active" : ""}`
@@ -110,9 +118,14 @@ export function AdminPageHead({
   lead: string;
 }) {
   const S = useStrings();
+  const demo =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("demo");
   return (
     <header className="db-hero">
-      <Badge tone="neutral">{S.adminEyebrow}</Badge>
+      <Badge tone="neutral">
+        {demo ? `${S.adminEyebrow} · ${S.dashDemoTag}` : S.adminEyebrow}
+      </Badge>
       <h1>{title}</h1>
       <p>{lead}</p>
       <AdminTabs />

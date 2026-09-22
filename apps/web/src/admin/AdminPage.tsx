@@ -142,10 +142,7 @@ export function AdminPage() {
         </Badge>
         <h1>{S.adminTitle}</h1>
         <p>{demo ? S.adminDemoLead : S.adminLead}</p>
-        {/* The observability pages the roadmap's phase one added sit under
-            the same room: one rail entry, five screens. The demo keeps its
-            own tabs out — a fixture page has no users or runs to show. */}
-        {!demo && <AdminTabs />}
+        <AdminTabs />
       </header>
       {body}
     </div>
