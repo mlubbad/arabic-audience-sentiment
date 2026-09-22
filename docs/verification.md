@@ -1,5 +1,22 @@
 # Verification
 
+## 2026-09-22 — Channel Setup Mutual Exclusivity & Plan-Gated Public Channel Access
+
+| Command / observation | Actual result |
+| --- | --- |
+| Database test suite: `npm run test:db` | **42 test files passed, 384 tests passed (100% green)**, including all tests in `plan_catalogue.test.ts` testing `allow_public_channels` column and `set_plan_public_channels` permissions. |
+| Web unit tests: `npm test` | **117 test files passed, 917 tests passed (100% green)**, including 51 tests in `WorkspaceCard.test.tsx` verifying permission gating for Option 2. |
+| Python worker test suite: `npm run worker:test` | **270 tests passed in 4.37s (100% green)**. |
+| Python worker linter: `npm run worker:lint` | All checks passed cleanly (0 errors). |
+| Web linter: `npm run lint` | ESLint passed cleanly with 0 errors, 0 warnings. |
+| Code formatting: `npm run format:check` | 100% verified with Prettier. |
+| TypeScript typecheck: `npm run typecheck` | Passed cleanly (`tsc --noEmit`, 0 errors). |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`. |
+| Production build & prerender: `npm run build` | Built in 1.22s; 8 prerendered static pages generated cleanly; 0 build errors. |
+| Secrets scan: `npm run check:secrets` | Secret-pattern checks passed across 730 source files and built assets (0 secrets detected). |
+| Repository check gate: `npm run check` | **100% green exit code 0**. |
+
+
 ## 2026-09-22 — Cross-Workspace Deduplication & Catalogue Stored Counts
 
 | Command / observation | Actual result |

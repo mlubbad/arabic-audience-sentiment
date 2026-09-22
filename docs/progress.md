@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-09-22 — Channel Setup Mutual Exclusivity & Plan-Gated Public Channel Access
+
+Resolved UX ambiguity between connecting and selecting a channel, and implemented operator plan governance for public channel tracking:
+
+- **UX Conflict Resolution**:
+  - Eliminated the confusing coexistence of connecting and choosing a channel. In `WorkspaceCard.tsx`, the channel setup flow presents two distinct, mutually exclusive options:
+    1. **أملك القناة (Official Owner)**: Connects via Google OAuth for direct read permissions and comprehensive analytics.
+    2. **لا أملك القناة (Public Monitoring)**: Searches for and monitors public channels across YouTube, Telegram, X, and TikTok without requiring ownership.
+  - When either path is completed, the card transitions cleanly to the video selection/collection step, hiding conflicting setup controls.
+- **Default Owner Gating & Plan Access Control**:
+  - By default, the option to track arbitrary public channels ("لا أملك القناة") is restricted exclusively to the platform owner (`owner` plan / platform admin).
+  - Standard user accounts see only the direct single action: `[ربط قناة يوتيوب]`.
+  - Added `allow_public_channels` boolean column to `public.plans` (default `false`, set to `true` for `owner`).
+  - Added secure `SECURITY DEFINER` function `public.set_plan_public_channels(p_plan_key, p_allowed)` checking `is_platform_admin()`.
+  - Created operator management page at `/admin/plans` under the admin shell navigation tab **«أنواع الحسابات»**, allowing admins to toggle access for any plan tier (`free`, `creator`, `creator_plus`, `agency`, `media`, `enterprise`) in real time.
+- **Verification**:
+  - Database integration tests in `supabase/tests/plan_catalogue.test.ts`.
+  - UI component unit tests in `WorkspaceCard.test.tsx` (51 tests) covering gating behavior and interactions.
+  - Full repo verification (`npm run check`): 117 Vitest suites (917 tests), 42 DB test suites (384 tests), 270 worker pytest tests, production build, prerendering, and secret checks passed with exit code 0.
+
+
 ## 2026-09-22 — Dashboard Scroll Glitch Fix & Sticky Filter Bar Shielding
 
 Resolved visual collision and background bleed-through defect during vertical scrolling on the dashboard:

@@ -1,5 +1,18 @@
 # Implementation decisions
  
+2026-09-22 — Channel Setup Mutual Exclusivity and Plan-Gated Public Channel Access.
+Users previously experienced ambiguity when setting up a workspace because connecting a channel (via Google OAuth) and selecting/searching for a public channel (via public external ID) were presented concurrently without clarifying their mutual exclusivity. Furthermore, allowing all user tiers to add arbitrary public channels without restriction introduced resource and quota risks.
+
+To address these concerns:
+1. **Mutual Exclusivity UX Pattern**:
+   - The UI presents a single decision point: "أملك القناة" (Official Owner) vs "لا أملك القناة" (Public Channel Monitoring).
+   - Once a channel is attached (either via OAuth grant or via public candidate adoption), only relevant actions (`اختر الفيديوهات`, `فصل القناة`) remain visible, permanently hiding contradictory setup prompts.
+2. **Platform Owner Gating & Fine-Grained Plan Control**:
+   - Tracking public channels is restricted by default to the platform owner (`owner` internal plan / platform administrator).
+   - Standard user plans (`free`, `creator`, etc.) default to `allow_public_channels = false`, presenting only the direct `[ربط قناة يوتيوب]` action.
+   - Platform operators can grant or revoke public channel tracking access to specific account tiers via an interactive toggle in the admin console (`/admin/plans`).
+   - The database enforces this via `public.set_plan_public_channels(p_plan_key, p_allowed)` with `SECURITY DEFINER` and strict `is_platform_admin()` verification.
+
 2026-09-22 — Cross-Workspace Deduplication & Unified Database Architecture (قاعدة البيانات الواحدة).
 When multiple workspaces monitor the same public channel (e.g. YouTube `@channel_id`), or when a user unselects videos to preserve their daily YouTube API quota (10,000 units), two critical operational issues arose:
 1. Workspaces re-fetching and re-analysing identical videos and comments wasted limited YouTube quota and compute power.
