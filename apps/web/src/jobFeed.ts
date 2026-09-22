@@ -80,6 +80,8 @@ function explain(code: string, S: Strings): string | null {
     case "comments_disabled":
     case "explicitly_disabled":
       return S.jobCommentsDisabled;
+    case "telegram_discussion_requires_auth":
+      return S.jobTelegramDiscussionRequiresAuth;
     case "no_upload_has_comments": {
       // `12_checked_0_disabled` — counts, not prose, so they are read out.
       const m = tail.match(/^(\d+)_checked_(\d+)_disabled$/);

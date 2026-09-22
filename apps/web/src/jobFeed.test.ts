@@ -139,6 +139,9 @@ describe("describeJob", () => {
     expect(explainCode("topic_model_not_active", ar)).toBe(
       ar.jobTopicModelNotActive,
     );
+    expect(explainCode("telegram_discussion_requires_auth", ar)).toBe(
+      ar.jobTelegramDiscussionRequiresAuth,
+    );
   });
 
   it("names a discover job as catalogue and does not promise comments", () => {

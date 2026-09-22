@@ -403,6 +403,12 @@ describe("what a selected video's state cell says", () => {
       expect(explainCode("unchanged", S)).toBe(S.catStateUnchanged);
     }
   });
+
+  it("renders warning state when Telegram discussion requires auth", () => {
+    expect(cell("telegram_discussion_requires_auth")).toBe(
+      ar.catStateTelegramAuthRequired,
+    );
+  });
 });
 
 describe("reactive lifecycle updates", () => {

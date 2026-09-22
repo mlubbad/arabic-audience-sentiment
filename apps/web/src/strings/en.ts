@@ -623,6 +623,8 @@ export const en: Strings = {
 
   jobCommentsDisabled:
     "Comments are disabled on this video. There is nothing to collect from it, and that is a setting on the video itself, not a fault in the tool.",
+  jobTelegramDiscussionRequiresAuth:
+    "This channel's discussion group is private or restricted and requires opening the Telegram app; Telegram prevents unauthenticated web access to it.",
   jobNoUploadHasComments: "None of the videos checked has any comments yet.",
   jobNoUploadHasCommentsCounted: (checked: string, disabled: number) =>
     `${checked} of the latest videos were checked, and none has a comment yet.${
@@ -910,6 +912,7 @@ export const en: Strings = {
   catPreviewCollectedInfo: (col: number, ana: number) =>
     `Stored in database: ${col} comments (${ana} classified)`,
   catStateDisabled: "Comments disabled",
+  catStateTelegramAuthRequired: "Requires Telegram app",
   catStatePartial: "Partial",
   catStateUnchanged: "Unchanged since the last read",
   catEmpty: "No videos in the list yet.",

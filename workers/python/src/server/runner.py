@@ -337,6 +337,13 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                     if batch.outcome != "partial":
                         break
             except CollectionError as exc:
+                if exc.code == "telegram_discussion_requires_auth":
+                    for v in videos:
+                        try:
+                            control.video_finished(lease, v["video_id"], "blocked", exc.code)
+                        except Exception:
+                            pass
+                    raise
                 if exc.code != "comments_disabled":
                     raise
                 # A property of the video, not of the run. Learned back into

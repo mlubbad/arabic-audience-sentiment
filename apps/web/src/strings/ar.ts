@@ -626,6 +626,8 @@ export const ar = {
   // ---- the attempts log (jobFeed.ts) ----
   jobCommentsDisabled:
     "التعليقات مُعطَّلة على هذا الفيديو. لا شيء يمكن جمعه منه، وهذا إعداد في الفيديو نفسه لا خلل في الأداة.",
+  jobTelegramDiscussionRequiresAuth:
+    "مجموعة النقاش والتعليقات المرتبطة بهذه القناة خاصة أو مقيّدة وتتطلب تسجيل الدخول في تطبيق تليجرام، وتمنع سياسة تليجرام قراءتها عبر الويب دون مصادقة.",
   jobNoUploadHasComments: "لا يحمل أيٌّ من الفيديوهات المفحوصة تعليقات بعد.",
   jobNoUploadHasCommentsCounted: (checked: string, disabled: number) =>
     `فُحص ${checked} من أحدث الفيديوهات، ولا يحمل أيٌّ منها تعليقًا بعد.${
@@ -902,6 +904,7 @@ export const ar = {
   catPreviewCollectedInfo: (col: number, ana: number) =>
     `المحفوظ في القاعدة: ${col} تعليق (صُنّف منها ${ana})`,
   catStateDisabled: "تعليقات معطّلة",
+  catStateTelegramAuthRequired: "تتطلب تطبيق تليجرام",
   catStatePartial: "جزئي",
   // The live check found the comment count where the last read left it:
   // up to date, not a stoppage.

@@ -284,6 +284,8 @@ export function Catalogue({
     // is a healthy state, and filing it under "partial" would make a video
     // nothing happened to look like one a read failed on.
     if (r.last_outcome === "unchanged") return S.catStateUnchanged;
+    if (r.last_outcome === "telegram_discussion_requires_auth")
+      return S.catStateTelegramAuthRequired;
     if (r.last_outcome && r.last_outcome !== "exhausted")
       return `${S.catStatePartial} · ${explainCode(r.last_outcome, S) ?? r.last_outcome}`;
     if (r.last_collected_at) {
@@ -309,13 +311,15 @@ export function Catalogue({
   const stateOf = (r: CatalogueVideo) =>
     r.comments_state === "disabled"
       ? "disabled"
-      : r.selected
-        ? "selected"
-        : r.collected > 0
-          ? "unselected_stored"
-          : "none";
+      : r.last_outcome === "telegram_discussion_requires_auth"
+        ? "warning"
+        : r.selected
+          ? "selected"
+          : r.collected > 0
+            ? "unselected_stored"
+            : "none";
   const toneOf = (s: ReturnType<typeof stateOf>) =>
-    s === "disabled"
+    s === "disabled" || s === "warning"
       ? "warning"
       : s === "selected"
         ? "success"

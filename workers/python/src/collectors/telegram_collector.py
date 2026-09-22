@@ -230,7 +230,11 @@ class TelegramCollector:
         if self.client:
             urls = []
             if self.channel_id:
-                urls.append(f"https://t.me/{self.channel_id}/{video_id}?embed=1&discussion=1")
+                try:
+                    clean_ch = self._clean_handle(self.channel_id)
+                except ValueError:
+                    clean_ch = self.channel_id.lstrip("@").strip()
+                urls.append(f"https://t.me/{clean_ch}/{video_id}?embed=1&discussion=1")
             urls.append(f"https://t.me/api/discussion/{video_id}")
 
             resp = None
