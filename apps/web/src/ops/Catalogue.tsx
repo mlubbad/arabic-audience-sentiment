@@ -688,10 +688,21 @@ export function Catalogue({
                           ? displayDate(r.published_at, lang)
                           : S.catCountUnknown}
                       </span>
-                      <span className="db-cat-count">
-                        {r.reported_comment_count === null
-                          ? S.catCountUnknown
-                          : r.reported_comment_count}
+                      <span
+                        className="db-cat-count"
+                        title={
+                          r.reported_comment_count === null && r.collected === 0
+                            ? lang === "ar"
+                              ? "غير متوفر مسبقاً من القناة (يُحسب عند الجمع)"
+                              : "Not reported by platform (counted upon collection)"
+                            : undefined
+                        }
+                      >
+                        {r.reported_comment_count !== null
+                          ? r.reported_comment_count
+                          : r.collected > 0
+                            ? r.collected
+                            : S.catCountUnknown}
                       </span>
                       <Badge
                         className="db-cat-state"
