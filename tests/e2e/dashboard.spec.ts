@@ -1050,7 +1050,7 @@ test("every table header declares what it heads", async ({ page }) => {
   );
   // And a table needs a name that is on the page, not only in the tree.
   await expect(
-    page.locator("table caption", { hasText: "مقارنة الفيديوهات ضمن الفلاتر" }),
+    page.locator("table caption", { hasText: "التعليقات ضمن الفلاتر" }),
   ).toBeVisible();
 });
 
@@ -1244,10 +1244,10 @@ test("a marker on a card says something true about the card", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  const tags = page.locator(".db-insight-tag");
+  const tags = page.locator(".db-kpi-label");
   await expect(tags.first()).toBeVisible();
-  // These four readings are independent — coverage, reply share, concentration,
-  // datedness — so numbering them 1..4 asserted a sequence that does not exist.
+  // These readings are independent — coverage, reply share, concentration,
+  // authors — so numbering them asserted a sequence that does not exist.
   // A marker earns its place by naming its card, not by counting it.
   const texts = await tags.allTextContents();
   expect(texts.length).toBeGreaterThan(1);
