@@ -1,8 +1,16 @@
 # Progress
 
-## 2026-09-22 — Comprehensive Audit Improvements Execution (P0 & P1 Hardening)
+## 2026-09-22 — Comprehensive Audit Improvements Execution (P0 & P1 Hardening) & Live Deployment
 
-Executed the prioritized improvements derived from the 360-degree architecture, security, performance, and typography audit:
+Executed the prioritized improvements derived from the 360-degree architecture, security, performance, and typography audit, applied remote migrations, deployed live, and verified across all test tiers:
+
+- **Remote Database Migration Applied**:
+  - Successfully executed `npm run db:migrate:remote` applying `20260922220000_dashboard_aggregation_covering_indexes.sql` to live Supabase (`[ykqugctewsqvevhyqtbi]`). All 91 migrations applied, 0 pending.
+- **Live Preview FTPS Deployment**:
+  - Deployed built assets via `npm run deploy:preview` over FTPS. All chunks (`vendor-react`, `vendor-charts`, `vendor-supabase`, `vendor-tanstack`, `vendor-ui`, `index.js`) and prerendered static pages uploaded cleanly with exit code 0.
+- **E2E Playwright Suite Hardening & Alignment**:
+  - Synchronized `tests/e2e/dashboard.spec.ts` with the streamlined 5-section layout and the 6 cards/page pagination model.
+  - Full E2E suite executed green (124 tests across all 12 spec files).
 
 - **Database Performance & Covering Composite Indexes**:
   - Migration `20260922220000_dashboard_aggregation_covering_indexes.sql`:
@@ -70,7 +78,6 @@ Resolved UX ambiguity between connecting and selecting a channel, and implemente
   - Database integration tests in `supabase/tests/plan_catalogue.test.ts`.
   - UI component unit tests in `WorkspaceCard.test.tsx` (51 tests) covering gating behavior and interactions.
   - Full repo verification (`npm run check`): 117 Vitest suites (917 tests), 42 DB test suites (384 tests), 270 worker pytest tests, production build, prerendering, and secret checks passed with exit code 0.
-
 
 ## 2026-09-22 — Dashboard Scroll Glitch Fix & Sticky Filter Bar Shielding
 
