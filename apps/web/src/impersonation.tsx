@@ -1,0 +1,148 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type ReactNode,
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
+import { supabase } from "./supabase";
+import { toast } from "./ui/Toast";
+import { useStrings } from "./strings";
+import type { AdminUser } from "@sentiment/contracts";
+
+const STORAGE_KEY = "sentiment_impersonation_session";
+
+export type ImpersonatedTarget = {
+  id: string;
+  email: string | null;
+};
+
+export type ImpersonationContextType = {
+  isImpersonating: boolean;
+  impersonatedUser: ImpersonatedTarget | null;
+  startImpersonation: (
+    user: AdminUser | { id: string; email: string | null },
+  ) => Promise<void>;
+  stopImpersonation: () => Promise<void>;
+  loading: boolean;
+};
+
+const ImpersonationContext = createContext<ImpersonationContextType>({
+  isImpersonating: false,
+  impersonatedUser: null,
+  startImpersonation: async () => {},
+  stopImpersonation: async () => {},
+  loading: false,
+});
+
+export function ImpersonationProvider({ children }: { children: ReactNode }) {
+  const S = useStrings();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [impersonatedUser, setImpersonatedUser] =
+    useState<ImpersonatedTarget | null>(() => {
+      try {
+        const raw = sessionStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.id === "string") {
+          return { id: parsed.id, email: parsed.email ?? null };
+        }
+      } catch {
+        // storage unavailable or corrupt
+      }
+      return null;
+    });
+  const [loading, setLoading] = useState(false);
+
+  const startImpersonation = useCallback(
+    async (user: AdminUser | { id: string; email: string | null }) => {
+      setLoading(true);
+      try {
+        if (supabase) {
+          const { error } = await supabase.rpc("admin_start_impersonation", {
+            p_target_user_id: user.id,
+          });
+          if (error) {
+            console.error("Failed to audit impersonation start:", error);
+            // Proceed only if not forbidden
+            if (error.code === "42501" || error.message.includes("forbidden")) {
+              toast({ title: S.adminImpersonateError });
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        const target: ImpersonatedTarget = {
+          id: user.id,
+          email: user.email ?? null,
+        };
+
+        try {
+          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(target));
+        } catch {
+          // ignore
+        }
+
+        setImpersonatedUser(target);
+        await queryClient.invalidateQueries();
+        toast({ title: S.adminImpersonateStarting });
+        navigate("/dashboard");
+      } catch (e) {
+        console.error("Error during startImpersonation:", e);
+        toast({ title: S.adminImpersonateError });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigate, queryClient, S],
+  );
+
+  const stopImpersonation = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (supabase && impersonatedUser) {
+        const { error } = await supabase.rpc("admin_stop_impersonation", {
+          p_target_user_id: impersonatedUser.id,
+        });
+        if (error) {
+          console.error("Failed to audit impersonation stop:", error);
+        }
+      }
+    } catch (e) {
+      console.error("Error during stopImpersonation audit:", e);
+    } finally {
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+      setImpersonatedUser(null);
+      await queryClient.invalidateQueries();
+      toast({ title: S.adminImpersonateStopping });
+      navigate("/admin/users");
+      setLoading(false);
+    }
+  }, [impersonatedUser, navigate, queryClient, S]);
+
+  return (
+    <ImpersonationContext.Provider
+      value={{
+        isImpersonating: impersonatedUser !== null,
+        impersonatedUser,
+        startImpersonation,
+        stopImpersonation,
+        loading,
+      }}
+    >
+      {children}
+    </ImpersonationContext.Provider>
+  );
+}
+
+export function useImpersonation() {
+  return useContext(ImpersonationContext);
+}

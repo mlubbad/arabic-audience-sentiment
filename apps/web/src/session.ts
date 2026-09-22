@@ -49,11 +49,49 @@ export function useSession() {
 export const workspacesKey = (userId: string | null) =>
   ["workspaces", userId] as const;
 
-export function useWorkspaces(session: Session | null) {
-  const userId = session?.user.id ?? null;
+export function getEffectiveUserId(
+  session: Session | null,
+  overrideUserId?: string | null,
+): string | null {
+  if (overrideUserId !== undefined) return overrideUserId;
+  try {
+    if (
+      typeof window !== "undefined" &&
+      typeof sessionStorage !== "undefined"
+    ) {
+      const raw = sessionStorage.getItem("sentiment_impersonation_session");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.id === "string") return parsed.id;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return session?.user.id ?? null;
+}
+
+export function useWorkspaces(
+  session: Session | null,
+  overrideUserId?: string | null,
+) {
+  const userId = getEffectiveUserId(session, overrideUserId);
   const query = useQuery({
     queryKey: workspacesKey(userId),
     queryFn: async () => {
+      // 1. Try my_workspaces RPC for strict tenant isolation
+      try {
+        const { data, error } = await supabase!.rpc("my_workspaces", {
+          target_user_id: userId,
+        });
+        if (!error && Array.isArray(data)) {
+          return data as Workspace[];
+        }
+      } catch {
+        // RPC probe failed, fallback to direct query
+      }
+
+      // 2. Direct table fallback for test mocks or legacy environments
       const { data, error } = await supabase!
         .from("workspaces")
         .select("id,name,created_by");

@@ -46,6 +46,7 @@ import {
   type AccountDemoAction,
 } from "./accountDemo";
 import { useIsPlatformAdmin } from "../adminAccess";
+import { useImpersonation } from "../impersonation";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 import { Loading, LoadError } from "../pageStates/PageStates";
@@ -320,6 +321,10 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
     setReloads((n) => n + 1);
     void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
   };
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
   const [asking, setAsking] = useState<Asking>(null);
   useEffect(() => {
     if (!session) {
@@ -328,8 +333,22 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
       return;
     }
     let active = true;
+    const fetchWs = async () => {
+      try {
+        const { data, error } = await client.rpc("my_workspaces", {
+          target_user_id: effectiveUserId,
+        });
+        if (!error && Array.isArray(data)) {
+          return { data: data as { id: string; name: string }[], error: null };
+        }
+      } catch {
+        // fallback
+      }
+      return client.from("workspaces").select("id,name");
+    };
+
     void Promise.all([
-      client.from("workspaces").select("id,name"),
+      fetchWs(),
       client.from("clients").select("id,workspace_id"),
       // Every column the view exposes, rather than a list. `title` arrives
       // with migration 20260915080000, and a build that names it against a
@@ -345,7 +364,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
       client.from("subscriptions").select("workspace_id,plan_key"),
     ]).then(([w, c, ch, j, s]) => {
       if (!active) return;
-      setLoadedWorkspaceUserId(session.user.id);
+      setLoadedWorkspaceUserId(effectiveUserId);
       if (w.error) say("page", S.workspacesLoadFailed);
       else setWorkspaces(w.data ?? []);
       setClients(c.data ?? []);
@@ -358,7 +377,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
     return () => {
       active = false;
     };
-  }, [session, reloads]);
+  }, [session, effectiveUserId, reloads]);
   async function auth(
     action: AuthAction,
     creds: { email: string; password: string },
@@ -408,7 +427,22 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
         return;
       }
       const [wRes, cRes] = await Promise.all([
-        client.from("workspaces").select("id,name"),
+        (async () => {
+          try {
+            const { data, error } = await client.rpc("my_workspaces", {
+              target_user_id: effectiveUserId,
+            });
+            if (!error && Array.isArray(data)) {
+              return {
+                data: data as { id: string; name: string }[],
+                error: null,
+              };
+            }
+          } catch {
+            // fallback
+          }
+          return client.from("workspaces").select("id,name");
+        })(),
         client.from("clients").select("id,workspace_id"),
       ]);
       if (wRes.error || cRes.error) say("create", S.createWorkspaceListFailed);
@@ -455,10 +489,10 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
           <PlanPanel
             session={session}
             workspaces={workspaces}
-            loading={loadedWorkspaceUserId !== session.user.id}
+            loading={loadedWorkspaceUserId !== effectiveUserId}
           />
           <Workspaces
-            loading={loadedWorkspaceUserId !== session.user.id}
+            loading={loadedWorkspaceUserId !== effectiveUserId}
             workspaces={workspaces}
             card={(w, i) => {
               const workspaceClient = clients.find(
@@ -735,7 +769,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
             feedback={feedback("create")}
             onSubmit={createWorkspace}
             tourAnchor={
-              loadedWorkspaceUserId === session.user.id &&
+              loadedWorkspaceUserId === effectiveUserId &&
               workspaces.length === 0
                 ? "workspace"
                 : undefined

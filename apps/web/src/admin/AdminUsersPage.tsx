@@ -19,6 +19,9 @@ import {
   TableHeaderCell,
   TableRow,
 } from "../ui/Table";
+import { Button } from "../ui/Button";
+import { useSession } from "../session";
+import { useImpersonation } from "../impersonation";
 import { readAdminUsers } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
 
@@ -29,6 +32,9 @@ const day = (iso: string | null | undefined) => iso?.slice(0, 10) ?? NONE;
 export function AdminUsersPage() {
   const S = useStrings();
   const { admin, shell } = useAdminShell();
+  const { session } = useSession();
+  const { startImpersonation, loading: impersonateLoading } =
+    useImpersonation();
   const list = useQuery({
     queryKey: ["admin", "users"],
     queryFn: readAdminUsers,
@@ -68,11 +74,18 @@ export function AdminUsersPage() {
                 <TableHeaderCell>{S.adminUsersLastSeen}</TableHeaderCell>
                 <TableHeaderCell>{S.adminUsersWorkspaces}</TableHeaderCell>
                 <TableHeaderCell>{S.adminUsersOwned}</TableHeaderCell>
+                <TableHeaderCell>{S.adminUsersActions}</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {list.data.map((u) => (
-                <UserRow key={u.id} user={u} />
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  isCurrent={session?.user.id === u.id}
+                  onImpersonate={startImpersonation}
+                  disabled={impersonateLoading}
+                />
               ))}
             </TableBody>
           </Table>
@@ -91,7 +104,17 @@ export function AdminUsersPage() {
   );
 }
 
-function UserRow({ user }: { user: AdminUser }) {
+function UserRow({
+  user,
+  isCurrent,
+  onImpersonate,
+  disabled,
+}: {
+  user: AdminUser;
+  isCurrent: boolean;
+  onImpersonate: (user: AdminUser) => void;
+  disabled: boolean;
+}) {
   const S = useStrings();
   return (
     <TableRow>
@@ -102,6 +125,29 @@ function UserRow({ user }: { user: AdminUser }) {
       <TableCell>{day(user.last_sign_in_at)}</TableCell>
       <TableCell>{user.workspace_count}</TableCell>
       <TableCell>{user.owner_count}</TableCell>
+      <TableCell>
+        {isCurrent ? (
+          <span className="admin-user-current" data-testid="admin-user-current">
+            {S.adminUserCurrent}
+          </span>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="admin-impersonate-btn"
+            disabled={disabled}
+            onClick={() => onImpersonate(user)}
+            data-testid={`admin-impersonate-${user.id}`}
+            aria-label={`${S.adminUserImpersonate} ${user.email ?? user.id}`}
+          >
+            <span aria-hidden="true" className="admin-impersonate-icon">
+              🎭
+            </span>
+            <span>{S.adminUserImpersonate}</span>
+          </Button>
+        )}
+      </TableCell>
     </TableRow>
   );
 }

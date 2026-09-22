@@ -424,6 +424,18 @@ export const ar = {
   adminUsersWorkspaces: "المساحات",
   adminUsersOwned: "منها يملكها",
   adminUsersNoEmail: "بلا بريد",
+  adminUsersActions: "الإجراءات",
+  adminUserImpersonate: "الدخول كـ",
+  adminUserCurrent: "(حسابك الحالي)",
+  adminImpersonationBadge: "وضع محاكاة المستخدم",
+  adminImpersonationBanner: (email: string) =>
+    `أنت تتصفح المنصة حالياً بصفتك: ${email}`,
+  adminImpersonationReturn: "العودة إلى حساب المدير",
+  adminImpersonationActive: "محاكاة",
+  adminImpersonationExitAction: "الخروج من محاكاة المستخدم والعودة للمدير",
+  adminImpersonateStarting: "جارٍ الانتقال لحساب المستخدم…",
+  adminImpersonateStopping: "جارٍ العودة لحساب المدير…",
+  adminImpersonateError: "تعذر بدء وضع المحاكاة لهذا الحساب.",
   adminUsersPiiNote:
     "البريد بيانات شخصية: يظهر هنا لأن القاعدة تتحقق من صفتك كمشغّل، ويُسجّل في السجل كل استخدام إداري قادم.",
   // channels

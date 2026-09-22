@@ -420,6 +420,18 @@ export const en: Strings = {
   adminUsersWorkspaces: "Workspaces",
   adminUsersOwned: "Owned",
   adminUsersNoEmail: "No email",
+  adminUsersActions: "Actions",
+  adminUserImpersonate: "Log in as",
+  adminUserCurrent: "(Your account)",
+  adminImpersonationBadge: "User Impersonation Mode",
+  adminImpersonationBanner: (email: string) =>
+    `You are currently viewing the platform as: ${email}`,
+  adminImpersonationReturn: "Return to Admin Account",
+  adminImpersonationActive: "Impersonating",
+  adminImpersonationExitAction: "Exit Impersonation & Return to Admin",
+  adminImpersonateStarting: "Switching to user view…",
+  adminImpersonateStopping: "Returning to admin account…",
+  adminImpersonateError: "Failed to start impersonation for this account.",
   adminUsersPiiNote:
     "Email is personal data: it shows here because the database checked that you are an operator, and every admin action to come is written to the trail.",
   // channels

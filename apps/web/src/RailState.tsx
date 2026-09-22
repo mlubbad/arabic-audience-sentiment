@@ -24,6 +24,7 @@ import { useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useSession, useWorkspaces } from "./session";
 import { useWorkspaceSelection } from "./workspaceSelection";
+import { useImpersonation } from "./impersonation";
 import { workspaceState } from "./workspace";
 import { configuredMode, fixtureWorkspace, loadOpsSource } from "./data";
 import { syncHealth } from "./syncHealth";
@@ -42,9 +43,13 @@ const SCOPED = new Set(["/dashboard", "/sync"]);
 export function WorkspaceSwitch() {
   const S = useStrings();
   const { session } = useSession();
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
   const { workspaces } = useWorkspaces(session);
   const { pathname } = useLocation();
-  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
+  const [chosen, setChosen] = useWorkspaceSelection(effectiveUserId, {
     route: SCOPED.has(pathname),
   });
   if (!session || configuredMode !== "live") return null;
@@ -93,8 +98,12 @@ export function WorkspaceSwitch() {
 export function CollectionState() {
   const S = useStrings();
   const { session } = useSession();
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
   const { workspaces } = useWorkspaces(session);
-  const [chosen] = useWorkspaceSelection(session?.user.id ?? null);
+  const [chosen] = useWorkspaceSelection(effectiveUserId);
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,

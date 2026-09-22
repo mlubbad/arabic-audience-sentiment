@@ -10,6 +10,9 @@ const shared = vi.hoisted(() => ({
   session: null as null | { user: { id: string; email?: string } },
   loading: false,
   signOut: vi.fn<() => Promise<{ error: { message: string } | null }>>(),
+  isImpersonating: false,
+  impersonatedUser: null as null | { id: string; email?: string },
+  stopImpersonation: vi.fn<() => Promise<void>>(),
 }));
 
 vi.mock("./session", () => ({
@@ -17,6 +20,15 @@ vi.mock("./session", () => ({
 }));
 vi.mock("./supabase", () => ({
   supabase: { auth: { signOut: () => shared.signOut() } },
+}));
+vi.mock("./impersonation", () => ({
+  useImpersonation: () => ({
+    isImpersonating: shared.isImpersonating,
+    impersonatedUser: shared.impersonatedUser,
+    stopImpersonation: shared.stopImpersonation,
+    loading: false,
+    startImpersonation: vi.fn(),
+  }),
 }));
 
 import { SessionControl } from "./SessionControl";
@@ -33,6 +45,10 @@ beforeEach(() => {
   shared.loading = false;
   shared.signOut.mockReset();
   shared.signOut.mockResolvedValue({ error: null });
+  shared.isImpersonating = false;
+  shared.impersonatedUser = null;
+  shared.stopImpersonation.mockReset();
+  shared.stopImpersonation.mockResolvedValue(undefined);
 });
 
 describe("SessionControl", () => {
@@ -103,5 +119,54 @@ describe("SessionControl", () => {
     );
     await waitFor(() => expect(shared.signOut).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows impersonated user email and simulation tag when impersonating", async () => {
+    shared.isImpersonating = true;
+    shared.impersonatedUser = {
+      id: "subscriber-1",
+      email: "subscriber@example.com",
+    };
+    renderControl();
+
+    const trigger = screen.getByRole("button", {
+      name: new RegExp(
+        `subscriber@example\\.com.*${ar.adminImpersonationActive}`,
+      ),
+    });
+    expect(trigger).toBeInTheDocument();
+
+    await userEvent.click(trigger);
+    const exitItem = await screen.findByRole("menuitem", {
+      name: ar.adminImpersonationExitAction,
+    });
+    expect(exitItem).toBeInTheDocument();
+
+    await userEvent.click(exitItem);
+    expect(shared.stopImpersonation).toHaveBeenCalledTimes(1);
+  });
+
+  it("sign out while impersonating stops impersonation instead of signing out admin", async () => {
+    shared.isImpersonating = true;
+    shared.impersonatedUser = {
+      id: "subscriber-1",
+      email: "subscriber@example.com",
+    };
+    renderControl();
+
+    const trigger = screen.getByRole("button", {
+      name: new RegExp(
+        `subscriber@example\\.com.*${ar.adminImpersonationActive}`,
+      ),
+    });
+    await userEvent.click(trigger);
+
+    const signOutBtn = await screen.findByRole("menuitem", {
+      name: ar.signOut,
+    });
+    await userEvent.click(signOutBtn);
+
+    expect(shared.stopImpersonation).toHaveBeenCalledTimes(1);
+    expect(shared.signOut).not.toHaveBeenCalled();
   });
 });

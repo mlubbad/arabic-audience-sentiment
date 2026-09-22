@@ -65,6 +65,87 @@
   font-size: var(--fs-small);
   height: 2rem;
 }
+.app-impersonation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+  color: var(--text-1);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  z-index: 60;
+  position: relative;
+}
+.app-impersonation-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.app-impersonation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-1);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--color-warning);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+}
+.app-impersonation-message {
+  color: var(--text-1);
+  font-weight: 500;
+}
+.app-impersonation-return-btn {
+  font-size: var(--fs-small);
+  height: 2rem;
+  white-space: nowrap;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--color-warning);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+.app-impersonation-return-btn:hover:not(:disabled) {
+  background: var(--warning-border);
+}
+.admin-impersonate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--fs-micro);
+  height: 1.875rem;
+  padding: 0 0.65rem;
+  color: var(--link);
+  border-color: var(--border-2);
+}
+.admin-impersonate-btn:hover:not(:disabled) {
+  background: var(--bg-muted);
+  border-color: var(--link);
+}
+.admin-user-current {
+  display: inline-block;
+  font-size: var(--fs-micro);
+  color: var(--text-3);
+  font-style: italic;
+}
+.app-session-trigger--impersonating {
+  border-color: var(--warning-mark) !important;
+  background: var(--warning-bg) !important;
+}
+.app-session-impersonate-tag {
+  color: var(--warning-mark);
+  font-size: var(--fs-micro);
+  margin-inline-start: var(--space-1);
+  font-weight: 600;
+}
+
 .app-shell > .app-header {
   /* Level 2. Pinned, so the page passes behind it rather than under a lid. */
   position: sticky;
