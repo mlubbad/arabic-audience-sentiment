@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-09-22 — Admin Workspace Isolation & User Impersonation («الدخول كـ»)
+
+Implemented workspace isolation for the platform administrator/owner and full perspective swapping ("لأرى المستخدم بعدسته وعينه") with audit logging and return controls:
+
+- **Workspace Isolation (`my_workspaces`)**:
+  - Replaced indiscriminate platform-wide workspace listing for admins with `public.my_workspaces(target_user_id)`.
+  - The admin's workspace rail and account page display only their personal workspaces, eliminating clutter from client/tenant workspaces.
+  - When `target_user_id` is supplied, `is_platform_admin()` gate validates caller privileges.
+- **User Impersonation («الدخول كـ»)**:
+  - Added an "الإجراءات" column in `/admin/users` (`AdminUsersPage.tsx`) with a dedicated **«الدخول كـ»** action button for every customer account (showing «حسابك الحالي» for the admin's own row).
+  - Activating impersonation swaps the active perspective to the target user: fetches only their workspaces, selects their workspace in the app rail, updates the account page, and scopes metrics to their context.
+  - Preserves the admin's underlying authenticated session without credential manipulation or password resets.
+- **Safety Banner & Return Controls**:
+  - Mounted persistent `<ImpersonationBanner />` at the top of the app displaying: «أنت تتصفح المنصة حالياً بصفتك: [user]» with action button **«العودة إلى حساب المدير»**.
+  - Updated `SessionControl.tsx` avatar pill to show `[user] (محاكاة)`. Added «الخروج من محاكاة المستخدم» menu item, and made standard «تسجيل الخروج» terminate impersonation and return cleanly to admin account without dropping credentials.
+- **Auditing & Security**:
+  - Added `public.admin_start_impersonation` and `public.admin_stop_impersonation` logging `impersonation_started` and `impersonation_ended` into `public.audit_events`.
+  - Migration `20260922170000_user_impersonation_and_workspace_isolation.sql` tested via 24 test cases in `user_impersonation.test.ts` (394/394 DB tests passing) and applied remotely via `npm run db:migrate:remote`.
+- **Verification**:
+  - Added unit tests in `impersonation.test.tsx`, `ImpersonationBanner.test.tsx`, and `AdminUsersPage.test.tsx`.
+  - Full repo verification (`npm run check`): 120 Vitest suites (930 tests), 43 DB test suites (392 tests), 270 worker pytest tests, build, and secret check passed 100% green.
+
 ## 2026-09-22 — Channel Setup Mutual Exclusivity & Plan-Gated Public Channel Access
 
 Resolved UX ambiguity between connecting and selecting a channel, and implemented operator plan governance for public channel tracking:

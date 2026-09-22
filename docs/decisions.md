@@ -1,5 +1,24 @@
 # Implementation decisions
  
+2026-09-22 — Admin Workspace Isolation and User Impersonation («الدخول كـ»).
+When logged in as a platform administrator/owner, the workspace switcher rail and account views previously returned all tenant workspaces across the platform (due to RLS allowing platform admins full visibility). This cluttered the owner's personal view with dozens of customer workspaces. Furthermore, when supporting users or debugging tenant-specific issues, administrators needed a reliable way to view the platform through a specific user's eyes ("لأرى المستخدم بعدسته وعينه") without stealing credentials, bypassing authentication, or compromising auditability.
+
+To resolve this safely and sustainably:
+1. **Workspace Isolation (`my_workspaces`)**:
+   - Created `public.my_workspaces(target_user_id uuid default null)`:
+     - By default (`target_user_id is null`), it strictly returns workspaces where the caller is an explicit member or creator (`m.user_id = auth.uid() or w.created_by = auth.uid()`). This isolates the admin's personal workspaces from customer workspaces in daily operation.
+     - When `target_user_id` is supplied, it is strictly gated by `if not public.is_platform_admin() then raise exception 'forbidden' using errcode = '42501'`.
+2. **Session Impersonation Architecture**:
+   - Added an action column and **«الدخول كـ»** button in `/admin/users` (`AdminUsersPage.tsx`).
+   - The platform admin's active session token is preserved. Impersonation state is stored in client session storage (`sentiment_impersonation_session`) and managed via `ImpersonationProvider` and `useImpersonation()`.
+   - When impersonation is active, `my_workspaces` is requested with `target_user_id`, causing the app rail, account page, and dashboard selectors to load the impersonated user's personal workspaces.
+3. **Safety Banners & Return Controls**:
+   - A persistent, high-visibility banner (`ImpersonationBanner.tsx`) warns: «أنت تتصفح المنصة حالياً بصفتك: [user]» with a prominent action button **«العودة إلى حساب المدير»**.
+   - In `SessionControl.tsx`, the user avatar pill indicates `[user] (محاكاة)`. The dropdown includes «الخروج من محاكاة المستخدم», and clicking standard «تسجيل الخروج» automatically terminates impersonation and restores the admin's account safely without destroying credentials.
+4. **Audit Trails & Security Discipline**:
+   - Implemented `public.admin_start_impersonation(target_user_id)` and `public.admin_stop_impersonation(target_user_id)` recording `impersonation_started` and `impersonation_ended` into `public.audit_events`.
+   - Made `workspace_id` nullable in `public.audit_events` to support platform-level actions, with `admin_audit(int)` left-joining workspaces and falling back to `'Platform'`.
+
 2026-09-22 — Channel Setup Mutual Exclusivity and Plan-Gated Public Channel Access.
 Users previously experienced ambiguity when setting up a workspace because connecting a channel (via Google OAuth) and selecting/searching for a public channel (via public external ID) were presented concurrently without clarifying their mutual exclusivity. Furthermore, allowing all user tiers to add arbitrary public channels without restriction introduced resource and quota risks.
 

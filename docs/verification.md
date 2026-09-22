@@ -1,5 +1,22 @@
 # Verification
 
+## 2026-09-22 — Admin Workspace Isolation & User Impersonation («الدخول كـ»)
+
+| Command / observation | Actual result |
+| --- | --- |
+| Database test suite: `npm run test:db` | **43 test files passed, 392 tests passed (100% green)**, including all 9 test cases in `user_impersonation.test.ts` testing isolation of `my_workspaces`, admin delegation, forbidden error codes for non-admins, and audit events. |
+| Web unit tests: `npm test` | **120 test files passed, 930 tests passed (100% green)**, including `impersonation.test.tsx`, `ImpersonationBanner.test.tsx`, `AdminUsersPage.test.tsx`, `SessionControl.test.tsx`. |
+| Python worker test suite: `npm run worker:test` | **270 tests passed in 4.36s (100% green)**. |
+| Python worker linter: `npm run worker:lint` | All checks passed cleanly (0 errors). |
+| Web linter: `npm run lint` | ESLint passed cleanly with 0 errors, 0 warnings. |
+| Code formatting: `npm run format:check` | 100% verified with Prettier. |
+| TypeScript typecheck: `npm run typecheck` | Passed cleanly (`tsc --noEmit`, 0 errors). |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`. |
+| Production build & prerender: `npm run build` | Built in 1.19s; 8 prerendered static pages generated cleanly; 0 build errors. |
+| Secrets scan: `npm run check:secrets` | Secret-pattern checks passed across 737 source files and built assets (0 secrets detected). |
+| Remote database migration: `npm run db:migrate:remote` | Applied migration `20260922170000_user_impersonation_and_workspace_isolation.sql` to live Supabase instance with exit code 0. |
+| Repository check gate: `npm run check` | **100% green exit code 0**. |
+
 ## 2026-09-22 — Channel Setup Mutual Exclusivity & Plan-Gated Public Channel Access
 
 | Command / observation | Actual result |
