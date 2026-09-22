@@ -23,6 +23,7 @@ import {
 import { supabase } from "../supabase";
 import { useSession, useWorkspaces } from "../session";
 import { useWorkspaceSelection } from "../workspaceSelection";
+import { useImpersonation } from "../impersonation";
 import { WorkspaceGate } from "../WorkspaceGate";
 import { workspaceState, readableWorkspace } from "../workspace";
 import { syncHealth } from "../syncHealth";
@@ -46,10 +47,15 @@ export function Sync() {
     loading: workspacesLoading,
     failed: workspacesFailed,
   } = useWorkspaces(session);
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
+
   // One selection for the whole product. This was `useState(null)` here
   // and again in the other page; both routes are lazy, so the answer died
   // on every navigation and the question came back.
-  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
+  const [chosen, setChosen] = useWorkspaceSelection(effectiveUserId, {
     route: true,
   });
   const S = useStrings();
@@ -60,6 +66,17 @@ export function Sync() {
     workspaces,
     selectedId: chosen,
   });
+
+  // Reconcile if the place became ready with a workspace that differs from chosen
+  useEffect(() => {
+    if (
+      place.kind === "ready" &&
+      chosen !== place.id &&
+      workspaces.length > 0
+    ) {
+      setChosen(place.id);
+    }
+  }, [place, chosen, workspaces.length, setChosen]);
   // An explicit way in to the demo of this page. Not a workaround for the line
   // below: the fixture operations page is the only surface on which the
   // product's hardest guarantees can be exercised without a live account —

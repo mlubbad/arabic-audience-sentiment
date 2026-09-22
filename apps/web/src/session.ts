@@ -103,13 +103,25 @@ export function useWorkspaces(
   // The key carries the user id, so a change of user is a change of query:
   // the next user never sees the last user's list, even for one paint.
   if (!supabase || !userId)
-    return { workspaces: [], loading: false, failed: false };
+    return {
+      workspaces: [],
+      data: [],
+      loading: false,
+      isLoading: false,
+      failed: false,
+      isError: false,
+      refetch: async () => ({ data: [] as Workspace[] }),
+    };
   // A failed read leaves the list empty *and* says so. Treating it as "this
   // account has no workspaces" would send the user to create one they
   // already have.
   return {
     workspaces: query.data ?? [],
+    data: query.data ?? [],
     loading: query.isPending,
+    isLoading: query.isPending,
     failed: query.isError,
+    isError: query.isError,
+    refetch: query.refetch,
   };
 }

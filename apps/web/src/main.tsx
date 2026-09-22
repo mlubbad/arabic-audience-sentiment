@@ -39,6 +39,7 @@ import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
 import { useIsPlatformAdmin } from "./adminAccess";
 import { ToastHost } from "./ui/Toast";
+import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { carriedSearch } from "./workspaceUrl";
 import {
   applyToDocument,
@@ -421,18 +422,20 @@ function AppLayout() {
           </div>
         </aside>
         <main id="content" className="app-main">
-          <Suspense
-            fallback={
-              <div className="app-state" role="status">
-                <span className="app-state-symbol" aria-hidden="true">
-                  ◌
-                </span>
-                <p>{S.pageOpening}</p>
-              </div>
-            }
-          >
-            <Outlet />
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense
+              fallback={
+                <div className="app-state" role="status">
+                  <span className="app-state-symbol" aria-hidden="true">
+                    ◌
+                  </span>
+                  <p>{S.pageOpening}</p>
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </main>
         <footer className="app-footer">
           <div>
@@ -489,29 +492,31 @@ const app = (
       <DirectionRoot>
         <BrowserRouter>
           <ImpersonationProvider>
-            <Routes>
-              {/* The public pages, beside the landing and not inside the
-                  shell: read signed out, in the language their address names,
-                  and served prerendered — see publicPaths.ts. The pricing and
-                  legal pages load on demand. */}
-              {publicRoutes({ Landing, Pricing, LegalPage }, (element) => (
-                <Suspense fallback={null}>{element}</Suspense>
-              ))}
-              <Route element={<AppLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/account" element={<Account />} />
-                <Route path="/sync" element={<Sync />} />
-                <Route path="/ops" element={<OpsRedirect />} />
-                <Route path="/connected" element={<Connected />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/admin/channels" element={<AdminChannels />} />
-                <Route path="/admin/plans" element={<AdminPlans />} />
-                <Route path="/admin/ops" element={<AdminOps />} />
-                <Route path="/admin/audit" element={<AdminAudit />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                {/* The public pages, beside the landing and not inside the
+                    shell: read signed out, in the language their address names,
+                    and served prerendered — see publicPaths.ts. The pricing and
+                    legal pages load on demand. */}
+                {publicRoutes({ Landing, Pricing, LegalPage }, (element) => (
+                  <Suspense fallback={null}>{element}</Suspense>
+                ))}
+                <Route element={<AppLayout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/account" element={<Account />} />
+                  <Route path="/sync" element={<Sync />} />
+                  <Route path="/ops" element={<OpsRedirect />} />
+                  <Route path="/connected" element={<Connected />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/admin/users" element={<AdminUsers />} />
+                  <Route path="/admin/channels" element={<AdminChannels />} />
+                  <Route path="/admin/plans" element={<AdminPlans />} />
+                  <Route path="/admin/ops" element={<AdminOps />} />
+                  <Route path="/admin/audit" element={<AdminAudit />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
+              </Routes>
+            </ErrorBoundary>
           </ImpersonationProvider>
         </BrowserRouter>
         <ToastHost />

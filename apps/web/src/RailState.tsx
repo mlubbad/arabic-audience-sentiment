@@ -125,13 +125,6 @@ export function CollectionState() {
     enabled: !!session && configuredMode === "live" && !!workspaceId,
   });
   if (!session || configuredMode !== "live" || !workspaceId) return null;
-  if (source.isPending)
-    return (
-      <p className="app-rail-collection" data-testid="rail-collection">
-        <span className="app-rail-caption">{S.railCollectionCaption}</span>
-        <span data-severity="unknown">{S.railCollectionReading}</span>
-      </p>
-    );
   if (source.isError)
     return (
       <p className="app-rail-collection" data-testid="rail-collection">
@@ -139,7 +132,14 @@ export function CollectionState() {
         <span data-severity="unknown">{S.railCollectionUnavailable}</span>
       </p>
     );
-  const health = syncHealth(source.data.sync ?? null, new Date());
+  if (source.isPending || !source.data)
+    return (
+      <p className="app-rail-collection" data-testid="rail-collection">
+        <span className="app-rail-caption">{S.railCollectionCaption}</span>
+        <span data-severity="unknown">{S.railCollectionReading}</span>
+      </p>
+    );
+  const health = syncHealth(source.data.sync, new Date());
   return (
     <p className="app-rail-collection" data-testid="rail-collection">
       <span className="app-rail-caption">{S.railCollectionCaption}</span>

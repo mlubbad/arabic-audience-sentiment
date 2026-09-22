@@ -47,6 +47,7 @@ import { failureCode } from "../failure";
 import { supabase } from "../supabase";
 import { useSession, useWorkspaces } from "../session";
 import { useWorkspaceSelection } from "../workspaceSelection";
+import { useImpersonation } from "../impersonation";
 import { WorkspaceGate } from "../WorkspaceGate";
 import { workspaceState, readableWorkspace } from "../workspace";
 import { useLocale } from "../locale";
@@ -108,10 +109,15 @@ export function Dashboard() {
     loading: workspacesLoading,
     failed: workspacesFailed,
   } = useWorkspaces(session);
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
+
   // One selection for the whole product. This was `useState(null)` here
   // and again in the other page; both routes are lazy, so the answer died
   // on every navigation and the question came back.
-  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
+  const [chosen, setChosen] = useWorkspaceSelection(effectiveUserId, {
     route: true,
   });
   const S = useStrings();
@@ -122,13 +128,26 @@ export function Dashboard() {
     workspaces,
     selectedId: chosen,
   });
+
+  // Reconcile if the place became ready with a workspace that differs from chosen
+  // (e.g. if the route had a stale admin workspace ws= parameter when switching contexts)
+  useEffect(() => {
+    if (
+      place.kind === "ready" &&
+      chosen !== place.id &&
+      workspaces.length > 0
+    ) {
+      setChosen(place.id);
+    }
+  }, [place, chosen, workspaces.length, setChosen]);
+
   const live = readableWorkspace(place);
   const mode = resolveMode({ signedIn: !!session, workspace: live });
   // In fixture mode the id is the fixture's, never a real one left over from a
   // previous render: a correction addressed to the wrong pair is exactly what
   // the old build-time constant existed to prevent.
   const workspaceId = mode === "live" && live ? live : fixtureWorkspace;
-  const userId = session?.user.id ?? "visitor";
+  const userId = effectiveUserId ?? "visitor";
   // A new identity remounts the whole report, including any open review dialog.
   // No comment or pending correction from a previous tenant survives the switch.
   return (

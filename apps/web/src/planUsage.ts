@@ -16,13 +16,14 @@ import { useWorkspaceSelection } from "./workspaceSelection";
 import { workspaceState, type WorkspaceOption } from "./workspace";
 import { configuredMode, fixtureWorkspace } from "./data";
 import { supabase } from "./supabase";
+import { getEffectiveUserId } from "./session";
 
 export function usePlanUsage(
   session: Session | null,
   workspaces: WorkspaceOption[],
 ) {
-  const userId = session?.user.id ?? null;
-  const [chosen] = useWorkspaceSelection(userId);
+  const effectiveUserId = getEffectiveUserId(session);
+  const [chosen] = useWorkspaceSelection(effectiveUserId);
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,
@@ -32,7 +33,7 @@ export function usePlanUsage(
   });
   const workspaceId = place.kind === "ready" ? place.id : null;
   const plan = useQuery({
-    queryKey: ["plan", userId, workspaceId],
+    queryKey: ["plan", effectiveUserId, workspaceId],
     enabled: !!supabase && !!workspaceId,
     queryFn: async () => {
       const { data, error } = await supabase!.rpc("usage_summary", {

@@ -2,15 +2,26 @@ import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useSession, useWorkspaces } from "./session";
 import { useIsPlatformAdmin } from "./adminAccess";
+import { useImpersonation } from "./impersonation";
 import { workspaceFromSearch } from "./workspaceUrl";
 import { supabase } from "./supabase";
 
 export function useAdminInspection() {
   const [searchParams] = useSearchParams();
   const { session } = useSession();
+  const { isImpersonating } = useImpersonation();
   const { data: isAdmin } = useIsPlatformAdmin(session);
   const { workspaces } = useWorkspaces(session);
   const wsId = workspaceFromSearch(searchParams);
+
+  // When impersonating a specific user, the impersonation banner takes precedence
+  if (isImpersonating) {
+    return {
+      isInspecting: false,
+      workspaceId: null,
+      workspaceName: null,
+    };
+  }
 
   // Check if it's among the user's regular workspaces
   const foundInOwn = workspaces.find((w) => w.id === wsId);
