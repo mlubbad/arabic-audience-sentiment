@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-09-22 — Catalogue Reactive Lifecycle Bridge & Background Job Synchronization
+
+Resolved the issue where videos did not appear in the catalogue list after channel discovery completed:
+- **Root Cause**:
+  - The TanStack Query cache in `Catalogue.tsx` was queried upon page load prior to discovery finishing, caching an empty list (`videos: []`).
+  - `Sync.tsx` adaptive polling polled `ops-source` snapshot and jobs without invalidating or refetching `["catalogue", ...]`.
+  - When background discover jobs finished (`running` -> `succeeded`), there was no reactive lifecycle hook in `Catalogue.tsx` to refetch video data, leaving the UI showing "لا فيديوهات في القائمة بعد." and "لم تُبنَ القائمة بعد.".
+- **Architectural Solution**:
+  - `apps/web/src/ops/Catalogue.tsx`: Added reactive `useEffect` hooks tracking `discovering` and `activeCollect` job transitions to automatically call `read.refetch()` as soon as background jobs succeed.
+  - Added fallback recovery on mount when an uncatalogued state coincides with an already-succeeded discover job.
+  - `apps/web/src/ops/Sync.tsx`: Tracked `hasActiveWork` transitions using `useQueryClient` to invalidate `["catalogue", ...]` and `["ops-source", ...]` when background work completes.
+  - Decoupled `effectiveChannelId` from snapshot state and passed explicit `channelId` prop to prevent button disablement.
+- **Verification**:
+  - Unit tests in `Catalogue.test.tsx` (17 tests) asserting reactive refetching on job completion.
+  - Full repo verification (`npm run check`): 159 test files / 1299 vitest tests, 270 worker pytest tests, builds, and secret scans passed.
+  - Pushed to `main` (commit `0b25ab6`) triggering automated CD deployment.
+
 ## 2026-09-22 — Omnichannel Data Ingestion Audit, Hardening & End-to-End Testing (Twitter, TikTok, Telegram)
 
 Comprehensive inspection, hardening, and hermetic end-to-end testing for Twitter (X), TikTok, and Telegram ingestion:
