@@ -59,6 +59,35 @@ export default defineConfig({
     // It must stay in step with the sweep in scripts/deploy-preview.sh, which
     // deletes the previous build's files from this directory by name.
     assetsDir: "static",
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (
+              id.includes("react/") ||
+              id.includes("react-dom/") ||
+              id.includes("/react/") ||
+              id.includes("/react-dom/") ||
+              id.includes("scheduler")
+            ) {
+              return "vendor-react";
+            }
+            if (id.includes("@supabase")) {
+              return "vendor-supabase";
+            }
+            if (id.includes("@tanstack")) {
+              return "vendor-tanstack";
+            }
+            if (id.includes("chart.js") || id.includes("react-chartjs-2")) {
+              return "vendor-charts";
+            }
+            if (id.includes("@radix-ui") || id.includes("lucide-react")) {
+              return "vendor-ui";
+            }
+          }
+        },
+      },
+    },
   },
   server: { host: "127.0.0.1", strictPort: true, port: 5173 },
 });

@@ -1,6 +1,19 @@
 # Implementation decisions
  
-2026-09-22 — Admin Workspace Isolation and User Impersonation («الدخول كـ»).
+2026-09-22 — Dashboard Covering Composite Indexes and Frontend Code-Splitting.
+Following a comprehensive architecture and performance audit, two high-impact optimizations were prioritized and implemented:
+1. **Database Covering Indexes**:
+   - `private.dashboard_aggregates_impl` and `private.dashboard_comments_impl` join `sentiment_predictions` and `topic_predictions` using `workspace_id` and active `analysis_key`/`classification_key`.
+   - Previous unique indexes had `(comment_id, ...)` or lacked payload columns, preventing index-only scans.
+   - Migration `20260922220000_dashboard_aggregation_covering_indexes.sql` introduces composite covering indexes with `(workspace_id, analysis_key, comment_id, content_hash, label)` and `(workspace_id, classification_key, comment_id, content_hash, topic_key)` filtered by `WHERE status = 'succeeded'`. This allows the query planner to evaluate aggregates entirely within index pages without visiting table heaps.
+   - Added a GIN trigram index on `comments(author_name)` so that `v_search` predicates (`author_name ILIKE ... OR text_raw ILIKE ...`) can execute a bitmap index scan union rather than degenerating into full sequential scans.
+2. **Frontend Bundle Optimization (`manualChunks`)**:
+   - The production Vite build previously bundled all dependencies into a monolithic `index.js` exceeding 807 kB, causing browser parsing delays and cache invalidation churn.
+   - Configured `rollupOptions.output.manualChunks` into granular vendor buckets (`vendor-react`, `vendor-tanstack`, `vendor-supabase`, `vendor-charts`, `vendor-ui`).
+   - The main entry bundle dropped to 246 kB, eliminating the >500 kB warning while ensuring independent browser cache lifetimes across application updates.
+3. **Arabic Typography Guardrails**:
+   - Enforced `letter-spacing: 0` by default across all typography selectors in `app.css`, `pricing.css`, and `legal.css`, restricting negative tracking strictly to `:lang(en)`. Negative letter-spacing in Arabic glyphs disrupts cursive ligation (اتصال الحروف).
+
 When logged in as a platform administrator/owner, the workspace switcher rail and account views previously returned all tenant workspaces across the platform (due to RLS allowing platform admins full visibility). This cluttered the owner's personal view with dozens of customer workspaces. Furthermore, when supporting users or debugging tenant-specific issues, administrators needed a reliable way to view the platform through a specific user's eyes ("لأرى المستخدم بعدسته وعينه") without stealing credentials, bypassing authentication, or compromising auditability.
 
 To resolve this safely and sustainably:

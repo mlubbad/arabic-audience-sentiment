@@ -1,6 +1,29 @@
 # Progress
 
-## 2026-09-22 — Admin Workspace Isolation & User Impersonation («الدخول كـ»)
+## 2026-09-22 — Comprehensive Audit Improvements Execution (P0 & P1 Hardening)
+
+Executed the prioritized improvements derived from the 360-degree architecture, security, performance, and typography audit:
+
+- **Database Performance & Covering Composite Indexes**:
+  - Migration `20260922220000_dashboard_aggregation_covering_indexes.sql`:
+    - Added covering composite index `sentiment_preds_active_covering_idx` on `public.sentiment_predictions (workspace_id, analysis_key, comment_id, content_hash, label) WHERE status = 'succeeded'`. Enables index-only scans on dashboard CTEs without touching heap tables.
+    - Added covering composite index `topic_preds_active_covering_idx` on `public.topic_predictions (workspace_id, classification_key, comment_id, content_hash, topic_key) WHERE status = 'succeeded'`.
+    - Added GIN trigram index `comments_author_name_trgm_idx` on `public.comments(author_name)` inside a resilient `DO $$` block, preventing sequential scan fallbacks when searching `text_raw OR author_name`.
+  - Verified across all 43 database test suites (392 tests passing 100% green).
+- **Arabic Typography Strict Invariant (`letter-spacing: 0`)**:
+  - Hardened Arabic typography across all surfaces to prevent broken cursive glyph connections:
+    - `apps/web/src/app.css`: Fixed `.app-rail .app-brand b` to default to `letter-spacing: 0;`, scoping `-0.01em` strictly to `:lang(en)`.
+    - `apps/web/src/pricing.css`: Fixed `.pricing .lp-section-heading h1` to default to `letter-spacing: 0;`, scoping `-1px` strictly to `:lang(en)`.
+    - `apps/web/src/legal.css`: Fixed `.legal-head h1` to default to `letter-spacing: 0;`, scoping `-1px` strictly to `:lang(en)`.
+- **Frontend Bundle Code-Splitting & Vite Optimization**:
+  - Configured `build.rollupOptions.output.manualChunks` in `apps/web/vite.config.ts` to cleanly partition vendor modules:
+    - `vendor-react` (208 kB), `vendor-tanstack` (40 kB), `vendor-supabase` (226 kB), `vendor-charts` (183 kB), `vendor-ui` (112 kB).
+  - Reduced the monolithic `index.js` chunk from **807.30 kB down to 246.36 kB** (a 70% reduction).
+  - Completely eliminated the Vite build warning `Some chunks are larger than 500 kB after minification`.
+- **CI/CD Deployment Preflight Gate**:
+  - Hardened `.github/workflows/deploy.yml` with a preflight safety gate (`npm run check:secrets && npm run typecheck`) before building and pushing to FTPS/Supabase.
+- **Verification**:
+  - Full repo verification (`npm run check`): 121 Vitest suites (933 tests), 43 DB test suites (392 tests), 270 worker pytest tests, build, and secret check passed 100% green.
 
 Implemented workspace isolation for the platform administrator/owner and full perspective swapping ("لأرى المستخدم بعدسته وعينه") with audit logging and return controls:
 

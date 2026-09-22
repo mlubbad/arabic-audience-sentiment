@@ -36,8 +36,11 @@
 .pricing .lp-section-heading h1 {
   /* The landing's h1 is a hero; this one is a page title. */
   font-size: clamp(34px, 4vw, 52px);
-  letter-spacing: -1px;
+  letter-spacing: 0;
   margin-bottom: 14px;
+}
+.pricing .lp-section-heading h1:lang(en) {
+  letter-spacing: -1px;
 }
 .pricing-lead {
   color: var(--text-3);

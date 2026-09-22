@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify build safety and types
+        run: npm run check:secrets && npm run typecheck
+
       - name: Build frontend distribution
         run: npm run build
 

@@ -524,6 +524,9 @@
 .app-rail .app-brand b {
   font-size: 16px;
   font-weight: 700;
+  letter-spacing: 0;
+}
+.app-rail .app-brand b:lang(en) {
   letter-spacing: -0.01em;
 }
 .app-rail .app-brand small {
