@@ -99,9 +99,10 @@ export const ar = {
 
   // ---- the three steps (setup.ts) and the card (WorkspaceCard.tsx) ----
   stepWorkspace: "أنشئ حسابك ومساحة العمل الخاصة بك.",
-  stepChannel: "اربط قناة يوتيوب بعد موافقتك على الإذن.",
+  stepChannel: "حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة.",
   stepCollect: "اختر الفيديوهات التي تُجمع، ثم تابع حالتها في صفحة التشغيل.",
-  stepChannelSeeded: "القناة مسجَّلة بلا إذن بعد؛ اربطها لتأكيد ملكيتها.",
+  stepChannelSeeded:
+    "تم اختيار القناة العامة للمتابعة؛ الخطوة التالية اختيار الفيديوهات.",
   stepChannelLapsed: "القناة تحتاج إعادة ربط؛ الإذن السابق لم يعد صالحًا.",
   stepCollectPending: "الطلب قائم؛ تفاصيل التقدّم في صفحة التشغيل.",
   stepCollectFailed: "آخر محاولة لم تكتمل؛ السبب في صفحة التشغيل.",
@@ -112,11 +113,26 @@ export const ar = {
   stepStateAttention: "يحتاج انتباهك",
   stepsLabel: "خطوات الإعداد",
   channelConnected: "قناة مرتبطة: ",
-  channelSeeded: "قناة عامة بلا إذن بعد: ",
+  channelSeeded: "قناة عامة (متابعة): ",
   channelNeedsRelink: (status: string) =>
     `القناة تحتاج إعادة ربط (${status}): `,
   channelIdLabel: "المعرّف",
   channelNone: "لا توجد قناة مرتبطة بعد",
+  channelSetupHeading: "تحديد قناة مساحة العمل",
+  channelSetupSubheading:
+    "اختر مساراً واحداً لإضافة القناة بحسب ملكيتك لها (الخياران متبادلان):",
+  channelOptionOwnerBadge: "مالك رسمي",
+  channelOptionOwnerTitle: "أملك القناة",
+  channelOptionOwnerDesc:
+    "ربط القناة بحساب Google الرسمي لتأكيد الملكية وصلاحيات القراءة المباشرة والتحليل الشامل.",
+  channelOptionOwnerAction: "ربط قناة يوتيوب عبر Google",
+  channelOptionPublicBadge: "متابعة عامة",
+  channelOptionPublicTitle: "لا أملك القناة",
+  channelOptionPublicDesc:
+    "البحث عن أي قناة عامة بالرابط أو المعرّف (YouTube, Telegram, X, TikTok) لمتابعتها دون الحاجة لحساب المالك.",
+  channelOptionPublicAction: "البحث عن قناة واختيارها",
+  searchPublicChannelHeading:
+    "البحث عن قناة عامة للمتابعة (لا تتطلب ملكية أو تسجيل دخول)",
   disconnectChannel: "فصل القناة",
   disconnectConfirm:
     "سيتوقف الجمع وتُلغى صلاحية الوصول إلى القناة. ما جُمع يبقى. هل تفصلها؟",
@@ -375,8 +391,26 @@ export const ar = {
   adminTabWorkspaces: "مساحات العمل",
   adminTabUsers: "المستخدمون",
   adminTabChannels: "القنوات",
+  adminTabPlans: "أنواع الحسابات",
   adminTabOps: "التشغيل",
   adminTabAudit: "سجل التدقيق",
+  // plans & account types
+  adminPlansTitle: "أنواع الحسابات والصلاحيات",
+  adminPlansLead:
+    "إدارة أنواع الحسابات والتحكم في إتاحة ميزة تتبع القنوات العامة (خيار «لا أملك القناة») لكل باقة.",
+  adminPlansLoading: "جارٍ قراءة أنواع الحسابات…",
+  adminPlansEmpty: "لا توجد باقات مسجلة.",
+  adminPlansHeading: "أنواع الحسابات المتاحة",
+  adminPlanColName: "نوع الحساب",
+  adminPlanColKey: "المعرّف",
+  adminPlanColSegment: "الشريحة",
+  adminPlanColPrice: "السعر الشهري",
+  adminPlanColPublicChannels: "خيار «لا أملك القناة»",
+  adminPlanOwnerAlwaysActive: "مفعّل دائماً للمالك",
+  adminPlanPublicChannelsAllowed: "مسموح",
+  adminPlanPublicChannelsBlocked: "معطّل",
+  adminPlanToggleSuccess: "تم تحديث صلاحية نوع الحساب بنجاح.",
+  adminPlanToggleFailed: "تعذر تحديث صلاحية نوع الحساب.",
   // users
   adminUsersTitle: "المستخدمون",
   adminUsersLead:

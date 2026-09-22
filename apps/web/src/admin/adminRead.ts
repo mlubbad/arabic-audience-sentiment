@@ -53,3 +53,14 @@ export async function readAdminAudit(
   if (error) throw error;
   return AdminAuditEventsSchema.parse(data);
 }
+
+export async function updatePlanPublicChannels(
+  planKey: string,
+  allowed: boolean,
+): Promise<void> {
+  const { error } = await supabase!.rpc("set_plan_public_channels", {
+    p_plan_key: planKey,
+    p_allowed: allowed,
+  });
+  if (error) throw error;
+}

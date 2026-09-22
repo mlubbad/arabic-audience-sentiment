@@ -79,9 +79,11 @@ describe("a workspace card", () => {
         title: null,
       },
     });
-    expect(html).toContain("قناة عامة بلا إذن بعد");
+    expect(html).toContain("قناة عامة (متابعة)");
     expect(html).not.toContain("إعادة ربط (");
-    expect(html).toContain(`data-testid="connect-${W1}"`);
+    expect(html).not.toContain(`data-testid="connect-${W1}"`);
+    expect(html).toContain(`data-testid="sync-${W1}"`);
+    expect(html).toContain(`data-testid="disconnect-${W1}"`);
   });
 
   it("places the workspace on the three steps from what the page loaded", () => {

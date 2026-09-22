@@ -88,6 +88,9 @@ const AdminChannels = lazy(() =>
     default: m.AdminChannelsPage,
   })),
 );
+const AdminPlans = lazy(() =>
+  import("./admin/AdminPlansPage").then((m) => ({ default: m.AdminPlansPage })),
+);
 const AdminOps = lazy(() =>
   import("./admin/AdminOpsPage").then((m) => ({ default: m.AdminOpsPage })),
 );
@@ -499,6 +502,7 @@ const app = (
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/channels" element={<AdminChannels />} />
+              <Route path="/admin/plans" element={<AdminPlans />} />
               <Route path="/admin/ops" element={<AdminOps />} />
               <Route path="/admin/audit" element={<AdminAudit />} />
               <Route path="*" element={<NotFound />} />

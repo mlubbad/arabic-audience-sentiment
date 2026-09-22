@@ -28,13 +28,13 @@ describe("where a workspace is on the three steps", () => {
     }
   });
 
-  it("a public channel the operator seeded is step two not yet taken, not step two gone wrong", () => {
+  it("a public channel chosen for monitoring completes step two and unlocks step three", () => {
     const steps = setupProgress(
       { channel: { status: "public_unverified" }, latestJob: null },
       ar,
     );
-    expect(statuses(steps)).toEqual(["done", "next", "later"]);
-    expect(steps[1].detail).toContain("ملكيتها");
+    expect(statuses(steps)).toEqual(["done", "done", "next"]);
+    expect(steps[1].detail).toContain("القناة العامة");
   });
 
   it("a job that ran counts, partial included; one in flight is pending; one that stopped needs attention", () => {

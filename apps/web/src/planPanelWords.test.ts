@@ -20,6 +20,7 @@ const summary = (over: Partial<UsageSummary>): UsageSummary => ({
     price_yearly_cents: 12000,
     self_serve: true,
     provider_prices: {},
+    allow_public_channels: false,
     limits: {
       analysis_units: 10000,
       topic_units: 4000,

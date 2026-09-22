@@ -74,6 +74,7 @@ const TABS = [
   { to: "/admin", key: "adminTabWorkspaces" },
   { to: "/admin/users", key: "adminTabUsers" },
   { to: "/admin/channels", key: "adminTabChannels" },
+  { to: "/admin/plans", key: "adminTabPlans" },
   { to: "/admin/ops", key: "adminTabOps" },
   { to: "/admin/audit", key: "adminTabAudit" },
 ] as const;

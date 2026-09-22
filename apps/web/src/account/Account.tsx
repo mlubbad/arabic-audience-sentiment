@@ -15,6 +15,7 @@
  * one mounts from two values that never change within a page load.
  */
 import { useState, useEffect, type FormEvent, type ReactNode } from "react";
+import { useSearchParams } from "react-router";
 import type { Session } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,6 +24,7 @@ import {
   type SourcePlatform,
 } from "@sentiment/contracts";
 import { supabase } from "../supabase";
+import { usePlanCatalogue } from "../planCatalogue";
 import {
   authErrorMessage,
   authSuccessMessage,
@@ -284,6 +286,10 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
   // The newest job per workspace is enough to place it on the three steps.
   // Row-level security scopes the table to this account's workspaces.
   const [jobs, setJobs] = useState<JobRow[]>([]);
+  const catalogue = usePlanCatalogue();
+  const [subscriptions, setSubscriptions] = useState<
+    { workspace_id: string; plan_key: string }[]
+  >([]);
   useEffect(() => {
     let active = true;
     void client.auth.getSession().then(({ data, error }) => {
@@ -336,7 +342,8 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
         .select("workspace_id,status,created_at")
         .order("created_at", { ascending: false })
         .limit(200),
-    ]).then(([w, c, ch, j]) => {
+      client.from("subscriptions").select("workspace_id,plan_key"),
+    ]).then(([w, c, ch, j, s]) => {
       if (!active) return;
       setLoadedWorkspaceUserId(session.user.id);
       if (w.error) say("page", S.workspacesLoadFailed);
@@ -344,6 +351,9 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
       setClients(c.data ?? []);
       setChannels(ch.data ?? []);
       setJobs(j.data ?? []);
+      setSubscriptions(
+        (s?.data as { workspace_id: string; plan_key: string }[]) ?? [],
+      );
     });
     return () => {
       active = false;
@@ -455,10 +465,20 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                 (c) => c.workspace_id === w.id,
               );
               const scope: Scope = `ws:${w.id}`;
+              const sub = subscriptions.find((s) => s.workspace_id === w.id);
+              const plan = catalogue.data?.find((p) => p.key === sub?.plan_key);
+              const isPlatformAdmin = Boolean(session && access.data === true);
+              const allowPublicChannels = Boolean(
+                isPlatformAdmin ||
+                  (plan
+                    ? plan.allow_public_channels
+                    : sub?.plan_key === "owner"),
+              );
               return (
                 <WorkspaceCard
                   key={w.id}
                   workspace={w}
+                  allowPublicChannels={allowPublicChannels}
                   tourAnchor={i === 0 ? "workspace" : undefined}
                   hasClient={!!workspaceClient}
                   channel={
@@ -762,10 +782,16 @@ function DemoAccount() {
  *  ever "working…" — the note lands on the next render. */
 function DemoBody({ initial }: { initial: AccountDemo }) {
   const S = useStrings();
+  const [searchParams] = useSearchParams();
   const [state, setState] = useState<AccountDemo>(initial);
   const { setNote, say, feedback, pending } = useFeedback(null);
   const [name, setName] = useState("");
   const [asking, setAsking] = useState<Asking>(null);
+  const [lookup, setLookup] = useState<{
+    ws: string;
+    candidates: ChannelCandidate[] | null;
+    error: string | null;
+  }>({ ws: "", candidates: null, error: null });
   /** One action over the current rows; `onRefused` maps the reducer's
    *  refusal to the sentence the live page would print for the RPC's.
    *  Optional: `reduceAccountDemo` only ever throws for `rename` and
@@ -820,10 +846,20 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
         card={(w, i) => {
           const scope: Scope = `ws:${w.id}`;
           const hasClient = state.clients.some((c) => c.workspace_id === w.id);
+          const usage = state.usage[w.id];
+          const isOwnerOrAdmin =
+            searchParams.get("owner") === "1" ||
+            searchParams.get("admin") === "1";
+          const allowPublicChannels = Boolean(
+            isOwnerOrAdmin ||
+              usage?.plan?.allow_public_channels ||
+              usage?.plan_key === "owner",
+          );
           return (
             <WorkspaceCard
               key={w.id}
               workspace={w}
+              allowPublicChannels={allowPublicChannels}
               tourAnchor={i === 0 ? "workspace" : undefined}
               hasClient={hasClient}
               channel={
@@ -891,6 +927,55 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
                 act({ type: "connect", w: w.id }, () =>
                   say(scope, S.demoExternalNote),
                 );
+              }}
+              addingChannel={
+                asking?.ws === w.id && asking.what === "addchannel"
+              }
+              channelCandidates={lookup.ws === w.id ? lookup.candidates : null}
+              channelLookupError={lookup.ws === w.id ? lookup.error : null}
+              onAddChannel={(step, value, _candidate, platform) => {
+                if (step === "open") {
+                  setAsking({ ws: w.id, what: "addchannel" });
+                  setLookup({ ws: w.id, candidates: null, error: null });
+                  return;
+                }
+                if (step === "cancel") {
+                  setAsking(null);
+                  setLookup({ ws: w.id, candidates: null, error: null });
+                  return;
+                }
+                if (step === "clear-error") {
+                  setLookup((prev) => ({ ...prev, error: null }));
+                  return;
+                }
+                if (step === "search") {
+                  const q = (value ?? "").trim();
+                  if (!q) {
+                    setLookup({
+                      ws: w.id,
+                      candidates: null,
+                      error: S.addChannelQueryInvalid,
+                    });
+                    return;
+                  }
+                  setLookup({
+                    ws: w.id,
+                    candidates: [
+                      {
+                        platform: platform ?? "youtube",
+                        external_channel_id: "UC_demo_preview_channel",
+                        title: `${q} (قناة توضيحية)`,
+                        handle: `@${q.replace(/^@/, "")}`,
+                        thumbnail_url: null,
+                      },
+                    ],
+                    error: null,
+                  });
+                  return;
+                }
+                if (step === "add") {
+                  say(scope, S.demoExternalNote);
+                }
               }}
             />
           );

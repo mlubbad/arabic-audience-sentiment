@@ -23,6 +23,7 @@ export const PlanSchema = z
     price_yearly_cents: z.number().int().nonnegative(),
     self_serve: z.boolean(),
     provider_prices: z.record(z.string()).default({}),
+    allow_public_channels: z.boolean().default(false),
     limits: PlanLimitsSchema,
   })
   .strict();

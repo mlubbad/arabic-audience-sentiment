@@ -134,6 +134,34 @@ export const fixtureCatalogue = PlanCatalogueSchema.parse([
   },
 ]);
 
+export const adminFixtureCatalogue = PlanCatalogueSchema.parse([
+  ...fixtureCatalogue,
+  {
+    key: "owner",
+    segment: "internal",
+    title_ar: "المالك",
+    title_en: "Owner",
+    price_monthly_cents: 0,
+    price_yearly_cents: 0,
+    self_serve: false,
+    provider_prices: {},
+    allow_public_channels: true,
+    limits: limits(-1, -1, 10000, -1, -1, -1, 0),
+  },
+  {
+    key: "pilot",
+    segment: "internal",
+    title_ar: "شريك مؤسِّس",
+    title_en: "Founding Partner",
+    price_monthly_cents: 0,
+    price_yearly_cents: 0,
+    self_serve: false,
+    provider_prices: {},
+    allow_public_channels: false,
+    limits: limits(5000, 20000, 10, 3, 5, 1, 0),
+  },
+]);
+
 // A channel can have hundreds of videos; comparing all of them is neither
 // usable nor cheap. The busiest few are compared and the rest declared.
 const COMPARISON_LIMIT = 10;

@@ -93,12 +93,11 @@ export function setupProgress(
   else if (channel.status === "connected")
     second = { ...link, status: "done", detail: null };
   else if (channel.status === "public_unverified")
-    // The operator seeded a public channel into this workspace and nobody has
-    // proved they own it yet. That is step two not yet taken, not step two
-    // gone wrong: the instruction is still "connect", with the reason said.
+    // A public channel chosen/added for monitoring without OAuth ownership.
+    // Step two is accomplished (channel selected), unlocking step three (collect).
     second = {
       ...link,
-      status: "next",
+      status: "done",
       detail: S.stepChannelSeeded,
     };
   else

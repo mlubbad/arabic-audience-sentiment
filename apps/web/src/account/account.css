@@ -160,6 +160,92 @@
 .db-ws-consent .db-actions {
   margin-top: var(--space-3);
 }
+
+/* ---------------- the unified channel setup block ---------------- */
+/* When a workspace names no channel, the card explains the two mutually exclusive
+   paths based on channel ownership (Owner vs Public) as a unified decision. */
+.db-channel-setup {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--bg-muted);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.db-channel-setup-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.db-channel-setup-title {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.db-channel-setup-sub {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.db-channel-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+.db-channel-choice {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.db-channel-choice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.db-channel-choice-title {
+  margin: 0;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.db-channel-choice-badge {
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--bg-muted);
+  color: var(--text-2);
+  border: 1px solid var(--border-1);
+}
+.db-channel-choice--owner .db-channel-choice-badge {
+  background: var(--bg-muted);
+  color: var(--color-success);
+}
+.db-channel-choice--public .db-channel-choice-badge {
+  background: var(--ml-indigo-50);
+  color: var(--ml-indigo);
+}
+.db-channel-choice-desc {
+  margin: 0;
+  font-size: var(--fs-micro);
+  color: var(--text-2);
+  line-height: 1.6;
+  flex-grow: 1;
+}
+.db-channel-choice .db-actions {
+  margin-top: var(--space-2);
+}
 /* The lookup's answers, under the query form: one row per candidate, the
    face and name that identify the channel, then its add door. The form's
    own rhythm is reused above; these only lay the rows out. */

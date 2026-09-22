@@ -90,11 +90,12 @@ export const en: Strings = {
   serviceUnreachable: "Could not reach the service. Try again.",
 
   stepWorkspace: "Create your account and your workspace.",
-  stepChannel: "Connect a YouTube channel after granting permission.",
+  stepChannel:
+    "Select a channel by connecting as owner or choosing a public one.",
   stepCollect:
     "Choose the videos to collect, then follow their status on the operations page.",
   stepChannelSeeded:
-    "The channel is registered without permission yet; connect it to confirm ownership.",
+    "Public channel chosen for monitoring; next step is choosing videos.",
   stepChannelLapsed:
     "The channel needs reconnecting; the previous permission is no longer valid.",
   stepCollectPending:
@@ -108,11 +109,26 @@ export const en: Strings = {
   stepStateAttention: "Needs your attention",
   stepsLabel: "Setup steps",
   channelConnected: "Connected channel: ",
-  channelSeeded: "Public channel, no permission yet: ",
+  channelSeeded: "Public channel (monitored): ",
   channelNeedsRelink: (status: string) =>
     `The channel needs reconnecting (${status}): `,
   channelIdLabel: "ID",
   channelNone: "No channel connected yet",
+  channelSetupHeading: "Workspace channel setup",
+  channelSetupSubheading:
+    "Choose one path based on channel ownership (mutually exclusive):",
+  channelOptionOwnerBadge: "Official owner",
+  channelOptionOwnerTitle: "I own the channel",
+  channelOptionOwnerDesc:
+    "Connect via official Google account to verify ownership and grant full read & analysis access.",
+  channelOptionOwnerAction: "Connect YouTube via Google",
+  channelOptionPublicBadge: "Public monitoring",
+  channelOptionPublicTitle: "I don't own the channel",
+  channelOptionPublicDesc:
+    "Search and select any public channel (YouTube, Telegram, X, TikTok) to monitor without owner login.",
+  channelOptionPublicAction: "Search & select channel",
+  searchPublicChannelHeading:
+    "Search for a public channel to monitor (no login or ownership needed)",
   disconnectChannel: "Disconnect channel",
   disconnectConfirm:
     "Collection stops and access to the channel is revoked. What was collected stays. Disconnect it?",
@@ -371,8 +387,26 @@ export const en: Strings = {
   adminTabWorkspaces: "Workspaces",
   adminTabUsers: "Users",
   adminTabChannels: "Channels",
+  adminTabPlans: "Account Types",
   adminTabOps: "Operations",
   adminTabAudit: "Audit trail",
+  // plans & account types
+  adminPlansTitle: "Account Types & Permissions",
+  adminPlansLead:
+    "Manage account tiers and control access to public channel tracking (the 'Don't own channel' option) per plan.",
+  adminPlansLoading: "Reading account types…",
+  adminPlansEmpty: "No plans recorded yet.",
+  adminPlansHeading: "Available Account Types",
+  adminPlanColName: "Account Type",
+  adminPlanColKey: "Key",
+  adminPlanColSegment: "Segment",
+  adminPlanColPrice: "Monthly Price",
+  adminPlanColPublicChannels: "Public Channels Option",
+  adminPlanOwnerAlwaysActive: "Always active for owner",
+  adminPlanPublicChannelsAllowed: "Allowed",
+  adminPlanPublicChannelsBlocked: "Blocked",
+  adminPlanToggleSuccess: "Account type permission updated successfully.",
+  adminPlanToggleFailed: "Failed to update account type permission.",
   // users
   adminUsersTitle: "Users",
   adminUsersLead:

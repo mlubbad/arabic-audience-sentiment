@@ -64,6 +64,7 @@ export function WorkspaceCard({
   sharing,
   onShare,
   tourAnchor,
+  allowPublicChannels = false,
 }: {
   workspace: { id: string; name: string };
   /** A workspace cannot be connected without the client it owns. */
@@ -106,6 +107,8 @@ export function WorkspaceCard({
   /** The onboarding tour's `data-tour` name for this card — the page gives
    *  it to the first card only, and that card's setup path is lit too. */
   tourAnchor?: string;
+  /** Whether this workspace/account is permitted to use the public channel tracking option ("لا أملك القناة"). */
+  allowPublicChannels?: boolean;
 }) {
   const S = useStrings();
   const [internalShareOpen, setInternalShareOpen] = useState(false);
@@ -385,107 +388,187 @@ export function WorkspaceCard({
           testId={`setup-${workspace.id}`}
           tourAnchor={tourAnchor ? "setup" : undefined}
         />
-        <div className="db-actions">
-          {/* Connected: the next thing to do is choose what to collect.
-              Collection is per video, chosen on the operations page, so the
-              card points there — a link, not an action, because the choice
-              is the action and it needs the catalogue in front of the
-              reader. */}
-          {(connected || hasPublicChannel) && (
-            <Button asChild>
-              <Link
-                to={`/sync?ws=${workspace.id}`}
-                data-testid={`sync-${workspace.id}`}
-              >
-                {S.chooseVideos}
-              </Link>
-            </Button>
-          )}
-          {/* Shown only when it can actually work: without a client the
-              server would refuse, and a button that always fails is worse
-              than no button. */}
-          {hasClient && !connected && (
-            <Button
-              disabled={pending}
-              data-testid={`connect-${workspace.id}`}
-              onClick={onConnect}
+
+        {/* When the workspace names no channel: present the two mutually exclusive
+            paths (Owner vs Public) as one unified decision if allowed; otherwise offer direct owner connect. */}
+        {(!channel || channel.status === "disconnected") &&
+          allowPublicChannels && (
+            <div
+              className="db-channel-setup"
+              data-testid={`channel-setup-${workspace.id}`}
             >
-              {S.connectChannel}
-            </Button>
+              <div className="db-channel-setup-header">
+                <h4 className="db-channel-setup-title">
+                  {S.channelSetupHeading}
+                </h4>
+                <p className="db-channel-setup-sub">
+                  {S.channelSetupSubheading}
+                </p>
+              </div>
+              <div className="db-channel-setup-grid">
+                <div className="db-channel-choice db-channel-choice--owner">
+                  <div className="db-channel-choice-head">
+                    <h5 className="db-channel-choice-title">
+                      {S.channelOptionOwnerTitle}
+                    </h5>
+                    <span className="db-channel-choice-badge">
+                      {S.channelOptionOwnerBadge}
+                    </span>
+                  </div>
+                  <p className="db-channel-choice-desc">
+                    {S.channelOptionOwnerDesc}
+                  </p>
+                  <div className="db-actions">
+                    {hasClient && (
+                      <Button
+                        disabled={pending}
+                        data-testid={`connect-${workspace.id}`}
+                        onClick={onConnect}
+                      >
+                        {S.connectChannel}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="db-channel-choice db-channel-choice--public">
+                  <div className="db-channel-choice-head">
+                    <h5 className="db-channel-choice-title">
+                      {S.channelOptionPublicTitle}
+                    </h5>
+                    <span className="db-channel-choice-badge">
+                      {S.channelOptionPublicBadge}
+                    </span>
+                  </div>
+                  <p className="db-channel-choice-desc">
+                    {S.channelOptionPublicDesc}
+                  </p>
+                  <div className="db-actions">
+                    {hasClient && onAddChannel && !addingChannel && (
+                      <Button
+                        variant="secondary"
+                        disabled={pending}
+                        data-testid={`addchannel-${workspace.id}`}
+                        onClick={() => onAddChannel("open")}
+                      >
+                        {S.channelOptionPublicAction}
+                      </Button>
+                    )}
+                    {hasClient && onAddChannel && addingChannel && (
+                      <Button
+                        variant="ghost"
+                        disabled={pending}
+                        onClick={() => onAddChannel("cancel")}
+                      >
+                        {S.addChannelCancel}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
-          {/* The public-data door, beside the OAuth one: a channel added by
-              its link or by a search collects public data with no grant and
-              no Google visit, and can be linked for real at any time later.
-              Offered only while the workspace names no channel — the
-              registration refuses a second one — and only with a handler,
-              which the demo body passes none of. */}
-          {hasClient &&
-            !connected &&
-            (!channel || channel.status === "disconnected") &&
-            onAddChannel &&
-            !addingChannel && (
+
+        {/* When public channels are not permitted for this account type: render direct connect button */}
+        {(!channel || channel.status === "disconnected") &&
+          !allowPublicChannels && (
+            <div className="db-actions">
+              {hasClient && (
+                <Button
+                  disabled={pending}
+                  data-testid={`connect-${workspace.id}`}
+                  onClick={onConnect}
+                >
+                  {S.connectChannel}
+                </Button>
+              )}
+            </div>
+          )}
+
+        {/* Action doors for existing channels or workspace-level actions */}
+        {(connected ||
+          hasPublicChannel ||
+          channel?.status === "reconnect_required" ||
+          onRetire) && (
+          <div className="db-actions">
+            {/* Connected or chosen public channel: proceed to choose what to collect. */}
+            {(connected || hasPublicChannel) && (
+              <Button asChild>
+                <Link
+                  to={`/sync?ws=${workspace.id}`}
+                  data-testid={`sync-${workspace.id}`}
+                >
+                  {S.chooseVideos}
+                </Link>
+              </Button>
+            )}
+            {/* Reconnect door: offered ONLY when a previously connected channel's grant lapsed. */}
+            {hasClient && channel?.status === "reconnect_required" && (
+              <Button
+                disabled={pending}
+                data-testid={`connect-${workspace.id}`}
+                onClick={onConnect}
+              >
+                {S.connectChannel}
+              </Button>
+            )}
+            {hasClient && unnamed && (
               <Button
                 variant="secondary"
                 disabled={pending}
-                data-testid={`addchannel-${workspace.id}`}
-                onClick={() => onAddChannel("open")}
+                data-testid={`relink-${workspace.id}`}
+                onClick={onConnect}
               >
-                {S.addChannel}
+                {S.relinkForName}
               </Button>
             )}
-          {hasClient && unnamed && (
-            <Button
-              variant="secondary"
-              disabled={pending}
-              data-testid={`relink-${workspace.id}`}
-              onClick={onConnect}
-            >
-              {S.relinkForName}
-            </Button>
-          )}
-          {/* The way out, offered while there is a grant or public channel to withdraw.
-              Two presses on purpose: disconnecting stops every scheduled
-              read and revokes the stored grant, and a single button beside
-              "choose videos" would be pressed by mistake. What YouTube's
-              audit asks for is that a user can withdraw access from inside
-              the application; this is it. */}
-          {(connected || hasPublicChannel) && (
-            <Button
-              variant="ghost"
-              disabled={pending}
-              data-testid={`disconnect-${workspace.id}`}
-              onClick={() => onDisconnect?.("ask")}
-            >
-              {S.disconnectChannel}
-            </Button>
-          )}
-          {/* No handler, no door: the account page passes none to a platform
-              admin, who has nobody to hand a workspace to but themself. The
-              server refuses too (owner_cannot_retire); this is the courtesy. */}
-          {onRetire && (
-            <Button
-              variant="ghost"
-              className="db-ws-danger"
-              disabled={pending}
-              data-testid={`retire-${workspace.id}`}
-              onClick={() => onRetire("ask")}
-            >
-              {S.retireWorkspace}
-            </Button>
-          )}
-        </div>
+            {/* The way out: offered while there is a grant or public channel to withdraw. */}
+            {(connected || hasPublicChannel) && (
+              <Button
+                variant="ghost"
+                disabled={pending}
+                data-testid={`disconnect-${workspace.id}`}
+                onClick={() => onDisconnect?.("ask")}
+              >
+                {S.disconnectChannel}
+              </Button>
+            )}
+            {/* No handler, no door: the account page passes none to a platform
+                admin, who has nobody to hand a workspace to but themself. */}
+            {onRetire && (
+              <Button
+                variant="ghost"
+                className="db-ws-danger"
+                disabled={pending}
+                data-testid={`retire-${workspace.id}`}
+                onClick={() => onRetire("ask")}
+              >
+                {S.retireWorkspace}
+              </Button>
+            )}
+          </div>
+        )}
         {feedback}
         {/* The public-data door's form: a query in, candidates out, one add
             button per candidate. Inline like the Google consent card above —
             an explanation and a way back, not a dialog. The thumbnail and the
             name are what the reader recognises the channel by; the id is
             shown only when the source gave neither a name nor a handle. */}
-        {addingChannel && onAddChannel && (
+        {addingChannel && onAddChannel && allowPublicChannels && (
           <Card
             className="db-ws-consent"
             role="group"
             aria-label={S.addChannel}
           >
+            <p
+              style={{
+                marginBottom: "0.75rem",
+                fontWeight: 600,
+                color: "var(--text-1)",
+              }}
+            >
+              {S.searchPublicChannelHeading}
+            </p>
             <div
               className="db-actions"
               style={{

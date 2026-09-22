@@ -43,6 +43,7 @@ function mount(
     latestJob: null,
     pending: false,
     feedback: null,
+    allowPublicChannels: true,
     onConnect: vi.fn(),
     ...over,
   };
@@ -194,6 +195,30 @@ describe("WorkspaceCard", () => {
       expect(screen.queryByTestId(`sync-${W}`)).not.toBeInTheDocument();
       expect(screen.queryByTestId(`disconnect-${W}`)).not.toBeInTheDocument();
       expect(screen.queryByTestId(`relink-${W}`)).not.toBeInTheDocument();
+    });
+
+    it("public channel: sync and disconnect doors shown, but never connect door", () => {
+      mount({
+        channel: { ...connected, status: "public_unverified" },
+        onDisconnect: vi.fn(),
+      });
+      expect(screen.getByTestId(`sync-${W}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`disconnect-${W}`)).toBeInTheDocument();
+      expect(screen.queryByTestId(`connect-${W}`)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(`channel-setup-${W}`),
+      ).not.toBeInTheDocument();
+    });
+
+    it("no channel: displays unified channel setup explaining owner vs public options", () => {
+      const onAddChannel = vi.fn();
+      mount({ channel: null, onAddChannel });
+      expect(screen.getByTestId(`channel-setup-${W}`)).toBeInTheDocument();
+      expect(screen.getByText(ar.channelSetupHeading)).toBeInTheDocument();
+      expect(screen.getByText(ar.channelOptionOwnerTitle)).toBeInTheDocument();
+      expect(screen.getByText(ar.channelOptionPublicTitle)).toBeInTheDocument();
+      expect(screen.getByTestId(`connect-${W}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`addchannel-${W}`)).toBeInTheDocument();
     });
 
     it("a channel that needs relinking gets the connect door, not disconnect", () => {
@@ -739,6 +764,22 @@ describe("WorkspaceCard", () => {
         undefined,
         "tiktok",
       );
+    });
+  });
+
+  describe("permission gating for public channels", () => {
+    it("hides public channel choice when allowPublicChannels is false", () => {
+      mount({ allowPublicChannels: false });
+      expect(screen.queryByTestId(`channel-setup-${W}`)).toBeNull();
+      expect(screen.queryByTestId(`addchannel-${W}`)).toBeNull();
+      expect(screen.getByTestId(`connect-${W}`)).toBeInTheDocument();
+    });
+
+    it("displays both choices when allowPublicChannels is true", () => {
+      mount({ allowPublicChannels: true, onAddChannel: vi.fn() });
+      expect(screen.getByTestId(`channel-setup-${W}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`connect-${W}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`addchannel-${W}`)).toBeInTheDocument();
     });
   });
 });
