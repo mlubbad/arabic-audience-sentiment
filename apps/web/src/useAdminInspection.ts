@@ -14,22 +14,13 @@ export function useAdminInspection() {
   const { workspaces } = useWorkspaces(session);
   const wsId = workspaceFromSearch(searchParams);
 
-  // When impersonating a specific user, the impersonation banner takes precedence
-  if (isImpersonating) {
-    return {
-      isInspecting: false,
-      workspaceId: null,
-      workspaceName: null,
-    };
-  }
-
   // Check if it's among the user's regular workspaces
   const foundInOwn = workspaces.find((w) => w.id === wsId);
 
   // If admin is viewing a workspace, query its details
   const { data: wsDetails } = useQuery({
     queryKey: ["inspect_workspace", wsId],
-    enabled: !!isAdmin && !!wsId && !!supabase,
+    enabled: !isImpersonating && !!isAdmin && !!wsId && !!supabase,
     queryFn: async () => {
       const { data, error } = await supabase!
         .from("workspaces")
@@ -43,6 +34,7 @@ export function useAdminInspection() {
 
   const activeWs = foundInOwn ?? wsDetails;
   const isInspecting =
+    !isImpersonating &&
     Boolean(isAdmin) &&
     Boolean(activeWs) &&
     Boolean(activeWs?.created_by) &&
@@ -50,7 +42,7 @@ export function useAdminInspection() {
 
   return {
     isInspecting,
-    workspaceId: wsId,
-    workspaceName: activeWs?.name ?? null,
+    workspaceId: isInspecting ? wsId : null,
+    workspaceName: isInspecting ? (activeWs?.name ?? null) : null,
   };
 }
