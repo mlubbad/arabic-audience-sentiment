@@ -6,6 +6,7 @@ Hermetically testable with synthetic HTTP responses and fixture data.
 import html
 import json
 import re
+import uuid
 from collections.abc import Iterator
 from datetime import datetime, timezone
 import httpx
@@ -67,6 +68,7 @@ class TelegramCollector:
                     "kind": "channel_post",
                     "published_at": p.get("date", datetime.now(timezone.utc).isoformat()),
                     "reported_comment_count": p.get("comments_count"),
+                    "comments_state": p.get("comments_state", "open"),
                     "field_provenance": {"source": self.source, "channel": clean_handle},
                 })
             return Catalogue(videos=videos, complete=True)
@@ -107,6 +109,7 @@ class TelegramCollector:
                         "kind": "channel_post",
                         "published_at": item.get("date"),
                         "reported_comment_count": item.get("replies_count"),
+                        "comments_state": item.get("comments_state", "open"),
                         "field_provenance": {"source": self.source, "channel": clean_handle},
                     })
                 return Catalogue(videos=videos, complete=True)
@@ -149,6 +152,7 @@ class TelegramCollector:
                         "kind": "channel_post",
                         "published_at": pub_time,
                         "reported_comment_count": count,
+                        "comments_state": "open",
                         "field_provenance": {"source": self.source, "channel": clean_handle},
                     })
 
@@ -164,6 +168,7 @@ class TelegramCollector:
                             "kind": "channel_post",
                             "published_at": datetime.now(timezone.utc).isoformat(),
                             "reported_comment_count": None,
+                            "comments_state": "open",
                             "field_provenance": {"source": self.source, "channel": clean_handle},
                         })
 
@@ -223,14 +228,26 @@ class TelegramCollector:
 
         # 2. HTTP client mode
         if self.client:
-            try:
-                resp = self.client.get(
-                    f"https://t.me/api/discussion/{video_id}",
-                    params={"checkpoint": checkpoint} if checkpoint else {},
-                    timeout=20,
-                )
-            except httpx.HTTPError:
-                raise CollectionError("network_failure", retryable=True) from None
+            urls = []
+            if self.channel_id:
+                urls.append(f"https://t.me/{self.channel_id}/{video_id}?embed=1&discussion=1")
+            urls.append(f"https://t.me/api/discussion/{video_id}")
+
+            resp = None
+            for u in urls:
+                try:
+                    resp = self.client.get(
+                        u,
+                        params={"checkpoint": checkpoint} if checkpoint else None,
+                        timeout=20,
+                    )
+                except httpx.HTTPError:
+                    raise CollectionError("network_failure", retryable=True) from None
+                if resp.status_code != 404:
+                    break
+
+            if resp is None:
+                raise CollectionError("network_failure", retryable=True)
 
             if resp.status_code == 401:
                 raise CollectionError("telegram_discussion_requires_auth", "blocked")
@@ -244,42 +261,93 @@ class TelegramCollector:
             if resp.status_code != 200:
                 raise CollectionError(f"http_{resp.status_code}", "failed")
 
-            try:
-                data = resp.json()
-            except Exception:
-                raise CollectionError("invalid_response") from None
+            # Check if JSON response (e.g. mock API transport)
+            is_json = "application/json" in resp.headers.get("content-type", "") or resp.text.strip().startswith("{")
+            if is_json:
+                try:
+                    data = resp.json()
+                except Exception:
+                    data = None
 
-            if data.get("error") == "UNAUTHORIZED":
-                raise CollectionError("telegram_discussion_requires_auth", "blocked")
+                if data is not None:
+                    if data.get("error") == "UNAUTHORIZED":
+                        raise CollectionError("telegram_discussion_requires_auth", "blocked")
 
-            if data.get("comments_disabled"):
+                    if data.get("comments_disabled"):
+                        yield Batch(comments=[], checkpoint=None, outcome="explicitly_disabled")
+                        return
+
+                    items = data.get("items", [])
+                    raw_comments = []
+                    for item in items:
+                        raw_comments.append(RawComment(
+                            id=str(item["id"]),
+                            video_id=str(video_id),
+                            text=item["text"],
+                            parent_id=str(item["parent_id"]) if item.get("parent_id") else None,
+                            is_reply=bool(item.get("parent_id")),
+                            parent_source="api",
+                            published_at=item.get("date"),
+                            timestamp_precision="second",
+                            author_channel_id=str(item.get("author_id", "tg_user")),
+                            author_name=item.get("author_name", ""),
+                            likes_value=item.get("reactions_count"),
+                            likes_raw=str(item.get("reactions_count")) if item.get("reactions_count") is not None else None,
+                            source=self.source,
+                            platform="telegram",
+                            field_provenance={"adapter": self.source},
+                        ))
+
+                    next_token = data.get("next_checkpoint")
+                    outcome = "partial" if next_token else "exhausted"
+                    yield Batch(comments=raw_comments, checkpoint=next_token, outcome=outcome)
+                    return
+
+            # HTML discussion embed response
+            if "Discussion is not available at the moment" in resp.text:
                 yield Batch(comments=[], checkpoint=None, outcome="explicitly_disabled")
                 return
 
-            items = data.get("items", [])
-            raw_comments = []
-            for item in items:
-                raw_comments.append(RawComment(
-                    id=str(item["id"]),
-                    video_id=str(video_id),
-                    text=item["text"],
-                    parent_id=str(item["parent_id"]) if item.get("parent_id") else None,
-                    is_reply=bool(item.get("parent_id")),
-                    parent_source="api",
-                    published_at=item.get("date"),
-                    timestamp_precision="second",
-                    author_channel_id=str(item.get("author_id", "tg_user")),
-                    author_name=item.get("author_name", ""),
-                    likes_value=item.get("reactions_count"),
-                    likes_raw=str(item.get("reactions_count")) if item.get("reactions_count") is not None else None,
-                    source=self.source,
-                    platform="telegram",
-                    field_provenance={"adapter": self.source},
-                ))
+            if "Please open Telegram to view this discussion" in resp.text:
+                raise CollectionError("telegram_discussion_requires_auth", "blocked")
 
-            next_token = data.get("next_checkpoint")
-            outcome = "partial" if next_token else "exhausted"
-            yield Batch(comments=raw_comments, checkpoint=next_token, outcome=outcome)
+            comment_wraps = re.findall(
+                r'(<div class="tgme_widget_message_wrap\b[^"]*"[^>]*>.*?)(?=<div class="tgme_widget_message_wrap\b|\Z)',
+                resp.text,
+                re.DOTALL,
+            )
+            raw_comments = []
+            for b in comment_wraps:
+                author_m = re.search(r'class="tgme_widget_message_author_name"[^>]*>(.*?)</span>', b)
+                text_m = re.search(r'class="tgme_widget_message_text\b[^"]*"[^>]*>(.*?)</div>', b, re.DOTALL)
+                time_m = re.search(r'<time[^>]*datetime="([^"]+)"', b)
+                id_m = re.search(r'data-post-id="(\d+)"', b) or re.search(r'data-post="[^"]+/(\d+)"', b)
+
+                if text_m:
+                    author = re.sub(r'<[^>]+>', '', author_m.group(1)).strip() if author_m else "مستخدم تليجرام"
+                    clean_text = html.unescape(re.sub(r'<br\s*/?>', '\n', text_m.group(1)))
+                    clean_text = re.sub(r'<[^>]+>', '', clean_text).strip()
+                    cmt_id = id_m.group(1) if id_m else str(uuid.uuid4())
+                    pub_at = time_m.group(1) if time_m else datetime.now(timezone.utc).isoformat()
+                    raw_comments.append(RawComment(
+                        id=cmt_id,
+                        video_id=str(video_id),
+                        text=clean_text,
+                        parent_id=None,
+                        is_reply=False,
+                        parent_source="api",
+                        published_at=pub_at,
+                        timestamp_precision="second",
+                        author_channel_id="tg_user",
+                        author_name=author,
+                        likes_value=0,
+                        likes_raw="0",
+                        source=self.source,
+                        platform="telegram",
+                        field_provenance={"adapter": self.source},
+                    ))
+
+            yield Batch(comments=raw_comments, checkpoint=None, outcome="exhausted")
             return
 
         # 3. No client or credentials configured

@@ -306,9 +306,98 @@ def test_telegram_collector_html_blocks_parsing():
     assert v1["title"] == 'خبر عاجل: "تطورات جديدة في المنطقة" & تفاصيل إضافية'
     assert v1["published_at"] == "2026-09-20T18:00:00+00:00"
     assert v1["reported_comment_count"] == 42
+    assert v1["comments_state"] == "open"
 
     assert v2["external_video_id"] == "101"
     assert v2["title"] == "منشور ثانٍ بدون تعليقات"
     assert v2["reported_comment_count"] is None
+    assert v2["comments_state"] == "open"
+
+
+def test_telegram_collector_html_discussion_embed_with_comments():
+    html_discussion = """
+    <html>
+    <body>
+      <div class="tgme_widget_message_wrap js-widget_message_wrap" data-post-id="501">
+        <div class="tgme_widget_message">
+          <div class="tgme_widget_message_author default_color_1">
+            <span class="tgme_widget_message_author_name">سامي العلي</span>
+          </div>
+          <div class="tgme_widget_message_text js-message_text" dir="auto">تعليق مفيد جدا شكرا لكم</div>
+          <div class="tgme_widget_message_footer">
+            <div class="tgme_widget_message_info">
+              <time datetime="2026-09-22T21:00:00+00:00" class="time">21:00</time>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tgme_widget_message_wrap js-widget_message_wrap" data-post-id="502">
+        <div class="tgme_widget_message">
+          <div class="tgme_widget_message_author default_color_2">
+            <span class="tgme_widget_message_author_name">مريم خالد</span>
+          </div>
+          <div class="tgme_widget_message_text js-message_text" dir="auto">أتفق مع الطرح تماما<br>مزيدا من التقدم</div>
+          <div class="tgme_widget_message_footer">
+            <div class="tgme_widget_message_info">
+              <time datetime="2026-09-22T21:05:00+00:00" class="time">21:05</time>
+            </div>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+    def handler(request: httpx.Request):
+        if "embed=1&discussion=1" in str(request.url):
+            return httpx.Response(200, text=html_discussion)
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    col = TelegramCollector(channel_id="test_channel", client=client)
+
+    batches = list(col.batches("100", None))
+    assert len(batches) == 1
+    assert batches[0].outcome == "exhausted"
+    assert len(batches[0].comments) == 2
+
+    c1, c2 = batches[0].comments
+    assert c1.id == "501"
+    assert c1.author_name == "سامي العلي"
+    assert c1.text == "تعليق مفيد جدا شكرا لكم"
+    assert c1.published_at == "2026-09-22T21:00:00+00:00"
+
+    assert c2.id == "502"
+    assert c2.author_name == "مريم خالد"
+    assert "أتفق مع الطرح تماما" in c2.text
+    assert c2.published_at == "2026-09-22T21:05:00+00:00"
+
+
+def test_telegram_collector_html_discussion_disabled_and_auth_required():
+    disabled_html = '<div class="tme_no_messages_found">Discussion is not available at the moment.</div>'
+    auth_html = '<div class="tme_no_messages_found">Please open Telegram to view this discussion from @mychannel</div>'
+
+    def handler(request: httpx.Request):
+        url_str = str(request.url)
+        if "/991" in url_str:
+            return httpx.Response(200, text=disabled_html)
+        if "/992" in url_str:
+            return httpx.Response(200, text=auth_html)
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    col = TelegramCollector(channel_id="mychannel", client=client)
+
+    # 1. Disabled discussion
+    b_disabled = list(col.batches("991", None))
+    assert len(b_disabled) == 1
+    assert b_disabled[0].outcome == "explicitly_disabled"
+    assert len(b_disabled[0].comments) == 0
+
+    # 2. Discussion requires opening Telegram app (auth required)
+    with pytest.raises(CollectionError) as exc_auth:
+        list(col.batches("992", None))
+    assert exc_auth.value.code == "telegram_discussion_requires_auth"
+    assert exc_auth.value.outcome == "blocked"
 
 
