@@ -1,8 +1,26 @@
 # Progress
 
+## 2026-09-22 — Dashboard Scroll Glitch Fix & Sticky Filter Bar Shielding
+
+Resolved visual collision and background bleed-through defect during vertical scrolling on the dashboard:
+
+- **Root Causes**:
+  - In an empty workspace (`لم تصل تعليقات بعد`), the dashboard was unconditionally rendering the `<Summary>` section with zeroed metric cards. On scroll down, this created an awkward rectangular protrusion colliding directly under the sticky search bar.
+  - The sticky filter bar (`.db-sticky-bar`) utilized `--glass-2-tint` with low opacity, allowing text and card elements behind it to bleed through during scrolling.
+  - The sticky bar container had margins and padding that did not seamlessly match the application viewport (`.app-main`), leaving gaps.
+- **Visual & Layout Fixes**:
+  - `apps/web/src/dashboard/Dashboard.tsx`: Guarded `<Summary>` to render only when `s.workspace_total > 0`. For empty channels/workspaces, zeroed KPI cards are suppressed, bringing the onboarding state cleanly into focus.
+  - `apps/web/src/dashboard/filter-bar.css`: Replaced translucent tint with a 96% opaque card background (`color-mix(in srgb, var(--bg-card) 96%, transparent)`), 20px backdrop blur, subtle bottom border (`1px solid rgba(20, 17, 47, 0.08)`), and soft elevation ring.
+  - Standardized margin-inline (`-1.5rem` desktop, `-1rem` mobile) and padding-inline (`1.5rem` desktop, `1rem` mobile) to match `.app-main` boundaries precisely.
+  - `apps/web/src/dashboard/SectionNav.tsx`: Cleaned DOM by returning `null` when `show={false}` to eliminate empty flex gaps.
+  - `apps/web/src/dashboard/summary.css`: Added explicit `background-color: var(--bg-card)` fallback.
+- **Verification**:
+  - Passed all verification gates (`npm run check`): 117 web unit files / 917 tests, 42 db test files / 384 tests, 270 worker pytest tests, ESLint, Prettier, TypeScript, and Vite production build + prerender.
+
 ## 2026-09-22 — Catalogue Reactive Lifecycle Bridge & Background Job Synchronization
 
 Resolved the issue where videos did not appear in the catalogue list after channel discovery completed:
+
 - **Root Cause**:
   - The TanStack Query cache in `Catalogue.tsx` was queried upon page load prior to discovery finishing, caching an empty list (`videos: []`).
   - `Sync.tsx` adaptive polling polled `ops-source` snapshot and jobs without invalidating or refetching `["catalogue", ...]`.
@@ -20,8 +38,9 @@ Resolved the issue where videos did not appear in the catalogue list after chann
 ## 2026-09-22 — Omnichannel Data Ingestion Audit, Hardening & End-to-End Testing (Twitter, TikTok, Telegram)
 
 Comprehensive inspection, hardening, and hermetic end-to-end testing for Twitter (X), TikTok, and Telegram ingestion:
+
 - **Collector Hardening & Anti-Silent Failure Protection**:
-  - Bound to golden rule: *"Treat collection failures as partial/failed, never as successful empty datasets."*
+  - Bound to golden rule: _"Treat collection failures as partial/failed, never as successful empty datasets."_
   - **Twitter / X (`x_collector.py`)**: Captured scraper errors, eliminated empty fallback batches (`Batch([], outcome="exhausted")`), and raised `CollectionError("comments_scraper_not_configured", "blocked")`.
   - **TikTok (`tiktok_collector.py`)**: Added SlardarWAF / anti-bot challenge detection. Blocked empty `complete=True` reports when challenges occur, and raised explicit errors when scraper keys are missing.
   - **Telegram (`telegram_collector.py`)**: Normalized channel handles, fixed block regex with `\b` word boundary to parse full post bodies with Arabic reply counts (`تعليق`, `رد`), and mapped HTTP 401 discussion endpoint to `telegram_discussion_requires_auth`.
@@ -38,6 +57,7 @@ Comprehensive inspection, hardening, and hermetic end-to-end testing for Twitter
 ## 2026-09-22 — Instant Unified Multi-Workspace Content Adoption (قاعدة البيانات الواحدة الشاملة)
 
 Completed user request for single-database deduplication and immediate analytics visibility across workspaces without requiring video re-selection:
+
 - **Instant Full Channel Content Adoption**:
   - Implemented `private.adopt_channel_content(w, c)` in `supabase/migrations/20260922020000_adopt_full_channel_on_registration_and_backfill.sql`:
     - Adopts catalogue (videos), bulk comments, sentiment predictions, topic predictions, workspace topics, analysis runs, and sync runs from donor workspace in set-based bulk queries.
@@ -75,7 +95,6 @@ Addressed user requirement for single-database deduplication across workspaces a
 3. **Full Repository Verification**:
    - 100% green across all verification gates: 42 database test files (382 tests), 117 web test files (914 tests), 262 Python worker tests, ESLint, Prettier, TypeScript typecheck, Deno check, Vite build, prerendering, and secret scanner.
 
-
 Transformed the Arabic-first analytics dashboard into an executive data narrative guided by the `/storytelling-with-data` framework (Cole Nussbaumer Knaflic), enhancing cognitive clarity, preattentive visual hierarchy, and actionable decision-making:
 
 1. **Executive Story Briefing (موجز القصة ونبض الجمهور) in `Summary.tsx`**:
@@ -87,14 +106,14 @@ Transformed the Arabic-first analytics dashboard into an executive data narrativ
 
 2. **Action Titles & Subtitles Across All Sections**:
    - Replaced passive nouns with actionable, conclusion-first headers:
-     - **Summary**: *موجز الأداء ونبض الجمهور* (*Performance Summary & Audience Pulse*)
-     - **Voice**: *صوت الجمهور وتوزيع المشاعر* (*Audience Voice & Sentiment Distribution*)
-     - **Timing**: *أوقات النشر وذروة التفاعل* (*Publishing Times & Engagement Peaks*)
-     - **Videos**: *أداء المحتوى وتفاعل المشاهدين* (*Content Performance & Viewer Engagement*)
-     - **Compare**: *مقارنة تفاعلية بين الفيديوهات والمحتوى* (*Interactive Content & Video Comparison*)
-     - **Engaged**: *التعليقات الأكثر تأثيراً وتفاعلاً* (*High-Impact & Most Engaged Comments*)
-     - **Comments**: *استكشاف التعليقات والتفاعل التفصيلي* (*Detailed Comments Explorer & Interaction*)
-     - **People**: *أبرز المعلقين ونشاط الجمهور* (*Top Commenters & Audience Activity*)
+     - **Summary**: _موجز الأداء ونبض الجمهور_ (_Performance Summary & Audience Pulse_)
+     - **Voice**: _صوت الجمهور وتوزيع المشاعر_ (_Audience Voice & Sentiment Distribution_)
+     - **Timing**: _أوقات النشر وذروة التفاعل_ (_Publishing Times & Engagement Peaks_)
+     - **Videos**: _أداء المحتوى وتفاعل المشاهدين_ (_Content Performance & Viewer Engagement_)
+     - **Compare**: _مقارنة تفاعلية بين الفيديوهات والمحتوى_ (_Interactive Content & Video Comparison_)
+     - **Engaged**: _التعليقات الأكثر تأثيراً وتفاعلاً_ (_High-Impact & Most Engaged Comments_)
+     - **Comments**: _استكشاف التعليقات والتفاعل التفصيلي_ (_Detailed Comments Explorer & Interaction_)
+     - **People**: _أبرز المعلقين ونشاط الجمهور_ (_Top Commenters & Audience Activity_)
    - Preserved `SectionNav` anchor IDs and short button labels to keep navigation clean and familiar.
 
 3. **10% Highlighting Law & Preattentive Visual Hierarchy**:
@@ -153,18 +172,18 @@ Transformed the Arabic-first analytics dashboard into an executive data narrativ
    - Types (`tsc --noEmit`), linter (`eslint` + `ruff`), prettier, functions check (`deno check`), and build + prerender passing.
    - Secret scan passing (701 source files + built assets).
 
-1. **Real-Time Duration & Time Estimation Display**:
+6. **Real-Time Duration & Time Estimation Display**:
    - Added precise Arabic grammatical duration formatting in `apps/web/src/i18n.ts` (`formatDuration` & `formatElapsed`).
    - Integrated live running ticker in `apps/web/src/ops/Catalogue.tsx` displaying:
      `⏱️ جارية منذ X ثانية · الوقت التقديري عادة: 15–30 ثانية`.
    - Updated `apps/web/src/ops/Attempts.tsx` to display live elapsed seconds for active jobs (`· مستمرة منذ X ثانية`) and total completed duration for finished jobs (`· استغرقت X ثانية`).
    - Added platform-aware messaging for Telegram post cataloguing in `ar.ts` and `en.ts`.
-2. **Enhanced Telegram Public Collector (`workers/python/src/collectors/telegram_collector.py`)**:
+7. **Enhanced Telegram Public Collector (`workers/python/src/collectors/telegram_collector.py`)**:
    - Enabled redirect following (`follow_redirects=True`) for Telegram web endpoints.
    - Added detection for non-public channels and user contacts (`<title>Telegram: Contact @...`) raising `channel_not_public`.
    - Enhanced block-level HTML parsing to extract Arabic post titles, exact timestamps, and comment counts.
    - Added full unit test coverage in `tests/test_telegram_collector.py`.
-3. **Verification**:
+8. **Verification**:
    - All 240 python tests passing.
    - All 112 vitest test files passing.
    - Clean types, formatting, lint, build, and secrets checks.
@@ -173,6 +192,7 @@ Transformed the Arabic-first analytics dashboard into an executive data narrativ
 ## 2026-09-20 — Omnichannel Multi-Platform Expansion: Telegram Support & Universal Abstraction Layer
 
 Architected and implemented full multi-platform capability across the entire stack, accommodating YouTube, Telegram, X (Twitter), TikTok, Facebook, and Instagram, with Telegram fully operational as the first non-YouTube platform:
+
 1. **Omnichannel Multi-Platform Database Architecture (`20260920190000_omnichannel_multi_platform_support.sql`)**:
    - Expanded platform check constraint to support `('youtube', 'telegram', 'x', 'tiktok', 'facebook', 'instagram')`.
    - Widened content kinds across all platforms: `('video', 'short', 'stream', 'channel_post', 'tweet', 'status')`.
@@ -201,8 +221,8 @@ Architected and implemented full multi-platform capability across the entire sta
 5. **Full Repository Verification**:
    - 100% green verification: 112 vitest test files (881 tests passed), 40 database test files (370 tests passed), 238 python tests passed, clean types (`tsc --noEmit`), clean linter, clean build, clean secrets scan.
 
-
 Addressed fundamental scalability bottlenecks for large channels (e.g. AJ360 with 71,310+ comments):
+
 1. **Server-Side Big-Data Architecture (`public.dashboard_aggregates` & `public.dashboard_comments`)**:
    - Replaced monolithic client-side memory dump (which transferred over 120MB raw JSON on each filter change) with two decoupled, specialized RPCs:
      - `public.dashboard_aggregates(w, f)`: Executes high-speed SQL aggregations across summary metrics, sentiment distribution, timeline buckets, topic counts, video comparison, 24-hour activity distribution, 7-day weekday activity, weekly volume, top commenters, and the 5 most engaged negative comments. Payload is reduced to ~300KB (or <8KB for smaller filters) with sub-second execution (~1.3s on 71,310 rows).
@@ -222,8 +242,8 @@ Addressed fundamental scalability bottlenecks for large channels (e.g. AJ360 wit
    - Zero typecheck errors (`tsc --noEmit`).
    - Clean production Vite build and prerender pass.
 
-
 Addressed user confusion and friction around job progress and sync status:
+
 1. **Accurate Catalogue Discovery Differentiation in Job Feed (`jobFeed.ts`, `ar.ts`, `en.ts`)**:
    - Differentiated channel cataloguing (`type === 'discover'`) from comment collection (`collect`).
    - Replaced misleading «0 تعليق» and generic comments-centric copy with explicit catalogue metadata:
@@ -246,6 +266,7 @@ Addressed user confusion and friction around job progress and sync status:
    - 100% test pass: 111 web test files (874 tests), 39 db test files (365 tests), 229 python tests, clean build, clean types, clean linters.
 
 Resolved the root cause of `read:live_unavailable` on `/sync` and `RailState`:
+
 1. **Lightweight Operational Snapshot (`workspace_ops_snapshot`)**:
    Created `public.workspace_ops_snapshot(w uuid)` (with SECURITY DEFINER `private.workspace_ops_snapshot_impl`)
    to serve `/sync` and the sidebar rail. Instead of streaming 28,000+ comment records (55.6 MB) just
@@ -268,18 +289,18 @@ Resolved the root cause of `read:live_unavailable` on `/sync` and `RailState`:
 Three fault classes from the 2026-09-19 incident are closed at the source, not patched around:
 
 1. **A replayed platform request is not a worker fight.** `jobs.heartbeats` records whether a lease's
- holder ever proved alive. A lapsed lease with zero heartbeats — a platform retry, or a worker that
- died before its first batch — resumes without counting a reclaim and without backoff. A lease that
- was heartbeated and then lapsed is a real takeover: it counts and backs off, and twenty of those
- still bury the job as `lease_thrashing`. The collect job that reached `reclaims=20` from pure
- platform retries could never reach that state again.
+   holder ever proved alive. A lapsed lease with zero heartbeats — a platform retry, or a worker that
+   died before its first batch — resumes without counting a reclaim and without backoff. A lease that
+   was heartbeated and then lapsed is a real takeover: it counts and backs off, and twenty of those
+   still bury the job as `lease_thrashing`. The collect job that reached `reclaims=20` from pure
+   platform retries could never reach that state again.
 2. **A claim names the work its caller can run.** `claim_job` takes `job_types`; the gateway passes
- the body's `types`; `run_backfill` claims `collect`, `run_discover` claims `discover`, and the loop
- claims unscoped only when it has a topic classifier, else `collect`+`discover`. The one-shot run
- that consumed a queued topics job and finished it «succeeded» with nothing classified cannot
- happen again — verified live: a scoped collect claim returns 204 while a topics job waits.
+   the body's `types`; `run_backfill` claims `collect`, `run_discover` claims `discover`, and the loop
+   claims unscoped only when it has a topic classifier, else `collect`+`discover`. The one-shot run
+   that consumed a queued topics job and finished it «succeeded» with nothing classified cannot
+   happen again — verified live: a scoped collect claim returns 204 while a topics job waits.
 3. **A heartbeat can no longer shorten the lease.** The renewal is a five-minute floor, not a
- sixty-second reset, so a fast first batch followed by a slow one cannot lose the lease mid-run.
+   sixty-second reset, so a fast first batch followed by a slow one cannot lose the lease mid-run.
 
 The scoped RPC's first parameter was deployed once named `token_hash` and corrected in a following
 migration (PostgREST matches RPCs by parameter name; the mismatch surfaced as PGRST202 — see the
@@ -318,13 +339,12 @@ The updated production front-end bundle (including the new Arabic sentiment engi
 
 ## 2026-09-14 — Comment confidence scores displayed on sentiment chips
 
-
 Model prediction confidence scores (`class_scores`) are now visibly presented on comment sentiment chips across the dashboard (both cards and table views), showing the exact percentage measured by the active model (e.g. `(85٪)`). Human reviews continue to be explicitly attributed with `مراجعة بشرية` and supersede model predictions. The live browser suite was aligned with the redesigned sidebar navigation destinations, and all 68 Playwright tests plus live mode passed cleanly.
 
 ## 2026-09-14 — Arabic NLP sentiment engine and text normalization enhancements
 
-
 The Python worker's sentiment analysis pipeline (`workers/python/src/sentiment/`) was upgraded with specialized Arabic text preprocessing and multi-model support:
+
 - Added Arabic text normalization helpers (`normalize_arabic_text`, `strip_tatweel`, `strip_tashkeel`, `reduce_elongation`) in `preprocess.py` to handle kashida/tatweel, diacritics, and character elongation while strictly preserving emojis, dialect words, and negation particles (`مش`, `ما`, `لم`, `لن`, `لا`, `ليس`).
 - Upgraded `load_pinned` in `transformer.py` to accept registered candidate model names as strings or `ModelCard` instances, with strict validation against model config (`verify_mapping`).
 - Added full support for the four-class AraBERT candidate (`PRAli22/AraBert-Arabic-Sentiment-Analysis`) with its first-class `mixed` sentiment label, alongside CAMeLBERT-DA and MARBERT variants.
@@ -333,7 +353,6 @@ The Python worker's sentiment analysis pipeline (`workers/python/src/sentiment/`
 - All checks passed: `npm run check` (127 Python tests, 225 unit tests, 135 SQL tests, lint/format/typecheck clean) and `npm run test:e2e` (68/68 Playwright tests passed).
 
 ## 2026-09-14 — Internal pages redesigned around the landing identity
-
 
 The dashboard, account, synchronization, OAuth result and unknown-route pages now share an
 Arabic RTL application shell with the landing's mark, type, indigo action color, navigation,
@@ -378,7 +397,7 @@ Updated 2026-09-13. Status words are used strictly:
 sanitized synthetic data; **blocked** = cannot proceed without a named missing input.
 
 **Nothing here has run against live YouTube, Google OAuth, a real sentiment model, or any
-deployment.** As of 2026-09-13 the schema *has* been applied to a real Supabase development
+deployment.** As of 2026-09-13 the schema _has_ been applied to a real Supabase development
 project and anonymous isolation probed over HTTP; every authenticated path remains untested. Every "implemented" below means verified in
 embedded PostgreSQL, in Node, or in a browser against fixtures. The list of what that
 excludes is at the end of `verification.md` and is the honest limit of this work.
@@ -391,16 +410,16 @@ CI has never executed: there is no remote.
 
 ## M1 — collection primitives (unblocked parts implemented)
 
-| Item | Status | Notes |
-| --- | --- | --- |
-| Collector protocol | implemented | "Exhausted" means the source stopped returning rows, never that everything was retrieved |
-| YouTube Data API adapter | fixture-tested | Explicit reply pagination, tested against synthetic HTTP only. **Never run against live YouTube.** Authenticates with an API key *or* an OAuth access token; the token path needs no API key and reads a connected channel directly |
-| Refusals told apart | implemented | Comments disabled is the video's answer (`explicitly_disabled`), quota comes back tomorrow (retryable), an expired token asks to be renewed, and a refusal is none of those |
-| Durable local spool | implemented | Lease fencing, heartbeats, bounded retries, rows and checkpoint in one transaction |
-| Queue semantics | implemented | Lease bounds, batch limits, exponential backoff, both routes to a terminal job |
-| Failure is never success | implemented | 403/429 → blocked, 5xx → retryable failure, malformed JSON → invalid response |
-| Sentiment interfaces | implemented | Pinned-revision registry, preprocessing, a deterministic test analyzer that is **not a model** |
-| Catalogue import, live discovery, model inference | **blocked** | Needs the ZIP, the CSVs, an API key, the notebooks |
+| Item                                              | Status         | Notes                                                                                                                                                                                                                               |
+| ------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Collector protocol                                | implemented    | "Exhausted" means the source stopped returning rows, never that everything was retrieved                                                                                                                                            |
+| YouTube Data API adapter                          | fixture-tested | Explicit reply pagination, tested against synthetic HTTP only. **Never run against live YouTube.** Authenticates with an API key _or_ an OAuth access token; the token path needs no API key and reads a connected channel directly |
+| Refusals told apart                               | implemented    | Comments disabled is the video's answer (`explicitly_disabled`), quota comes back tomorrow (retryable), an expired token asks to be renewed, and a refusal is none of those                                                         |
+| Durable local spool                               | implemented    | Lease fencing, heartbeats, bounded retries, rows and checkpoint in one transaction                                                                                                                                                  |
+| Queue semantics                                   | implemented    | Lease bounds, batch limits, exponential backoff, both routes to a terminal job                                                                                                                                                      |
+| Failure is never success                          | implemented    | 403/429 → blocked, 5xx → retryable failure, malformed JSON → invalid response                                                                                                                                                       |
+| Sentiment interfaces                              | implemented    | Pinned-revision registry, preprocessing, a deterministic test analyzer that is **not a model**                                                                                                                                      |
+| Catalogue import, live discovery, model inference | **blocked**    | Needs the ZIP, the CSVs, an API key, the notebooks                                                                                                                                                                                  |
 
 ## M2 — secure SaaS foundation (complete)
 
@@ -413,19 +432,19 @@ first's workspaces and is refused `forbidden` when asking for their dashboard di
 
 ## M3 — ingestion and analysis (server path complete)
 
-| Item | Status | Notes |
-| --- | --- | --- |
-| Worker batch contract (I1) | implemented | Rows addressed by platform id; **no workspace field exists** in the payload |
-| Atomic ingestion (P2) | implemented | Rows, predictions, checkpoint and meter in one transaction; a batch that cannot be paid for in full is refused whole |
-| Replay safety | implemented | `batch_key` plus payload fingerprint: identical replay is a no-op, a reused key with different rows is a conflict |
-| Metering | implemented | One unit per unique comment, ever. Retries, reimports, likes refreshes and re-analysis after an edit are free |
-| Worker gateway (P3) | implemented | Scoped credential, never the service role; the tenant comes from the credential |
-| Worker lifecycle | implemented | Explicit terminal result; nothing promotes a job to succeeded on its own |
-| Python control-plane client | implemented | Canonical payload hashing; only an exhausted source maps to succeeded |
-| Edge handler | **deployed and answering** | `worker`, `oauth-start` and `oauth-callback` are live on the project. The gateway refuses an unknown credential *from the database*, over HTTP, which is the seam that was untested all along |
-| Legacy import and reconciliation | **blocked** | Needs the original CSVs and the amendment file |
-| Analysis in the server path | implemented, fixture-tested | `run_once` labels each batch before committing, so rows and verdicts land in one transaction. Verified end to end with the **deterministic test analyzer, which is not a model** |
-| Real model inference | **blocked** | Needs the notebooks and ~600 human-labelled comments. No accuracy figure is claimed |
+| Item                             | Status                      | Notes                                                                                                                                                                                         |
+| -------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker batch contract (I1)       | implemented                 | Rows addressed by platform id; **no workspace field exists** in the payload                                                                                                                   |
+| Atomic ingestion (P2)            | implemented                 | Rows, predictions, checkpoint and meter in one transaction; a batch that cannot be paid for in full is refused whole                                                                          |
+| Replay safety                    | implemented                 | `batch_key` plus payload fingerprint: identical replay is a no-op, a reused key with different rows is a conflict                                                                             |
+| Metering                         | implemented                 | One unit per unique comment, ever. Retries, reimports, likes refreshes and re-analysis after an edit are free                                                                                 |
+| Worker gateway (P3)              | implemented                 | Scoped credential, never the service role; the tenant comes from the credential                                                                                                               |
+| Worker lifecycle                 | implemented                 | Explicit terminal result; nothing promotes a job to succeeded on its own                                                                                                                      |
+| Python control-plane client      | implemented                 | Canonical payload hashing; only an exhausted source maps to succeeded                                                                                                                         |
+| Edge handler                     | **deployed and answering**  | `worker`, `oauth-start` and `oauth-callback` are live on the project. The gateway refuses an unknown credential _from the database_, over HTTP, which is the seam that was untested all along |
+| Legacy import and reconciliation | **blocked**                 | Needs the original CSVs and the amendment file                                                                                                                                                |
+| Analysis in the server path      | implemented, fixture-tested | `run_once` labels each batch before committing, so rows and verdicts land in one transaction. Verified end to end with the **deterministic test analyzer, which is not a model**              |
+| Real model inference             | **blocked**                 | Needs the notebooks and ~600 human-labelled comments. No accuracy figure is claimed                                                                                                           |
 
 ## M4 — dashboard (complete; live read implemented, never served over HTTP)
 
@@ -447,17 +466,17 @@ deployed project**, so PostgREST between the two is untested.
 
 ## M5 — OAuth (server half implemented)
 
-| Item | Status | Notes |
-| --- | --- | --- |
-| State lifecycle | implemented | Hash-only storage, bound to user/workspace/client, 10 minutes, single use. Spent states are prunable; no schedule until there is a project to attach one to |
-| Callback cannot be redirected | implemented | Consume returns the binding rather than accepting one; there is no workspace argument to forge |
-| Channel ownership | implemented | Connected claim is globally exclusive; a public_unverified row is upgraded in place so pilot data carries over |
-| Revocation | implemented | Moves to reconnect_required and cancels dependent jobs; never falls back to scraping |
-| PKCE and the authorization URL | implemented | S256 checked against the RFC 7636 worked example; verifier stored server-side only, state stored as a hash, state written before the redirect is issued |
+| Item                                                 | Status                          | Notes                                                                                                                                                                               |
+| ---------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| State lifecycle                                      | implemented                     | Hash-only storage, bound to user/workspace/client, 10 minutes, single use. Spent states are prunable; no schedule until there is a project to attach one to                         |
+| Callback cannot be redirected                        | implemented                     | Consume returns the binding rather than accepting one; there is no workspace argument to forge                                                                                      |
+| Channel ownership                                    | implemented                     | Connected claim is globally exclusive; a public_unverified row is upgraded in place so pilot data carries over                                                                      |
+| Revocation                                           | implemented                     | Moves to reconnect_required and cancels dependent jobs; never falls back to scraping                                                                                                |
+| PKCE and the authorization URL                       | implemented                     | S256 checked against the RFC 7636 worked example; verifier stored server-side only, state stored as a hash, state written before the redirect is issued                             |
 | Code exchange, channels.list, token sealing, refresh | implemented, **never run live** | Pure handler with injected transport. The channel comes from `channels.list(mine=true)`, the verifier from the stored state, tokens are AES-GCM sealed with a fresh nonce per grant |
-| Deployed callback route | implemented | `/functions/v1/oauth-callback` renders an Arabic result page; refusals carry a code and no detail |
-| Connect button in the product | implemented | Shown only where it can work — a workspace with a client and no connected channel — because a button that always fails is worse than none |
-| A real consent round trip | **needs a person** | Everything up to Google's sign-in page is verified live. Approving is a human step |
+| Deployed callback route                              | implemented                     | `/functions/v1/oauth-callback` renders an Arabic result page; refusals carry a code and no detail                                                                                   |
+| Connect button in the product                        | implemented                     | Shown only where it can work — a workspace with a client and no connected channel — because a button that always fails is worse than none                                           |
+| A real consent round trip                            | **needs a person**              | Everything up to Google's sign-in page is verified live. Approving is a human step                                                                                                  |
 
 ## M6 — private pilot (front end deployed, journey incomplete)
 
@@ -471,16 +490,16 @@ worker endpoint. None of those exist yet, so there is no complete creator journe
 
 ## Exact missing input per blocked task
 
-| Blocked task | Exact input required |
-| --- | --- |
-| Legacy import and the handoff's topic-count reconciliation | Original comments CSV/data files, plus the classification amendment file |
-| Catalogue verification (35 + 157 + 2 = 194) | `SpecTech-YouTube-MVP-Package.zip` with its manifest and JSONL catalog |
-| Final dashboard styling | Standalone dashboard HTML, the dashboard ZIP, and the brand assets |
-| Live public collection | A YouTube Data API key placed server-side |
-| Authenticated paths, Storage, Edge Functions, and proving the edge handler and SQL agree over HTTP | The project's service-role key. The project is linked and all 13 migrations are applied; anonymous isolation is verified over HTTP. Creating a test user needs admin access, because GoTrue rejects reserved test email domains |
-| OAuth code exchange and live connection | Google OAuth client id/secret, registered redirect URI, test-user authorization. PKCE and the authorization URL are implemented and need none of these |
-| Model selection and any accuracy claim | The two model notebooks and ~600 independently human-labelled comments. The sampler, the blind labelling sheets and the protocol are built (`docs/labelling-guide.md`, `npm run label:draw`); what is missing is the human labelling itself and the notebooks |
-| Private pilot deployment | Sites access with a verified private mode |
+| Blocked task                                                                                       | Exact input required                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Legacy import and the handoff's topic-count reconciliation                                         | Original comments CSV/data files, plus the classification amendment file                                                                                                                                                                                      |
+| Catalogue verification (35 + 157 + 2 = 194)                                                        | `SpecTech-YouTube-MVP-Package.zip` with its manifest and JSONL catalog                                                                                                                                                                                        |
+| Final dashboard styling                                                                            | Standalone dashboard HTML, the dashboard ZIP, and the brand assets                                                                                                                                                                                            |
+| Live public collection                                                                             | A YouTube Data API key placed server-side                                                                                                                                                                                                                     |
+| Authenticated paths, Storage, Edge Functions, and proving the edge handler and SQL agree over HTTP | The project's service-role key. The project is linked and all 13 migrations are applied; anonymous isolation is verified over HTTP. Creating a test user needs admin access, because GoTrue rejects reserved test email domains                               |
+| OAuth code exchange and live connection                                                            | Google OAuth client id/secret, registered redirect URI, test-user authorization. PKCE and the authorization URL are implemented and need none of these                                                                                                        |
+| Model selection and any accuracy claim                                                             | The two model notebooks and ~600 independently human-labelled comments. The sampler, the blind labelling sheets and the protocol are built (`docs/labelling-guide.md`, `npm run label:draw`); what is missing is the human labelling itself and the notebooks |
+| Private pilot deployment                                                                           | Sites access with a verified private mode                                                                                                                                                                                                                     |
 
 ## Retention
 
@@ -496,7 +515,7 @@ tenant request is still to build.
   PostgREST, Storage HTTP, or a deployed project.
 - Concurrent overspend is not provable here: PGlite runs a single connection, so two
   simultaneous transactions cannot be staged. The row lock is the mechanism; what the tests
-  prove is that no *sequence* of calls exceeds an allowance.
+  prove is that no _sequence_ of calls exceeds an allowance.
 - The edge handler and the SQL now meet in `end_to_end.test.ts`, over a request body captured
   from the real Python client. What remains untested is an actual network hop and a deployed
   Edge Function runtime.
@@ -586,7 +605,7 @@ it did; the lowest is the button's hover at 4.98:1.
 `app.css` and `report.css` now carry no raw hex outside comments; `layers.test.ts` holds it
 there and keeps the backlog mechanism with an empty set. The rail's alphas stay as
 `rgba(255,255,255,α)` on purpose: `rail.test.ts` measures them, and it now reads the ground
-from the token rather than a copy. The line count went *up* by 21 (comments); the measure that
+from the token rather than a copy. The line count went _up_ by 21 (comments); the measure that
 means something went from 56 to 0.
 
 ## 2026-09-15 — the rail carries state; "the worker" leaves the reader's sentences
@@ -741,7 +760,6 @@ running — a run whose list was fixed when it was claimed — or when nothing w
 all; the panel now says which of four things happened, in both languages. A removal alone
 also reads no plan, so a paused tenant can deselect.
 
-
 ## 2026-09-16 — the catalogue turns pages, links out, and plays here
 
 The first live catalogue was 4,456 rows in one list. It is now fifty to a page, client-side
@@ -851,8 +869,8 @@ model call.
 
 **Paid before the plan check.** `worker_topics_due` reads the remaining
 `topic_classification` allowance (new `private.topic_units_remaining`: no subscription, or
-one inactive or outside its period, is zero) and hands over only as many rows *that would
-cost a unit* as remain. A row costs nothing when its comment was charged before — a
+one inactive or outside its period, is zero) and hands over only as many rows _that would
+cost a unit_ as remain. A row costs nothing when its comment was charged before — a
 taxonomy edit re-classifies for free, as `reserve_usage`'s once-ever rule already says — or
 when its text is purged (recorded `unsupported`, never sent), and those ride outside the
 cap; this is a deliberate refinement of the finding's `least(limit, remaining)`, which
@@ -861,7 +879,7 @@ When nothing can be handed over, nothing remains, and `topics_pending` is still 
 answer is `blocked: 'quota_exceeded'` with no rows and no taxonomy.
 
 **Deploy order.** The worker service and the `worker` Edge Function must be updated
-*before* the three migrations are pushed: a worker built before this feature treats any
+_before_ the three migrations are pushed: a worker built before this feature treats any
 job that is not `discover` as a collection, and handed an `analyse` job it would walk the
 empty due-video list its claim carries and mark the job `succeeded` having classified
 nothing. `workers/deploy/README.md` carries this under "Order of a deploy that adds a job
@@ -898,7 +916,7 @@ instead of hitting `batch_conflict`; within one lease a replay still replays. An
 quota window in `worker_topics_due` no longer drops a free row that sorts behind more
 costing rows than remain: the predicate is `not costs or spent <= remaining`, so a free row
 is handed over wherever it sorts. While there: a workspace with no active plan (or one
-outside its period) is now told `blocked: 'quota_exceeded'` with *no* rows, free ones
+outside its period) is now told `blocked: 'quota_exceeded'` with _no_ rows, free ones
 included, because `reserve_usage` would refuse every record at commit; a plan with nothing
 left still hands the free rows over.
 
@@ -919,7 +937,7 @@ topic layer had the identical defect and fixed it in `20260916011000`; `docs/dec
 had recorded the sentiment twin as a known follow-up.
 
 `supabase/migrations/20260916020000_a_failed_verdict_is_retried.sql` rebuilds
-`commit_batch` from its *current* definition — `20260914070000`, which carries the
+`commit_batch` from its _current_ definition — `20260914070000`, which carries the
 `sync_runs` open/accumulate block, not `20260913220000` as first thought — with one change:
 the predictions insert's conflict clause becomes `do update ... where
 public.sentiment_predictions.status = 'failed'`, so only a failure is ever overwritten. A
@@ -1060,11 +1078,12 @@ Playwright `pricing` + `app-shell` 8; `npm run check` green (the run is in the f
 `.superpowers/sdd/2026-09-16-plans-and-paddle-billing/final-fix-report.md`).
 
 What remains before live keys are set:
+
 1. **Server-minted checkout** — the transaction created by an edge function from the caller's
    session, so `custom_data.workspace_id` is never the browser's word (the `conflict` outcome is
    the guard until then; `docs/decisions.md`).
 2. **The tax-mode PATCH run against the sandbox** by the controller (`node --env-file=.env.local
-   scripts/paddle-sync-prices.mjs`), so the seven existing prices read `external`; then one more
+scripts/paddle-sync-prices.mjs`), so the seven existing prices read `external`; then one more
    sandbox payment to see an invoice with tax on top.
 3. **The `pilot` rename** with bilingual titles shown by locale, and the rail card printing the
    plan's title rather than its key.
@@ -1335,11 +1354,11 @@ exact-pinned) and `ui/Dialog`'s new `variant="sheet"` (Tasks 1–2).
 `.superpowers/sdd/2026-09-17-landing-redesign/vitals.txt`), LCP element `H1.hero-title` in
 every cell, before and after:
 
-| | before (`77d90fc`) | after |
-|---|---|---|
-| LCP, unthrottled | 96ms | 132ms |
-| LCP, 4× CPU throttle | 280ms | 408ms |
-| CLS | 0 | 0 |
+|                      | before (`77d90fc`) | after |
+| -------------------- | ------------------ | ----- |
+| LCP, unthrottled     | 96ms               | 132ms |
+| LCP, 4× CPU throttle | 280ms              | 408ms |
+| CLS                  | 0                  | 0     |
 
 CLS passed (tied at 0). LCP missed the "after ≤ before" budget under both CPU conditions —
 the same element paints later, not a heavier one replacing it (1.375× unthrottled, 1.457×
@@ -1414,7 +1433,7 @@ keeps only margin, weight and the Arabic `letter-spacing: 0`. Measured on the pr
 
 **Correction to the 2026-09-17 "landing rebuilt" entry above:** the `@media (max-width:
 650px)` block in `pricing.css` (`.pricing-page .lp-nav { display: flex }` /
-`.lp-header-cta { display: inline-block }`) was recorded there as a *dead* override deferred
+`.lp-header-cta { display: inline-block }`) was recorded there as a _dead_ override deferred
 to phase 5. It was live: same specificity as `public.css`'s hides and later in bundle order,
 so at ≤650px the pricing header showed the inline links, the account CTA and the sheet
 button together. Deleted; the pricing header now matches the landing's at 390px (one
@@ -1438,7 +1457,7 @@ addresses with JavaScript off (one `h1`, the page's own body class, `.pricing-ca
 `display: grid`, `.legal`'s max-width read from `legal.css`, no visible box past either
 viewport edge) and, JavaScript on, the H1 face on `/en` and `/`. Getting that project to
 mean anything took one more fix: `vite preview` probes no extensions and answers
-`/pricing` with `index.html` — the prerendered *landing* — so a first draft that looked for
+`/pricing` with `index.html` — the prerendered _landing_ — so a first draft that looked for
 `.pricing-cards` "where present" passed on the wrong page. `apps/web/vite.config.ts` gives
 the preview server `public/.htaccess`'s two rewrites (`<path>/index.html` for a
 prerendered address with or without its slash, `app.html` for anything that is not a file),
@@ -2254,7 +2273,7 @@ work; the Bionic session's never-executed test:db files).
 
 - **Node 22.14.0 installed locally** (`~/.local/share/nodejs/`, official
   tarball — no system change) and **Supabase CLI 2.117.0** (`~/.local/share/
-  supabase-cli/`); this machine still has no global node/npm/supabase.
+supabase-cli/`); this machine still has no global node/npm/supabase.
 - **`supabase db push`: nothing to push.** The Management API's migration list
   shows `20260919170000_worker_renews_its_token` already applied to the live
   project (with `20260919120000`–`140000`, `160000`). `20260919180000` (the
@@ -2344,6 +2363,7 @@ service**, and deploy the web bundle when convenient.
 ## 2026-09-19 — platform reader grants and immediate discovery for public channels
 
 Google Cloud rejected standard API keys for YouTube Data API v3 on modern GCP projects with `403 API keys are not supported by this API`. Rather than blocking on Google API key quirks, the public channel addition path was connected to the platform OAuth reader architecture (`private.platform_reader`):
+
 - `supabase/migrations/20260919230000_platform_reader_grants.sql`:
   - Granted `select, update` on `private.platform_reader` to `service_role` so the worker gateway can read and renew platform reader access tokens.
   - Updated `private.schedule_due_work` to include `status in ('connected', 'public_unverified')` channels, ensuring recurring synchronization processes public channels alongside connected ones.
@@ -2362,6 +2382,7 @@ Google Cloud rejected standard API keys for YouTube Data API v3 on modern GCP pr
 ## 2026-09-19 — browser CORS preflight fix for channel lookup
 
 While `channel-lookup` responded successfully to backend and curl requests, in-browser requests from `https://app.sky-develop.net` were failing during the preflight `OPTIONS` handshake with `TypeError: Failed to fetch`, displaying `تعذّر البحث عن القنوات. حاول من جديد.` to the user.
+
 - **Root cause**: The Supabase browser client sends `x-client-info` (and SDK headers) within `Access-Control-Request-Headers`. `supabase/functions/_shared/cors.ts` previously only allowed `authorization, content-type, apikey`, causing browsers to refuse the preflight.
 - **Resolution**: Updated `corsHeaders()` in `supabase/functions/_shared/cors.ts` to allow `x-client-info, x-retry-count, traceparent, tracestate, baggage` and echo `access-control-request-headers` for allowed origins (`https://app.sky-develop.net` and local origins).
 - **Edge Functions redeployed**: `channel-lookup`, `billing-portal`, `oauth-start`, and `paddle-checkout` redeployed to Supabase project `ykqugctewsqvevhyqtbi`.
@@ -2390,4 +2411,3 @@ While `channel-lookup` responded successfully to backend and curl requests, in-b
 - **Environment flexibility**: Decoupled `scripts/deploy-preview.sh` from local `.env.local`, allowing it to consume GitHub Secrets passed into the runner environment.
 - **Remote database migrations**: Added `scripts/apply-migrations-remote.mjs` (`npm run db:migrate:remote`) to query applied versions from `supabase_migrations.schema_migrations` and apply any pending `.sql` files in chronological order inside atomic transactions via the Supabase Management API.
 - **Verification**: Local execution of `npm run db:migrate:remote` verified 78 migrations applied cleanly with 0 pending. Full `npm run check` suite passed green across all 111 web test files (874 tests), 39 db test files (365 tests), 229 python tests, clean build, and clean secret scanning.
-

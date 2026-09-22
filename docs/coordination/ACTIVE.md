@@ -25,7 +25,7 @@ So:
   against a theoretical mistake — it happened in this checkout on 2026-09-14
   during mutation testing, destroyed about an hour of uncommitted work in
   `Dashboard.tsx` and `report.css`, and the work had to be written again from
-  memory. Mutation testing in particular *invites* this: the natural instinct
+  memory. Mutation testing in particular _invites_ this: the natural instinct
   after mutating a file is to check it out, and the natural instinct is wrong.
   Back the file up, mutate, restore from the backup.
 - **Commit early.** An uncommitted change is the only kind that can vanish.
@@ -51,26 +51,26 @@ for a day, assume it is free.
 
 Claimed as of 2026-09-14, by message between the two live Claude sessions:
 
-| Area | Held by | Since |
-| --- | --- | --- |
-| `supabase/migrations/**` | `sentimentanalysis-91` — collection-queue reliability | 2026-09-14 |
-| `workers/python/src/server/**` | `sentimentanalysis-91` | 2026-09-14 |
-| `apps/web/src/syncHealth.ts`, `jobFeed.ts`, `Sync.tsx` | shared — touched by -91, -82 and Antigravity since 2026-09-14 | 2026-09-14 |
-| `tests/e2e/dashboard.spec.ts` | **shared, append-only** — add your block, never rewrite another's | |
-| `apps/web/src/Dashboard.tsx`, `Account.tsx`, `Landing.tsx`, `main.tsx`, `authProviders.ts`, the CSS | `sentimentanalysis-82` | 2026-09-14 |
-| `packages/contracts/**` | `sentimentanalysis-82` | 2026-09-14 |
-| `workers/python/src/labelling/**` | free | |
-| `docs/coordination/ACTIVE.md` | `sentimentanalysis-82` maintains it; everyone reads it | |
-| `docs/progress.md`, `decisions.md`, `verification.md` | shared, append-only | |
-| `apps/web/src/locale.ts`, `locale.css`, `strings/**`, `LanguageSwitch.tsx`, `tests/e2e/language.spec.ts` | **done** — English language support landed as `f9b2840`…`7478dc0` by the audit-phase-two Claude session; free | 2026-09-15 |
-| UI text in `apps/web/src/**` | **every sentence now lives in `strings/ar.ts` with a typed English twin in `strings/en.ts`.** A new sentence goes there, in both languages, or `tsc` fails. `Landing.tsx` included since `b956c64` — the demo's four comments are the one deliberate Arabic-only text, as data | 2026-09-15 |
-| `workers/python/src/topics/**`, `supabase/migrations/20260916010000`–`012000`, `supabase/functions/_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`, `packages/contracts/src/topics.ts` | **done** — topic classification (tasks 1–10) landed as `0866318`…`1b4ed30`; free, and see the not-yet-live-deployed note below | 2026-09-16 |
-| `apps/web/src/dashboard/**` (and the `.ui-split` primitive in `apps/web/src/ui/ui.css`) | **done** — the dashboard redesign (tasks 1–12) landed as `4566718`…`07e9ccd`; the old `apps/web/src/Dashboard.tsx` is deleted, `report.css` no longer loads on this page; free | 2026-09-17 |
-| `apps/web/scripts/{demo-content,make-demo-fixture}.mjs` (+ `.d.mts`), `apps/web/public/fixtures/{dashboard,e2e-dashboard,catalogue}.json`, `apps/web/src/{demoFixture,noSyntheticWords}.test.ts`, `tests/e2e/demo.spec.ts` | **done** — the demo-data feature (tasks 1–4) landed as `938cfc0`…`97ed318`, plus this task's records commit; the visitor dashboard and the browser suite now read separate fixtures from one generator, «توضيحية» replaces «اصطناعي» everywhere reader- or test-facing; free | 2026-09-17 |
-| `apps/web/src/googleOneTap.ts` (+ `.test.ts`), `apps/web/src/google-gsi.d.ts`, `apps/web/vite-env.d.ts`, the Google door's slice of `Account.tsx`/`Account.entry.test.ts`, `.env.example` | **done** — Google sign-in and One Tap (`docs/superpowers/plans/2026-09-17-google-signin.md`) landed as `0102bea`…`5c2f9ca`, plus this task's hardening (`6e2ac2e`) and records commit; the door opens on `VITE_AUTH_PROVIDERS=google`, One Tap prompts a signed-out `/account` visitor via GIS + `signInWithIdToken`; free | 2026-09-17 |
-| `apps/web/src/pages.css`, `apps/web/src/pageStates/**`, `apps/web/src/ops/**`, `apps/web/src/admin/**`, `apps/web/src/account.css`, `apps/web/src/noReportCss.test.ts` | **done** — the operations and admin redesign (`docs/superpowers/plans/2026-09-17-ops-admin-redesign.md`, tasks 1–8) landed as `0d6f51f`…`e3642af`, plus this task's records commit; `/sync` and `/admin` are on the shared `db-*` rhythm and `ui/` primitives now, `report.css` is deleted, `/account` carries the last of its rules verbatim in `account.css` until phase 5; free | 2026-09-17 |
-| `apps/web/src/account/**`, `apps/web/src/ui/BudgetMeter.tsx`, `apps/web/src/setup-path.css`, `apps/web/public/fixtures/account.json`, `tests/e2e/account.spec.ts` | **done** — the account redesign (`docs/superpowers/plans/2026-09-17-account-redesign.md`, tasks 1–8) landed as `dc7b513`…`b95f7a2`, plus this task's records commit; `/account` is on `ui/` now, the verbatim `account.css` and every remaining `.app-shell .rp-*` block in `app.css` are deleted, `BudgetMeter` moved into `ui/`; free | 2026-09-18 |
-| `apps/web/src/tour/**`, `apps/web/src/strings/{ar,en}.ts`'s tour keys, `data-tour` attributes on `main.tsx`/`account/{Account,WorkspaceCard,CreateWorkspace}.tsx`/`SetupPath.tsx`/`ops/{Catalogue,SelectionBar}.tsx`/`dashboard/{FilterBar,SectionNav}.tsx`, `playwright.config.ts`'s `tourSeen` storageState, `tests/e2e/tour.spec.ts` | **done** — the onboarding tour (`docs/superpowers/plans/2026-09-18-onboarding-tour.md`, tasks 1–4) landed as `6649c60`…`c7d96b5`…`847c369`…`51b5b2e`, plus this task's browser suite and records commit; a once-per-browser welcome plus seven anchored steps across `/account`, `/sync`, `/dashboard`, replayable from the rail and via `?tour=1`; free | 2026-09-18 |
+| Area                                                                                                                                                                                                                                                                                                                                    | Held by                                                                                                                                                                                                                                                                                                                                                                            | Since      |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `supabase/migrations/**`                                                                                                                                                                                                                                                                                                                | `sentimentanalysis-91` — collection-queue reliability                                                                                                                                                                                                                                                                                                                              | 2026-09-14 |
+| `workers/python/src/server/**`                                                                                                                                                                                                                                                                                                          | `sentimentanalysis-91`                                                                                                                                                                                                                                                                                                                                                             | 2026-09-14 |
+| `apps/web/src/syncHealth.ts`, `jobFeed.ts`, `Sync.tsx`                                                                                                                                                                                                                                                                                  | shared — touched by -91, -82 and Antigravity since 2026-09-14                                                                                                                                                                                                                                                                                                                      | 2026-09-14 |
+| `tests/e2e/dashboard.spec.ts`                                                                                                                                                                                                                                                                                                           | **shared, append-only** — add your block, never rewrite another's                                                                                                                                                                                                                                                                                                                  |            |
+| `apps/web/src/Dashboard.tsx`, `Account.tsx`, `Landing.tsx`, `main.tsx`, `authProviders.ts`, the CSS                                                                                                                                                                                                                                     | `sentimentanalysis-82`                                                                                                                                                                                                                                                                                                                                                             | 2026-09-14 |
+| `packages/contracts/**`                                                                                                                                                                                                                                                                                                                 | `sentimentanalysis-82`                                                                                                                                                                                                                                                                                                                                                             | 2026-09-14 |
+| `workers/python/src/labelling/**`                                                                                                                                                                                                                                                                                                       | free                                                                                                                                                                                                                                                                                                                                                                               |            |
+| `docs/coordination/ACTIVE.md`                                                                                                                                                                                                                                                                                                           | `sentimentanalysis-82` maintains it; everyone reads it                                                                                                                                                                                                                                                                                                                             |            |
+| `docs/progress.md`, `decisions.md`, `verification.md`                                                                                                                                                                                                                                                                                   | shared, append-only                                                                                                                                                                                                                                                                                                                                                                |            |
+| `apps/web/src/locale.ts`, `locale.css`, `strings/**`, `LanguageSwitch.tsx`, `tests/e2e/language.spec.ts`                                                                                                                                                                                                                                | **done** — English language support landed as `f9b2840`…`7478dc0` by the audit-phase-two Claude session; free                                                                                                                                                                                                                                                                      | 2026-09-15 |
+| UI text in `apps/web/src/**`                                                                                                                                                                                                                                                                                                            | **every sentence now lives in `strings/ar.ts` with a typed English twin in `strings/en.ts`.** A new sentence goes there, in both languages, or `tsc` fails. `Landing.tsx` included since `b956c64` — the demo's four comments are the one deliberate Arabic-only text, as data                                                                                                     | 2026-09-15 |
+| `workers/python/src/topics/**`, `supabase/migrations/20260916010000`–`012000`, `supabase/functions/_shared/worker-gateway.ts`, `supabase/functions/worker/index.ts`, `packages/contracts/src/topics.ts`                                                                                                                                 | **done** — topic classification (tasks 1–10) landed as `0866318`…`1b4ed30`; free, and see the not-yet-live-deployed note below                                                                                                                                                                                                                                                     | 2026-09-16 |
+| `apps/web/src/dashboard/**` (and the `.ui-split` primitive in `apps/web/src/ui/ui.css`)                                                                                                                                                                                                                                                 | **done** — the dashboard redesign (tasks 1–12) landed as `4566718`…`07e9ccd`; the old `apps/web/src/Dashboard.tsx` is deleted, `report.css` no longer loads on this page; free                                                                                                                                                                                                     | 2026-09-17 |
+| `apps/web/scripts/{demo-content,make-demo-fixture}.mjs` (+ `.d.mts`), `apps/web/public/fixtures/{dashboard,e2e-dashboard,catalogue}.json`, `apps/web/src/{demoFixture,noSyntheticWords}.test.ts`, `tests/e2e/demo.spec.ts`                                                                                                              | **done** — the demo-data feature (tasks 1–4) landed as `938cfc0`…`97ed318`, plus this task's records commit; the visitor dashboard and the browser suite now read separate fixtures from one generator, «توضيحية» replaces «اصطناعي» everywhere reader- or test-facing; free                                                                                                       | 2026-09-17 |
+| `apps/web/src/googleOneTap.ts` (+ `.test.ts`), `apps/web/src/google-gsi.d.ts`, `apps/web/vite-env.d.ts`, the Google door's slice of `Account.tsx`/`Account.entry.test.ts`, `.env.example`                                                                                                                                               | **done** — Google sign-in and One Tap (`docs/superpowers/plans/2026-09-17-google-signin.md`) landed as `0102bea`…`5c2f9ca`, plus this task's hardening (`6e2ac2e`) and records commit; the door opens on `VITE_AUTH_PROVIDERS=google`, One Tap prompts a signed-out `/account` visitor via GIS + `signInWithIdToken`; free                                                         | 2026-09-17 |
+| `apps/web/src/pages.css`, `apps/web/src/pageStates/**`, `apps/web/src/ops/**`, `apps/web/src/admin/**`, `apps/web/src/account.css`, `apps/web/src/noReportCss.test.ts`                                                                                                                                                                  | **done** — the operations and admin redesign (`docs/superpowers/plans/2026-09-17-ops-admin-redesign.md`, tasks 1–8) landed as `0d6f51f`…`e3642af`, plus this task's records commit; `/sync` and `/admin` are on the shared `db-*` rhythm and `ui/` primitives now, `report.css` is deleted, `/account` carries the last of its rules verbatim in `account.css` until phase 5; free | 2026-09-17 |
+| `apps/web/src/account/**`, `apps/web/src/ui/BudgetMeter.tsx`, `apps/web/src/setup-path.css`, `apps/web/public/fixtures/account.json`, `tests/e2e/account.spec.ts`                                                                                                                                                                       | **done** — the account redesign (`docs/superpowers/plans/2026-09-17-account-redesign.md`, tasks 1–8) landed as `dc7b513`…`b95f7a2`, plus this task's records commit; `/account` is on `ui/` now, the verbatim `account.css` and every remaining `.app-shell .rp-*` block in `app.css` are deleted, `BudgetMeter` moved into `ui/`; free                                            | 2026-09-18 |
+| `apps/web/src/tour/**`, `apps/web/src/strings/{ar,en}.ts`'s tour keys, `data-tour` attributes on `main.tsx`/`account/{Account,WorkspaceCard,CreateWorkspace}.tsx`/`SetupPath.tsx`/`ops/{Catalogue,SelectionBar}.tsx`/`dashboard/{FilterBar,SectionNav}.tsx`, `playwright.config.ts`'s `tourSeen` storageState, `tests/e2e/tour.spec.ts` | **done** — the onboarding tour (`docs/superpowers/plans/2026-09-18-onboarding-tour.md`, tasks 1–4) landed as `6649c60`…`c7d96b5`…`847c369`…`51b5b2e`, plus this task's browser suite and records commit; a once-per-browser welcome plus seven anchored steps across `/account`, `/sync`, `/dashboard`, replayable from the rail and via `?tour=1`; free                           | 2026-09-18 |
 
 `sentimentanalysis-69` reported itself inactive with no uncommitted work.
 
@@ -107,7 +107,7 @@ total on the dashboard is taken downstream of it. A new panel that reads
 `input` instead of the returned `filtered`/`rows` silently puts the channel's 13
 promotional replies back into that panel's denominator — nothing fails, the
 number is just wrong. `channel_own_comments` is deliberately counted from the
-*unfiltered* input and shown on screen; it should stay visible.
+_unfiltered_ input and shown on screen; it should stay visible.
 
 **`measurable` is what stops the legend printing a false zero.** It is a Set
 built from `active_analysis_labels`, and it is why the legend reads
@@ -119,8 +119,8 @@ static list and the regression comes back looking like a design detail.
 **The trust panel on the signed-out account page may not carry a number.**
 It currently says six Arabic classifiers were measured against a hand-labelled
 set and none passed the gate — all three parts check out against
-`docs/evaluation/model-comparison.md`, and the claim is safe *because it is a
-negative one*. The golden set has a single annotator, no second pass and no
+`docs/evaluation/model-comparison.md`, and the claim is safe _because it is a
+negative one_. The golden set has a single annotator, no second pass and no
 adjudication (model-comparison.md:23–26), which cannot make "we measured and
 none passed" less true. It can make an absolute figure false. So the moment
 anyone writes a per-class number or an accuracy into that panel, the
@@ -129,7 +129,7 @@ absolute accuracy. Flagged by `sentimentanalysis-69`, which built the set. Same
 shape as the two above: no test will catch it.
 
 **`create or replace` on a SQL function is a whole-body rewrite.** Build the
-replacement from the function's *current* definition, never from the migration
+replacement from the function's _current_ definition, never from the migration
 that first created it — a later migration may have added something to the body,
 and starting from the original silently reverts it. This happened on
 2026-09-14: a `worker_finish` replacement drafted from the original plus one
@@ -139,7 +139,7 @@ announces a reverted body. Flagged by `sentimentanalysis-91`, which hit it.
 
 **The operations page cannot currently show a job that died before committing.**
 `sync_runs` opens on the first committed batch, so a job that fails earlier
-leaves no run row and the panel shows the last *successful* run instead — which
+leaves no run row and the panel shows the last _successful_ run instead — which
 reads as "things were fine recently" at the exact moment they were not. This is
 why a screenshot of that page was misdiagnosed on 2026-09-14 as a stopped
 worker process when the worker was running fine and the lease was too short: it
@@ -170,7 +170,7 @@ letters join, and tracking runs after shaping, so positive tracking draws the
 connected forms with gaps between them — the word comes apart and reads as a
 rendering fault. `report.css` tracks the hero eyebrow at 0.16em for the Latin
 landing page, and `.app-shell .rp-page .rp-eyebrow { letter-spacing: 0 }`
-exists *only* to undo it inside the app. A restyle on 2026-09-15 replaced that
+exists _only_ to undo it inside the app. A restyle on 2026-09-15 replaced that
 zero with 0.03em, which looks like a taste change and is not one.
 `dashboard.spec.ts`'s "no Arabic label is letter-spaced" caught it, and caught
 a new caption at 0.08em in the same run. It cannot catch `.app-plan-kicker`,
@@ -184,13 +184,13 @@ it. If a preview is already running, `npm run test:e2e` waits 60 s and then
 reports the whole suite as failed — failures that are not real and that look
 exactly like real ones. Stop your preview before running the browser suite.
 
-**The browser suite's exit code.** `npm run test:e2e | tail` reports *tail's*
+**The browser suite's exit code.** `npm run test:e2e | tail` reports _tail's_
 exit code, not Playwright's. A run with two failures reads as success. Redirect
 to a file and check `$?`, or check each gate separately. This also happened
 here, and a green report was nearly filed on a run that was not green.
 
 **System load.** On a loaded machine (load average above ~15) single browser
-tests take 25 s and the suite reports one or two failures, a *different* one
+tests take 25 s and the suite reports one or two failures, a _different_ one
 each run, each passing in isolation. That is contention, not regression — but
 confirm it by running the failing test alone rather than assuming.
 
@@ -224,13 +224,13 @@ Pending, from selective video sync, all the user's decisions and none of them ta
   `20260915140000` (catalogue columns, `video_selections`, `select_videos`/
   `request_discovery`, the worker's due-list/catalogue/tick routes, and — the fourth, from
   the final review — the quota priced against every outstanding selection, the last run
-  being the last *collect* run, the tick's hour-long backoff after a failed job, and the
+  being the last _collect_ run, the tick's hour-long backoff after a failed job, and the
   pilot plan's 30-minute rate limit).
 - Redeploying the `worker` Edge Function — its `supabase/functions/worker/index.ts` and
   `_shared/worker-gateway.ts` now carry the due-list, commit-catalogue, video-finished and
   tick routes the three migrations above expect, and the deployed function does not yet.
 - `create extension pg_cron` plus `select cron.schedule('sentiment-tick', '17 * * * *',
-  $$select private.schedule_all()$$)` — until then, the worker's own idle-loop `tick()` is
+$$select private.schedule_all()$$)` — until then, the worker's own idle-loop `tick()` is
   the only thing that would run `schedule_due_work`, and only while a worker process is up.
 - `supabase/migrations/20260916020000_a_failed_verdict_is_retried.sql` (`eaac5c6`) — **applied,
   2026-09-16**: `migration list --linked` shows it remote. It went up with the topic three in
@@ -257,7 +257,7 @@ sign in; a signed-in visit should not show the prompt at all.
 ## What the tests are for
 
 Every guarantee in this product is asserted somewhere, and most of the
-assertions were written *after* a mutation proved they would catch the thing
+assertions were written _after_ a mutation proved they would catch the thing
 they claim to catch. If you change behaviour and a test fails, read the test's
 comment before changing it: it usually records a specific defect that shipped
 once.
@@ -276,15 +276,15 @@ about to add a second place where something is decided, that is the shape.
 **But unifying is not automatically an improvement, and this is not a rule you
 can apply without looking.** Both failure modes showed up while fixing the six:
 
-- *The merged reader said less than a reader it replaced.* Two error-code
+- _The merged reader said less than a reader it replaced._ Two error-code
   tables became one, and the surviving one's entry for a bare
   `source_access_denied` was thinner than the table's had been — it dropped the
   half of the sentence that told the operator where to look. Caught by a
   browser test, by luck. The rule now encoded: a merged reader may override
-  another only where it has something *more* specific to say; otherwise the
+  another only where it has something _more_ specific to say; otherwise the
   replaced wording stands, asserted over every key with the one deliberate
   exception named.
-- *The discarded version was better on a dimension nobody was measuring.* The
+- _The discarded version was better on a dimension nobody was measuring._ The
   landing page's sentiment palette separated better under deuteranopia than the
   dashboard's (ΔE 23.4 against 9.6) — the dashboard's was still chosen, because
   all four landing marks sat under 3:1 on white and a mark carries meaning at
@@ -412,21 +412,22 @@ phase 6 (the product tour) remain open; nothing in this phase started either.
 
 2026-09-18, closing the note above: phase 5 (`docs/superpowers/plans/2026-09-17-account-redesign.md`,
 tasks 1–8) rebuilt `/account` on `ui/`, moved `BudgetMeter` into `ui/`, added `/account?demo=1`
-+ `accountDemo.ts`, and retired the verbatim `account.css` along with every remaining
-`.app-shell .rp-*` block in `app.css`. Claimed `apps/web/src/account/**`,
-`apps/web/src/ui/BudgetMeter.tsx`, `apps/web/src/setup-path.css`,
-`apps/web/public/fixtures/account.json`, `tests/e2e/account.spec.ts` (row added to the table
-above) — done, `dc7b513`…`b95f7a2` (interleaved with another session's OAuth commits on the same
-branch — `b3001ae`, `9135a6c`, `7dd0086`, `bf0c3a7`, `7714683`, `0a4c1f0`, and the formatting fix
-`9867c0d` — none of it touched here) plus this task's records commit. `npm run check`, run stage
-by stage after the chained command stopped at one db timeout: lint, format:check, typecheck,
-`check:functions` (deno), unit (105 files / 786 tests, `apps/web` alone 94 files / 669), db (32
-files / 310 tests, one timeout — see below), worker (195 tests), build (8 prerendered pages),
-secrets (622 source files plus built assets); full e2e is 123 (114 carried + 9 new in
-`tests/e2e/account.spec.ts`), `test:e2e:build` stays 6. `docs/verification.md`'s dated entry
-below carries the host-load caveat for both the one `test:db` timeout and the e2e counts.
-`.screenshots/` (untracked) was never touched; this feature's own screenshots live under
-`.superpowers/sdd/2026-09-17-account-redesign/shots/`.
+
+- `accountDemo.ts`, and retired the verbatim `account.css` along with every remaining
+  `.app-shell .rp-*` block in `app.css`. Claimed `apps/web/src/account/**`,
+  `apps/web/src/ui/BudgetMeter.tsx`, `apps/web/src/setup-path.css`,
+  `apps/web/public/fixtures/account.json`, `tests/e2e/account.spec.ts` (row added to the table
+  above) — done, `dc7b513`…`b95f7a2` (interleaved with another session's OAuth commits on the same
+  branch — `b3001ae`, `9135a6c`, `7dd0086`, `bf0c3a7`, `7714683`, `0a4c1f0`, and the formatting fix
+  `9867c0d` — none of it touched here) plus this task's records commit. `npm run check`, run stage
+  by stage after the chained command stopped at one db timeout: lint, format:check, typecheck,
+  `check:functions` (deno), unit (105 files / 786 tests, `apps/web` alone 94 files / 669), db (32
+  files / 310 tests, one timeout — see below), worker (195 tests), build (8 prerendered pages),
+  secrets (622 source files plus built assets); full e2e is 123 (114 carried + 9 new in
+  `tests/e2e/account.spec.ts`), `test:e2e:build` stays 6. `docs/verification.md`'s dated entry
+  below carries the host-load caveat for both the one `test:db` timeout and the e2e counts.
+  `.screenshots/` (untracked) was never touched; this feature's own screenshots live under
+  `.superpowers/sdd/2026-09-17-account-redesign/shots/`.
 
 **PENDING, unchanged from before this phase: phase 6 (the in-app onboarding/product tour)
 remains open; nothing in this phase started it.**
@@ -494,19 +495,19 @@ commits exist on this disk only, which is exactly the situation the rules above 
 for.
 
 1. **Arabic normalization reaches the model.** `LogitsAdapter.predict` now calls
- `normalize_arabic_text`; `PREPROCESSING_VERSION` → `strip-html-arabic-norm-v2` in the same
- change (the wiring gap this file warned about on 2026-09-14 is closed, with a guard test).
- Golden fixture regenerated via `test_golden_batch.rebuild()`.
+   `normalize_arabic_text`; `PREPROCESSING_VERSION` → `strip-html-arabic-norm-v2` in the same
+   change (the wiring gap this file warned about on 2026-09-14 is closed, with a guard test).
+   Golden fixture regenerated via `test_golden_batch.rebuild()`.
 2. **Lease/claim semantics** (`20260919120000` + `20260919130000`): `jobs.heartbeats` — a lapsed
- lease with zero heartbeats resumes free (platform replays are not worker fights); heartbeated-then-
- lapsed counts and backs off; heartbeat renewal is a 5-minute floor (was 60s — an early heartbeat
- shortened the lease). Claims carry `job_types` end to end; a collect-scoped run can no longer
- consume a topics job (verified live: scoped claim → 204 while a topics job waits).
+   lease with zero heartbeats resumes free (platform replays are not worker fights); heartbeated-then-
+   lapsed counts and backs off; heartbeat renewal is a 5-minute floor (was 60s — an early heartbeat
+   shortened the lease). Claims carry `job_types` end to end; a collect-scoped run can no longer
+   consume a topics job (verified live: scoped claim → 204 while a topics job waits).
 3. **Resource guard + monitor** (`20260919140000` + `scripts/monitor.sh`): `comment_reviews` and
- `topic_reviews` indexed on (workspace_id, comment_id) — the dashboard's per-comment review
- lookups were seq scans, ~37,700 per page load; and an external monitor probing rest/gateway/
- leases/failures/worker/freshness/site, installed in this machine's crontab every 5 minutes
- (edge-triggered alerts, `ALERT_WEBHOOK_URL` optional).
+   `topic_reviews` indexed on (workspace_id, comment_id) — the dashboard's per-comment review
+   lookups were seq scans, ~37,700 per page load; and an external monitor probing rest/gateway/
+   leases/failures/worker/freshness/site, installed in this machine's crontab every 5 minutes
+   (edge-triggered alerts, `ALERT_WEBHOOK_URL` optional).
 
 **Live-project operations another agent must know about** (all on `ykqugctewsqvevhyqtbi`):
 migrations `20260919120000`, `20260919130000`, `20260919140000` applied via the Management API
@@ -546,7 +547,7 @@ change in loop.py is still uncommitted on disk, untouched, exactly as it left it
 `supabase/tests/worker_gateway_handler.test.ts`, `scripts/check-secrets.mjs`,
 ten prettier-only reformats, and the three shared docs — all committed
 (`7df9f56`, `1fc5a9b`, `87ff30a`, `b3c3b95`). The channel-lookup lane's
-uncommitted work (gateway, worker/index, python, account/**, strings,
+uncommitted work (gateway, worker/index, python, account/\*\*, strings,
 migration `20260919180000`) was seen on disk, left byte-for-byte alone, and
 deliberately EXCLUDED from the deploy (done from a worktree at `b3c3b95`;
 worker is now v17). Two machine notes for the next session: Node 22.14.0 and
@@ -584,6 +585,7 @@ those paths). The deployed web bundle predates the new door until the next
 `deploy:preview`.
 
 2026-09-19, Antigravity session — platform reader grants, immediate discovery, and live rollout:
+
 - Google Cloud API key creation on modern projects failed with `403 API keys are not supported by this API`.
 - Integrated `private.platform_reader` into `channel-lookup` and `worker` edge functions, unsealing reader tokens via `TOKEN_ENCRYPTION_KEY` and auto-refreshing against Google OAuth endpoints when `YOUTUBE_API_KEY` is not present.
 - Migration `20260919230000_platform_reader_grants.sql` granted `select, update` on `private.platform_reader` to `service_role` and updated `schedule_due_work` to include `public_unverified` channels. Pushed live via `supabase db push --linked`.
@@ -594,6 +596,7 @@ those paths). The deployed web bundle predates the new door until the next
 - All test suites green: unit 110 files / 865 tests, db 38 files / 361 tests, python worker 229 tests, deno check, build, secret scan. All paths free.
 
 2026-09-19 (evening), Antigravity session — browser CORS preflight fix for channel-lookup and edge functions:
+
 - Problem: Browser fetch from `apps/web` (`https://app.sky-develop.net`) failed during preflight `OPTIONS` with `Failed to fetch` / `تعذّر البحث عن القنوات. حاول من جديد.` because the browser Supabase client sends `x-client-info` in `Access-Control-Request-Headers`, while `_shared/cors.ts` only permitted `authorization, content-type, apikey`.
 - Fix: Updated `supabase/functions/_shared/cors.ts` so `corsHeaders()` allows `x-client-info, x-retry-count, traceparent, tracestate, baggage` and reflects `access-control-request-headers` on preflight for allowed origins.
 - Tests: Added test in `supabase/tests/cors.test.ts` verifying `x-client-info` and requested headers reflection.
@@ -602,6 +605,7 @@ those paths). The deployed web bundle predates the new door until the next
 - Preview deployed: `npm run build && npm run deploy:preview` uploaded cleanly. Full verification suite `npm run check` passed 100% green. All paths free.
 
 2026-09-20, Antigravity session — Decoupled Big-Data Dashboard Architecture (DONE):
+
 - **Radical Big-Data Architecture Completed & Deployed**: Transitioned the live dashboard from monolithic in-memory fetching to a fully decoupled enterprise server-side aggregation and paginated stream architecture suited for tens of thousands to millions of comments.
 - **Database & Indices (`supabase/migrations/20260920150000_decoupled_dashboard_architecture.sql`)**:
   - GIN Trigram index `comments_text_trgm_idx` created on `public.comments USING gin (text_raw extensions.gin_trgm_ops)`. ILIKE queries run in 28ms across 71,310 rows.
@@ -621,6 +625,7 @@ those paths). The deployed web bundle predates the new door until the next
 - **Paths released**: All paths free.
 
 2026-09-20, Antigravity session — Continuous Deployment (CD) Pipeline with GitHub Actions & Remote Migrations:
+
 - **Deployment is now automated:** Any push to `main` triggers `.github/workflows/deploy.yml`.
 - **Pipeline actions:**
   1. Checks out repo and sets up Node 22 (pinned SHA actions).
@@ -633,6 +638,7 @@ those paths). The deployed web bundle predates the new door until the next
   - Manual local fallback commands if ever needed: `npm run deploy:preview` and `npm run db:migrate:remote`.
 
 2026-09-21, Antigravity session — Storytelling with Data Transformation (DONE):
+
 - **Executive Story Briefing in `Summary.tsx`**: Added Net Sentiment score gauge and 3-act narrative (Pulse, Driver, Actionable recommendation) with dedicated `Summary.test.tsx` suite.
 - **Action Titles**: Replaced passive category labels with action-oriented conclusion headers across `Summary`, `Voice`, `Timing`, `Videos`, `Compare`, `Engaged`, `Comments`, and `People`.
 - **10% Highlighting & Preattentive Hierarchy**:
@@ -647,3 +653,9 @@ those paths). The deployed web bundle predates the new door until the next
   - `Dashboard.tsx` & `FilterBar.tsx`: Supplies `effectiveLabels` containing only measurable labels and resets active sentiment filter if unsupported.
   - Unit tests added in `Voice.test.tsx`, `Compare.test.tsx`, and `FilterBar.test.tsx`.
 - **Verification**: All gates 100% green: 117 Vitest suites (913 tests), 40 DB test suites (370 tests), 262 Python pytest tests, ESLint, Prettier, TypeScript, Deno check, and Vite production build + prerender. All paths free.
+
+2026-09-22, Antigravity session — Dashboard Scroll Glitch Fix & Sticky Bar Shielding (DONE):
+
+- Fixed dashboard scroll visual glitch: guarded `<Summary>` with `s.workspace_total > 0` to eliminate zeroed cards protrusion on empty channels.
+- Hardened `.db-sticky-bar`: replaced translucent tint with 96% opaque card surface (`color-mix(in srgb, var(--bg-card) 96%, transparent)`), 20px blur, and matching viewport padding to eliminate bleed-through.
+- Verified 100% green across all gates via `npm run check`. All paths free.
