@@ -11,6 +11,10 @@ Executed the prioritized improvements derived from the 360-degree architecture, 
 - **E2E Playwright Suite Hardening & Alignment**:
   - Synchronized `tests/e2e/dashboard.spec.ts` with the streamlined 5-section layout and the 6 cards/page pagination model.
   - Full E2E suite executed green (124 tests across all 12 spec files).
+- **User Impersonation Lens & UI Isolation Hardening**:
+  - `apps/web/src/main.tsx`: Hidden the admin navigation rail destination when active in impersonation mode (`access.data === true && !isImpersonating`). Mirrors the authentic client view with no admin chrome leakage.
+  - `apps/web/src/admin/AdminPage.tsx` & `apps/web/src/admin/AdminShell.tsx`: Blocked admin surface access during impersonation (`admin = !demo && !isImpersonating && access.data === true`), rendering the forbidden card and hiding admin tabs.
+  - `apps/web/src/admin/AdminShell.test.tsx`: Added unit test coverage for `useAdminShell` and `AdminPage` impersonation protection. All 4 tests passing.
 
 - **Database Performance & Covering Composite Indexes**:
   - Migration `20260922220000_dashboard_aggregation_covering_indexes.sql`:

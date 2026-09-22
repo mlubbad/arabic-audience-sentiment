@@ -57,7 +57,7 @@ import { publicRoutes } from "./publicRoutes";
 import { SessionControl } from "./SessionControl";
 import { AdminInspectionBanner } from "./AdminInspectionBanner";
 import { ImpersonationBanner } from "./ImpersonationBanner";
-import { ImpersonationProvider } from "./impersonation";
+import { ImpersonationProvider, useImpersonation } from "./impersonation";
 import { TourProvider } from "./tour/TourProvider";
 import { TourEntry } from "./tour/TourEntry";
 const Dashboard = lazy(() =>
@@ -288,9 +288,10 @@ function AppLayout() {
   const S = useStrings();
   // Signed out, nothing is asked; signed in, one query the admin page shares.
   const { session } = useSession();
+  const { isImpersonating } = useImpersonation();
   const access = useIsPlatformAdmin(session);
   const destinations = DESTINATIONS.filter(
-    (d) => !("admin" in d) || access.data === true,
+    (d) => !("admin" in d) || (access.data === true && !isImpersonating),
   );
   // The language lands on <html> before paint, where CSS `:lang()` and the
   // bidi algorithm read it. The shell is the only surface that speaks two

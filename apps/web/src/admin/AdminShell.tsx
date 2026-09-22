@@ -17,6 +17,7 @@ import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 import { useSession } from "../session";
 import { useIsPlatformAdmin } from "../adminAccess";
+import { useImpersonation } from "../impersonation";
 import { useStrings } from "../strings";
 import { failureCode } from "../failure";
 import { Badge } from "../ui/Badge";
@@ -32,8 +33,10 @@ export function useAdminShell(): {
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("demo");
   const { session, loading } = useSession();
+  const { isImpersonating } = useImpersonation();
   const access = useIsPlatformAdmin(demo ? null : session);
-  const admin = demo || !!(session && access.data === true);
+  const admin =
+    demo || (!isImpersonating && !!(session && access.data === true));
   const shell = (body: ReactNode) => <div className="db-page">{body}</div>;
   if (!demo) {
     if (loading || (session && access.isPending))
