@@ -84,27 +84,26 @@ export function SectionNav({
   S: Strings;
   show: boolean;
 }) {
+  if (!show) return null;
   return (
     <nav
       className="db-nav"
       aria-label={S.reportSectionsLabel}
       data-testid="section-nav"
-      data-tour={show ? "sections" : undefined}
+      data-tour="sections"
     >
-      {show && (
-        <div className="db-nav-links">
-          {SECTIONS.map((section) => (
-            <a
-              key={section.id}
-              href={`#${section.id}`}
-              // Where the reader is, not only where they can go.
-              aria-current={active === section.id ? "true" : undefined}
-            >
-              {S[section.label]}
-            </a>
-          ))}
-        </div>
-      )}
+      <div className="db-nav-links">
+        {SECTIONS.map((section) => (
+          <a
+            key={section.id}
+            href={`#${section.id}`}
+            // Where the reader is, not only where they can go.
+            aria-current={active === section.id ? "true" : undefined}
+          >
+            {S[section.label]}
+          </a>
+        ))}
+      </div>
     </nav>
   );
 }

@@ -6,27 +6,45 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4) var(--space-2);
-  margin-inline: calc(-1 * var(--space-4));
-  background: var(--glass-2-tint);
-  backdrop-filter: var(--glass-2-blur) var(--glass-lens);
-  -webkit-backdrop-filter: var(--glass-2-blur) var(--glass-lens);
-  border-bottom: var(--glass-2-edge);
-  box-shadow: var(--glass-2-ring);
+  padding: var(--space-3) 1.5rem var(--space-2);
+  margin-inline: -1.5rem;
+  background: var(--bg-card);
+  background: color-mix(in srgb, var(--bg-card) 96%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(20, 17, 47, 0.08);
+  box-shadow: 0 4px 16px rgba(20, 17, 47, 0.04);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .db-sticky-bar {
+    background: var(--bg-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .db-sticky-bar .db-filterbar {
+  /* style.css frames every bare <form> as a bordered white box with a margin;
+     inside the sticky bar this form is purely the row of filter controls. */
   position: static;
-  margin-inline: 0;
+  margin: 0;
   padding: 0;
-  background: none;
+  border: 0;
+  border-radius: 0;
+  background: inherit;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-bottom: none;
   box-shadow: none;
 }
 
 .db-filterbar {
+  /* style.css frames every bare <form> with a border, border-radius, and
+     margin-block: 1rem. This bar is a sticky strip of controls across the page. */
+  margin: 0;
+  margin-inline: calc(-1 * var(--space-4));
+  border: 0;
+  border-radius: 0;
   position: sticky;
   /* Below the shell header, not behind it — the offset the old report.css's
      nav bar once read. `--app-header-h` is 0px in the current rail shell (no
@@ -43,7 +61,6 @@
      clipped, and a readable search box is worth the second row. */
   gap: var(--space-2) var(--space-3);
   padding: var(--space-3) var(--space-4);
-  margin-inline: calc(-1 * var(--space-4));
   background: var(--glass-2-tint);
   backdrop-filter: var(--glass-2-blur) var(--glass-lens);
   -webkit-backdrop-filter: var(--glass-2-blur) var(--glass-lens);
@@ -102,6 +119,10 @@
    button sits at inline-end instead; the chips and the error still take the
    full row beneath it. */
 @media (max-width: 900px) {
+  .db-sticky-bar {
+    padding-inline: 1rem;
+    margin-inline: -1rem;
+  }
   .db-filterbar {
     justify-content: flex-end;
   }

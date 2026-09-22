@@ -106,6 +106,13 @@
   overflow-wrap: anywhere;
 }
 .db-ws-rename {
+  /* style.css frames every bare <form> as a bordered white box with a margin;
+     this rename/add strip sits directly on the card's ground. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   display: grid;
   gap: var(--space-2);
 }

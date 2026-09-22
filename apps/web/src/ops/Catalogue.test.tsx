@@ -22,7 +22,7 @@ const shared = vi.hoisted(() => ({
     data: undefined as unknown,
     isPending: false,
     isError: false,
-    refetch: () => Promise.resolve(),
+    refetch: vi.fn(() => Promise.resolve()),
   },
 }));
 vi.mock("@tanstack/react-query", () => ({
@@ -136,7 +136,7 @@ beforeEach(() => {
     },
     isPending: false,
     isError: false,
-    refetch: () => Promise.resolve(),
+    refetch: vi.fn(() => Promise.resolve()),
   };
 });
 
@@ -402,5 +402,61 @@ describe("what a selected video's state cell says", () => {
       // outcome to it.
       expect(explainCode("unchanged", S)).toBe(S.catStateUnchanged);
     }
+  });
+});
+
+describe("reactive lifecycle updates", () => {
+  it("refetches catalogue when a discover job transitions from running to finished", () => {
+    const refetch = vi.fn(() => Promise.resolve());
+    shared.query.refetch = refetch;
+
+    const { rerender } = render(
+      <Catalogue {...props({ jobs: [job({ status: "running" })] })} />,
+    );
+    expect(refetch).not.toHaveBeenCalled();
+
+    // The discover job finishes: jobs now has a succeeded job (or no active job)
+    rerender(
+      <Catalogue {...props({ jobs: [job({ status: "succeeded" })] })} />,
+    );
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches catalogue when an active collect job transitions from running to finished", () => {
+    const refetch = vi.fn(() => Promise.resolve());
+    shared.query.refetch = refetch;
+
+    const { rerender } = render(
+      <Catalogue
+        {...props({
+          jobs: [job({ type: "collect", status: "running" })],
+        })}
+      />,
+    );
+    expect(refetch).not.toHaveBeenCalled();
+
+    // The collect job finishes
+    rerender(
+      <Catalogue
+        {...props({
+          jobs: [job({ type: "collect", status: "succeeded" })],
+        })}
+      />,
+    );
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches when catalogue is uncatalogued but a succeeded discover job exists", () => {
+    const refetch = vi.fn(() => Promise.resolve());
+    shared.query.refetch = refetch;
+    shared.query.data = {
+      videos: [],
+      selections: [],
+      channelId: "ch1",
+      cataloguedAt: null,
+    };
+
+    render(<Catalogue {...props({ jobs: [job({ status: "succeeded" })] })} />);
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

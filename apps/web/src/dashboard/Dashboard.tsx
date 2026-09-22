@@ -1010,7 +1010,9 @@ function DashboardBody({
       )}
       {s && (
         <>
-          <Summary s={s} S={S} topicName={topicName} />
+          {s.workspace_total > 0 && (
+            <Summary s={s} S={S} topicName={topicName} />
+          )}
           {s.total === 0 ? (
             /* Two different zeros, and for years one message.
                A workspace whose collection has not run yet and a filter that

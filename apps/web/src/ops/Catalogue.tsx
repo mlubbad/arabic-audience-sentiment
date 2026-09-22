@@ -76,6 +76,7 @@ export function Catalogue({
   stored,
   jobs,
   workerConnected,
+  channelId,
   onChanged,
 }: {
   mode: "live" | "sanitized_fixture";
@@ -87,6 +88,7 @@ export function Catalogue({
   jobs: JobRow[] | null;
   /** For the discover job's sentence: queued reads differently with no worker. */
   workerConnected: boolean;
+  channelId?: string | null;
   onChanged: () => void;
 }) {
   const S = useStrings();
@@ -95,6 +97,7 @@ export function Catalogue({
     queryKey: ["catalogue", mode, workspaceId],
     queryFn: ({ signal }) => loadCatalogue(mode, workspaceId, signal),
   });
+  const effectiveChannelId = channelId ?? read.data?.channelId ?? null;
   const rows = useMemo(
     () => (read.data ? mergeCatalogue(read.data, stored) : []),
     [read.data, stored],
@@ -125,9 +128,8 @@ export function Catalogue({
   const remaining =
     plan?.budgets.find((b) => b.event_type === "comment_analysis")?.remaining ??
     null;
-  const CATALOGUE_PAGE_SIZE = 15;
   const shown = filterCatalogue(rows, { search, kind, sort });
-  const paged = pageOf(shown, page, CATALOGUE_PAGE_SIZE);
+  const paged = pageOf(shown, page);
   const saved = new Map(rows.map((r) => [r.id, r.selected]));
   const adding = new Set([...ticked].filter((id) => !saved.get(id)));
   const removing = rows
@@ -154,6 +156,54 @@ export function Catalogue({
     const interval = setInterval(() => setTimerTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, [discovering?.status]);
+
+  // When a discover job finishes, immediately refetch the catalogue so the newly
+  // discovered videos appear on screen without requiring a manual page reload.
+  const prevDiscoveringRef = useRef(discovering);
+  useEffect(() => {
+    if (prevDiscoveringRef.current && !discovering) {
+      hasCheckedSucceededDiscover.current = true;
+      void read.refetch();
+    }
+    prevDiscoveringRef.current = discovering;
+  }, [discovering, read]);
+
+  // When active collection finishes, refetch so selections and comment counts update.
+  const activeCollect = useMemo(
+    () =>
+      (jobs ?? []).find(
+        (j) =>
+          j.type === "collect" &&
+          (j.status === "queued" || j.status === "running"),
+      ) ?? null,
+    [jobs],
+  );
+  const prevCollectRef = useRef(activeCollect);
+  useEffect(() => {
+    if (prevCollectRef.current && !activeCollect) {
+      void read.refetch();
+    }
+    prevCollectRef.current = activeCollect;
+  }, [activeCollect, read]);
+
+  // If the catalogue read returned uncatalogued, but there is already a succeeded
+  // discover job in the attempt log, refetch to recover from any race condition.
+  const hasCheckedSucceededDiscover = useRef(false);
+  const hasSucceededDiscover = (jobs ?? []).some(
+    (j) => j.type === "discover" && j.status === "succeeded",
+  );
+  useEffect(() => {
+    if (
+      !hasCheckedSucceededDiscover.current &&
+      !read.isPending &&
+      read.data?.cataloguedAt === null &&
+      hasSucceededDiscover
+    ) {
+      hasCheckedSucceededDiscover.current = true;
+      void read.refetch();
+    }
+  }, [hasSucceededDiscover, read]);
+
   const dirty = adding.size > 0 || removing.length > 0;
   const kindWord = (k: CatalogueVideo["kind"]) =>
     k === "video"
@@ -171,13 +221,13 @@ export function Catalogue({
     });
 
   const save = () => {
-    if (!supabase || !read.data?.channelId) return;
+    if (!supabase || !effectiveChannelId) return;
     setBusy(true);
     setFeedback(null);
     void supabase
       .rpc("select_videos", {
         w: workspaceId,
-        c: read.data.channelId,
+        c: effectiveChannelId,
         add: [...adding],
         remove: removing,
       })
@@ -206,11 +256,11 @@ export function Catalogue({
       });
   };
   const refresh = () => {
-    if (!supabase || !read.data?.channelId) return;
+    if (!supabase || !effectiveChannelId) return;
     setBusy(true);
     setFeedback(null);
     void supabase
-      .rpc("request_discovery", { w: workspaceId, c: read.data.channelId })
+      .rpc("request_discovery", { w: workspaceId, c: effectiveChannelId })
       .then(({ error }) => {
         setBusy(false);
         setFeedback(error ? S.catRequestFailed : S.catRequested);
@@ -457,7 +507,7 @@ export function Catalogue({
                   variant="secondary"
                   size="sm"
                   data-testid="cat-refresh"
-                  disabled={busy || mode !== "live" || !read.data?.channelId}
+                  disabled={busy || mode !== "live" || !effectiveChannelId}
                   onClick={refresh}
                 >
                   {S.catRefresh}
@@ -716,7 +766,7 @@ export function Catalogue({
               !dirty ||
               est.exceeds ||
               busy ||
-              (mode === "live" && !read.data?.channelId)
+              (mode === "live" && !effectiveChannelId)
             }
             onSave={save}
             feedback={feedback}

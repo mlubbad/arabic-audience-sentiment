@@ -17,6 +17,7 @@ import {
   toCsv,
   effectiveLabel,
   effectiveTopic,
+  exportObjectPath,
   type Comment,
   type CommentReviewInput,
   type Filters,
@@ -490,13 +491,7 @@ export async function buildExport(mode: DataMode, filters: Filters) {
   );
   return {
     rows: rows.length,
-    filename: [
-      filters.workspace_id,
-      "comments",
-      new Date().toISOString().replaceAll(":", "-"),
-      "csv",
-    ]
-      .join(".")
+    filename: exportObjectPath(filters.workspace_id, new Date())
       .split("/")
       .pop()!,
     csv: toCsv(rows),

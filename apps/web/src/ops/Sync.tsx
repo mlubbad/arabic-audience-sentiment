@@ -12,8 +12,8 @@
  * decision, so the demo has an operations page too and the two can never
  * disagree about what the sync state is.
  */
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   configuredMode,
   fixtureWorkspace,
@@ -153,6 +153,7 @@ function SyncBody({
 }) {
   const S = useStrings();
   const lang = useLocale();
+  const queryClient = useQueryClient();
   // The operations page reads the lightweight ops snapshot: worker health,
   // sync state, quota usage and comment counts per video. Shared with the
   // rail indicator under the "ops-source" key.
@@ -196,10 +197,13 @@ function SyncBody({
       void snapshot.refetch();
     });
   };
-  // Re-read the live-only rows and the snapshot together, after an action.
+  // Re-read the live-only rows, the snapshot, and the catalogue together, after an action.
   const refresh = () => {
     setTick((t) => t + 1);
     void snapshot.refetch();
+    void queryClient.invalidateQueries({
+      queryKey: ["catalogue", mode, workspaceId],
+    });
   };
   useEffect(() => {
     if (!supabase || mode !== "live") {
@@ -309,6 +313,21 @@ function SyncBody({
   }, [mode, sync?.queued_jobs, sync?.last_run?.status, jobs]);
 
   const refetch = snapshot.refetch;
+  const prevActiveWorkRef = useRef(hasActiveWork);
+  useEffect(() => {
+    if (prevActiveWorkRef.current && !hasActiveWork) {
+      // Background jobs just transitioned from running to finished:
+      // invalidate both catalogue and ops-source queries so UI updates immediately.
+      void queryClient.invalidateQueries({
+        queryKey: ["catalogue", mode, workspaceId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["ops-source", userId, mode, workspaceId],
+      });
+    }
+    prevActiveWorkRef.current = hasActiveWork;
+  }, [hasActiveWork, queryClient, mode, workspaceId, userId]);
+
   useEffect(() => {
     if (!hasActiveWork) return;
     const interval = setInterval(() => {
@@ -385,6 +404,7 @@ function SyncBody({
             stored={stored}
             jobs={jobs}
             workerConnected={connected}
+            channelId={channelId}
             onChanged={refresh}
           />
           <Attempts
