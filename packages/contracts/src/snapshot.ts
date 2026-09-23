@@ -13,6 +13,10 @@ export type VideoAggregate = {
   analysed: number;
   replies: number;
   sentiments: Record<Label, number>;
+  thumbnail_url?: string | null;
+  view_count?: number | null;
+  like_count?: number | null;
+  reported_comment_count?: number | null;
 };
 
 export type LabelledComment = Comment & {
@@ -268,6 +272,21 @@ export function snapshot(
     unique_authors: new Set(
       rows.flatMap((c) => (c.author_channel_id ? [c.author_channel_id] : [])),
     ).size,
+    kpis: {
+      total_views: null,
+      total_likes: rows.reduce((sum, c) => sum + (c.likes_value ?? 0), 0),
+      total_comments: rows.length,
+      engagement_rate: null,
+      net_sentiment:
+        analysed > 0
+          ? Number(
+              (
+                ((sentiments.positive - sentiments.negative) / analysed) *
+                100
+              ).toFixed(1),
+            )
+          : null,
+    },
     // Busiest first, ties broken by id so the order does not wobble.
     videos: [...videos.values()].sort(
       (a, b) => b.total - a.total || a.id.localeCompare(b.id, "en"),

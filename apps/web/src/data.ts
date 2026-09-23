@@ -422,6 +422,56 @@ export function deriveSnapshot(
       active_analysis_key: source.active_analysis_key,
       active_topic_key: source.active_topic_key,
       cursor_reset,
+      kpis: {
+        total_views: null,
+        total_likes: null,
+        total_comments: base.total,
+        engagement_rate: null,
+        net_sentiment:
+          base.sentiments.positive + base.sentiments.negative > 0
+            ? Math.round(
+                ((base.sentiments.positive - base.sentiments.negative) /
+                  (base.sentiments.positive + base.sentiments.negative)) *
+                  1000,
+              ) / 10
+            : null,
+      },
+      channel: {
+        id: comments[0]?.channel_id ?? "ch_fixture",
+        title: "قناة تجريبية",
+        avatar_url: null,
+        subscriber_count: null,
+        view_count: null,
+        video_count: null,
+      },
+      people: Array.from(
+        comments
+          .filter((c) => !c.by_channel_owner && c.author_name)
+          .reduce((acc, c) => {
+            const author = c.author_name!;
+            const existing = acc.get(author);
+            if (!existing) {
+              acc.set(author, {
+                name: author,
+                channel_id: c.author_channel_id,
+                avatar_url: c.author_profile_image_url ?? null,
+                channel_url: c.author_channel_url ?? null,
+                comments_count: 1,
+                likes_count: c.likes_value ?? 0,
+              });
+            } else {
+              existing.comments_count++;
+              existing.likes_count += c.likes_value ?? 0;
+              if (!existing.avatar_url && c.author_profile_image_url) {
+                existing.avatar_url = c.author_profile_image_url;
+              }
+            }
+            return acc;
+          }, new Map<string, { name: string; channel_id: string | null; avatar_url: string | null; channel_url: string | null; comments_count: number; likes_count: number }>())
+          .values(),
+      )
+        .sort((a, b) => b.comments_count - a.comments_count)
+        .slice(0, 10),
     };
   };
   try {
@@ -536,6 +586,10 @@ export interface RawCommentLike {
   platform?: SourcePlatform;
   video_kind?: ContentKind;
   author_channel_id?: string | null;
+  author_profile_image_url?: string | null;
+  author_channel_url?: string | null;
+  reply_count?: number;
+  updated_at?: string | null;
   by_channel_owner?: boolean;
   author_name?: string | null;
   text_raw?: string | null;
@@ -636,6 +690,10 @@ export function toLabelledComment(
     reviews: comment.reviews ?? [],
     topic_prediction: topicPred,
     topic_reviews: comment.topic_reviews ?? [],
+    author_profile_image_url: comment.author_profile_image_url ?? null,
+    author_channel_url: comment.author_channel_url ?? null,
+    reply_count: comment.reply_count ?? 0,
+    updated_at: comment.updated_at ?? null,
   };
   return {
     ...c,
@@ -717,6 +775,28 @@ export async function loadDashboardAggregates(
     analysed: snap.analysed,
     unanalysed: snap.unanalysed,
     sentiments: snap.sentiments,
+    kpis: {
+      total_views: null,
+      total_likes: null,
+      total_comments: snap.total,
+      engagement_rate: null,
+      net_sentiment:
+        snap.sentiments.positive + snap.sentiments.negative > 0
+          ? Math.round(
+              ((snap.sentiments.positive - snap.sentiments.negative) /
+                (snap.sentiments.positive + snap.sentiments.negative)) *
+                1000,
+            ) / 10
+          : null,
+    },
+    channel: {
+      id: fixture.comments[0]?.channel_id ?? "ch_fixture",
+      title: "قناة تجريبية",
+      avatar_url: null,
+      subscriber_count: null,
+      view_count: null,
+      video_count: null,
+    },
     measurable: Array.from(snap.measurable),
     negative_ranked: snap.negative_ranked,
     negative_unranked: snap.negative_unranked,
@@ -727,13 +807,41 @@ export async function loadDashboardAggregates(
     hours: [],
     weekdays: [],
     weeks: [],
-    people: [],
+    people: Array.from(
+      comments
+        .filter((c) => !c.by_channel_owner && c.author_name)
+        .reduce((acc, c) => {
+          const author = c.author_name!;
+          const existing = acc.get(author);
+          if (!existing) {
+            acc.set(author, {
+              name: author,
+              channel_id: c.author_channel_id,
+              avatar_url: c.author_profile_image_url ?? null,
+              channel_url: c.author_channel_url ?? null,
+              comments_count: 1,
+              likes_count: c.likes_value ?? 0,
+            });
+          } else {
+            existing.comments_count++;
+            existing.likes_count += c.likes_value ?? 0;
+            if (!existing.avatar_url && c.author_profile_image_url) {
+              existing.avatar_url = c.author_profile_image_url;
+            }
+          }
+          return acc;
+        }, new Map<string, { name: string; channel_id: string | null; avatar_url: string | null; channel_url: string | null; comments_count: number; likes_count: number }>())
+        .values(),
+    )
+      .sort((a, b) => b.comments_count - a.comments_count)
+      .slice(0, 10),
     most_engaged_negative: snap.most_engaged_negative.map((c) => ({
       id: c.id,
       video_id: c.video_id,
       video_title: c.video_title,
       text_raw: c.text_raw ?? "",
       author_name: c.author_name,
+      author_profile_image_url: c.author_profile_image_url ?? null,
       published_at: c.published_at,
       likes_value: c.likes_value,
       label: c.label,

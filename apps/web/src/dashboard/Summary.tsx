@@ -142,14 +142,53 @@ export function Summary({
           </div>
         </Card>
       )}
-      <div className="db-grid" aria-label={S.metricsLabel}>
-        <Card className="db-kpi">
+
+      {/* 5 Primary Storytelling KPIs */}
+      <div className="db-kpis-primary" aria-label={S.metricsLabel}>
+        <Card className="db-kpi db-kpi-highlight">
+          <strong className="db-kpi-value ui-num" data-testid="kpi-views">
+            {s.kpis?.total_views != null ? n(s.kpis.total_views) : "—"}
+          </strong>
+          <span className="db-kpi-label">{S.kpiViews}</span>
+          <small className="db-note">{S.kpiViewsNote}</small>
+        </Card>
+        <Card className="db-kpi db-kpi-highlight">
           <strong className="db-kpi-value ui-num" data-testid="total">
             {n(s.total)}
           </strong>
           <span className="db-kpi-label">{S.metricComments}</span>
           <small className="db-note">{S.metricCommentsNote}</small>
         </Card>
+        <Card className="db-kpi db-kpi-highlight">
+          <strong className="db-kpi-value ui-num" data-testid="kpi-likes">
+            {s.kpis?.total_likes != null ? n(s.kpis.total_likes) : "—"}
+          </strong>
+          <span className="db-kpi-label">{S.kpiLikes}</span>
+          <small className="db-note">{S.kpiLikesNote}</small>
+        </Card>
+        <Card className="db-kpi db-kpi-highlight">
+          <strong
+            className="db-kpi-value ui-num"
+            data-testid="kpi-net-sentiment"
+          >
+            {netSign}
+          </strong>
+          <span className="db-kpi-label">{S.kpiNetSentiment}</span>
+          <small className="db-note">{S.kpiNetSentimentNote}</small>
+        </Card>
+        <Card className="db-kpi db-kpi-highlight">
+          <strong className="db-kpi-value ui-num" data-testid="kpi-engagement">
+            {s.kpis?.engagement_rate != null
+              ? `${s.kpis.engagement_rate}٪`
+              : "—"}
+          </strong>
+          <span className="db-kpi-label">{S.kpiEngagement}</span>
+          <small className="db-note">{S.kpiEngagementNote}</small>
+        </Card>
+      </div>
+
+      {/* Technical and Pipeline Breakdown */}
+      <div className="db-kpis-technical" aria-label={S.metricsLabel}>
         <Card className="db-kpi">
           <strong className="db-kpi-value ui-num">{n(s.analysed)}</strong>
           <span className="db-kpi-label">{S.metricAnalysed}</span>
@@ -170,11 +209,41 @@ export function Summary({
         <Card className="db-kpi">
           <strong className="db-kpi-value ui-num">{n(s.unique_authors)}</strong>
           <span className="db-kpi-label">{S.metricAuthors}</span>
-          {/* Counted by channel id. Rows whose author was purged are not
-              countable as people and are excluded rather than guessed at. */}
           <small className="db-note">{S.metricAuthorsNote}</small>
         </Card>
       </div>
+
+      {/* Actionable Steps / Recommendations */}
+      {s.analysed > 0 && (
+        <Card className="db-actionable-card" data-testid="actionable-steps">
+          <div className="db-actionable-header">
+            <span aria-hidden="true">💡</span>
+            <span>{S.actionableStepsTitle}</span>
+          </div>
+          <ul className="db-actionable-list">
+            {(negPct >= 15 || s.most_engaged_negative?.length > 0) && (
+              <li className="db-actionable-item">
+                <span className="db-actionable-num">١</span>
+                <span>{S.actionStep1Critical}</span>
+              </li>
+            )}
+            {posPct >= 30 && (
+              <li className="db-actionable-item">
+                <span className="db-actionable-num">٢</span>
+                <span>{S.actionStep2Positive}</span>
+              </li>
+            )}
+            <li className="db-actionable-item">
+              <span className="db-actionable-num">٣</span>
+              <span>{S.actionStep3Timing}</span>
+            </li>
+            <li className="db-actionable-item">
+              <span className="db-actionable-num">٤</span>
+              <span>{S.actionStep4Engagement}</span>
+            </li>
+          </ul>
+        </Card>
+      )}
     </section>
   );
 }

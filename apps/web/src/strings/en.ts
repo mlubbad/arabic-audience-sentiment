@@ -1043,6 +1043,28 @@ export const en: Strings = {
   // Engaged creator tip
   engagedCreatorTip:
     "Actionable tip: These comments received widespread viewer agreement; replying or clarifying officially mitigates controversy and builds trust.",
+
+  // Storytelling with Data KPIs & Actionable Steps
+  kpiViews: "Views",
+  kpiViewsNote: "Total views across analysed videos",
+  kpiLikes: "Likes",
+  kpiLikesNote: "Total likes interaction",
+  kpiNetSentiment: "Net Sentiment",
+  kpiNetSentimentNote: "Positive minus negative ratio",
+  kpiEngagement: "Engagement Rate",
+  kpiEngagementNote: "(Comments + Likes) / Views",
+  actionableStepsTitle: "Actionable Recommendations & Next Steps",
+  actionStep1Critical:
+    "Proactively address top critical comments to clarify misunderstandings and defuse tension.",
+  actionStep2Positive:
+    "Amplify high-performing positive themes in upcoming content and engage loyal fans.",
+  actionStep3Timing:
+    "Leverage peak engagement hours for publishing to maximize reach and response.",
+  actionStep4Engagement:
+    "Pin clarifying comments or run community polls around trending debate topics.",
+  actionStepGeneral:
+    "Maintain continuous audience sentiment monitoring with every new release to sustain positive growth.",
+
   dateOrderError: "The start date must come before the end date",
   chipSearch: (q: string) => `search: “${q}”`,
   chipVideo: "one video",

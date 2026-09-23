@@ -75,7 +75,7 @@ def content_hash(text: str) -> str:
 
 
 def _comment(c: RawComment) -> dict[str, Any]:
-    return {
+    d = {
         "external_comment_id": c.id,
         "external_parent_id": c.parent_id,
         "is_reply": c.is_reply,
@@ -95,6 +95,15 @@ def _comment(c: RawComment) -> dict[str, Any]:
         "source": c.source,
         "field_provenance": c.field_provenance,
     }
+    if c.author_profile_image_url is not None:
+        d["author_profile_image_url"] = c.author_profile_image_url
+    if c.author_channel_url is not None:
+        d["author_channel_url"] = c.author_channel_url
+    if c.reply_count:
+        d["reply_count"] = c.reply_count
+    if c.updated_at is not None:
+        d["updated_at"] = c.updated_at
+    return d
 
 
 def _canonicalise(value: Any) -> Any:

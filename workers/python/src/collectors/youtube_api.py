@@ -155,15 +155,20 @@ class YouTubeAPI:
         except (ValueError, KeyError, TypeError, IndexError):
             return ""
 
-    def _comment(self, item, video, parent=None):
+    def _comment(self, item, video, parent=None, reply_count=0):
         try:
             s = item["snippet"]
             parent = s.get("parentId", parent)
+            r_count = reply_count or s.get("totalReplyCount", 0)
             return RawComment(id=item["id"], video_id=video, text=s["textOriginal"],
                               parent_id=parent, is_reply=parent is not None,
                               parent_source="api" if parent else "unknown",
                               author_channel_id=s.get("authorChannelId", {}).get("value"),
                               author_name=s.get("authorDisplayName", ""),
+                              author_profile_image_url=s.get("authorProfileImageUrl"),
+                              author_channel_url=s.get("authorChannelUrl"),
+                              reply_count=int(r_count) if r_count is not None else 0,
+                              updated_at=s.get("updatedAt"),
                               published_time_raw=s.get("publishedAt"), published_at=s.get("publishedAt"),
                               timestamp_precision="second" if s.get("publishedAt") else "unknown",
                               likes_value=s.get("likeCount"), source=self.source,
@@ -228,9 +233,9 @@ class YouTubeAPI:
                         if effective_since and top_pub and self._is_before_or_at(top_pub, effective_since):
                             cutoff_reached = True
                             break
-                        comments.append(self._comment(top, video_id))
-                        inline = i.get("replies", {}).get("comments", [])
                         total_replies = i["snippet"].get("totalReplyCount", 0)
+                        comments.append(self._comment(top, video_id, reply_count=total_replies))
+                        inline = i.get("replies", {}).get("comments", [])
                         if total_replies <= len(inline):
                             for r in inline:
                                 comments.append(self._comment(r, video_id, parent=top["id"]))
@@ -378,7 +383,11 @@ class YouTubeAPI:
                 try:
                     vid = item["id"]
                     s = item.get("snippet", {})
-                    raw = item.get("statistics", {}).get("commentCount")
+                    stat = item.get("statistics", {})
+                    raw = stat.get("commentCount")
+                    raw_views = stat.get("viewCount")
+                    raw_likes = stat.get("likeCount")
+                    raw_fav = stat.get("favoriteCount")
                     provenance = {"source": self.source, "adapter_revision": self.revision,
                                   "credential_kind": self.credential_kind,
                                   "discovered_in_tabs": found[vid]["tabs"]}
@@ -393,6 +402,12 @@ class YouTubeAPI:
                         "duration_sec": self._seconds(item.get("contentDetails", {}).get("duration")),
                         # None is the setting being off, never a count of zero.
                         "reported_comment_count": None if raw is None else int(raw),
+                        "view_count": None if raw_views is None else int(raw_views),
+                        "like_count": None if raw_likes is None else int(raw_likes),
+                        "favorite_count": None if raw_fav is None else int(raw_fav),
+                        "tags": s.get("tags") or [],
+                        "description": s.get("description") or "",
+                        "category_id": s.get("categoryId"),
                         "field_provenance": provenance,
                     })
                 except (KeyError, TypeError, ValueError):

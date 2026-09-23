@@ -83,6 +83,10 @@ export const BatchCommentSchema = z
     likes_value: z.number().int().nonnegative().nullable(),
     source: z.string().min(1),
     field_provenance: z.record(z.unknown()),
+    author_profile_image_url: z.string().nullable().optional(),
+    author_channel_url: z.string().nullable().optional(),
+    reply_count: z.number().int().nonnegative().optional(),
+    updated_at: timestamp.nullable().optional(),
   })
   .strict()
   .refine(

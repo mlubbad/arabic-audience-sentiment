@@ -18,6 +18,10 @@ class RawComment:
     timestamp_precision: str = "unknown"
     author_channel_id: str | None = None
     author_name: str = ""
+    author_profile_image_url: str | None = None
+    author_channel_url: str | None = None
+    reply_count: int = 0
+    updated_at: str | None = None
     likes_raw: str | None = None
     likes_value: int | None = None
     source: str = "sanitized_fixture"

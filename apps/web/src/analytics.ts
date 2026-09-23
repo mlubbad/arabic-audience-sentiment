@@ -123,6 +123,8 @@ export function byWeek(comments: LabelledComment[]): Bucketed {
 export type Commenter = {
   key: string;
   name: string;
+  avatar_url?: string | null;
+  channel_url?: string | null;
   comments: number;
   /** Null when no comment of theirs carried a parsable like count. */
   likes: number | null;
@@ -157,6 +159,8 @@ export function commenters(
     const found = acc.get(key) ?? {
       key,
       name: c.author_name,
+      avatar_url: c.author_profile_image_url ?? null,
+      channel_url: c.author_channel_url ?? null,
       comments: 0,
       likes: null,
       sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 } as Record<
@@ -164,6 +168,12 @@ export function commenters(
         number
       >,
     };
+    if (!found.avatar_url && c.author_profile_image_url) {
+      found.avatar_url = c.author_profile_image_url;
+    }
+    if (!found.channel_url && c.author_channel_url) {
+      found.channel_url = c.author_channel_url;
+    }
     found.comments++;
     // Unknown likes stay unknown. Treating null as 0 would rank a commenter
     // whose counts could not be read below one with genuinely zero likes.
@@ -244,6 +254,8 @@ export function peopleToCommenters(
   peopleList: Array<{
     name: string;
     channel_id?: string | null;
+    avatar_url?: string | null;
+    channel_url?: string | null;
     comments_count?: number;
     likes_count?: number;
     key?: string;
@@ -257,6 +269,8 @@ export function peopleToCommenters(
     ranked: peopleList.map((p) => ({
       key: p.key ?? p.channel_id ?? p.name,
       name: p.name,
+      avatar_url: p.avatar_url ?? null,
+      channel_url: p.channel_url ?? null,
       comments: p.comments ?? p.comments_count ?? 0,
       likes: p.likes ?? p.likes_count ?? null,
       sentiments: {

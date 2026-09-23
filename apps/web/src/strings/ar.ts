@@ -1035,6 +1035,28 @@ export const ar = {
   // Engaged creator tip
   engagedCreatorTip:
     "توصية إجرائية: هذه التعليقات حازت على إعجاب واسع من المتابعين؛ الرد عليها أو توضيحها رسمياً يمتص الجدل ويعزز ثقة الجمهور.",
+
+  // Storytelling with Data KPIs & Actionable Steps
+  kpiViews: "المشاهدات",
+  kpiViewsNote: "إجمالي المشاهدات للفيديوهات المحللة",
+  kpiLikes: "الإعجابات",
+  kpiLikesNote: "إجمالي التفاعل بالإعجاب",
+  kpiNetSentiment: "صافي الرضا",
+  kpiNetSentimentNote: "الفارق بين الإيجابي والسلبي",
+  kpiEngagement: "معدل التفاعل",
+  kpiEngagementNote: "(التعليقات + الإعجابات) / المشاهدات",
+  actionableStepsTitle: "خطوات مقترحة ومسارات تحسين",
+  actionStep1Critical:
+    "الرد الاستباقي على بؤر النقد الأكثر انتشاراً لتصحيح المفاهيم وتخفيف الاحتقان.",
+  actionStep2Positive:
+    "تعزيز المحاور الأكثر إيجابية في الحلقات القادمة وتكريم المعلّقين المخلصين.",
+  actionStep3Timing:
+    "استغلال فترات الذروة الزمنية للنشر لضمان وصول المحتوى إلى أوسع شريحة متفاعلة.",
+  actionStep4Engagement:
+    "تثبيت تعليقات توضيحية أو فتح استطلاعات رأي حول الموضوعات الأكثر جدلاً.",
+  actionStepGeneral:
+    "مواصلة رصد ومتابعة نبض الجمهور دورياً مع كل إصدار جديد للحفاظ على نمو الرضا.",
+
   dateOrderError: "يجب أن يسبق تاريخ البداية تاريخ النهاية",
   chipSearch: (q: string) => `بحث: «${q}»`,
   chipVideo: "فيديو محدَّد",

@@ -482,3 +482,59 @@ def test_early_stopping_on_since_watermark():
         assert [c.id for c in batches[0].comments] == ["new_c"]
         # Crucial check: page2 was NEVER called!
         assert calls == [None]
+
+
+def test_youtube_interaction_fields_extracted():
+    def handler(request):
+        if request.url.path.endswith('/commentThreads'):
+            return httpx.Response(200, json={
+                'items': [{
+                    'snippet': {
+                        'topLevelComment': {
+                            'id': 'c_rich',
+                            'snippet': {
+                                'textOriginal': 'تعليق تفاعلي',
+                                'authorDisplayName': 'المعلق الفعال',
+                                'authorChannelId': {'value': 'UCcommenter123'},
+                                'authorProfileImageUrl': 'https://yt3.ggpht.com/avatar.jpg',
+                                'authorChannelUrl': 'http://www.youtube.com/channel/UCcommenter123',
+                                'publishedAt': '2026-09-23T10:00:00Z',
+                                'updatedAt': '2026-09-23T10:05:00Z',
+                                'likeCount': 42,
+                            }
+                        },
+                        'totalReplyCount': 2
+                    }
+                }]
+            })
+        if request.url.path.endswith('/comments'):
+            return httpx.Response(200, json={
+                'items': [{
+                    'id': 'reply_1',
+                    'snippet': {
+                        'textOriginal': 'رد رائع',
+                        'parentId': 'c_rich',
+                        'authorDisplayName': 'المجيب',
+                        'authorProfileImageUrl': 'https://yt3.ggpht.com/reply_avatar.jpg',
+                        'publishedAt': '2026-09-23T11:00:00Z',
+                    }
+                }]
+            })
+        return httpx.Response(404, json={})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI("fixture-key", client)
+        batches = list(adapter.batches("abcdefghijk", None))
+        assert len(batches) == 2
+        c = batches[0].comments[0]
+        assert c.author_name == "المعلق الفعال"
+        assert c.author_channel_id == "UCcommenter123"
+        assert c.author_profile_image_url == "https://yt3.ggpht.com/avatar.jpg"
+        assert c.author_channel_url == "http://www.youtube.com/channel/UCcommenter123"
+        assert c.reply_count == 2
+        assert c.updated_at == "2026-09-23T10:05:00Z"
+        assert c.likes_value == 42
+        r = batches[1].comments[0]
+        assert r.author_profile_image_url == "https://yt3.ggpht.com/reply_avatar.jpg"
+        assert r.is_reply is True
+

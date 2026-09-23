@@ -130,3 +130,53 @@ def test_needs_the_owner_token():
     with httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"items": []}))) as client:
         with pytest.raises(CollectionError, match="no_channel_for_credential"):
             YouTubeAPI("key", client).catalogue()
+
+
+def test_catalogue_extracts_video_interaction_metrics():
+    def handler(request):
+        p = request.url.path
+        if p.endswith("/channels"):
+            return httpx.Response(200, json=channel())
+        if p.endswith("/playlistItems"):
+            pl = request.url.params["playlistId"]
+            if "LF" in pl:
+                return httpx.Response(200, json=items(["vid12345678"]))
+            return httpx.Response(404, json={"error": {}})
+        if p.endswith("/videos"):
+            return httpx.Response(200, json={
+                "items": [{
+                    "id": "vid12345678",
+                    "snippet": {
+                        "title": "فيديو تفاعلي",
+                        "publishedAt": "2026-09-20T00:00:00Z",
+                        "description": "وصف الفيديو",
+                        "tags": ["arabic", "sentiment"],
+                        "categoryId": "27",
+                        "thumbnails": {"medium": {"url": "https://i.ytimg.com/vi/vid12345678/mqdefault.jpg"}},
+                    },
+                    "statistics": {
+                        "viewCount": "125000",
+                        "likeCount": "4300",
+                        "favoriteCount": "0",
+                        "commentCount": "210",
+                    },
+                    "contentDetails": {"duration": "PT5M30S"},
+                }]
+            })
+        return httpx.Response(404, json={})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    cat = YouTubeAPI(None, client, access_token="tok").catalogue()
+    assert cat.complete is True
+    v = cat.videos[0]
+    assert v["external_video_id"] == "vid12345678"
+    assert v["title"] == "فيديو تفاعلي"
+    assert v["view_count"] == 125000
+    assert v["like_count"] == 4300
+    assert v["favorite_count"] == 0
+    assert v["reported_comment_count"] == 210
+    assert v["tags"] == ["arabic", "sentiment"]
+    assert v["description"] == "وصف الفيديو"
+    assert v["category_id"] == "27"
+    assert v["duration_sec"] == 330
+

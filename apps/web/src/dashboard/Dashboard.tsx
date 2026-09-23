@@ -425,7 +425,9 @@ function DashboardBody({
       cursor_reset: false,
       replies: 0,
       unknown_dates: 0,
-      unique_authors: 0,
+      unique_authors: (agg.people ?? []).length,
+      kpis: agg.kpis,
+      channel: agg.channel,
       comparison: (agg.videos ?? []).slice(0, 10),
       comparison_truncated: (agg.videos ?? []).length > 10,
     } as Snapshot;

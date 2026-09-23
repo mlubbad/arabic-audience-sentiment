@@ -121,13 +121,34 @@ export function Comments({
             <li key={c.id}>
               <Card className="db-comment">
                 <div className="db-comment-head">
-                  <span className="db-comment-who">
-                    {/* A purged author is named as purged, not left blank
-                        and not replaced with a plausible name. `<bdi>` keeps
-                        a Latin handle reading left-to-right (`@abu_faisal`,
-                        not `abu_faisal@`) inside the surrounding RTL text. */}
-                    <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
-                  </span>
+                  <div className="db-comment-author-info">
+                    {c.author_profile_image_url ? (
+                      <img
+                        src={c.author_profile_image_url}
+                        alt=""
+                        className="db-comment-avatar"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="db-comment-avatar-fallback">
+                        {(c.author_name ?? "؟").slice(0, 1)}
+                      </span>
+                    )}
+                    <span className="db-comment-who">
+                      {c.author_channel_url ? (
+                        <a
+                          href={c.author_channel_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="db-comment-author-link"
+                        >
+                          <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
+                        </a>
+                      ) : (
+                        <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
+                      )}
+                    </span>
+                  </div>
                   <Badge tone={c.label ? SENTIMENT_TONE[c.label] : "neutral"}>
                     {c.label ? labels[c.label] : S.noLabel}
                     {score !== null && (

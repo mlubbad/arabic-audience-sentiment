@@ -111,6 +111,16 @@ export function Videos({
                   v.sentiments.positive / v.analysed >= 0.7 && (
                     <Badge tone="positive">{S.videoTagTopPositive}</Badge>
                   )}
+                {v.view_count != null && (
+                  <Badge numeric>
+                    {n(v.view_count)} {S.kpiViews}
+                  </Badge>
+                )}
+                {v.like_count != null && (
+                  <Badge numeric>
+                    {n(v.like_count)} {S.kpiLikes}
+                  </Badge>
+                )}
                 <Badge numeric>{S.countComments(n(v.total))}</Badge>
                 <Badge numeric>{S.countReplies(n(v.replies))}</Badge>
                 <Badge numeric>{S.countAnalysed(n(v.analysed))}</Badge>

@@ -113,6 +113,10 @@ export const CommentSchema = z
     // dashboard then shows "no topic classification has run yet".
     topic_prediction: TopicPredictionSchema.nullable().default(null),
     topic_reviews: z.array(TopicReviewSchema).default([]),
+    author_profile_image_url: z.string().nullable().optional(),
+    author_channel_url: z.string().nullable().optional(),
+    reply_count: z.number().int().nonnegative().optional(),
+    updated_at: timestamp.nullable().optional(),
   })
   .strict();
 export type Comment = z.infer<typeof CommentSchema>;
