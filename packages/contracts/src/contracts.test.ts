@@ -666,6 +666,50 @@ describe("human corrections", () => {
       }).success,
     ).toBe(true);
   });
+  it("accepts comments across multi-platform sources and refuses empty source", () => {
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "tg1",
+        source: "telegram_mtproto",
+        platform: "telegram",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "tg2",
+        source: "telegram_http",
+        platform: "telegram",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "x1",
+        source: "x_api",
+        platform: "x",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "tt1",
+        source: "tiktok_display_api",
+        platform: "tiktok",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "yt1",
+        source: "youtube_data_api_public",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({ ...base, id: "bad", source: "" }).success,
+    ).toBe(false);
+  });
   it("aggregates each video in the same pass, on its own denominator", () => {
     const across: Comment[] = [
       { ...base, id: "v1a", video_id: "v1", prediction: pred("positive") },

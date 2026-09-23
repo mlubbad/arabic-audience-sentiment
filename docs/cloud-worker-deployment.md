@@ -1,0 +1,87 @@
+# دليل نشر وتشغيل عامل البايثون سحابياً (24/7 Cloud Worker Deployment)
+
+هذا الدليل يوضح كيفية تشغيل عامل البايثون السحابي على مدار الساعة (24/7) دون الحاجة لتشغيل جهازك الشخصي أو إبقائه مفتوحاً.
+
+---
+
+## 1. المتطلبات السحابية (متغيرات البيئة)
+
+العامل السحابي يحتاج المتغيرات التالية المسجلة لديك في `.env.local` للاتصال بـ Supabase وقنوات التواصل:
+
+| اسم المتغير | الوظيفة | أين تجده؟ |
+| :--- | :--- | :--- |
+| `WORKER_API_BASE_URL` | عنوان دالة Supabase Edge Function | `https://ykqugctewsqvevhyqtbi.supabase.co/functions/v1/worker` |
+| `WORKER_CREDENTIAL` | المفتاح السري المخصص للعامل للمصادقة مع قاعدة البيانات | من ملف `.env.local` |
+| `SENTIMENT_MODEL` | نموذج تحليل المشاعر العربي الافتراضي | `camelbert-da` |
+| `TOPIC_MODEL` | نموذج تصنيف المواضيع بالذكاء الاصطناعي | `gemini` |
+| `GEMINI_API_KEY` | مفتاح Google Gemini API لتصنيف المواضيع | من ملف `.env.local` |
+| `YOUTUBE_API_KEY` | مفتاح YouTube Data API v3 للقنوات العامة | من ملف `.env.local` |
+| `TELEGRAM_API_ID` | معرف تطبيق تليجرام | `18186196` |
+| `TELEGRAM_API_HASH` | المفتاح السري لتطبيق تليجرام | من ملف `.env.local` |
+| `TELEGRAM_SESSION_STRING` | جلسة تليجرام الموثقة لقراءة المجموعات والردود | من ملف `.env.local` |
+
+---
+
+## 2. خيار النشر الأول (الأسهل والموصى به): منصة Render
+
+منصة **[Render](https://render.com)** توفر خياراً متخصصاً لتشغيل العمال الخلفيين (**Background Worker**) بشكل سحابي كامل ومستقل.
+
+### خطوات التشغيل (بضغطة زر):
+1. ادخل إلى لوحة تحكم ريندر: **[dashboard.render.com](https://dashboard.render.com)**
+2. اضغط على زر **New +** ثم اختر **Background Worker**.
+3. اختر ربط مستودع GitHub الخاص بالمشروع (`arabic-audience-sentiment`).
+4. اضبط الإعدادات التالية في الصفحة:
+   - **Name**: `sentiment-worker`
+   - **Region**: `Frankfurt (EU Central)` (الأقرب لسرعة الاتصال بالشرق الأوسط وسيرفرات Supabase).
+   - **Environment**: اختر **Docker**.
+   - **Dockerfile Path**: `./workers/python/Dockerfile`
+   - **Docker Context**: `./workers/python`
+   - **Instance Type**: اختر **Starter** (أو المناسب لميزانيتك، الحاوية تستهلك ~500MB RAM فقط).
+5. في قسم **Environment Variables** (المتغيرات البيئية):
+   - اضغط **Add Environment Variable** وأضف المتغيرات المذكورة في الجدول أعلاه مع قيمها من `.env.local`.
+6. اضغط على زر **Create Background Worker**.
+
+> 💡 **النتيجة**:
+> ستقوم Render ببناء الحاوية فوراً وتشغيلها. ستظهر لك شاشة السجلات الحية (**Live Logs**) توضح:
+> `worker up, model=camelbert-da, tenants=1, topics=gemini, public=yes, telegram_auth=yes`
+> وسيبدأ العامل بمراقبة قاعدة بيانات Supabase وسحب وتحليل أي وظيفة فور إنشائها.
+
+---
+
+## 3. خيار النشر الثاني: منصة Railway
+
+إذا كنت تفضل منصة **[Railway.com](https://railway.com)**:
+1. ادخل إلى **[railway.com](https://railway.com)** وسجل الدخول بحساب GitHub.
+2. اضغط **New Project** -> **Deploy from GitHub repo**.
+3. اختر المستودع.
+4. اذهب إلى **Settings** -> في خانة **Root Directory** ضع: `workers/python`.
+5. في خانة **Variables** أضف المتغيرات البيئية من الجدول أعلاه.
+6. سيبدأ البناء تلقائياً وسيعمل العامل 24/7.
+
+---
+
+## 4. خيار النشر الثالث: سيرفر VPS خاص عبر Docker Compose
+
+إذا كان لديك سيرفر افتراضي خاص (VPS) يدعم Docker:
+1. ارفع المشروع إلى السيرفر:
+   ```bash
+   git clone <REPO_URL>
+   cd SentimentAnalysis
+   ```
+2. ضع ملف `.env.local` على السيرفر في المجلد الرئيسي.
+3. شغل الحاوية بأمر واحد:
+   ```bash
+   docker compose up -d --build
+   ```
+4. لمتابعة السجلات والتأكد من عمله:
+   ```bash
+   docker compose logs -f
+   ```
+
+---
+
+## 5. كيف تتأكد من عمل العامل السحابي بكفاءة؟
+
+1. **في لوحة تحكم Render/Railway**: ستشاهد رسائل السجل (Logs) تظهر استهلاك المهام دون أي توقف أو أخطاء.
+2. **في لوحة تحكم التطبيق**:
+   - عند طلب سحب قناة يوتيوب أو تليجرام، ستتحول حالة الوظيفة تلقائياً من `queued` إلى `running` ثم `succeeded` في الخلفية، حتى وإن أغلقت متصفحك أو جهازك تماماً!

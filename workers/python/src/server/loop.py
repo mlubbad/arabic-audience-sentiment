@@ -265,17 +265,30 @@ def main() -> None:
         default=os.environ.get("WORKER_CREDENTIAL", ""),
         help="one or more scoped worker credentials, comma-separated",
     )
+    default_model = os.environ.get("SENTIMENT_MODEL", "none")
+    if default_model not in ["none", "deterministic-test", *CANDIDATES.keys()]:
+        default_model = "none"
     p.add_argument(
-        "--model", default="none", choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())]
+        "--model", default=default_model, choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())]
     )
     p.add_argument(
         "--topics",
-        default="gemini" if os.environ.get("GEMINI_API_KEY") else "none",
+        default=os.environ.get("TOPIC_MODEL", "gemini" if os.environ.get("GEMINI_API_KEY") else "none"),
         choices=["none", "deterministic-test", "gemini", "typesafe"],
         help="topic classifier; gemini needs GEMINI_API_KEY, typesafe needs TYPESAFE_API_KEY",
     )
-    p.add_argument("--idle-seconds", type=float, default=60.0, help="pause after an empty queue")
-    p.add_argument("--max-idle", type=int, default=30, help="exit after this many consecutive empty cycles")
+    p.add_argument(
+        "--idle-seconds",
+        type=float,
+        default=float(os.environ.get("WORKER_IDLE_SECONDS", "60.0")),
+        help="pause after an empty queue",
+    )
+    p.add_argument(
+        "--max-idle",
+        type=int,
+        default=int(os.environ.get("WORKER_MAX_IDLE", "30")),
+        help="exit after this many consecutive empty cycles",
+    )
     args = p.parse_args()
     if not args.base or not args.credential:
         raise SystemExit("need WORKER_API_BASE_URL and WORKER_CREDENTIAL")

@@ -37,6 +37,24 @@ export const ReviewSchema = z
       v.origin !== "human" || (v.reason !== null && v.reason.trim().length > 0),
     "a human review must state a reason",
   );
+export const KNOWN_COMMENT_SOURCES = [
+  "sanitized_fixture",
+  "youtube_data_api_public",
+  "youtube_public_scrape",
+  "youtube_oauth",
+  "legacy_import",
+  "telegram_mtproto",
+  "telegram_http",
+  "x_api",
+  "x_apify",
+  "x_brightdata",
+  "tiktok_display_api",
+  "tiktok_apify",
+  "tiktok_brightdata",
+  "youtube_apify_scrape",
+  "youtube_brightdata_scrape",
+] as const;
+
 export const CommentSchema = z
   .object({
     id: z.string().min(1),
@@ -83,13 +101,7 @@ export const CommentSchema = z
     is_reply: z.boolean(),
     parent_comment_id: z.string().nullable(),
     parent_source: z.enum(["api", "extractor", "inferred_id", "unknown"]),
-    source: z.enum([
-      "sanitized_fixture",
-      "youtube_data_api_public",
-      "youtube_public_scrape",
-      "youtube_oauth",
-      "legacy_import",
-    ]),
+    source: z.string().min(1),
     field_provenance: z.record(z.unknown()),
     comment_type: z.string().nullable(),
     // When the text was removed under the retention rule; null while retained.

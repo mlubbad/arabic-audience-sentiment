@@ -548,12 +548,7 @@ export interface RawCommentLike {
   is_reply?: boolean;
   parent_comment_id?: string | null;
   parent_source?: "api" | "extractor" | "inferred_id" | "unknown";
-  source?:
-    | "sanitized_fixture"
-    | "youtube_data_api_public"
-    | "youtube_public_scrape"
-    | "youtube_oauth"
-    | "legacy_import";
+  source?: string | null;
   field_provenance?: Record<string, unknown>;
   comment_type?: string | null;
   content_purged_at?: string | null;

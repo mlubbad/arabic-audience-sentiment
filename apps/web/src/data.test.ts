@@ -388,3 +388,58 @@ describe("loadOpsSource operational snapshot", () => {
     ).rejects.toThrow("live_unavailable");
   });
 });
+
+describe("loadDashboardComments multi-platform source compatibility", () => {
+  it("successfully parses comments with telegram_mtproto and other sources in live mode", async () => {
+    const { loadDashboardComments } = await loadModule();
+    const commentWithTelegramSource = {
+      id: "tg_msg_100",
+      workspace_id: "00000000-0000-4000-8000-000000000001",
+      client_id: "client",
+      channel_id: "channel",
+      video_id: "post_1",
+      video_title: "منشور تيليجرام",
+      platform: "telegram",
+      video_kind: "channel_post",
+      author_channel_id: "user_1",
+      by_channel_owner: false,
+      author_name: "متابع",
+      text_raw: "تعليق من تيليجرام",
+      content_hash: "hash_tg_1",
+      likes_raw: null,
+      likes_value: null,
+      published_at: "2026-09-23T10:00:00Z",
+      published_time_raw: "2026-09-23T10:00:00Z",
+      timestamp_precision: "second",
+      is_reply: false,
+      parent_comment_id: null,
+      parent_source: "unknown",
+      source: "telegram_mtproto",
+      field_provenance: {},
+      comment_type: null,
+      content_purged_at: null,
+      prediction: null,
+      reviews: [],
+      topic_prediction: null,
+      topic_reviews: [],
+    };
+    const mockRpcResponse = {
+      total: 1,
+      comments: [commentWithTelegramSource],
+      limit: 50,
+      offset: 0,
+      has_more: false,
+      next_cursor: null,
+    };
+    rpc.mockResolvedValueOnce({ data: mockRpcResponse, error: null });
+
+    const result = await loadDashboardComments(
+      "live",
+      "00000000-0000-4000-8000-000000000001",
+      { limit: 50 },
+    );
+    expect(result.total).toBe(1);
+    expect(result.comments[0].source).toBe("telegram_mtproto");
+    expect(result.comments[0].platform).toBe("telegram");
+  });
+});

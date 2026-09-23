@@ -1,0 +1,32 @@
+services:
+  - type: worker
+    name: sentiment-worker
+    env: docker
+    dockerfilePath: ./workers/python/Dockerfile
+    dockerContext: ./workers/python
+    region: frankfurt
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: WORKER_API_BASE_URL
+        sync: false
+      - key: WORKER_CREDENTIAL
+        sync: false
+      - key: SENTIMENT_MODEL
+        value: camelbert-da
+      - key: TOPIC_MODEL
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_SESSION_STRING
+        sync: false
+      - key: WORKER_IDLE_SECONDS
+        value: "30"
+      - key: WORKER_MAX_IDLE
+        value: "30"
