@@ -98,12 +98,15 @@ def _comment(c: RawComment) -> dict[str, Any]:
 
 
 def _canonicalise(value: Any) -> Any:
-    """Render numbers the way JSON does, so both languages agree.
+    """Render numbers the way JSON does, and strip NUL bytes that PostgreSQL rejects.
 
     Python writes an integral float as 1.0 and JavaScript writes 1. Hashing the
     raw form makes the same payload produce two different digests, which turns a
     legitimate replay into a batch_conflict on the server.
+    PostgreSQL rejects NUL (\u0000) characters with 22P05 (untranslatable_character).
     """
+    if isinstance(value, str):
+        return value.replace("\x00", "")
     if isinstance(value, bool):
         return value
     if isinstance(value, float) and value.is_integer():
@@ -123,18 +126,18 @@ def build_batch(
     comments: Iterable[RawComment],
     predictions: Iterable[dict[str, Any]] = (),
 ) -> tuple[dict[str, Any], str]:
-    payload = {
+    payload = _canonicalise({
         "external_video_id": video_id,
         "video_title": video_title,
         "checkpoint": checkpoint,
         "outcome": outcome,
         "comments": [_comment(c) for c in comments],
         "predictions": list(predictions),
-    }
+    })
     # Canonical form: the same content must hash identically however the dict
     # was built, or a legitimate replay would look like a conflicting payload.
     canonical = json.dumps(
-        _canonicalise(payload), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
     return payload, hashlib.sha256(canonical.encode()).hexdigest()
 
@@ -246,7 +249,7 @@ class ControlPlane:
     def commit_catalogue(self, lease: dict[str, Any], videos: list[dict[str, Any]]) -> dict[str, Any] | None:
         return self._post(
             "/worker/commit-catalogue",
-            {"job_id": lease["job_id"], "lease_token": lease["lease_token"], "payload": videos},
+            {"job_id": lease["job_id"], "lease_token": lease["lease_token"], "payload": _canonicalise(videos)},
         )
 
     def video_finished(self, lease: dict[str, Any], video_id: str, outcome: str,
