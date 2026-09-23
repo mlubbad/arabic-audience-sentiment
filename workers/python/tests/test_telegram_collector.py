@@ -404,3 +404,80 @@ def test_telegram_collector_html_discussion_disabled_and_auth_required():
     assert exc_auth.value.outcome == "blocked"
 
 
+def test_telegram_collector_mtproto_catalogue_and_batches():
+    class DummySender:
+        first_name = "أحمد"
+        last_name = "علي"
+        title = None
+
+    class DummyReplies:
+        replies = 5
+
+    class DummyReactionResult:
+        count = 3
+
+    class DummyReactions:
+        results = [DummyReactionResult()]
+
+    class DummyReplyTo:
+        reply_to_msg_id = 100
+
+    class DummyMessage:
+        def __init__(self, msg_id, text, replies_cnt=0, is_comment=False):
+            self.id = msg_id
+            self.message = text
+            self.text = text
+            self.date = None
+            self.sender_id = 98765
+            self.sender = DummySender()
+            self.replies = DummyReplies() if replies_cnt > 0 else None
+            self.reactions = DummyReactions()
+            self.reply_to = DummyReplyTo() if is_comment else None
+
+    class MockTelethonClient:
+        def get_entity(self, handle):
+            return f"entity_{handle}"
+
+        def get_messages(self, channel, limit=50):
+            return [
+                DummyMessage(100, "منشور تليجرام رسمي مع نقاش", replies_cnt=5),
+                DummyMessage(101, "منشور بدون تعليقات", replies_cnt=0),
+            ]
+
+        def iter_messages(self, channel, reply_to=None, limit=50, offset_id=0):
+            if reply_to == 100:
+                return [
+                    DummyMessage(201, "هذا تعليق رائع وموثق عبر MTProto!", is_comment=True),
+                    DummyMessage(202, "تعليق ثانٍ على المنشور", is_comment=True),
+                ]
+            return []
+
+    mock_tg = MockTelethonClient()
+    col = TelegramCollector(
+        channel_id="@warlife3",
+        telethon_client=mock_tg,
+    )
+
+    # Test catalogue via MTProto
+    cat = col.catalogue()
+    assert cat.complete is True
+    assert len(cat.videos) == 2
+    assert cat.videos[0]["external_video_id"] == "100"
+    assert cat.videos[0]["reported_comment_count"] == 5
+    assert cat.videos[0]["comments_state"] == "open"
+    assert cat.videos[1]["external_video_id"] == "101"
+    assert cat.videos[1]["reported_comment_count"] == 0
+
+    # Test batches via MTProto
+    batches = list(col.batches("100", None))
+    assert len(batches) == 1
+    assert batches[0].outcome == "exhausted"
+    assert len(batches[0].comments) == 2
+    assert batches[0].comments[0].id == "201"
+    assert batches[0].comments[0].text == "هذا تعليق رائع وموثق عبر MTProto!"
+    assert batches[0].comments[0].author_name == "أحمد علي"
+    assert batches[0].comments[0].likes_value == 3
+    assert batches[0].comments[0].source == "telegram_mtproto"
+
+
+

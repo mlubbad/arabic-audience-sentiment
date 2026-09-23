@@ -3,7 +3,10 @@ name = "sentiment-worker"
 version = "0.1.0"
 description = "Durable collection primitives; no network work runs on installation"
 requires-python = ">=3.12,<3.13"
-dependencies = ["httpx==0.28.1"]
+dependencies = [
+    "httpx==0.28.1",
+    "telethon==1.45.0",
+]
 
 [dependency-groups]
 dev = ["pytest==8.3.5", "ruff==0.11.13"]

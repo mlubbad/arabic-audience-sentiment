@@ -25,15 +25,19 @@ class TelegramCollector:
         channel_id: str | None = None,
         client: httpx.Client | None = None,
         bot_token: str | None = None,
-        api_id: str | None = None,
+        api_id: str | int | None = None,
         api_hash: str | None = None,
+        session_string: str | None = None,
+        telethon_client: object | None = None,
         fixture_data: dict | None = None,
     ):
         self.channel_id = channel_id
         self.client = client
         self.bot_token = bot_token
-        self.api_id = api_id
+        self.api_id = str(api_id) if api_id else None
         self.api_hash = api_hash
+        self.session_string = session_string
+        self.telethon_client = telethon_client
         self.fixture_data = fixture_data
 
     @staticmethod
@@ -73,6 +77,44 @@ class TelegramCollector:
                     "field_provenance": {"source": self.source, "channel": clean_handle},
                 })
             return Catalogue(videos=videos, complete=True)
+
+        # 1.5. Telethon MTProto client mode (authenticated session)
+        if self.telethon_client or (self.session_string and self.api_id and self.api_hash):
+            try:
+                def _fetch_catalogue(tg):
+                    channel = tg.get_entity(clean_handle)
+                    messages = tg.get_messages(channel, limit=50)
+                    vids = []
+                    for m in messages:
+                        if not getattr(m, "id", None):
+                            continue
+                        msg_text = getattr(m, "message", "") or getattr(m, "text", "") or ""
+                        first_line = msg_text.strip().split("\n")[0] if msg_text else f"منشور {m.id}"
+                        replies_obj = getattr(m, "replies", None)
+                        comment_count = getattr(replies_obj, "replies", 0) if replies_obj else 0
+                        comments_state = "open" if (comment_count > 0 or replies_obj is not None) else "disabled"
+                        vids.append({
+                            "external_video_id": str(m.id),
+                            "title": first_line[:120],
+                            "kind": "channel_post",
+                            "published_at": m.date.isoformat() if getattr(m, "date", None) else datetime.now(timezone.utc).isoformat(),
+                            "thumbnail_url": None,
+                            "reported_comment_count": comment_count,
+                            "comments_state": comments_state,
+                            "field_provenance": {"source": self.source, "channel": clean_handle},
+                        })
+                    return vids
+
+                if self.telethon_client:
+                    return Catalogue(videos=_fetch_catalogue(self.telethon_client), complete=True)
+                else:
+                    from telethon.sync import TelegramClient
+                    from telethon.sessions import StringSession
+                    with TelegramClient(StringSession(self.session_string), int(self.api_id), self.api_hash) as tg:
+                        return Catalogue(videos=_fetch_catalogue(tg), complete=True)
+            except Exception as exc:
+                if not self.client:
+                    raise CollectionError(f"telegram_mtproto_error: {exc}", "failed") from exc
 
         # 2. HTTP client mode (public preview endpoint or test mock transport)
         if self.client:
@@ -233,6 +275,72 @@ class TelegramCollector:
             outcome = "partial" if has_more else "exhausted"
             yield Batch(comments=raw_comments, checkpoint=next_cp, outcome=outcome)
             return
+
+        # 1.5. Telethon MTProto client mode (authenticated session)
+        if self.telethon_client or (self.session_string and self.api_id and self.api_hash):
+            clean_ch = self._clean_handle(self.channel_id) if self.channel_id else None
+            offset_id = int(checkpoint) if (checkpoint and str(checkpoint).isdigit()) else 0
+            page_size = 50
+
+            def _fetch_batches(tg):
+                channel = tg.get_entity(clean_ch)
+                post_id = int(video_id)
+                items = []
+                for msg in tg.iter_messages(channel, reply_to=post_id, limit=page_size, offset_id=offset_id):
+                    text = getattr(msg, "text", None) or getattr(msg, "message", None) or ""
+                    if not text:
+                        continue
+                    author_name = "مستخدم تليجرام"
+                    author_id = f"tg_{msg.sender_id}" if getattr(msg, "sender_id", None) else "tg_unknown"
+                    if getattr(msg, "sender", None):
+                        first = getattr(msg.sender, "first_name", "") or ""
+                        last = getattr(msg.sender, "last_name", "") or ""
+                        full = f"{first} {last}".strip()
+                        author_name = full or getattr(msg.sender, "title", "مستخدم تليجرام")
+
+                    reactions_count = 0
+                    if getattr(msg, "reactions", None) and getattr(msg.reactions, "results", None):
+                        reactions_count = sum(r.count for r in msg.reactions.results)
+
+                    reply_to_msg_id = getattr(getattr(msg, "reply_to", None), "reply_to_msg_id", None)
+                    is_reply = bool(reply_to_msg_id and reply_to_msg_id != post_id)
+                    parent_id = str(reply_to_msg_id) if is_reply else None
+
+                    items.append(RawComment(
+                        id=str(msg.id),
+                        video_id=str(video_id),
+                        text=text,
+                        parent_id=parent_id,
+                        is_reply=is_reply,
+                        parent_source="api",
+                        published_at=msg.date.isoformat() if getattr(msg, "date", None) else datetime.now(timezone.utc).isoformat(),
+                        timestamp_precision="second",
+                        author_channel_id=author_id,
+                        author_name=author_name,
+                        likes_value=reactions_count,
+                        likes_raw=str(reactions_count),
+                        source=self.source,
+                        platform="telegram",
+                        field_provenance={"adapter": self.source},
+                    ))
+                return items
+
+            try:
+                if self.telethon_client:
+                    raw_comments = _fetch_batches(self.telethon_client)
+                else:
+                    from telethon.sync import TelegramClient
+                    from telethon.sessions import StringSession
+                    with TelegramClient(StringSession(self.session_string), int(self.api_id), self.api_hash) as tg:
+                        raw_comments = _fetch_batches(tg)
+
+                next_cp = str(raw_comments[-1].id) if len(raw_comments) >= page_size else None
+                outcome = "partial" if next_cp else "exhausted"
+                yield Batch(comments=raw_comments, checkpoint=next_cp, outcome=outcome)
+                return
+            except Exception as exc:
+                if not self.client:
+                    raise CollectionError(f"telegram_mtproto_error: {exc}", "failed") from exc
 
         # 2. HTTP client mode
         if self.client:

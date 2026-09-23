@@ -57,6 +57,9 @@ def build_collector(
     client: httpx.Client,
     api_key: str | None = None,
     telegram_bot_token: str | None = None,
+    telegram_api_id: str | None = None,
+    telegram_api_hash: str | None = None,
+    telegram_session_string: str | None = None,
     telegram_fixture: dict | None = None,
     x_bearer_token: str | None = None,
     x_fixture: dict | None = None,
@@ -114,6 +117,9 @@ def build_collector(
                 channel_id=channel_id,
                 client=client,
                 bot_token=telegram_bot_token,
+                api_id=telegram_api_id,
+                api_hash=telegram_api_hash,
+                session_string=telegram_session_string,
                 fixture_data=telegram_fixture,
             )
         if p == "x":
@@ -319,6 +325,9 @@ def main() -> None:
     # blocked with a code that names the gap.
     api_key = os.environ.get("YOUTUBE_API_KEY") or None
     telegram_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN") or None
+    telegram_api_id = os.environ.get("TELEGRAM_API_ID") or None
+    telegram_api_hash = os.environ.get("TELEGRAM_API_HASH") or None
+    telegram_session_string = os.environ.get("TELEGRAM_SESSION_STRING") or None
     x_bearer_token = os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or None
     tiktok_access_token = os.environ.get("TIKTOK_ACCESS_TOKEN") or None
     apify_token = os.environ.get("APIFY_API_TOKEN") or os.environ.get("APIFY_TOKEN") or None
@@ -333,6 +342,9 @@ def main() -> None:
         client,
         api_key=api_key,
         telegram_bot_token=telegram_bot_token,
+        telegram_api_id=telegram_api_id,
+        telegram_api_hash=telegram_api_hash,
+        telegram_session_string=telegram_session_string,
         x_bearer_token=x_bearer_token,
         tiktok_access_token=tiktok_access_token,
         apify_token=apify_token,
@@ -344,10 +356,12 @@ def main() -> None:
         tiktok_scraper_provider=tiktok_scraper_provider,
     )
     has_scrapers = bool(apify_token or brightdata_api_key or brightdata_proxy_url)
+    telegram_auth = bool(telegram_api_id and telegram_session_string)
     _log(
         f"worker up, model={args.model}, tenants={len(controls)}, "
         f"topics={args.topics}, public={'yes' if api_key else 'no'}, "
-        f"scrapers={'yes' if has_scrapers else 'no'}"
+        f"scrapers={'yes' if has_scrapers else 'no'}, "
+        f"telegram_auth={'yes' if telegram_auth else 'no'}"
     )
     why = serve(
         controls,

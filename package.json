@@ -31,6 +31,7 @@
     "label:score": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m labelling.score_cli",
     "worker:collect": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python -m collectors.cli",
     "omnichannel:check": "PYTHONPATH=src uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python src/collectors/diagnostics.py",
+    "telegram:auth": "uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python ../../scripts/telegram_auth.py",
     "deploy:preview": "sh scripts/deploy-preview.sh",
     "db:migrate:remote": "node scripts/apply-migrations-remote.mjs",
     "demo:fixture": "node apps/web/scripts/make-demo-fixture.mjs",
