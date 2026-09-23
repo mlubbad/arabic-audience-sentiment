@@ -101,4 +101,25 @@ describe("CataloguePreview", () => {
       "https://example.com/telegram-thumb.jpg",
     );
   });
+
+  it("embeds telegram widget when handle is provided", () => {
+    const telegramVideo: CatalogueVideo = {
+      ...video,
+      platform: "telegram",
+      external_video_id: "154030",
+    };
+    render(
+      <CataloguePreview
+        video={telegramVideo}
+        handle="@warlife3"
+        kindLabel="منشور قناة"
+        onClose={vi.fn()}
+        S={ar}
+      />,
+    );
+    expect(screen.getByTestId("cat-preview-frame")).toHaveAttribute(
+      "src",
+      "https://t.me/warlife3/154030?embed=1",
+    );
+  });
 });

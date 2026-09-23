@@ -195,7 +195,9 @@ export function videoLinks(
       watch: clean
         ? `https://t.me/${clean}/${external_video_id}`
         : `https://t.me/c/${external_video_id}`,
-      embed: null,
+      embed: clean
+        ? `https://t.me/${clean}/${external_video_id}?embed=1`
+        : null,
     };
   }
   if (platform === "x") {

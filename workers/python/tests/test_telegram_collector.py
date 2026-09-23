@@ -275,6 +275,7 @@ def test_telegram_collector_html_blocks_parsing():
     <div class="tgme_widget_message_wrap">
       <div class="tgme_widget_message js-widget_message" data-post="news_channel/100">
         <div class="tgme_widget_message_bubble">
+          <a class="tgme_widget_message_photo_wrap" style="background-image:url('https://cdn4.telesco.pe/file/thumb100.jpg')"></a>
           <div class="tgme_widget_message_text">خبر عاجل: &quot;تطورات جديدة في المنطقة&quot; &amp; تفاصيل إضافية</div>
           <div class="tgme_widget_message_footer">
             <time datetime="2026-09-20T18:00:00+00:00">18:00</time>
@@ -305,11 +306,13 @@ def test_telegram_collector_html_blocks_parsing():
     assert v1["external_video_id"] == "100"
     assert v1["title"] == 'خبر عاجل: "تطورات جديدة في المنطقة" & تفاصيل إضافية'
     assert v1["published_at"] == "2026-09-20T18:00:00+00:00"
+    assert v1["thumbnail_url"] == "https://cdn4.telesco.pe/file/thumb100.jpg"
     assert v1["reported_comment_count"] == 42
     assert v1["comments_state"] == "open"
 
     assert v2["external_video_id"] == "101"
     assert v2["title"] == "منشور ثانٍ بدون تعليقات"
+    assert v2["thumbnail_url"] is None
     assert v2["reported_comment_count"] is None
     assert v2["comments_state"] == "open"
 

@@ -22,12 +22,14 @@ import type { Strings } from "../strings";
 
 export function CataloguePreview({
   video,
+  handle,
   kindLabel,
   onClose,
   returnTo,
   S,
 }: {
   video: CatalogueVideo | null;
+  handle?: string | null;
   /** The kind, already in the reader's words — the owner has the table. */
   kindLabel: string;
   onClose: () => void;
@@ -37,6 +39,9 @@ export function CataloguePreview({
   S: Strings;
 }) {
   const content = useRef<HTMLDivElement | null>(null);
+  const links = video
+    ? videoLinks(video.external_video_id, video.kind, video.platform, handle)
+    : null;
   return (
     <Dialog
       open={!!video}
@@ -72,15 +77,11 @@ export function CataloguePreview({
           <DialogTitle asChild>
             <h3 className="db-preview-title">{video.title}</h3>
           </DialogTitle>
-          {videoLinks(video.external_video_id, video.kind, video.platform)
-            .embed ? (
+          {links?.embed ? (
             <iframe
               className="db-preview-frame"
               data-testid="cat-preview-frame"
-              src={
-                videoLinks(video.external_video_id, video.kind, video.platform)
-                  .embed ?? undefined
-              }
+              src={links.embed}
               title={video.title}
               allow="autoplay; encrypted-media; picture-in-picture"
               allowFullScreen
@@ -130,14 +131,7 @@ export function CataloguePreview({
                 </>
               )}
             </span>
-            <a
-              href={
-                videoLinks(video.external_video_id, video.kind, video.platform)
-                  .watch
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={links?.watch} target="_blank" rel="noopener noreferrer">
               {video.platform === "telegram"
                 ? S.catOpenTelegram
                 : video.platform === "x"

@@ -247,9 +247,14 @@ describe("videoLinks", () => {
     );
   });
   it("formats telegram links correctly", () => {
-    expect(
-      videoLinks("100", "channel_post", "telegram", "@news_channel").watch,
-    ).toBe("https://t.me/news_channel/100");
+    const links = videoLinks(
+      "100",
+      "channel_post",
+      "telegram",
+      "@news_channel",
+    );
+    expect(links.watch).toBe("https://t.me/news_channel/100");
+    expect(links.embed).toBe("https://t.me/news_channel/100?embed=1");
   });
   it("formats x links correctly", () => {
     const links = videoLinks("1234567890", "tweet", "x", "@elonmusk");

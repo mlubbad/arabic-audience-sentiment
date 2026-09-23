@@ -67,6 +67,7 @@ class TelegramCollector:
                     "title": p.get("text", "")[:100] or f"Post {p['id']}",
                     "kind": "channel_post",
                     "published_at": p.get("date", datetime.now(timezone.utc).isoformat()),
+                    "thumbnail_url": p.get("thumbnail_url") or p.get("photo"),
                     "reported_comment_count": p.get("comments_count"),
                     "comments_state": p.get("comments_state", "open"),
                     "field_provenance": {"source": self.source, "channel": clean_handle},
@@ -146,11 +147,18 @@ class TelegramCollector:
                     )
                     count = int(replies_m.group(1)) if replies_m else None
 
+                    thumb_m = re.search(
+                        r'(?:tgme_widget_message_photo_wrap|tgme_widget_message_video_thumb)[^>]*style="[^"]*background-image:url\(\x27([^\x27]+)\x27\)',
+                        block,
+                    )
+                    thumbnail_url = thumb_m.group(1) if thumb_m else None
+
                     videos.append({
                         "external_video_id": msg_id,
                         "title": title,
                         "kind": "channel_post",
                         "published_at": pub_time,
+                        "thumbnail_url": thumbnail_url,
                         "reported_comment_count": count,
                         "comments_state": "open",
                         "field_provenance": {"source": self.source, "channel": clean_handle},

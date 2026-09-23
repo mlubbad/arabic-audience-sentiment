@@ -766,6 +766,7 @@ export function Catalogue({
 
           <CataloguePreview
             video={previewing}
+            handle={read.data?.handle}
             kindLabel={previewing ? kindWord(previewing.kind) : ""}
             onClose={() => setPreviewing(null)}
             returnTo={previewTrigger}
