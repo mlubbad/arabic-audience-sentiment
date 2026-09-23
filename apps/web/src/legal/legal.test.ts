@@ -76,7 +76,9 @@ describe("the legal documents", () => {
       const links = hrefs(doc);
       expect(links).toContain("https://policies.google.com/privacy");
       expect(links).toContain("https://www.youtube.com/t/terms");
-      expect(links).toContain("https://myaccount.google.com/permissions");
+      expect(links).toContain(
+        "https://myaccount.google.com/connections?filters=3,4&hl=en",
+      );
     }
   });
 

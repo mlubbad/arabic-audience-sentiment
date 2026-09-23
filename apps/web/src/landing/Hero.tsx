@@ -13,9 +13,6 @@ export function Hero({ locale }: { locale: Locale }) {
       <div className="lp-container lp-hero-grid">
         <div className="lp-hero-copy">
           <Badge tone="neutral" className="lp-eyebrow">
-            <span className="lp-youtube" aria-hidden="true">
-              ▶
-            </span>
             {S.lpHeroEyebrow}
           </Badge>
           <h1 id="hero-title">

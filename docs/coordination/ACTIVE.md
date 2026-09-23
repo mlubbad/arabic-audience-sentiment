@@ -659,3 +659,19 @@ those paths). The deployed web bundle predates the new door until the next
 - Fixed dashboard scroll visual glitch: guarded `<Summary>` with `s.workspace_total > 0` to eliminate zeroed cards protrusion on empty channels.
 - Hardened `.db-sticky-bar`: replaced translucent tint with 96% opaque card surface (`color-mix(in srgb, var(--bg-card) 96%, transparent)`), 20px blur, and matching viewport padding to eliminate bleed-through.
 - Verified 100% green across all gates via `npm run check`. All paths free.
+
+2026-09-23, Antigravity session — YouTube API Services Compliance Review Violations Fixes (DONE):
+
+- **UI Branding Violations (Policy III.F.2a)**:
+  - Removed custom red YouTube play button icon `<span className="lp-youtube">▶</span>` from `apps/web/src/landing/Hero.tsx` eyebrow badge and `apps/web/src/landing/Audience.tsx` demo card.
+  - Cleaned up obsolete `.lp-youtube` class from `apps/web/src/landing/hero.css`.
+- **Privacy Policy & Terms Updates (Policies III.A.2e, III.A.2h, III.A.2i)**:
+  - Updated `GOOGLE_PERMISSIONS` constant in both `en.ts` and `ar.ts` to `https://myaccount.google.com/connections?filters=3,4&hl=en` matching Google's required revocation endpoint.
+  - Updated `UPDATED` constant to `2026-09-23`.
+  - Added direct email contact information (`support@sky-develop.net` and `privacy@sky-develop.net`) in `who` and `terms.contact` sections.
+  - Explicitly specified data usage, local processing with self-hosted open-source Arabic NLP models without third-party AI APIs, and delineated internal (need-to-know engineering/support) vs. external parties (Supabase, Paddle, Google, Cloudflare) in `use` and `sharing` sections.
+  - Detailed explicit step-by-step procedures for data deletion (30-day automated purge, in-app disconnection, and 7-day complete account deletion by email request) in `retention` and `google` sections.
+  - Maintained strict 1:1 structural parity between Arabic and English legal twins.
+  - Updated `apps/web/src/legal/legal.test.ts` to verify the new Google permissions URL.
+- **Verification**: Verified 100% green across all gates with `npm run check` (123 web test suites, 43 db test suites, 277 python pytest tests, full Vite build + prerender, and secret scans). All paths free.
+
