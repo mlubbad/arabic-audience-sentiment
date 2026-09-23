@@ -64,3 +64,15 @@ export async function updatePlanPublicChannels(
   });
   if (error) throw error;
 }
+
+export async function updatePlanLimits(
+  planKey: string,
+  limits: Record<string, unknown>,
+): Promise<{ ok: boolean; plan: unknown }> {
+  const { data, error } = await supabase!.rpc("update_plan_limits", {
+    p_plan_key: planKey,
+    p_limits: limits,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; plan: unknown };
+}

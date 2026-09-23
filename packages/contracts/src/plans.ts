@@ -24,6 +24,8 @@ export const PlanSchema = z
     self_serve: z.boolean(),
     provider_prices: z.record(z.string()).default({}),
     allow_public_channels: z.boolean().default(false),
+    backfill_units: z.number().int().min(-1).optional(),
+    historical_days_limit: z.number().int().min(-1).optional(),
     limits: PlanLimitsSchema,
   })
   .strict();

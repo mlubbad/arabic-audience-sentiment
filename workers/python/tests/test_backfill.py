@@ -388,3 +388,72 @@ def test_a_lost_lease_on_the_counts_step_still_escapes():
     with pytest.raises(LeaseLost):
         drive_counts(collector, THREE, counts_response={"code": "lease_lost"}, counts_status=409)
     assert collector.asked == []
+
+
+def test_historical_import_passes_since_and_preserves_is_historical_checkpoint():
+    class SinceRecordingCollector(Plan):
+        def __init__(self, pages):
+            super().__init__(pages)
+            self.kwargs_received = []
+
+        def batches(self, video_id, checkpoint=None, **kwargs):
+            self.kwargs_received.append((video_id, kwargs))
+            yield from super().batches(video_id, checkpoint)
+
+    sent = {"commits": [], "finish": None}
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j-hist-1", "lease_token": "t-hist-1", "type": "import",
+                "checkpoint": {
+                    "is_historical": True,
+                    "since": "2026-01-01T00:00:00Z",
+                    "max_items": 500,
+                },
+                "videos": [{"video_id": "v1", "external_video_id": "v1", "title": "تاريخي"}],
+                "access_token": "ya29.ok",
+            })
+        if path == "commit-batch":
+            body = json.loads(request.content)["payload"]
+            sent["commits"].append(body)
+        if path == "video-finished":
+            pass
+        if path == "finish":
+            sent["finish"] = json.loads(request.content)["outcome"]
+        return httpx.Response(200, json={})
+
+    collector = SinceRecordingCollector({"v1": [Batch([comment("c1")], None, "exhausted")]})
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    worked = run_backfill(plane, lambda token, expires_at=None, renew=None: collector)
+    assert worked is True
+    assert len(collector.kwargs_received) == 1
+    assert collector.kwargs_received[0][1]["since"] == "2026-01-01T00:00:00Z"
+    assert collector.kwargs_received[0][1]["max_items"] == 500
+    assert len(sent["commits"]) == 1
+    committed_checkpoint = sent["commits"][0]["checkpoint"]
+    assert committed_checkpoint["is_historical"] is True
+    assert sent["finish"] == "succeeded"
+
+
+def test_run_job_claims_import_when_no_classifier():
+    from server.runner import run_job
+
+    claimed_types = []
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        if path == "claim":
+            body = json.loads(request.content) if request.content else {}
+            claimed_types.append(body.get("types"))
+            return httpx.Response(204)
+        return httpx.Response(200, json={})
+
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    worked = run_job(plane, lambda token, expires_at=None, renew=None: None, classifier=None)
+    assert worked is False
+    assert claimed_types == [["collect", "discover", "import"]]
+

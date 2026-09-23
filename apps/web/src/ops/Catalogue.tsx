@@ -50,6 +50,7 @@ import { Labelled } from "../ui/Labelled";
 import { SelectItem } from "../ui/Select";
 import { Tabs, TabsList, TabsTrigger } from "../ui/Tabs";
 import { CataloguePreview } from "./CataloguePreview";
+import { HistoricalImportModal } from "./HistoricalImportModal";
 import { SelectionBar } from "./SelectionBar";
 import "./catalogue.css";
 
@@ -122,6 +123,7 @@ export function Catalogue({
   // opened it is kept so focus can go back there on close.
   const [previewing, setPreviewing] = useState<CatalogueVideo | null>(null);
   const previewTrigger = useRef<HTMLButtonElement | null>(null);
+  const [historicalModalOpen, setHistoricalModalOpen] = useState(false);
 
   // The budget's own figure, -1 included: that is a plan with no ceiling,
   // and `selectionEstimate` reads it as such rather than as a count.
@@ -516,6 +518,15 @@ export function Catalogue({
                 >
                   {S.catRefresh}
                 </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  data-testid="cat-historical-import"
+                  disabled={busy || !effectiveChannelId}
+                  onClick={() => setHistoricalModalOpen(true)}
+                >
+                  {S.historicalImportButton}
+                </Button>
               </div>
               <p className="db-note db-cat-refreshed">
                 {discovering?.status === "running" ? (
@@ -788,6 +799,21 @@ export function Catalogue({
             feedback={feedback}
             S={S}
           />
+
+          {historicalModalOpen && (
+            <HistoricalImportModal
+              open={historicalModalOpen}
+              onClose={() => setHistoricalModalOpen(false)}
+              workspaceId={workspaceId}
+              channelId={effectiveChannelId}
+              platform={read.data?.platform}
+              plan={plan}
+              onSuccess={() => {
+                onChanged();
+                void read.refetch();
+              }}
+            />
+          )}
         </>
       )}
     </section>

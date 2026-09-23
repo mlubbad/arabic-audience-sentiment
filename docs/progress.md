@@ -1,6 +1,31 @@
 # Progress
 
-## 2026-09-23 — Restricting Public Channels Experiment to Owner & Impersonation Isolation
+## 2026-09-23 — Omnichannel Historical Data Backfill & Import & Dynamic Admin Plan Limits
+
+- **Omnichannel Historical Data Backfill & External Import**:
+  - Implemented a complete end-to-end historical data backfill and file import system governed by workspace plan limits (`backfill_units` and `historical_days_limit`).
+  - Added support for both **Direct Platform Sync** (YouTube / Telegram / etc.) and **External File Import** (CSV / JSON) directly from the Catalogue page.
+  - Platform direct sync (`public.request_historical_platform_sync` RPC):
+    - Validates date boundaries against the workspace's plan `historical_days_limit`.
+    - Enqueues an `import` job in `public.jobs` with `checkpoint = {"is_historical": true, "since": since_date, "max_items": ...}`.
+    - Python worker `server/runner.py` detects `is_historical`, fetches backfilled posts/comments with timestamp watermarks, and classifies sentiment.
+  - External file import (`public.import_historical_records` RPC & `historicalCsvJson.ts` parser):
+    - Supports CSV (RFC 4180 compliant) and JSON formats with automatic column header mapping for Arabic and English headers (e.g., `معرف التعليق`, `نص التعليق`, `تاريخ النشر`, `اسم المعلق`).
+    - Provides a downloadable sample CSV template for instant user guidance.
+    - Enforces idempotent insertion using MD5 content hashing and day precision timestamps (`timestamp_precision = 'day'`).
+  - Metering & Quota Invariants:
+    - Ingested records consume quota from `historical_backfill` events and **strictly never** touch the monthly `comment_analysis` allowance.
+    - Idempotent prediction key pattern `'backfill:' || ch_platform || ':' || external_comment_id` prevents double-metering.
+- **Dynamic Plan Limits Management in Admin Panel**:
+  - Enabled platform administrators to dynamically adjust subscription plan limits (`channels`, `analysis_units`, `topic_units`, `insight_reports`, `members`, `workspaces`, `backfill_units`, `historical_days_limit`, `allow_public_channels`) directly from the Admin control panel (`/admin/plans`).
+  - Implemented `public.update_plan_limits` RPC (SECURITY DEFINER, strictly restricted to platform admins) which validates and updates `public.plans` dynamically without requiring new database migrations.
+  - Added `EditPlanLimitsDialog.tsx` with bilingual validation, error boundaries, and real-time catalogue refresh.
+- **Verification**:
+  - Created contracts test suite `packages/contracts/src/historical.test.ts` (6 tests).
+  - Created database test suite `supabase/tests/historical_import_and_plans.test.ts` (8 comprehensive tests covering admin security, plan limit validation, RPC executions, and quota isolation).
+  - Created Python worker test suite `workers/python/tests/test_backfill.py` (3 tests verifying historical collector invocations and backfill metering).
+  - Created web test suites: `apps/web/src/ops/historicalCsvJson.test.ts` (13 tests), `apps/web/src/ops/HistoricalImportModal.test.tsx` (5 tests), `apps/web/src/admin/EditPlanLimitsDialog.test.tsx` (3 tests).
+  - Full project gate `npm run check` passed 100% green: 127 Vitest suites (971 tests), 44 DB suites (399 tests), 279 Python pytest tests, ESLint, Prettier, TypeScript, Deno functions, and secret checks.
 
 - **Owner-Only Experiment Restriction for "لا أملك القناة"**:
   - Confirmed and implemented the business rule that public channel tracking is an internal experiment under active testing, unpublished to standard users, and not included in any commercial plan.

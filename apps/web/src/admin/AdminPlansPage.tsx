@@ -30,6 +30,7 @@ import {
 import { useAdminPlanCatalogue } from "../planCatalogue";
 import { updatePlanPublicChannels } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
+import { EditPlanLimitsDialog } from "./EditPlanLimitsDialog";
 
 export function AdminPlansPage() {
   const S = useStrings();
@@ -42,6 +43,7 @@ export function AdminPlansPage() {
   const catalogueQuery = useAdminPlanCatalogue(effectiveAdmin);
 
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [feedback, setFeedback] = useState<{
     msg: string;
     tone: "success" | "error";
@@ -126,9 +128,11 @@ export function AdminPlansPage() {
                 <TableHeaderCell>{S.adminPlanColKey}</TableHeaderCell>
                 <TableHeaderCell>{S.adminPlanColSegment}</TableHeaderCell>
                 <TableHeaderCell>{S.adminPlanColPrice}</TableHeaderCell>
+                <TableHeaderCell>{S.adminPlanColLimits}</TableHeaderCell>
                 <TableHeaderCell>
                   {S.adminPlanColPublicChannels}
                 </TableHeaderCell>
+                <TableHeaderCell>{S.adminPlanEditLimits}</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -146,6 +150,9 @@ export function AdminPlansPage() {
                     : locale === "ar"
                       ? "مجاني"
                       : "Free";
+
+                const backfillVal = p.backfill_units ?? 0;
+                const daysVal = p.historical_days_limit ?? 0;
 
                 return (
                   <TableRow key={p.key} data-testid={`plan-row-${p.key}`}>
@@ -172,6 +179,42 @@ export function AdminPlansPage() {
                     </TableCell>
                     <TableCell>{priceFormatted}</TableCell>
                     <TableCell>
+                      <div style={{ fontSize: "0.85rem", lineHeight: 1.4 }}>
+                        <div>
+                          {locale === "ar" ? "قنوات: " : "Channels: "}
+                          <strong>
+                            {p.limits.channels === -1
+                              ? S.pricingUnlimited
+                              : p.limits.channels}
+                          </strong>
+                        </div>
+                        <div>
+                          {locale === "ar" ? "تحليل شهري: " : "Analysis: "}
+                          <strong>
+                            {p.limits.analysis_units === -1
+                              ? S.pricingUnlimited
+                              : p.limits.analysis_units.toLocaleString()}
+                          </strong>
+                        </div>
+                        <div>
+                          {locale === "ar" ? "جلب تاريخي: " : "Backfill: "}
+                          <strong>
+                            {backfillVal === -1
+                              ? S.pricingUnlimited
+                              : backfillVal.toLocaleString()}
+                          </strong>
+                        </div>
+                        <div>
+                          {locale === "ar" ? "أيام سابقة: " : "History: "}
+                          <strong>
+                            {daysVal === -1
+                              ? S.pricingUnlimited
+                              : `${daysVal}d`}
+                          </strong>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       {isOwner ? (
                         <Badge
                           tone="success"
@@ -197,12 +240,36 @@ export function AdminPlansPage() {
                         </div>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setEditingPlan(p)}
+                        data-testid={`btn-edit-limits-${p.key}`}
+                      >
+                        {S.adminPlanEditLimits}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
         </div>
+
+        {editingPlan && (
+          <EditPlanLimitsDialog
+            plan={editingPlan}
+            open={Boolean(editingPlan)}
+            onClose={() => setEditingPlan(null)}
+            onSuccess={() => {
+              void queryClient.invalidateQueries({
+                queryKey: ["admin", "catalogue"],
+              });
+              void queryClient.invalidateQueries({ queryKey: ["catalogue"] });
+              setFeedback({ msg: S.adminPlanLimitsUpdated, tone: "success" });
+            }}
+          />
+        )}
       </section>
     );
   }

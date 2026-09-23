@@ -318,9 +318,15 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
             # issued.
             start = cursor if vid == current else None
             video_outcome = "partial"
+            chk = lease.get("checkpoint") or {}
+            is_hist = bool(chk.get("is_historical") or lease.get("type") == "import")
             kwargs = {}
-            if video.get("last_seen_comment_count") is not None and video.get("last_collected_at"):
+            if chk.get("since"):
+                kwargs["since"] = chk["since"]
+            elif video.get("last_seen_comment_count") is not None and video.get("last_collected_at"):
                 kwargs["since"] = video["last_collected_at"]
+            if chk.get("max_items"):
+                kwargs["max_items"] = chk["max_items"]
             try:
                 try:
                     batch_iter = collector.batches(vid, start, **kwargs)
@@ -334,9 +340,12 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                         except AnalysisError:
                             analysis_failed = True
                     control.heartbeat(lease)
+                    progress_dict = {"video": vid, "done": sorted(done)}
+                    if is_hist:
+                        progress_dict["is_historical"] = True
                     control.commit_batch(
                         lease, vid, video.get("title"), batch, predictions,
-                        progress={"video": vid, "done": sorted(done)},
+                        progress=progress_dict,
                     )
                     video_outcome = (
                         batch.outcome if batch.outcome in _DECLARABLE else "failed"
@@ -507,7 +516,7 @@ def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=No
     # without a topic classifier claiming unscoped would take a topics job,
     # hold its lease, and finish it blocked — five minutes the queue waited
     # for nothing. Scope the claim to what can actually be dispatched.
-    job_types = None if classifier is not None else ["collect", "discover"]
+    job_types = None if classifier is not None else ["collect", "discover", "import"]
     lease = control.claim(job_types)
     if lease is None:
         return False

@@ -1,5 +1,19 @@
 # Implementation decisions
- 
+
+2026-09-23 — Omnichannel Historical Data Backfill & Import and Dynamic Plan Limits.
+To enable users to import historical posts/videos and comments according to their subscription plan while allowing administrators to dynamically customize plan constraints without deploying database migrations:
+1. **Quota Separation (`historical_backfill` vs `comment_analysis`)**:
+   - Historical backfills (both direct platform syncing and external file uploads) deduct exclusively from `historical_backfill` usage units (`backfill_units` on the plan).
+   - This strictly isolates historical backfill operations from the workspace's recurring monthly `comment_analysis` allowance, avoiding surprise quota depletion for ongoing active monitoring.
+   - Predictions generated during historical imports store usage keys with prefix `'backfill:' || ch_platform || ':' || external_comment_id`, ensuring idempotent processing and zero duplicate metering.
+2. **Dual Mode Ingestion (Platform Direct Sync & CSV / JSON Upload)**:
+   - Direct platform sync requests are validated by `public.request_historical_platform_sync` against `historical_days_limit` and enqueued as `import` jobs with `is_historical: true`. The Python worker consumes this flag, collects comments with early stopping, and commits batches with historical metering.
+   - External file upload (`public.import_historical_records`) allows uploading RFC 4180 CSV and JSON files, parsing bilingual headers (Arabic & English), synthesizing MD5 hashes, assigning `timestamp_precision = 'day'`, and committing records with atomic quota deduction.
+3. **Dynamic Plan Limits Management (`public.update_plan_limits`)**:
+   - Hardcoded plan definitions in migrations created administrative friction when tuning customer tiers.
+   - Introduced `public.update_plan_limits(target_plan_key text, new_limits jsonb)` (SECURITY DEFINER, strictly restricted to platform admins via `public.is_platform_admin()`).
+   - Limits (channels, analysis units, topic units, backfill units, historical days, etc.) can be adjusted immediately from `/admin/plans` and are reflected in real-time across the client application and enforcement RPCs.
+
 2026-09-23 — YouTube Data API Quota Optimization & Incremental Watermark Early Stopping.
 To maximize the efficiency of YouTube's daily API quota limit (10,000 units/day) when monitoring active YouTube channels and videos:
 1. **Inline Replies Optimization**:

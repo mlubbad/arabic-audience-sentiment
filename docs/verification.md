@@ -1,5 +1,21 @@
 # Verification
 
+## 2026-09-23 — Omnichannel Historical Data Backfill & Import and Dynamic Admin Plan Limits
+
+| Command / observation                           | Actual result                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web unit tests: `npm test`                      | **127 test files passed, 971 tests passed (100% green)**, including all new test suites for `HistoricalImportModal.test.tsx` (5 tests), `historicalCsvJson.test.ts` (13 tests), `EditPlanLimitsDialog.test.tsx` (3 tests), and `historical.test.ts` (6 tests). |
+| Database test suite: `npm run test:db`          | **44 test files passed, 399 tests passed (100% green)**, including all 8 tests in `historical_import_and_plans.test.ts` testing admin RPC permissions, plan boundaries, job enqueueing, external record importing, and isolated quota metering. |
+| Python worker test suite: `npm run worker:test` | **279 tests passed in 4.53s (100% green)**, including all tests in `test_backfill.py` verifying historical flag handling and watermark-based comment extraction.                                                                               |
+| Python worker linter: `npm run worker:lint`     | All checks passed cleanly (0 errors).                                                                                                                                                                                                           |
+| Web linter: `npm run lint`                      | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                                                                                                                |
+| Code formatting: `npm run format:check`         | 100% verified with Prettier (all matched files formatted).                                                                                                                                                                                      |
+| TypeScript typecheck: `npm run typecheck`       | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                                                                      |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                                                                                                                           |
+| Production build & prerender: `npm run build`   | Built in 1.39s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                                                   |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 763 source files and built assets (0 secrets detected).                                                                                                                                                     |
+| Repository check gate: `npm run check`          | **100% green exit code 0** across all gates.                                                                                                                                                                                                    |
+
 ## 2026-09-23 — YouTube Data API Quota Optimization & Incremental Watermark Early Stopping
 
 | Command / observation                           | Actual result                                                                                                                                       |
