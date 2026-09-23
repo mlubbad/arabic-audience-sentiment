@@ -339,6 +339,11 @@ class TelegramCollector:
                 yield Batch(comments=raw_comments, checkpoint=next_cp, outcome=outcome)
                 return
             except Exception as exc:
+                err_name = type(exc).__name__
+                err_msg = str(exc).lower()
+                if "msgidinvalid" in err_name.lower() or "invalid" in err_msg or "not found" in err_msg:
+                    yield Batch(comments=[], checkpoint=None, outcome="exhausted")
+                    return
                 if not self.client:
                     raise CollectionError(f"telegram_mtproto_error: {exc}", "failed") from exc
 

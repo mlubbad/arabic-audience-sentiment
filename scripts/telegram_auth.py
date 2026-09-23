@@ -100,14 +100,20 @@ def main():
     print("\nجاري اختبار جلب تعليقات من قناة @warlife3...")
     try:
         channel = client.get_entity("warlife3")
-        messages = client.get_messages(channel, limit=3)
+        messages = client.get_messages(channel, limit=10)
         print(f"  [✓] تم الوصول للقناة بنجاح! تم فحص آخر {len(messages)} منشورات.")
+        tested_replies = 0
         for msg in messages:
-            comments = list(client.iter_messages(channel, reply_to=msg.id, limit=5))
-            replies_cnt = msg.replies.replies if msg.replies else len(comments)
-            print(f"    - منشور #{msg.id}: {replies_cnt} تعليق.")
-    except Exception as e:
-        print(f"  [!] ملاحظة أثناء الاختبار: {e}")
+            if not msg.text:
+                continue
+            if msg.replies and msg.replies.replies > 0:
+                comments = list(client.iter_messages(channel, reply_to=msg.id, limit=3))
+                print(f"    - منشور #{msg.id} ({msg.text[:35]}...): تم جلب {len(comments)} تعليقات تجريبية (الإجمالي: {msg.replies.replies})")
+                tested_replies += 1
+                if tested_replies >= 2:
+                    break
+            else:
+                print(f"    - منشور #{msg.id}: التعليقات غير مفعلة على هذا المنشور.")
 
     print("\n🎉 تم الإعداد بنجاح! المشغل جاهز الآن لسحب كافة التعليقات والنقاشات المقيدة.")
 
