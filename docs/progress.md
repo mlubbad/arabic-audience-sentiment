@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-09-23 — Restricting Public Channels Experiment to Owner & Impersonation Isolation
+
+- **Owner-Only Experiment Restriction for "لا أملك القناة"**:
+  - Confirmed and implemented the business rule that public channel tracking is an internal experiment under active testing, unpublished to standard users, and not included in any commercial plan.
+  - Reverted default `stepChannel` in `apps/web/src/strings/ar.ts` and `en.ts` to the standard connect wording (`"اربط قناة يوتيوب بعد موافقتك على الإذن."`).
+  - Added `stepChannelWithPublic` in both locales (`"حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة."`) displayed exclusively when `allowPublicChannels` is enabled.
+  - Updated `apps/web/src/setup.ts` (`setupProgress`) and `apps/web/src/account/WorkspaceCard.tsx` to dynamically select the step title based on `allowPublicChannels`.
+- **User Impersonation Lens Isolation**:
+  - In `apps/web/src/account/Account.tsx`, guarded `isPlatformAdmin` and `allowPublicChannels` with `!isImpersonating`.
+  - When the platform owner uses user impersonation (`محاكاة المستخدم`) to inspect regular user workspaces, the owner sees the exact user view: the experimental "لا أملك القناة" box is strictly hidden, direct connect is shown, and standard step texts are rendered.
+- **Verification**:
+  - Created `apps/web/src/account/Account.impersonation.test.tsx` verifying:
+    1. Public channel experiment is strictly hidden when admin impersonates a standard user.
+    2. Public channel experiment is displayed when admin views their own account without impersonation.
+  - Updated `apps/web/src/setup.test.ts` and `apps/web/src/account/WorkspaceCard.test.tsx`.
+  - Full repo verification (`npm run check`): all linters, formatters, typecheckers, Vitest suites (936 tests), DB suites (392 tests), pytest worker tests (277 tests), prerender, and secret checks passed 100% green.
+  - Pushed to `origin main` (`68c6f82`).
+
 ## 2026-09-23 — YouTube Data API Quota Optimization (Inline Replies & Watermark Early Stopping)
 
 Implemented comprehensive quota optimization in the YouTube Data API collector and worker synchronization loop to cut API quota usage by 85–95%:
