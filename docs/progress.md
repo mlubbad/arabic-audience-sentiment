@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-09-24 — Audience Interaction Metrics & Storytelling with Data Integration
+
+- **Audience Interaction Metrics Ingestion**:
+  - Leveraged existing YouTube Data API calls (`videos.list` with `part="snippet,statistics,contentDetails"` and `commentThreads.list` with `part="snippet,replies"`) to collect audience interaction signals at **zero additional API quota cost**.
+  - Ingested video-level interaction metrics: `view_count`, `like_count`, `description`, `tags`, and `category_id`.
+  - Ingested comment-level author and engagement metadata: `author_profile_image_url`, `author_channel_url`, `reply_count`, and `updated_at`.
+- **Database Schema Migration & Storytelling Aggregates**:
+  - Created migration `20260924010000_interaction_metrics_and_storytelling.sql`:
+    - Added `view_count bigint`, `like_count bigint`, `description text`, `tags text[]`, `category_id text` to `public.videos`.
+    - Added `author_profile_image_url text`, `author_channel_url text`, `reply_count integer default 0`, `updated_at timestamptz` to `public.comments`.
+    - Updated `private.dashboard_aggregates_impl` to compute top-level Storytelling with Data KPIs (`total_views`, `total_likes`, `engagement_rate`, `net_sentiment`).
+    - Fixed cross-workspace video deduplication adoption logic in `private.enqueue_workspace_video_sync`.
+- **Frontend Dashboard Enhancements**:
+  - Integrated video thumbnails and interactive engagement percentage rate badges into `Videos.tsx`.
+  - Enriched `CommentsTable.tsx` (desktop table and mobile cards) with author avatar images, clickable channel links, and reply count indicator badges.
+  - Enriched contract `snapshot()` calculation to populate storytelling interaction KPIs seamlessly in fallback and fixture flows.
+- **Verification**:
+  - Unit tests: 127 Vitest test suites (971 tests passing).
+  - Database tests: 45 PGlite test suites (404 tests passing, including 5/5 in `interaction_metrics_and_storytelling.test.ts`).
+  - Worker tests: 281 pytest tests passing in 4.37s.
+  - E2E tests: 124 Playwright tests passing across 12 spec files in 1.5m.
+  - Remote DB migration verified applied to remote Supabase instance `[ykqugctewsqvevhyqtbi]`.
+  - Production preview deployment verified uploaded over FTPS (`app.sky-develop.net`).
+
 ## 2026-09-23 — Omnichannel Historical Data Backfill & Import & Dynamic Admin Plan Limits
 
 - **Omnichannel Historical Data Backfill & External Import**:

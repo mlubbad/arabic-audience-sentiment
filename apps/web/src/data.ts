@@ -775,9 +775,9 @@ export async function loadDashboardAggregates(
     analysed: snap.analysed,
     unanalysed: snap.unanalysed,
     sentiments: snap.sentiments,
-    kpis: {
+    kpis: snap.kpis ?? {
       total_views: null,
-      total_likes: null,
+      total_likes: comments.reduce((sum, c) => sum + (c.likes_value ?? 0), 0),
       total_comments: snap.total,
       engagement_rate: null,
       net_sentiment:

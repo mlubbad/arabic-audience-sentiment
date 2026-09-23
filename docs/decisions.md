@@ -1,5 +1,18 @@
 # Implementation decisions
 
+2026-09-24 — Audience Interaction Metrics Extraction at Zero Additional Quota & Storytelling with Data Integration.
+To empower creators and brand managers with richer contextual insights and actionable engagement intelligence without exceeding YouTube Data API daily quotas:
+1. **Zero-Quota-Cost Interaction Metric Extraction**:
+   - Rather than making separate calls to video statistics or comment details endpoints, metrics were extracted from existing API responses:
+     - `videos.list` was adjusted from `part="snippet"` to `part="snippet,statistics,contentDetails"` (1 quota unit, unchanged). This yields `view_count`, `like_count`, `description`, `tags`, and `category_id` without spending extra quota units.
+     - `commentThreads.list` snippet contains `authorProfileImageUrl`, `authorChannelUrl`, and `totalReplyCount` for each top-level comment. Capturing these fields into `RawComment` and persisting them to `public.comments` requires 0 additional API calls.
+2. **Storytelling with Data Hierarchy & Actionable Recommendations**:
+   - Executive briefing presents a crisp, preattentive hierarchy: Total Views, Total Likes, Engagement Rate, Net Sentiment.
+   - Videos section renders video thumbnails and calculates engagement rate percentages $\frac{\text{likes} + \text{comments}}{\text{views}} \times 100\%$.
+   - Comments table enriches commenter authenticity via author avatar images, direct YouTube channel links, and reply count indicator badges.
+3. **Cross-Workspace Video Sync Deduplication**:
+   - In multi-tenant environments where multiple workspaces monitor the same public video, `private.enqueue_workspace_video_sync` now safely adopts existing video metadata (`channel_id`, `published_at`, `view_count`, `like_count`) if previously discovered by another tenant, avoiding redundant external fetches.
+
 2026-09-23 — Omnichannel Historical Data Backfill & Import and Dynamic Plan Limits.
 To enable users to import historical posts/videos and comments according to their subscription plan while allowing administrators to dynamically customize plan constraints without deploying database migrations:
 1. **Quota Separation (`historical_backfill` vs `comment_analysis`)**:

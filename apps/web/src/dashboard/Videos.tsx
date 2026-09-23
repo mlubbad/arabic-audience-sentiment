@@ -98,7 +98,17 @@ export function Videos({
                 }
               }}
             >
-              <h3 className="db-card-title">{videoLabel(v.id, v.title)}</h3>
+              <div className="db-video-header">
+                {v.thumbnail_url && (
+                  <img
+                    src={v.thumbnail_url}
+                    alt=""
+                    className="db-video-thumbnail"
+                    loading="lazy"
+                  />
+                )}
+                <h3 className="db-card-title">{videoLabel(v.id, v.title)}</h3>
+              </div>
               <div className="db-row-actions">
                 {v.id === s.videos[0]?.id && s.videos.length > 1 && (
                   <Badge tone="warning">{S.videoTagTopVolume}</Badge>
@@ -119,6 +129,14 @@ export function Videos({
                 {v.like_count != null && (
                   <Badge numeric>
                     {n(v.like_count)} {S.kpiLikes}
+                  </Badge>
+                )}
+                {v.view_count != null && v.view_count > 0 && (
+                  <Badge numeric tone="sentiment-neutral">
+                    {Math.round(
+                      (((v.like_count ?? 0) + v.total) / v.view_count) * 1000,
+                    ) / 10}
+                    ٪ {S.kpiEngagement}
                   </Badge>
                 )}
                 <Badge numeric>{S.countComments(n(v.total))}</Badge>

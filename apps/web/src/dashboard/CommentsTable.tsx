@@ -28,6 +28,7 @@ import type { Snapshot } from "./Dashboard";
 import type { Locale } from "../locale";
 import { commentText, displayDate } from "../i18n";
 import { useMediaQuery } from "../ui/useMediaQuery";
+import { n } from "./format";
 import "./comments.css";
 
 /** The sentiment scale's own tone, never `neutral`'s badge default — same
@@ -165,10 +166,36 @@ export function CommentsTable({
         {s.comments.map((c) => (
           <Card key={c.id} className="db-comment-row">
             <h3 className="db-card-title">
-              {/* `<bdi>` keeps a Latin handle reading left-to-right
-                  (`@abu_faisal`, not `abu_faisal@`) inside the RTL row. */}
-              <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
-              {c.is_reply && <small>{S.replyTag}</small>}
+              <div className="db-comment-author-cell">
+                {c.author_profile_image_url && (
+                  <img
+                    src={c.author_profile_image_url}
+                    alt=""
+                    className="db-comment-avatar"
+                    loading="lazy"
+                  />
+                )}
+                <div className="db-comment-author-info-table">
+                  {c.author_channel_url ? (
+                    <a
+                      href={c.author_channel_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="db-comment-author-link"
+                    >
+                      <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
+                    </a>
+                  ) : (
+                    <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
+                  )}
+                  {c.is_reply && <small>{S.replyTag}</small>}
+                  {c.reply_count != null && c.reply_count > 0 && (
+                    <small className="db-comment-replies-badge">
+                      ({n(c.reply_count)} {S.countReplies(n(c.reply_count))})
+                    </small>
+                  )}
+                </div>
+              </div>
             </h3>
             <dl className="db-comment-dl">
               <div>
@@ -224,10 +251,36 @@ export function CommentsTable({
           {s.comments.map((c) => (
             <TableRow key={c.id}>
               <TableCell>
-                {/* `<bdi>` keeps a Latin handle reading left-to-right
-                    (`@abu_faisal`, not `abu_faisal@`) inside the RTL row. */}
-                <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
-                {c.is_reply && <small>{S.replyTag}</small>}
+                <div className="db-comment-author-cell">
+                  {c.author_profile_image_url && (
+                    <img
+                      src={c.author_profile_image_url}
+                      alt=""
+                      className="db-comment-avatar"
+                      loading="lazy"
+                    />
+                  )}
+                  <div className="db-comment-author-info-table">
+                    {c.author_channel_url ? (
+                      <a
+                        href={c.author_channel_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="db-comment-author-link"
+                      >
+                        <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
+                      </a>
+                    ) : (
+                      <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
+                    )}
+                    {c.is_reply && <small>{S.replyTag}</small>}
+                    {c.reply_count != null && c.reply_count > 0 && (
+                      <small className="db-comment-replies-badge">
+                        ({n(c.reply_count)} {S.countReplies(n(c.reply_count))})
+                      </small>
+                    )}
+                  </div>
+                </div>
               </TableCell>
               <TableCell>{commentText(c, S)}</TableCell>
               <TableCell>
