@@ -467,6 +467,7 @@ def test_telegram_collector_mtproto_catalogue_and_batches():
     assert cat.videos[0]["comments_state"] == "open"
     assert cat.videos[1]["external_video_id"] == "101"
     assert cat.videos[1]["reported_comment_count"] == 0
+    assert cat.videos[1]["comments_state"] == "open"
 
     # Test batches via MTProto
     batches = list(col.batches("100", None))
@@ -478,6 +479,59 @@ def test_telegram_collector_mtproto_catalogue_and_batches():
     assert batches[0].comments[0].author_name == "أحمد علي"
     assert batches[0].comments[0].likes_value == 3
     assert batches[0].comments[0].source == "telegram_mtproto"
+
+
+def test_telegram_collector_channel_vs_megagroup_discussion():
+    class DummyChannelEntity:
+        def __init__(self, is_broadcast: bool, is_megagroup: bool):
+            self.broadcast = is_broadcast
+            self.megagroup = is_megagroup
+
+    class DummyFullChat:
+        def __init__(self, linked_chat_id):
+            self.linked_chat_id = linked_chat_id
+
+    class DummyFullChannel:
+        def __init__(self, linked_chat_id):
+            self.full_chat = DummyFullChat(linked_chat_id)
+
+    class MockTelethonDiscussionClient:
+        def __init__(self, entity, linked_chat_id=None):
+            self._entity = entity
+            self._linked_chat_id = linked_chat_id
+
+        def get_entity(self, handle):
+            return self._entity
+
+        def __call__(self, request):
+            return DummyFullChannel(self._linked_chat_id)
+
+        def get_messages(self, channel, limit=500):
+            class Msg:
+                id = 999
+                message = "رسالة تجريبية"
+                date = None
+                replies = None
+            return [Msg()]
+
+    # 1. Supergroup / Megagroup -> always open
+    megagroup_client = MockTelethonDiscussionClient(DummyChannelEntity(is_broadcast=False, is_megagroup=True))
+    c1 = TelegramCollector(channel_id="@Istanbul_N23", telethon_client=megagroup_client)
+    cat1 = c1.catalogue()
+    assert cat1.videos[0]["comments_state"] == "open"
+
+    # 2. Broadcast Channel WITH linked discussion chat -> open
+    channel_with_disc = MockTelethonDiscussionClient(DummyChannelEntity(is_broadcast=True, is_megagroup=False), linked_chat_id=12345)
+    c2 = TelegramCollector(channel_id="@warlife3", telethon_client=channel_with_disc)
+    cat2 = c2.catalogue()
+    assert cat2.videos[0]["comments_state"] == "open"
+
+    # 3. Broadcast Channel WITHOUT linked discussion chat -> disabled
+    channel_no_disc = MockTelethonDiscussionClient(DummyChannelEntity(is_broadcast=True, is_megagroup=False), linked_chat_id=None)
+    c3 = TelegramCollector(channel_id="@official_broadcast", telethon_client=channel_no_disc)
+    cat3 = c3.catalogue()
+    assert cat3.videos[0]["comments_state"] == "disabled"
+
 
 
 

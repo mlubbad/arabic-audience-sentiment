@@ -5,6 +5,7 @@ Hermetically testable with synthetic HTTP responses and fixture data.
 """
 import html
 import json
+import os
 import re
 import uuid
 from collections.abc import Iterator
@@ -39,6 +40,26 @@ class TelegramCollector:
         self.session_string = session_string
         self.telethon_client = telethon_client
         self.fixture_data = fixture_data
+        self._active_client = None
+
+    def _get_tg_client(self):
+        if self.telethon_client:
+            return self.telethon_client
+        if not self._active_client or not getattr(self._active_client, "is_connected", lambda: False)():
+            from telethon.sync import TelegramClient
+            from telethon.sessions import StringSession
+            tg = TelegramClient(StringSession(self.session_string), int(self.api_id), self.api_hash)
+            tg.connect()
+            self._active_client = tg
+        return self._active_client
+
+    def close(self):
+        if self._active_client and getattr(self._active_client, "is_connected", lambda: False)():
+            try:
+                self._active_client.disconnect()
+            except Exception:
+                pass
+            self._active_client = None
 
     @staticmethod
     def _clean_handle(channel_id: str) -> str:
@@ -83,7 +104,22 @@ class TelegramCollector:
             try:
                 def _fetch_catalogue(tg):
                     channel = tg.get_entity(clean_handle)
-                    messages = tg.get_messages(channel, limit=50)
+                    is_broadcast = getattr(channel, "broadcast", False)
+                    has_discussion = True
+                    if is_broadcast:
+                        try:
+                            from telethon.tl.functions.channels import GetFullChannelRequest
+                            full = tg(GetFullChannelRequest(channel))
+                            has_discussion = bool(getattr(getattr(full, "full_chat", None), "linked_chat_id", None))
+                        except Exception:
+                            has_discussion = True
+
+                    try:
+                        limit = int(os.environ.get("TELEGRAM_CATALOGUE_LIMIT", "500"))
+                    except (ValueError, TypeError):
+                        limit = 500
+
+                    messages = tg.get_messages(channel, limit=limit)
                     vids = []
                     for m in messages:
                         if not getattr(m, "id", None):
@@ -92,7 +128,7 @@ class TelegramCollector:
                         first_line = msg_text.strip().split("\n")[0] if msg_text else f"منشور {m.id}"
                         replies_obj = getattr(m, "replies", None)
                         comment_count = getattr(replies_obj, "replies", 0) if replies_obj else 0
-                        comments_state = "open" if (comment_count > 0 or replies_obj is not None) else "disabled"
+                        comments_state = "open" if has_discussion else "disabled"
                         vids.append({
                             "external_video_id": str(m.id),
                             "title": first_line[:120],
@@ -105,13 +141,8 @@ class TelegramCollector:
                         })
                     return vids
 
-                if self.telethon_client:
-                    return Catalogue(videos=_fetch_catalogue(self.telethon_client), complete=True)
-                else:
-                    from telethon.sync import TelegramClient
-                    from telethon.sessions import StringSession
-                    with TelegramClient(StringSession(self.session_string), int(self.api_id), self.api_hash) as tg:
-                        return Catalogue(videos=_fetch_catalogue(tg), complete=True)
+                tg = self._get_tg_client()
+                return Catalogue(videos=_fetch_catalogue(tg), complete=True)
             except Exception as exc:
                 if not self.client:
                     raise CollectionError(f"telegram_mtproto_error: {exc}", "failed") from exc
@@ -326,13 +357,8 @@ class TelegramCollector:
                 return items
 
             try:
-                if self.telethon_client:
-                    raw_comments = _fetch_batches(self.telethon_client)
-                else:
-                    from telethon.sync import TelegramClient
-                    from telethon.sessions import StringSession
-                    with TelegramClient(StringSession(self.session_string), int(self.api_id), self.api_hash) as tg:
-                        raw_comments = _fetch_batches(tg)
+                tg = self._get_tg_client()
+                raw_comments = _fetch_batches(tg)
 
                 next_cp = str(raw_comments[-1].id) if len(raw_comments) >= page_size else None
                 outcome = "partial" if next_cp else "exhausted"
