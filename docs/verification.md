@@ -15,6 +15,9 @@
 | Production build & prerender: `npm run build`   | Built in 1.39s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                                                   |
 | Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 763 source files and built assets (0 secrets detected).                                                                                                                                                     |
 | Repository check gate: `npm run check`          | **100% green exit code 0** across all gates.                                                                                                                                                                                                    |
+| Remote database migration: `npm run db:migrate:remote` | Applied migration `20260923180000_historical_data_import_and_dynamic_plans.sql` to live remote Supabase instance `[ykqugctewsqvevhyqtbi]`. Database up to date (92 migrations applied, 0 pending). |
+| Preview host FTPS deploy: `npm run deploy:preview`     | Successfully built bundle and uploaded all static assets, HTML pages, fonts, and cleaned up obsolete hashed chunks over FTPS with exit code 0.                                                                 |
+| Playwright E2E test suite: `npm run test:e2e`          | **124 tests passed (100% green)** across all 12 spec files in 1.5m.                                                                                                                                             |
 
 ## 2026-09-23 — YouTube Data API Quota Optimization & Incremental Watermark Early Stopping
 
