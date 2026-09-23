@@ -501,12 +501,18 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
               const scope: Scope = `ws:${w.id}`;
               const sub = subscriptions.find((s) => s.workspace_id === w.id);
               const plan = catalogue.data?.find((p) => p.key === sub?.plan_key);
-              const isPlatformAdmin = Boolean(session && access.data === true);
+              const isPlatformAdmin = Boolean(
+                !isImpersonating && session && access.data === true,
+              );
+              // "لا أملك القناة" (Public channel tracking) is an internal experiment under testing.
+              // It has not been published to standard users or included in any customer plan yet,
+              // so it is strictly restricted to the platform owner when not impersonating a regular user.
               const allowPublicChannels = Boolean(
-                isPlatformAdmin ||
-                  (plan
-                    ? plan.allow_public_channels
-                    : sub?.plan_key === "owner"),
+                !isImpersonating &&
+                  (isPlatformAdmin ||
+                    (plan
+                      ? plan.allow_public_channels
+                      : sub?.plan_key === "owner")),
               );
               return (
                 <WorkspaceCard

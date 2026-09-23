@@ -773,6 +773,14 @@ describe("WorkspaceCard", () => {
       expect(screen.queryByTestId(`channel-setup-${W}`)).toBeNull();
       expect(screen.queryByTestId(`addchannel-${W}`)).toBeNull();
       expect(screen.getByTestId(`connect-${W}`)).toBeInTheDocument();
+      expect(
+        screen.getByText("اربط قناة يوتيوب بعد موافقتك على الإذن."),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          "حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة.",
+        ),
+      ).toBeNull();
     });
 
     it("displays both choices when allowPublicChannels is true", () => {
@@ -780,6 +788,11 @@ describe("WorkspaceCard", () => {
       expect(screen.getByTestId(`channel-setup-${W}`)).toBeInTheDocument();
       expect(screen.getByTestId(`connect-${W}`)).toBeInTheDocument();
       expect(screen.getByTestId(`addchannel-${W}`)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة.",
+        ),
+      ).toBeInTheDocument();
     });
   });
 });

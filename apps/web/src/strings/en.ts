@@ -90,7 +90,8 @@ export const en: Strings = {
   serviceUnreachable: "Could not reach the service. Try again.",
 
   stepWorkspace: "Create your account and your workspace.",
-  stepChannel:
+  stepChannel: "Connect a YouTube channel after granting permission.",
+  stepChannelWithPublic:
     "Select a channel by connecting as owner or choosing a public one.",
   stepCollect:
     "Choose the videos to collect, then follow their status on the operations page.",

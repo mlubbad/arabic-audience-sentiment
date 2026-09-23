@@ -117,7 +117,7 @@ export function WorkspaceCard({
     setInternalShareOpen(open);
     onShare?.(open);
   };
-  const steps = setupProgress({ channel, latestJob }, S);
+  const steps = setupProgress({ channel, latestJob, allowPublicChannels }, S);
   const nameId = `rename-name-${workspace.id}`;
   const addChannelQueryId = `addchannel-query-${workspace.id}`;
   const addTelegramInputId = `addtelegram-handle-${workspace.id}`;

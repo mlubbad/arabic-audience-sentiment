@@ -99,7 +99,8 @@ export const ar = {
 
   // ---- the three steps (setup.ts) and the card (WorkspaceCard.tsx) ----
   stepWorkspace: "أنشئ حسابك ومساحة العمل الخاصة بك.",
-  stepChannel: "حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة.",
+  stepChannel: "اربط قناة يوتيوب بعد موافقتك على الإذن.",
+  stepChannelWithPublic: "حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة.",
   stepCollect: "اختر الفيديوهات التي تُجمع، ثم تابع حالتها في صفحة التشغيل.",
   stepChannelSeeded:
     "تم اختيار القناة العامة للمتابعة؛ الخطوة التالية اختيار الفيديوهات.",

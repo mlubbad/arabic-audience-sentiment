@@ -76,13 +76,18 @@ export function setupProgress(
     channel: { status: ChannelStatus | string } | null;
     /** The most recent job for the workspace, or null when none was ever asked for. */
     latestJob: { status: JobStatus | string } | null;
+    /** Whether public channels are enabled for this workspace (owner-only experiment). */
+    allowPublicChannels?: boolean;
   },
   S: Strings,
 ): SetupStep[] {
-  const { channel, latestJob } = input;
+  const { channel, latestJob, allowPublicChannels } = input;
   const [workspace, link, collect] = setupSteps.map((step) => ({
     key: step.key,
-    title: S[step.title],
+    title:
+      step.key === "channel" && allowPublicChannels
+        ? S.stepChannelWithPublic
+        : S[step.title],
   }));
 
   // Being on this list at all means the first step happened.
