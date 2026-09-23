@@ -51,4 +51,6 @@ class Collector(Protocol):
     source: str
     revision: str
 
-    def batches(self, video_id: str, checkpoint: str | None) -> Iterator[Batch]: ...
+    def batches(
+        self, video_id: str, checkpoint: str | None, since: str | None = None
+    ) -> Iterator[Batch]: ...

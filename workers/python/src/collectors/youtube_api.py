@@ -8,7 +8,7 @@ directly.
 import json
 import re
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import httpx
 from .protocol import Batch, Catalogue, CollectionError, RawComment
 
@@ -172,16 +172,32 @@ class YouTubeAPI:
         except (KeyError, TypeError, AttributeError):
             raise CollectionError("invalid_comment") from None
 
-    def batches(self, video_id: str, checkpoint: str | None) -> Iterator[Batch]:
+    @staticmethod
+    def _is_before_or_at(pub_str: str | None, since_str: str | None) -> bool:
+        """Check if publishedAt is older than or equal to since (with 60s clock skew tolerance)."""
+        if not pub_str or not since_str:
+            return False
+        try:
+            pub_dt = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+            since_dt = datetime.fromisoformat(since_str.replace("Z", "+00:00"))
+            return pub_dt <= (since_dt - timedelta(seconds=60))
+        except (ValueError, TypeError):
+            return False
+
+    def batches(
+        self, video_id: str, checkpoint: str | None, since: str | None = None
+    ) -> Iterator[Batch]:
         if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
             raise ValueError("invalid_video_id")
         try:
             state = json.loads(checkpoint) if checkpoint else {
-                "video_id": video_id, "page": None, "parents": [], "reply_page": None, "threads_done": False}
+                "video_id": video_id, "page": None, "parents": [], "reply_page": None,
+                "threads_done": False, "since": since}
             if state["video_id"] != video_id or not isinstance(state["parents"], list):
                 raise ValueError()
         except (KeyError, ValueError, TypeError):
             raise CollectionError("invalid_checkpoint") from None
+        effective_since = state.get("since") or since
         while True:
             if state["parents"]:
                 parent = state["parents"][0]
@@ -197,22 +213,41 @@ class YouTubeAPI:
                 if not next_page:
                     state["parents"].pop(0)
             elif not state["threads_done"]:
-                params = {"part": "snippet", "videoId": video_id, "maxResults": 100,
+                params = {"part": "snippet,replies", "videoId": video_id, "maxResults": 100,
                           "order": "time", "textFormat": "plainText"}
                 if state["page"]:
                     params["pageToken"] = state["page"]
                 data = self._get("commentThreads", params)
                 try:
-                    comments = [self._comment(i["snippet"]["topLevelComment"], video_id) for i in data["items"]]
-                    state["parents"] = [i["snippet"]["topLevelComment"]["id"] for i in data["items"]
-                                        if i["snippet"]["totalReplyCount"] > 0]
+                    comments = []
+                    parents = []
+                    cutoff_reached = False
+                    for i in data.get("items", []):
+                        top = i["snippet"]["topLevelComment"]
+                        top_pub = top.get("snippet", {}).get("publishedAt")
+                        if effective_since and top_pub and self._is_before_or_at(top_pub, effective_since):
+                            cutoff_reached = True
+                            break
+                        comments.append(self._comment(top, video_id))
+                        inline = i.get("replies", {}).get("comments", [])
+                        total_replies = i["snippet"].get("totalReplyCount", 0)
+                        if total_replies <= len(inline):
+                            for r in inline:
+                                comments.append(self._comment(r, video_id, parent=top["id"]))
+                        else:
+                            parents.append(top["id"])
+                    state["parents"] = parents
                 except (KeyError, TypeError):
                     raise CollectionError("invalid_thread") from None
-                next_page = data.get("nextPageToken")
-                if next_page and next_page == state["page"]:
-                    raise CollectionError("repeated_page_token", "partial")
-                state["page"] = next_page
-                state["threads_done"] = next_page is None
+                if cutoff_reached:
+                    state["threads_done"] = True
+                    state["page"] = None
+                else:
+                    next_page = data.get("nextPageToken")
+                    if next_page and next_page == state["page"]:
+                        raise CollectionError("repeated_page_token", "partial")
+                    state["page"] = next_page
+                    state["threads_done"] = next_page is None
             else:
                 yield Batch([], None, "exhausted")
                 return
@@ -220,6 +255,7 @@ class YouTubeAPI:
             yield Batch(comments, None if done else json.dumps(state), "exhausted" if done else "partial")
             if done:
                 return
+
 
     def comment_counts(self, video_ids: list[str]) -> dict[str, int | None]:
         """The source's commentCount for each video, fifty ids per unit.

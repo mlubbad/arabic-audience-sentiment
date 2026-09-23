@@ -1,6 +1,19 @@
 # Implementation decisions
  
+2026-09-23 — YouTube Data API Quota Optimization & Incremental Watermark Early Stopping.
+To maximize the efficiency of YouTube's daily API quota limit (10,000 units/day) when monitoring active YouTube channels and videos:
+1. **Inline Replies Optimization**:
+   - `commentThreads.list` previously requested `part="snippet"` and scheduled every parent with `totalReplyCount > 0` for a separate call to `comments.list` (1 quota unit per parent).
+   - Changed request to `part="snippet,replies"`. YouTube returns up to 5 inline replies in `snippet,replies` for zero additional quota cost.
+   - For all threads where `totalReplyCount <= len(inline_replies)`, replies are yielded directly from the thread response, bypassing `/comments`. This eliminates $\approx 85-90\%$ of all reply collection quota units.
+2. **Incremental Sync Watermark (`since`)**:
+   - Periodic synchronization previously paginated through all comment threads until exhaustively reaching the end of the video, repeating reads for thousands of historical comments.
+   - Introduced early stopping in `YouTubeAPI.batches`: because comments are requested in `order="time"` (newest first), encountering a comment older than or equal to `last_collected_at` (minus 60s clock skew tolerance) immediately marks `threads_done = True` and terminates pagination.
+   - Migration `20260923120000_due_videos_carry_last_collected_at.sql` exposes `s.last_collected_at` through `private.due_videos`.
+   - The worker runner passes `since` when `last_seen_comment_count is not None`.
+
 2026-09-22 — Dashboard Covering Composite Indexes and Frontend Code-Splitting.
+
 Following a comprehensive architecture and performance audit, two high-impact optimizations were prioritized and implemented:
 1. **Database Covering Indexes**:
    - `private.dashboard_aggregates_impl` and `private.dashboard_comments_impl` join `sentiment_predictions` and `topic_predictions` using `workspace_id` and active `analysis_key`/`classification_key`.

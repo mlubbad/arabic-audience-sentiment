@@ -318,8 +318,15 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
             # issued.
             start = cursor if vid == current else None
             video_outcome = "partial"
+            kwargs = {}
+            if video.get("last_seen_comment_count") is not None and video.get("last_collected_at"):
+                kwargs["since"] = video["last_collected_at"]
             try:
-                for batch in collector.batches(vid, start):
+                try:
+                    batch_iter = collector.batches(vid, start, **kwargs)
+                except TypeError:
+                    batch_iter = collector.batches(vid, start)
+                for batch in batch_iter:
                     predictions: list = []
                     if analyzer is not None:
                         try:

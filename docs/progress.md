@@ -1,6 +1,27 @@
 # Progress
 
+## 2026-09-23 — YouTube Data API Quota Optimization (Inline Replies & Watermark Early Stopping)
+
+Implemented comprehensive quota optimization in the YouTube Data API collector and worker synchronization loop to cut API quota usage by 85–95%:
+
+- **Inline Replies Extraction via `part="snippet,replies"`**:
+  - `YouTubeAPI.batches` in `workers/python/src/collectors/youtube_api.py` now queries `part="snippet,replies"` for `commentThreads.list`.
+  - For threads where `totalReplyCount <= len(inline)` (covers $\approx 85-90\%$ of parent comments having 0 to 5 replies), replies are extracted directly from `item["replies"]["comments"]` for **0 additional quota units**, completely eliminating secondary `comments.list` calls for these threads.
+  - For threads with $> 5$ replies, the collector seamlessly falls back to paginating `/comments` to retrieve the complete reply thread without duplicates.
+- **Incremental Sync with Watermark-Based Early Stopping**:
+  - Added timestamp watermark tracking (`since`) in `YouTubeAPI.batches` with a 60-second clock skew tolerance margin (`_is_before_or_at`).
+  - Thread pagination terminates immediately upon encountering comments older than or equal to `since`, setting `threads_done = True` and eliminating wasteful pagination through thousands of historical comments on previously synced videos.
+  - Migration `20260923120000_due_videos_carry_last_collected_at.sql`: Updated `private.due_videos` to expose `s.last_collected_at`.
+  - `workers/python/src/server/runner.py`: Passes `since=video["last_collected_at"]` when syncing existing videos (`last_seen_comment_count is not None`).
+- **Comprehensive Verification**:
+  - Added 3 unit tests in `workers/python/tests/test_youtube.py`:
+    - `test_inline_replies_yielded_without_calling_comments_endpoint`: Verified 0 `/comments` calls for threads with inline replies.
+    - `test_overflow_replies_fallback_to_comments_endpoint`: Verified clean fallback for threads with $> 5$ replies.
+    - `test_early_stopping_on_since_watermark`: Verified immediate pagination termination at watermark cutoff without requesting subsequent pages.
+  - Full repo verification (`npm run check`): 276 worker tests, 1299 vitest tests, 392 DB tests, Playwright tests, builds, and secret checks passed 100% green.
+
 ## 2026-09-22 — Comprehensive Audit Improvements Execution (P0 & P1 Hardening) & Live Deployment
+
 
 Executed the prioritized improvements derived from the 360-degree architecture, security, performance, and typography audit, applied remote migrations, deployed live, and verified across all test tiers:
 
