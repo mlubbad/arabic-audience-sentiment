@@ -151,7 +151,7 @@ def build_collector(
                 renew=renew,
                 public_reader=bool(channel_id),
             )
-        if channel_id and api_key:
+        if channel_id and api_key and not api_key.startswith("AQ."):
             return YouTubeAPI(api_key, client)
         return None
 

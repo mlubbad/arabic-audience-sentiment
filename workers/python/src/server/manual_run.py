@@ -183,7 +183,7 @@ def main() -> None:
             if token:
                 return YouTubeAPI(None, client, access_token=token,
                                   expires_at=expires_at, renew=renew)
-            if channel_id and os.environ.get("YOUTUBE_API_KEY"):
+            if channel_id and os.environ.get("YOUTUBE_API_KEY") and not os.environ["YOUTUBE_API_KEY"].startswith("AQ."):
                 return YouTubeAPI(os.environ["YOUTUBE_API_KEY"], client)
             return None
         worked = run_backfill(

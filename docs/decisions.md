@@ -1,5 +1,17 @@
 # Implementation decisions
 
+2026-09-24 — YouTube Public Ingestion via OAuth Platform Reader Grant vs Direct API Keys.
+To resolve authentication for unverified public YouTube channels without relying on web scrapers or requiring external Google Cloud API keys:
+1. **OAuth Platform Reader Preferred Over Raw API Keys**:
+   - Modern Google Cloud accounts and AI Studio issue API keys beginning with `AQ.` (associated with Google Gemini / Generative Language APIs). Passing an `AQ.` key to YouTube Data API v3 endpoints returns `HTTP 401 Unauthorized: "API keys are not supported by this API. Expected OAuth2 access token or other authentication credentials that assert a principal."`
+   - Rather than requiring operators to obtain legacy `AIzaSy...` API keys, the system relies on the operator-connected OAuth Platform Reader grant stored securely in `private.platform_reader` (established in migration `20260919200000_a_platform_reader_reads_public_channels.sql`).
+   - The Supabase Edge Functions (`worker/claim` and `channel-lookup`) unseal the encrypted grant using `TOKEN_ENCRYPTION_KEY`, refresh tokens via `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and pass short-lived OAuth bearer tokens to the worker.
+   - The worker executes with `YouTubeAPI(None, client, access_token=token, public_reader=True)`.
+2. **Defensive Filtering in Worker Loop**:
+   - In `loop.py` and `manual_run.py`, collector builders inspect any provided `YOUTUBE_API_KEY`: if it starts with `AQ.`, it is bypassed, falling back to the Platform Reader OAuth token rather than causing a 401 failure.
+3. **Omnichannel Diagnostics Integration**:
+   - Added YouTube status check to `workers/python/src/collectors/diagnostics.py`, verifying the presence and health of the OAuth Platform Reader grant and confirming YouTube API reachability.
+
 2026-09-24 — Audience Interaction Metrics Extraction at Zero Additional Quota & Storytelling with Data Integration.
 To empower creators and brand managers with richer contextual insights and actionable engagement intelligence without exceeding YouTube Data API daily quotas:
 1. **Zero-Quota-Cost Interaction Metric Extraction**:

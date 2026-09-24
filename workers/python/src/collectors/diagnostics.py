@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import os
 import httpx
 
@@ -22,6 +23,8 @@ def _load_env():
         os.path.join(os.getcwd(), ".env"),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.env.local")),
         os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.env")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.env.local")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.env")),
     ]
     for env_path in candidates:
         if os.path.isfile(env_path):
@@ -228,11 +231,68 @@ def check_telegram_channel(handle: str) -> dict:
     }
 
 
+def check_youtube_channel(channel: str = "asharqnews") -> dict:
+    """Diagnose YouTube collection capabilities (Platform Reader OAuth grant + API key)."""
+    clean = channel.lstrip("@")
+    supabase_url = os.environ.get("SUPABASE_URL")
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    worker_cred = os.environ.get("WORKER_CREDENTIAL")
+    api_key = os.environ.get("YOUTUBE_API_KEY")
+
+    details = []
+    has_reader = False
+    if worker_cred and supabase_url and service_key:
+        h = hashlib.sha256(worker_cred.encode()).hexdigest()
+        try:
+            res = httpx.post(
+                f"{supabase_url}/rest/v1/rpc/svc_worker_reader_grant",
+                json={"credential_hash": h},
+                headers={"apikey": service_key, "Authorization": f"Bearer {service_key}"},
+                timeout=10,
+            )
+            if res.status_code == 200 and len(res.json()) > 0:
+                has_reader = True
+                details.append("OAuth Platform Reader active in private.platform_reader (can read public YouTube channels without API key).")
+        except Exception as exc:
+            details.append(f"Reader check error: {exc}")
+
+    if api_key:
+        if api_key.startswith("AQ."):
+            details.append("YOUTUBE_API_KEY has AQ.* prefix (Google AI Studio/Cloud format, not accepted by YouTube API v3; bypassed in favor of OAuth Reader).")
+        elif api_key.startswith("AIzaSy"):
+            details.append("YOUTUBE_API_KEY has AIzaSy* prefix (standard Data API v3 key).")
+    else:
+        details.append("Direct API key not configured (not required; Platform Reader provides OAuth tokens).")
+
+    # Probe YouTube Data API reachability
+    try:
+        resp = httpx.get("https://www.googleapis.com/youtube/v3/videos", timeout=5)
+        if resp.status_code in (400, 401, 403):
+            details.append("YouTube Data API v3 endpoint reachable.")
+        else:
+            details.append(f"YouTube endpoint returned HTTP {resp.status_code}.")
+    except Exception as exc:
+        details.append(f"YouTube endpoint unreachable: {exc}")
+
+    if has_reader:
+        status = "HEALTHY (OAuth Platform Reader Active)"
+    elif api_key and api_key.startswith("AIzaSy"):
+        status = "HEALTHY (Direct API Key)"
+    else:
+        status = "DEGRADED (Requires Platform Reader or API Key)"
+
+    return {
+        "name": f"YouTube (@{clean})",
+        "status": status,
+        "details": " ".join(details),
+    }
+
+
 def main():
     _load_env()
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--platform", default="all", choices=["all", "x", "tiktok", "telegram", "scrapers"])
-    p.add_argument("--channel", default="aljazeera", help="Channel handle or username to test")
+    p.add_argument("--platform", default="all", choices=["all", "youtube", "x", "tiktok", "telegram", "scrapers"])
+    p.add_argument("--channel", default="asharqnews", help="Channel handle or username to test")
     args = p.parse_args()
 
     apify_token = os.environ.get("APIFY_API_TOKEN")
@@ -249,6 +309,9 @@ def main():
     if args.platform in ("all", "scrapers"):
         results.append(check_apify(apify_token))
         results.append(check_brightdata(brightdata_key))
+
+    if args.platform in ("all", "youtube"):
+        results.append(check_youtube_channel(args.channel))
 
     if args.platform in ("all", "x"):
         results.append(check_x_channel(args.channel, x_bearer))
@@ -268,12 +331,14 @@ def main():
     print("\n" + "=" * 78)
     print("  SUMMARY RECOMMENDATIONS (التوصيات)")
     print("=" * 78)
-    print("1. Twitter (X): Public syndication is aggressively rate-limited (HTTP 429) by Twitter.")
+    print("1. YouTube: Public channel collection is fully managed via the OAuth Platform Reader")
+    print("   (private.platform_reader). No external AIzaSy... API key is required.")
+    print("2. Twitter (X): Public syndication is aggressively rate-limited (HTTP 429) by Twitter.")
     print("   Setting APIFY_API_TOKEN in .env.local enables resilient automated scraping.")
-    print("2. TikTok: Web requests encounter Cloudflare/Slardar anti-bot challenges.")
-    print("   The collector now correctly marks these as blocked/failed (never empty success).")
+    print("3. TikTok: Web requests encounter Cloudflare/Slardar anti-bot challenges.")
+    print("   The collector correctly marks these as blocked/failed (never empty success).")
     print("   Setting APIFY_API_TOKEN routes collection through managed residential scrapers.")
-    print("3. Telegram: Public post discovery is functional. Discussion comments require session auth.")
+    print("4. Telegram: Public post discovery is functional. Discussion comments require session auth.")
     print("=" * 78 + "\n")
 
 

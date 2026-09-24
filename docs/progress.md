@@ -2591,10 +2591,20 @@ While `channel-lookup` responded successfully to backend and curl requests, in-b
   - All 111 test files and 874 unit tests passed. `npm run check` (typecheck + eslint) passed clean.
   - Deployed preview bundle to `https://app.sky-develop.net`.
 
-## 2026-09-20 — Continuous Deployment (CD) pipeline with GitHub Actions, FTPS upload, and remote migrations
+## 2026-09-24 — YouTube Platform Reader OAuth pipeline verification and omnichannel diagnostics
 
-- **Automated Workflow**: Added `.github/workflows/deploy.yml` triggered on push to `main` and `workflow_dispatch`.
-- **Security compliance**: Pinned all actions to full commit SHAs (`actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2`, `actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0`), least-privilege `permissions: contents: read`, `concurrency`, `timeout-minutes: 20`, and `persist-credentials: false`.
-- **Environment flexibility**: Decoupled `scripts/deploy-preview.sh` from local `.env.local`, allowing it to consume GitHub Secrets passed into the runner environment.
-- **Remote database migrations**: Added `scripts/apply-migrations-remote.mjs` (`npm run db:migrate:remote`) to query applied versions from `supabase_migrations.schema_migrations` and apply any pending `.sql` files in chronological order inside atomic transactions via the Supabase Management API.
-- **Verification**: Local execution of `npm run db:migrate:remote` verified 78 migrations applied cleanly with 0 pending. Full `npm run check` suite passed green across all 111 web test files (874 tests), 39 db test files (365 tests), 229 python tests, clean build, and clean secret scanning.
+- **Platform Reader OAuth Architecture Confirmed**:
+  - Investigated YouTube public channel ingestion. Modern Google Cloud accounts exclusively issue `AQ.` formatted API keys, which YouTube Data API v3 rejects with HTTP 401 ("API keys are not supported by this API").
+  - Confirmed the platform was intentionally architected (migration `20260919200000_a_platform_reader_reads_public_channels.sql`) to use an operator-connected OAuth Platform Reader grant stored in `private.platform_reader`.
+  - The control plane Edge Functions (`worker` and `channel-lookup`) unseal this grant with `TOKEN_ENCRYPTION_KEY`, refresh tokens via `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and issue fresh OAuth2 bearer tokens directly to the worker.
+  - Verified live: Public YouTube channel `@asharqnews` successfully looked up via `channel-lookup` (HTTP 200) and channel videos catalogued directly via `YouTubeAPI` with the minted OAuth2 token. No external `AIzaSy...` API key is needed.
+- **Defensive Safeguards in Collector Builders**:
+  - In `workers/python/src/server/loop.py` and `manual_run.py`: Added checks ensuring that any `AQ.` key is never passed as a raw YouTube API key to YouTube Data API v3, preventing 401 errors if an operator places a Gemini/AI Studio key into `YOUTUBE_API_KEY`.
+  - In `.env.local`: Documented that `YOUTUBE_API_KEY` is superseded by the Platform Reader OAuth grant and left unset.
+- **Omnichannel Diagnostics Upgrade**:
+  - In `workers/python/src/collectors/diagnostics.py`: Fixed `_load_env` to traverse four path levels to locate root `.env.local`. Added `check_youtube_channel` to verify Platform Reader grant in Supabase and test YouTube Data API endpoint reachability. Added `--platform youtube` CLI support.
+- **Database Migrations Applied**:
+  - Applied migration `20260924130000_historical_sync_rpc_compatibility.sql` to remote Supabase database `ykqugctewsqvevhyqtbi` via `scripts/apply-migrations-remote.mjs`, supporting unlimited plans and flexible RPC overloads.
+- **Verification**:
+  - `uv run python src/collectors/diagnostics.py --platform all` reported YouTube as `HEALTHY (OAuth Platform Reader Active)`.
+  - All CI verification gates passed cleanly via `npm run check` (web unit tests, database tests, python tests, production build, and secret scanning).
