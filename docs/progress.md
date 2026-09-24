@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-09-24 — Worker Health, Omnichannel Pipeline & Daemon Recovery
+
+- **Diagnosis of Worker Degradation**:
+  - Investigated user report of background workers not operating properly across 6 runtime layers: daemon lifecycle, SQL stored procedures, YouTube credential format, database timeouts, LLM quota limits, and MTProto collector connections.
+- **Root Causes Identified & Resolved**:
+  1. **Launchd User Mismatch**: `com.skydevelop.sentiment-worker.plist` was registered under former username `/Users/mlubbad` instead of active user `/Users/muhammed`. Updated template and re-registered launchd agent (`gui/501/com.skydevelop.sentiment-worker`) with active Python venv and CAMeL-Lab BERT classifier.
+  2. **Omnichannel Schema Failure**: `private.worker_topics_due` and `private.worker_commit_topics` hardcoded `cm.platform = 'youtube'` and event key `'topics:youtube:'`. When non-YouTube channels (Telegram, X, TikTok) ran topic analysis, the RPC failed with `invalid_batch` and marked jobs as permanently blocked. Added dynamic platform resolution joining on `channels.platform` and using `'topics:' || p || ':' || comment_id`.
+  3. **Usage Events Unindexed Query Timeout**: The correlated subqueries in `worker_topics_due` scanned 200k+ comments against unindexed `public.usage_events(workspace_id, event_key)`, causing PostgreSQL statement timeouts (57014). Added composite indexes on `(workspace_id, event_key)` and `(workspace_id, event_type, event_key)`.
+  4. **Collector Surrogate & MTProto Sanitization**: Added lone surrogate and NUL byte filtering in `workers/python/src/server/gateway.py` `_canonicalise()`, and added session reset `self.close()` on MTProto sequence desynchronization in `workers/python/src/collectors/telegram_collector.py`.
+  5. **Auto-Unblocking**: Migration `20260924120000_omnichannel_topics_and_cost_index.sql` reset all blocked `invalid_batch` jobs back to `queued`.
+- **Live Verification**:
+  - Remote DB migration applied via `npm run db:migrate:remote`.
+  - Worker detached checkout updated via `bash scripts/worker-service-update.sh`.
+  - Verified daemon actively polling, leasing, and successfully completing jobs across YouTube, X, and Telegram channels (`status: succeeded`).
+  - All 281 Python tests passing (`uv run pytest`), all 127 Vitest suites passing, all 45 DB suites passing (`npm run check`).
+
 ## 2026-09-24 — Audience Interaction Metrics & Storytelling with Data Integration
 
 - **Audience Interaction Metrics Ingestion**:
