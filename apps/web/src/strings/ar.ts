@@ -873,6 +873,8 @@ export const ar = {
   historicalStartingSync: "جارٍ جدولة الجلب…",
   historicalSyncQueued: "تمت جدولة مهمة الجلب التاريخي بنجاح.",
   historicalSyncFailed: "تعذر جدولة الجلب التاريخي.",
+  historicalSyncPlanNotAllowed:
+    "الجلب التاريخي غير متاح في خطتك الحالية. يرجى ترقية الخطة للوصول إلى هذه الميزة.",
   historicalFileUploadLabel: "اختر أو أسقط ملف CSV أو JSON",
   historicalFileDropzone: "انقر لاختيار ملف أو اسحبه إلى هنا (يدعم CSV و JSON)",
   historicalDownloadCsvTemplate: "تحميل نموذج CSV التجريبي",

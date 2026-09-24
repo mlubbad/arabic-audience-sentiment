@@ -51,14 +51,28 @@ export function HistoricalImportModal({
     return plan?.budgets.find((b) => b.event_type === "historical_backfill");
   }, [plan]);
 
-  const remainingQuota = backfillBudget
-    ? backfillBudget.remaining
-    : (plan?.plan?.backfill_units ?? 0);
-  const maxDaysLimit = plan?.plan?.historical_days_limit ?? 30;
+  const rawDaysLimit = plan?.plan?.historical_days_limit;
+  const isUnlimitedDays =
+    rawDaysLimit === null ||
+    rawDaysLimit === undefined ||
+    rawDaysLimit === -1 ||
+    plan?.plan_key === "owner";
+  const maxDaysLimit = isUnlimitedDays ? -1 : rawDaysLimit;
+
+  const rawBackfillUnits = plan?.plan?.backfill_units;
+  const isUnlimitedBackfill =
+    rawBackfillUnits === null ||
+    rawBackfillUnits === -1 ||
+    plan?.plan_key === "owner";
+  const remainingQuota = isUnlimitedBackfill
+    ? -1
+    : backfillBudget
+      ? backfillBudget.remaining
+      : (rawBackfillUnits ?? 0);
 
   // Platform sync form state
   const [daysBack, setDaysBack] = useState<number>(
-    Math.min(30, maxDaysLimit > 0 ? maxDaysLimit : 30),
+    maxDaysLimit > 0 ? Math.min(30, maxDaysLimit) : 30,
   );
   const [maxItems, setMaxItems] = useState<number>(50);
   const [publishedAfter, setPublishedAfter] = useState<string>("");
@@ -118,7 +132,18 @@ export function HistoricalImportModal({
       );
 
       if (error) {
-        setSyncFeedback({ msg: error.message, tone: "error" });
+        let msg = error.message;
+        if (msg.includes("historical_sync_not_allowed_on_plan")) {
+          msg = S.historicalSyncPlanNotAllowed;
+        } else if (msg.includes("date_beyond_plan_limit")) {
+          msg =
+            maxDaysLimit > 0
+              ? S.historicalDaysLimitNotice(maxDaysLimit)
+              : S.historicalSyncFailed;
+        } else if (msg.includes("quota_exceeded")) {
+          msg = S.historicalImportQuotaExceeded;
+        }
+        setSyncFeedback({ msg, tone: "error" });
       } else {
         const res = data as { ok: boolean; job_id?: string; error?: string };
         if (res.ok) {
@@ -212,7 +237,18 @@ export function HistoricalImportModal({
       });
 
       if (error) {
-        setFileFeedback({ msg: error.message, tone: "error" });
+        let msg = error.message;
+        if (msg.includes("historical_sync_not_allowed_on_plan")) {
+          msg = S.historicalSyncPlanNotAllowed;
+        } else if (msg.includes("date_beyond_plan_limit")) {
+          msg =
+            maxDaysLimit > 0
+              ? S.historicalDaysLimitNotice(maxDaysLimit)
+              : S.historicalImportFailed;
+        } else if (msg.includes("quota_exceeded")) {
+          msg = S.historicalImportQuotaExceeded;
+        }
+        setFileFeedback({ msg, tone: "error" });
       } else {
         const res = data as {
           ok: boolean;

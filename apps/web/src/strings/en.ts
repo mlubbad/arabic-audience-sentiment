@@ -878,6 +878,8 @@ export const en: Strings = {
   historicalStartingSync: "Scheduling sync…",
   historicalSyncQueued: "Historical sync task queued successfully.",
   historicalSyncFailed: "Failed to queue historical sync.",
+  historicalSyncPlanNotAllowed:
+    "Historical sync is not allowed on your current plan. Please upgrade to access this feature.",
   historicalFileUploadLabel: "Select or drop a CSV or JSON file",
   historicalFileDropzone:
     "Click to select a file or drag & drop here (CSV and JSON supported)",

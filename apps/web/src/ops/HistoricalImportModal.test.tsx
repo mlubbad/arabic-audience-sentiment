@@ -213,4 +213,78 @@ describe("HistoricalImportModal", () => {
       expect(onSuccess).toHaveBeenCalled();
     });
   });
+
+  it("handles owner unlimited plan correctly without capping days limit", async () => {
+    const user = userEvent.setup();
+    const onSuccess = vi.fn();
+    mockRpc.mockResolvedValueOnce({
+      data: { ok: true, job_id: "job_owner_1" },
+      error: null,
+    });
+
+    const ownerPlan: UsageSummary = {
+      plan_key: "owner",
+      status: "active",
+      period_start: "2026-03-01T00:00:00Z",
+      period_end: "2026-04-01T00:00:00Z",
+      cancel_at_period_end: false,
+      billing_interval: "month",
+      provider: null,
+      budgets: [],
+      plan: {
+        key: "owner",
+        title_ar: "خطة المالك",
+        title_en: "Owner Plan",
+        price_monthly_cents: 0,
+        price_yearly_cents: 0,
+        provider_prices: {},
+        segment: "internal",
+        self_serve: false,
+        limits: {
+          channels: 100,
+          analysis_units: 1000000,
+          topic_units: 10000,
+          insight_reports: 100,
+          members: 100,
+          workspaces: 10,
+          live_interval_minutes: 5,
+        },
+        backfill_units: -1,
+        historical_days_limit: -1,
+        allow_public_channels: true,
+      },
+    };
+
+    render(
+      <HistoricalImportModal
+        open={true}
+        onClose={vi.fn()}
+        workspaceId="w_owner"
+        channelId="c_owner"
+        plan={ownerPlan}
+        onSuccess={onSuccess}
+      />,
+    );
+
+    // Displays unlimited
+    expect(screen.getAllByText(/بلا حدود/).length).toBeGreaterThanOrEqual(1);
+
+    const daysInput = screen.getByTestId("input-days-back");
+    await user.clear(daysInput);
+    await user.type(daysInput, "365");
+
+    const submitBtn = screen.getByTestId("btn-submit-sync");
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith("request_historical_platform_sync", {
+        w: "w_owner",
+        p_channel_id: "c_owner",
+        p_days_back: 365,
+        p_max_items: 50,
+        p_published_after: null,
+      });
+      expect(onSuccess).toHaveBeenCalled();
+    });
+  });
 });
