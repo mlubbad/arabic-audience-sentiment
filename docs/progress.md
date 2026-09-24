@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-09-24 — Permanent Resolution of Dashboard Timeouts (134k+ Comments), Decoupled UI Failure, and Quota Lifecycle
+
+- **User Directives**:
+  - *"مرارا وتكرارا نواجه نفس المشاكل ،، اريد معرفة جذور المشكلة وحلها لمرة واحدة وبلا رجعة"* ("Over and over again we face the same problems... I want to know the root causes of the problem and solve it once and for all, with no return.")
+- **Root Causes Identified & Eliminated**:
+  1. **Quadratic Database Date Operations in `private.dashboard_aggregates_impl`**:
+     - Previously, 31 separate scans (`generate_series(0, 23)` and `(0, 6)`) ran nested loops against 125,000+ comments (~3.87M operations), pushing query latency past 2.5s and triggering statement timeouts or PostgREST 504 gateway drops.
+     - Replaced with a single-pass hash aggregation for hourly, daily, and weekly distribution, reducing aggregation latency from 2,465 ms to ~700 ms.
+  2. **Full-Table Text & Video Join Before Pagination in `private.dashboard_comments_impl`**:
+     - Previously joined all 134,526 comment rows against `public.videos` and hydrated full Arabic text, authors, and sentiment fields before `ORDER BY ... LIMIT 25`, exhausting memory and generating massive PostgREST payloads.
+     - Refactored to sort and paginate lightweight `uuid` keys first (`LIMIT 25`), only hydrating video titles and text for the 25 returned comments. Pagination latency dropped from 2,500 ms to 22 ms (a 113x speedup).
+  3. **Frontend Full-Page Error Conflation in `Dashboard.tsx`**:
+     - Previously `result.isError` evaluated `aggregatesQuery.isError || commentsQuery.isError`. If the secondary comments query hit any transient network glitch, the entire dashboard unmounted and showed `تعذر تحميل البيانات. حاول مرة أخرى.` (`live_unavailable`).
+     - Decoupled `result.isError` so that `aggregatesQuery` keeps the dashboard (KPIs, sentiment trends, breakdown charts) fully mounted and visible even if comments are still loading or retry.
+  4. **Staggered Query Execution**:
+     - Staggered `commentsQuery` and `cardsQuery` to enable only after `aggregatesQuery.isSuccess`, preventing 3 simultaneous heavy RPCs from hammering the database concurrently on initial render.
+  5. **Automated RPC Retry with Exponential Backoff (`data.ts`)**:
+     - Wrapped Supabase RPC calls with automatic retries for transient gateway timeouts (502, 503, 504, 57014, NetworkError).
+  6. **Quota Lifecycle Clarification in Sidebar Rail (`syncHealth.ts`)**:
+     - Differentiated YouTube daily API limit (`quota_exceeded`) from fatal connection failures (`source_access_denied` / `network_failure`).
+     - Displayed `quota_paused` with an honest status explanation indicating automatic resumption at 00:00 UTC. Automatically evaluates to `healthy` once midnight UTC has passed.
+- **Verification & Deployment**:
+  - `npm run check` passed 100% green: 128 vitest files (983 unit tests), 45 database tests, 282 worker pytest tests, TypeScript typechecking, linting, and secret verification.
+  - Remote migration `20260924200000_optimize_dashboard_performance.sql` applied to Supabase via `npm run db:migrate:remote`.
+  - Pushed to `origin/main` to trigger automated CD deployment via GitHub Actions.
+
 ## 2026-09-24 — Deep Audit, Root-Cause Elimination for Scheduler/Worker Quota Lifecycle & Platform Admin Services Dashboard
 
 - **User Directives**:
