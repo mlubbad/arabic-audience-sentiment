@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-09-24 — Historical Sync RPC Compatibility & Unlimited Owner Plan Fix
+
+- **Issue Reported**:
+  - User encountered RPC schema cache error: `Could not find the function public.request_historical_platform_sync(p_channel_id, p_days_back, p_max_items, p_published_after, w) in the schema cache` when attempting to trigger historical platform sync on the Owner workspace (`AJ360 - الجزيرة 360`).
+  - The modal also defaulted days limit to 30 instead of recognizing `null` (unlimited) for owner and enterprise plans.
+- **Root Cause & Resolution**:
+  1. **PostgREST RPC Parameter Matching**:
+     - Frontend passed named arguments `{ w, p_channel_id, p_days_back, p_max_items, p_published_after }` while SQL function defined `(w uuid, c uuid, since_date timestamptz, max_items int)`. PostgREST couldn't find a matching overload in the schema cache.
+     - Added migration `20260924130000_historical_sync_rpc_compatibility.sql` providing an exact PostgREST overload `request_historical_platform_sync(w uuid, p_channel_id uuid, p_days_back int default null, p_max_items int default 500, p_published_after timestamptz default null)` that computes `calc_since` and delegates to the canonical procedure.
+     - Added dual-parameter compatibility to `import_historical_records(w, c, payload, p_channel_id, p_payload)` and removed nonexistent `source` column insert in `public.videos`.
+  2. **Unlimited Plan Days Limit Handling**:
+     - In `apps/web/src/ops/HistoricalImportModal.tsx`, treated `null`, `undefined`, `-1`, and `owner` plan as unlimited (`maxDaysLimit = -1`).
+     - Displayed `بلا حدود` (`S.pricingUnlimited`) in Arabic UI for unlimited accounts.
+     - Added user-friendly localization error formatting for plan limits, date constraints, and quota exhaustion.
+  3. **Verification & Deployment**:
+     - Remote database migration applied and schema cache reloaded via `NOTIFY pgrst, 'reload schema'`.
+     - 45 DB test suites (404 tests) passing, including new owner unlimited sync/import tests.
+     - Web UI tested and deployed to preview host via FTPS.
+     - Pushed to `origin/main`.
+
 ## 2026-09-24 — Worker Health, Omnichannel Pipeline & Daemon Recovery
 
 - **Diagnosis of Worker Degradation**:
