@@ -327,32 +327,41 @@ class XCollector:
             cascade_replies.append(("brightdata", lambda: self.brightdata_client.scrape_x_replies(clean_id, handle=self.channel_id)))
 
         last_error = None
+        empty_batch_fallback = None
         for source_name, fn in cascade_replies:
             try:
                 raw_replies = fn()
                 if isinstance(raw_replies, list):
-                    comments = [
-                        RawComment(
-                            id=r["id"],
-                            video_id=clean_id,
-                            text=r["text"],
-                            parent_id=r.get("parent_id"),
-                            is_reply=r.get("is_reply", True),
-                            parent_source=f"{source_name}_reply",
-                            published_at=r.get("published_at"),
-                            author_name=r.get("author_name", ""),
-                            author_channel_id=r.get("author_channel_id"),
-                            likes_value=r.get("likes_value", 0),
-                            source=source_name,
-                            platform="x",
-                        )
-                        for r in raw_replies
-                    ]
-                    yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
-                    return
+                    if raw_replies:
+                        comments = [
+                            RawComment(
+                                id=r["id"],
+                                video_id=clean_id,
+                                text=r["text"],
+                                parent_id=r.get("parent_id"),
+                                is_reply=r.get("is_reply", True),
+                                parent_source=f"{source_name}_reply",
+                                published_at=r.get("published_at"),
+                                author_name=r.get("author_name", ""),
+                                author_channel_id=r.get("author_channel_id"),
+                                likes_value=r.get("likes_value", 0),
+                                source=source_name,
+                                platform="x",
+                            )
+                            for r in raw_replies
+                        ]
+                        yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
+                        return
+                    else:
+                        empty_batch_fallback = Batch(comments=[], checkpoint=None, outcome="exhausted")
+                        continue
             except CollectionError as exc:
                 last_error = exc
                 continue
+
+        if empty_batch_fallback is not None:
+            yield empty_batch_fallback
+            return
 
         # 4. Bearer token mode (Twitter API v2)
         if self.bearer_token and self.client:

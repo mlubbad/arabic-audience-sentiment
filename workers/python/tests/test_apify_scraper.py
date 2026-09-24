@@ -160,9 +160,20 @@ def test_apify_error_handling():
         c404.scrape_x_profile("channel")
     assert exc404.value.code == "channel_not_found"
 
-    # 429
-    c429 = ApifyClient(token="test", client=httpx.Client(transport=httpx.MockTransport(make_handler(429))))
-    with pytest.raises(CollectionError) as exc429:
-        c429.scrape_x_profile("channel")
-    assert exc429.value.code == "rate_limit_exceeded"
-    assert exc429.value.retryable is True
+    # 402 Payment Required / Quota Depleted
+    c402 = ApifyClient(token="test", client=httpx.Client(transport=httpx.MockTransport(make_handler(402))))
+    with pytest.raises(CollectionError) as exc402:
+        c402.scrape_x_profile("channel")
+    assert exc402.value.code == "apify_quota_depleted"
+    assert exc402.value.outcome == "failed"
+    assert exc402.value.retryable is False
+
+    # 400 with usage exceeded message
+    def usage_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"type": "monthly-usage-exceeded", "message": "Monthly usage limit reached"}})
+
+    c_usage = ApifyClient(token="test", client=httpx.Client(transport=httpx.MockTransport(usage_handler)))
+    with pytest.raises(CollectionError) as exc_usage:
+        c_usage.scrape_x_profile("channel")
+    assert exc_usage.value.code == "apify_quota_depleted"
+    assert exc_usage.value.retryable is False

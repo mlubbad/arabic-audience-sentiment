@@ -302,3 +302,55 @@ def test_tiktok_collector_apify_and_brightdata_integration():
     assert batches_bd[0].comments[0].id == "c_bd_tiktok_1"
     assert batches_bd[0].comments[0].source == "brightdata"
 
+
+def test_tiktok_collector_batches_falls_back_to_brightdata_on_apify_empty_or_quota():
+    """Verify that batches() falls back to Bright Data if Apify returns [] or encounters quota exhaustion."""
+    from collectors.scrapers.apify import ApifyClient
+    from collectors.scrapers.brightdata import BrightDataClient
+
+    # 1. Apify returns empty comments []
+    def apify_empty_comments(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    def bd_comments(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "comment_id": "c_bd_fallback_99",
+                    "comment": "تعليق تيك توك تم جلبه عبر برايت داتا كاحتياطي",
+                    "create_time": 1758410200,
+                    "likes": 12,
+                    "user": {"nickname": "ريم"},
+                }
+            ],
+        )
+
+    apify_c1 = ApifyClient(token="token_ap", client=httpx.Client(transport=httpx.MockTransport(apify_empty_comments)))
+    bd_c1 = BrightDataClient(api_key="key_bd", client=httpx.Client(transport=httpx.MockTransport(bd_comments)))
+
+    col1 = TikTokCollector(channel_id="@aljazeera", apify_client=apify_c1, brightdata_client=bd_c1)
+    batches1 = list(col1.batches("7112233445566778899"))
+
+    assert len(batches1) == 1
+    assert len(batches1[0].comments) == 1
+    assert batches1[0].comments[0].id == "c_bd_fallback_99"
+    assert batches1[0].comments[0].source == "brightdata"
+    assert batches1[0].comments[0].text == "تعليق تيك توك تم جلبه عبر برايت داتا كاحتياطي"
+
+    # 2. Apify returns 402 quota depleted
+    def apify_quota_depleted(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(402, json={"error": "Payment required, compute units exhausted"})
+
+    apify_c2 = ApifyClient(token="token_ap", client=httpx.Client(transport=httpx.MockTransport(apify_quota_depleted)))
+    bd_c2 = BrightDataClient(api_key="key_bd", client=httpx.Client(transport=httpx.MockTransport(bd_comments)))
+
+    col2 = TikTokCollector(channel_id="@aljazeera", apify_client=apify_c2, brightdata_client=bd_c2)
+    batches2 = list(col2.batches("7112233445566778899"))
+
+    assert len(batches2) == 1
+    assert len(batches2[0].comments) == 1
+    assert batches2[0].comments[0].id == "c_bd_fallback_99"
+    assert batches2[0].comments[0].source == "brightdata"
+
+

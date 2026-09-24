@@ -44,8 +44,10 @@ class ApifyClient:
         except httpx.HTTPError:
             raise CollectionError("network_failure", retryable=True) from None
 
-        if resp.status_code == 401 or resp.status_code == 403:
+        if resp.status_code in (401, 403):
             raise CollectionError("invalid_credentials", "blocked")
+        if resp.status_code == 402:
+            raise CollectionError("apify_quota_depleted", "failed", retryable=False)
         if resp.status_code == 404:
             raise CollectionError("channel_not_found", "failed")
         if resp.status_code == 429:
@@ -53,6 +55,16 @@ class ApifyClient:
         if resp.status_code in (502, 504):
             raise CollectionError("scraper_timeout", "failed", retryable=True)
         if resp.is_error:
+            try:
+                err_json = resp.json()
+                err_type = str(err_json.get("error", {}).get("type", "")).lower() if isinstance(err_json, dict) else ""
+                err_msg = str(err_json.get("error", {}).get("message", "")).lower() if isinstance(err_json, dict) else ""
+                if any(x in err_type or x in err_msg for x in ("usage", "credit", "payment", "quota", "plan-limit")):
+                    raise CollectionError("apify_quota_depleted", "failed", retryable=False)
+            except CollectionError:
+                raise
+            except Exception:
+                pass
             raise CollectionError(f"apify_error_{resp.status_code}", "failed", retryable=True)
 
         try:

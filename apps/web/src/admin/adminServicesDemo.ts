@@ -14,11 +14,11 @@ export function getDemoServicesHealth(): ServicesHealthReport {
     checked_at: now,
     summary: {
       total: 15,
-      healthy: 13,
+      healthy: 14,
       degraded: 1,
       down: 0,
-      unconfigured: 1,
-      avg_latency_ms: 54,
+      unconfigured: 0,
+      avg_latency_ms: 58,
     },
     services: [
       // 1. Infrastructure, Hosting & Database
@@ -253,18 +253,17 @@ export function getDemoServicesHealth(): ServicesHealthReport {
         name_ar: "شبكة البروكسي Bright Data",
         name_en: "Bright Data Web Unlocker & Proxy",
         category: "data_ingestion",
-        status: "unconfigured",
-        latency_ms: null,
-        quota_used: null,
-        quota_total: null,
-        quota_unit: null,
+        status: "healthy",
+        latency_ms: 110,
+        quota_used: 12,
+        quota_total: 5000,
+        quota_unit: "طلبات كشط / شهر",
         details:
-          "المفتاح BRIGHTDATA_API_KEY غير مهيأ في البيئة الحالية (اختياري)",
+          "المفتاح BRIGHTDATA_API_KEY مهيأ ونشط بنجاح · جاهز كخط دفاع بديل وتلقائي (Fallback) عند استنفاد رصيد Apify أو تعطلها",
         last_checked_at: now,
-        endpoint: null,
-        error_code: "KEY_UNCONFIGURED",
-        remediation:
-          "يمكن ضبط BRIGHTDATA_API_KEY في ملف البيئة في حال الحاجة لتجاوز حظر الـ IP المعقد.",
+        endpoint: "https://api.brightdata.com",
+        error_code: null,
+        remediation: null,
       },
 
       // 4. Billing & Supporting Services

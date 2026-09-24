@@ -77,11 +77,36 @@ def check_brightdata(key: str | None) -> dict:
             "status": "NOT_CONFIGURED",
             "details": "BRIGHTDATA_API_KEY is not set.",
         }
-    return {
-        "name": "Bright Data Scraping API",
-        "status": "CONFIGURED",
-        "details": "API key configured for web unlocker / scraper fallback.",
-    }
+    try:
+        resp = httpx.post(
+            "https://api.brightdata.com/datasets/v3/scrape?dataset_id=gd_lwxmeb2u1cniijd7t4",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json=[],
+            timeout=10,
+        )
+        if resp.status_code in (200, 400):
+            return {
+                "name": "Bright Data Scraping API",
+                "status": "HEALTHY",
+                "details": "Authenticated successfully. Configured and active as automatic fallback for X and TikTok.",
+            }
+        if resp.status_code in (401, 403):
+            return {
+                "name": "Bright Data Scraping API",
+                "status": "INVALID_KEY",
+                "details": f"Bright Data rejected key with HTTP {resp.status_code}.",
+            }
+        return {
+            "name": "Bright Data Scraping API",
+            "status": "CONFIGURED",
+            "details": f"Configured for fallback (HTTP {resp.status_code}).",
+        }
+    except Exception as exc:
+        return {
+            "name": "Bright Data Scraping API",
+            "status": "CONFIGURED",
+            "details": f"Configured for fallback (connectivity check skipped: {exc}).",
+        }
 
 
 def check_x_channel(handle: str, bearer: str | None) -> dict:

@@ -341,32 +341,41 @@ class TikTokCollector:
             cascade_comments.append(("brightdata", lambda: self.brightdata_client.scrape_tiktok_comments(clean_id, handle=self.channel_id)))
 
         last_error = None
+        empty_batch_fallback = None
         for source_name, fn in cascade_comments:
             try:
                 raw_comments = fn()
                 if isinstance(raw_comments, list):
-                    comments = [
-                        RawComment(
-                            id=c["id"],
-                            video_id=clean_id,
-                            text=c["text"],
-                            parent_id=c.get("parent_id"),
-                            is_reply=c.get("is_reply", False),
-                            parent_source=f"{source_name}_comment",
-                            published_at=c.get("published_at"),
-                            author_name=c.get("author_name", ""),
-                            author_channel_id=c.get("author_channel_id"),
-                            likes_value=c.get("likes_value", 0),
-                            source=source_name,
-                            platform="tiktok",
-                        )
-                        for c in raw_comments
-                    ]
-                    yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
-                    return
+                    if raw_comments:
+                        comments = [
+                            RawComment(
+                                id=c["id"],
+                                video_id=clean_id,
+                                text=c["text"],
+                                parent_id=c.get("parent_id"),
+                                is_reply=c.get("is_reply", False),
+                                parent_source=f"{source_name}_comment",
+                                published_at=c.get("published_at"),
+                                author_name=c.get("author_name", ""),
+                                author_channel_id=c.get("author_channel_id"),
+                                likes_value=c.get("likes_value", 0),
+                                source=source_name,
+                                platform="tiktok",
+                            )
+                            for c in raw_comments
+                        ]
+                        yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
+                        return
+                    else:
+                        empty_batch_fallback = Batch(comments=[], checkpoint=None, outcome="exhausted")
+                        continue
             except CollectionError as exc:
                 last_error = exc
                 continue
+
+        if empty_batch_fallback is not None:
+            yield empty_batch_fallback
+            return
 
         # 4. Access token mode (TikTok Display API)
         if self.access_token and self.client:
