@@ -107,15 +107,16 @@ def _comment(c: RawComment) -> dict[str, Any]:
 
 
 def _canonicalise(value: Any) -> Any:
-    """Render numbers the way JSON does, and strip NUL bytes that PostgreSQL rejects.
+    """Render numbers the way JSON does, and strip NUL bytes and lone surrogates that PostgreSQL rejects.
 
     Python writes an integral float as 1.0 and JavaScript writes 1. Hashing the
     raw form makes the same payload produce two different digests, which turns a
     legitimate replay into a batch_conflict on the server.
-    PostgreSQL rejects NUL (\u0000) characters with 22P05 (untranslatable_character).
+    PostgreSQL rejects NUL (\u0000) characters and unpaired surrogates with 22P05.
     """
     if isinstance(value, str):
-        return value.replace("\x00", "")
+        s = value.replace("\x00", "")
+        return s.encode("utf-8", "replace").decode("utf-8")
     if isinstance(value, bool):
         return value
     if isinstance(value, float) and value.is_integer():
@@ -299,5 +300,5 @@ class ControlPlane:
                       records: list[dict[str, Any]]) -> dict[str, Any] | None:
         return self._post("/worker/commit-topics", {
             "job_id": lease["job_id"], "lease_token": lease["lease_token"],
-            "batch_key": batch_key, "records": records,
+            "batch_key": batch_key, "records": _canonicalise(records),
         })

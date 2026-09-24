@@ -144,6 +144,7 @@ class TelegramCollector:
                 tg = self._get_tg_client()
                 return Catalogue(videos=_fetch_catalogue(tg), complete=True)
             except Exception as exc:
+                self.close()
                 if not self.client:
                     raise CollectionError(f"telegram_mtproto_error: {exc}", "failed") from exc
 
@@ -365,6 +366,7 @@ class TelegramCollector:
                 yield Batch(comments=raw_comments, checkpoint=next_cp, outcome=outcome)
                 return
             except Exception as exc:
+                self.close()
                 err_name = type(exc).__name__
                 err_msg = str(exc).lower()
                 if "msgidinvalid" in err_name.lower() or "invalid" in err_msg or "not found" in err_msg:
