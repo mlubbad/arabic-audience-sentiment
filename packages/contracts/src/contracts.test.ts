@@ -9,6 +9,7 @@ import {
   applyReview,
   effectiveLabel,
   snapshot,
+  DashboardAggregatesSchema,
   type Comment,
 } from "./index";
 const workspace = "00000000-0000-4000-8000-000000000001";
@@ -876,5 +877,43 @@ describe("the sync contract survives its two halves deploying separately", () =>
         last_run: null,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("DashboardAggregatesSchema handles workspaces without connected channels", () => {
+  it("accepts null for channel and kpis without throwing invalid_type error", () => {
+    const raw = {
+      workspace_total: 0,
+      channel_own_comments: 0,
+      total: 0,
+      analysed: 0,
+      unanalysed: 0,
+      sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      kpis: null,
+      channel: null,
+      measurable: ["positive", "negative", "neutral", "mixed"],
+      negative_ranked: 0,
+      negative_unranked: 0,
+      timeline: {},
+      topic_counts: {},
+      platform_breakdown: {},
+      videos: [],
+      hours: [],
+      weekdays: [],
+      weeks: [],
+      people: [],
+      most_engaged_negative: [],
+      comment_types: [],
+      video_options: [],
+      topics: [],
+      active_analysis_key: null,
+      active_topic_key: null,
+      revision: "empty",
+    };
+
+    const parsed = DashboardAggregatesSchema.parse(raw);
+    expect(parsed.channel).toBeNull();
+    expect(parsed.kpis).toBeNull();
+    expect(parsed.total).toBe(0);
   });
 });

@@ -127,6 +127,26 @@
   - Full repo verification (`npm run check`): all linters, formatters, typecheckers, Vitest suites (936 tests), DB suites (392 tests), pytest worker tests (277 tests), prerender, and secret checks passed 100% green.
   - Pushed to `origin main` (`68c6f82`).
 
+## 2026-09-24 — Root Cause Fix: Dashboard Aggregates & Comments Null Channel Handling (`read:invalid_type@channel`)
+
+Fixed live dashboard crash `read:invalid_type@channel` occurring when impersonating or loading workspaces that have zero connected channels (e.g., newly registered workspaces or workspaces without an active YouTube connection):
+
+- **Zod Contract Schema Hardening (`packages/contracts/src/fixture.ts`)**:
+  - `DashboardAggregatesSchema`: Updated `channel` and `kpis` fields with `.nullable().optional()`. This prevents Zod schema validation errors when Postgres scalar subquery `(SELECT jsonb_build_object(...) FROM ch)` returns SQL `NULL` for workspaces without connected channels.
+- **Frontend Typings Alignment (`apps/web/src/data.ts`)**:
+  - Updated `deriveSnapshot` return typing for `channel` and `kpis` to allow `null`, maintaining contract parity across live and fixture modes.
+- **Database Query Resilience (`supabase/migrations/20260924150000_fix_dashboard_null_channel_aggregates.sql`)**:
+  - Refactored `private.dashboard_aggregates_impl` and `private.dashboard_comments_impl`:
+    - Replaced inner `CROSS JOIN ch` with `LEFT JOIN ch ON true`. In previous migrations, a `CROSS JOIN ch` caused queries over workspaces with no connected channel to collapse to zero rows (silently dropping all comments if comments existed via omnichannel/manual ingest).
+    - Added `coalesce(cm.author_channel_id IS NOT NULL AND cm.author_channel_id = ch.external_channel_id, false)` for `by_owner`.
+    - Added `coalesce(ch.client_id, cm.workspace_id)` and `coalesce(ch.channel_id, v.channel_id)` in `dashboard_comments_impl`.
+    - Preserved all permissions, security definer settings, and search paths (`SET search_path = ''`).
+- **Comprehensive Verification Across Tiers**:
+  - Added unit test in `packages/contracts/src/contracts.test.ts` verifying `DashboardAggregatesSchema` cleanly parses payloads where `channel: null` and `kpis: null`.
+  - Added unit test in `apps/web/src/data.test.ts` verifying `loadDashboardAggregates` in live mode cleanly handles `channel: null`.
+  - Added database test in `supabase/tests/interaction_metrics_and_storytelling.test.ts` verifying `dashboard_aggregates` and `dashboard_comments` execute without error on an empty workspace with no registered channels.
+  - Full repo verification (`npm run check`): All linter, format check, TypeScript, Vitest unit tests (331 tests), DB tests (45 files, 330 tests), Pytest worker tests (281 tests), production build & prerender, and secret checks passed 100% green.
+
 ## 2026-09-23 — YouTube Data API Quota Optimization (Inline Replies & Watermark Early Stopping)
 
 Implemented comprehensive quota optimization in the YouTube Data API collector and worker synchronization loop to cut API quota usage by 85–95%:

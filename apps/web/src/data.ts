@@ -435,7 +435,13 @@ export function deriveSnapshot(
                   1000,
               ) / 10
             : null,
-      },
+      } as {
+        total_views?: number | null;
+        total_likes?: number | null;
+        total_comments?: number | null;
+        engagement_rate?: number | null;
+        net_sentiment?: number | null;
+      } | null,
       channel: {
         id: comments[0]?.channel_id ?? "ch_fixture",
         title: "قناة تجريبية",
@@ -443,7 +449,14 @@ export function deriveSnapshot(
         subscriber_count: null,
         view_count: null,
         video_count: null,
-      },
+      } as {
+        id?: string;
+        title?: string | null;
+        avatar_url?: string | null;
+        subscriber_count?: number | null;
+        view_count?: number | null;
+        video_count?: number | null;
+      } | null,
       people: Array.from(
         comments
           .filter((c) => !c.by_channel_owner && c.author_name)

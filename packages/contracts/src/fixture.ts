@@ -70,6 +70,7 @@ export const DashboardAggregatesSchema = z.object({
       engagement_rate: z.number().nullable().optional(),
       net_sentiment: z.number().nullable().optional(),
     })
+    .nullable()
     .optional(),
   channel: z
     .object({
@@ -80,6 +81,7 @@ export const DashboardAggregatesSchema = z.object({
       view_count: z.number().nullable().optional(),
       video_count: z.number().nullable().optional(),
     })
+    .nullable()
     .optional(),
   measurable: z.array(z.string()),
   negative_ranked: z.number().int(),

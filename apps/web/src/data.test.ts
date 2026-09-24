@@ -443,3 +443,52 @@ describe("loadDashboardComments multi-platform source compatibility", () => {
     expect(result.comments[0].platform).toBe("telegram");
   });
 });
+
+describe("loadDashboardAggregates null channel handling", () => {
+  it("successfully parses live aggregates when workspace has no channel (channel: null)", async () => {
+    const { loadDashboardAggregates } = await loadModule();
+    const mockAggregates = {
+      workspace_total: 0,
+      channel_own_comments: 0,
+      total: 0,
+      analysed: 0,
+      unanalysed: 0,
+      sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      kpis: {
+        total_views: 0,
+        total_likes: 0,
+        total_comments: 0,
+        engagement_rate: null,
+        net_sentiment: null,
+      },
+      channel: null,
+      measurable: ["positive", "negative", "neutral", "mixed"],
+      negative_ranked: 0,
+      negative_unranked: 0,
+      timeline: {},
+      topic_counts: {},
+      platform_breakdown: {},
+      videos: [],
+      hours: [],
+      weekdays: [],
+      weeks: [],
+      people: [],
+      most_engaged_negative: [],
+      comment_types: [],
+      video_options: [],
+      topics: [],
+      active_analysis_key: null,
+      active_topic_key: null,
+      revision: "empty",
+    };
+    rpc.mockResolvedValueOnce({ data: mockAggregates, error: null });
+
+    const result = await loadDashboardAggregates(
+      "live",
+      "00000000-0000-4000-8000-000000000001",
+    );
+    expect(result.channel).toBeNull();
+    expect(result.total).toBe(0);
+    expect(result.kpis?.total_comments).toBe(0);
+  });
+});

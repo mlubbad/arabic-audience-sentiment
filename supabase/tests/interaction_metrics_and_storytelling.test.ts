@@ -398,4 +398,37 @@ describe("interaction metrics and storytelling", () => {
     );
     expect(w2Comments.rows[0].reply_count).toBe(5);
   });
+
+  it("handles workspaces with no registered channel without crashing or returning invalid payloads", async () => {
+    const W_NO_CHANNEL = "00000000-0000-4000-8000-000000000099";
+    await resetAdmin();
+    await db.query(
+      "insert into workspaces(id,name,created_by) values ($1,'Empty WS',$2)",
+      [W_NO_CHANNEL, owner],
+    );
+    await db.query("insert into memberships values ($1,$2,'workspace_owner')", [
+      W_NO_CHANNEL,
+      owner,
+    ]);
+
+    await user(owner);
+    const aggRes = await db.query<{
+      dashboard_aggregates: Record<string, unknown>;
+    }>("select dashboard_aggregates($1, '{}'::jsonb) as dashboard_aggregates", [
+      W_NO_CHANNEL,
+    ]);
+    const agg = aggRes.rows[0].dashboard_aggregates;
+    expect(agg.channel).toBeNull();
+    expect(agg.total).toBe(0);
+    expect(agg.workspace_total).toBe(0);
+
+    const commentsRes = await db.query<{
+      dashboard_comments: { total: number; comments: unknown[] };
+    }>("select dashboard_comments($1, '{}'::jsonb) as dashboard_comments", [
+      W_NO_CHANNEL,
+    ]);
+    const comments = commentsRes.rows[0].dashboard_comments;
+    expect(comments.total).toBe(0);
+    expect(comments.comments).toEqual([]);
+  });
 });
