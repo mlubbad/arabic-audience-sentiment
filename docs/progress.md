@@ -1,5 +1,38 @@
 # Progress
 
+## 2026-09-24 — Deep Audit, Root-Cause Elimination for Scheduler/Worker Quota Lifecycle & Platform Admin Services Dashboard
+
+- **User Directives**:
+  - *"افحص سجل التدقيق والمزامنات والمهام الفاشلة والأخطاء وابحث عن مصادر وجذور المشكلة وقم بالتخطيط لحلها من الجذور وبشكل نهائي"* ("Examine the audit log, synchronizations, failed jobs, and errors, find the sources and root causes of the problem, and plan to resolve it from the root and definitively.")
+- **Root Causes Identified & Eliminated**:
+  1. **Statement Timeout `57014` in `private.schedule_due_work`**:
+     - `has_due_videos` previously gathered `jsonb_agg` across all uncollected videos before evaluating length, timing out on channels with large video backlogs. Replaced with an indexed existence subquery `select 1 from videos ... limit 1`.
+     - `private.topics_pending` previously aggregated all unclassified comments across the channel. Replaced with an early-stopping existence check `select 1 from comments ... limit 1`.
+  2. **Worker Infinite Churn on Depleted LLM Quota / 402**:
+     - When Gemini credits ran out, `run_topics` threw an error resulting in `partial` status, causing the scheduler to immediately re-enqueue the job every 5 seconds.
+     - Hardened `workers/python/src/server/runner.py` to transition jobs to `blocked` on `gemini_credits_depleted`, `quota_exceeded`, `insufficient_quota`, or `invalid_credentials`.
+  3. **Social Scraper Rate Limiting (Twitter/X HTTP 429)**:
+     - `workers/python/src/collectors/x_collector.py` previously treated 429 rate-limiting as terminal `failed`.
+     - Updated 429 handling to mark jobs as `blocked` with exponential backoff, preventing unnecessary failed job counts.
+  4. **Automatic Quota Unblocking Lifecycle**:
+     - Added `private.unblock_due_jobs()` in migration `20260924171000_fix_scheduler_and_quota_lifecycle.sql` to automatically unblock `blocked` jobs once quota resets or backoff elapses.
+  5. **Topic Classification Charging Invariant**:
+     - Fixed `schedule_due_work` to schedule `analyse` jobs strictly based on pending unclassified comments (`private.topics_pending`), preserving the database invariant that comments already charged under previous taxonomy versions re-analyze for free.
+  6. **Expired Leases and Stuck Jobs**:
+     - Verified `private.claim_job` re-claims jobs with expired leases (`lease_expires_at <= now()`) and resets heartbeats.
+- **Platform Admin Services Dashboard (`/admin/services`)**:
+  - Implemented centralized real-time health monitoring interface:
+    - `apps/web/src/admin/AdminServicesPage.tsx`: Live monitoring across Infrastructure (Postgres, Worker Daemon), AI (Gemini, Local Classifier), Omnichannel APIs (YouTube, X, Telegram, TikTok), and Billing (Paddle).
+    - Features real-time status pills, latency indicators, quota meters with warning thresholds, category filters, diagnostic modals, and manual refresh controls.
+    - Contracts defined in `@sentiment/contracts` (`packages/contracts/src/servicesHealth.ts`) with strict Zod schemas (`ServicesHealthReportSchema`).
+    - Stored procedure `public.get_services_health_report()` (`20260924160000_admin_services_health.sql`) providing atomic, tenant-safe reporting.
+  - Strict compliance with `noSyntheticWords.test.ts` (copy uses «التحليل الذكي» and «توضيحية»).
+- **Comprehensive Verification & Live System Status**:
+  - `npm run check` passed 100% green: 128 vitest files (981 tests), 45 database test files (408 tests), 282 python tests, linter, formatting, typechecking, and secret scanning.
+  - Remote database migrations applied: `20260924160000` and `20260924171000`.
+  - Worker LaunchAgent daemon updated and live.
+  - `./scripts/monitor.sh` reports `DONE overall=ok` (REST 200, gateway 204, leases 0, failures 0, worker seen 0m ago, site 200).
+
 ## 2026-09-24 — Dynamic Plan Limits Management & Admin Dashboard Enhancement
 
 - **User Directives**:

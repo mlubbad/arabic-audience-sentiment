@@ -91,7 +91,7 @@ class XCollector:
         if user_resp.status_code == 401:
             raise CollectionError("invalid_credentials", "blocked")
         if user_resp.status_code == 429:
-            raise CollectionError("rate_limit_exceeded", "failed", retryable=True)
+            raise CollectionError("rate_limit_exceeded", "blocked", retryable=True)
         if user_resp.is_error:
             raise CollectionError("api_error", "failed")
 
@@ -114,7 +114,7 @@ class XCollector:
             raise CollectionError("network_failure", retryable=True) from None
 
         if tweets_resp.status_code == 429:
-            raise CollectionError("rate_limit_exceeded", "failed", retryable=True)
+            raise CollectionError("rate_limit_exceeded", "blocked", retryable=True)
         if tweets_resp.is_error:
             raise CollectionError("api_error", "failed")
 
@@ -376,7 +376,7 @@ class XCollector:
                 raise CollectionError("network_failure", retryable=True) from None
 
             if resp.status_code == 429:
-                raise CollectionError("rate_limit_exceeded", "failed", retryable=True)
+                raise CollectionError("rate_limit_exceeded", "blocked", retryable=True)
             if resp.is_error:
                 raise CollectionError("api_error", "failed")
 

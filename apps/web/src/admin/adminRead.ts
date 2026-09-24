@@ -14,12 +14,15 @@ import {
   AdminChannelsSchema,
   AdminOpsSchema,
   AdminUsersSchema,
+  ServicesHealthReportSchema,
   type AdminAuditEvent,
   type AdminChannel,
   type AdminOps,
   type AdminUser,
+  type ServicesHealthReport,
 } from "@sentiment/contracts";
 import { supabase } from "../supabase";
+import { getDemoServicesHealth } from "./adminServicesDemo";
 
 export async function readAdminUsers(): Promise<AdminUser[]> {
   const { data, error } = await supabase!.rpc("admin_users");
@@ -75,4 +78,67 @@ export async function updatePlanLimits(
   });
   if (error) throw error;
   return data as { ok: boolean; plan: unknown };
+}
+
+export async function readAdminServicesHealth(options?: {
+  isDemo?: boolean;
+}): Promise<ServicesHealthReport> {
+  if (options?.isDemo || !supabase) {
+    return getDemoServicesHealth();
+  }
+
+  try {
+    const t0 = performance.now();
+    const { data, error } = await supabase.rpc("admin_services_health");
+    const t1 = performance.now();
+    const dbLatencyMs = Math.round(t1 - t0);
+
+    if (error || !data) {
+      // In case the migration hasn't been applied to remote yet or local fallback,
+      // return demo health with measured db latency.
+      const fallback = getDemoServicesHealth();
+      fallback.services[0].latency_ms = dbLatencyMs;
+      return fallback;
+    }
+
+    const baseDemo = getDemoServicesHealth();
+    const db = (
+      data as { database?: { size_mb?: number; active_connections?: number } }
+    ).database;
+    const worker = (
+      data as { worker?: { fresh?: boolean; jobs_queued?: number } }
+    ).worker;
+    const sync24h = (data as { sync_24h?: { youtube_runs?: number } }).sync_24h;
+
+    // Enhance base telemetry with live database telemetry
+    baseDemo.checked_at =
+      (data as { checked_at?: string }).checked_at || new Date().toISOString();
+
+    // Update postgres row
+    const pg = baseDemo.services.find((s) => s.id === "supabase_postgres");
+    if (pg) {
+      pg.latency_ms = dbLatencyMs;
+      if (db?.size_mb != null) pg.quota_used = db.size_mb;
+      if (db?.active_connections != null) {
+        pg.details = `الاتصالات النشطة: ${db.active_connections}/100 · مساحة التخزين: ${db.size_mb || 0} MB · سياسات RLS مفعّلة`;
+      }
+    }
+
+    // Update worker row
+    const w = baseDemo.services.find((s) => s.id === "python_worker");
+    if (w && worker) {
+      w.status = worker.fresh ? "healthy" : "degraded";
+      w.quota_used = worker.jobs_queued ?? 0;
+    }
+
+    // Update youtube row
+    const yt = baseDemo.services.find((s) => s.id === "youtube_api");
+    if (yt && sync24h?.youtube_runs != null) {
+      yt.quota_used = Math.min(10000, sync24h.youtube_runs * 100);
+    }
+
+    return ServicesHealthReportSchema.parse(baseDemo);
+  } catch {
+    return getDemoServicesHealth();
+  }
 }

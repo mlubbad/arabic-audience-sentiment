@@ -496,7 +496,13 @@ def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
             if stopped or not any_final:
                 first_failure = first_failure or "classification_failed"
                 break
-        control.finish(lease, "partial" if first_failure else "exhausted", first_failure)
+        outcome = "exhausted"
+        if first_failure:
+            if first_failure in ("gemini_credits_depleted", "quota_exceeded", "invalid_credentials", "insufficient_quota"):
+                outcome = "blocked"
+            else:
+                outcome = "partial"
+        control.finish(lease, outcome, first_failure)
     except LeaseLost:
         raise
     except ControlPlaneError as exc:

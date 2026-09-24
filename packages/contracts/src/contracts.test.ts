@@ -10,6 +10,7 @@ import {
   effectiveLabel,
   snapshot,
   DashboardAggregatesSchema,
+  ServicesHealthReportSchema,
   type Comment,
 } from "./index";
 const workspace = "00000000-0000-4000-8000-000000000001";
@@ -915,5 +916,46 @@ describe("DashboardAggregatesSchema handles workspaces without connected channel
     expect(parsed.channel).toBeNull();
     expect(parsed.kpis).toBeNull();
     expect(parsed.total).toBe(0);
+  });
+});
+
+describe("ServicesHealthReportSchema and ServiceHealthItemSchema", () => {
+  it("parses valid services health report and items", () => {
+    const report = {
+      overall_status: "healthy",
+      checked_at: "2026-09-24T12:00:00Z",
+      summary: {
+        total: 15,
+        healthy: 14,
+        degraded: 1,
+        down: 0,
+        unconfigured: 0,
+        avg_latency_ms: 45.2,
+      },
+      services: [
+        {
+          id: "supabase_postgres",
+          name_ar: "قاعدة بيانات Supabase Postgres",
+          name_en: "Supabase Postgres Database",
+          category: "infrastructure",
+          status: "healthy",
+          latency_ms: 22,
+          quota_used: 125,
+          quota_total: 1000,
+          quota_unit: "MB",
+          details: "الاتصالات النشطة: 8/100 · مساحة التخزين: 125 MB",
+          last_checked_at: "2026-09-24T12:00:00Z",
+          endpoint: "postgresql://postgres@db:5432",
+          error_code: null,
+          remediation: null,
+        },
+      ],
+    };
+
+    const parsed = ServicesHealthReportSchema.parse(report);
+    expect(parsed.overall_status).toBe("healthy");
+    expect(parsed.services).toHaveLength(1);
+    expect(parsed.services[0].id).toBe("supabase_postgres");
+    expect(parsed.summary.avg_latency_ms).toBe(45.2);
   });
 });

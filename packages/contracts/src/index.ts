@@ -25,3 +25,4 @@ export * from "./channelLookup";
 export * from "./ops";
 export * from "./workspaceSharing";
 export * from "./historical";
+export * from "./servicesHealth";

@@ -148,3 +148,16 @@ def test_a_blocked_due_list_ends_the_job_blocked_before_any_model_call():
     run_job(plane.plane(), None, classifier=DeterministicTestClassifier())
     assert plane.committed == []
     assert plane.finished == ("blocked", "quota_exceeded")
+
+
+def test_gemini_credits_depleted_ends_the_job_blocked():
+    class Depleted:
+        model_id, prompt_version = "deterministic-test-classifier", "t1"
+
+        def classify(self, taxonomy, items):
+            return [TopicVerdict("failed", None, None, "gemini_credits_depleted") for _ in items]
+
+    plane = Plane(due=[[row(1)]])
+    run_job(plane.plane(), None, classifier=Depleted())
+    assert plane.finished == ("blocked", "gemini_credits_depleted")
+

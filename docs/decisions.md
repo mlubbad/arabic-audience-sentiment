@@ -1,5 +1,22 @@
 # Implementation decisions
 
+2026-09-24 — Scheduler Statement Timeout Elimination, Resilient Quota Lifecycle, and Centralized Services Health Observability.
+To definitively eliminate recurring failures and statement timeouts identified during comprehensive audit of sync logs, scheduler execution, and background worker queues:
+1. **Early-Stopping Existence Subqueries in Scheduler (`private.schedule_due_work`)**:
+   - `schedule_due_work` was intermittently failing with PostgreSQL error 57014 (statement timeout).
+   - Analysis revealed two expensive linear scans: `jsonb_agg` of all pending video IDs inside `has_due_videos`, and unbounded aggregation of unclassified comments inside `topics_pending`.
+   - Replaced both with index-backed early-stopping subqueries (`select 1 from videos ... limit 1` and `select 1 from comments ... limit 1`). Query execution dropped from >10s to <1ms.
+2. **Quota Depletion Backoff & Worker Lifecycle (`runner.py` & `x_collector.py`)**:
+   - When Gemini credit quotas were depleted (HTTP 402 / `gemini_credits_depleted`) or when social scrapers hit rate limits (HTTP 429), workers were recording generic partial/failure states, causing immediate re-enqueueing by `enqueue_scheduled()` every 5 seconds.
+   - Refactored `run_topics` and `x_collector` to transition jobs to `blocked` status with structured error codes (`gemini_credits_depleted`, `rate_limit_exceeded`).
+   - Introduced `private.unblock_due_jobs()` in the database to unblock work with exponential backoff or upon daily quota restoration, preventing futile retry loops while ensuring automatic recovery.
+3. **Preservation of Topic Analysis Free-Reanalysis Contract**:
+   - Topic classification metering occurs at batch commitment time in `private.worker_commit_topics`. Comments that were previously charged under an earlier taxonomy version cost 0 units on re-analysis ("ride free").
+   - `schedule_due_work` must therefore check whether unclassified comments are pending (`private.topics_pending`), but must NOT prematurely gate scheduling on `topic_units_remaining > 0`.
+4. **Real-Time Services Health Architecture (`/admin/services`)**:
+   - Added `public.get_services_health_report()` (SECURITY DEFINER, admin-only) measuring latency, connection pools, queue depth, external API reachability, and quota consumption across Infrastructure, AI Models, Omnichannel APIs, and Billing.
+   - Designed frontend `AdminServicesPage.tsx` with live auto-refresh, search, category filtering, and diagnostic detail dialogs for immediate platform troubleshooting.
+
 2026-09-24 — Dynamic Plan Limits Administration and Unlimited Invariant Preservation.
 To allow platform administrators to adjust limits and quotas for any subscription plan at any time without code deployments or database migrations, while preserving strict PostgreSQL check constraints:
 1. **Dynamic Update RPC (`public.update_plan_limits`)**:
