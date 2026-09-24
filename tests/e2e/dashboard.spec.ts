@@ -68,6 +68,26 @@ test("Arabic fixture shell filters consistent totals and supports an empty state
   await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
   await expect(page.getByTestId("total")).toHaveText("2");
 });
+test("FilterBar inside sticky bar has no rogue border-top or margin from style.css form rule", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const filterForm = page.locator("#report-filters");
+  await expect(filterForm).toBeVisible();
+  const styles = await filterForm.evaluate((el) => {
+    const cs = window.getComputedStyle(el);
+    return {
+      borderTopWidth: cs.borderTopWidth,
+      borderTopStyle: cs.borderTopStyle,
+      marginTop: cs.marginTop,
+      borderTopLeftRadius: cs.borderTopLeftRadius,
+    };
+  });
+  expect(styles.borderTopWidth).toBe("0px");
+  expect(styles.borderTopStyle).toBe("none");
+  expect(styles.marginTop).toBe("0px");
+  expect(styles.borderTopLeftRadius).toBe("0px");
+});
 test("shows actual pending fetch then safe error with working retry", async ({
   page,
 }) => {
