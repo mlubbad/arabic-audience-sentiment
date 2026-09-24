@@ -151,8 +151,15 @@ export function AdminPlansPage() {
                       ? "مجاني"
                       : "Free";
 
-                const backfillVal = p.backfill_units ?? 0;
-                const daysVal = p.historical_days_limit ?? 0;
+                const backfillVal =
+                  p.backfill_units == null || p.backfill_units === -1
+                    ? -1
+                    : p.backfill_units;
+                const daysVal =
+                  p.historical_days_limit == null ||
+                  p.historical_days_limit === -1
+                    ? -1
+                    : p.historical_days_limit;
 
                 return (
                   <TableRow key={p.key} data-testid={`plan-row-${p.key}`}>
@@ -210,6 +217,22 @@ export function AdminPlansPage() {
                             {daysVal === -1
                               ? S.pricingUnlimited
                               : `${daysVal}d`}
+                          </strong>
+                        </div>
+                        <div>
+                          {locale === "ar" ? "تصنيف مواضيع: " : "Topics: "}
+                          <strong>
+                            {p.limits.topic_units === -1
+                              ? S.pricingUnlimited
+                              : p.limits.topic_units.toLocaleString()}
+                          </strong>
+                        </div>
+                        <div>
+                          {locale === "ar" ? "أعضاء: " : "Members: "}
+                          <strong>
+                            {p.limits.members === -1
+                              ? S.pricingUnlimited
+                              : p.limits.members}
                           </strong>
                         </div>
                       </div>

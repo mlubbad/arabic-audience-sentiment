@@ -1,5 +1,18 @@
 # Implementation decisions
 
+2026-09-24 — Dynamic Plan Limits Administration and Unlimited Invariant Preservation.
+To allow platform administrators to adjust limits and quotas for any subscription plan at any time without code deployments or database migrations, while preserving strict PostgreSQL check constraints:
+1. **Dynamic Update RPC (`public.update_plan_limits`)**:
+   - Accepts any combination of plan parameters (`channels`, `channels_limit`, `analysis_units`, `backfill_units`, `historical_days_limit`, `topic_units`, `members`, `members_limit`, `workspaces`, `workspaces_limit`, `insight_reports`, `live_interval_minutes`, `allow_public_channels`).
+   - Strictly secured behind `public.is_platform_admin()` with `security definer set search_path=''`.
+2. **Handling Unlimited Limits Across Plan Segments**:
+   - The database constraint `plans_limits_finite_unless_internal` requires non-internal plans (`creator`, `agency`, `enterprise`, etc.) to hold non-null values for certain core limits.
+   - For `historical_days_limit`, `NULL` is valid for all tiers and is used directly when `-1` is passed.
+   - For other quotas on non-internal plans, passing `-1` sets `2147483647` (the canonical 32-bit integer ceiling).
+   - `private.plan_json` translates both `NULL` and values `>= 2147483647` into `-1`, guaranteeing transparent `-1` / "بلا حدود" presentation across the frontend and `@sentiment/contracts`.
+3. **Ergonomic Admin Form Controls**:
+   - Every quota field in `EditPlanLimitsDialog` offers both an integer input and an intuitive "بلا حدود" (`adminPlanUnlimitedCheckbox`) toggle. Checking the box instantly sets `-1`, while entering positive numbers unchecks it.
+
 2026-09-24 — YouTube Public Ingestion via OAuth Platform Reader Grant vs Direct API Keys.
 To resolve authentication for unverified public YouTube channels without relying on web scrapers or requiring external Google Cloud API keys:
 1. **OAuth Platform Reader Preferred Over Raw API Keys**:

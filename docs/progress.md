@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-09-24 — Dynamic Plan Limits Management & Admin Dashboard Enhancement
+
+- **User Directives**:
+  - *"نفذ وارفع واختبر"* ("Execute, deploy, and test")
+  - *"وقم بتنفيذ تطوير على لوحة الادارة حتى يتمكنوا من تعديل القيود كلما ارادو بحيث تكون القيود ديناميكية."* ("Implement an enhancement on the admin dashboard so that they can adjust restrictions whenever they want, so that restrictions are dynamic.")
+- **Database Architecture & Migration**:
+  - Created migration `20260924140000_dynamic_plan_limits_enhancement.sql`:
+    - Updated `public.update_plan_limits(p_plan_key text, p_limits jsonb)` to dynamically update all plan limits: `channels_limit` (with `channels` alias), `analysis_units`, `backfill_units`, `historical_days_limit`, `topic_units`, `members_limit` (with `members` alias), `workspaces_limit` (with `workspaces` alias), `insight_reports`, `live_interval_minutes`, and `allow_public_channels`.
+    - Handled `-1` (representing Unlimited / بلا حدود) by setting `NULL` for `historical_days_limit` and internal plans, or `2147483647` for non-internal plans, preserving the schema constraint `plans_limits_finite_unless_internal`.
+    - Updated `private.plan_json` to cleanly coalesce `NULL` and `>= 2147483647` limits to `-1` for contracts serialization.
+- **Admin Dashboard UI & Localization**:
+  - `apps/web/src/admin/EditPlanLimitsDialog.tsx`:
+    - Added dedicated inputs and "بلا حدود" (`adminPlanUnlimitedCheckbox`) toggles for channels, analysis units, backfill quota, historical depth, topic units, members, and workspaces.
+    - Fixed `historicalDays` input `min={-1}`, allowing administrators to set unlimited historical retrieval without input validation errors.
+    - Added helper texts indicating `-1` or checking "بلا حدود" designates an unlimited limit.
+  - `apps/web/src/admin/AdminPlansPage.tsx`:
+    - Updated table cells to display topic units and members limits alongside channels, analysis, backfill, and history.
+    - Handled `null` and `-1` values cleanly with `S.pricingUnlimited` ("بلا حدود").
+  - Strings localized in Arabic and English (`ar.ts` & `en.ts`).
+- **Comprehensive Verification & Live Deployment**:
+  - `npm run check` passed 100% green: 127 vitest files, 45 database test files (407 tests), 281 python tests, linter, formatting, typechecking, and secret scanning.
+  - Applied remote database migration `20260924140000_dynamic_plan_limits_enhancement.sql` via `npm run db:migrate:remote`.
+  - Deployed web bundle to preview host via FTPS (`npm run deploy:preview`).
+
 ## 2026-09-24 — Historical Sync RPC Compatibility & Unlimited Owner Plan Fix
 
 - **Issue Reported**:

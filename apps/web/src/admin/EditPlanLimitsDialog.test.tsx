@@ -39,7 +39,7 @@ describe("EditPlanLimitsDialog", () => {
     vi.clearAllMocks();
   });
 
-  it("renders plan title, key, and current limits", () => {
+  it("renders plan title, key, and all current limits", () => {
     render(
       <EditPlanLimitsDialog
         plan={mockPlan}
@@ -54,10 +54,13 @@ describe("EditPlanLimitsDialog", () => {
     expect(screen.getByTestId("input-plan-analysis-units")).toHaveValue(50000);
     expect(screen.getByTestId("input-plan-backfill-units")).toHaveValue(40000);
     expect(screen.getByTestId("input-plan-historical-days")).toHaveValue(30);
+    expect(screen.getByTestId("input-plan-topic-units")).toHaveValue(1000);
+    expect(screen.getByTestId("input-plan-members")).toHaveValue(2);
+    expect(screen.getByTestId("input-plan-workspaces")).toHaveValue(1);
     expect(screen.getByTestId("checkbox-plan-public")).not.toBeChecked();
   });
 
-  it("submits updated limits successfully", async () => {
+  it("submits updated limits successfully with all dynamic fields", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onSuccess = vi.fn();
@@ -83,19 +86,71 @@ describe("EditPlanLimitsDialog", () => {
     await user.clear(daysInput);
     await user.type(daysInput, "60");
 
+    const topicInput = screen.getByTestId("input-plan-topic-units");
+    await user.clear(topicInput);
+    await user.type(topicInput, "5000");
+
     const saveBtn = screen.getByTestId("btn-save-plan-limits");
     await user.click(saveBtn);
 
     await waitFor(() => {
-      expect(adminRead.updatePlanLimits).toHaveBeenCalledWith("creator", {
-        channels: 3,
-        analysis_units: 50000,
-        backfill_units: 80000,
-        historical_days_limit: 60,
-        allow_public_channels: false,
-      });
+      expect(adminRead.updatePlanLimits).toHaveBeenCalledWith(
+        "creator",
+        expect.objectContaining({
+          channels: 3,
+          channels_limit: 3,
+          analysis_units: 50000,
+          backfill_units: 80000,
+          historical_days_limit: 60,
+          topic_units: 5000,
+          members: 2,
+          members_limit: 2,
+          workspaces: 1,
+          workspaces_limit: 1,
+          allow_public_channels: false,
+        }),
+      );
       expect(onSuccess).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("sets a limit to -1 when clicking the unlimited checkbox", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onSuccess = vi.fn();
+    vi.mocked(adminRead.updatePlanLimits).mockResolvedValueOnce({
+      ok: true,
+      plan: mockPlan,
+    });
+
+    render(
+      <EditPlanLimitsDialog
+        plan={mockPlan}
+        open={true}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+
+    const unlHistoricalCheckbox = screen.getByTestId(
+      "checkbox-unlimited-historical-days",
+    );
+    expect(unlHistoricalCheckbox).not.toBeChecked();
+
+    await user.click(unlHistoricalCheckbox);
+    expect(screen.getByTestId("input-plan-historical-days")).toHaveValue(-1);
+
+    const saveBtn = screen.getByTestId("btn-save-plan-limits");
+    await user.click(saveBtn);
+
+    await waitFor(() => {
+      expect(adminRead.updatePlanLimits).toHaveBeenCalledWith(
+        "creator",
+        expect.objectContaining({
+          historical_days_limit: -1,
+        }),
+      );
     });
   });
 

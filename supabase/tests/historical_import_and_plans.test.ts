@@ -127,6 +127,75 @@ describe("historical data import and dynamic plan limits", () => {
       );
     });
 
+    it("allows updating channels, topic units, members, workspaces, and setting unlimited (-1)", async () => {
+      await user(adminUser);
+      const res = await db.query<{
+        result: {
+          ok: boolean;
+          plan: {
+            limits: {
+              channels: number;
+              topic_units: number;
+              members: number;
+              workspaces: number;
+              analysis_units: number;
+            };
+            backfill_units: number;
+            historical_days_limit: number;
+          };
+        };
+      }>(
+        `select public.update_plan_limits('creator', jsonb_build_object(
+          'channels', 5,
+          'topic_units', 8000,
+          'members', 4,
+          'workspaces', 2,
+          'historical_days_limit', -1,
+          'backfill_units', -1
+        )) as result`,
+      );
+      const parsed = res.rows[0].result;
+      expect(parsed.ok).toBe(true);
+      expect(parsed.plan.limits.channels).toBe(5);
+      expect(parsed.plan.limits.topic_units).toBe(8000);
+      expect(parsed.plan.limits.members).toBe(4);
+      expect(parsed.plan.limits.workspaces).toBe(2);
+      expect(parsed.plan.historical_days_limit).toBe(-1);
+      expect(parsed.plan.backfill_units).toBe(-1);
+
+      // Verify plans table directly shows NULL for unlimited columns
+      await resetAdmin();
+      const planCheck = await db.query<{
+        channels_limit: number;
+        topic_units: number;
+        members_limit: number;
+        workspaces_limit: number;
+        historical_days_limit: number | null;
+        backfill_units: number | null;
+      }>(
+        "select channels_limit, topic_units, members_limit, workspaces_limit, historical_days_limit, backfill_units from public.plans where key = 'creator'",
+      );
+      expect(planCheck.rows[0].channels_limit).toBe(5);
+      expect(planCheck.rows[0].topic_units).toBe(8000);
+      expect(planCheck.rows[0].members_limit).toBe(4);
+      expect(planCheck.rows[0].workspaces_limit).toBe(2);
+      expect(planCheck.rows[0].historical_days_limit).toBeNull();
+      expect(planCheck.rows[0].backfill_units).toBe(2147483647);
+
+      // Restore back to original creator limits
+      await user(adminUser);
+      await db.query(
+        `select public.update_plan_limits('creator', jsonb_build_object(
+          'channels', 1,
+          'topic_units', 4000,
+          'members', 1,
+          'workspaces', 1,
+          'historical_days_limit', 30,
+          'backfill_units', 40000
+        ))`,
+      );
+    });
+
     it("rejects non-admin users from updating plan limits", async () => {
       await user(owner);
       await expect(

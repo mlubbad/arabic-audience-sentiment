@@ -2,7 +2,7 @@
  * Dialog for platform administrators to dynamically adjust subscription plan limits.
  *
  * Allows updating channels, analysis units, historical backfill quota, historical depth,
- * and data retention without needing database migrations or service redeploys.
+ * topic units, members limit, and public channels access without needing migrations.
  */
 import { useState } from "react";
 import type { Plan } from "@sentiment/contracts";
@@ -40,7 +40,14 @@ export function EditPlanLimitsDialog({
     plan?.backfill_units ?? 40000,
   );
   const [historicalDays, setHistoricalDays] = useState<number>(
-    plan?.historical_days_limit ?? 30,
+    plan?.historical_days_limit ?? -1,
+  );
+  const [topicUnits, setTopicUnits] = useState<number>(
+    plan?.limits.topic_units ?? 4000,
+  );
+  const [members, setMembers] = useState<number>(plan?.limits.members ?? 1);
+  const [workspaces, setWorkspaces] = useState<number>(
+    plan?.limits.workspaces ?? 1,
   );
   const [allowPublic, setAllowPublic] = useState<boolean>(
     plan?.allow_public_channels ?? false,
@@ -63,9 +70,15 @@ export function EditPlanLimitsDialog({
     try {
       await updatePlanLimits(plan.key, {
         channels,
+        channels_limit: channels,
         analysis_units: analysisUnits,
         backfill_units: backfillUnits,
         historical_days_limit: historicalDays,
+        topic_units: topicUnits,
+        members,
+        members_limit: members,
+        workspaces,
+        workspaces_limit: workspaces,
         allow_public_channels: allowPublic,
       });
       onSuccess();
@@ -105,8 +118,35 @@ export function EditPlanLimitsDialog({
             marginTop: "var(--space-3)",
           }}
         >
-          <label>
-            <strong>{S.adminPlanChannelsLimit}</strong>
+          {/* Channels Limit */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "4px",
+              }}
+            >
+              <strong>{S.adminPlanChannelsLimit}</strong>
+              <label
+                style={{
+                  fontSize: "0.82rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={channels === -1}
+                  onChange={(e) => setChannels(e.target.checked ? -1 : 1)}
+                  data-testid="checkbox-unlimited-channels"
+                />
+                <span>{S.adminPlanUnlimitedCheckbox}</span>
+              </label>
+            </div>
             <Input
               type="number"
               min={-1}
@@ -116,10 +156,39 @@ export function EditPlanLimitsDialog({
               data-testid="input-plan-channels"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
-          </label>
+          </div>
 
-          <label>
-            <strong>{S.adminPlanAnalysisUnits}</strong>
+          {/* Analysis Units */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "4px",
+              }}
+            >
+              <strong>{S.adminPlanAnalysisUnits}</strong>
+              <label
+                style={{
+                  fontSize: "0.82rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={analysisUnits === -1}
+                  onChange={(e) =>
+                    setAnalysisUnits(e.target.checked ? -1 : 10000)
+                  }
+                  data-testid="checkbox-unlimited-analysis"
+                />
+                <span>{S.adminPlanUnlimitedCheckbox}</span>
+              </label>
+            </div>
             <Input
               type="number"
               min={-1}
@@ -131,10 +200,39 @@ export function EditPlanLimitsDialog({
               data-testid="input-plan-analysis-units"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
-          </label>
+          </div>
 
-          <label>
-            <strong>{S.adminPlanBackfillUnits}</strong>
+          {/* Backfill Units */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "4px",
+              }}
+            >
+              <strong>{S.adminPlanBackfillUnits}</strong>
+              <label
+                style={{
+                  fontSize: "0.82rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={backfillUnits === -1}
+                  onChange={(e) =>
+                    setBackfillUnits(e.target.checked ? -1 : 40000)
+                  }
+                  data-testid="checkbox-unlimited-backfill"
+                />
+                <span>{S.adminPlanUnlimitedCheckbox}</span>
+              </label>
+            </div>
             <Input
               type="number"
               min={-1}
@@ -146,13 +244,42 @@ export function EditPlanLimitsDialog({
               data-testid="input-plan-backfill-units"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
-          </label>
+          </div>
 
-          <label>
-            <strong>{S.adminPlanHistoricalDays}</strong>
+          {/* Historical Depth (Days) */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "4px",
+              }}
+            >
+              <strong>{S.adminPlanHistoricalDays}</strong>
+              <label
+                style={{
+                  fontSize: "0.82rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={historicalDays === -1}
+                  onChange={(e) =>
+                    setHistoricalDays(e.target.checked ? -1 : 30)
+                  }
+                  data-testid="checkbox-unlimited-historical-days"
+                />
+                <span>{S.adminPlanUnlimitedCheckbox}</span>
+              </label>
+            </div>
             <Input
               type="number"
-              min={0}
+              min={-1}
               value={historicalDays}
               onChange={(e) =>
                 setHistoricalDays(parseInt(e.target.value, 10) || 0)
@@ -160,8 +287,130 @@ export function EditPlanLimitsDialog({
               required
               data-testid="input-plan-historical-days"
             />
-          </label>
+            <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
+          </div>
 
+          {/* Topic Classification Units */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "4px",
+              }}
+            >
+              <strong>{S.adminPlanTopicUnits}</strong>
+              <label
+                style={{
+                  fontSize: "0.82rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={topicUnits === -1}
+                  onChange={(e) => setTopicUnits(e.target.checked ? -1 : 4000)}
+                  data-testid="checkbox-unlimited-topic-units"
+                />
+                <span>{S.adminPlanUnlimitedCheckbox}</span>
+              </label>
+            </div>
+            <Input
+              type="number"
+              min={-1}
+              value={topicUnits}
+              onChange={(e) => setTopicUnits(parseInt(e.target.value, 10) || 0)}
+              required
+              data-testid="input-plan-topic-units"
+            />
+            <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
+          </div>
+
+          {/* Members Limit */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "4px",
+              }}
+            >
+              <strong>{S.adminPlanMembersLimit}</strong>
+              <label
+                style={{
+                  fontSize: "0.82rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={members === -1}
+                  onChange={(e) => setMembers(e.target.checked ? -1 : 1)}
+                  data-testid="checkbox-unlimited-members"
+                />
+                <span>{S.adminPlanUnlimitedCheckbox}</span>
+              </label>
+            </div>
+            <Input
+              type="number"
+              min={-1}
+              value={members}
+              onChange={(e) => setMembers(parseInt(e.target.value, 10) || 0)}
+              required
+              data-testid="input-plan-members"
+            />
+            <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
+          </div>
+
+          {/* Workspaces Limit */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "4px",
+              }}
+            >
+              <strong>{S.adminPlanWorkspacesLimit}</strong>
+              <label
+                style={{
+                  fontSize: "0.82rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={workspaces === -1}
+                  onChange={(e) => setWorkspaces(e.target.checked ? -1 : 1)}
+                  data-testid="checkbox-unlimited-workspaces"
+                />
+                <span>{S.adminPlanUnlimitedCheckbox}</span>
+              </label>
+            </div>
+            <Input
+              type="number"
+              min={-1}
+              value={workspaces}
+              onChange={(e) => setWorkspaces(parseInt(e.target.value, 10) || 0)}
+              required
+              data-testid="input-plan-workspaces"
+            />
+            <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
+          </div>
+
+          {/* Allow Public Channels Checkbox */}
           <div
             style={{
               display: "flex",
