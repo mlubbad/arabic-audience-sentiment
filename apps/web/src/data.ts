@@ -291,6 +291,28 @@ async function callRpcWithAuthRetry<T>(
     }
   }
 
+  // Transient network, gateway, or timeout errors (502, 503, 504, fetch failures)
+  if (
+    error &&
+    (error.code === "504" ||
+      error.code === "502" ||
+      error.code === "503" ||
+      error.code === "57014" ||
+      error.message?.includes("Failed to fetch") ||
+      error.message?.includes("statement timeout") ||
+      error.message?.includes("NetworkError"))
+  ) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await new Promise((res) => setTimeout(res, attempt * 500));
+      const retryResult = await supabase.rpc(rpcName, args);
+      if (retryResult) {
+        data = retryResult.data;
+        error = retryResult.error;
+        if (!error) break;
+      }
+    }
+  }
+
   if (error) {
     console.error(`[RPC ${rpcName}] error:`, error);
     throw new Error("live_unavailable");

@@ -661,6 +661,8 @@ export const en: Strings = {
       "The source ended without proving full coverage; that does not mean every comment was collected",
     failed: "The last sync failed",
     blocked: "The source could not be reached in the last sync",
+    quota_paused:
+      "YouTube daily API quota reached; sync will resume automatically at 00:00 UTC",
     stalled:
       "Jobs are waiting and collection is stopped — nothing is running to take them",
     never_run: "No sync has run yet",

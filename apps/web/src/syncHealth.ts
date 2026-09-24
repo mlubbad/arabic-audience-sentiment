@@ -22,6 +22,7 @@ export type HealthKey =
   | "incomplete_coverage"
   | "failed"
   | "blocked"
+  | "quota_paused"
   | "stalled"
   | "never_run"
   | "never_run_no_worker"
@@ -59,7 +60,30 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
     return { ...base, severity: "ok", key: "running", queued };
   if (queued > 0)
     return { ...base, severity: "warning", key: "queued", queued, errorCode };
-  if (run.status === "failed" || run.status === "blocked")
+
+  if (run.status === "failed" || run.status === "blocked") {
+    if (run.status === "blocked" && run.error_code === "quota_exceeded") {
+      const endedDate = run.ended_at ? new Date(run.ended_at) : null;
+      const isPastMidnightUtc =
+        endedDate &&
+        (now.getUTCFullYear() > endedDate.getUTCFullYear() ||
+          now.getUTCMonth() > endedDate.getUTCMonth() ||
+          now.getUTCDate() > endedDate.getUTCDate());
+
+      if (isPastMidnightUtc) {
+        return state.worker.connected
+          ? { ...base, severity: "ok", key: "healthy", queued }
+          : { ...base, severity: "warning", key: "stale", queued };
+      }
+      return {
+        ...base,
+        severity: "warning",
+        key: "quota_paused",
+        queued,
+        errorCode,
+      };
+    }
+
     return {
       ...base,
       severity: "critical",
@@ -67,6 +91,7 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
       queued,
       errorCode,
     };
+  }
   if (run.status === "partial")
     return { ...base, severity: "warning", key: "partial", queued, errorCode };
 

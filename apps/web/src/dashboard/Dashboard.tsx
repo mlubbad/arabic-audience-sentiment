@@ -288,9 +288,12 @@ function DashboardBody({
         },
         signal,
       ),
-    enabled: mode === "live" && !read.data,
-    retry: 1,
-    retryDelay: 1000,
+    enabled:
+      mode === "live" &&
+      !read.data &&
+      (aggregatesQuery.isSuccess || Boolean(aggregatesQuery.data)),
+    retry: 2,
+    retryDelay: (attempt) => attempt * 1000,
   });
 
   const cardsParamsKey = useMemo(
@@ -316,9 +319,12 @@ function DashboardBody({
         },
         signal,
       ),
-    enabled: mode === "live" && !read.data,
-    retry: 1,
-    retryDelay: 1000,
+    enabled:
+      mode === "live" &&
+      !read.data &&
+      (aggregatesQuery.isSuccess || Boolean(aggregatesQuery.data)),
+    retry: 2,
+    retryDelay: (attempt) => attempt * 1000,
   });
 
   // For the empty state's setup path only; live only, and cheap.
@@ -453,7 +459,10 @@ function DashboardBody({
       ? aggregatesQuery.isFetching || commentsQuery.isFetching
       : read.isFetching,
     isError: isLiveServer
-      ? aggregatesQuery.isError || commentsQuery.isError
+      ? aggregatesQuery.isError ||
+        (commentsQuery.isError &&
+          !aggregatesQuery.isSuccess &&
+          !aggregatesQuery.data)
       : read.isError || derived?.ok === false,
     refetch: () => {
       if (isLiveServer) {
@@ -475,7 +484,9 @@ function DashboardBody({
     failure: isLiveServer
       ? aggregatesQuery.isError
         ? failureCode("read", aggregatesQuery.error)
-        : commentsQuery.isError
+        : !aggregatesQuery.isSuccess &&
+            !aggregatesQuery.data &&
+            commentsQuery.isError
           ? failureCode("read", commentsQuery.error)
           : null
       : read.isError
