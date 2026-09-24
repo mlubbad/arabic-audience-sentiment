@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const W = "00000000-0000-4000-8000-000000000001";
 const W_FREE = "00000000-0000-4000-8000-000000000002";
+const W_OWNER = "00000000-0000-4000-8000-000000000003";
 const owner = "10000000-0000-4000-8000-000000000001";
 const adminUser = "10000000-0000-4000-8000-000000000002";
 const viewer = "10000000-0000-4000-8000-000000000003";
@@ -11,6 +12,7 @@ const viewer = "10000000-0000-4000-8000-000000000003";
 let db: PGlite;
 let channelId: string;
 let freeChannelId: string;
+let ownerChannelId: string;
 
 async function user(id: string) {
   await db.exec("reset role");
@@ -47,24 +49,24 @@ describe("historical data import and dynamic plan limits", () => {
 
     // Workspaces
     await db.query(
-      "insert into workspaces(id,name,created_by) values ($1,'Creator Workspace',$3),($2,'Free Workspace',$3)",
-      [W, W_FREE, owner],
+      "insert into workspaces(id,name,created_by) values ($1,'Creator Workspace',$4),($2,'Free Workspace',$4),($3,'Owner Workspace',$4)",
+      [W, W_FREE, W_OWNER, owner],
     );
     await db.query(
-      "insert into memberships values ($1,$2,'workspace_owner'),($3,$2,'workspace_owner'),($1,$4,'viewer')",
-      [W, owner, W_FREE, viewer],
+      "insert into memberships values ($1,$2,'workspace_owner'),($3,$2,'workspace_owner'),($4,$2,'workspace_owner'),($1,$5,'viewer')",
+      [W, owner, W_FREE, W_OWNER, viewer],
     );
 
-    // Subscriptions: W on creator (30 days, 40000 backfill), W_FREE on free (0 days, 0 backfill)
+    // Subscriptions: W on creator (30 days, 40000 backfill), W_FREE on free (0 days, 0 backfill), W_OWNER on owner (unlimited)
     await db.query(
-      "insert into subscriptions(workspace_id,plan_key,status,period_start,period_end) values ($1,'creator','active',now(),now()+'30 days'::interval),($2,'free','active',now(),now()+'30 days'::interval)",
-      [W, W_FREE],
+      "insert into subscriptions(workspace_id,plan_key,status,period_start,period_end) values ($1,'creator','active',now(),now()+'30 days'::interval),($2,'free','active',now(),now()+'30 days'::interval),($3,'owner','active',now(),now()+'30 days'::interval)",
+      [W, W_FREE, W_OWNER],
     );
 
     // Clients
     await db.query(
-      "insert into clients(id,workspace_id,name) values ($1,$1,'Client A'),($2,$2,'Client B')",
-      [W, W_FREE],
+      "insert into clients(id,workspace_id,name) values ($1,$1,'Client A'),($2,$2,'Client B'),($3,$3,'Client C')",
+      [W, W_FREE, W_OWNER],
     );
 
     // Channels
@@ -79,6 +81,12 @@ describe("historical data import and dynamic plan limits", () => {
       [W_FREE],
     );
     freeChannelId = c2.rows[0].id;
+
+    const c3 = await db.query<{ id: string }>(
+      "insert into channels(workspace_id,client_id,platform,external_channel_id,title) values ($1,$1,'youtube','UCOWNER','Owner Channel') returning id",
+      [W_OWNER],
+    );
+    ownerChannelId = c3.rows[0].id;
   });
 
   afterAll(async () => {
@@ -180,6 +188,31 @@ describe("historical data import and dynamic plan limits", () => {
       expect(job.rows[0].type).toBe("import");
       expect(job.rows[0].checkpoint.is_historical).toBe(true);
     });
+
+    it("allows unlimited sync on owner plan and supports named argument overload", async () => {
+      await user(owner);
+      const res = await db.query<{
+        result: {
+          ok: boolean;
+          status: string;
+          historical_days_limit: number;
+          job_id: string;
+        };
+      }>(
+        `select public.request_historical_platform_sync(
+          w => $1,
+          p_channel_id => $2,
+          p_days_back => 365,
+          p_max_items => 500,
+          p_published_after => '2024-01-09T00:00:00Z'::timestamptz
+        ) as result`,
+        [W_OWNER, ownerChannelId],
+      );
+      const data = res.rows[0].result;
+      expect(data.ok).toBe(true);
+      expect(data.status).toBe("queued");
+      expect(data.historical_days_limit).toBe(-1); // -1 signifies unlimited
+    });
   });
 
   describe("import_historical_records (CSV / JSON)", () => {
@@ -269,6 +302,47 @@ describe("historical data import and dynamic plan limits", () => {
         (e) => e.event_type === "comment_analysis",
       );
       expect(analysisEvent).toBeUndefined(); // Did NOT touch monthly comment_analysis!
+    });
+
+    it("allows external import on owner plan and supports named argument overload", async () => {
+      await user(owner);
+      const payload = {
+        posts: [
+          {
+            external_video_id: "vid_owner_1",
+            title: "منشور غير محدود",
+            kind: "video",
+          },
+        ],
+        comments: [
+          {
+            external_video_id: "vid_owner_1",
+            external_comment_id: "comm_owner_1",
+            author_name: "مستخدم الجزيرة",
+            text_raw: "تعليق من عام 2024",
+            published_at: "2024-01-09T12:00:00Z",
+          },
+        ],
+      };
+
+      const res = await db.query<{
+        result: {
+          ok: boolean;
+          posts_count: number;
+          comments_count: number;
+        };
+      }>(
+        `select public.import_historical_records(
+          w => $1,
+          p_channel_id => $2,
+          p_payload => $3::jsonb
+        ) as result`,
+        [W_OWNER, ownerChannelId, JSON.stringify(payload)],
+      );
+      const result = res.rows[0].result;
+      expect(result.ok).toBe(true);
+      expect(result.posts_count).toBe(1);
+      expect(result.comments_count).toBe(1);
     });
   });
 });
