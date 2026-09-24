@@ -25,7 +25,26 @@ vi.mock("./AdminShell", async (importOriginal) => {
 });
 
 describe("AdminServicesPage", () => {
-  const mockHealthReport = getDemoServicesHealth();
+  const baseDemo = getDemoServicesHealth();
+  const mockHealthReport = {
+    ...baseDemo,
+    services: baseDemo.services.map((s) =>
+      s.id === "x_twitter_api"
+        ? {
+            ...s,
+            status: "degraded" as const,
+            quota_used: 88,
+            quota_total: 100,
+            quota_unit: "طلب / 15 دقيقة",
+            details: "اقتراب من حد الطلبات (HTTP 429 Rate Warning)",
+            endpoint: "https://api.twitter.com/2/tweets",
+            error_code: "RATE_LIMIT_WARNING",
+            remediation:
+              "ينصح بتقليل وتيرة المزامنة اللحظية لحسابات X أو ترقية باقة الـ Bearer Token.",
+          }
+        : s,
+    ),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
