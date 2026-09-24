@@ -70,43 +70,54 @@ def check_apify(token: str | None) -> dict:
         }
 
 
-def check_brightdata(key: str | None) -> dict:
-    if not key:
+def check_brightdata(key: str | None, webdriver_url: str | None = None) -> dict:
+    if not key and not webdriver_url:
         return {
-            "name": "Bright Data Scraping API",
+            "name": "Bright Data Scraping API & Browser",
             "status": "NOT_CONFIGURED",
-            "details": "BRIGHTDATA_API_KEY is not set.",
+            "details": "Neither BRIGHTDATA_API_KEY nor BRIGHTDATA_WEBDRIVER_URL is set.",
         }
-    try:
-        resp = httpx.post(
-            "https://api.brightdata.com/datasets/v3/scrape?dataset_id=gd_lwxmeb2u1cniijd7t4",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json=[],
-            timeout=10,
-        )
-        if resp.status_code in (200, 400):
-            return {
-                "name": "Bright Data Scraping API",
-                "status": "HEALTHY",
-                "details": "Authenticated successfully. Configured and active as automatic fallback for X and TikTok.",
-            }
-        if resp.status_code in (401, 403):
-            return {
-                "name": "Bright Data Scraping API",
-                "status": "INVALID_KEY",
-                "details": f"Bright Data rejected key with HTTP {resp.status_code}.",
-            }
-        return {
-            "name": "Bright Data Scraping API",
-            "status": "CONFIGURED",
-            "details": f"Configured for fallback (HTTP {resp.status_code}).",
-        }
-    except Exception as exc:
-        return {
-            "name": "Bright Data Scraping API",
-            "status": "CONFIGURED",
-            "details": f"Configured for fallback (connectivity check skipped: {exc}).",
-        }
+
+    status = "CONFIGURED"
+    details_parts = []
+
+    if key:
+        try:
+            resp = httpx.post(
+                "https://api.brightdata.com/datasets/v3/scrape?dataset_id=gd_lwxmeb2u1cniijd7t4",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json=[],
+                timeout=10,
+            )
+            if resp.status_code in (200, 400):
+                status = "HEALTHY"
+                details_parts.append("Datasets API: Authenticated successfully")
+            elif resp.status_code in (401, 403):
+                status = "INVALID_KEY"
+                details_parts.append(f"Datasets API: Rejected key with HTTP {resp.status_code}")
+            else:
+                details_parts.append(f"Datasets API: HTTP {resp.status_code}")
+        except Exception as exc:
+            details_parts.append(f"Datasets API: Connectivity check skipped ({exc})")
+
+    if webdriver_url:
+        try:
+            wb_resp = httpx.get(f"{webdriver_url.rstrip('/')}/status", timeout=10)
+            if wb_resp.status_code == 200 and wb_resp.json().get("value", {}).get("ready"):
+                if status != "INVALID_KEY":
+                    status = "HEALTHY"
+                details_parts.append("Scraping Browser: Ready for automated sessions (port 9515/9222)")
+            else:
+                details_parts.append(f"Scraping Browser: HTTP {wb_resp.status_code}")
+        except Exception as exc:
+            details_parts.append(f"Scraping Browser: Connectivity check skipped ({exc})")
+
+    details = " · ".join(details_parts) if details_parts else "Configured for fallback."
+    return {
+        "name": "Bright Data Scraping API & Browser",
+        "status": status,
+        "details": details,
+    }
 
 
 def check_x_channel(handle: str, bearer: str | None) -> dict:
@@ -322,6 +333,7 @@ def main():
 
     apify_token = os.environ.get("APIFY_API_TOKEN")
     brightdata_key = os.environ.get("BRIGHTDATA_API_KEY")
+    brightdata_webdriver = os.environ.get("BRIGHTDATA_WEBDRIVER_URL")
     x_bearer = os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN")
     tiktok_token = os.environ.get("TIKTOK_ACCESS_TOKEN")
 
@@ -333,7 +345,7 @@ def main():
 
     if args.platform in ("all", "scrapers"):
         results.append(check_apify(apify_token))
-        results.append(check_brightdata(brightdata_key))
+        results.append(check_brightdata(brightdata_key, brightdata_webdriver))
 
     if args.platform in ("all", "youtube"):
         results.append(check_youtube_channel(args.channel))

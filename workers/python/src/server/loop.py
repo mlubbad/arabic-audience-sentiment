@@ -70,6 +70,8 @@ def build_collector(
     apify_tiktok_actor: str | None = None,
     brightdata_api_key: str | None = None,
     brightdata_proxy_url: str | None = None,
+    brightdata_browser_ws: str | None = None,
+    brightdata_webdriver_url: str | None = None,
     x_scraper_provider: str | None = None,
     tiktok_scraper_provider: str | None = None,
 ):
@@ -97,10 +99,12 @@ def build_collector(
         apify_client = ApifyClient(**apify_kwargs)
 
     brightdata_client = None
-    if brightdata_api_key or brightdata_proxy_url:
+    if brightdata_api_key or brightdata_proxy_url or brightdata_browser_ws or brightdata_webdriver_url:
         brightdata_client = BrightDataClient(
             api_key=brightdata_api_key,
             proxy_url=brightdata_proxy_url,
+            browser_ws=brightdata_browser_ws,
+            webdriver_url=brightdata_webdriver_url,
             client=client,
         )
 
@@ -348,6 +352,8 @@ def main() -> None:
     apify_tiktok_actor = os.environ.get("APIFY_TIKTOK_ACTOR") or None
     brightdata_api_key = os.environ.get("BRIGHTDATA_API_KEY") or None
     brightdata_proxy_url = os.environ.get("BRIGHTDATA_PROXY_URL") or None
+    brightdata_browser_ws = os.environ.get("BRIGHTDATA_BROWSER_WS") or None
+    brightdata_webdriver_url = os.environ.get("BRIGHTDATA_WEBDRIVER_URL") or None
     x_scraper_provider = os.environ.get("X_SCRAPER_PROVIDER") or None
     tiktok_scraper_provider = os.environ.get("TIKTOK_SCRAPER_PROVIDER") or None
 
@@ -365,10 +371,18 @@ def main() -> None:
         apify_tiktok_actor=apify_tiktok_actor,
         brightdata_api_key=brightdata_api_key,
         brightdata_proxy_url=brightdata_proxy_url,
+        brightdata_browser_ws=brightdata_browser_ws,
+        brightdata_webdriver_url=brightdata_webdriver_url,
         x_scraper_provider=x_scraper_provider,
         tiktok_scraper_provider=tiktok_scraper_provider,
     )
-    has_scrapers = bool(apify_token or brightdata_api_key or brightdata_proxy_url)
+    has_scrapers = bool(
+        apify_token
+        or brightdata_api_key
+        or brightdata_proxy_url
+        or brightdata_browser_ws
+        or brightdata_webdriver_url
+    )
     telegram_auth = bool(telegram_api_id and telegram_session_string)
     _log(
         f"worker up, model={args.model}, tenants={len(controls)}, "

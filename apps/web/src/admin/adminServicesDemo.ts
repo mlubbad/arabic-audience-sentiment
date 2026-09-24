@@ -250,8 +250,8 @@ export function getDemoServicesHealth(): ServicesHealthReport {
       },
       {
         id: "bright_data_proxy",
-        name_ar: "شبكة البروكسي Bright Data",
-        name_en: "Bright Data Web Unlocker & Proxy",
+        name_ar: "شبكة الكشط والمتصفح السحابي Bright Data",
+        name_en: "Bright Data Scraping API & Scraping Browser",
         category: "data_ingestion",
         status: "healthy",
         latency_ms: 110,
@@ -259,9 +259,9 @@ export function getDemoServicesHealth(): ServicesHealthReport {
         quota_total: 5000,
         quota_unit: "طلبات كشط / شهر",
         details:
-          "المفتاح BRIGHTDATA_API_KEY مهيأ ونشط بنجاح · جاهز كخط دفاع بديل وتلقائي (Fallback) عند استنفاد رصيد Apify أو تعطلها",
+          "المفتاح BRIGHTDATA_API_KEY والمتصفح السحابي Scraping Browser (scraping_browser1) مهيأ ونشط بنجاح · جاهز كخط دفاع بديل وتلقائي (Fallback) عند استنفاد رصيد Apify أو تعطلها",
         last_checked_at: now,
-        endpoint: "https://api.brightdata.com",
+        endpoint: "https://api.brightdata.com · brd.superproxy.io:9222/9515",
         error_code: null,
         remediation: null,
       },

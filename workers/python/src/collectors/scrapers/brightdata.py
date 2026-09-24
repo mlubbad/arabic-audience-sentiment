@@ -13,6 +13,8 @@ class BrightDataClient:
         self,
         api_key: str | None = None,
         proxy_url: str | None = None,
+        browser_ws: str | None = None,
+        webdriver_url: str | None = None,
         client: httpx.Client | None = None,
         timeout: float = 60.0,
         dataset_x: str | None = None,
@@ -21,10 +23,12 @@ class BrightDataClient:
         dataset_tiktok_posts: str | None = None,
         dataset_tiktok_comments: str | None = None,
     ):
-        if not api_key and not proxy_url:
+        if not api_key and not proxy_url and not browser_ws and not webdriver_url:
             raise ValueError("need_brightdata_api_key_or_proxy_url")
         self.api_key = api_key
         self.proxy_url = proxy_url
+        self.browser_ws = browser_ws
+        self.webdriver_url = webdriver_url
         self.client = client or httpx.Client()
         self.timeout = timeout
         self.dataset_x = dataset_x or "gd_lwxmeb2u1cniijd7t4"  # Bright Data Twitter Profiles dataset
@@ -38,6 +42,19 @@ class BrightDataClient:
         if not self.proxy_url:
             return None
         return httpx.Client(proxy=self.proxy_url, timeout=self.timeout)
+
+    def check_webdriver_status(self) -> dict:
+        """Query Bright Data Scraping Browser WebDriver endpoint status."""
+        if not self.webdriver_url:
+            return {"ready": False, "error": "webdriver_url_not_configured"}
+        try:
+            status_url = f"{self.webdriver_url.rstrip('/')}/status"
+            resp = self.client.get(status_url, timeout=self.timeout)
+            if resp.status_code == 200:
+                return resp.json().get("value", {"ready": True})
+            return {"ready": False, "status_code": resp.status_code}
+        except Exception as exc:
+            return {"ready": False, "error": str(exc)}
 
     def _scrape_dataset(self, dataset_id: str, urls: list[dict | str]) -> list[dict]:
         """Call Bright Data Datasets Scrape API."""

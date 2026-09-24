@@ -206,3 +206,38 @@ def test_brightdata_scrape_x_profile_nested_posts():
     assert videos[0]["reported_comment_count"] == 15
     assert videos[1]["external_video_id"] == "2101909767610589578"
 
+
+def test_brightdata_scraping_browser_initialization_and_status():
+    client_ws = BrightDataClient(browser_ws="wss://user:pass@brd.superproxy.io:9222")
+    assert client_ws.browser_ws == "wss://user:pass@brd.superproxy.io:9222"
+    assert client_ws.check_webdriver_status() == {"ready": False, "error": "webdriver_url_not_configured"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "https://brd.superproxy.io:9515/status"
+        return httpx.Response(200, json={"value": {"ready": True, "message": "WebDriver ready"}})
+
+    mock_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client_wb = BrightDataClient(
+        webdriver_url="https://brd.superproxy.io:9515",
+        client=mock_client,
+    )
+    status = client_wb.check_webdriver_status()
+    assert status.get("ready") is True
+
+
+def test_check_brightdata_diagnostics():
+    from collectors.diagnostics import check_brightdata
+
+    # Not configured
+    res_none = check_brightdata(None, None)
+    assert res_none["status"] == "NOT_CONFIGURED"
+
+    # Both configured and healthy
+    res_healthy = check_brightdata(
+        key="07cbaeac-c954-4e47-a6d7-474cd27ce4be",
+        webdriver_url="https://brd-customer-hl_41bb0e8e-zone-scraping_browser1:3oo1wdj909uz@brd.superproxy.io:9515",
+    )
+    assert res_healthy["status"] == "HEALTHY"
+    assert "Datasets API: Authenticated successfully" in res_healthy["details"]
+    assert "Scraping Browser: Ready" in res_healthy["details"]
+
