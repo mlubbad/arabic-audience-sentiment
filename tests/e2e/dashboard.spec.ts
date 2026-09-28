@@ -947,7 +947,12 @@ test("the skip link is the first stop and reaches the content", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  await page.keyboard.press("Tab");
+  // Headless Chromium (CI) loads a page with focus on nothing, so a bare
+  // page.keyboard.press("Tab") is swallowed. Pressing from <body> seats focus
+  // inside the page first, so Tab lands on the first tabbable element — the
+  // skip link. (Local browsers focus the document on load, so this passes
+  // there and only fails in CI.)
+  await page.locator("body").press("Tab");
   const skip = page.getByRole("link", { name: "انتقل إلى المحتوى" });
   await expect(skip).toBeFocused();
   // A skip link that stays parked off-screen while focused helps nobody who can
