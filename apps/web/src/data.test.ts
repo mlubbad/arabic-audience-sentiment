@@ -491,4 +491,71 @@ describe("loadDashboardAggregates null channel handling", () => {
     expect(result.total).toBe(0);
     expect(result.kpis?.total_comments).toBe(0);
   });
+
+  describe("buildExport cap and deriveSnapshot kpis", () => {
+    it("buildExport returns rows capped at EXPORT_ROW_CAP and flags truncation", async () => {
+      const { buildExport, EXPORT_ROW_CAP } = await loadModule();
+      expect(EXPORT_ROW_CAP).toBe(10_000);
+
+      // Create a large fixture with 10_005 comments
+      const manyComments = Array.from({ length: 10_005 }, (_, i) => ({
+        ...target,
+        id: `comment_${i}`,
+        content_hash: `hash_${i}`,
+        text_raw: `تعليق رقم ${i}`,
+        published_at: "2026-09-20T00:00:00Z",
+      }));
+      const largeFixture = JSON.stringify({
+        ...JSON.parse(fixtureJson),
+        comments: manyComments,
+      });
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(largeFixture, { status: 200 })),
+      );
+
+      const result = await buildExport("sanitized_fixture", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+
+      expect(result.totalRows).toBe(10_005);
+      expect(result.rows).toBe(10_000);
+      expect(result.truncated).toBe(true);
+      expect(result.csv.split("\n").length).toBe(10_002); // Header + 10,000 rows + trailing empty line
+    });
+
+    it("deriveSnapshot preserves total_likes from base kpis", async () => {
+      const { deriveSnapshot } = await loadModule();
+      const mockSource = {
+        revision: "rev1",
+        comments: [
+          {
+            ...target,
+            id: "c1",
+            likes_value: 42,
+            published_at: "2026-09-20T00:00:00Z",
+          },
+          {
+            ...target,
+            id: "c2",
+            likes_value: 58,
+            published_at: "2026-09-20T00:00:00Z",
+          },
+        ],
+        active_analysis_key: null,
+        active_analysis_labels: ["positive", "negative", "neutral"],
+        active_topic_key: null,
+        cursor_reset: false,
+      };
+
+      // @ts-expect-error minimal mock source
+      const snapshot = deriveSnapshot(mockSource, "sanitized_fixture", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+
+      expect(snapshot.kpis?.total_likes).toBe(100);
+      expect(snapshot.kpis?.total_comments).toBe(2);
+    });
+  });
 });
