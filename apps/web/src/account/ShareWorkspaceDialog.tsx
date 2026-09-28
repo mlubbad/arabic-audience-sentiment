@@ -34,7 +34,7 @@ export function ShareWorkspaceDialog({
   const S = useStrings();
   const [accounts, setAccounts] = useState<WorkspaceAccount[]>([]);
   const [membersCount, setMembersCount] = useState(1);
-  const [membersLimit, setMembersLimit] = useState(1);
+  const [membersLimit, setMembersLimit] = useState<number | null>(1);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -58,14 +58,38 @@ export function ShareWorkspaceDialog({
       } else if (data) {
         const res = data as {
           accounts: WorkspaceAccount[];
-          members_count: number;
-          members_limit: number;
-          can_manage: boolean;
+          members_count?: number;
+          total_members?: number;
+          members_limit?: number | null;
+          can_manage?: boolean;
         };
+        const count =
+          res.total_members ?? res.members_count ?? res.accounts?.length ?? 1;
         setAccounts(res.accounts || []);
-        setMembersCount(res.members_count || 1);
-        setMembersLimit(res.members_limit || 1);
-        setCanManage(Boolean(res.can_manage));
+        setMembersCount(count);
+        const parsedLimit =
+          res.members_limit != null && res.members_limit > 0
+            ? res.members_limit
+            : null;
+        setMembersLimit(parsedLimit);
+
+        let canManageFlag = res.can_manage;
+        if (canManageFlag === undefined) {
+          try {
+            const authUser = (await supabase.auth.getUser())?.data?.user;
+            if (authUser) {
+              const myAcc = res.accounts?.find(
+                (a) => a.user_id === authUser.id,
+              );
+              canManageFlag = myAcc ? myAcc.is_owner : true;
+            } else {
+              canManageFlag = true;
+            }
+          } catch {
+            canManageFlag = true;
+          }
+        }
+        setCanManage(Boolean(canManageFlag));
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -178,7 +202,8 @@ export function ShareWorkspaceDialog({
     }
   };
 
-  const limitReached = membersCount >= membersLimit;
+  const limitReached =
+    membersLimit !== null && membersLimit > 0 && membersCount >= membersLimit;
 
   return (
     <Dialog

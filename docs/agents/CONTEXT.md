@@ -54,6 +54,7 @@ Scheduling: pg_cron `sentiment-tick` hourly enqueues due work; the worker polls 
 | `npm run worker:test` / `npm run worker:lint` | worker tests / Ruff |
 | `npm run check` | everything except e2e (~3–5 min). Run once before asking for review |
 | `npm run test:e2e` | Playwright (~3 min). Starts its own dev server; refuses one already running |
+| `git config core.hooksPath .githooks` | one-time: enable the pre-commit hook (prettier/eslint/ruff on staged files; bypass with `--no-verify`) |
 
 Traps:
 - `npm run dev -- --port X` is silently ignored. Playwright uses `E2E_PORT`.

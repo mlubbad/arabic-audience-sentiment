@@ -118,4 +118,60 @@ describe("ImpersonationProvider and useImpersonation", () => {
     expect(mockInvalidateQueries).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
   });
+
+  it("fails closed on startImpersonation RPC error without updating session or navigating", async () => {
+    mockRpc.mockResolvedValueOnce({
+      error: { code: "P0001", message: "Audit log failed" },
+    });
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+
+    await act(async () => {
+      await result.current.startImpersonation({
+        id: "target-456",
+        email: "target@example.com",
+      });
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith("admin_start_impersonation", {
+      p_target_user_id: "target-456",
+    });
+    expect(
+      sessionStorage.getItem("sentiment_impersonation_session"),
+    ).toBeNull();
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatedUser).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on stopImpersonation RPC error without clearing session or navigating", async () => {
+    sessionStorage.setItem(
+      "sentiment_impersonation_session",
+      JSON.stringify({ id: "target-456", email: "target@example.com" }),
+    );
+
+    mockRpc.mockResolvedValueOnce({
+      error: { code: "P0001", message: "Audit stop failed" },
+    });
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+    expect(result.current.isImpersonating).toBe(true);
+
+    await act(async () => {
+      await result.current.stopImpersonation();
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith("admin_stop_impersonation", {
+      p_target_user_id: "target-456",
+    });
+    expect(
+      sessionStorage.getItem("sentiment_impersonation_session"),
+    ).not.toBeNull();
+    expect(result.current.isImpersonating).toBe(true);
+    expect(result.current.impersonatedUser).toEqual({
+      id: "target-456",
+      email: "target@example.com",
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });

@@ -325,4 +325,45 @@ describe("ShareWorkspaceDialog", () => {
       expect(screen.queryByText("member@example.com")).not.toBeInTheDocument();
     });
   });
+
+  it("handles unlimited members_limit without marking limitReached", async () => {
+    vi.mocked(supabase!.rpc).mockReturnValueOnce(
+      mockRpcData({
+        accounts: [
+          {
+            user_id: "user-owner",
+            email: "owner@example.com",
+            role: "workspace_owner",
+            is_owner: true,
+            joined_at: new Date().toISOString(),
+          },
+        ],
+        total_members: 1,
+        members_limit: null,
+        can_manage: true,
+      }),
+    );
+
+    render(
+      <ShareWorkspaceDialog
+        open={true}
+        workspaceId={W}
+        workspaceName="مطبخ ريم"
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(ar.shareWorkspaceAccountsCount(1, null)),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("share-email-input")).not.toBeDisabled();
+    });
+
+    await userEvent.type(
+      screen.getByTestId("share-email-input"),
+      "unlimited@example.com",
+    );
+    expect(screen.getByTestId("share-submit-btn")).not.toBeDisabled();
+  });
 });

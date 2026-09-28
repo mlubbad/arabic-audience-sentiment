@@ -1358,8 +1358,12 @@ export const ar = {
   noLabel: "بلا تصنيف",
   cursorReset: "تغيّرت النتائج فأُعيد العرض من الصفحة الأولى.",
   exportCsv: "تصدير CSV",
-  exportNote: (total: number) =>
-    `يصدّر كل التعليقات المطابقة للفلاتر الحالية (${total}) وليس الصفحة المعروضة فقط. تُعطَّل صيغ الجداول في الملف دون تغيير النص المخزن.`,
+  exportNote: (total: number, cap = 10000) =>
+    total > cap
+      ? `يصدّر أول ${cap.toLocaleString("en-US")} تعليق من إجمالي ${total.toLocaleString("en-US")} مطابق للفلاتر لحماية أداء المتصفح. تُعطَّل صيغ الجداول في الملف دون تغيير النص المخزن.`
+      : `يصدّر كل التعليقات المطابقة للفلاتر الحالية (${total}) وليس الصفحة المعروضة فقط. تُعطَّل صيغ الجداول في الملف دون تغيير النص المخزن.`,
+  exportTruncatedNotice: (cap: number, total: number) =>
+    `تم تصدير أول ${cap.toLocaleString("en-US")} تعليق فقط (من أصل ${total.toLocaleString("en-US")}) لضمان كفاءة المتصفح.`,
   exportFailed: "تعذر إنشاء ملف التصدير. حاول مرة أخرى.",
   commentsCaption: "التعليقات ضمن الفلاتر",
   colAuthor: "المؤلف",

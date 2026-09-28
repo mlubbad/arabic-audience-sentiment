@@ -1363,8 +1363,12 @@ export const en: Strings = {
   cursorReset:
     "The results changed, so the view restarted from the first page.",
   exportCsv: "Export CSV",
-  exportNote: (total: number) =>
-    `Exports every comment matching the current filters (${total}), not only the page shown. Spreadsheet formulas are neutralised in the file without changing the stored text.`,
+  exportNote: (total: number, cap = 10000) =>
+    total > cap
+      ? `Exports the first ${cap.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} comments matching the current filters to protect browser performance. Spreadsheet formulas are neutralised in the file without changing the stored text.`
+      : `Exports every comment matching the current filters (${total}), not only the page shown. Spreadsheet formulas are neutralised in the file without changing the stored text.`,
+  exportTruncatedNotice: (cap: number, total: number) =>
+    `Exported first ${cap.toLocaleString("en-US")} comments only (out of ${total.toLocaleString("en-US")}) for browser stability.`,
   exportFailed: "The export file could not be created. Try again.",
   commentsCaption: "Comments within the filters",
   colAuthor: "Author",

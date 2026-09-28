@@ -4,7 +4,6 @@ Claims collect jobs, collects discussion replies via Telethon MTProto,
 runs CAMeLBERT sentiment analysis on each comment, and commits batches to Supabase.
 """
 import os
-import re
 import sys
 import time
 from pathlib import Path
@@ -13,10 +12,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "workers" / "python" / "src"))
 
 import httpx
-from server.gateway import ControlPlane
-from server.loop import build_collector
-from server.runner import _backfill
-from sentiment.transformer import load_pinned
 
 
 def load_env():
@@ -39,7 +34,19 @@ def main():
     target_clean = target_handle.lstrip("@").lower()
 
     supabase_url = os.environ.get("SUPABASE_URL", "")
-    worker_cred = os.environ.get("WORKER_CREDENTIAL", "fc78e075d00cd78ce0db0d3f61cceadeac5d91c3bb939a37d21a977360986fcd")
+    worker_cred = os.environ.get("WORKER_CREDENTIAL")
+    if not worker_cred:
+        print(
+            "WORKER_CREDENTIAL is required in the environment or .env.local.",
+            file=sys.stderr,
+        )
+        return 2
+
+    from server.gateway import ControlPlane
+    from server.loop import build_collector
+    from server.runner import _backfill
+    from sentiment.transformer import load_pinned
+
     base_url = f"{supabase_url.rstrip('/')}/functions/v1"
 
     print("=" * 60)
@@ -84,6 +91,8 @@ def main():
                 print(f"\nTarget channel @{target_clean} collection complete!")
                 break
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
