@@ -27,4 +27,19 @@ test("allows documented URL credential placeholders", () => {
     ),
     false,
   );
+  // The literal example used in docs/agents/work-orders/WO-1.md.
+  assert.equal(
+    containsEmbeddedUrlCredentials("scheme://user:password@host"),
+    false,
+  );
+});
+
+test("still flags a real-looking embedded credential", () => {
+  // Built from parts so the literal credential never appears in this file.
+  const realCredentialUrl = [
+    "wss://acme-customer-42",
+    "s3cr3tKey@brd.example.test:9515",
+  ].join(":");
+
+  assert.equal(containsEmbeddedUrlCredentials(realCredentialUrl), true);
 });

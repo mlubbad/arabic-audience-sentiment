@@ -16,10 +16,32 @@ const forbidden = [
 const embeddedUrlCredentials =
   /[a-z][a-z0-9+.-]*:\/\/([^/\s:@]+):([^@/\s]+)@[^/\s]+/gi;
 
+// Obvious non-secret tokens used in documentation and examples. A URL
+// credential counts as a placeholder when both parts are angle-bracketed
+// (<user>) or dictionary placeholders, so documented examples like
+// scheme://user:password@host never trip the scan while a real
+// user:secret@host still does.
+const PLACEHOLDER_WORDS = new Set([
+  "user",
+  "username",
+  "pass",
+  "passwd",
+  "password",
+  "example",
+  "host",
+  "hostname",
+  "changeme",
+  "placeholder",
+  "dummy",
+  "xxx",
+]);
+
+function isPlaceholderPart(value) {
+  return /^<[^>]+>$/.test(value) || PLACEHOLDER_WORDS.has(value.toLowerCase());
+}
+
 function isPlaceholder(username, password) {
-  if (username === "user" && password === "pass") return true;
-  if (username === "USER" && password === "PASSWORD") return true;
-  return /^<[^>]+>$/.test(username) || /^<[^>]+>$/.test(password);
+  return isPlaceholderPart(username) && isPlaceholderPart(password);
 }
 
 export function containsEmbeddedUrlCredentials(content) {
