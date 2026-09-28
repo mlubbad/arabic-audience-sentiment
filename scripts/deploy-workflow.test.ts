@@ -19,7 +19,14 @@ describe("deployment verification gate", () => {
 
   test("requires success and deploys the exact commit that passed CI", () => {
     expect(workflow).toContain(
-      "if: github.event.workflow_run.conclusion == 'success'",
+      "github.event.workflow_run.conclusion == 'success'",
+    );
+    expect(workflow).toContain("github.event.workflow_run.event == 'push'");
+    expect(workflow).toContain(
+      "github.event.workflow_run.head_branch == 'main'",
+    );
+    expect(workflow).toContain(
+      "github.event.workflow_run.head_repository.full_name == github.repository",
     );
     expect(workflow).toContain(
       "group: deploy-preview-${{ github.event.workflow_run.head_sha }}",
