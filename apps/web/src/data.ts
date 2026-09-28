@@ -445,18 +445,27 @@ export function deriveSnapshot(
       active_topic_key: source.active_topic_key,
       cursor_reset,
       kpis: {
-        total_views: null,
-        total_likes: null,
+        total_views: base.kpis?.total_views ?? null,
+        total_likes: base.kpis?.total_likes ?? null,
         total_comments: base.total,
-        engagement_rate: null,
+        engagement_rate:
+          base.kpis?.engagement_rate ??
+          (base.kpis?.total_views && base.kpis.total_views > 0
+            ? Math.round(
+                ((base.total + (base.kpis.total_likes ?? 0)) /
+                  base.kpis.total_views) *
+                  1000,
+              ) / 10
+            : null),
         net_sentiment:
-          base.sentiments.positive + base.sentiments.negative > 0
+          base.kpis?.net_sentiment ??
+          (base.sentiments.positive + base.sentiments.negative > 0
             ? Math.round(
                 ((base.sentiments.positive - base.sentiments.negative) /
                   (base.sentiments.positive + base.sentiments.negative)) *
                   1000,
               ) / 10
-            : null,
+            : null),
       } as {
         total_views?: number | null;
         total_likes?: number | null;
@@ -587,12 +596,16 @@ export async function submitTopicReview(mode: DataMode, raw: TopicReviewInput) {
   sessionTopicReviews.push({ input, at: new Date().toISOString() });
 }
 
+export const EXPORT_ROW_CAP = 10_000;
+
 /**
  * Builds the export from the filters currently on screen, through the same
  * shared row selection the dashboard uses. In fixture mode the file is produced
  * in the browser; a real export is a background job writing to the private
  * bucket, which is why the name already carries the workspace prefix the
  * storage policy checks.
+ *
+ * For browser stability and memory protection, rows are capped at EXPORT_ROW_CAP.
  */
 export async function buildExport(mode: DataMode, filters: Filters) {
   const source = await loadSource(mode, filters.workspace_id);
@@ -602,12 +615,15 @@ export async function buildExport(mode: DataMode, filters: Filters) {
     source.active_analysis_key,
     source.active_topic_key,
   );
+  const cappedRows = rows.slice(0, EXPORT_ROW_CAP);
   return {
-    rows: rows.length,
+    rows: cappedRows.length,
+    totalRows: rows.length,
+    truncated: rows.length > EXPORT_ROW_CAP,
     filename: exportObjectPath(filters.workspace_id, new Date())
       .split("/")
       .pop()!,
-    csv: toCsv(rows),
+    csv: toCsv(cappedRows),
   };
 }
 

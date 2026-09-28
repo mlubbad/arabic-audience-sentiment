@@ -68,12 +68,9 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
           });
           if (error) {
             console.error("Failed to audit impersonation start:", error);
-            // Proceed only if not forbidden
-            if (error.code === "42501" || error.message.includes("forbidden")) {
-              toast({ title: S.adminImpersonateError });
-              setLoading(false);
-              return;
-            }
+            toast({ title: S.adminImpersonateError });
+            setLoading(false);
+            return;
           }
         }
 
@@ -137,22 +134,28 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("Failed to audit impersonation stop:", error);
+          toast({ title: S.adminImpersonateError });
+          setLoading(false);
+          return;
         }
       }
     } catch (e) {
       console.error("Error during stopImpersonation audit:", e);
-    } finally {
-      try {
-        sessionStorage.removeItem(STORAGE_KEY);
-      } catch {
-        // ignore
-      }
-      setImpersonatedUser(null);
-      await queryClient.invalidateQueries();
-      toast({ title: S.adminImpersonateStopping });
-      navigate("/admin/users");
+      toast({ title: S.adminImpersonateError });
       setLoading(false);
+      return;
     }
+
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    setImpersonatedUser(null);
+    await queryClient.invalidateQueries();
+    toast({ title: S.adminImpersonateStopping });
+    navigate("/admin/users");
+    setLoading(false);
   }, [impersonatedUser, navigate, queryClient, S]);
 
   return (

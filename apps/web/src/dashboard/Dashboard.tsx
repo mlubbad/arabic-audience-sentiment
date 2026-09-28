@@ -29,6 +29,7 @@ import {
 } from "@sentiment/contracts";
 import {
   buildExport,
+  EXPORT_ROW_CAP,
   type DataMode,
   deriveSnapshot,
   fixtureWorkspace,
@@ -56,6 +57,7 @@ import { describeSource } from "../dataSource";
 import { useChannelStatus } from "../channelStatus";
 import { latestJobFromSync, setupProgress } from "../setup";
 import { SetupPath } from "../SetupPath";
+import { toast } from "../ui/Toast";
 import { n } from "./format";
 import { FilterBar } from "./FilterBar";
 import { ActiveFilters } from "./ActiveFilters";
@@ -581,7 +583,7 @@ function DashboardBody({
   });
   const exporting = useMutation({
     mutationFn: () => buildExport(mode, page),
-    onSuccess: ({ csv, filename }) => {
+    onSuccess: ({ csv, filename, truncated, totalRows }) => {
       const url = URL.createObjectURL(
         new Blob([csv], { type: "text/csv;charset=utf-8" }),
       );
@@ -590,6 +592,11 @@ function DashboardBody({
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+      if (truncated) {
+        toast({
+          title: S.exportTruncatedNotice(EXPORT_ROW_CAP, totalRows),
+        });
+      }
     },
   });
   function startReview(c: LabelledComment, trigger: HTMLButtonElement) {

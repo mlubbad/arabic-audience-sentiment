@@ -221,24 +221,36 @@ export function Summary({
             <span>{S.actionableStepsTitle}</span>
           </div>
           <ul className="db-actionable-list">
-            {(negPct >= 15 || s.most_engaged_negative?.length > 0) && (
+            {(negPct >= 15 || (s.most_engaged_negative && s.most_engaged_negative.length > 0)) && (
               <li className="db-actionable-item">
-                <span className="db-actionable-num">١</span>
+                <span className="db-actionable-num">{n(1)}</span>
                 <span>{S.actionStep1Critical}</span>
               </li>
             )}
             {posPct >= 30 && (
               <li className="db-actionable-item">
-                <span className="db-actionable-num">٢</span>
+                <span className="db-actionable-num">
+                  {n(negPct >= 15 || (s.most_engaged_negative && s.most_engaged_negative.length > 0) ? 2 : 1)}
+                </span>
                 <span>{S.actionStep2Positive}</span>
               </li>
             )}
             <li className="db-actionable-item">
-              <span className="db-actionable-num">٣</span>
+              <span className="db-actionable-num">
+                {n(
+                  (negPct >= 15 || (s.most_engaged_negative && s.most_engaged_negative.length > 0) ? 1 : 0) +
+                  (posPct >= 30 ? 1 : 0) + 1
+                )}
+              </span>
               <span>{S.actionStep3Timing}</span>
             </li>
             <li className="db-actionable-item">
-              <span className="db-actionable-num">٤</span>
+              <span className="db-actionable-num">
+                {n(
+                  (negPct >= 15 || (s.most_engaged_negative && s.most_engaged_negative.length > 0) ? 1 : 0) +
+                  (posPct >= 30 ? 1 : 0) + 2
+                )}
+              </span>
               <span>{S.actionStep4Engagement}</span>
             </li>
           </ul>
