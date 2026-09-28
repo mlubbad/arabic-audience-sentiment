@@ -132,12 +132,19 @@ class YouTubeAPI:
                 f"source_access_denied:{reason}" if reason else "source_access_denied",
                 "blocked",
             )
-        if response.status_code == 404 and allow_404:
-            return None
+        if response.status_code == 404:
+            if allow_404:
+                return None
+            reason = self._reason(response)
+            raise CollectionError(
+                "video_not_found" if (reason == "videoNotFound" or not reason) else f"not_found:{reason}",
+                "unavailable",
+            )
         if response.status_code >= 500:
             raise CollectionError("source_unavailable", retryable=True)
         if response.status_code != 200:
             raise CollectionError("source_http_error")
+
         try:
             data = response.json()
             if not isinstance(data, dict) or not isinstance(data.get("items"), list):
@@ -190,9 +197,15 @@ class YouTubeAPI:
             return False
 
     def batches(
-        self, video_id: str, checkpoint: str | None, since: str | None = None
+        self,
+        video_id: str,
+        checkpoint: str | None = None,
+        since: str | None = None,
+        max_items: int | None = None,
+        **kwargs,
     ) -> Iterator[Batch]:
         if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+
             raise ValueError("invalid_video_id")
         try:
             state = json.loads(checkpoint) if checkpoint else {

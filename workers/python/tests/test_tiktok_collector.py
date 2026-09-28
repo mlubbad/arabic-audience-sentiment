@@ -354,3 +354,78 @@ def test_tiktok_collector_batches_falls_back_to_brightdata_on_apify_empty_or_quo
     assert batches2[0].comments[0].source == "brightdata"
 
 
+def test_tiktok_collector_batches_raises_when_cascade_fails_even_if_one_was_empty():
+    """WO-3 Invariant 2: Failure never becomes success.
+    If Apify returns [] but Bright Data fails with CollectionError, batches() MUST NOT
+    silently yield Batch([], None, 'exhausted'). It must raise the CollectionError.
+    """
+    from collectors.scrapers.apify import ApifyClient
+    from collectors.scrapers.brightdata import BrightDataClient
+
+    def apify_empty(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    def bd_error(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(402, json={"error": "BrightData account quota depleted"})
+
+    apify_c = ApifyClient(token="tok", client=httpx.Client(transport=httpx.MockTransport(apify_empty)))
+    bd_c = BrightDataClient(api_key="key", client=httpx.Client(transport=httpx.MockTransport(bd_error)))
+
+    col = TikTokCollector(channel_id="@aljazeera", apify_client=apify_c, brightdata_client=bd_c)
+    with pytest.raises(CollectionError) as exc_info:
+        list(col.batches("7112233445566778899"))
+    assert exc_info.value.code == "brightdata_error_402"
+
+
+
+def test_tiktok_collector_batches_falls_back_to_display_api_when_scrapers_empty():
+    """WO-3 Invariant 2: Scrapers returning [] must NOT short-circuit and bypass official Display API mode."""
+    from collectors.scrapers.apify import ApifyClient
+    from collectors.scrapers.brightdata import BrightDataClient
+
+    def apify_empty(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    def bd_empty(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    def tiktok_api(request: httpx.Request) -> httpx.Response:
+        if "comment/list" in str(request.url):
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "comments": [
+                            {
+                                "id": "tt_api_comment_1",
+                                "text": "تعليق رسمي عبر واجهة تيك توك",
+                                "create_time": 1758410200,
+                                "like_count": 15,
+                            }
+                        ],
+                        "has_more": False,
+                    },
+                    "error": {"code": "ok", "message": ""},
+                },
+            )
+        return httpx.Response(404)
+
+    apify_c = ApifyClient(token="tok", client=httpx.Client(transport=httpx.MockTransport(apify_empty)))
+    bd_c = BrightDataClient(api_key="key", client=httpx.Client(transport=httpx.MockTransport(bd_empty)))
+    tt_client = httpx.Client(transport=httpx.MockTransport(tiktok_api))
+
+    col = TikTokCollector(
+        channel_id="@aljazeera",
+        access_token="mock_access_token",
+        client=tt_client,
+        apify_client=apify_c,
+        brightdata_client=bd_c,
+    )
+    batches = list(col.batches("7112233445566778899"))
+    assert len(batches) == 1
+    assert len(batches[0].comments) == 1
+    assert batches[0].comments[0].id == "tt_api_comment_1"
+    assert batches[0].comments[0].text == "تعليق رسمي عبر واجهة تيك توك"
+
+
+

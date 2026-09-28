@@ -259,10 +259,18 @@ class TelegramCollector:
         # 3. No client or credentials configured
         raise CollectionError("telegram_credentials_missing", "blocked")
 
-    def batches(self, video_id: str, checkpoint: str | None) -> Iterator[Batch]:
+    def batches(
+        self,
+        video_id: str,
+        checkpoint: str | None = None,
+        since: str | None = None,
+        max_items: int | None = None,
+        **kwargs,
+    ) -> Iterator[Batch]:
         """Fetch replies / discussion comments for a specific channel post."""
         if not video_id or not str(video_id).isalnum():
             raise ValueError("invalid_video_id")
+
 
         # 1. Fixture mode
         if self.fixture_data and "comments" in self.fixture_data:
@@ -365,15 +373,16 @@ class TelegramCollector:
                 outcome = "partial" if next_cp else "exhausted"
                 yield Batch(comments=raw_comments, checkpoint=next_cp, outcome=outcome)
                 return
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — translate Telethon MTProto errors to protocol outcomes
                 self.close()
-                err_name = type(exc).__name__
+                err_name = type(exc).__name__.lower()
                 err_msg = str(exc).lower()
-                if "msgidinvalid" in err_name.lower() or "invalid" in err_msg or "not found" in err_msg:
-                    yield Batch(comments=[], checkpoint=None, outcome="exhausted")
+                if "msgidinvalid" in err_name or "not found" in err_msg or "message was deleted" in err_msg:
+                    yield Batch(comments=[], checkpoint=None, outcome="unavailable")
                     return
                 if not self.client:
                     raise CollectionError(f"telegram_mtproto_error: {exc}", "failed") from exc
+
 
         # 2. HTTP client mode
         if self.client:
@@ -469,7 +478,24 @@ class TelegramCollector:
                 resp.text,
                 re.DOTALL,
             )
+
+            # Check for bot challenges or Cloudflare protection
+            lower_text = resp.text.lower()
+            if "cf-browser-verification" in lower_text or "just a moment..." in lower_text or "challenge-running" in lower_text:
+                raise CollectionError("telegram_bot_challenge_blocked", "blocked")
+
+            # Check if this is a recognizable Telegram embed page
+            is_tg_page = (
+                "tgme_widget_message" in resp.text
+                or "tgme_page" in resp.text
+                or "tme_messages_more" in resp.text
+                or "tgme_channel_info" in resp.text
+            )
+            if not is_tg_page and not comment_wraps:
+                raise CollectionError("unrecognized_response_format", "failed")
+
             raw_comments = []
+
             for b in comment_wraps:
                 author_m = re.search(r'class="tgme_widget_message_author_name"[^>]*>(.*?)</span>', b)
                 text_m = re.search(r'class="tgme_widget_message_text\b[^"]*"[^>]*>(.*?)</div>', b, re.DOTALL)

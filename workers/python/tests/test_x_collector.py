@@ -391,4 +391,78 @@ def test_x_collector_batches_falls_back_to_brightdata_on_apify_empty_or_quota():
     assert batches2[0].comments[0].source == "brightdata"
 
 
+def test_x_collector_batches_raises_when_cascade_fails_even_if_one_was_empty():
+    """WO-3 Invariant 2: Failure never becomes success.
+    If Apify returns [] but Bright Data fails with CollectionError, batches() MUST NOT
+    silently yield Batch([], None, 'exhausted'). It must raise the CollectionError.
+    """
+    from collectors.scrapers.apify import ApifyClient
+    from collectors.scrapers.brightdata import BrightDataClient
+
+    def apify_empty(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    def bd_error(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(402, json={"error": "BrightData account quota depleted"})
+
+    apify_c = ApifyClient(token="tok", client=httpx.Client(transport=httpx.MockTransport(apify_empty)))
+    bd_c = BrightDataClient(api_key="key", client=httpx.Client(transport=httpx.MockTransport(bd_error)))
+
+    col = XCollector(channel_id="@skynewsarabia", apify_client=apify_c, brightdata_client=bd_c)
+    with pytest.raises(CollectionError) as exc_info:
+        list(col.batches("1922334455667788990"))
+    assert exc_info.value.code == "brightdata_error_402"
+
+
+
+def test_x_collector_batches_falls_back_to_bearer_token_when_scrapers_empty():
+    """WO-3 Invariant 2: Scrapers returning [] must NOT short-circuit and bypass official Bearer token mode."""
+    from collectors.scrapers.apify import ApifyClient
+    from collectors.scrapers.brightdata import BrightDataClient
+
+    def apify_empty(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    def bd_empty(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    def twitter_api_v2(request: httpx.Request) -> httpx.Response:
+        if "tweets/search/recent" in str(request.url):
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": "tweet_api_reply_1",
+                            "text": "رد رسمي عبر واجهة برمجة تويتر",
+                            "conversation_id": "1922334455667788990",
+                            "author_id": "user_123",
+                            "created_at": "2026-09-21T07:00:00Z",
+                            "public_metrics": {"like_count": 8},
+                        }
+                    ],
+                    "meta": {"result_count": 1},
+                },
+            )
+        return httpx.Response(404)
+
+    apify_c = ApifyClient(token="tok", client=httpx.Client(transport=httpx.MockTransport(apify_empty)))
+    bd_c = BrightDataClient(api_key="key", client=httpx.Client(transport=httpx.MockTransport(bd_empty)))
+    tw_client = httpx.Client(transport=httpx.MockTransport(twitter_api_v2))
+
+    col = XCollector(
+        channel_id="@skynewsarabia",
+        bearer_token="mock_bearer_token",
+        client=tw_client,
+        apify_client=apify_c,
+        brightdata_client=bd_c,
+    )
+    batches = list(col.batches("1922334455667788990"))
+    assert len(batches) == 1
+    assert len(batches[0].comments) == 1
+    assert batches[0].comments[0].id == "tweet_api_reply_1"
+    assert batches[0].comments[0].text == "رد رسمي عبر واجهة برمجة تويتر"
+
+
+
 
