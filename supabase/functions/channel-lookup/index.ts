@@ -202,12 +202,24 @@ Deno.serve(async (request) => {
   const db = createClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
     global: { headers: { authorization: auth } },
   });
+  const {
+    data: { user },
+    error: userError,
+  } = await db.auth.getUser();
+  if (userError || !user) return json(403, { code: "forbidden" });
   const { data: memberships, error: memberError } = await db
     .from("memberships")
     .select("role")
-    .eq("workspace_id", body.workspace_id);
+    .eq("workspace_id", body.workspace_id)
+    .eq("user_id", user.id);
   if (memberError) return json(403, { code: "forbidden" });
-  if (!memberships?.length) return json(403, { code: "forbidden" });
+  if (
+    !memberships?.some(
+      (membership) =>
+        membership.role === "workspace_owner" || membership.role === "analyst",
+    )
+  )
+    return json(403, { code: "forbidden" });
 
   if (platform === "telegram") {
     let clean = body.query.trim();
@@ -333,7 +345,11 @@ Deno.serve(async (request) => {
   const key = env("YOUTUBE_API_KEY");
   const credential: { key?: string; token?: string } = key
     ? { key }
-    : { token: await readerToken(db) };
+    : {
+        token: await readerToken(
+          createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY")),
+        ),
+      };
   if (!credential.key && !credential.token)
     return json(500, { code: "lookup_not_configured" });
 

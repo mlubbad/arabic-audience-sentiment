@@ -57,6 +57,19 @@ describe("register_public_channel", () => {
       "insert into clients(id,workspace_id,name) values ($1,$1,'A'),($2,$2,'B')",
       [A, B],
     );
+    await db.query(
+      `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
+       values ($1,'owner','active',now(),now()+interval '30 days'),
+              ($2,'free','active',now(),now()+interval '30 days')`,
+      [A, B],
+    );
+  });
+
+  it("refuses a direct registration when the workspace plan disallows public channels", async () => {
+    await user(ownerB);
+    await expect(
+      db.query("select register_public_channel($1,$1,$2,null,null)", [B, ID]),
+    ).rejects.toThrow(/public_channels_not_allowed_on_plan/);
   });
   afterAll(async () => {
     await db?.close();
@@ -182,8 +195,7 @@ describe("register_public_channel", () => {
     // worker's side of that promise is the claim's external_channel_id.
     await admin();
     await db.query(
-      `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
-       values ($1,'pilot','active',now()-interval '1 day',now()+interval '29 days')`,
+      "update subscriptions set plan_key='pilot' where workspace_id=$1",
       [A],
     );
     await user(ownerA);
@@ -198,6 +210,11 @@ describe("register_public_channel", () => {
     );
     expect(job.rows[0].type).toBe("discover");
     expect(job.rows[0].status).toBe("queued");
+    await admin();
+    await db.query(
+      "update subscriptions set plan_key='owner' where workspace_id=$1",
+      [A],
+    );
   });
 
   it("owner can remove a channel, which cleans up jobs and deletes the channel row", async () => {
