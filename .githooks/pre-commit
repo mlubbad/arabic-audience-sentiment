@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Fast pre-commit gate: format + lint the STAGED files only. Never runs the test
+# suite. Enable once per clone with:  git config core.hooksPath .githooks
+#
+# It mirrors the CI checks (prettier, eslint, ruff) so obvious problems are
+# caught before they cost a CI cycle. It is intentionally best-effort: if a
+# tool is not installed yet (deps not set up), it skips that tool with a note
+# rather than blocking the commit.
+set -u
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root" || exit 1
+
+# Staged, still-present files (Added/Copied/Modified), NUL-delimited for safety.
+mapfile -d '' -t staged < <(git diff --cached --name-only --diff-filter=ACM -z)
+[ "${#staged[@]}" -eq 0 ] && exit 0
+
+prettier_targets=()
+eslint_targets=()
+ruff_targets=()
+for f in "${staged[@]}"; do
+  case "$f" in
+    *.ts|*.tsx|*.js|*.mjs|*.cts|*.mts)
+      prettier_targets+=("$f"); eslint_targets+=("$f") ;;
+    *.css|*.json)
+      prettier_targets+=("$f") ;;
+    *.py)
+      ruff_targets+=("$f") ;;
+  esac
+done
+
+status=0
+
+run_or_skip() {
+  # $1 = human label, $2 = command probe, rest = command to run
+  local label="$1"; shift
+  local probe="$1"; shift
+  if ! command -v "$probe" >/dev/null 2>&1; then
+    echo "pre-commit: $label not available ($probe missing) — skipped. Run 'npm run setup'." >&2
+    return 0
+  fi
+  "$@"
+}
+
+if [ "${#prettier_targets[@]}" -gt 0 ]; then
+  run_or_skip "prettier" npx npx --no-install prettier --check "${prettier_targets[@]}" || status=1
+fi
+if [ "${#eslint_targets[@]}" -gt 0 ]; then
+  run_or_skip "eslint" npx npx --no-install eslint "${eslint_targets[@]}" || status=1
+fi
+if [ "${#ruff_targets[@]}" -gt 0 ]; then
+  # --project keeps the cwd at the repo root, so repo-relative paths resolve.
+  run_or_skip "ruff" uv uv run --project workers/python --frozen ruff check "${ruff_targets[@]}" || status=1
+fi
+
+if [ "$status" -ne 0 ]; then
+  echo "" >&2
+  echo "pre-commit: format/lint failed on staged files. Fix them (e.g. 'npm run format'), or commit with --no-verify to bypass." >&2
+fi
+exit "$status"
