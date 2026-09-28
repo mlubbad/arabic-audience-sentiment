@@ -303,13 +303,13 @@ describe("the pre-check gates agree with the meter", () => {
     expect(await analysisRemaining(W)).toBe(10000);
   });
 
-  it("answer the largest int for a plan without a ceiling", async () => {
+  it("answer null for a plan without a ceiling", async () => {
     await db.query(
       "update subscriptions set plan_key='owner' where workspace_id=$1",
       [W],
     );
-    expect(await analysisRemaining(W)).toBe(2147483647);
-    expect(await topicRemaining(W)).toBe(2147483647);
+    expect(await analysisRemaining(W)).toBeNull();
+    expect(await topicRemaining(W)).toBeNull();
     await db.query(
       "update subscriptions set plan_key='creator' where workspace_id=$1",
       [W],
