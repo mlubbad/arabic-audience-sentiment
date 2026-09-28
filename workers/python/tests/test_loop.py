@@ -164,3 +164,22 @@ def test_a_tick_refusal_does_not_take_the_worker_down():
     why = serve(controls, None, run=lambda *a, **k: False, max_idle=2, sleep=lambda s: None)
     assert why == "idle"
     assert controls[0].ticks >= 1
+
+
+def test_cli_typesafe_model_requires_api_key(monkeypatch):
+    import pytest
+    from server.loop import main
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "loop",
+            "--base", "http://localhost:54321",
+            "--credential", "test-token",
+            "--model", "typesafe",
+        ],
+    )
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    with pytest.raises(SystemExit, match="--model typesafe needs TYPESAFE_API_KEY"):
+        main()
+
