@@ -1,6 +1,5 @@
-# Continuous Deployment pipeline for preview host and remote database migrations.
+# Deploy only an exact main commit whose credential-free and security workflows passed.
 # Every third-party action is pinned to a full commit SHA with the version in a comment.
-# Least-privilege permissions, timeout-minutes, concurrency, and persist-credentials: false.
 name: Deploy Preview
 
 on:
@@ -8,29 +7,106 @@ on:
     workflows: ["Credential-free checks"]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
-  group: deploy-preview-${{ github.event.workflow_run.head_sha }}
-  cancel-in-progress: true
+  group: deploy-preview-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy preview & migrations
+  required-checks:
+    name: Require verified main commit
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - name: Checkout repository
+      - name: Require successful CI and Security jobs for this commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          require_workflow_jobs() {
+            local workflow_file=$1
+            shift
+            local response run_id status conclusion jobs job job_conclusion
+
+            for attempt in {1..90}; do
+              response=$(gh api -X GET \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_file/runs" \
+                -f head_sha="$TARGET_SHA" -f event=push -f branch=main -f per_page=10)
+              run_id=$(jq -r --arg sha "$TARGET_SHA" \
+                '[.workflow_runs[] | select(.head_sha == $sha and .event == "push")] | sort_by(.run_number) | last | .id // empty' \
+                <<<"$response")
+
+              if [ -z "$run_id" ]; then
+                sleep 10
+                continue
+              fi
+
+              status=$(jq -r --arg sha "$TARGET_SHA" \
+                '[.workflow_runs[] | select(.head_sha == $sha and .event == "push")] | sort_by(.run_number) | last | .status' \
+                <<<"$response")
+              conclusion=$(jq -r --arg sha "$TARGET_SHA" \
+                '[.workflow_runs[] | select(.head_sha == $sha and .event == "push")] | sort_by(.run_number) | last | .conclusion' \
+                <<<"$response")
+
+              if [ "$status" != completed ]; then
+                sleep 10
+                continue
+              fi
+              if [ "$conclusion" != success ]; then
+                echo "$workflow_file did not succeed for $TARGET_SHA: $conclusion" >&2
+                return 1
+              fi
+
+              jobs=$(gh api \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")
+              for job in "$@"; do
+                job_conclusion=$(jq -r --arg name "$job" \
+                  '[.jobs[] | select(.name == $name)] | if length == 1 then .[0].conclusion else "missing" end' \
+                  <<<"$jobs")
+                if [ "$job_conclusion" != success ]; then
+                  echo "$workflow_file job '$job' is not successful for $TARGET_SHA: $job_conclusion" >&2
+                  return 1
+                fi
+              done
+              return 0
+            done
+
+            echo "Timed out waiting for $workflow_file on $TARGET_SHA" >&2
+            return 1
+          }
+
+          require_workflow_jobs ci.yml verify
+          require_workflow_jobs security.yml \
+            "Secret scan" "Semgrep SAST" "Dependency audit"
+
+  deploy:
+    name: Deploy preview & migrations
+    needs: required-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout verified commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ env.TARGET_SHA }}
           persist-credentials: false
 
       - name: Setup Node.js
@@ -42,50 +118,43 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Require deployment credentials
+        shell: bash
+        env:
+          PREVIEW_FTP_HOST: ${{ secrets.PREVIEW_FTP_HOST }}
+          PREVIEW_FTP_USER: ${{ secrets.PREVIEW_FTP_USER }}
+          PREVIEW_FTP_PASSWORD: ${{ secrets.PREVIEW_FTP_PASSWORD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in PREVIEW_FTP_HOST PREVIEW_FTP_USER PREVIEW_FTP_PASSWORD \
+            SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            printf 'Missing required deployment secret: %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
       - name: Verify build safety and types
         run: npm run check:secrets && npm run typecheck
 
       - name: Build frontend distribution
         run: npm run build
 
-      - name: Check FTP deployment credentials
-        id: ftp-check
+      - name: Apply remote database migrations
         env:
-          FTP_HOST: ${{ secrets.PREVIEW_FTP_HOST }}
-          FTP_USER: ${{ secrets.PREVIEW_FTP_USER }}
-          FTP_PASS: ${{ secrets.PREVIEW_FTP_PASSWORD }}
-        run: |
-          if [ -n "$FTP_HOST" ] && [ -n "$FTP_USER" ] && [ -n "$FTP_PASS" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-            echo "FTP credentials present in GitHub Secrets."
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Deployment Notice::PREVIEW_FTP_* secrets are not set in GitHub Secrets. Skipping FTP upload."
-          fi
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: npm run db:migrate:remote
 
       - name: Deploy frontend to preview host via FTPS
-        if: steps.ftp-check.outputs.configured == 'true'
         env:
           PREVIEW_FTP_HOST: ${{ secrets.PREVIEW_FTP_HOST }}
           PREVIEW_FTP_USER: ${{ secrets.PREVIEW_FTP_USER }}
           PREVIEW_FTP_PASSWORD: ${{ secrets.PREVIEW_FTP_PASSWORD }}
         run: sh scripts/deploy-preview.sh
-
-      - name: Check Supabase database migration credentials
-        id: db-check
-        env:
-          SUPABASE_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          if [ -n "$SUPABASE_TOKEN" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-            echo "Supabase access token present in GitHub Secrets."
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Migration Notice::SUPABASE_ACCESS_TOKEN secret is not set in GitHub Secrets. Skipping remote migration."
-          fi
-
-      - name: Apply remote database migrations
-        if: steps.db-check.outputs.configured == 'true'
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: npm run db:migrate:remote

@@ -183,7 +183,7 @@ test("at 390px the six rows are six cards and nothing scrolls sideways", async (
 
 test("navigates to users tab and tests user impersonation with escape hatch", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.getByRole("link", { name: "المستخدمون" }).click();
   await expect(page).toHaveURL(/\/admin\/users\?demo=1/);
 
@@ -192,7 +192,7 @@ test("navigates to users tab and tests user impersonation with escape hatch", as
 
   // Screenshot 1: Admin Users page with "حسابك الحالي" and "الدخول كـ" buttons
   await page.screenshot({
-    path: "/Users/muhammed/.gemini/antigravity/brain/50d99fb8-09d4-4479-934d-83a629ce042c/ui-admin-users.png",
+    path: testInfo.outputPath("ui-admin-users.png"),
     fullPage: true,
   });
 
@@ -218,7 +218,7 @@ test("navigates to users tab and tests user impersonation with escape hatch", as
 
   // Screenshot 2: Active Impersonation state with banner and escape hatch
   await page.screenshot({
-    path: "/Users/muhammed/.gemini/antigravity/brain/50d99fb8-09d4-4479-934d-83a629ce042c/ui-impersonating-user.png",
+    path: testInfo.outputPath("ui-impersonating-user.png"),
     fullPage: true,
   });
 
