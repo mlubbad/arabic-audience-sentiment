@@ -3,7 +3,7 @@
 # Production Cloud Worker for Arabic Audience Sentiment Analysis
 # Non-root, self-contained container for continuous 24/7 collection & analysis.
 # ------------------------------------------------------------------------------
-FROM python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9
+FROM python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d
 
 WORKDIR /app
 
