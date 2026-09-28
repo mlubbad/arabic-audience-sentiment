@@ -180,21 +180,21 @@ describe("the platform reader", () => {
     expect(after.rows[0].status).toBe("retired");
   });
 
-  it("the lookup door reads signed-in, not anon", async () => {
+  it("the lookup door is service-role only", async () => {
     // The reader was retired by the revocation test; a fresh promotion first.
     await admin();
     await db.query(
       "update private.platform_reader set status='active', retired_at=null where id = (select id from private.platform_reader order by created_at desc limit 1)",
     );
     await user(ownerA);
+    await expect(
+      db.query("select connection_id from channel_lookup_reader_grant()"),
+    ).rejects.toThrow(/permission denied|not permitted/i);
+    await db.exec("reset role");
+    await db.exec("set role service_role");
     const { rows } = await db.query(
       "select connection_id from channel_lookup_reader_grant()",
     );
     expect(rows.length).toBe(1);
-    await db.exec("reset role");
-    await db.exec("set role anon");
-    await expect(
-      db.query("select * from channel_lookup_reader_grant()"),
-    ).rejects.toThrow(/permission denied|not permitted/i);
   });
 });

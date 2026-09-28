@@ -43,7 +43,7 @@ describe("interaction metrics and storytelling", () => {
       [W, owner, W2],
     );
     await db.query(
-      "insert into subscriptions(workspace_id,plan_key,status,period_start,period_end) values ($1,'creator','active',now(),now()+'30 days'::interval),($2,'creator','active',now(),now()+'30 days'::interval)",
+      "insert into subscriptions(workspace_id,plan_key,status,period_start,period_end) values ($1,'owner','active',now(),now()+'30 days'::interval),($2,'owner','active',now(),now()+'30 days'::interval)",
       [W, W2],
     );
 

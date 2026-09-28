@@ -47,6 +47,10 @@ describe("omnichannel multi-platform migration", () => {
       "insert into clients(id,workspace_id,name) values ($1,$1,'Client A')",
       [A],
     );
+    await db.query(
+      "insert into subscriptions(workspace_id,plan_key,status,period_start,period_end) values ($1,'owner','active',now(),now()+interval '30 days')",
+      [A],
+    );
   });
 
   afterAll(async () => {

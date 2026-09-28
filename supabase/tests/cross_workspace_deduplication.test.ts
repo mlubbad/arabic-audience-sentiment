@@ -51,8 +51,8 @@ describe("cross-workspace deduplication", () => {
     );
     await db.query(
       `insert into subscriptions(workspace_id,plan_key,status,period_start,period_end)
-       values ($1,'enterprise','active',now()-interval '1 day',now()+interval '29 days'),
-              ($2,'enterprise','active',now()-interval '1 day',now()+interval '29 days')`,
+       values ($1,'owner','active',now()-interval '1 day',now()+interval '29 days'),
+              ($2,'owner','active',now()-interval '1 day',now()+interval '29 days')`,
       [A, B],
     );
   });
@@ -61,7 +61,7 @@ describe("cross-workspace deduplication", () => {
     await db.close();
   });
 
-  it("automatically adopts catalogue, comments, and sentiment predictions across workspaces", async () => {
+  it("adopts only platform-collected raw comments across workspaces", async () => {
     // 1. Workspace A registers channel and populates catalogue + comments + sentiment
     await asUser(ownerA);
     const regA = await db.query<{ id: string }>(
@@ -94,6 +94,15 @@ describe("cross-workspace deduplication", () => {
     );
     const commentAId = commentInsertA.rows[0].id;
 
+    await db.query(
+      `insert into public.comments (
+        workspace_id, video_id, platform, external_comment_id, text_raw, text_plain,
+        content_hash, timestamp_precision, source, field_provenance
+      ) values ($1, $2, 'youtube', 'imported_private', 'خاص', 'خاص',
+        'imported_hash', 'second', 'external_import', '{"source":"file_upload"}')`,
+      [A, videoAId],
+    );
+
     // Insert analysis run and sentiment prediction into Workspace A
     const arInsertA = await db.query<{ id: string }>(
       `insert into public.analysis_runs (
@@ -111,6 +120,23 @@ describe("cross-workspace deduplication", () => {
       ) values ($1, $2, 'hash999', $3, 'key_1', 'succeeded', 'positive', '{"positive": 0.95}'::jsonb, now())`,
       [A, commentAId, arAId],
     );
+    await db.query(
+      `insert into public.workspace_topics(workspace_id,key,name_ar,name_en,description,position)
+       values ($1,'donor_only','خاص','Donor only','Donor tenant taxonomy',99)`,
+      [A],
+    );
+    await db.query(
+      `insert into public.topic_predictions(
+        workspace_id,comment_id,content_hash,classification_key,status,topic_key,
+        confidence,model_id,prompt_version)
+       values ($1,$2,'hash999','topic-key','succeeded','donor_only',0.9,'topic-model','p1')`,
+      [A, commentAId],
+    );
+    await db.query(
+      `insert into public.sync_runs(workspace_id,channel_id,mode,source,status,started_at,ended_at)
+       values ($1,$2,'collect','youtube_data_api_public','succeeded',now(),now())`,
+      [A, channelAId],
+    );
 
     // 2. Workspace B registers the same channel
     await asUser(ownerB);
@@ -121,7 +147,7 @@ describe("cross-workspace deduplication", () => {
     const channelBId = regB.rows[0].id;
     expect(channelBId).toBeTruthy();
 
-    // 3. Workspace B should immediately have the video adopted in catalogue AND comments + sentiment adopted
+    // 3. Workspace B receives catalogue and public raw comments only.
     const bVideos = await db.query<{
       id: string;
       external_video_id: string;
@@ -150,7 +176,7 @@ describe("cross-workspace deduplication", () => {
     );
     expect(bCommentsBeforeSelection.rows[0].text_plain).toBe("تعليق رائع");
 
-    // Check sentiment predictions in Workspace B exist IMMEDIATELY
+    // Tenant analysis artifacts are never copied.
     const bSentimentBeforeSelection = await db.query<{
       label: string;
       status: string;
@@ -158,9 +184,32 @@ describe("cross-workspace deduplication", () => {
       "select label, status from public.sentiment_predictions where workspace_id = $1",
       [B],
     );
-    expect(bSentimentBeforeSelection.rows).toHaveLength(1);
-    expect(bSentimentBeforeSelection.rows[0].label).toBe("positive");
-    expect(bSentimentBeforeSelection.rows[0].status).toBe("succeeded");
+    expect(bSentimentBeforeSelection.rows).toHaveLength(0);
+    const privateArtifacts = await db.query<{
+      runs: number;
+      topics: number;
+      topic_predictions: number;
+      syncs: number;
+      active_topic_key: string | null;
+      active_analysis_key: string | null;
+    }>(
+      `select
+         (select count(*)::int from public.analysis_runs where workspace_id=$1) runs,
+         (select count(*)::int from public.workspace_topics where workspace_id=$1 and key='donor_only') topics,
+         (select count(*)::int from public.topic_predictions where workspace_id=$1) topic_predictions,
+         (select count(*)::int from public.sync_runs where workspace_id=$1) syncs,
+         (select active_topic_key from public.workspaces where id=$1) active_topic_key,
+         (select active_analysis_key from public.channels where workspace_id=$1 and id=$2) active_analysis_key`,
+      [B, channelBId],
+    );
+    expect(privateArtifacts.rows[0]).toEqual({
+      runs: 0,
+      topics: 0,
+      topic_predictions: 0,
+      syncs: 0,
+      active_topic_key: null,
+      active_analysis_key: null,
+    });
 
     // Check dashboard aggregates for Workspace B works immediately
     const aggBeforeSelection = await db.query<{
@@ -171,8 +220,8 @@ describe("cross-workspace deduplication", () => {
       };
     }>("select private.dashboard_aggregates_impl($1, '{}'::jsonb) as agg", [B]);
     expect(aggBeforeSelection.rows[0].agg.total).toBe(1);
-    expect(aggBeforeSelection.rows[0].agg.analysed).toBe(1);
-    expect(aggBeforeSelection.rows[0].agg.sentiments.positive).toBe(1);
+    expect(aggBeforeSelection.rows[0].agg.analysed).toBe(0);
+    expect(aggBeforeSelection.rows[0].agg.sentiments.positive).toBe(0);
 
     // 4. Workspace B selects the video -> updates selection status idempotently
     await asUser(ownerB);
@@ -200,11 +249,9 @@ describe("cross-workspace deduplication", () => {
       "select label, status from public.sentiment_predictions where workspace_id = $1",
       [B],
     );
-    expect(bSentiment.rows).toHaveLength(1);
-    expect(bSentiment.rows[0].label).toBe("positive");
-    expect(bSentiment.rows[0].status).toBe("succeeded");
+    expect(bSentiment.rows).toHaveLength(0);
 
-    // Check video_selections in Workspace B is marked exhausted to avoid re-calling YouTube
+    // An incomplete donor cannot mark the target collection exhausted.
     const bSelections = await db.query<{
       last_outcome: string;
       last_seen_comment_count: number;
@@ -213,8 +260,8 @@ describe("cross-workspace deduplication", () => {
       [B, videoBId],
     );
     expect(bSelections.rows).toHaveLength(1);
-    expect(bSelections.rows[0].last_outcome).toBe("exhausted");
-    expect(bSelections.rows[0].last_seen_comment_count).toBe(1);
+    expect(bSelections.rows[0].last_outcome).toBeNull();
+    expect(bSelections.rows[0].last_seen_comment_count).toBeNull();
 
     // 5. Check workspace_ops_snapshot for Workspace B
     const opsSnap = await db.query<{
@@ -229,11 +276,11 @@ describe("cross-workspace deduplication", () => {
     }>("select private.workspace_ops_snapshot_impl($1) as r", [B]);
     const snap = opsSnap.rows[0].r;
     expect(snap.video_counts).toEqual([
-      { id: videoBId, total: 1, analysed: 1 },
+      { id: videoBId, total: 1, analysed: 0 },
     ]);
     expect(snap.catalogue_summary).toEqual({
       total_comments_collected: 1,
-      total_comments_analysed: 1,
+      total_comments_analysed: 0,
       videos_with_comments: 1,
     });
 
