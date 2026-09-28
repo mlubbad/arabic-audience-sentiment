@@ -225,19 +225,54 @@ def test_brightdata_scraping_browser_initialization_and_status():
     assert status.get("ready") is True
 
 
-def test_check_brightdata_diagnostics():
+def test_check_brightdata_diagnostics(monkeypatch):
     from collectors.diagnostics import check_brightdata
 
     # Not configured
     res_none = check_brightdata(None, None)
     assert res_none["status"] == "NOT_CONFIGURED"
 
-    # Both configured and healthy
+    calls = []
+
+    def healthy_post(url, **kwargs):
+        calls.append(("post", url))
+        return httpx.Response(200, json={})
+
+    def healthy_get(url, **kwargs):
+        calls.append(("get", url))
+        return httpx.Response(
+            200,
+            json={"value": {"ready": True, "message": "WebDriver ready"}},
+        )
+
+    monkeypatch.setattr(httpx, "post", healthy_post)
+    monkeypatch.setattr(httpx, "get", healthy_get)
+
+    # Both configured and healthy, using only the in-process fakes above.
     res_healthy = check_brightdata(
-        key="07cbaeac-c954-4e47-a6d7-474cd27ce4be",
-        webdriver_url="https://brd-customer-hl_41bb0e8e-zone-scraping_browser1:3oo1wdj909uz@brd.superproxy.io:9515",
+        key="synthetic-api-key",
+        webdriver_url="https://user:pass@webdriver.example.test:9515",
     )
     assert res_healthy["status"] == "HEALTHY"
     assert "Datasets API: Authenticated successfully" in res_healthy["details"]
     assert "Scraping Browser: Ready" in res_healthy["details"]
+    assert [method for method, _ in calls] == ["post", "get"]
 
+    def rejected_post(url, **kwargs):
+        return httpx.Response(401, json={"error": "synthetic-auth-failure"})
+
+    monkeypatch.setattr(httpx, "post", rejected_post)
+    res_auth_failure = check_brightdata("synthetic-invalid-key")
+    assert res_auth_failure["status"] == "INVALID_KEY"
+    assert "Rejected key with HTTP 401" in res_auth_failure["details"]
+
+    def not_ready_get(url, **kwargs):
+        return httpx.Response(200, json={"value": {"ready": False}})
+
+    monkeypatch.setattr(httpx, "get", not_ready_get)
+    res_not_ready = check_brightdata(
+        None,
+        "https://user:pass@webdriver.example.test:9515",
+    )
+    assert res_not_ready["status"] == "CONFIGURED"
+    assert "Scraping Browser: HTTP 200" in res_not_ready["details"]
