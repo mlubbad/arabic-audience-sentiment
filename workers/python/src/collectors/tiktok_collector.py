@@ -300,7 +300,14 @@ class TikTokCollector:
             raise last_error
         return Catalogue(videos=[], complete=False, reason="no_videos_found")
 
-    def batches(self, video_id: str, checkpoint: str | None = None) -> Iterator[Batch]:
+    def batches(
+        self,
+        video_id: str,
+        checkpoint: str | None = None,
+        since: str | None = None,
+        max_items: int | None = None,
+        **kwargs,
+    ) -> Iterator[Batch]:
         """Collect comments for a TikTok video."""
         clean_id = self._clean_video_id(video_id)
 
@@ -341,7 +348,7 @@ class TikTokCollector:
             cascade_comments.append(("brightdata", lambda: self.brightdata_client.scrape_tiktok_comments(clean_id, handle=self.channel_id)))
 
         last_error = None
-        empty_batch_fallback = None
+        has_empty_scraper_result = False
         for source_name, fn in cascade_comments:
             try:
                 raw_comments = fn()
@@ -367,15 +374,12 @@ class TikTokCollector:
                         yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
                         return
                     else:
-                        empty_batch_fallback = Batch(comments=[], checkpoint=None, outcome="exhausted")
+                        has_empty_scraper_result = True
                         continue
             except CollectionError as exc:
                 last_error = exc
                 continue
 
-        if empty_batch_fallback is not None:
-            yield empty_batch_fallback
-            return
 
         # 4. Access token mode (TikTok Display API)
         if self.access_token and self.client:
@@ -439,4 +443,9 @@ class TikTokCollector:
         if last_error:
             raise last_error
 
+        if has_empty_scraper_result:
+            yield Batch(comments=[], checkpoint=None, outcome="exhausted")
+            return
+
         raise CollectionError("comments_scraper_not_configured", "blocked")
+

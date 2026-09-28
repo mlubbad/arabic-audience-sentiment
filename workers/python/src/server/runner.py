@@ -328,11 +328,10 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
             if chk.get("max_items"):
                 kwargs["max_items"] = chk["max_items"]
             try:
-                try:
-                    batch_iter = collector.batches(vid, start, **kwargs)
-                except TypeError:
-                    batch_iter = collector.batches(vid, start)
+                batch_iter = collector.batches(vid, start, **kwargs)
+                collected_for_video = 0
                 for batch in batch_iter:
+                    collected_for_video += len(batch.comments)
                     predictions: list = []
                     if analyzer is not None:
                         try:
@@ -360,13 +359,23 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                         except Exception:
                             pass
                     raise
-                if exc.code != "comments_disabled":
-                    raise
-                # A property of the video, not of the run. Learned back into
-                # the catalogue and the next video is read.
-                control.video_finished(lease, video["video_id"], "blocked", exc.code)
-                done.add(vid)
-                continue
+                if exc.code in ("comments_disabled", "video_not_found") or exc.outcome in ("explicitly_disabled", "unavailable"):
+                    # A property of the video, not of the run. Learned back into
+                    # the catalogue and the next video is read.
+                    control.video_finished(lease, video["video_id"], "blocked", exc.code)
+                    done.add(vid)
+                    continue
+                raise
+
+            # WO-3 Invariant 2: Failure never becomes success.
+            # If the video had reported comments > 0, but 0 comments were collected,
+            # this cannot be declared exhausted (which would set last_seen_comment_count = reported_comment_count
+            # and permanently suppress future collection). It must be treated as partial.
+            if video_outcome == "exhausted" and collected_for_video == 0 and (video.get("reported_comment_count") or 0) > 0:
+                control.video_finished(lease, video["video_id"], "partial", "zero_comments_reported")
+                outcome = "partial"
+                break
+
             if video_outcome != "exhausted":
                 # Stop the run here. The checkpoint names this video and the
                 # ones behind it, so the next attempt continues rather than
@@ -376,6 +385,7 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                 break
             control.video_finished(lease, video["video_id"], "exhausted")
             done.add(vid)
+
         if analysis_failed and outcome == "exhausted":
             outcome = "partial"
         control.finish(lease, outcome)

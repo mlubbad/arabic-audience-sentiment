@@ -27,9 +27,10 @@ class Plan:
     def __init__(self, pages: dict[str, list[Batch]]):
         self.pages, self.asked = pages, []
 
-    def batches(self, video_id, checkpoint):
+    def batches(self, video_id, checkpoint, since=None, **kwargs):
         self.asked.append((video_id, checkpoint))
         yield from self.pages.get(video_id, [])
+
 
 
 def drive(pages, videos, checkpoint=None, access_token="ya29.ok"):
@@ -172,10 +173,11 @@ def test_a_lease_with_no_due_list_at_all_is_blocked_not_an_empty_success():
 
 def test_a_disabled_video_is_reported_and_skipped_not_the_whole_run():
     class Refusing(Plan):
-        def batches(self, video_id, checkpoint):
+        def batches(self, video_id, checkpoint, *args, **kwargs):
             if video_id == "off":
                 raise CollectionError("comments_disabled", "explicitly_disabled")
-            yield from super().batches(video_id, checkpoint)
+            yield from super().batches(video_id, checkpoint, *args, **kwargs)
+
 
     sent = {"video_finished": [], "finish": None}
 
@@ -456,4 +458,19 @@ def test_run_job_claims_import_when_no_classifier():
     worked = run_job(plane, lambda token, expires_at=None, renew=None: None, classifier=None)
     assert worked is False
     assert claimed_types == [["collect", "discover", "import"]]
+
+
+def test_backfill_video_with_reported_comments_and_zero_collected_is_partial_not_exhausted():
+    """WO-3 Invariant 2: Failure never becomes success.
+    If a video has reported_comment_count > 0, but collector yields 0 comments with outcome 'exhausted',
+    the runner MUST NOT declare the video 'exhausted' or the job 'succeeded'.
+    It must record outcome as 'partial' (so it retries and does not update last_seen_comment_count).
+    """
+    worked, sent, _ = drive(
+        {"v1": [Batch([], None, "exhausted")]},
+        [{"video_id": "v1", "external_video_id": "v1", "title": "الفيديو", "reported_comment_count": 10}],
+    )
+    assert sent["video_finished"] == [("v1", "partial", "zero_comments_reported")]
+    assert sent["finish"] == "partial"
+
 

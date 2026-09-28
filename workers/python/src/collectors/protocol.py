@@ -1,6 +1,6 @@
 """Adapter contracts. Exhaustion describes source traversal, never 100% coverage."""
 from dataclasses import dataclass, field
-from typing import Literal, Protocol, Iterator
+from typing import Any, Iterator, Literal, Protocol
 
 Outcome = Literal["partial", "exhausted", "explicitly_disabled", "unavailable", "failed", "blocked"]
 
@@ -56,5 +56,11 @@ class Collector(Protocol):
     revision: str
 
     def batches(
-        self, video_id: str, checkpoint: str | None, since: str | None = None
+        self,
+        video_id: str,
+        checkpoint: str | None,
+        since: str | None = None,
+        max_items: int | None = None,
+        **kwargs: Any,
     ) -> Iterator[Batch]: ...
+

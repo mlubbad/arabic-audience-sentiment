@@ -533,5 +533,54 @@ def test_telegram_collector_channel_vs_megagroup_discussion():
     assert cat3.videos[0]["comments_state"] == "disabled"
 
 
+def test_telegram_collector_mtproto_invalid_auth_raises_collection_error():
+    """WO-3 Invariant 2: Auth or session failures containing 'invalid' must NOT be swallowed as exhausted."""
+    class FailingTelethonClient:
+        def get_entity(self, handle):
+            return "entity"
+
+        def iter_messages(self, *args, **kwargs):
+            raise Exception("SessionPasswordNeeded: The password is invalid or expired")
+
+    c = TelegramCollector(channel_id="@warlife3", telethon_client=FailingTelethonClient())
+    with pytest.raises(CollectionError) as exc_info:
+        list(c.batches("100", None))
+    assert exc_info.value.code.startswith("telegram_mtproto_error")
+
+
+def test_telegram_collector_mtproto_msg_id_invalid_yields_unavailable():
+    """WO-3 Invariant 2: Deleted/invalid post must yield 'unavailable', NEVER 'exhausted'."""
+    class MsgNotFoundTelethonClient:
+        def get_entity(self, handle):
+            return "entity"
+
+        def iter_messages(self, *args, **kwargs):
+            raise Exception("MsgIdInvalidError: Message was deleted or not found")
+
+    c = TelegramCollector(channel_id="@warlife3", telethon_client=MsgNotFoundTelethonClient())
+    batches = list(c.batches("100", None))
+    assert len(batches) == 1
+    assert batches[0].outcome == "unavailable"
+    assert batches[0].comments == []
+
+
+
+def test_telegram_collector_http_challenge_or_malformed_page_raises_collection_error():
+    """WO-3 Invariant 2: Anti-bot challenge or malformed HTML without Telegram markup must raise, not yield exhausted."""
+    def challenge_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text="""<html><head><title>Just a moment...</title></head>
+            <body><div class="cf-browser-verification">Checking your browser before accessing t.me.</div></body></html>""",
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(challenge_handler))
+    c = TelegramCollector(channel_id="@warlife3", client=client)
+    with pytest.raises(CollectionError) as exc_info:
+        list(c.batches("100", None))
+    assert "unrecognized_response_format" in exc_info.value.code or "blocked" in exc_info.value.code
+
+
+
 
 
