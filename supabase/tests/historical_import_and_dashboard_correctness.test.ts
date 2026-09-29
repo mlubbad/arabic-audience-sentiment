@@ -238,6 +238,71 @@ describe("WO-5a Part 2: Historical Import & Dashboard SQL Correctness", () => {
         ]),
       ).rejects.toThrow(/forbidden/);
     });
+
+    it("does not overwrite comments when existing comment source is not external_import, but does update when source is external_import", async () => {
+      await resetAdmin();
+      const vRes = await db.query<{ id: string }>(
+        `insert into public.videos (workspace_id, channel_id, platform, external_video_id, title)
+         values ($1, $2, 'youtube', 'v_source_guard', 'Video Source Guard')
+         returning id`,
+        [W, channelId],
+      );
+      const vId = vRes.rows[0].id;
+
+      // Comment 1: source = 'youtube' (scraped/sync)
+      await db.query(
+        `insert into public.comments (workspace_id, video_id, platform, external_comment_id, text_raw, text_plain, source, content_hash, timestamp_precision)
+         values ($1, $2, 'youtube', 'comm_youtube_source', 'Original Scraped Text', 'Original Scraped Text', 'youtube', md5('Original Scraped Text'), 'second')`,
+        [W, vId],
+      );
+
+      // Comment 2: source = 'external_import'
+      await db.query(
+        `insert into public.comments (workspace_id, video_id, platform, external_comment_id, text_raw, text_plain, source, content_hash, timestamp_precision)
+         values ($1, $2, 'youtube', 'comm_import_source', 'Original Imported Text', 'Original Imported Text', 'external_import', md5('Original Imported Text'), 'second')`,
+        [W, vId],
+      );
+
+      await user(owner);
+      const payload = {
+        posts: [{ external_video_id: "v_source_guard", title: "Video Source Guard" }],
+        comments: [
+          {
+            external_video_id: "v_source_guard",
+            external_comment_id: "comm_youtube_source",
+            text_raw: "Attempted Overwrite Of Scraped Comment",
+          },
+          {
+            external_video_id: "v_source_guard",
+            external_comment_id: "comm_import_source",
+            text_raw: "Valid Overwrite Of Imported Comment",
+          },
+        ],
+      };
+
+      const res = await db.query<{ result: { ok: boolean } }>(
+        "select public.import_historical_records($1, $2, $3::jsonb) as result",
+        [W, channelId, JSON.stringify(payload)],
+      );
+      expect(res.rows[0].result.ok).toBe(true);
+
+      await resetAdmin();
+      const checkYoutube = await db.query<{ text_raw: string; source: string }>(
+        "select text_raw, source from public.comments where workspace_id = $1 and external_comment_id = 'comm_youtube_source'",
+        [W],
+      );
+      // Scraped comment is NOT overwritten
+      expect(checkYoutube.rows[0].text_raw).toBe("Original Scraped Text");
+      expect(checkYoutube.rows[0].source).toBe("youtube");
+
+      const checkImport = await db.query<{ text_raw: string; source: string }>(
+        "select text_raw, source from public.comments where workspace_id = $1 and external_comment_id = 'comm_import_source'",
+        [W],
+      );
+      // Imported comment IS updated
+      expect(checkImport.rows[0].text_raw).toBe("Valid Overwrite Of Imported Comment");
+      expect(checkImport.rows[0].source).toBe("external_import");
+    });
   });
 
   describe("dashboard_aggregates: Invariant 3 (unknown metrics are null, not zero)", () => {
@@ -414,8 +479,97 @@ describe("WO-5a Part 2: Historical Import & Dashboard SQL Correctness", () => {
       );
       expect(res.rows[0].result.ok).toBe(true);
       expect(res.rows[0].result.status).toBe("queued");
-      // -1 signifies unlimited in request_historical_platform_sync return object
-      expect(res.rows[0].result.historical_days_limit).toBe(-1);
+      // Unlimited plans return NULL for historical_days_limit, never magic numbers like -1
+      expect(res.rows[0].result.historical_days_limit).toBeNull();
+    });
+
+    it("does not reset or overwrite jobs with status 'running' or 'succeeded', but re-queues failed jobs", async () => {
+      await user(owner);
+      const sinceDate = "2026-01-01T00:00:00Z";
+      // 1. Initial request creates queued job
+      const res1 = await db.query<{
+        result: { ok: boolean; status: string; job_id: string };
+      }>(
+        "select public.request_historical_platform_sync($1, $2, $3::timestamptz, 500) as result",
+        [W, channelId, sinceDate],
+      );
+      expect(res1.rows[0].result.status).toBe("queued");
+      const jobId = res1.rows[0].result.job_id;
+
+      // 2. Mark job as running with attempt = 2
+      await resetAdmin();
+      await db.query(
+        "update public.jobs set status = 'running', attempt = 2, lease_token = gen_random_uuid(), lease_expires_at = now() + interval '10 minutes' where id = $1",
+        [jobId],
+      );
+
+      // 3. Re-requesting the exact same historical sync while job is running returns status 'running' and does NOT reset attempt or status
+      await user(owner);
+      const resRunning = await db.query<{
+        result: { ok: boolean; status: string; job_id: string };
+      }>(
+        "select public.request_historical_platform_sync($1, $2, $3::timestamptz, 500) as result",
+        [W, channelId, sinceDate],
+      );
+      expect(resRunning.rows[0].result.job_id).toBe(jobId);
+      expect(resRunning.rows[0].result.status).toBe("running");
+
+      await resetAdmin();
+      const jobRunning = await db.query<{ status: string; attempt: number }>(
+        "select status, attempt from public.jobs where id = $1",
+        [jobId],
+      );
+      expect(jobRunning.rows[0].status).toBe("running");
+      expect(jobRunning.rows[0].attempt).toBe(2);
+
+      // 4. Mark job as succeeded
+      await db.query(
+        "update public.jobs set status = 'succeeded' where id = $1",
+        [jobId],
+      );
+
+      // 5. Re-requesting the exact same historical sync while job is succeeded returns status 'succeeded' and does NOT reset to queued
+      await user(owner);
+      const resSucceeded = await db.query<{
+        result: { ok: boolean; status: string; job_id: string };
+      }>(
+        "select public.request_historical_platform_sync($1, $2, $3::timestamptz, 500) as result",
+        [W, channelId, sinceDate],
+      );
+      expect(resSucceeded.rows[0].result.job_id).toBe(jobId);
+      expect(resSucceeded.rows[0].result.status).toBe("succeeded");
+
+      await resetAdmin();
+      const jobSucceeded = await db.query<{ status: string; attempt: number }>(
+        "select status, attempt from public.jobs where id = $1",
+        [jobId],
+      );
+      expect(jobSucceeded.rows[0].status).toBe("succeeded");
+
+      // 6. Mark job as failed
+      await db.query(
+        "update public.jobs set status = 'failed', error_code = 'temporary_error' where id = $1",
+        [jobId],
+      );
+
+      // 7. Re-requesting after failed DOES reset to queued with attempt = 0
+      await user(owner);
+      const resFailed = await db.query<{
+        result: { ok: boolean; status: string; job_id: string };
+      }>(
+        "select public.request_historical_platform_sync($1, $2, $3::timestamptz, 500) as result",
+        [W, channelId, sinceDate],
+      );
+      expect(resFailed.rows[0].result.job_id).toBe(jobId);
+      expect(resFailed.rows[0].result.status).toBe("queued");
+
+      await resetAdmin();
+      const jobRequeued = await db.query<{ status: string; attempt: number }>(
+        "select status, attempt from public.jobs where id = $1",
+        [jobId],
+      );
+      expect(jobRequeued.rows[0].status).toBe("queued");
+      expect(jobRequeued.rows[0].attempt).toBe(0);
     });
 
     it("blocks request_historical_platform_sync on free plan (0 days limit)", async () => {
