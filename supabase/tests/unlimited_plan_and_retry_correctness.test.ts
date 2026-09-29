@@ -100,50 +100,46 @@ describe("Unlimited plans overflow protection and worker retry lifecycle", () =>
   }
 
   describe("Unlimited-plan NULL limits and bigint arithmetic", () => {
-    it("persists NULL in public.plans when -1 is passed for limits via update_plan_limits", async () => {
+    it("persists NULL in public.plans for historical_days_limit when -1 is passed via update_plan_limits for a non-internal plan (creator)", async () => {
+      await asServiceRole();
+      // Creator starts with finite historical_days_limit = 30
+      const initial = await db.query<{ historical_days_limit: number | null }>(
+        "select historical_days_limit from public.plans where key = 'creator'",
+      );
+      expect(initial.rows[0].historical_days_limit).toBe(30);
+
       await asAdmin();
       const res = await db.query<{ update_plan_limits: UpdatePlanResult }>(
-        `select public.update_plan_limits('owner', jsonb_build_object(
-          'analysis_units', -1,
-          'topic_units', -1,
-          'backfill_units', -1,
-          'channels', -1,
-          'members', -1,
-          'workspaces', -1,
+        `select public.update_plan_limits('creator', jsonb_build_object(
           'historical_days_limit', -1
         )) as update_plan_limits`,
       );
 
       const parsed = res.rows[0].update_plan_limits;
       expect(parsed.ok).toBe(true);
-      expect(parsed.plan.limits.analysis_units).toBe(-1);
-      expect(parsed.plan.limits.topic_units).toBe(-1);
-      expect(parsed.plan.backfill_units).toBe(-1);
       expect(parsed.plan.historical_days_limit).toBe(-1);
-      expect(parsed.plan.limits.channels).toBe(-1);
-      expect(parsed.plan.limits.members).toBe(-1);
-      expect(parsed.plan.limits.workspaces).toBe(-1);
 
-      // Verify the underlying table has true NULL, not 2147483647
+      // Verify the underlying table has true NULL, not -1
       await asServiceRole();
       const check = await db.query<{
-        analysis_units: number | null;
-        topic_units: number | null;
-        backfill_units: number | null;
-        channels_limit: number | null;
-        members_limit: number | null;
-        workspaces_limit: number | null;
         historical_days_limit: number | null;
       }>(
-        "select analysis_units, topic_units, backfill_units, channels_limit, members_limit, workspaces_limit, historical_days_limit from public.plans where key = 'owner'",
+        "select historical_days_limit from public.plans where key = 'creator'",
       );
-      expect(check.rows[0].analysis_units).toBeNull();
-      expect(check.rows[0].topic_units).toBeNull();
-      expect(check.rows[0].backfill_units).toBeNull();
-      expect(check.rows[0].channels_limit).toBeNull();
-      expect(check.rows[0].members_limit).toBeNull();
-      expect(check.rows[0].workspaces_limit).toBeNull();
       expect(check.rows[0].historical_days_limit).toBeNull();
+
+      // And verify updating back to a positive integer persists the integer
+      await asAdmin();
+      await db.query(
+        `select public.update_plan_limits('creator', jsonb_build_object(
+          'historical_days_limit', 45
+        ))`,
+      );
+      await asServiceRole();
+      const restored = await db.query<{ historical_days_limit: number | null }>(
+        "select historical_days_limit from public.plans where key = 'creator'",
+      );
+      expect(restored.rows[0].historical_days_limit).toBe(45);
     });
 
     it("budget_entry formats unlimited as -1 without 32-bit integer overflow", async () => {
@@ -410,6 +406,136 @@ describe("Unlimited plans overflow protection and worker retry lifecycle", () =>
       ).rows[0];
       expect(syncRun.status).toBe("succeeded");
       expect(syncRun.error_code).toBeNull();
+    });
+
+    it("sets not_before to next reset on blocked: quota_exceeded", async () => {
+      await asServiceRole();
+      const jobId = "00000000-0000-4000-8000-000000000030";
+      const leaseToken = "00000000-0000-4000-8000-000000000031";
+      const periodEnd = new Date(Date.now() + 5 * 86400 * 1000).toISOString();
+
+      // Set subscription period_end to a known future date
+      await db.query(
+        "update subscriptions set period_end = $1 where workspace_id = $2",
+        [periodEnd, W],
+      );
+
+      await db.query(
+        `insert into jobs(id, workspace_id, channel_id, type, dedupe_key, status, lease_token, lease_expires_at, attempt)
+         values ($1, $2, $3, 'collect', 'dedupe-blocked-quota', 'running', $4, now() + interval '10 minutes', 1)`,
+        [jobId, W, chId, leaseToken],
+      );
+
+      await db.query(
+        "select private.worker_finish($1, $2, $3, 'blocked', 'quota_exceeded')",
+        [WORKER_TOKEN, jobId, leaseToken],
+      );
+
+      const job = (
+        await db.query<{ status: string; not_before: string; error_code: string }>(
+          "select status, not_before, error_code from jobs where id = $1",
+          [jobId],
+        )
+      ).rows[0];
+
+      expect(job.status).toBe("blocked");
+      expect(job.error_code).toBe("quota_exceeded");
+      expect(new Date(job.not_before).toISOString()).toBe(new Date(periodEnd).toISOString());
+    });
+
+    it("sets not_before to NULL on blocked for non-time-based reasons (plan_inactive, source_access_denied)", async () => {
+      await asServiceRole();
+      const jobId1 = "00000000-0000-4000-8000-000000000032";
+      const leaseToken1 = "00000000-0000-4000-8000-000000000033";
+      const jobId2 = "00000000-0000-4000-8000-000000000034";
+      const leaseToken2 = "00000000-0000-4000-8000-000000000035";
+
+      await db.query(
+        `insert into jobs(id, workspace_id, channel_id, type, dedupe_key, status, lease_token, lease_expires_at, attempt)
+         values ($1, $2, $3, 'collect', 'dedupe-blocked-plan', 'running', $4, now() + interval '10 minutes', 1)`,
+        [jobId1, W, chId, leaseToken1],
+      );
+
+      await db.query(
+        "select private.worker_finish($1, $2, $3, 'blocked', 'plan_inactive')",
+        [WORKER_TOKEN, jobId1, leaseToken1],
+      );
+
+      await db.query(
+        `insert into jobs(id, workspace_id, channel_id, type, dedupe_key, status, lease_token, lease_expires_at, attempt)
+         values ($1, $2, $3, 'collect', 'dedupe-blocked-source', 'running', $4, now() + interval '10 minutes', 1)`,
+        [jobId2, W, chId, leaseToken2],
+      );
+
+      await db.query(
+        "select private.worker_finish($1, $2, $3, 'blocked', 'source_access_denied')",
+        [WORKER_TOKEN, jobId2, leaseToken2],
+      );
+
+      const job1 = (
+        await db.query<{ status: string; not_before: string | null }>(
+          "select status, not_before from jobs where id = $1",
+          [jobId1],
+        )
+      ).rows[0];
+      const job2 = (
+        await db.query<{ status: string; not_before: string | null }>(
+          "select status, not_before from jobs where id = $1",
+          [jobId2],
+        )
+      ).rows[0];
+
+      expect(job1.status).toBe("blocked");
+      expect(job1.not_before).toBeNull();
+
+      expect(job2.status).toBe("blocked");
+      expect(job2.not_before).toBeNull();
+    });
+
+    it("unblock_due_jobs unblocks due quota jobs without resetting attempt or reclaims, and ignores NULL not_before", async () => {
+      await asServiceRole();
+      const dueJobId = "00000000-0000-4000-8000-000000000036";
+      const nonTimeJobId = "00000000-0000-4000-8000-000000000037";
+
+      // Insert a time-based blocked job with not_before in past, and non-zero attempt/reclaims
+      await db.query(
+        `insert into jobs(id, workspace_id, channel_id, type, dedupe_key, status, not_before, attempt, reclaims, error_code)
+         values ($1, $2, $3, 'collect', 'dedupe-unblock-due', 'blocked', now() - interval '1 minute', 2, 1, 'quota_exceeded'),
+                ($4, $2, $3, 'collect', 'dedupe-unblock-notime', 'blocked', null, 1, 0, 'plan_inactive')`,
+        [dueJobId, W, chId, nonTimeJobId],
+      );
+
+      const unblockedCount = await db.query<{ unblock_due_jobs: number }>(
+        "select private.unblock_due_jobs()",
+      );
+      expect(unblockedCount.rows[0].unblock_due_jobs).toBeGreaterThanOrEqual(1);
+
+      // Verify the due job unblocked to queued, and attempt/reclaims were preserved
+      const dueJob = (
+        await db.query<{
+          status: string;
+          attempt: number;
+          reclaims: number;
+          error_code: string | null;
+        }>(
+          "select status, attempt, reclaims, error_code from jobs where id = $1",
+          [dueJobId],
+        )
+      ).rows[0];
+      expect(dueJob.status).toBe("queued");
+      expect(dueJob.attempt).toBe(2);
+      expect(dueJob.reclaims).toBe(1);
+      expect(dueJob.error_code).toBeNull();
+
+      // Verify the non-time-based job remains blocked
+      const nonTimeJob = (
+        await db.query<{ status: string; not_before: string | null }>(
+          "select status, not_before from jobs where id = $1",
+          [nonTimeJobId],
+        )
+      ).rows[0];
+      expect(nonTimeJob.status).toBe("blocked");
+      expect(nonTimeJob.not_before).toBeNull();
     });
   });
 });

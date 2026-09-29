@@ -1,5 +1,5 @@
 -- WO-5a PR 1: Unlimited-plan overflow protection, bigint usage arithmetic, and worker job retries.
--- Timestamp: 20260930000000
+-- Timestamp: 20261001010000
 
 -- 1. Clean existing magic number (2147483647) back to NULL where applicable (internal plans)
 update public.plans set backfill_units = null where backfill_units >= 2147483647 and internal;
@@ -234,7 +234,7 @@ grant execute on function private.topic_units_remaining(uuid) to service_role;
 
 drop function if exists private.backfill_remaining(uuid);
 create or replace function private.backfill_remaining(w uuid) returns bigint
-language plpgsql stable security invoker set search_path='' as $$
+language plpgsql stable security definer set search_path='' as $$
 declare sub record; begin
   select s.period_start, pl.backfill_units into sub
     from public.subscriptions s join public.plans pl on pl.key = s.plan_key
@@ -474,7 +474,11 @@ end $$;
 revoke all on function private.worker_topics_due(text, uuid, uuid, text, text, int) from public, anon, authenticated;
 grant execute on function private.worker_topics_due(text, uuid, uuid, text, text, int) to service_role;
 
--- 11. Upgrade private.worker_finish to implement exponential backoff retry lifecycle
+-- 11. Allow not_before to be NULL for non-time-based blocked jobs
+alter table public.jobs alter column not_before drop not null;
+
+-- 12. Upgrade private.worker_finish to implement exponential backoff retry lifecycle
+-- and reason-based not_before for blocked jobs
 create or replace function private.worker_finish(
   token_hash text, j uuid, t uuid, outcome text, reason text) returns void
 language plpgsql security invoker set search_path='' as $$
@@ -485,12 +489,17 @@ declare
   dur_sec integer;
   j_attempt integer;
   backoff_seconds integer;
+  sub_reset timestamptz;
+  blocked_not_before timestamptz;
 begin
   perform private.worker_job(token_hash, j, t);
   if outcome not in ('succeeded','partial','failed','blocked','cancelled') then
     raise exception 'invalid_outcome' using errcode='22023'; end if;
 
-  select created_at, attempt into start_time, j_attempt from public.jobs where id = j;
+  select created_at, attempt, workspace_id, channel_id
+    into start_time, j_attempt, w, ch
+    from public.jobs
+   where id = j;
   dur_sec := greatest(1, round(extract(epoch from (now() - coalesce(start_time, now())))))::int;
 
   -- Exponential backoff retry lifecycle for transient failures on attempts 1 and 2
@@ -509,8 +518,7 @@ begin
              '{duration_seconds}',
              to_jsonb(dur_sec)
            )
-     where id = j
-     returning workspace_id, channel_id into w, ch;
+     where id = j;
 
     insert into public.sync_runs(workspace_id, channel_id, job_id, mode, source,
                                  status, ended_at, error_code)
@@ -520,6 +528,24 @@ begin
           ended_at = excluded.ended_at,
           error_code = excluded.error_code;
     return;
+  end if;
+
+  -- On blocked, set not_before by reason (quota -> next reset; plan_inactive/source_access_denied -> not time-based)
+  if outcome = 'blocked' then
+    if reason ilike '%quota%' or reason in ('quota_exceeded', 'rate_limited') then
+      select s.period_end into sub_reset
+        from public.subscriptions s
+       where s.workspace_id = private.billing_root(w);
+
+      if sub_reset is not null and sub_reset > now() and sub_reset <= (now() + interval '366 days') then
+        blocked_not_before := sub_reset;
+      else
+        blocked_not_before := (date_trunc('day', now() at time zone 'utc') + interval '1 day');
+      end if;
+    else
+      -- plan_inactive, source_access_denied, and other non-quota reasons are not time-based
+      blocked_not_before := null;
+    end if;
   end if;
 
   update public.jobs set status = outcome,
@@ -533,14 +559,17 @@ begin
       when outcome in ('failed', 'partial') and coalesce(j_attempt, 1) >= 3 then 'retry_exhausted:' || coalesce(reason, 'unknown')
       else coalesce(reason, public.jobs.last_error)
     end,
+    not_before = case
+      when outcome = 'blocked' then blocked_not_before
+      else public.jobs.not_before
+    end,
     counters = jsonb_set(
       coalesce(counters, '{}'::jsonb),
       '{duration_seconds}',
       to_jsonb(dur_sec)
     ),
     lease_token = null, lease_expires_at = null
-  where id = j
-  returning workspace_id, channel_id into w, ch;
+  where id = j;
 
   insert into public.sync_runs(workspace_id, channel_id, job_id, mode, source,
                                status, ended_at, error_code)
@@ -556,3 +585,45 @@ begin
         error_code = excluded.error_code;
 end $$;
 grant execute on function private.worker_finish(text, uuid, uuid, text, text) to service_role;
+
+-- 13. Fix private.unblock_due_jobs so time-based blocks don't reset attempt or reclaims
+create or replace function private.unblock_due_jobs() returns integer
+language plpgsql security definer set search_path='' as $$
+declare count int := 0; begin
+  -- Cancel any blocked job that is already superseded by an active queued/running job
+  update public.jobs b
+     set status = 'cancelled',
+         error_code = 'superseded_by_active_job'
+   where b.status = 'blocked'
+     and exists (
+       select 1 from public.jobs a
+        where a.workspace_id = b.workspace_id
+          and a.channel_id = b.channel_id
+          and a.type = b.type
+          and a.status in ('queued', 'running')
+          and a.id <> b.id
+     );
+
+  -- Unblock due jobs that have no outstanding active job without resetting attempt/reclaims
+  update public.jobs j
+     set status = 'queued',
+         error_code = null,
+         lease_token = null,
+         lease_expires_at = null,
+         not_before = now()
+   where j.status = 'blocked'
+     and j.not_before is not null
+     and j.not_before <= now()
+     and not exists (
+       select 1 from public.jobs a
+        where a.workspace_id = j.workspace_id
+          and a.channel_id = j.channel_id
+          and a.type = j.type
+          and a.status in ('queued', 'running')
+          and a.id <> j.id
+     );
+  get diagnostics count = row_count;
+  return count;
+end $$;
+revoke all on function private.unblock_due_jobs() from public, anon, authenticated;
+grant execute on function private.unblock_due_jobs() to service_role;
