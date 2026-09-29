@@ -303,3 +303,18 @@ def test_the_builder_carries_the_title_it_already_knows():
 
     assert run_once(plane, None, "", build_collector=build) is True
     assert rec.error_code == "رسالة من أسامة بن لادن"
+
+
+def test_explicitly_disabled_yielded_batch_finishes_as_blocked():
+    rec = Recorder()
+    collector = Collector(Batch([], None, "explicitly_disabled"))
+    assert run_once(rec.plane(), collector, "abcdefghijk") is True
+    assert rec.finished == "blocked"
+
+
+def test_unavailable_yielded_batch_finishes_as_blocked():
+    rec = Recorder()
+    collector = Collector(Batch([], None, "unavailable"))
+    assert run_once(rec.plane(), collector, "abcdefghijk") is True
+    assert rec.finished == "blocked"
+
