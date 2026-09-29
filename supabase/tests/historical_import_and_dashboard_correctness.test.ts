@@ -265,7 +265,9 @@ describe("WO-5a Part 2: Historical Import & Dashboard SQL Correctness", () => {
 
       await user(owner);
       const payload = {
-        posts: [{ external_video_id: "v_source_guard", title: "Video Source Guard" }],
+        posts: [
+          { external_video_id: "v_source_guard", title: "Video Source Guard" },
+        ],
         comments: [
           {
             external_video_id: "v_source_guard",
@@ -300,7 +302,9 @@ describe("WO-5a Part 2: Historical Import & Dashboard SQL Correctness", () => {
         [W],
       );
       // Imported comment IS updated
-      expect(checkImport.rows[0].text_raw).toBe("Valid Overwrite Of Imported Comment");
+      expect(checkImport.rows[0].text_raw).toBe(
+        "Valid Overwrite Of Imported Comment",
+      );
       expect(checkImport.rows[0].source).toBe("external_import");
     });
   });

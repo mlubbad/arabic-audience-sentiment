@@ -485,7 +485,7 @@ create table "public"."jobs" (
   "dedupe_key" text not null,
   "status" text default 'queued'::text not null,
   "attempt" integer default 0 not null,
-  "not_before" timestamp with time zone default now() not null,
+  "not_before" timestamp with time zone default now(),
   "lease_token" uuid,
   "lease_expires_at" timestamp with time zone,
   "checkpoint" jsonb default '{}'::jsonb not null,
@@ -508,7 +508,6 @@ alter table "public"."jobs" add constraint "jobs_dedupe_key_check" CHECK (length
 alter table "public"."jobs" add constraint "jobs_dedupe_key_not_null" NOT NULL dedupe_key;
 alter table "public"."jobs" add constraint "jobs_heartbeats_not_null" NOT NULL heartbeats;
 alter table "public"."jobs" add constraint "jobs_id_not_null" NOT NULL id;
-alter table "public"."jobs" add constraint "jobs_not_before_not_null" NOT NULL not_before;
 alter table "public"."jobs" add constraint "jobs_pkey" PRIMARY KEY (id);
 alter table "public"."jobs" add constraint "jobs_reclaims_check" CHECK (reclaims >= 0);
 alter table "public"."jobs" add constraint "jobs_reclaims_not_null" NOT NULL reclaims;
@@ -1262,7 +1261,7 @@ begin
 end $function$
 
 CREATE OR REPLACE FUNCTION private.analysis_remaining(w uuid)
- RETURNS integer
+ RETURNS bigint
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''
@@ -1272,8 +1271,8 @@ declare sub record; begin
     from public.subscriptions s join public.plans pl on pl.key = s.plan_key
    where s.workspace_id = private.billing_root(w) and private.subscription_open(s);
   if not found then raise exception 'no_active_plan' using errcode='53400'; end if;
-  if sub.analysis_units is null then return 2147483647; end if;
-  return greatest(0, sub.analysis_units + private.granted_units(w, 'comment_analysis')
+  if sub.analysis_units is null or sub.analysis_units >= 2147483647 then return null; end if;
+  return greatest(0::bigint, sub.analysis_units::bigint + private.granted_units(w, 'comment_analysis')
                      - private.used_units(w, 'comment_analysis', sub.period_start));
 end $function$
 
@@ -1372,20 +1371,18 @@ declare root uuid; begin
 end $function$
 
 CREATE OR REPLACE FUNCTION private.backfill_remaining(w uuid)
- RETURNS integer
+ RETURNS bigint
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
-  sub record;
-begin
+declare sub record; begin
   select s.period_start, pl.backfill_units into sub
     from public.subscriptions s join public.plans pl on pl.key = s.plan_key
    where s.workspace_id = private.billing_root(w) and private.subscription_open(s);
   if not found then raise exception 'no_active_plan' using errcode='53400'; end if;
-  if sub.backfill_units is null then return 2147483647; end if; -- unlimited
-  return greatest(0, sub.backfill_units + private.granted_units(w, 'historical_backfill')
+  if sub.backfill_units is null or sub.backfill_units >= 2147483647 then return null; end if;
+  return greatest(0::bigint, sub.backfill_units::bigint + private.granted_units(w, 'historical_backfill')
                      - private.used_units(w, 'historical_backfill', sub.period_start));
 end $function$
 
@@ -1440,16 +1437,19 @@ declare w uuid; begin
   return new;
 end $function$
 
-CREATE OR REPLACE FUNCTION private.budget_entry(kind text, allowance integer, used integer, granted integer DEFAULT 0)
+CREATE OR REPLACE FUNCTION private.budget_entry(kind text, allowance bigint, used bigint, granted bigint DEFAULT 0)
  RETURNS jsonb
  LANGUAGE sql
  IMMUTABLE
  SET search_path TO ''
 AS $function$
- select jsonb_build_object('event_type',kind,
-   'allowance', case when allowance is null then -1 else allowance+granted end,
-   'granted', granted, 'used',used,
-   'remaining', case when allowance is null then -1 else greatest(allowance+granted-used,0) end);
+  select jsonb_build_object(
+    'event_type', kind,
+    'allowance', case when allowance is null or allowance < 0 or allowance = 2147483647 then -1 else (allowance + granted) end,
+    'granted', granted,
+    'used', used,
+    'remaining', case when allowance is null or allowance < 0 or allowance = 2147483647 then -1 else greatest((allowance + granted) - used, 0::bigint) end
+  );
 $function$
 
 CREATE OR REPLACE FUNCTION private.cancel_job_impl(w uuid, j uuid)
@@ -1874,9 +1874,9 @@ BEGIN
       v.title,
       v.kind,
       v.thumbnail_url,
-      coalesce(v.view_count, 0) AS view_count,
-      coalesce(v.like_count, 0) AS like_count,
-      coalesce(v.reported_comment_count, 0) AS reported_comment_count
+      v.view_count,
+      v.like_count,
+      v.reported_comment_count
     FROM public.videos v
     WHERE v.workspace_id = w
       AND (v_platform IS NULL OR v.platform = v_platform)
@@ -1885,9 +1885,9 @@ BEGIN
   ),
   video_kpis AS (
     SELECT
-      coalesce(sum(view_count), 0) AS total_views,
-      coalesce(sum(like_count), 0) AS total_likes,
-      coalesce(sum(reported_comment_count), 0) AS total_reported_comments
+      sum(view_count) AS total_views,
+      sum(like_count) AS total_likes,
+      sum(reported_comment_count) AS total_reported_comments
     FROM distinct_videos
   ),
   raw_comments AS (
@@ -2150,10 +2150,14 @@ BEGIN
       'total_likes', (SELECT total_likes FROM video_kpis),
       'total_comments', (SELECT total FROM summary_stats),
       'engagement_rate', (
-        SELECT round(
-          ((total_likes + (SELECT total FROM summary_stats))::numeric / NULLIF(total_views, 0)::numeric) * 100,
-          2
-        )
+        SELECT CASE
+          WHEN total_views IS NOT NULL AND total_views > 0 THEN
+            round(
+              ((coalesce(total_likes, 0) + (SELECT total FROM summary_stats))::numeric / total_views::numeric) * 100,
+              2
+            )
+          ELSE NULL
+        END
         FROM video_kpis
       ),
       'net_sentiment', (
@@ -2833,15 +2837,16 @@ declare sub record; g uuid; begin
 end $function$
 
 CREATE OR REPLACE FUNCTION private.granted_units(w uuid, kind text)
- RETURNS integer
+ RETURNS bigint
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-  select coalesce(sum(g.units),0)::int from public.usage_grants g
-  where g.kind = granted_units.kind and g.expires_at > now()
-    and g.workspace_id in (select s.workspace_id from public.subscriptions s
-                           where coalesce(s.billing_workspace_id, s.workspace_id) = private.billing_root(w));
+  select coalesce(sum(g.units), 0)::bigint
+    from public.usage_grants g
+   where g.kind = granted_units.kind and g.expires_at > now()
+     and g.workspace_id in (select s.workspace_id from public.subscriptions s
+                            where coalesce(s.billing_workspace_id, s.workspace_id) = private.billing_root(w));
 $function$
 
 CREATE OR REPLACE FUNCTION private.has_due_videos(w uuid, c uuid)
@@ -3035,15 +3040,15 @@ AS $function$
     'price_monthly_cents', p.price_monthly_cents, 'price_yearly_cents', p.price_yearly_cents,
     'self_serve', p.self_serve, 'provider_prices', p.provider_prices,
     'allow_public_channels', coalesce(p.allow_public_channels, false),
-    'backfill_units', case when p.backfill_units is null or p.backfill_units >= 2147483647 then -1 else p.backfill_units end,
+    'backfill_units', case when p.backfill_units is null or p.backfill_units < 0 or p.backfill_units >= 2147483647 then -1 else p.backfill_units end,
     'historical_days_limit', coalesce(p.historical_days_limit, -1),
     'limits', jsonb_build_object(
-      'analysis_units', case when p.analysis_units is null or p.analysis_units >= 2147483647 then -1 else p.analysis_units end,
-      'topic_units', case when p.topic_units is null or p.topic_units >= 2147483647 then -1 else p.topic_units end,
+      'analysis_units', case when p.analysis_units is null or p.analysis_units < 0 or p.analysis_units >= 2147483647 then -1 else p.analysis_units end,
+      'topic_units', case when p.topic_units is null or p.topic_units < 0 or p.topic_units >= 2147483647 then -1 else p.topic_units end,
       'insight_reports', coalesce(p.insight_reports, 0),
-      'channels', case when p.channels_limit is null or p.channels_limit >= 2147483647 then -1 else p.channels_limit end,
-      'members', case when p.members_limit is null or p.members_limit >= 2147483647 then -1 else p.members_limit end,
-      'workspaces', case when p.workspaces_limit is null or p.workspaces_limit >= 2147483647 then -1 else p.workspaces_limit end,
+      'channels', case when p.channels_limit is null or p.channels_limit < 0 or p.channels_limit >= 2147483647 then -1 else p.channels_limit end,
+      'members', case when p.members_limit is null or p.members_limit < 0 or p.members_limit >= 2147483647 then -1 else p.members_limit end,
+      'workspaces', case when p.workspaces_limit is null or p.workspaces_limit < 0 or p.workspaces_limit >= 2147483647 then -1 else p.workspaces_limit end,
       'live_interval_minutes', coalesce(p.live_interval_minutes, 0)));
 $function$
 
@@ -3358,29 +3363,52 @@ CREATE OR REPLACE FUNCTION private.reserve_usage(w uuid, kind text, keys text[])
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare sub record; allowance int; used int; covered text[]; fresh text[]; begin
- if kind not in ('comment_analysis','historical_backfill','topic_classification') then
-   raise exception 'invalid_event_type' using errcode='22023'; end if;
- if coalesce(array_length(keys,1),0) > 500 then raise exception 'batch_too_large' using errcode='22023'; end if;
- select private.subscription_open(s) as open,s.period_start,pl.analysis_units,pl.backfill_units,pl.topic_units into sub
- from public.subscriptions s join public.plans pl on pl.key=s.plan_key
- where s.workspace_id=private.billing_root(w) for update of s;
- if not found then raise exception 'no_active_plan' using errcode='42501'; end if;
- if not sub.open then raise exception 'plan_inactive' using errcode='42501'; end if;
- allowance := case kind when 'comment_analysis' then sub.analysis_units
-                        when 'historical_backfill' then sub.backfill_units
-                        else sub.topic_units end;
- select coalesce(array_agg(u.event_key),'{}') into covered
- from public.usage_events u where u.workspace_id=w and u.event_key=any(keys);
- select coalesce(array_agg(distinct k),'{}') into fresh from unnest(keys) as k where not (k=any(covered));
- if allowance is not null then
-   allowance := allowance + private.granted_units(w,kind);
-   used := private.used_units(w,kind,sub.period_start);
-   fresh := fresh[1:greatest(allowance-used,0)];
- end if;
- insert into public.usage_events(workspace_id,period_start,event_key,event_type)
- select w,sub.period_start,k,kind from unnest(fresh) as k;
- return covered||fresh;
+declare
+  sub record;
+  allowance bigint;
+  used bigint;
+  covered text[];
+  fresh text[];
+begin
+  if kind not in ('comment_analysis', 'historical_backfill', 'topic_classification') then
+    raise exception 'invalid_event_type' using errcode='22023';
+  end if;
+  if coalesce(array_length(keys, 1), 0) > 500 then
+    raise exception 'batch_too_large' using errcode='22023';
+  end if;
+
+  select private.subscription_open(s) as open, s.period_start,
+         pl.analysis_units, pl.backfill_units, pl.topic_units
+    into sub
+    from public.subscriptions s join public.plans pl on pl.key = s.plan_key
+   where s.workspace_id = private.billing_root(w) for update of s;
+  if not found then raise exception 'no_active_plan' using errcode='42501'; end if;
+  if not sub.open then raise exception 'plan_inactive' using errcode='42501'; end if;
+
+  allowance := case kind
+    when 'comment_analysis' then sub.analysis_units
+    when 'historical_backfill' then sub.backfill_units
+    else sub.topic_units
+  end;
+
+  select coalesce(array_agg(u.event_key), '{}') into covered
+    from public.usage_events u
+   where u.workspace_id = w and u.event_key = any(keys);
+
+  select coalesce(array_agg(distinct k), '{}') into fresh
+    from unnest(keys) as k
+   where not (k = any(covered));
+
+  if allowance is not null and allowance < 2147483647 then
+    allowance := allowance + private.granted_units(w, kind);
+    used := private.used_units(w, kind, sub.period_start);
+    fresh := fresh[1:greatest(allowance - used, 0::bigint)];
+  end if;
+
+  insert into public.usage_events(workspace_id, period_start, event_key, event_type)
+  select w, sub.period_start, k, kind from unnest(fresh) as k;
+
+  return covered || fresh;
 end $function$
 
 CREATE OR REPLACE FUNCTION private.retire_platform_worker_credentials(keep uuid[])
@@ -3546,7 +3574,7 @@ CREATE OR REPLACE FUNCTION private.select_videos_impl(w uuid, c uuid, add uuid[]
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare estimate int := 0; unknowns int := 0; outstanding int := 0; remaining int; j uuid;
+declare estimate bigint := 0; unknowns int := 0; outstanding bigint := 0; remaining bigint; j uuid;
         queued boolean := false; deferred boolean := false; running boolean := false;
         rec record;
 begin
@@ -3567,7 +3595,7 @@ begin
   -- nothing to the sum and is reported apart, never as zero.
   select coalesce(sum(greatest(0, v.reported_comment_count
            - (select count(*) from public.comments cm
-               where cm.workspace_id=w and cm.video_id=v.id))), 0)::int,
+               where cm.workspace_id=w and cm.video_id=v.id))), 0)::bigint,
          count(*) filter (where v.reported_comment_count is null)::int
     into estimate, unknowns
     from public.videos v
@@ -3579,7 +3607,7 @@ begin
   -- the whole workspace and before this call writes anything.
   select coalesce(sum(greatest(0, v.reported_comment_count
            - (select count(*) from public.comments cm
-               where cm.workspace_id=w and cm.video_id=v.id))), 0)::int
+               where cm.workspace_id=w and cm.video_id=v.id))), 0)::bigint
     into outstanding
     from public.video_selections s
     join public.videos v on v.workspace_id=w and v.id=s.video_id
@@ -3588,7 +3616,7 @@ begin
   -- A removal alone spends nothing and needs no plan: a paused tenant can still deselect.
   if cardinality(add) > 0 then
     remaining := private.analysis_remaining(w);
-    if estimate + outstanding > remaining then
+    if remaining is not null and estimate + outstanding > remaining then
       raise exception 'quota_exceeded' using errcode='53400'; end if;
   end if;
 
@@ -3625,7 +3653,7 @@ begin
                             'already_running', running,
                             'estimate', estimate, 'unknown_count', unknowns,
                             'outstanding', outstanding,
-                            'remaining_after', remaining - outstanding - estimate);
+                            'remaining_after', case when remaining is null then -1 else remaining - outstanding - estimate end);
 end $function$
 
 CREATE OR REPLACE FUNCTION private.set_workspace_topics_impl(w uuid, topics jsonb)
@@ -3755,7 +3783,7 @@ AS $function$
 $function$
 
 CREATE OR REPLACE FUNCTION private.topic_units_remaining(w uuid)
- RETURNS integer
+ RETURNS bigint
  LANGUAGE plpgsql
  STABLE
  SET search_path TO ''
@@ -3765,8 +3793,8 @@ declare sub record; begin
     from public.subscriptions s join public.plans pl on pl.key = s.plan_key
    where s.workspace_id = private.billing_root(w) and private.subscription_open(s);
   if not found then return null; end if;
-  if sub.topic_units is null then return 2147483647; end if;
-  return greatest(0, sub.topic_units + private.granted_units(w, 'topic_classification')
+  if sub.topic_units is null or sub.topic_units >= 2147483647 then return null; end if;
+  return greatest(0::bigint, sub.topic_units::bigint + private.granted_units(w, 'topic_classification')
                      - private.used_units(w, 'topic_classification', sub.period_start));
 end $function$
 
@@ -3833,16 +3861,15 @@ declare count int := 0; begin
           and a.id <> b.id
      );
 
-  -- Unblock due jobs that have no outstanding active job
+  -- Unblock due jobs that have no outstanding active job without resetting attempt/reclaims
   update public.jobs j
      set status = 'queued',
          error_code = null,
-         attempt = 0,
-         reclaims = 0,
          lease_token = null,
          lease_expires_at = null,
          not_before = now()
    where j.status = 'blocked'
+     and j.not_before is not null
      and j.not_before <= now()
      and not exists (
        select 1 from public.jobs a
@@ -3888,15 +3915,16 @@ declare sub record; pl public.plans; begin
 end $function$
 
 CREATE OR REPLACE FUNCTION private.used_units(w uuid, kind text, since timestamp with time zone)
- RETURNS integer
+ RETURNS bigint
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
- select coalesce(sum(u.units),0)::int from public.usage_events u
- where u.event_type=kind and u.period_start=since
-   and u.workspace_id in (select s.workspace_id from public.subscriptions s
-                          where coalesce(s.billing_workspace_id, s.workspace_id) = private.billing_root(w));
+  select coalesce(sum(u.units), 0)::bigint
+    from public.usage_events u
+   where u.event_type = used_units.kind and u.period_start = since
+     and u.workspace_id in (select s.workspace_id from public.subscriptions s
+                            where coalesce(s.billing_workspace_id, s.workspace_id) = private.billing_root(w));
 $function$
 
 CREATE OR REPLACE FUNCTION private.worker_channel_grant(token_hash text, j uuid)
@@ -4152,32 +4180,98 @@ declare
   ch uuid;
   start_time timestamptz;
   dur_sec integer;
+  j_attempt integer;
+  backoff_seconds integer;
+  sub_reset timestamptz;
+  blocked_not_before timestamptz;
 begin
   perform private.worker_job(token_hash, j, t);
   if outcome not in ('succeeded','partial','failed','blocked','cancelled') then
     raise exception 'invalid_outcome' using errcode='22023'; end if;
 
-  select created_at into start_time from public.jobs where id = j;
+  select created_at, attempt, workspace_id, channel_id
+    into start_time, j_attempt, w, ch
+    from public.jobs
+   where id = j;
   dur_sec := greatest(1, round(extract(epoch from (now() - coalesce(start_time, now())))))::int;
 
+  -- Exponential backoff retry lifecycle for transient failures on attempts 1 and 2
+  if outcome in ('failed', 'partial') and coalesce(j_attempt, 1) < 3 then
+    backoff_seconds := least(30 * (2 ^ coalesce(j_attempt, 1)), 600);
+
+    update public.jobs
+       set status = 'queued',
+           not_before = now() + (backoff_seconds || ' seconds')::interval,
+           lease_token = null,
+           lease_expires_at = null,
+           error_code = reason,
+           last_error = coalesce(reason, public.jobs.last_error),
+           counters = jsonb_set(
+             coalesce(counters, '{}'::jsonb),
+             '{duration_seconds}',
+             to_jsonb(dur_sec)
+           )
+     where id = j;
+
+    insert into public.sync_runs(workspace_id, channel_id, job_id, mode, source,
+                                 status, ended_at, error_code)
+    values (w, ch, j, 'collect', 'unknown', outcome, now(), reason)
+    on conflict (workspace_id, job_id) do update
+      set status = excluded.status,
+          ended_at = excluded.ended_at,
+          error_code = excluded.error_code;
+    return;
+  end if;
+
+  -- On blocked, set not_before by reason (quota -> next reset; plan_inactive/source_access_denied -> not time-based)
+  if outcome = 'blocked' then
+    if reason ilike '%quota%' or reason in ('quota_exceeded', 'rate_limited') then
+      select s.period_end into sub_reset
+        from public.subscriptions s
+       where s.workspace_id = private.billing_root(w);
+
+      if sub_reset is not null and sub_reset > now() and sub_reset <= (now() + interval '366 days') then
+        blocked_not_before := sub_reset;
+      else
+        blocked_not_before := (date_trunc('day', now() at time zone 'utc') + interval '1 day');
+      end if;
+    else
+      -- plan_inactive, source_access_denied, and other non-quota reasons are not time-based
+      blocked_not_before := null;
+    end if;
+  end if;
+
   update public.jobs set status = outcome,
-    error_code = case when outcome = 'succeeded' then null else reason end,
+    error_code = case
+      when outcome = 'succeeded' then null
+      when outcome in ('failed', 'partial') and coalesce(j_attempt, 1) >= 3 then 'retry_exhausted:' || coalesce(reason, 'unknown')
+      else reason
+    end,
     last_error = case
       when outcome = 'succeeded' then null
-      else coalesce(reason, public.jobs.last_error) end,
+      when outcome in ('failed', 'partial') and coalesce(j_attempt, 1) >= 3 then 'retry_exhausted:' || coalesce(reason, 'unknown')
+      else coalesce(reason, public.jobs.last_error)
+    end,
+    not_before = case
+      when outcome = 'blocked' then blocked_not_before
+      else public.jobs.not_before
+    end,
     counters = jsonb_set(
       coalesce(counters, '{}'::jsonb),
       '{duration_seconds}',
       to_jsonb(dur_sec)
     ),
     lease_token = null, lease_expires_at = null
-  where id = j
-  returning workspace_id, channel_id into w, ch;
+  where id = j;
 
   insert into public.sync_runs(workspace_id, channel_id, job_id, mode, source,
                                status, ended_at, error_code)
   values (w, ch, j, 'collect', 'unknown', outcome, now(),
-          case when outcome = 'succeeded' then null else reason end)
+          case
+            when outcome = 'succeeded' then null
+            when outcome in ('failed', 'partial') and coalesce(j_attempt, 1) >= 3 then 'retry_exhausted:' || coalesce(reason, 'unknown')
+            else reason
+          end)
   on conflict (workspace_id, job_id) do update
     set status = excluded.status,
         ended_at = excluded.ended_at,
@@ -4314,7 +4408,8 @@ CREATE OR REPLACE FUNCTION private.worker_topics_due(token_hash text, j uuid, t 
  SET search_path TO ''
 AS $function$
 declare
-  w uuid; c uuid; p text; kind text; k text; active text; rows jsonb; taxonomy jsonb; remaining int;
+  w uuid; c uuid; p text; kind text; k text; active text; rows jsonb; taxonomy jsonb;
+  remaining bigint; sub_open boolean;
 begin
   w := private.worker_job(token_hash, j, t);
   select channel_id, type into c, kind from public.jobs where id = j;
@@ -4325,9 +4420,6 @@ begin
     raise exception 'invalid_batch' using errcode='22023'; end if;
   k := private.topic_classification_key(w, model_id, prompt_version);
   select active_topic_key into active from public.workspaces where id = w;
-  -- A worker running a model that is not the workspace's active one would
-  -- store verdicts that never become effective and pay Gemini for each. It is
-  -- told so instead, and reports the job blocked.
   if active is not null and active <> k then
     return jsonb_build_object('classification_key', k, 'active', false,
                               'taxonomy', '[]'::jsonb, 'rows', '[]'::jsonb);
@@ -4338,9 +4430,17 @@ begin
     into taxonomy
     from public.workspace_topics tp where tp.workspace_id = w and tp.retired_at is null;
 
-  -- Gemini is paid per row sent; the plan is charged per comment on its first
-  -- success, once ever.
-  remaining := private.topic_units_remaining(w);
+  select private.subscription_open(s) into sub_open
+    from public.subscriptions s
+   where s.workspace_id = private.billing_root(w);
+  sub_open := coalesce(sub_open, false);
+
+  if sub_open then
+    remaining := private.topic_units_remaining(w);
+  else
+    remaining := 0::bigint;
+  end if;
+
   select coalesce(jsonb_agg(jsonb_build_object(
            'external_comment_id', e.external_comment_id, 'content_hash', e.content_hash,
            'text', e.text, 'parent_text', e.parent_text, 'is_reply', e.is_reply)
@@ -4373,12 +4473,12 @@ begin
              and private.topic_row_due(w, cm, k)
         ) r
     ) d
-    where remaining is not null and (not d.costs or d.spent <= remaining)
+    where (sub_open and (remaining is null or not d.costs or d.spent <= remaining))
     order by d.published_at nulls last, d.id
     limit least(greatest(coalesce(max_rows, 200), 1), 200)
     ) e;
 
-  if jsonb_array_length(rows) = 0 and coalesce(remaining, 0) = 0
+  if jsonb_array_length(rows) = 0 and (not sub_open or (remaining is not null and remaining = 0))
      and private.topics_pending(w, c) then
     return jsonb_build_object('classification_key', k, 'active', true,
                               'taxonomy', '[]'::jsonb, 'rows', '[]'::jsonb,
@@ -5123,7 +5223,7 @@ CREATE OR REPLACE FUNCTION public.import_historical_records(w uuid, c uuid DEFAU
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
+DECLARE
   effective_c uuid;
   effective_payload jsonb;
   sub record;
@@ -5137,137 +5237,147 @@ declare
   posts_count int := 0;
   comments_count int := 0;
   min_pub timestamptz;
-begin
-  if not private.has_role(w, array['workspace_owner', 'analyst']) then
-    raise exception 'forbidden' using errcode='42501';
-  end if;
+BEGIN
+  IF NOT private.has_role(w, ARRAY['workspace_owner', 'analyst']) THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
 
   effective_c := coalesce(c, p_channel_id);
   effective_payload := coalesce(payload, p_payload);
 
-  if effective_c is null then
-    raise exception 'channel_not_found' using errcode='22023';
-  end if;
+  IF effective_c IS NULL THEN
+    RAISE EXCEPTION 'channel_not_found' USING errcode = '22023';
+  END IF;
 
-  select coalesce(platform, 'youtube') into ch_platform
-    from public.channels where id = effective_c and workspace_id = w;
-  if not found then
-    raise exception 'channel_not_found' using errcode='22023';
-  end if;
+  SELECT coalesce(platform, 'youtube') INTO ch_platform
+    FROM public.channels WHERE id = effective_c AND workspace_id = w;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'channel_not_found' USING errcode = '22023';
+  END IF;
 
-  select pl.key, pl.backfill_units, pl.historical_days_limit into sub
-    from public.subscriptions s join public.plans pl on pl.key = s.plan_key
-   where s.workspace_id = private.billing_root(w) and private.subscription_open(s);
-  if not found then raise exception 'no_active_plan' using errcode='53400'; end if;
+  SELECT pl.key, pl.backfill_units, pl.historical_days_limit INTO sub
+    FROM public.subscriptions s JOIN public.plans pl ON pl.key = s.plan_key
+   WHERE s.workspace_id = private.billing_root(w) AND private.subscription_open(s);
+  IF NOT FOUND THEN RAISE EXCEPTION 'no_active_plan' USING errcode = '53400'; END IF;
 
   -- Only block if explicitly set to 0. NULL means unlimited (Owner / Enterprise).
-  if sub.historical_days_limit is not null and sub.historical_days_limit = 0 then
-    raise exception 'historical_sync_not_allowed_on_plan' using errcode='53400';
-  end if;
+  IF sub.historical_days_limit IS NOT NULL AND sub.historical_days_limit = 0 THEN
+    RAISE EXCEPTION 'historical_sync_not_allowed_on_plan' USING errcode = '53400';
+  END IF;
 
-  if effective_payload is null or jsonb_typeof(effective_payload) != 'object' then
-    raise exception 'invalid_payload' using errcode='22023';
-  end if;
+  IF effective_payload IS NULL OR jsonb_typeof(effective_payload) != 'object' THEN
+    RAISE EXCEPTION 'invalid_payload' USING errcode = '22023';
+  END IF;
 
   -- Validate comments volume (max 1000 per import request)
-  if jsonb_array_length(coalesce(effective_payload->'comments', '[]'::jsonb)) > 1000 then
-    raise exception 'batch_too_large' using errcode='22023';
-  end if;
-  if jsonb_array_length(coalesce(effective_payload->'comments', '[]'::jsonb)) = 0 then
-    raise exception 'no_comments_provided' using errcode='22023';
-  end if;
+  IF jsonb_array_length(coalesce(effective_payload->'comments', '[]'::jsonb)) > 1000 THEN
+    RAISE EXCEPTION 'batch_too_large' USING errcode = '22023';
+  END IF;
+  IF jsonb_array_length(coalesce(effective_payload->'comments', '[]'::jsonb)) = 0 THEN
+    RAISE EXCEPTION 'no_comments_provided' USING errcode = '22023';
+  END IF;
 
   -- If plan has historical_days_limit > 0, ensure imported items do not exceed date depth
-  if sub.historical_days_limit is not null and sub.historical_days_limit > 0 then
-    select min(coalesce((comm_el->>'published_at')::timestamptz, now()))
-      into min_pub
-      from jsonb_array_elements(effective_payload->'comments') comm_el
-     where (comm_el->>'published_at') is not null and (comm_el->>'published_at') <> '';
+  IF sub.historical_days_limit IS NOT NULL AND sub.historical_days_limit > 0 THEN
+    SELECT min((comm_el->>'published_at')::timestamptz)
+      INTO min_pub
+      FROM jsonb_array_elements(effective_payload->'comments') comm_el
+     WHERE (comm_el->>'published_at') IS NOT NULL AND (comm_el->>'published_at') <> '';
 
-    if min_pub is not null and min_pub < (now() - (sub.historical_days_limit || ' days')::interval) then
-      raise exception 'date_beyond_plan_limit' using errcode='22023';
-    end if;
-  end if;
+    IF min_pub IS NOT NULL AND min_pub < (now() - (sub.historical_days_limit || ' days')::interval) THEN
+      RAISE EXCEPTION 'date_beyond_plan_limit' USING errcode = '22023';
+    END IF;
+  END IF;
 
   -- Meter usage against historical_backfill
-  select coalesce(array_agg(distinct 'backfill:' || ch_platform || ':' || (comm_el->>'external_comment_id')), '{}')
-    into keys
-    from jsonb_array_elements(effective_payload->'comments') comm_el;
+  SELECT coalesce(array_agg(DISTINCT 'backfill:' || ch_platform || ':' || (comm_el->>'external_comment_id')), '{}')
+    INTO keys
+    FROM jsonb_array_elements(effective_payload->'comments') comm_el;
   wanted := coalesce(array_length(keys, 1), 0);
-  if wanted > 0 then
+  IF wanted > 0 THEN
     covered := private.reserve_usage(w, 'historical_backfill', keys);
-    if coalesce(array_length(covered, 1), 0) <> wanted then
-      raise exception 'quota_exceeded' using errcode='53400';
-    end if;
-  end if;
+    IF coalesce(array_length(covered, 1), 0) <> wanted THEN
+      RAISE EXCEPTION 'quota_exceeded' USING errcode = '53400';
+    END IF;
+  END IF;
 
   -- Upsert posts/videos
-  for p_rec in
-    select p->>'external_video_id' as ext_id,
-           coalesce(nullif(p->>'title', ''), p->>'external_video_id') as title,
-           coalesce(p->>'kind', case when ch_platform = 'telegram' then 'channel_post' else 'video' end) as kind,
-           nullif(p->>'published_at', '')::timestamptz as published_at
-      from jsonb_array_elements(coalesce(effective_payload->'posts', '[]'::jsonb)) p
-  loop
-    insert into public.videos(workspace_id, channel_id, platform, external_video_id, title, kind, published_at)
-    values (w, effective_c, ch_platform, p_rec.ext_id, p_rec.title, p_rec.kind, p_rec.published_at)
-    on conflict (workspace_id, platform, external_video_id) do update set
-      title = case when excluded.title <> public.videos.external_video_id then excluded.title else public.videos.title end,
+  FOR p_rec IN
+    SELECT p->>'external_video_id' AS ext_id,
+           coalesce(nullif(p->>'title', ''), p->>'external_video_id') AS title,
+           coalesce(p->>'kind', CASE WHEN ch_platform = 'telegram' THEN 'channel_post' ELSE 'video' END) AS kind,
+           nullif(p->>'published_at', '')::timestamptz AS published_at
+      FROM jsonb_array_elements(coalesce(effective_payload->'posts', '[]'::jsonb)) p
+  LOOP
+    INSERT INTO public.videos(workspace_id, channel_id, platform, external_video_id, title, kind, published_at)
+    VALUES (w, effective_c, ch_platform, p_rec.ext_id, p_rec.title, p_rec.kind, p_rec.published_at)
+    ON CONFLICT (workspace_id, platform, external_video_id) DO UPDATE SET
+      title = CASE WHEN excluded.title <> public.videos.external_video_id THEN excluded.title ELSE public.videos.title END,
       kind = coalesce(excluded.kind, public.videos.kind),
       published_at = coalesce(excluded.published_at, public.videos.published_at),
       last_observed_at = now();
     posts_count := posts_count + 1;
-  end loop;
+  END LOOP;
 
   -- Upsert comments
-  for c_rec in
-    select comm_el->>'external_video_id' as ext_video_id,
-           comm_el->>'external_comment_id' as ext_comm_id,
-           comm_el->>'external_parent_id' as ext_parent_id,
-           coalesce((comm_el->>'is_reply')::boolean, false) as is_reply,
-           comm_el->>'author_name' as author_name,
-           comm_el->>'text_raw' as text_raw,
-           coalesce(comm_el->>'text_plain', comm_el->>'text_raw') as text_plain,
-           comm_el->>'content_hash' as content_hash,
-           nullif(comm_el->>'published_at', '')::timestamptz as published_at,
-           coalesce((comm_el->>'likes_value')::bigint, 0) as likes_value
-      from jsonb_array_elements(effective_payload->'comments') comm_el
-  loop
+  FOR c_rec IN
+    SELECT comm_el->>'external_video_id' AS ext_video_id,
+           comm_el->>'external_comment_id' AS ext_comm_id,
+           comm_el->>'external_parent_id' AS ext_parent_id,
+           coalesce((comm_el->>'is_reply')::boolean, false) AS is_reply,
+           comm_el->>'author_name' AS author_name,
+           comm_el->>'text_raw' AS text_raw,
+           coalesce(comm_el->>'text_plain', comm_el->>'text_raw') AS text_plain,
+           comm_el->>'content_hash' AS content_hash,
+           nullif(comm_el->>'published_at', '')::timestamptz AS published_at,
+           (comm_el->>'likes_value')::bigint AS likes_value
+      FROM jsonb_array_elements(effective_payload->'comments') comm_el
+  LOOP
     -- Ensure video exists
-    insert into public.videos(workspace_id, channel_id, platform, external_video_id, title, kind)
-    values (w, effective_c, ch_platform, c_rec.ext_video_id, c_rec.ext_video_id, case when ch_platform = 'telegram' then 'channel_post' else 'video' end)
-    on conflict (workspace_id, platform, external_video_id) do update set last_observed_at = now()
-    returning id into v_id;
+    INSERT INTO public.videos(workspace_id, channel_id, platform, external_video_id, title, kind)
+    VALUES (w, effective_c, ch_platform, c_rec.ext_video_id, c_rec.ext_video_id, CASE WHEN ch_platform = 'telegram' THEN 'channel_post' ELSE 'video' END)
+    ON CONFLICT (workspace_id, platform, external_video_id) DO UPDATE SET last_observed_at = now()
+    RETURNING id INTO v_id;
 
-    -- Upsert comment
-    insert into public.comments(
+    -- Upsert comment (Invariant 3: null likes preserved, missing date is null with unknown precision)
+    INSERT INTO public.comments(
       workspace_id, video_id, platform, external_comment_id, external_parent_id,
       is_reply, author_name, text_raw, text_plain, content_hash,
       timestamp_precision, published_at, likes_value, source, field_provenance
     )
-    values (
+    VALUES (
       w, v_id, ch_platform, c_rec.ext_comm_id, c_rec.ext_parent_id,
       c_rec.is_reply, coalesce(c_rec.author_name, ''), c_rec.text_raw, c_rec.text_plain,
       coalesce(nullif(c_rec.content_hash, ''), md5(c_rec.text_raw)),
-      'second', coalesce(c_rec.published_at, now()), c_rec.likes_value, 'external_import',
+      CASE WHEN c_rec.published_at IS NOT NULL THEN 'second' ELSE 'unknown' END,
+      c_rec.published_at,
+      c_rec.likes_value,
+      'external_import',
       jsonb_build_object('imported_at', now(), 'source', 'file_upload')
     )
-    on conflict (workspace_id, platform, external_comment_id) do update set
+    ON CONFLICT (workspace_id, platform, external_comment_id) DO UPDATE SET
       text_raw = excluded.text_raw,
       text_plain = excluded.text_plain,
-      likes_value = excluded.likes_value,
-      last_seen_at = now();
+      likes_value = coalesce(excluded.likes_value, public.comments.likes_value),
+      published_at = coalesce(excluded.published_at, public.comments.published_at),
+      timestamp_precision = CASE
+        WHEN excluded.published_at IS NOT NULL THEN 'second'
+        ELSE public.comments.timestamp_precision
+      END,
+      last_seen_at = now()
+    WHERE public.comments.source = 'external_import';
     comments_count := comments_count + 1;
-  end loop;
+  END LOOP;
 
-  return jsonb_build_object(
+  RETURN jsonb_build_object(
     'ok', true,
     'posts_count', posts_count,
     'comments_count', comments_count,
     'backfill_units_used', wanted,
     'backfill_units_remaining', private.backfill_remaining(w)
   );
-end $function$
+END;
+$function$
 
 CREATE OR REPLACE FUNCTION public.is_platform_admin()
  RETURNS boolean
@@ -5446,87 +5556,100 @@ CREATE OR REPLACE FUNCTION public.request_historical_platform_sync(w uuid, p_cha
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
+DECLARE
   calc_since timestamptz;
-begin
-  if p_published_after is not null then
+BEGIN
+  IF p_published_after IS NOT NULL THEN
     calc_since := p_published_after;
-  elsif p_days_back is not null and p_days_back > 0 then
+  ELSIF p_days_back IS NOT NULL AND p_days_back > 0 THEN
     calc_since := now() - (p_days_back || ' days')::interval;
-  else
+  ELSE
     calc_since := now() - interval '30 days';
-  end if;
+  END IF;
 
-  return public.request_historical_platform_sync(
+  RETURN public.request_historical_platform_sync(
     w => w,
     c => p_channel_id,
     since_date => calc_since,
     max_items => coalesce(p_max_items, 500)
   );
-end $function$
+END;
+$function$
 
-CREATE OR REPLACE FUNCTION public.request_historical_platform_sync(w uuid, c uuid, since_date timestamp with time zone, max_items integer DEFAULT 500)
+CREATE OR REPLACE FUNCTION public.request_historical_platform_sync(w uuid, c uuid, since_date timestamp with time zone DEFAULT NULL::timestamp with time zone, max_items integer DEFAULT 500)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
+DECLARE
   sub record;
-  job_id uuid;
-  ch_exists boolean;
   effective_since timestamptz;
-begin
-  if not private.has_role(w, array['workspace_owner', 'analyst']) then
-    raise exception 'forbidden' using errcode='42501';
-  end if;
+  job_id uuid;
+  existing_status text;
+BEGIN
+  IF NOT private.has_role(w, ARRAY['workspace_owner', 'analyst']) THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
 
-  select exists(select 1 from public.channels where id = c and workspace_id = w) into ch_exists;
-  if not ch_exists then
-    raise exception 'channel_not_found' using errcode='22023';
-  end if;
+  PERFORM 1 FROM public.channels WHERE id = c AND workspace_id = w;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'channel_not_found' USING errcode = '22023';
+  END IF;
 
-  select pl.key, pl.backfill_units, pl.historical_days_limit into sub
-    from public.subscriptions s join public.plans pl on pl.key = s.plan_key
-   where s.workspace_id = private.billing_root(w) and private.subscription_open(s);
-  if not found then raise exception 'no_active_plan' using errcode='53400'; end if;
+  SELECT pl.key, pl.backfill_units, pl.historical_days_limit INTO sub
+    FROM public.subscriptions s JOIN public.plans pl ON pl.key = s.plan_key
+   WHERE s.workspace_id = private.billing_root(w) AND private.subscription_open(s);
+  IF NOT FOUND THEN RAISE EXCEPTION 'no_active_plan' USING errcode = '53400'; END IF;
 
   -- Only block if explicitly set to 0 (e.g. Free tier). NULL means unlimited (Owner / Enterprise).
-  if sub.historical_days_limit is not null and sub.historical_days_limit = 0 then
-    raise exception 'historical_sync_not_allowed_on_plan' using errcode='53400';
-  end if;
+  IF sub.historical_days_limit IS NOT NULL AND sub.historical_days_limit = 0 THEN
+    RAISE EXCEPTION 'historical_sync_not_allowed_on_plan' USING errcode = '53400';
+  END IF;
 
   effective_since := coalesce(since_date, now() - interval '30 days');
 
-  if sub.historical_days_limit is not null and sub.historical_days_limit > 0 then
-    if effective_since < (now() - (sub.historical_days_limit || ' days')::interval) then
-      raise exception 'date_beyond_plan_limit' using errcode='22023';
-    end if;
-  end if;
+  IF sub.historical_days_limit IS NOT NULL AND sub.historical_days_limit > 0 THEN
+    IF effective_since < (now() - (sub.historical_days_limit || ' days')::interval) THEN
+      RAISE EXCEPTION 'date_beyond_plan_limit' USING errcode = '22023';
+    END IF;
+  END IF;
 
-  if private.backfill_remaining(w) <= 0 then
-    raise exception 'quota_exceeded' using errcode='53400';
-  end if;
+  -- Guard against quota exceeded when limit is bounded
+  IF private.backfill_remaining(w) IS NOT NULL AND private.backfill_remaining(w) <= 0 THEN
+    RAISE EXCEPTION 'quota_exceeded' USING errcode = '53400';
+  END IF;
 
-  insert into public.jobs(workspace_id, channel_id, type, dedupe_key, checkpoint)
-  values (w, c, 'import', 'hist_sync:' || c || ':' || extract(epoch from effective_since), jsonb_build_object(
+  INSERT INTO public.jobs(workspace_id, channel_id, type, dedupe_key, checkpoint)
+  VALUES (w, c, 'import', 'hist_sync:' || c || ':' || extract(epoch FROM effective_since), jsonb_build_object(
     'is_historical', true,
     'since', effective_since,
     'max_items', coalesce(max_items, 500),
     'source', 'platform_sync'
   ))
-  on conflict (workspace_id, dedupe_key) do update set
+  ON CONFLICT (workspace_id, dedupe_key) DO UPDATE SET
     checkpoint = excluded.checkpoint, status = 'queued', attempt = 0, not_before = now()
-  returning id into job_id;
+  WHERE public.jobs.status NOT IN ('running', 'succeeded')
+  RETURNING id INTO job_id;
 
-  return jsonb_build_object(
+  IF job_id IS NULL THEN
+    SELECT id, status INTO job_id, existing_status
+      FROM public.jobs
+     WHERE workspace_id = w
+       AND dedupe_key = 'hist_sync:' || c || ':' || extract(epoch FROM effective_since);
+  ELSE
+    existing_status := 'queued';
+  END IF;
+
+  RETURN jsonb_build_object(
     'ok', true,
     'job_id', job_id,
-    'status', 'queued',
-    'historical_days_limit', coalesce(sub.historical_days_limit, -1),
+    'status', coalesce(existing_status, 'queued'),
+    'historical_days_limit', sub.historical_days_limit,
     'backfill_remaining', private.backfill_remaining(w)
   );
-end $function$
+END;
+$function$
 
 CREATE OR REPLACE FUNCTION public.retire_workspace(w uuid)
  RETURNS void
@@ -5986,8 +6109,18 @@ CREATE OR REPLACE FUNCTION public.update_plan_limits(p_plan_key text, p_limits j
  SET search_path TO ''
 AS $function$
 declare
-  target_plan public.plans;
-  updated_plan public.plans;
+  target_plan public.plans%rowtype;
+  updated_plan public.plans%rowtype;
+  v_analysis_units int;
+  v_channels_limit int;
+  v_members_limit int;
+  v_workspaces_limit int;
+  v_backfill_units int;
+  v_topic_units int;
+  v_historical_days_limit int;
+  v_insight_reports int;
+  v_live_interval_minutes int;
+  v_allow_public_channels boolean;
 begin
   if not public.is_platform_admin() then
     raise exception 'forbidden' using errcode='42501';
@@ -5995,92 +6128,94 @@ begin
 
   select * into target_plan from public.plans where key = p_plan_key;
   if not found then
-    raise exception 'unknown_plan' using errcode='22023';
+    raise exception 'plan_not_found' using errcode='P0002';
   end if;
 
+  -- historical_days_limit has no check constraint and can be true NULL across all plans
+  v_historical_days_limit := case
+    when p_limits ? 'historical_days_limit' then
+      case when (p_limits->>'historical_days_limit')::int = -1 then null else (p_limits->>'historical_days_limit')::int end
+    else target_plan.historical_days_limit end;
+
+  -- backfill_units, topic_units, analysis_units, channels_limit, members_limit, workspaces_limit
+  -- are governed by plans_limits_finite_unless_internal check constraint
+  v_backfill_units := case
+    when p_limits ? 'backfill_units' then
+      case when (p_limits->>'backfill_units')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'backfill_units')::int end
+    else target_plan.backfill_units end;
+
+  v_topic_units := case
+    when p_limits ? 'topic_units' then
+      case when (p_limits->>'topic_units')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'topic_units')::int end
+    else target_plan.topic_units end;
+
+  v_analysis_units := case
+    when p_limits ? 'analysis_units' then
+      case when (p_limits->>'analysis_units')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'analysis_units')::int end
+    else target_plan.analysis_units end;
+
+  v_channels_limit := case
+    when p_limits ? 'channels_limit' then
+      case when (p_limits->>'channels_limit')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'channels_limit')::int end
+    when p_limits ? 'channels' then
+      case when (p_limits->>'channels')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'channels')::int end
+    else target_plan.channels_limit end;
+
+  v_members_limit := case
+    when p_limits ? 'members_limit' then
+      case when (p_limits->>'members_limit')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'members_limit')::int end
+    when p_limits ? 'members' then
+      case when (p_limits->>'members')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'members')::int end
+    else target_plan.members_limit end;
+
+  v_workspaces_limit := case
+    when p_limits ? 'workspaces_limit' then
+      case when (p_limits->>'workspaces_limit')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'workspaces_limit')::int end
+    when p_limits ? 'workspaces' then
+      case when (p_limits->>'workspaces')::int = -1 then
+        case when target_plan.internal then null else 2147483647 end
+      else (p_limits->>'workspaces')::int end
+    else target_plan.workspaces_limit end;
+
+  v_insight_reports := case
+    when p_limits ? 'insight_reports' then (p_limits->>'insight_reports')::int
+    else target_plan.insight_reports end;
+
+  v_live_interval_minutes := case
+    when p_limits ? 'live_interval_minutes' then (p_limits->>'live_interval_minutes')::int
+    else target_plan.live_interval_minutes end;
+
+  v_allow_public_channels := case
+    when p_limits ? 'allow_public_channels' then (p_limits->>'allow_public_channels')::boolean
+    else target_plan.allow_public_channels end;
+
   update public.plans
-     set backfill_units = case
-           when p_limits ? 'backfill_units' then
-             case
-               when (p_limits->>'backfill_units')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'backfill_units')::int
-             end
-           else backfill_units end,
-         historical_days_limit = case
-           when p_limits ? 'historical_days_limit' then
-             case when (p_limits->>'historical_days_limit')::int = -1 then null else (p_limits->>'historical_days_limit')::int end
-           else historical_days_limit end,
-         analysis_units = case
-           when p_limits ? 'analysis_units' then
-             case
-               when (p_limits->>'analysis_units')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'analysis_units')::int
-             end
-           else analysis_units end,
-         topic_units = case
-           when p_limits ? 'topic_units' then
-             case
-               when (p_limits->>'topic_units')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'topic_units')::int
-             end
-           else topic_units end,
-         channels_limit = case
-           when p_limits ? 'channels_limit' then
-             case
-               when (p_limits->>'channels_limit')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'channels_limit')::int
-             end
-           when p_limits ? 'channels' then
-             case
-               when (p_limits->>'channels')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'channels')::int
-             end
-           else channels_limit end,
-         members_limit = case
-           when p_limits ? 'members_limit' then
-             case
-               when (p_limits->>'members_limit')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'members_limit')::int
-             end
-           when p_limits ? 'members' then
-             case
-               when (p_limits->>'members')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'members')::int
-             end
-           else members_limit end,
-         workspaces_limit = case
-           when p_limits ? 'workspaces_limit' then
-             case
-               when (p_limits->>'workspaces_limit')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'workspaces_limit')::int
-             end
-           when p_limits ? 'workspaces' then
-             case
-               when (p_limits->>'workspaces')::int = -1 then
-                 case when target_plan.internal then null else 2147483647 end
-               else (p_limits->>'workspaces')::int
-             end
-           else workspaces_limit end,
-         insight_reports = case
-           when p_limits ? 'insight_reports' then
-             (p_limits->>'insight_reports')::int
-           else insight_reports end,
-         live_interval_minutes = case
-           when p_limits ? 'live_interval_minutes' then
-             (p_limits->>'live_interval_minutes')::int
-           else live_interval_minutes end,
-         allow_public_channels = case
-           when p_limits ? 'allow_public_channels' then
-             (p_limits->>'allow_public_channels')::boolean
-           else allow_public_channels end
+     set backfill_units = v_backfill_units,
+         historical_days_limit = v_historical_days_limit,
+         analysis_units = v_analysis_units,
+         topic_units = v_topic_units,
+         channels_limit = v_channels_limit,
+         members_limit = v_members_limit,
+         workspaces_limit = v_workspaces_limit,
+         insight_reports = v_insight_reports,
+         live_interval_minutes = v_live_interval_minutes,
+         allow_public_channels = v_allow_public_channels
    where key = p_plan_key
    returning * into updated_plan;
 
@@ -6661,14 +6796,17 @@ grant EXECUTE on function private.adopt_first_topic_classification() to "postgre
 grant EXECUTE on function private.adopt_video_comments_and_predictions(uuid,uuid) to "postgres";
 grant EXECUTE on function private.adopt_video_comments_and_predictions(uuid,uuid) to "service_role";
 grant EXECUTE on function private.analysis_remaining(uuid) to "postgres";
+grant EXECUTE on function private.analysis_remaining(uuid) to "service_role";
 grant EXECUTE on function private.apply_billing_event(text,text,timestamp with time zone,uuid,text,text,timestamp with time zone,timestamp with time zone,text,boolean,text,text,jsonb) to "postgres";
 grant EXECUTE on function private.apply_pack_event(text,timestamp with time zone,uuid,text,integer,text,jsonb) to "postgres";
 grant EXECUTE on function private.backfill_remaining(uuid) to "postgres";
+grant EXECUTE on function private.backfill_remaining(uuid) to "service_role";
 grant EXECUTE on function private.billing_root(uuid) to "postgres";
 grant EXECUTE on function private.billing_root(uuid) to "service_role";
 grant EXECUTE on function private.billing_sweep() to "postgres";
 grant EXECUTE on function private.bootstrap_personal_workspace() to "postgres";
-grant EXECUTE on function private.budget_entry(text,integer,integer,integer) to "postgres";
+grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "postgres";
+grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "service_role";
 grant EXECUTE on function private.cancel_job_impl(uuid,uuid) to "authenticated";
 grant EXECUTE on function private.cancel_job_impl(uuid,uuid) to "postgres";
 grant EXECUTE on function private.claim_job(uuid) to "postgres";
