@@ -3,7 +3,7 @@
  *
  * Supports omnichannel historical post/video and comment ingestion:
  * 1. Platform-direct historical sync (YouTube/Telegram) capped by plan's historical days limit.
- * 2. External CSV / JSON file upload with column auto-mapping, quota verification, and preview.
+ * 2. External CSV / JSON file upload with column auto-mapping, quota verification, caps enforcement, and preview.
  */
 import { useMemo, useRef, useState } from "react";
 import type { UsageSummary } from "@sentiment/contracts";
@@ -21,9 +21,12 @@ import {
 } from "../ui/Dialog";
 import {
   generateSampleCsvTemplate,
-  parseHistoricalFile,
+  parseHistoricalFileAsync,
+  MAX_HISTORICAL_FILE_SIZE,
+  MAX_HISTORICAL_COMMENTS,
   type ParseResult,
 } from "./historicalCsvJson";
+import "./ops.css";
 
 export function HistoricalImportModal({
   open,
@@ -85,6 +88,7 @@ export function HistoricalImportModal({
   // File import state
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isParsingFile, setIsParsingFile] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [isImportingFile, setIsImportingFile] = useState(false);
   const [fileFeedback, setFileFeedback] = useState<{
@@ -98,6 +102,7 @@ export function HistoricalImportModal({
     setFileFeedback(null);
     setFileName(null);
     setParseResult(null);
+    setIsParsingFile(false);
     onClose();
   }
 
@@ -132,16 +137,21 @@ export function HistoricalImportModal({
       );
 
       if (error) {
-        let msg = error.message;
-        if (msg.includes("historical_sync_not_allowed_on_plan")) {
+        let msg = S.historicalSyncFailed;
+        const errText = error.message || "";
+        if (errText.includes("historical_sync_not_allowed_on_plan")) {
           msg = S.historicalSyncPlanNotAllowed;
-        } else if (msg.includes("date_beyond_plan_limit")) {
+        } else if (errText.includes("date_beyond_plan_limit")) {
           msg =
             maxDaysLimit > 0
-              ? S.historicalDaysLimitNotice(maxDaysLimit)
+              ? S.historicalDateBeyondPlanLimit(maxDaysLimit)
               : S.historicalSyncFailed;
-        } else if (msg.includes("quota_exceeded")) {
+        } else if (errText.includes("quota_exceeded")) {
           msg = S.historicalImportQuotaExceeded;
+        } else if (errText.includes("channel_not_found")) {
+          msg = S.historicalChannelNotFound;
+        } else if (errText.includes("forbidden")) {
+          msg = S.historicalForbidden;
         }
         setSyncFeedback({ msg, tone: "error" });
       } else {
@@ -175,22 +185,51 @@ export function HistoricalImportModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Immediately clear previous parse state and feedback
     setFileName(file.name);
+    setParseResult(null);
     setFileFeedback(null);
 
+    // Enforce file size limit immediately before reading
+    if (file.size > MAX_HISTORICAL_FILE_SIZE) {
+      setFileFeedback({
+        msg: S.historicalFileTooLarge,
+        tone: "error",
+      });
+      return;
+    }
+
+    setIsParsingFile(true);
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = String(event.target?.result || "");
-      const parsed = parseHistoricalFile(content, file.name);
-      setParseResult(parsed);
-      if (!parsed.ok) {
+    reader.onload = async (event) => {
+      try {
+        const content = String(event.target?.result || "");
+        // Parse off main thread using async chunked parser
+        const parsed = await parseHistoricalFileAsync(content, file.name);
+        setParseResult(parsed);
+        if (!parsed.ok) {
+          let errorMsg = S.historicalFileInvalid;
+          if (parsed.error === "file_too_large") {
+            errorMsg = S.historicalFileTooLarge;
+          } else if (parsed.error === "batch_too_large") {
+            errorMsg = S.historicalBatchTooLarge;
+          }
+          setFileFeedback({
+            msg: errorMsg,
+            tone: "error",
+          });
+        }
+      } catch {
         setFileFeedback({
           msg: S.historicalFileInvalid,
           tone: "error",
         });
+      } finally {
+        setIsParsingFile(false);
       }
     };
     reader.onerror = () => {
+      setIsParsingFile(false);
       setFileFeedback({
         msg: S.historicalFileInvalid,
         tone: "error",
@@ -218,6 +257,14 @@ export function HistoricalImportModal({
     if (!channelId || !supabase || !parseResult?.payload) return;
 
     const commentsCount = parseResult.payload.comments.length;
+    if (commentsCount > MAX_HISTORICAL_COMMENTS) {
+      setFileFeedback({
+        msg: S.historicalBatchTooLarge,
+        tone: "error",
+      });
+      return;
+    }
+
     if (remainingQuota !== -1 && commentsCount > remainingQuota) {
       setFileFeedback({
         msg: S.historicalImportQuotaExceeded,
@@ -237,16 +284,27 @@ export function HistoricalImportModal({
       });
 
       if (error) {
-        let msg = error.message;
-        if (msg.includes("historical_sync_not_allowed_on_plan")) {
+        let msg = S.historicalImportFailed;
+        const errText = error.message || "";
+        if (errText.includes("batch_too_large")) {
+          msg = S.historicalBatchTooLarge;
+        } else if (errText.includes("file_too_large")) {
+          msg = S.historicalFileTooLarge;
+        } else if (errText.includes("historical_sync_not_allowed_on_plan")) {
           msg = S.historicalSyncPlanNotAllowed;
-        } else if (msg.includes("date_beyond_plan_limit")) {
+        } else if (errText.includes("date_beyond_plan_limit")) {
           msg =
             maxDaysLimit > 0
-              ? S.historicalDaysLimitNotice(maxDaysLimit)
+              ? S.historicalDateBeyondPlanLimit(maxDaysLimit)
               : S.historicalImportFailed;
-        } else if (msg.includes("quota_exceeded")) {
+        } else if (errText.includes("quota_exceeded")) {
           msg = S.historicalImportQuotaExceeded;
+        } else if (errText.includes("channel_not_found")) {
+          msg = S.historicalChannelNotFound;
+        } else if (errText.includes("forbidden")) {
+          msg = S.historicalForbidden;
+        } else if (errText.includes("invalid_payload")) {
+          msg = S.historicalInvalidPayload;
         }
         setFileFeedback({ msg, tone: "error" });
       } else {
@@ -266,8 +324,12 @@ export function HistoricalImportModal({
           onSuccess();
           setTimeout(() => handleClose(), 1600);
         } else {
+          let msg = res.error || S.historicalImportFailed;
+          if (res.error?.includes("batch_too_large")) {
+            msg = S.historicalBatchTooLarge;
+          }
           setFileFeedback({
-            msg: res.error || S.historicalImportFailed,
+            msg,
             tone: "error",
           });
         }
@@ -292,24 +354,12 @@ export function HistoricalImportModal({
       <DialogContent
         closeLabel={locale === "ar" ? "إغلاق" : "Close"}
         className="db-historical-dialog"
-        style={{ maxWidth: "600px", width: "95vw" }}
       >
         <DialogTitle>{S.historicalImportTitle}</DialogTitle>
         <DialogDescription>{S.historicalImportLead}</DialogDescription>
 
         {/* Quota Banner */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "var(--bg-muted)",
-            padding: "var(--space-2) var(--space-3)",
-            borderRadius: "var(--radius-1)",
-            margin: "var(--space-2) 0 var(--space-3) 0",
-            fontSize: "0.9rem",
-          }}
-        >
+        <div className="db-historical-quota-banner">
           <div>
             <strong>{S.budgetBackfill}: </strong>
             <Badge tone={remainingQuota === 0 ? "danger" : "neutral"}>
@@ -326,32 +376,11 @@ export function HistoricalImportModal({
         </div>
 
         {/* Tab Selector */}
-        <div
-          style={{
-            display: "flex",
-            gap: "var(--space-2)",
-            borderBottom: "1px solid var(--border-1)",
-            marginBottom: "var(--space-3)",
-          }}
-        >
+        <div className="db-historical-tabs">
           <button
             type="button"
             onClick={() => setActiveTab("platform")}
-            style={{
-              padding: "var(--space-2) var(--space-3)",
-              background: "none",
-              border: "none",
-              borderBottom:
-                activeTab === "platform"
-                  ? "2px solid var(--color-primary, #0284c7)"
-                  : "none",
-              fontWeight: activeTab === "platform" ? "bold" : "normal",
-              cursor: "pointer",
-              color:
-                activeTab === "platform"
-                  ? "var(--text-1)"
-                  : "var(--text-muted)",
-            }}
+            className={`db-historical-tab ${activeTab === "platform" ? "is-active" : ""}`}
             data-testid="tab-platform-sync"
           >
             {platform
@@ -361,19 +390,7 @@ export function HistoricalImportModal({
           <button
             type="button"
             onClick={() => setActiveTab("file")}
-            style={{
-              padding: "var(--space-2) var(--space-3)",
-              background: "none",
-              border: "none",
-              borderBottom:
-                activeTab === "file"
-                  ? "2px solid var(--color-primary, #0284c7)"
-                  : "none",
-              fontWeight: activeTab === "file" ? "bold" : "normal",
-              cursor: "pointer",
-              color:
-                activeTab === "file" ? "var(--text-1)" : "var(--text-muted)",
-            }}
+            className={`db-historical-tab ${activeTab === "file" ? "is-active" : ""}`}
             data-testid="tab-file-import"
           >
             {S.historicalTabFile}
@@ -382,20 +399,12 @@ export function HistoricalImportModal({
 
         {/* TAB 1: Platform Direct Sync */}
         {activeTab === "platform" && (
-          <form
-            onSubmit={handleSubmitSync}
-            style={{ display: "grid", gap: "var(--space-3)" }}
-          >
+          <form onSubmit={handleSubmitSync} className="db-historical-form">
             {syncFeedback && (
               <div
                 role="alert"
-                style={{
-                  color:
-                    syncFeedback.tone === "error"
-                      ? "var(--tone-danger)"
-                      : "var(--tone-success)",
-                  fontSize: "0.9rem",
-                }}
+                className="db-historical-feedback"
+                data-tone={syncFeedback.tone}
               >
                 {syncFeedback.msg}
               </div>
@@ -447,14 +456,7 @@ export function HistoricalImportModal({
               />
             </label>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "var(--space-2)",
-                marginTop: "var(--space-2)",
-              }}
-            >
+            <div className="db-historical-dialog-actions">
               <Button
                 type="button"
                 variant="secondary"
@@ -483,32 +485,20 @@ export function HistoricalImportModal({
         {activeTab === "file" && (
           <form
             onSubmit={handleSubmitFileImport}
-            style={{ display: "grid", gap: "var(--space-3)" }}
+            className="db-historical-form"
           >
             {fileFeedback && (
               <div
                 role="alert"
-                style={{
-                  color:
-                    fileFeedback.tone === "error"
-                      ? "var(--tone-danger)"
-                      : "var(--tone-success)",
-                  fontSize: "0.9rem",
-                }}
+                className="db-historical-feedback"
+                data-tone={fileFeedback.tone}
               >
                 {fileFeedback.msg}
               </div>
             )}
 
             <div
-              style={{
-                border: "2px dashed var(--border-2, #ccc)",
-                borderRadius: "var(--radius-2)",
-                padding: "var(--space-4)",
-                textAlign: "center",
-                background: "var(--bg-muted)",
-                cursor: "pointer",
-              }}
+              className="db-historical-dropzone"
               onClick={() => fileInputRef.current?.click()}
             >
               <input
@@ -519,18 +509,19 @@ export function HistoricalImportModal({
                 onChange={handleFileChange}
                 data-testid="input-file-import"
               />
-              <p style={{ margin: "0 0 var(--space-2) 0", fontWeight: 600 }}>
-                {fileName ? fileName : S.historicalFileDropzone}
+              <p className="db-historical-dropzone-filename">
+                {isParsingFile
+                  ? S.historicalParsingFile
+                  : fileName
+                    ? fileName
+                    : S.historicalFileDropzone}
+              </p>
+              <p className="db-historical-dropzone-caps">
+                {S.historicalFileCapsHint(5, 1000)}
               </p>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
+            <div className="db-historical-file-actions">
               <Button
                 type="button"
                 variant="secondary"
@@ -542,7 +533,7 @@ export function HistoricalImportModal({
               </Button>
 
               {parseResult?.ok && parseResult.summary && (
-                <div style={{ fontSize: "0.85rem" }}>
+                <div className="db-historical-file-counts">
                   <span>
                     {S.historicalPreviewPostsCount(
                       parseResult.summary.postsCount,
@@ -562,30 +553,12 @@ export function HistoricalImportModal({
             {parseResult?.ok &&
               parseResult.payload &&
               parseResult.payload.comments.length > 0 && (
-                <div
-                  style={{
-                    maxHeight: "120px",
-                    overflowY: "auto",
-                    border: "1px solid var(--border-1)",
-                    borderRadius: "var(--radius-1)",
-                    padding: "var(--space-2)",
-                    fontSize: "0.8rem",
-                    background: "var(--bg-card)",
-                  }}
-                >
-                  <div
-                    style={{ fontWeight: 600, marginBottom: "var(--space-1)" }}
-                  >
+                <div className="db-historical-preview">
+                  <div className="db-historical-preview-title">
                     {S.historicalPreviewTitle}
                   </div>
                   {parseResult.payload.comments.slice(0, 3).map((c, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        borderBottom: "1px solid var(--border-1)",
-                        padding: "2px 0",
-                      }}
-                    >
+                    <div key={i} className="db-historical-preview-row">
                       <strong>{c.author_name || "Anonymous"}: </strong>
                       <span>{c.text_raw}</span>
                     </div>
@@ -593,19 +566,12 @@ export function HistoricalImportModal({
                 </div>
               )}
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "var(--space-2)",
-                marginTop: "var(--space-2)",
-              }}
-            >
+            <div className="db-historical-dialog-actions">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={handleClose}
-                disabled={isImportingFile}
+                disabled={isImportingFile || isParsingFile}
               >
                 {locale === "ar" ? "إلغاء" : "Cancel"}
               </Button>
@@ -614,6 +580,7 @@ export function HistoricalImportModal({
                 variant="primary"
                 disabled={
                   isImportingFile ||
+                  isParsingFile ||
                   !channelId ||
                   !parseResult?.ok ||
                   (remainingQuota !== -1 &&

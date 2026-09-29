@@ -2248,3 +2248,27 @@ test("at phone width the filters open as a sheet and nothing overflows", async (
       .toBeLessThanOrEqual(0);
   }
 });
+
+test("the historical import modal opens from catalogue, displays caps and switches tabs", async ({
+  page,
+}) => {
+  await page.goto("/sync?demo=1");
+  const openModalBtn = page.getByTestId("cat-historical-import");
+  await expect(openModalBtn).toBeVisible();
+  await openModalBtn.click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+
+  // Switch to file tab
+  const fileTab = page.getByTestId("tab-file-import");
+  await fileTab.click();
+
+  // Verify 5 MB and 1,000-row caps are displayed
+  await expect(dialog).toContainText("5");
+  await expect(dialog).toContainText("1,000");
+
+  // Close dialog via escape
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});
