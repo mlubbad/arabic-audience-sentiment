@@ -432,15 +432,20 @@ describe("Unlimited plans overflow protection and worker retry lifecycle", () =>
       );
 
       const job = (
-        await db.query<{ status: string; not_before: string; error_code: string }>(
-          "select status, not_before, error_code from jobs where id = $1",
-          [jobId],
-        )
+        await db.query<{
+          status: string;
+          not_before: string;
+          error_code: string;
+        }>("select status, not_before, error_code from jobs where id = $1", [
+          jobId,
+        ])
       ).rows[0];
 
       expect(job.status).toBe("blocked");
       expect(job.error_code).toBe("quota_exceeded");
-      expect(new Date(job.not_before).toISOString()).toBe(new Date(periodEnd).toISOString());
+      expect(new Date(job.not_before).toISOString()).toBe(
+        new Date(periodEnd).toISOString(),
+      );
     });
 
     it("sets not_before to NULL on blocked for non-time-based reasons (plan_inactive, source_access_denied)", async () => {
