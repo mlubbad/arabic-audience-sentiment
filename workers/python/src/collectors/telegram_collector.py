@@ -57,7 +57,7 @@ class TelegramCollector:
         if self._active_client and getattr(self._active_client, "is_connected", lambda: False)():
             try:
                 self._active_client.disconnect()
-            except Exception:
+            except Exception:  # noqa: BLE001 — teardown cleanup must not raise during close()
                 pass
             self._active_client = None
 
@@ -111,7 +111,7 @@ class TelegramCollector:
                             from telethon.tl.functions.channels import GetFullChannelRequest
                             full = tg(GetFullChannelRequest(channel))
                             has_discussion = bool(getattr(getattr(full, "full_chat", None), "linked_chat_id", None))
-                        except Exception:
+                        except Exception:  # noqa: BLE001 — fallback to has_discussion=True if channel lookup fails
                             has_discussion = True
 
                     try:
@@ -428,7 +428,7 @@ class TelegramCollector:
             if is_json:
                 try:
                     data = resp.json()
-                except Exception:
+                except (ValueError, json.JSONDecodeError):
                     data = None
 
                 if data is not None:

@@ -474,3 +474,25 @@ def test_backfill_video_with_reported_comments_and_zero_collected_is_partial_not
     assert sent["finish"] == "partial"
 
 
+def test_backfill_yielded_explicitly_disabled_skips_video_as_blocked():
+    """A yielded explicitly_disabled or unavailable batch outcome is a property of the video,
+    not of the run. It must skip the video, mark it blocked with its error code in the catalogue,
+    and proceed to read the next video without failing the whole run.
+    """
+    worked, sent, _ = drive(
+        {
+            "v1": [Batch([], None, "explicitly_disabled")],
+            "v2": [Batch([comment("c2")], None, "exhausted")],
+        },
+        [
+            {"video_id": "v1", "external_video_id": "v1", "title": "الأولى"},
+            {"video_id": "v2", "external_video_id": "v2", "title": "الثانية"},
+        ],
+    )
+    assert worked is True
+    assert ("v1", "blocked", "explicitly_disabled") in sent["video_finished"]
+    assert ("v2", "exhausted", None) in sent["video_finished"]
+    assert sent["finish"] == "succeeded"
+
+
+
