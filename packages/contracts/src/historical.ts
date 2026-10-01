@@ -28,7 +28,7 @@ export const HistoricalCommentImportSchema = z
     author_name: z.string().default(""),
     author_channel_id: z.string().nullable().default(null),
     published_at: z.string().nullable().default(null),
-    likes_value: z.number().int().nonnegative().default(0),
+    likes_value: z.number().int().nonnegative().nullable().default(null),
   })
   .strict();
 

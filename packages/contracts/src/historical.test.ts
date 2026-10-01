@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  HistoricalCommentImportSchema,
   HistoricalImportPayloadSchema,
   HistoricalImportResultSchema,
   HistoricalSyncRequestSchema,
@@ -79,6 +80,31 @@ describe("historical data and plan limits contracts", () => {
     expect(payload.posts).toHaveLength(1);
     expect(payload.comments).toHaveLength(1);
     expect(payload.comments[0].text_raw).toBe("تعليق رائع ومميز");
+  });
+
+  it("preserves null for unknown likes in HistoricalCommentImportSchema", () => {
+    const withNull = HistoricalCommentImportSchema.parse({
+      external_video_id: "v123",
+      external_comment_id: "c456",
+      text_raw: "تعليق",
+      likes_value: null,
+    });
+    expect(withNull.likes_value).toBeNull();
+
+    const omitted = HistoricalCommentImportSchema.parse({
+      external_video_id: "v123",
+      external_comment_id: "c457",
+      text_raw: "تعليق آخر",
+    });
+    expect(omitted.likes_value).toBeNull();
+
+    const withZero = HistoricalCommentImportSchema.parse({
+      external_video_id: "v123",
+      external_comment_id: "c458",
+      text_raw: "تعليق ثالث",
+      likes_value: 0,
+    });
+    expect(withZero.likes_value).toBe(0);
   });
 
   it("validates historical sync request", () => {

@@ -958,6 +958,17 @@ export const en: Strings = {
   historicalImportQuotaExceeded:
     "Number of comments in file exceeds your remaining plan quota.",
   historicalNoChannelSelected: "Please select a channel first.",
+  historicalFileCapsHint: (maxMb: number, maxRows: number) =>
+    `Maximum file size: ${maxMb} MB and up to ${maxRows.toLocaleString()} comments (1,000).`,
+  historicalFileTooLarge: "File size exceeds the 5 MB limit.",
+  historicalBatchTooLarge:
+    "Batch too large: maximum import size is 1,000 comments per upload.",
+  historicalForbidden: "You do not have permission to perform this action.",
+  historicalChannelNotFound: "The selected channel was not found.",
+  historicalInvalidPayload:
+    "Invalid import payload or missing required fields.",
+  historicalDateBeyondPlanLimit: (days: number) =>
+    `The specified date exceeds your plan's historical limit (${days} days).`,
   historicalCloseModal: "Close dialog",
   catDiscoveringRunning: (elapsed: string, estimated: string) =>
     `running for ${elapsed} · typical estimated time: ${estimated}`,
