@@ -334,17 +334,21 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
     }
     let active = true;
     const fetchWs = async () => {
-      try {
-        const { data, error } = await client.rpc("my_workspaces", {
-          target_user_id: effectiveUserId,
-        });
-        if (!error && Array.isArray(data)) {
-          return { data: data as { id: string; name: string }[], error: null };
-        }
-      } catch {
-        // fallback
+      const args =
+        isImpersonating && effectiveUserId
+          ? { target_user_id: effectiveUserId }
+          : {};
+      const { data, error } = await client.rpc("my_workspaces", args);
+      if (error) {
+        return { data: [] as { id: string; name: string }[], error };
       }
-      return client.from("workspaces").select("id,name");
+      return {
+        data: (Array.isArray(data) ? data : []) as {
+          id: string;
+          name: string;
+        }[],
+        error: null,
+      };
     };
 
     void Promise.all([
@@ -428,20 +432,24 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
       }
       const [wRes, cRes] = await Promise.all([
         (async () => {
-          try {
-            const { data, error } = await client.rpc("my_workspaces", {
-              target_user_id: effectiveUserId,
-            });
-            if (!error && Array.isArray(data)) {
-              return {
-                data: data as { id: string; name: string }[],
-                error: null,
-              };
-            }
-          } catch {
-            // fallback
+          const args =
+            isImpersonating && effectiveUserId
+              ? { target_user_id: effectiveUserId }
+              : {};
+          const { data, error } = await client.rpc("my_workspaces", args);
+          if (error) {
+            return {
+              data: [] as { id: string; name: string }[],
+              error,
+            };
           }
-          return client.from("workspaces").select("id,name");
+          return {
+            data: (Array.isArray(data) ? data : []) as {
+              id: string;
+              name: string;
+            }[],
+            error: null,
+          };
         })(),
         client.from("clients").select("id,workspace_id"),
       ]);

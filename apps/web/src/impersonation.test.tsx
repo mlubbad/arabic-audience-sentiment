@@ -19,9 +19,13 @@ vi.mock("@tanstack/react-query", () => ({
   }),
 }));
 
+let mockSupabaseClient: { rpc: (...args: unknown[]) => unknown } | null = {
+  rpc: (...args: unknown[]) => mockRpc(...args),
+};
+
 vi.mock("./supabase", () => ({
-  supabase: {
-    rpc: (...args: unknown[]) => mockRpc(...args),
+  get supabase() {
+    return mockSupabaseClient;
   },
 }));
 
@@ -31,6 +35,9 @@ vi.mock("./ui/Toast", () => ({
 
 describe("ImpersonationProvider and useImpersonation", () => {
   beforeEach(() => {
+    mockSupabaseClient = {
+      rpc: (...args: unknown[]) => mockRpc(...args),
+    };
     sessionStorage.clear();
     mockNavigate.mockReset();
     mockInvalidateQueries.mockReset();
@@ -164,6 +171,148 @@ describe("ImpersonationProvider and useImpersonation", () => {
     expect(mockRpc).toHaveBeenCalledWith("admin_stop_impersonation", {
       p_target_user_id: "target-456",
     });
+    expect(
+      sessionStorage.getItem("sentiment_impersonation_session"),
+    ).not.toBeNull();
+    expect(result.current.isImpersonating).toBe(true);
+    expect(result.current.impersonatedUser).toEqual({
+      id: "target-456",
+      email: "target@example.com",
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on startImpersonation when supabase client is null", async () => {
+    mockSupabaseClient = null;
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+
+    await act(async () => {
+      await result.current.startImpersonation({
+        id: "target-456",
+        email: "target@example.com",
+      });
+    });
+
+    expect(
+      sessionStorage.getItem("sentiment_impersonation_session"),
+    ).toBeNull();
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatedUser).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on stopImpersonation when supabase client is null", async () => {
+    sessionStorage.setItem(
+      "sentiment_impersonation_session",
+      JSON.stringify({ id: "target-456", email: "target@example.com" }),
+    );
+
+    mockSupabaseClient = null;
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+    expect(result.current.isImpersonating).toBe(true);
+
+    await act(async () => {
+      await result.current.stopImpersonation();
+    });
+
+    expect(
+      sessionStorage.getItem("sentiment_impersonation_session"),
+    ).not.toBeNull();
+    expect(result.current.isImpersonating).toBe(true);
+    expect(result.current.impersonatedUser).toEqual({
+      id: "target-456",
+      email: "target@example.com",
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on startImpersonation on HTTP 500", async () => {
+    mockRpc.mockResolvedValueOnce({
+      error: { code: "500", message: "Internal Server Error", status: 500 },
+    });
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+
+    await act(async () => {
+      await result.current.startImpersonation({
+        id: "target-456",
+        email: "target@example.com",
+      });
+    });
+
+    expect(
+      sessionStorage.getItem("sentiment_impersonation_session"),
+    ).toBeNull();
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatedUser).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on stopImpersonation on HTTP 500", async () => {
+    sessionStorage.setItem(
+      "sentiment_impersonation_session",
+      JSON.stringify({ id: "target-456", email: "target@example.com" }),
+    );
+
+    mockRpc.mockResolvedValueOnce({
+      error: { code: "500", message: "Internal Server Error", status: 500 },
+    });
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+    expect(result.current.isImpersonating).toBe(true);
+
+    await act(async () => {
+      await result.current.stopImpersonation();
+    });
+
+    expect(
+      sessionStorage.getItem("sentiment_impersonation_session"),
+    ).not.toBeNull();
+    expect(result.current.isImpersonating).toBe(true);
+    expect(result.current.impersonatedUser).toEqual({
+      id: "target-456",
+      email: "target@example.com",
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on startImpersonation on rejected fetch", async () => {
+    mockRpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+
+    await act(async () => {
+      await result.current.startImpersonation({
+        id: "target-456",
+        email: "target@example.com",
+      });
+    });
+
+    expect(
+      sessionStorage.getItem("sentiment_impersonation_session"),
+    ).toBeNull();
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatedUser).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on stopImpersonation on rejected fetch", async () => {
+    sessionStorage.setItem(
+      "sentiment_impersonation_session",
+      JSON.stringify({ id: "target-456", email: "target@example.com" }),
+    );
+
+    mockRpc.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const { result } = renderHook(() => useImpersonation(), { wrapper });
+    expect(result.current.isImpersonating).toBe(true);
+
+    await act(async () => {
+      await result.current.stopImpersonation();
+    });
+
     expect(
       sessionStorage.getItem("sentiment_impersonation_session"),
     ).not.toBeNull();

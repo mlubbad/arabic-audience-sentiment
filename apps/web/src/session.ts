@@ -71,32 +71,53 @@ export function getEffectiveUserId(
   return session?.user.id ?? null;
 }
 
+export function isImpersonatingSession(
+  session: Session | null,
+  overrideUserId?: string | null,
+): boolean {
+  if (
+    overrideUserId !== undefined &&
+    overrideUserId !== null &&
+    overrideUserId !== session?.user.id
+  ) {
+    return true;
+  }
+  try {
+    if (
+      typeof window !== "undefined" &&
+      typeof sessionStorage !== "undefined"
+    ) {
+      const raw = sessionStorage.getItem("sentiment_impersonation_session");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          typeof parsed.id === "string" &&
+          parsed.id !== session?.user.id
+        ) {
+          return true;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
 export function useWorkspaces(
   session: Session | null,
   overrideUserId?: string | null,
 ) {
   const userId = getEffectiveUserId(session, overrideUserId);
+  const impersonating = isImpersonatingSession(session, overrideUserId);
   const query = useQuery({
     queryKey: workspacesKey(userId),
     queryFn: async () => {
-      // 1. Try my_workspaces RPC for strict tenant isolation
-      try {
-        const { data, error } = await supabase!.rpc("my_workspaces", {
-          target_user_id: userId,
-        });
-        if (!error && Array.isArray(data)) {
-          return data as Workspace[];
-        }
-      } catch {
-        // RPC probe failed, fallback to direct query
-      }
-
-      // 2. Direct table fallback for test mocks or legacy environments
-      const { data, error } = await supabase!
-        .from("workspaces")
-        .select("id,name,created_by");
+      const args = impersonating && userId ? { target_user_id: userId } : {};
+      const { data, error } = await supabase!.rpc("my_workspaces", args);
       if (error) throw error;
-      return (data ?? []) as Workspace[];
+      return (Array.isArray(data) ? data : []) as Workspace[];
     },
     enabled: !!supabase && !!userId,
   });

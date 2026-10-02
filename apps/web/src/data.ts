@@ -246,6 +246,54 @@ async function readFixture(signal?: AbortSignal) {
   return FixtureSchema.parse(await response.json());
 }
 
+export class DashboardRpcError extends Error {
+  code?: string;
+  details?: unknown;
+  hint?: string;
+
+  constructor(
+    message: string = "live_unavailable",
+    options?: {
+      code?: string;
+      details?: unknown;
+      hint?: string;
+      cause?: unknown;
+    },
+  ) {
+    super(message);
+    this.name = "DashboardRpcError";
+    this.code = options?.code;
+    this.details = options?.details;
+    this.hint = options?.hint;
+    if (options?.cause) this.cause = options?.cause;
+  }
+}
+
+export function isStatementTimeout(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof error === "object") {
+    const err = error as {
+      code?: string;
+      message?: string;
+      details?: unknown;
+      cause?: unknown;
+    };
+    if (err.code === "57014") return true;
+    if (
+      typeof err.message === "string" &&
+      (err.message.includes("57014") ||
+        err.message.toLowerCase().includes("statement timeout") ||
+        err.message
+          .toLowerCase()
+          .includes("canceling statement due to statement timeout"))
+    ) {
+      return true;
+    }
+    if (err.cause && isStatementTimeout(err.cause)) return true;
+  }
+  return false;
+}
+
 /**
  * Executes a Supabase RPC call with proactive session verification and automatic
  * refresh-and-retry on auth/permission errors (42501 / PGRST301 / expired token).
@@ -253,6 +301,7 @@ async function readFixture(signal?: AbortSignal) {
 async function callRpcWithAuthRetry<T>(
   rpcName: string,
   args: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<T> {
   if (!supabase) throw new Error("live_unavailable");
 
@@ -267,7 +316,21 @@ async function callRpcWithAuthRetry<T>(
     // Non-blocking; proceed to attempt RPC
   }
 
-  let { data, error } = await supabase.rpc(rpcName, args);
+  const runRpc = async () => {
+    let builder = supabase!.rpc(rpcName, args);
+    if (
+      signal &&
+      typeof (builder as { abortSignal?: (s: AbortSignal) => unknown })
+        ?.abortSignal === "function"
+    ) {
+      builder = (
+        builder as { abortSignal: (s: AbortSignal) => typeof builder }
+      ).abortSignal(signal);
+    }
+    return await builder;
+  };
+
+  let { data, error } = await runRpc();
 
   // If PostgREST returned forbidden or expired token, refresh session and retry once.
   if (
@@ -282,7 +345,7 @@ async function callRpcWithAuthRetry<T>(
       const { data: refreshData, error: refreshError } =
         await supabase.auth.refreshSession();
       if (!refreshError && refreshData.session) {
-        const retryResult = await supabase.rpc(rpcName, args);
+        const retryResult = await runRpc();
         data = retryResult.data;
         error = retryResult.error;
       }
@@ -291,31 +354,18 @@ async function callRpcWithAuthRetry<T>(
     }
   }
 
-  // Transient network, gateway, or timeout errors (502, 503, 504, fetch failures)
-  if (
-    error &&
-    (error.code === "504" ||
-      error.code === "502" ||
-      error.code === "503" ||
-      error.code === "57014" ||
-      error.message?.includes("Failed to fetch") ||
-      error.message?.includes("statement timeout") ||
-      error.message?.includes("NetworkError"))
-  ) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      await new Promise((res) => setTimeout(res, attempt * 500));
-      const retryResult = await supabase.rpc(rpcName, args);
-      if (retryResult) {
-        data = retryResult.data;
-        error = retryResult.error;
-        if (!error) break;
-      }
-    }
-  }
+  // NOTE: Transient retry loop is removed here. React Query in the application layer
+  // serves as the single retry layer for queries, preventing redundant cascading retries.
+  // Statement timeouts (57014) are NEVER retried.
 
   if (error) {
     console.error(`[RPC ${rpcName}] error:`, error);
-    throw new Error("live_unavailable");
+    throw new DashboardRpcError("live_unavailable", {
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      cause: error,
+    });
   }
 
   return data as T;
@@ -326,10 +376,14 @@ async function callRpcWithAuthRetry<T>(
  * the fixture, so a server that answers with a different shape is refused here
  * rather than rendered as a half-populated dashboard.
  */
-async function readLive(workspace: string) {
-  const data = await callRpcWithAuthRetry<unknown>("dashboard_snapshot", {
-    w: workspace,
-  });
+async function readLive(workspace: string, signal?: AbortSignal) {
+  const data = await callRpcWithAuthRetry<unknown>(
+    "dashboard_snapshot",
+    {
+      w: workspace,
+    },
+    signal,
+  );
   return LiveSnapshotSchema.parse(data);
 }
 
@@ -343,7 +397,7 @@ export async function loadSource(
   workspace: string,
   signal?: AbortSignal,
 ) {
-  if (mode === "live") return readLive(workspace);
+  if (mode === "live") return readLive(workspace, signal);
   const fixture = await readFixture(signal);
   return { ...fixture, comments: withSessionReviews(fixture.comments) };
 }
@@ -351,10 +405,17 @@ export async function loadSource(
 /** Everything one read of the source answers, before any filter is applied. */
 export type Source = Awaited<ReturnType<typeof loadSource>>;
 
-async function readOpsLive(workspace: string): Promise<OpsSnapshot> {
-  const data = await callRpcWithAuthRetry<unknown>("workspace_ops_snapshot", {
-    w: workspace,
-  });
+async function readOpsLive(
+  workspace: string,
+  signal?: AbortSignal,
+): Promise<OpsSnapshot> {
+  const data = await callRpcWithAuthRetry<unknown>(
+    "workspace_ops_snapshot",
+    {
+      w: workspace,
+    },
+    signal,
+  );
   return OpsSnapshotSchema.parse(data);
 }
 
@@ -787,10 +848,14 @@ export async function loadDashboardAggregates(
 ): Promise<DashboardAggregates> {
   if (mode === "live") {
     const f = filtersToRpc(filters);
-    const data = await callRpcWithAuthRetry<unknown>("dashboard_aggregates", {
-      w: workspace,
-      f,
-    });
+    const data = await callRpcWithAuthRetry<unknown>(
+      "dashboard_aggregates",
+      {
+        w: workspace,
+        f,
+      },
+      signal,
+    );
     return DashboardAggregatesSchema.parse(data);
   }
 
@@ -931,10 +996,14 @@ export async function loadDashboardComments(
   signal?: AbortSignal,
 ): Promise<DashboardCommentsResponse> {
   if (mode === "live") {
-    const data = await callRpcWithAuthRetry<unknown>("dashboard_comments", {
-      w: workspace,
-      f: params,
-    });
+    const data = await callRpcWithAuthRetry<unknown>(
+      "dashboard_comments",
+      {
+        w: workspace,
+        f: params,
+      },
+      signal,
+    );
     return DashboardCommentsResponseSchema.parse(data);
   }
 

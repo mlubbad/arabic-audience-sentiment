@@ -43,7 +43,18 @@ import {
   resolveMode,
   submitReview,
   submitTopicReview,
+  isStatementTimeout,
 } from "../data";
+
+export function shouldRetryDashboardQuery(
+  failureCount: number,
+  error: unknown,
+  maxRetries = 2,
+): boolean {
+  if (isStatementTimeout(error)) return false;
+  if (error instanceof Error && error.name === "AbortError") return false;
+  return failureCount < maxRetries;
+}
 import { failureCode } from "../failure";
 import { supabase } from "../supabase";
 import { useSession, useWorkspaces } from "../session";
@@ -240,6 +251,8 @@ function DashboardBody({
     queryKey: ["dashboard-source", userId, mode, workspaceId],
     queryFn: ({ signal }) => loadSource(mode, workspaceId, signal),
     enabled: mode !== "live",
+    retry: (failureCount, error) =>
+      shouldRetryDashboardQuery(failureCount, error, 1),
   });
 
   const filterParamsKey = useMemo(
@@ -257,7 +270,8 @@ function DashboardBody({
     queryFn: ({ signal }) =>
       loadDashboardAggregates(mode, workspaceId, page, signal),
     enabled: mode === "live" && !read.data,
-    retry: 1,
+    retry: (failureCount, error) =>
+      shouldRetryDashboardQuery(failureCount, error, 1),
     retryDelay: 1000,
   });
 
@@ -294,7 +308,8 @@ function DashboardBody({
       mode === "live" &&
       !read.data &&
       (aggregatesQuery.isSuccess || Boolean(aggregatesQuery.data)),
-    retry: 2,
+    retry: (failureCount, error) =>
+      shouldRetryDashboardQuery(failureCount, error, 2),
     retryDelay: (attempt) => attempt * 1000,
   });
 
@@ -325,7 +340,8 @@ function DashboardBody({
       mode === "live" &&
       !read.data &&
       (aggregatesQuery.isSuccess || Boolean(aggregatesQuery.data)),
-    retry: 2,
+    retry: (failureCount, error) =>
+      shouldRetryDashboardQuery(failureCount, error, 2),
     retryDelay: (attempt) => attempt * 1000,
   });
 

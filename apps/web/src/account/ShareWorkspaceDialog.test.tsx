@@ -158,8 +158,8 @@ describe("ShareWorkspaceDialog", () => {
 
     expect(supabase!.rpc).toHaveBeenCalledWith("share_workspace", {
       w: W,
-      target_email: "colleague@example.com",
-      role_to_assign: "analyst",
+      account_email: "colleague@example.com",
+      account_role: "analyst",
     });
 
     await waitFor(() => {
@@ -318,7 +318,7 @@ describe("ShareWorkspaceDialog", () => {
 
     expect(supabase!.rpc).toHaveBeenCalledWith("unshare_workspace", {
       w: W,
-      target_user: "user-member",
+      target_user_id: "user-member",
     });
 
     await waitFor(() => {
@@ -365,5 +365,124 @@ describe("ShareWorkspaceDialog", () => {
       "unlimited@example.com",
     );
     expect(screen.getByTestId("share-submit-btn")).not.toBeDisabled();
+  });
+
+  it("updates member role and sends target_user_id to update_workspace_account_role", async () => {
+    vi.mocked(supabase!.rpc)
+      .mockReturnValueOnce(
+        mockRpcData({
+          accounts: [
+            {
+              user_id: "user-owner",
+              email: "owner@example.com",
+              role: "workspace_owner",
+              is_owner: true,
+              joined_at: new Date().toISOString(),
+            },
+            {
+              user_id: "user-member",
+              email: "member@example.com",
+              role: "analyst",
+              is_owner: false,
+              joined_at: new Date().toISOString(),
+            },
+          ],
+          total_members: 2,
+          members_limit: 5,
+          can_manage: true,
+        }),
+      )
+      .mockReturnValueOnce(mockRpcData(null))
+      .mockReturnValueOnce(
+        mockRpcData({
+          accounts: [
+            {
+              user_id: "user-owner",
+              email: "owner@example.com",
+              role: "workspace_owner",
+              is_owner: true,
+              joined_at: new Date().toISOString(),
+            },
+            {
+              user_id: "user-member",
+              email: "member@example.com",
+              role: "viewer",
+              is_owner: false,
+              joined_at: new Date().toISOString(),
+            },
+          ],
+          total_members: 2,
+          members_limit: 5,
+          can_manage: true,
+        }),
+      );
+
+    render(
+      <ShareWorkspaceDialog
+        open={true}
+        workspaceId={W}
+        workspaceName="مطبخ ريم"
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("share-role-change-user-member"),
+      ).toBeInTheDocument();
+    });
+
+    // In Radix Select or custom select, trigger role change
+    const trigger = screen.getByTestId("share-role-change-user-member");
+    await userEvent.click(trigger);
+    const viewerOption = await screen.findByRole("option", {
+      name: ar.shareWorkspaceRoleViewer,
+    });
+    await userEvent.click(viewerOption);
+
+    expect(supabase!.rpc).toHaveBeenCalledWith(
+      "update_workspace_account_role",
+      {
+        w: W,
+        target_user_id: "user-member",
+        new_role: "viewer",
+      },
+    );
+  });
+
+  it("handles members_limit: 0 as zero members allowed, marking limit reached", async () => {
+    vi.mocked(supabase!.rpc).mockReturnValueOnce(
+      mockRpcData({
+        accounts: [
+          {
+            user_id: "user-owner",
+            email: "owner@example.com",
+            role: "workspace_owner",
+            is_owner: true,
+            joined_at: new Date().toISOString(),
+          },
+        ],
+        total_members: 1,
+        members_limit: 0,
+        can_manage: true,
+      }),
+    );
+
+    render(
+      <ShareWorkspaceDialog
+        open={true}
+        workspaceId={W}
+        workspaceName="مطبخ ريم"
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(ar.shareWorkspaceAccountsCount(1, 0)),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("share-email-input")).toBeDisabled();
+      expect(screen.getByTestId("share-submit-btn")).toBeDisabled();
+    });
   });
 });

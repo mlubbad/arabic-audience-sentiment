@@ -20,6 +20,60 @@ import {
 } from "../ui/Select";
 import "./account.css";
 
+export function buildShareWorkspaceRpcArgs(
+  action: "share_workspace",
+  params: {
+    w: string;
+    account_email: string;
+    account_role: "analyst" | "viewer";
+  },
+): { w: string; account_email: string; account_role: "analyst" | "viewer" };
+export function buildShareWorkspaceRpcArgs(
+  action: "unshare_workspace",
+  params: { w: string; target_user_id: string },
+): { w: string; target_user_id: string };
+export function buildShareWorkspaceRpcArgs(
+  action: "update_workspace_account_role",
+  params: {
+    w: string;
+    target_user_id: string;
+    new_role: "analyst" | "viewer";
+  },
+): { w: string; target_user_id: string; new_role: "analyst" | "viewer" };
+export function buildShareWorkspaceRpcArgs(
+  action:
+    | "share_workspace"
+    | "unshare_workspace"
+    | "update_workspace_account_role",
+  params: {
+    w: string;
+    account_email?: string;
+    account_role?: "analyst" | "viewer";
+    target_user_id?: string;
+    new_role?: "analyst" | "viewer";
+  },
+) {
+  switch (action) {
+    case "share_workspace":
+      return {
+        w: params.w,
+        account_email: (params.account_email ?? "").trim().toLowerCase(),
+        account_role: params.account_role ?? "analyst",
+      };
+    case "unshare_workspace":
+      return {
+        w: params.w,
+        target_user_id: params.target_user_id!,
+      };
+    case "update_workspace_account_role":
+      return {
+        w: params.w,
+        target_user_id: params.target_user_id!,
+        new_role: params.new_role ?? "viewer",
+      };
+  }
+}
+
 export function ShareWorkspaceDialog({
   open,
   workspaceId,
@@ -34,7 +88,7 @@ export function ShareWorkspaceDialog({
   const S = useStrings();
   const [accounts, setAccounts] = useState<WorkspaceAccount[]>([]);
   const [membersCount, setMembersCount] = useState(1);
-  const [membersLimit, setMembersLimit] = useState<number | null>(1);
+  const [membersLimit, setMembersLimit] = useState<number | null>(null);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -68,8 +122,10 @@ export function ShareWorkspaceDialog({
         setAccounts(res.accounts || []);
         setMembersCount(count);
         const parsedLimit =
-          res.members_limit != null && res.members_limit > 0
-            ? res.members_limit
+          res.members_limit !== null &&
+          res.members_limit !== undefined &&
+          !isNaN(Number(res.members_limit))
+            ? Number(res.members_limit)
             : null;
         setMembersLimit(parsedLimit);
 
@@ -118,11 +174,12 @@ export function ShareWorkspaceDialog({
     setSuccessMsg(null);
 
     try {
-      const { error } = await supabase.rpc("share_workspace", {
+      const args = buildShareWorkspaceRpcArgs("share_workspace", {
         w: workspaceId,
-        target_email: targetEmail,
-        role_to_assign: role,
+        account_email: targetEmail,
+        account_role: role,
       });
+      const { error } = await supabase.rpc("share_workspace", args);
 
       if (error) {
         const code = error.message;
@@ -155,10 +212,11 @@ export function ShareWorkspaceDialog({
     setSuccessMsg(null);
 
     try {
-      const { error } = await supabase.rpc("unshare_workspace", {
+      const args = buildShareWorkspaceRpcArgs("unshare_workspace", {
         w: workspaceId,
-        target_user: targetUserId,
+        target_user_id: targetUserId,
       });
+      const { error } = await supabase.rpc("unshare_workspace", args);
       if (error) {
         setErrorMsg(error.message);
       } else {
@@ -183,11 +241,15 @@ export function ShareWorkspaceDialog({
     setSuccessMsg(null);
 
     try {
-      const { error } = await supabase.rpc("update_workspace_account_role", {
+      const args = buildShareWorkspaceRpcArgs("update_workspace_account_role", {
         w: workspaceId,
-        target_user: targetUserId,
+        target_user_id: targetUserId,
         new_role: newRole,
       });
+      const { error } = await supabase.rpc(
+        "update_workspace_account_role",
+        args,
+      );
       if (error) {
         setErrorMsg(error.message);
       } else {
@@ -202,8 +264,7 @@ export function ShareWorkspaceDialog({
     }
   };
 
-  const limitReached =
-    membersLimit !== null && membersLimit > 0 && membersCount >= membersLimit;
+  const limitReached = membersLimit !== null && membersCount >= membersLimit;
 
   return (
     <Dialog
