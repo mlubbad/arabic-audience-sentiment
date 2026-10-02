@@ -46,7 +46,6 @@ import {
   shouldRetryDashboardQuery,
 } from "../data";
 
-export { shouldRetryDashboardQuery };
 import { failureCode } from "../failure";
 import { supabase } from "../supabase";
 import { useSession, useWorkspaces } from "../session";
