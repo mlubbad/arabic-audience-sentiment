@@ -3,7 +3,10 @@
 Mirror of GitHub issue #16. **The issue is the source of truth**; this copy exists for agents
 whose token can't read issues. If they differ, ask.
 
-- **Start only after** WO-2 (#10) and WO-4 (#12) are merged.
+- **Start:** now. WO-2 (#10) is merged. The original "after WO-4 (#12)" precondition is **waived by
+  the owner** (2026-10-02): WO-4 is not in flight, and none of its tasks touch `connect.ts`,
+  `connectResult.ts` or `Connected.tsx`. The only shared files are `apps/web/src/strings/{ar,en}.ts`:
+  **append new keys only**, never reorder, rename or rewrite existing ones, so WO-4 can merge cleanly later.
 - **Branch:** `codex/wo-5b-oauth-binding`
 - **PR title:** `WO-5b: bind OAuth completion to the initiating browser`
 - **Migration timestamp range:** `20261002000000`–`20261002235959`
