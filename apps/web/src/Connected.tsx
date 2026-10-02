@@ -9,7 +9,7 @@ import { useStrings } from "./strings";
 
 /** Where Google's callback hands the person back, inside the product. */
 export function Connected() {
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const S = useStrings();
   const [completion, setCompletion] = useState<PendingCompletion | null>(null);
   const started = useRef(false);
@@ -18,8 +18,13 @@ export function Connected() {
   useEffect(() => {
     if (params.get("connect") !== "pending" || started.current) return;
     started.current = true;
+    if (params.has("ticket")) {
+      const next = new URLSearchParams(params);
+      next.delete("ticket");
+      setSearchParams(next, { replace: true });
+    }
     void completePendingConnection(ticket ?? "").then(setCompletion);
-  }, [params, ticket]);
+  }, [params, setSearchParams, ticket]);
   const result = connectResult(params, S, completion);
   return (
     <div className="app-state connect-result-page">
