@@ -131,8 +131,7 @@ test("the pricing page exists in both languages with offers in its structured da
   expect(h.lang).toBe("en");
   expect(h.canonical).toMatch(/\/en\/pricing$/);
   const app = h.graph?.find((n) => n["@type"] === "SoftwareApplication") as
-    | { offers?: { name: string; price: string }[] }
-    | undefined;
+    { offers?: { name: string; price: string }[] } | undefined;
   expect(app?.offers?.map((o) => `${o.name} ${o.price}`)).toEqual([
     "Free 0.00",
     "Creator 12.00",

@@ -385,7 +385,7 @@ function DashboardBody({
     const isThreeClass =
       Boolean(
         agg.active_analysis_key &&
-          agg.active_analysis_key.toLowerCase().includes("camelbert"),
+        agg.active_analysis_key.toLowerCase().includes("camelbert"),
       ) || !rawMeasurable.includes("mixed");
     const measurableLabels = isThreeClass
       ? rawMeasurable.filter((l) => l !== "mixed")

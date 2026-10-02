@@ -56,10 +56,7 @@ export const setupSteps: { key: StepKey; title: StringKey }[] = [
 ];
 
 export type ChannelStatus =
-  | "public_unverified"
-  | "connected"
-  | "reconnect_required"
-  | "disconnected";
+  "public_unverified" | "connected" | "reconnect_required" | "disconnected";
 
 export type JobStatus =
   | "queued"

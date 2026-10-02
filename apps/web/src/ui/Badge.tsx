@@ -18,8 +18,7 @@ const badge = cva("ui-badge", {
 });
 
 export interface BadgeProps
-  extends React.ComponentPropsWithRef<"span">,
-    VariantProps<typeof badge> {
+  extends React.ComponentPropsWithRef<"span">, VariantProps<typeof badge> {
   /** True for a badge whose content is a number — applies the numeral face,
    *  not the body face, to that content. */
   numeric?: boolean;
