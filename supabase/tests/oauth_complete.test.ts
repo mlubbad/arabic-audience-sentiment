@@ -44,6 +44,30 @@ describe("oauth-complete edge handler", () => {
     expect(await response.json()).toEqual({ code: "oauth_binding_mismatch" });
   });
 
+  it.each([
+    ["23505", 409, "channel_already_connected"],
+    ["database_unavailable", 500, "oauth_complete_failed"],
+  ])(
+    "maps rejected completion RPCs to a CORS-enabled response",
+    async (rpcCode, status, responseCode) => {
+      const response = await handleOauthComplete(
+        request({ ticket: "ticket", nonce: "nonce" }),
+        {
+          complete: async () => {
+            throw new Error(rpcCode);
+          },
+        },
+        ["https://app.example"],
+      );
+
+      expect(response.status).toBe(status);
+      expect(response.headers.get("access-control-allow-origin")).toBe(
+        "https://app.example",
+      );
+      expect(await response.json()).toEqual({ code: responseCode });
+    },
+  );
+
   it("refuses missing authentication and missing binding inputs", async () => {
     const complete = vi.fn();
     expect(

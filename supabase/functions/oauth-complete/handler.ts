@@ -42,7 +42,15 @@ export async function handleOauthComplete(
   )
     return json(403, { code: "oauth_binding_mismatch" });
 
-  const result = await db.complete(body.ticket, body.nonce);
+  let result: Awaited<ReturnType<CompleteDb["complete"]>>;
+  try {
+    result = await db.complete(body.ticket, body.nonce);
+  } catch (error) {
+    const rpcCode = error instanceof Error ? error.message : "";
+    return rpcCode === "23505"
+      ? json(409, { code: "channel_already_connected" })
+      : json(500, { code: "oauth_complete_failed" });
+  }
   if (result.code || !result.channel_id)
     return json(403, { code: result.code ?? "oauth_binding_mismatch" });
   return json(200, { channel_id: result.channel_id });
