@@ -152,7 +152,8 @@ BEGIN
         WHEN excluded.published_at IS NOT NULL THEN 'second'
         ELSE public.comments.timestamp_precision
       END,
-      last_seen_at = now();
+      last_seen_at = now()
+    WHERE public.comments.source = 'external_import';
     comments_count := comments_count + 1;
   END LOOP;
 
@@ -181,6 +182,7 @@ DECLARE
   sub record;
   effective_since timestamptz;
   job_id uuid;
+  existing_status text;
 BEGIN
   IF NOT private.has_role(w, ARRAY['workspace_owner', 'analyst']) THEN
     RAISE EXCEPTION 'forbidden' USING errcode = '42501';
@@ -223,13 +225,23 @@ BEGIN
   ))
   ON CONFLICT (workspace_id, dedupe_key) DO UPDATE SET
     checkpoint = excluded.checkpoint, status = 'queued', attempt = 0, not_before = now()
+  WHERE public.jobs.status NOT IN ('running', 'succeeded')
   RETURNING id INTO job_id;
+
+  IF job_id IS NULL THEN
+    SELECT id, status INTO job_id, existing_status
+      FROM public.jobs
+     WHERE workspace_id = w
+       AND dedupe_key = 'hist_sync:' || c || ':' || extract(epoch FROM effective_since);
+  ELSE
+    existing_status := 'queued';
+  END IF;
 
   RETURN jsonb_build_object(
     'ok', true,
     'job_id', job_id,
-    'status', 'queued',
-    'historical_days_limit', coalesce(sub.historical_days_limit, -1),
+    'status', coalesce(existing_status, 'queued'),
+    'historical_days_limit', sub.historical_days_limit,
     'backfill_remaining', private.backfill_remaining(w)
   );
 END;

@@ -953,6 +953,18 @@ export const ar = {
   historicalImportQuotaExceeded:
     "عدد التعليقات في الملف يتجاوز الرصيد المتبقي في باقتك.",
   historicalNoChannelSelected: "يرجى اختيار القناة أولاً.",
+  historicalFileCapsHint: (maxMb: number, maxRows: number) =>
+    `الحد الأقصى: ${maxMb} ميجابايت وحتى ${maxRows.toLocaleString("ar-EG")} تعليق (1,000).`,
+  historicalFileTooLarge:
+    "حجم الملف يتجاوز الحد الأقصى المسموح به (5 ميجابايت).",
+  historicalBatchTooLarge:
+    "حجم الدفعة كبير جداً؛ الحد الأقصى للاستيراد هو 1,000 تعليق في المرة الواحدة.",
+  historicalForbidden: "ليس لديك الصلاحية لتنفيذ هذا الإجراء.",
+  historicalChannelNotFound: "لم يتم العثور على القناة المحددة.",
+  historicalInvalidPayload:
+    "بيانات الاستيراد غير صالحة أو تفتقر إلى الحقول الإجبارية.",
+  historicalDateBeyondPlanLimit: (days: number) =>
+    `التاريخ المحدد يتجاوز الحد الأقصى المسموح به في باقتك (${days} يوماً).`,
   historicalCloseModal: "إغلاق النافذة",
   catDiscoveringRunning: (elapsed: string, estimated: string) =>
     `جارية منذ ${elapsed} · الوقت التقديري عادة: ${estimated}`,

@@ -170,6 +170,9 @@ def run_once(
             # lease lapse underneath the write that follows it.
             control.heartbeat(lease)
             control.commit_batch(lease, video_id, video_title, batch, predictions)
+            if batch.outcome in ("explicitly_disabled", "unavailable"):
+                control.finish(lease, "blocked", batch.outcome)
+                return True
             outcome = batch.outcome if batch.outcome in _DECLARABLE else "failed"
             if batch.outcome != "partial":
                 break
@@ -330,6 +333,7 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
             try:
                 batch_iter = collector.batches(vid, start, **kwargs)
                 collected_for_video = 0
+                video_skipped_blocked = False
                 for batch in batch_iter:
                     collected_for_video += len(batch.comments)
                     predictions: list = []
@@ -346,17 +350,24 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                         lease, vid, video.get("title"), batch, predictions,
                         progress=progress_dict,
                     )
+                    if batch.outcome in ("explicitly_disabled", "unavailable"):
+                        control.video_finished(lease, video["video_id"], "blocked", batch.outcome)
+                        done.add(vid)
+                        video_skipped_blocked = True
+                        break
                     video_outcome = (
                         batch.outcome if batch.outcome in _DECLARABLE else "failed"
                     )
                     if batch.outcome != "partial":
                         break
+                if video_skipped_blocked:
+                    continue
             except CollectionError as exc:
                 if exc.code == "telegram_discussion_requires_auth":
                     for v in videos:
                         try:
                             control.video_finished(lease, v["video_id"], "blocked", exc.code)
-                        except Exception:
+                        except Exception:  # noqa: BLE001 — best-effort notification on fatal auth failure before re-raising
                             pass
                     raise
                 if exc.code in ("comments_disabled", "video_not_found") or exc.outcome in ("explicitly_disabled", "unavailable"):

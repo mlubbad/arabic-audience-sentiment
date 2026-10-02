@@ -131,3 +131,140 @@ li[data-severity="muted"] .db-attempt strong {
   align-items: center;
   gap: var(--space-3);
 }
+
+/* ---------------- historical import dialog ---------------- */
+.db-historical-dialog {
+  max-width: 600px;
+  width: 95vw;
+}
+
+.db-historical-quota-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  background: var(--bg-muted);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-1);
+  margin: var(--space-2) 0 var(--space-3) 0;
+  font-size: var(--fs-small);
+}
+
+.db-historical-tabs {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border-1);
+  margin-bottom: var(--space-3);
+}
+
+.db-historical-tab {
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-weight: normal;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: var(--fs-small);
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.db-historical-tab.is-active {
+  border-bottom: 2px solid var(--color-primary, #0284c7);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.db-historical-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.db-historical-feedback {
+  font-size: var(--fs-small);
+}
+
+.db-historical-feedback[data-tone="error"] {
+  color: var(--tone-danger);
+}
+
+.db-historical-feedback[data-tone="success"] {
+  color: var(--tone-success);
+}
+
+.db-historical-dropzone {
+  border: 2px dashed var(--border-2);
+  border-radius: var(--r-2);
+  padding: var(--space-4);
+  text-align: center;
+  background: var(--bg-muted);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.db-historical-dropzone:hover {
+  border-color: var(--color-primary, #0284c7);
+  background: var(--bg-card);
+}
+
+.db-historical-dropzone-filename {
+  margin: 0 0 var(--space-1) 0;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.db-historical-dropzone-caps {
+  margin: 0;
+  font-size: var(--fs-micro);
+  color: var(--text-muted);
+}
+
+.db-historical-file-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.db-historical-file-counts {
+  font-size: var(--fs-micro);
+  color: var(--text-2);
+}
+
+.db-historical-preview {
+  max-height: 120px;
+  overflow-y: auto;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-1);
+  padding: var(--space-2);
+  font-size: var(--fs-micro);
+  background: var(--bg-card);
+}
+
+.db-historical-preview-title {
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+  color: var(--text-1);
+}
+
+.db-historical-preview-row {
+  border-bottom: 1px solid var(--border-1);
+  padding: 2px 0;
+  color: var(--text-2);
+}
+
+.db-historical-preview-row:last-child {
+  border-bottom: none;
+}
+
+.db-historical-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}

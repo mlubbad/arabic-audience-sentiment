@@ -947,7 +947,12 @@ test("the skip link is the first stop and reaches the content", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  await page.keyboard.press("Tab");
+  // Headless Chromium (CI) loads a page with focus on nothing, so a bare
+  // page.keyboard.press("Tab") is swallowed. Pressing from <body> seats focus
+  // inside the page first, so Tab lands on the first tabbable element — the
+  // skip link. (Local browsers focus the document on load, so this passes
+  // there and only fails in CI.)
+  await page.locator("body").press("Tab");
   const skip = page.getByRole("link", { name: "انتقل إلى المحتوى" });
   await expect(skip).toBeFocused();
   // A skip link that stays parked off-screen while focused helps nobody who can
@@ -2242,4 +2247,28 @@ test("at phone width the filters open as a sheet and nothing overflows", async (
       )
       .toBeLessThanOrEqual(0);
   }
+});
+
+test("the historical import modal opens from catalogue, displays caps and switches tabs", async ({
+  page,
+}) => {
+  await page.goto("/sync?demo=1");
+  const openModalBtn = page.getByTestId("cat-historical-import");
+  await expect(openModalBtn).toBeVisible();
+  await openModalBtn.click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+
+  // Switch to file tab
+  const fileTab = page.getByTestId("tab-file-import");
+  await fileTab.click();
+
+  // Verify 5 MB and 1,000-row caps are displayed
+  await expect(dialog).toContainText("5");
+  await expect(dialog).toContainText("1,000");
+
+  // Close dialog via escape
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
 });

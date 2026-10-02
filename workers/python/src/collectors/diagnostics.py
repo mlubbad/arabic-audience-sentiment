@@ -37,7 +37,7 @@ def _load_env():
                             k, v = k.strip(), v.strip().strip('"').strip("'")
                             if k and k not in os.environ:
                                 os.environ[k] = v
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
 
 
@@ -62,7 +62,7 @@ def check_apify(token: str | None) -> dict:
             "status": "INVALID_TOKEN",
             "details": f"Apify returned HTTP {resp.status_code}. Verify token permissions.",
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
         return {
             "name": "Apify Scraper Engine",
             "status": "NETWORK_ERROR",
@@ -97,7 +97,7 @@ def check_brightdata(key: str | None, webdriver_url: str | None = None) -> dict:
                 details_parts.append(f"Datasets API: Rejected key with HTTP {resp.status_code}")
             else:
                 details_parts.append(f"Datasets API: HTTP {resp.status_code}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
             details_parts.append(f"Datasets API: Connectivity check skipped ({exc})")
 
     if webdriver_url:
@@ -109,7 +109,7 @@ def check_brightdata(key: str | None, webdriver_url: str | None = None) -> dict:
                 details_parts.append("Scraping Browser: Ready for automated sessions (port 9515/9222)")
             else:
                 details_parts.append(f"Scraping Browser: HTTP {wb_resp.status_code}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
             details_parts.append(f"Scraping Browser: Connectivity check skipped ({exc})")
 
     details = " · ".join(details_parts) if details_parts else "Configured for fallback."
@@ -140,7 +140,7 @@ def check_x_channel(handle: str, bearer: str | None) -> dict:
                 "status": "API_ERROR",
                 "details": f"Twitter API v2 returned HTTP {resp.status_code}.",
             }
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
             return {
                 "name": f"X / Twitter (@{clean}) - Official API",
                 "status": "NETWORK_ERROR",
@@ -168,7 +168,7 @@ def check_x_channel(handle: str, bearer: str | None) -> dict:
             "status": f"HTTP_{resp.status_code}",
             "details": "Public endpoint returned error.",
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
         return {
             "name": f"X / Twitter (@{clean}) - Public Syndication",
             "status": "UNREACHABLE",
@@ -215,7 +215,7 @@ def check_tiktok_channel(handle: str, token: str | None) -> dict:
             "status": f"HTTP_{resp.status_code}",
             "details": "Public profile returned error.",
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
         return {
             "name": f"TikTok (@{clean}) - Public HTML",
             "status": "UNREACHABLE",
@@ -241,7 +241,7 @@ def check_telegram_channel(handle: str) -> dict:
                 details.append("Public posts catalogue accessible via t.me/s/.")
         else:
             cat_status = f"HTTP_{resp.status_code}"
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
         cat_status = "UNREACHABLE"
         details.append(f"Catalogue unreachable: {exc}")
 
@@ -257,7 +257,7 @@ def check_telegram_channel(handle: str) -> dict:
             details.append("Discussion endpoint public.")
         else:
             disc_status = f"HTTP_{resp.status_code}"
-    except Exception:
+    except Exception:  # noqa: BLE001 — diagnostic probe reports connectivity failure
         disc_status = "UNREACHABLE"
 
     return {
@@ -289,7 +289,7 @@ def check_youtube_channel(channel: str = "asharqnews") -> dict:
             if res.status_code == 200 and len(res.json()) > 0:
                 has_reader = True
                 details.append("OAuth Platform Reader active in private.platform_reader (can read public YouTube channels without API key).")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
             details.append(f"Reader check error: {exc}")
 
     if api_key:
@@ -307,7 +307,7 @@ def check_youtube_channel(channel: str = "asharqnews") -> dict:
             details.append("YouTube Data API v3 endpoint reachable.")
         else:
             details.append(f"YouTube endpoint returned HTTP {resp.status_code}.")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — diagnostic probe reports connectivity failure
         details.append(f"YouTube endpoint unreachable: {exc}")
 
     if has_reader:

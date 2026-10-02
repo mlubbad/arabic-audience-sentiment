@@ -13,6 +13,9 @@ import {
   type HistoricalPostImport,
 } from "@sentiment/contracts";
 
+export const MAX_HISTORICAL_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+export const MAX_HISTORICAL_COMMENTS = 1000; // 1,000 comments cap
+
 export interface ParseResult {
   ok: boolean;
   payload?: HistoricalImportPayload;
@@ -23,8 +26,52 @@ export interface ParseResult {
   };
 }
 
+/**
+ * Fast, deterministic 64-bit FNV-1a hash formatted as hex string.
+ * Guarantees identical IDs when the same file is re-imported.
+ */
+export function generateDeterministicCommentId(
+  vid: string,
+  author: string,
+  publishedAt: string | null,
+  index: number,
+  text: string,
+): string {
+  const input = `${vid}|${author}|${publishedAt ?? ""}|${index}|${text}`;
+  let h1 = 0x811c9dc5;
+  let h2 = 0xcbf29ce4;
+  for (let i = 0; i < input.length; i++) {
+    const code = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 0x01000193);
+    h2 = Math.imul(h2 ^ (code >> 8), 0x01000193);
+  }
+  const hex1 = (h1 >>> 0).toString(16).padStart(8, "0");
+  const hex2 = (h2 >>> 0).toString(16).padStart(8, "0");
+  return `imp_${hex1}${hex2}`;
+}
+
+/**
+ * Detect delimiter once from the first/header line of CSV.
+ */
+export function detectCsvDelimiter(headerLine: string): string {
+  const candidates = [",", ";", "\t"];
+  let maxCount = 0;
+  let detected = ",";
+  for (const delim of candidates) {
+    const count = headerLine.split(delim).length - 1;
+    if (count > maxCount) {
+      maxCount = count;
+      detected = delim;
+    }
+  }
+  return detected;
+}
+
 /** RFC 4180 compliant CSV parser */
-export function parseCsvRows(text: string): string[][] {
+export function parseCsvRows(
+  text: string,
+  explicitDelimiter?: string,
+): string[][] {
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentField = "";
@@ -33,6 +80,8 @@ export function parseCsvRows(text: string): string[][] {
 
   // Normalize Windows CRLF to LF
   const str = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const firstLine = str.split("\n")[0] ?? "";
+  const delimiter = explicitDelimiter ?? detectCsvDelimiter(firstLine);
 
   while (i < str.length) {
     const char = str[i];
@@ -56,9 +105,15 @@ export function parseCsvRows(text: string): string[][] {
     }
 
     if (char === '"') {
-      inQuotes = true;
-      i++;
-    } else if (char === "," || char === "\t" || char === ";") {
+      if (currentField.length === 0) {
+        inQuotes = true;
+        i++;
+      } else {
+        // RFC 4180: quote mid-unquoted-field is literal
+        currentField += '"';
+        i++;
+      }
+    } else if (char === delimiter) {
       currentRow.push(currentField.trim());
       currentField = "";
       i++;
@@ -236,23 +291,30 @@ export function parseHistoricalCsv(
       defaultVideoId ||
       "imported_post_1";
 
-    const commentId =
-      (commentIdIdx !== -1 ? row[commentIdIdx]?.trim() : null) ||
-      `imp_c_${i}_${Date.now().toString(36)}`;
-
     const publishedAt =
       publishedAtIdx !== -1 && row[publishedAtIdx]?.trim()
         ? row[publishedAtIdx].trim()
-        : new Date().toISOString();
+        : null;
 
     const author =
       authorIdx !== -1 && row[authorIdx]?.trim() ? row[authorIdx].trim() : "";
+
+    const rawCid = commentIdIdx !== -1 ? row[commentIdIdx]?.trim() : null;
+    const commentId =
+      rawCid ||
+      generateDeterministicCommentId(vid, author, publishedAt, i, text);
 
     const likesRaw =
       likesIdx !== -1 && row[likesIdx]?.trim()
         ? row[likesIdx].trim()
         : undefined;
-    const likesVal = likesRaw ? parseInt(likesRaw, 10) : 0;
+    let likesVal: number | null = null;
+    if (likesRaw !== undefined && likesRaw !== "") {
+      const parsed = parseInt(likesRaw, 10);
+      if (Number.isFinite(parsed)) {
+        likesVal = Math.max(0, parsed);
+      }
+    }
 
     const parentId =
       parentIdIdx !== -1 && row[parentIdIdx]?.trim()
@@ -269,9 +331,13 @@ export function parseHistoricalCsv(
         text_plain: text,
         author_name: author,
         published_at: publishedAt,
-        likes_value: Number.isFinite(likesVal) ? Math.max(0, likesVal) : 0,
+        likes_value: likesVal,
       }),
     );
+
+    if (comments.length > MAX_HISTORICAL_COMMENTS) {
+      return { ok: false, error: "batch_too_large" };
+    }
 
     if (!postsMap.has(vid)) {
       const title =
@@ -377,28 +443,43 @@ export function parseHistoricalJson(
               "imported_post_1",
           ).trim();
 
-          const cid = String(
-            rec.external_comment_id ||
-              rec.comment_id ||
-              rec.id ||
-              `imp_c_${i}_${Date.now().toString(36)}`,
+          const author = String(
+            rec.author_name || rec.author_display_name || rec.author || "",
           ).trim();
+
+          const publishedAt = rec.published_at
+            ? String(rec.published_at)
+            : null;
+          const rawCid = rec.external_comment_id || rec.comment_id || rec.id;
+          const cid = rawCid
+            ? String(rawCid).trim()
+            : generateDeterministicCommentId(vid, author, publishedAt, i, text);
 
           const parentId =
             rec.external_parent_id || rec.parent_id
               ? String(rec.external_parent_id || rec.parent_id)
               : null;
 
-          const author = String(
-            rec.author_name || rec.author_display_name || rec.author || "",
-          ).trim();
-
-          const likesVal =
-            typeof rec.likes_value === "number"
-              ? rec.likes_value
-              : typeof rec.likes_raw === "string"
-                ? parseInt(rec.likes_raw, 10)
-                : 0;
+          let likesVal: number | null = null;
+          if (
+            typeof rec.likes_value === "number" &&
+            Number.isFinite(rec.likes_value)
+          ) {
+            likesVal = Math.max(0, Math.floor(rec.likes_value));
+          } else if (
+            typeof rec.likes === "number" &&
+            Number.isFinite(rec.likes)
+          ) {
+            likesVal = Math.max(0, Math.floor(rec.likes));
+          } else if (
+            typeof rec.likes_raw === "string" &&
+            rec.likes_raw.trim() !== ""
+          ) {
+            const parsed = parseInt(rec.likes_raw, 10);
+            if (Number.isFinite(parsed)) {
+              likesVal = Math.max(0, parsed);
+            }
+          }
 
           comments.push(
             HistoricalCommentImportSchema.parse({
@@ -409,14 +490,14 @@ export function parseHistoricalJson(
               text_raw: text,
               text_plain: text,
               author_name: author,
-              published_at: rec.published_at
-                ? String(rec.published_at)
-                : new Date().toISOString(),
-              likes_value: Number.isFinite(likesVal)
-                ? Math.max(0, likesVal)
-                : 0,
+              published_at: publishedAt,
+              likes_value: likesVal,
             }),
           );
+
+          if (comments.length > MAX_HISTORICAL_COMMENTS) {
+            return { ok: false, error: "batch_too_large" };
+          }
 
           if (!postsMap.has(vid)) {
             postsMap.set(
@@ -468,28 +549,38 @@ export function parseHistoricalJson(
           "imported_post_1",
       ).trim();
 
-      const cid = String(
-        rec.external_comment_id ||
-          rec.comment_id ||
-          rec.id ||
-          `imp_c_${i}_${Date.now().toString(36)}`,
+      const author = String(
+        rec.author_name || rec.author_display_name || rec.author || "",
       ).trim();
+
+      const publishedAt = rec.published_at ? String(rec.published_at) : null;
+      const rawCid = rec.external_comment_id || rec.comment_id || rec.id;
+      const cid = rawCid
+        ? String(rawCid).trim()
+        : generateDeterministicCommentId(vid, author, publishedAt, i, text);
 
       const parentId =
         rec.external_parent_id || rec.parent_id
           ? String(rec.external_parent_id || rec.parent_id)
           : null;
 
-      const author = String(
-        rec.author_name || rec.author_display_name || rec.author || "",
-      ).trim();
-
-      const likesVal =
-        typeof rec.likes_value === "number"
-          ? rec.likes_value
-          : typeof rec.likes_raw === "string"
-            ? parseInt(rec.likes_raw, 10)
-            : 0;
+      let likesVal: number | null = null;
+      if (
+        typeof rec.likes_value === "number" &&
+        Number.isFinite(rec.likes_value)
+      ) {
+        likesVal = Math.max(0, Math.floor(rec.likes_value));
+      } else if (typeof rec.likes === "number" && Number.isFinite(rec.likes)) {
+        likesVal = Math.max(0, Math.floor(rec.likes));
+      } else if (
+        typeof rec.likes_raw === "string" &&
+        rec.likes_raw.trim() !== ""
+      ) {
+        const parsed = parseInt(rec.likes_raw, 10);
+        if (Number.isFinite(parsed)) {
+          likesVal = Math.max(0, parsed);
+        }
+      }
 
       comments.push(
         HistoricalCommentImportSchema.parse({
@@ -500,12 +591,14 @@ export function parseHistoricalJson(
           text_raw: text,
           text_plain: text,
           author_name: author,
-          published_at: rec.published_at
-            ? String(rec.published_at)
-            : new Date().toISOString(),
-          likes_value: Number.isFinite(likesVal) ? Math.max(0, likesVal) : 0,
+          published_at: publishedAt,
+          likes_value: likesVal,
         }),
       );
+
+      if (comments.length > MAX_HISTORICAL_COMMENTS) {
+        return { ok: false, error: "batch_too_large" };
+      }
 
       if (!postsMap.has(vid)) {
         postsMap.set(
@@ -551,11 +644,37 @@ export function parseHistoricalFile(
   filename: string,
   defaultVideoId?: string,
 ): ParseResult {
-  const isJson = filename.toLowerCase().endsWith(".json");
-  if (isJson) {
-    return parseHistoricalJson(content, defaultVideoId);
+  if (content.length > MAX_HISTORICAL_FILE_SIZE) {
+    return { ok: false, error: "file_too_large" };
   }
-  return parseHistoricalCsv(content, defaultVideoId);
+  try {
+    const isJson = filename.toLowerCase().endsWith(".json");
+    if (isJson) {
+      return parseHistoricalJson(content, defaultVideoId);
+    }
+    return parseHistoricalCsv(content, defaultVideoId);
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "parse_error",
+    };
+  }
+}
+
+/**
+ * Async chunked parser that yields to the event loop so main thread is not blocked.
+ */
+export async function parseHistoricalFileAsync(
+  content: string,
+  filename: string,
+  defaultVideoId?: string,
+): Promise<ParseResult> {
+  if (content.length > MAX_HISTORICAL_FILE_SIZE) {
+    return { ok: false, error: "file_too_large" };
+  }
+  // Yield to event loop
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  return parseHistoricalFile(content, filename, defaultVideoId);
 }
 
 export function generateSampleCsvTemplate(): string {

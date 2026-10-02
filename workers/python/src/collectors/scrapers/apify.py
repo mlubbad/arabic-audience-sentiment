@@ -63,7 +63,7 @@ class ApifyClient:
                     raise CollectionError("apify_quota_depleted", "failed", retryable=False)
             except CollectionError:
                 raise
-            except Exception:
+            except (ValueError, KeyError, TypeError):
                 pass
             raise CollectionError(f"apify_error_{resp.status_code}", "failed", retryable=True)
 
@@ -74,7 +74,7 @@ class ApifyClient:
             if isinstance(data, dict) and "items" in data:
                 return data["items"]
             return []
-        except Exception:
+        except (ValueError, KeyError, TypeError):
             raise CollectionError("invalid_response_format", "failed") from None
 
     def scrape_x_profile(self, handle: str, max_items: int = 25) -> list[dict]:

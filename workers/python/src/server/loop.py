@@ -253,7 +253,7 @@ def _load_dotenv_if_needed() -> None:
                             v = v.strip().strip('"').strip("'")
                             if k and k not in os.environ:
                                 os.environ[k] = v
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
 
 
