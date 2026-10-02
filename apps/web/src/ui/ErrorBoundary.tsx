@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
       const isImpersonating = Boolean(
         typeof window !== "undefined" &&
-          sessionStorage.getItem("sentiment_impersonation_session"),
+        sessionStorage.getItem("sentiment_impersonation_session"),
       );
 
       return (
