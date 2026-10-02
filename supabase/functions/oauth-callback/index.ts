@@ -6,7 +6,11 @@
  * binding comes from the state row, and the channel from channels.list.
  */
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
-import { handleCallback, importSealingKey } from "../_shared/oauth-callback.ts";
+import {
+  handleCallback,
+  importSealingKey,
+  pendingRedirect,
+} from "../_shared/oauth-callback.ts";
 
 const env = (name: string) => Deno.env.get(name) ?? "";
 
@@ -39,7 +43,7 @@ Deno.serve(async (request) => {
   );
 
   try {
-    const { channelId } = await handleCallback({
+    const { ticket } = await handleCallback({
       code: url.searchParams.get("code"),
       state: url.searchParams.get("state"),
       error: url.searchParams.get("error"),
@@ -58,11 +62,10 @@ Deno.serve(async (request) => {
           if (error || !data?.length) throw new Error("invalid_state");
           return data[0];
         },
-        attachChannel: async (input) => {
-          const { data, error } = await db.rpc("svc_oauth_attach_channel", {
-            u: input.userId,
-            w: input.workspaceId,
-            c: input.clientId,
+        createPending: async (input) => {
+          const { error } = await db.rpc("svc_oauth_create_pending", {
+            state_id: input.stateId,
+            ticket_hash: input.ticketHash,
             external_channel: input.externalChannel,
             channel_handle: input.handle,
             channel_title: input.title,
@@ -75,14 +78,22 @@ Deno.serve(async (request) => {
             key_version: input.keyVersion,
             scopes: input.scopes,
           });
-          if (error) throw new Error(error.code ?? "attach_failed");
-          return data as string;
+          if (error) throw new Error(error.code ?? "pending_failed");
         },
       },
       http: (u, init) => fetch(u, init),
       key: await importSealingKey(env("TOKEN_ENCRYPTION_KEY")),
+      random: (n) => crypto.getRandomValues(new Uint8Array(n)),
     });
-    return back({ status: "connected", channel: channelId });
+    return new Response(null, {
+      status: 303,
+      headers: {
+        location: pendingRedirect(
+          env("APP_ORIGIN") || "https://app.sky-develop.net",
+          ticket,
+        ),
+      },
+    });
   } catch (error) {
     return back({ status: "error", code: (error as Error).message });
   }

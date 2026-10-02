@@ -28,6 +28,7 @@ export interface StartDb {
     client: string,
     stateHash: string,
     verifier: string,
+    browserNonceHash: string,
   ): Promise<void>;
 }
 
@@ -83,7 +84,7 @@ export async function beginAuthorization(
   config: OauthConfig,
   db: StartDb,
   random: RandomBytes,
-): Promise<{ url: string; state: string }> {
+): Promise<{ url: string; state: string; nonce: string }> {
   if (!config.client_id || !config.redirect_uri || config.scopes.length === 0)
     throw new Error("oauth_not_configured");
   // Refused rather than coerced: a redirect URI that is not exactly the one
@@ -101,9 +102,16 @@ export async function beginAuthorization(
   // the caller cannot influence.
   const verifier = base64url(random(32));
   const state = base64url(random(32));
+  const nonce = base64url(random(32));
   // Stored before the URL is handed out. A callback that arrives for a state
   // we failed to record must not be accepted, so the write happens first.
-  await db.createState(workspace, client, await sha256Hex(state), verifier);
+  await db.createState(
+    workspace,
+    client,
+    await sha256Hex(state),
+    verifier,
+    await sha256Hex(nonce),
+  );
 
   const params = new URLSearchParams({
     client_id: config.client_id,
@@ -121,5 +129,5 @@ export async function beginAuthorization(
     prompt: "consent",
     include_granted_scopes: "false",
   });
-  return { url: `${AUTHORIZE}?${params}`, state };
+  return { url: `${AUTHORIZE}?${params}`, state, nonce };
 }

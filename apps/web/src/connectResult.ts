@@ -7,6 +7,50 @@
  * person is, and because an unrecognised code must still say something useful.
  */
 import type { StringKey, Strings } from "./strings";
+import { OAUTH_BROWSER_NONCE_KEY } from "./connect";
+import { supabase } from "./supabase";
+
+export type PendingCompletion =
+  { kind: "success"; channelId: string } | { kind: "error"; code: string };
+
+export async function completePendingConnection(
+  ticket: string,
+): Promise<PendingCompletion> {
+  const nonce = sessionStorage.getItem(OAUTH_BROWSER_NONCE_KEY);
+  sessionStorage.removeItem(OAUTH_BROWSER_NONCE_KEY);
+  if (!nonce || !ticket)
+    return { kind: "error", code: "oauth_binding_mismatch" };
+  if (!supabase) return { kind: "error", code: "oauth_not_configured" };
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) return { kind: "error", code: "unauthenticated" };
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-complete`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ticket, nonce }),
+      },
+    );
+    const body = (await response.json().catch(() => ({}))) as {
+      channel_id?: string;
+      code?: string;
+    };
+    if (!response.ok || !body.channel_id)
+      return {
+        kind: "error",
+        code: body.code ?? "oauth_binding_mismatch",
+      };
+    return { kind: "success", channelId: body.channel_id };
+  } catch {
+    return { kind: "error", code: "unreachable" };
+  }
+}
 
 export type ConnectResult = {
   tone: "success" | "notice" | "error";
@@ -30,12 +74,33 @@ const FAILURES: Record<
   invalid_state: { detail: "crInvalidState", action: "retry" },
   invalid_callback: { detail: "crInvalidCallback", action: "retry" },
   channel_already_connected: { detail: "crAlreadyConnected", action: null },
+  oauth_binding_mismatch: { detail: "crBindingMismatch", action: "retry" },
+  unauthenticated: { detail: "crUnauthenticated", action: "retry" },
+  unreachable: { detail: "crUnreachable", action: "retry" },
 };
 
 export function connectResult(
   params: URLSearchParams,
   S: Strings,
+  completion: PendingCompletion | null = null,
 ): ConnectResult {
+  if (params.get("connect") === "pending") {
+    if (!completion)
+      return {
+        tone: "notice",
+        heading: S.crFinishingHeading,
+        detail: S.crFinishingDetail,
+        action: null,
+      };
+    if (completion.kind === "success")
+      return {
+        tone: "success",
+        heading: S.crConnectedHeading,
+        detail: S.crConnectedDetailWith(completion.channelId),
+        action: null,
+      };
+    params = new URLSearchParams({ status: "error", code: completion.code });
+  }
   if (params.get("status") === "connected") {
     const channel = params.get("channel");
     return {

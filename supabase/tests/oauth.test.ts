@@ -1,5 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
+import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // RFC 7636 appendix B: 43 unreserved characters.
@@ -12,9 +14,11 @@ const viewer = "10000000-0000-4000-8000-000000000003";
 const CHANNEL = "UC" + "a".repeat(22);
 // A stored state hash is a sha256 digest; these stand in at the same length.
 const h = (name: string) => name.padEnd(64, "0");
+const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 // Stands in for an AES-GCM sealed token blob. The encryption itself happens in
 // the Edge Function with a key from the service secret store; the database only
 // ever sees opaque bytes.
+const NONCE_HASH = "a".repeat(64);
 const CIPHERTEXT = new Uint8Array([0x63, 0x69, 0x70, 0x68, 0x65, 0x72]);
 let db: PGlite;
 
@@ -30,10 +34,43 @@ const attach = (state: string, channel = CHANNEL) =>
     [state, channel, CIPHERTEXT, "k1", ["youtube.readonly"]],
   );
 
+const createPending = async (
+  who: string,
+  workspace: string,
+  state: string,
+  ticket: string,
+  nonce: string,
+  channel: string,
+) => {
+  await user(who);
+  await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
+    workspace,
+    h(state),
+    VERIFIER,
+    sha(nonce),
+  ]);
+  await admin();
+  const consumed = await db.query<{ state_id: string }>(
+    "select state_id from private.oauth_consume_state($1)",
+    [h(state)],
+  );
+  await db.query(
+    "select private.oauth_create_pending($1,$2,$3,$4,'k1',$5,null,null)",
+    [
+      consumed.rows[0].state_id,
+      sha(ticket),
+      channel,
+      CIPHERTEXT,
+      ["youtube.force-ssl"],
+    ],
+  );
+};
+
 describe("youtube connection", () => {
   beforeAll(async () => {
-    db = new PGlite();
+    db = new PGlite({ extensions: { pgcrypto } });
     await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+      create schema extensions; create extension pgcrypto with schema extensions;
       create schema auth; create table auth.users(id uuid primary key);
       create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
       grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon;
@@ -78,26 +115,29 @@ describe("youtube connection", () => {
   it("only an owner may begin a connection, and only in their own workspace", async () => {
     await user(viewer);
     await expect(
-      db.query("select public.oauth_start($1,$1,$2,$3)", [
+      db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
         A,
         h("h-viewer"),
         VERIFIER,
+        NONCE_HASH,
       ]),
     ).rejects.toThrow();
     await user(ownerB);
     await expect(
-      db.query("select public.oauth_start($1,$1,$2,$3)", [
+      db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
         A,
         h("h-b"),
         VERIFIER,
+        NONCE_HASH,
       ]),
     ).rejects.toThrow();
     await user(ownerA);
     await expect(
-      db.query("select public.oauth_start($1,$1,$2,$3)", [
+      db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
         A,
         h("h-ok"),
         VERIFIER,
+        NONCE_HASH,
       ]),
     ).resolves.toBeTruthy();
   });
@@ -127,10 +167,11 @@ describe("youtube connection", () => {
     ).rejects.toThrow(/invalid_state/);
 
     await user(ownerA);
-    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
       A,
       h("h-expired"),
       VERIFIER,
+      NONCE_HASH,
     ]);
     await admin();
     await db.query(
@@ -154,10 +195,11 @@ describe("youtube connection", () => {
 
   it("takes the workspace from the stored state, never from the caller", async () => {
     await user(ownerA);
-    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
       A,
       h("h-attach"),
       VERIFIER,
+      NONCE_HASH,
     ]);
     await admin();
     // attach is given a state and a channel id only. There is no workspace
@@ -179,10 +221,11 @@ describe("youtube connection", () => {
       [B, "UC" + "b".repeat(22)],
     );
     await user(ownerB);
-    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
       B,
       h("h-upgrade"),
       VERIFIER,
+      NONCE_HASH,
     ]);
     await admin();
     const attached = await attach(h("h-upgrade"), "UC" + "b".repeat(22));
@@ -207,10 +250,11 @@ describe("youtube connection", () => {
       [B, CHANNEL],
     );
     await user(ownerB);
-    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
       B,
       h("h-seize"),
       VERIFIER,
+      NONCE_HASH,
     ]);
     await admin();
     // But it can never become the authorised holder while A is connected.
@@ -231,10 +275,11 @@ describe("youtube connection", () => {
     await admin();
     const named = "UC" + "n".repeat(22);
     await user(ownerB);
-    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
       B,
       h("h-named"),
       VERIFIER,
+      NONCE_HASH,
     ]);
     await admin();
     // The service entry point, as the Edge Function calls it: by name, with
@@ -267,10 +312,11 @@ describe("youtube connection", () => {
 
     // A reconnect that carries no names — an older deploy of the callback, or
     // a snippet Google left out — must not erase the ones already stored.
-    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
       B,
       h("h-named-again"),
       VERIFIER,
+      NONCE_HASH,
     ]);
     await admin();
     await attach(h("h-named-again"), named);
@@ -286,10 +332,11 @@ describe("youtube connection", () => {
     const twice = "UC" + "t".repeat(22);
     const link = async (name: string) => {
       await user(ownerB);
-      await db.query("select public.oauth_start($1,$1,$2,$3)", [
+      await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
         B,
         h(name),
         VERIFIER,
+        NONCE_HASH,
       ]);
       await admin();
       return (await attach(h(name), twice)).rows[0].id;
@@ -462,36 +509,40 @@ describe("youtube connection", () => {
       `${"a".repeat(42)} `,
     ]) {
       await expect(
-        db.query("select public.oauth_start($1,$1,$2,$3)", [
+        db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
           A,
           h(`h-bad-${bad.length}${bad.slice(-1)}`),
           bad,
+          NONCE_HASH,
         ]),
       ).rejects.toThrow(/invalid_verifier/);
     }
     // The boundary lengths themselves are valid.
     await expect(
-      db.query("select public.oauth_start($1,$1,$2,$3)", [
+      db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
         A,
         h("h-min"),
         "a".repeat(43),
+        NONCE_HASH,
       ]),
     ).resolves.toBeTruthy();
     await expect(
-      db.query("select public.oauth_start($1,$1,$2,$3)", [
+      db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
         A,
         h("h-max"),
         `${"a".repeat(124)}._~-`,
+        NONCE_HASH,
       ]),
     ).resolves.toBeTruthy();
   });
 
   it("hands the verifier to the exchange once, and never to a tenant", async () => {
     await user(ownerA);
-    await db.query("select public.oauth_start($1,$1,$2,$3)", [
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
       A,
       h("h-pkce"),
       VERIFIER,
+      NONCE_HASH,
     ]);
     // A tenant cannot read it back: the state table has no grants at all, and
     // consume is service-only.
@@ -584,11 +635,12 @@ describe("youtube connection", () => {
     );
     await user(owner);
     await expect(
-      db.query("select public.oauth_start($1,$2,$3,$4)", [
+      db.query("select public.oauth_start($1,$2,$3,$4,$5)", [
         row.rows[0].w,
         row.rows[0].c,
         h("h-journey"),
         VERIFIER,
+        NONCE_HASH,
       ]),
     ).resolves.toBeTruthy();
     await admin();
@@ -629,5 +681,139 @@ describe("youtube connection", () => {
         )
       ).rows[0].name,
     ).toBe("قديمة");
+  });
+
+  it("refuses completion by a different user and deletes the ticket", async () => {
+    const channel = `UC${"c".repeat(22)}`;
+    await createPending(
+      ownerA,
+      A,
+      "binding-user",
+      "ticket-user",
+      "nonce-user",
+      channel,
+    );
+    await user(ownerB);
+    const refused = await db.query<{ channel_id: string | null; code: string }>(
+      "select * from public.oauth_complete($1,$2)",
+      ["ticket-user", "nonce-user"],
+    );
+    expect(refused.rows[0]).toEqual({
+      channel_id: null,
+      code: "oauth_binding_mismatch",
+    });
+    await admin();
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select count(*)::int as n from channels where external_channel_id=$1",
+          [channel],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select count(*)::int as n from private.oauth_pending",
+        )
+      ).rows[0].n,
+    ).toBe(0);
+  });
+
+  it("refuses a wrong or missing browser nonce and consumes each ticket", async () => {
+    for (const [suffix, supplied] of [
+      ["wrong", "another-nonce"],
+      ["missing", null],
+    ] as const) {
+      const ticket = `ticket-${suffix}`;
+      await createPending(
+        ownerA,
+        A,
+        `binding-${suffix}`,
+        ticket,
+        `nonce-${suffix}`,
+        `UC${suffix[0].repeat(22)}`,
+      );
+      await user(ownerA);
+      const refused = await db.query<{ code: string }>(
+        "select * from public.oauth_complete($1,$2)",
+        [ticket, supplied],
+      );
+      expect(refused.rows[0].code).toBe("oauth_binding_mismatch");
+      const replay = await db.query<{ code: string }>(
+        "select * from public.oauth_complete($1,$2)",
+        [ticket, `nonce-${suffix}`],
+      );
+      expect(replay.rows[0].code).toBe("oauth_binding_mismatch");
+    }
+  });
+
+  it("refuses expired tickets", async () => {
+    await createPending(
+      ownerA,
+      A,
+      "binding-expired-ticket",
+      "expired-ticket",
+      "expired-nonce",
+      `UC${"e".repeat(22)}`,
+    );
+    await admin();
+    await db.exec(
+      "update private.oauth_pending set expires_at=now()-interval '1 second'",
+    );
+    await user(ownerA);
+    const result = await db.query<{ code: string }>(
+      "select * from public.oauth_complete($1,$2)",
+      ["expired-ticket", "expired-nonce"],
+    );
+    expect(result.rows[0].code).toBe("oauth_binding_mismatch");
+  });
+
+  it("attaches exactly once and refuses a replayed ticket", async () => {
+    const channel = `UC${"f".repeat(22)}`;
+    await createPending(
+      ownerA,
+      A,
+      "binding-happy",
+      "happy-ticket",
+      "happy-nonce",
+      channel,
+    );
+    await user(ownerA);
+    const first = await db.query<{ channel_id: string; code: string | null }>(
+      "select * from public.oauth_complete($1,$2)",
+      ["happy-ticket", "happy-nonce"],
+    );
+    expect(first.rows[0].channel_id).toBeTruthy();
+    expect(first.rows[0].code).toBeNull();
+    const replay = await db.query<{ channel_id: string | null; code: string }>(
+      "select * from public.oauth_complete($1,$2)",
+      ["happy-ticket", "happy-nonce"],
+    );
+    expect(replay.rows[0].code).toBe("oauth_binding_mismatch");
+    await admin();
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select count(*)::int as n from private.oauth_connections where channel_id=$1 and status='connected'",
+          [first.rows[0].channel_id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+  });
+
+  it("keeps pending grants invisible to tenant roles", async () => {
+    await createPending(
+      ownerA,
+      A,
+      "binding-private",
+      "private-ticket",
+      "private-nonce",
+      `UC${"g".repeat(22)}`,
+    );
+    await user(ownerA);
+    await expect(
+      db.query("select * from private.oauth_pending"),
+    ).rejects.toThrow();
   });
 });

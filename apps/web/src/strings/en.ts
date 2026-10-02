@@ -1595,4 +1595,12 @@ export const en: Strings = {
   tourStepSectionsTitle: "Sections",
   tourStepSectionsBody:
     "Move between the summary, videos, audience voice and comments from here. The tour has ended; find it again any time in the rail.",
+  crFinishingHeading: "Finishing the channel connection",
+  crFinishingDetail:
+    "We are checking that the connection returned to the browser and account that started it.",
+  crBindingMismatch:
+    "We could not verify the browser or account that started this connection. Start again.",
+  crUnauthenticated:
+    "Your session ended. Sign in and start the connection again.",
+  crUnreachable: "The connection service could not be reached. Try again.",
 };

@@ -19,6 +19,8 @@ import type { StringKey, Strings } from "./strings";
 export type ConnectOutcome =
   { kind: "redirect"; url: string } | { kind: "error"; code: string };
 
+export const OAUTH_BROWSER_NONCE_KEY = "oauth_browser_nonce";
+
 const MESSAGES: Record<string, StringKey> = {
   unauthenticated: "connectUnauthenticated",
   forbidden: "connectForbidden",
@@ -61,14 +63,16 @@ export async function beginConnect(
     );
     const body = (await response.json().catch(() => ({}))) as {
       url?: string;
+      nonce?: string;
       code?: string;
     };
-    if (!response.ok || !body.url)
+    if (!response.ok || !body.url || !body.nonce)
       return {
         kind: "error",
         // A code we do not recognise is passed on as a code, never as server text.
         code: body.code ?? String(response.status),
       };
+    sessionStorage.setItem(OAUTH_BROWSER_NONCE_KEY, body.nonce);
     return { kind: "redirect", url: body.url };
   } catch {
     return { kind: "error", code: "unreachable" };
