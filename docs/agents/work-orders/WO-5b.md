@@ -3,7 +3,10 @@
 Mirror of GitHub issue #16. **The issue is the source of truth**; this copy exists for agents
 whose token can't read issues. If they differ, ask.
 
-- **Start only after** WO-2 (#10) and WO-4 (#12) are merged.
+- **Start:** now. WO-2 (#10) is merged. The original "after WO-4 (#12)" precondition is **waived by
+  the owner** (2026-10-02): WO-4 is not in flight, and none of its tasks touch `connect.ts`,
+  `connectResult.ts` or `Connected.tsx`. The only shared files are `apps/web/src/strings/{ar,en}.ts`:
+  **append new keys only**, never reorder, rename or rewrite existing ones, so WO-4 can merge cleanly later.
 - **Branch:** `codex/wo-5b-oauth-binding`
 - **PR title:** `WO-5b: bind OAuth completion to the initiating browser`
 - **Migration timestamp range:** `20261002000000`–`20261002235959`
@@ -45,9 +48,15 @@ State and PKCE are bound to the *initiating user* in the database, but nothing t
    - the user still holds the required role in that workspace.
    Then attach, single use. Any mismatch is refused with `oauth_binding_mismatch`, and the pending
    row is deleted either way.
-4. **Client:** `connectResult.ts` handles `connect=pending`: read the nonce, call `oauth-complete`,
-   clear the nonce, show the existing success or error states. New strings go in both
-   `strings/ar.ts` and `strings/en.ts`.
+4. **Client:** the `connect=pending` completion is a side effect, so it must **not** run inside the
+   pure `connectResult()` (it is called during render in `Connected.tsx`; a fetch there would be a
+   render-time side effect that React 19 Strict Mode double-invokes → the ticket is consumed twice).
+   Do the completion in a `useEffect` in `Connected.tsx`, guarded by a `useRef` latch so Strict
+   Mode's double-invoke fires it once: read the nonce, call `oauth-complete`, clear the nonce, hold
+   the resolved outcome in state. Keep `connectResult()` a pure mapper and extend it to render the
+   in-flight ("finishing…") and completed success/error states from that resolved outcome. The real
+   single-use guarantee is server-side (step 3, single-use ticket / replay refused) — the ref latch
+   is defense-in-depth, not the guard. New strings go in both `strings/ar.ts` and `strings/en.ts`.
 5. **Pruning:** expired pending rows are pruned by the existing `prune-oauth-states` job.
 
 ## Owned paths
@@ -56,7 +65,9 @@ State and PKCE are bound to the *initiating user* in the database, but nothing t
   and a new `oauth-complete/**`.
 - The new function's block in `supabase/config.toml`.
 - `supabase/tests/oauth*.test.ts`.
-- `apps/web/src/connect.ts` and `connectResult.ts` plus their tests.
+- `apps/web/src/connect.ts`, `connectResult.ts`, and `Connected.tsx` plus their tests.
+  (`Connected.tsx` was added to this WO on 2026-09-29 to allow the effect-based completion in
+  step 4 — see the ruling on issue #16.)
 - New string keys only.
 
 ## Acceptance criteria

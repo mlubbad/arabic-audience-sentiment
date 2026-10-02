@@ -34,6 +34,23 @@ describe("parseCsvRows RFC 4180 parsing", () => {
       ["1", 'He said "great".'],
     ]);
   });
+
+  it("treats quote mid-unquoted-field as literal per RFC 4180", () => {
+    const csv = 'id,text\n1,He said "great" yesterday\n2,Normal text';
+    const rows = parseCsvRows(csv);
+    expect(rows[1][1]).toBe('He said "great" yesterday');
+  });
+
+  it("detects delimiter once from the header without splitting on embedded delimiters", () => {
+    const csv =
+      "video_id;text;author\nv1;Hello, my friend;Omar\nv2;Another, test, comma;Fatima";
+    const rows = parseCsvRows(csv);
+    expect(rows).toEqual([
+      ["video_id", "text", "author"],
+      ["v1", "Hello, my friend", "Omar"],
+      ["v2", "Another, test, comma", "Fatima"],
+    ]);
+  });
 });
 
 describe("parseHistoricalCsv", () => {
@@ -90,6 +107,49 @@ describe("parseHistoricalCsv", () => {
     expect(res.ok).toBe(false);
     expect(res.error).toBe("missing_text_column");
   });
+
+  it("keeps missing published_at date as null (never now())", () => {
+    const csv = "video_id,comment_id,text\nv1,c1,Comment without date";
+    const res = parseHistoricalCsv(csv);
+    expect(res.ok).toBe(true);
+    expect(res.payload?.comments[0].published_at).toBeNull();
+  });
+
+  it("keeps missing likes as null (never 0)", () => {
+    const csv = "video_id,comment_id,text\nv1,c1,Comment without likes";
+    const res = parseHistoricalCsv(csv);
+    expect(res.ok).toBe(true);
+    expect(res.payload?.comments[0].likes_value).toBeNull();
+  });
+
+  it("generates deterministic comment IDs for identical rows across re-imports", () => {
+    const csv =
+      "video_id,text,author\nv1,Helpful video,Ali\nv1,Helpful video,Ali";
+    const res1 = parseHistoricalCsv(csv);
+    const res2 = parseHistoricalCsv(csv);
+    expect(res1.ok).toBe(true);
+    expect(res2.ok).toBe(true);
+    expect(res1.payload?.comments[0].external_comment_id).toBe(
+      res2.payload?.comments[0].external_comment_id,
+    );
+    expect(res1.payload?.comments[0].external_comment_id).toMatch(
+      /^imp_[0-9a-f]+$/,
+    );
+    expect(res1.payload?.comments[0].external_comment_id).not.toBe(
+      res1.payload?.comments[1].external_comment_id,
+    );
+  });
+
+  it("enforces 1,000 comment row limit", () => {
+    const header = "video_id,comment_id,text\n";
+    const rows = Array.from(
+      { length: 1001 },
+      (_, i) => `v1,c${i},Text ${i}`,
+    ).join("\n");
+    const res = parseHistoricalCsv(header + rows);
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe("batch_too_large");
+  });
 });
 
 describe("parseHistoricalJson", () => {
@@ -137,6 +197,46 @@ describe("parseHistoricalJson", () => {
     expect(res.ok).toBe(false);
     expect(res.error).toBe("invalid_json");
   });
+
+  it("keeps missing dates and likes as null in JSON", () => {
+    const json = JSON.stringify([
+      { video_id: "v1", text: "No date, no likes" },
+    ]);
+    const res = parseHistoricalJson(json);
+    expect(res.ok).toBe(true);
+    expect(res.payload?.comments[0].published_at).toBeNull();
+    expect(res.payload?.comments[0].likes_value).toBeNull();
+  });
+
+  it("generates deterministic IDs for JSON comments without id", () => {
+    const json = JSON.stringify([
+      { video_id: "v1", text: "First comment" },
+      { video_id: "v1", text: "Second comment" },
+    ]);
+    const res1 = parseHistoricalJson(json);
+    const res2 = parseHistoricalJson(json);
+    expect(res1.ok).toBe(true);
+    expect(res2.ok).toBe(true);
+    expect(res1.payload?.comments[0].external_comment_id).toBe(
+      res2.payload?.comments[0].external_comment_id,
+    );
+    expect(res1.payload?.comments[0].external_comment_id).toMatch(
+      /^imp_[0-9a-f]+$/,
+    );
+    expect(res1.payload?.comments[0].external_comment_id).not.toBe(
+      res1.payload?.comments[1].external_comment_id,
+    );
+  });
+
+  it("enforces 1,000 comment row limit on JSON", () => {
+    const comments = Array.from({ length: 1001 }, (_, i) => ({
+      video_id: "v1",
+      text: `Comment ${i}`,
+    }));
+    const res = parseHistoricalJson(JSON.stringify(comments));
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe("batch_too_large");
+  });
 });
 
 describe("parseHistoricalFile and generateSampleCsvTemplate", () => {
@@ -159,5 +259,13 @@ describe("parseHistoricalFile and generateSampleCsvTemplate", () => {
     const res = parseHistoricalCsv(template);
     expect(res.ok).toBe(true);
     expect(res.summary?.commentsCount).toBe(3);
+  });
+
+  it("rejects file exceeding 5MB limit", () => {
+    // 5MB + 1 byte
+    const largeContent = "a".repeat(5 * 1024 * 1024 + 1);
+    const res = parseHistoricalFile(largeContent, "huge.csv");
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe("file_too_large");
   });
 });

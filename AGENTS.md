@@ -17,6 +17,19 @@
 | PM, architect, QA, DevOps, data lead | Claude Code | Work orders, architecture decisions (`docs/adr/`), reviews, quality gates, the canonical docs |
 | Precision engineer | Codex | Small, high-stakes, fully specified work orders |
 | Volume engineer | Gemini | Refactors, test suites, UI, worker restructuring, investigations |
+| DX / schema-tooling engineer | VS Code | Local tooling, schema snapshots, editor-driven config and DX chores |
+| Reviewer & GitHub-native chore engineer | GitHub Copilot | First-pass PR reviews; small, fully-specified, low-risk chores it owns end to end |
+
+**GitHub Copilot** is the team's automated first-pass reviewer and small-chore agent. It reviews
+every PR before Claude's PM review (its findings are advisory — Claude still runs the binding
+review and the owner still merges). For build work it takes only self-contained, fully-specified,
+low-risk chores (added test coverage, docs, mechanical refactors, config/dependency hygiene) on a
+`copilot/wo-N-slug` branch → one PR, like everyone else. It **never** touches security-critical or
+cross-cutting code: not `.github/workflows/**`, the five CI gates, SHA/digest pins or secrets
+(Claude/DevOps + Codex own those); not OAuth, DB security or RLS (Codex); not large features
+(Gemini); not the Claude-owned docs. Because its coding agent runs in GitHub Actions and consumes
+Actions minutes, it holds build chores while the account is out of minutes and does review-only
+work (which costs no Actions minutes) until the quota resets or the education benefit lands.
 
 Work arrives as a **GitHub issue (work order)**. You build it on your own branch, open a PR,
 and Claude reviews it. Only the owner merges. The playbook has the details; the short form is:
