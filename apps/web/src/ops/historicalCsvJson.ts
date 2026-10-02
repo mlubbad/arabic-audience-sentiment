@@ -27,8 +27,8 @@ export interface ParseResult {
 }
 
 /**
- * Fast, deterministic 64-bit FNV-1a hash formatted as hex string.
- * Guarantees identical IDs when the same file is re-imported.
+ * Fast, deterministic 64-bit ID from two independently seeded FNV-1a hashes.
+ * The versioned prefix distinguishes these full-entropy IDs across re-imports.
  */
 export function generateDeterministicCommentId(
   vid: string,
@@ -43,11 +43,11 @@ export function generateDeterministicCommentId(
   for (let i = 0; i < input.length; i++) {
     const code = input.charCodeAt(i);
     h1 = Math.imul(h1 ^ code, 0x01000193);
-    h2 = Math.imul(h2 ^ (code >> 8), 0x01000193);
+    h2 = Math.imul(h2 ^ code, 0x01000193);
   }
   const hex1 = (h1 >>> 0).toString(16).padStart(8, "0");
   const hex2 = (h2 >>> 0).toString(16).padStart(8, "0");
-  return `imp_${hex1}${hex2}`;
+  return `imp2_${hex1}${hex2}`;
 }
 
 /**
