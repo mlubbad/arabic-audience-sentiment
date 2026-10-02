@@ -46,7 +46,7 @@ Deno.serve(async (request) => {
   });
 
   try {
-    const { url } = await beginAuthorization(
+    const { url, nonce } = await beginAuthorization(
       body.workspace_id,
       body.client_id,
       {
@@ -66,20 +66,22 @@ Deno.serve(async (request) => {
         scopes: ["https://www.googleapis.com/auth/youtube.force-ssl"],
       },
       {
-        createState: async (w, c, stateHash, verifier) => {
+        createState: async (w, c, stateHash, verifier, browserNonceHash) => {
           const { error } = await db.rpc("oauth_start", {
             w,
             c,
             state_hash: stateHash,
             verifier,
+            browser_nonce_hash: browserNonceHash,
           });
           if (error) throw new Error(error.code ?? "forbidden");
         },
       },
       (n) => crypto.getRandomValues(new Uint8Array(n)),
     );
-    // The URL only. The verifier stays on this side; the state is in it.
-    return json(200, { url });
+    // The browser nonce is kept in sessionStorage by the app. It never enters
+    // Google's URL, so a forwarded consent link cannot carry it to a victim.
+    return json(200, { url, nonce });
   } catch (error) {
     const code = (error as Error).message;
     return json(code === "oauth_not_configured" ? 500 : 403, { code });

@@ -390,6 +390,9 @@ deno_version = 2
 [functions.paddle-webhook]
 verify_jwt = false
 
+[functions.oauth-complete]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

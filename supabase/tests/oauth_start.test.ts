@@ -117,6 +117,21 @@ describe("the authorization redirect", () => {
     expect(new URL(url).searchParams.get("state")).toBe(state);
   });
 
+  it("returns a browser nonce but stores only its hash outside the Google URL", async () => {
+    const { db, calls } = recorder();
+    const { url, nonce } = await beginAuthorization(
+      W,
+      C,
+      config,
+      db,
+      sequential(11),
+    );
+    const storedNonce = (calls[0] as string[])[4];
+    expect(nonce).toHaveLength(43);
+    expect(storedNonce).toBe(await sha256Hex(nonce));
+    expect(url).not.toContain(nonce);
+  });
+
   it("records the state before handing out the URL", async () => {
     // A callback for a state that was never recorded is refused, so the write
     // must not be able to fail after the user has already been sent to Google.
@@ -136,6 +151,7 @@ describe("the authorization redirect", () => {
     const a = await beginAuthorization(W, C, config, db, random);
     const b = await beginAuthorization(W, C, config, db, random);
     expect(a.state).not.toBe(b.state);
+    expect(a.nonce).not.toBe(b.nonce);
     expect((calls[0] as string[])[3]).not.toBe((calls[1] as string[])[3]);
   });
 

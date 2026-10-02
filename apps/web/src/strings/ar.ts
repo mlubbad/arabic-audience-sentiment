@@ -1607,6 +1607,13 @@ export const ar = {
   tourStepSectionsTitle: "الأقسام",
   tourStepSectionsBody:
     "انتقل بين الملخّص والفيديوهات وصوت الجمهور والتعليقات من هنا. انتهت الجولة؛ تجدها متى شئت في الشريط الجانبي.",
+  crFinishingHeading: "جارٍ إتمام ربط القناة",
+  crFinishingDetail: "نتحقق من أن طلب الربط عاد إلى المتصفح والحساب الصحيحين.",
+  crBindingMismatch:
+    "تعذر التحقق من المتصفح أو الحساب الذي بدأ الربط. ابدأ الربط من جديد.",
+  crUnauthenticated:
+    "انتهت جلسة تسجيل الدخول. سجّل الدخول وابدأ الربط من جديد.",
+  crUnreachable: "تعذر الوصول إلى خدمة الربط. حاول مرة أخرى.",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,

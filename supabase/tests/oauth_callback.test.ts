@@ -12,6 +12,7 @@ import {
   handleCallback,
   importSealingKey,
   openTokens,
+  pendingRedirect,
   refreshAccessToken,
   sealTokens,
   type CallbackConfig,
@@ -28,6 +29,7 @@ const config: CallbackConfig = {
   key_version: "k1",
 };
 const binding = {
+  state_id: "20000000-0000-4000-8000-000000000001",
   user_id: "10000000-0000-4000-8000-000000000001",
   workspace_id: "00000000-0000-4000-8000-000000000001",
   client_id: "00000000-0000-4000-8000-0000000000c1",
@@ -66,7 +68,7 @@ function transport(
 }
 
 function database() {
-  const attached: Parameters<CallbackDb["attachChannel"]>[0][] = [];
+  const pending: Parameters<CallbackDb["createPending"]>[0][] = [];
   const consumed: string[] = [];
   const db: CallbackDb = {
     consumeState: async (hash) => {
@@ -74,17 +76,16 @@ function database() {
       if (consumed.length > 1) throw new Error("invalid_state");
       return binding;
     },
-    attachChannel: async (input) => {
-      attached.push(input);
-      return "channel-uuid";
+    createPending: async (input) => {
+      pending.push(input);
     },
   };
-  return { db, attached, consumed };
+  return { db, pending, consumed };
 }
 
 const run = async (over: Parameters<typeof transport>[0] = {}, patch = {}) => {
   const { http, calls } = transport(over);
-  const { db, attached, consumed } = database();
+  const { db, pending, consumed } = database();
   const key = await importSealingKey(KEY_B64);
   const result = await handleCallback({
     code: "4/auth-code",
@@ -94,19 +95,29 @@ const run = async (over: Parameters<typeof transport>[0] = {}, patch = {}) => {
     db,
     http,
     key,
+    random: (n) => new Uint8Array(n).fill(9),
     ...patch,
   });
-  return { result, calls, attached, consumed, key };
+  return { result, calls, pending, consumed, key };
 };
 
 describe("completing a YouTube connection", () => {
+  it("redirects with only a pending ticket", () => {
+    const url = new URL(pendingRedirect("https://app.example", "ticket-only"));
+    expect([...url.searchParams.entries()]).toEqual([
+      ["connect", "pending"],
+      ["ticket", "ticket-only"],
+    ]);
+    expect(url.toString()).not.toContain("token");
+    expect(url.toString()).not.toContain("channel");
+  });
   it("takes the channel from Google, never from the callback URL", async () => {
     // A callback is reachable by anyone who can guess a URL. If the channel id
     // came from a query parameter, connecting someone else's channel would be
     // a matter of typing it.
-    const { result, attached, calls } = await run();
-    expect(attached[0].externalChannel).toBe(CHANNEL);
-    expect(result.channelId).toBe("channel-uuid");
+    const { result, pending, calls } = await run();
+    expect(pending[0].externalChannel).toBe(CHANNEL);
+    expect(result.ticket).toHaveLength(43);
     const lookup = calls.find((c) => c.url.includes("channels"))!;
     expect(lookup.url).toContain("mine=true");
     expect(lookup.init.headers).toMatchObject({
@@ -115,7 +126,7 @@ describe("completing a YouTube connection", () => {
   });
 
   it("carries the channel's names when Google sends them, and nulls when it does not", async () => {
-    const { attached, calls } = await run({
+    const { pending, calls } = await run({
       channels: {
         items: [
           { id: CHANNEL, snippet: { title: "قناة", customUrl: "@qanah" } },
@@ -123,7 +134,7 @@ describe("completing a YouTube connection", () => {
       },
     });
     expect(calls[1].url).toContain("part=id,snippet");
-    expect(attached[0]).toMatchObject({
+    expect(pending[0]).toMatchObject({
       externalChannel: CHANNEL,
       handle: "@qanah",
       title: "قناة",
@@ -131,13 +142,13 @@ describe("completing a YouTube connection", () => {
     // No snippet, or one with nothing usable in it, is not a failed connection:
     // the id is the contract and the name is a label on it.
     const bare = await run({ channels: { items: [{ id: CHANNEL }] } });
-    expect(bare.attached[0]).toMatchObject({ handle: null, title: null });
+    expect(bare.pending[0]).toMatchObject({ handle: null, title: null });
     const odd = await run({
       channels: {
         items: [{ id: CHANNEL, snippet: { title: 7, customUrl: " " } }],
       },
     });
-    expect(odd.attached[0]).toMatchObject({ handle: null, title: null });
+    expect(odd.pending[0]).toMatchObject({ handle: null, title: null });
   });
 
   it("takes the verifier from the stored state, never from the request", async () => {
@@ -148,14 +159,13 @@ describe("completing a YouTube connection", () => {
   });
 
   it("takes the workspace from the stored state, so a callback cannot redirect it", async () => {
-    const { attached } = await run();
-    expect(attached[0].workspaceId).toBe(binding.workspace_id);
-    expect(attached[0].userId).toBe(binding.user_id);
+    const { pending } = await run();
+    expect(pending[0].stateId).toBe(binding.state_id);
   });
 
   it("seals the tokens, so a database read is not a working credential", async () => {
-    const { attached, key } = await run();
-    const sealed = attached[0].sealedTokens;
+    const { pending, key } = await run();
+    const sealed = pending[0].sealedTokens;
     const asText = new TextDecoder().decode(sealed);
     expect(asText).not.toContain("ya29.access");
     expect(asText).not.toContain("1//refresh");
@@ -221,6 +231,7 @@ describe("completing a YouTube connection", () => {
         db,
         http,
         key: await importSealingKey(KEY_B64),
+        random: (n) => new Uint8Array(n).fill(9),
       }),
     ).rejects.toThrow(new ConnectError("token_exchange_failed"));
   });
@@ -238,6 +249,7 @@ describe("completing a YouTube connection", () => {
         db,
         http,
         key,
+        random: (n) => new Uint8Array(n).fill(9),
       });
     await call();
     await expect(call()).rejects.toThrow();
