@@ -19,6 +19,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # CodeQL's init and analyze steps must run from the same commit. Without
+    # a group, Dependabot bumps each sub-action in its own PR (see #6).
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   # The Python worker image (python:3.12-slim, pinned by digest). Dependabot
   # opens a PR when a newer digest is published so the base image stays patched.
