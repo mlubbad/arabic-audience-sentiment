@@ -158,3 +158,10 @@ jobs:
           PREVIEW_FTP_USER: ${{ secrets.PREVIEW_FTP_USER }}
           PREVIEW_FTP_PASSWORD: ${{ secrets.PREVIEW_FTP_PASSWORD }}
         run: sh scripts/deploy-preview.sh
+
+      # An upload proves the bytes reached the FTP account, not that the site
+      # serves them (2026-10-02: four "successful" deploys never went live).
+      - name: Verify the live site serves this build
+        env:
+          DEPLOY_VERIFY_URL: https://app.sky-develop.net
+        run: node scripts/verify-deploy.mjs
