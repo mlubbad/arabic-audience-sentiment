@@ -38,6 +38,7 @@ import "./legal.css";
 import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
 import { useIsPlatformAdmin } from "./adminAccess";
+import { shouldRetryDashboardQuery } from "./queryRetry";
 import { ToastHost } from "./ui/Toast";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { carriedSearch } from "./workspaceUrl";
@@ -113,7 +114,7 @@ const LegalPage = lazy(() =>
 const client = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: (failureCount) => failureCount < 1,
+      retry: (n, e) => shouldRetryDashboardQuery(n, e, 1),
       refetchOnWindowFocus: false,
     },
   },

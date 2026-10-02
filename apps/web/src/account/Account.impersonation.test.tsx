@@ -8,6 +8,7 @@ import * as impersonationModule from "../impersonation";
 import * as adminAccessModule from "../adminAccess";
 import * as sessionModule from "../session";
 import * as planCatalogueModule from "../planCatalogue";
+import { supabase } from "../supabase";
 import { Account } from "./Account";
 
 vi.mock("../supabase", () => {
@@ -220,5 +221,52 @@ describe("Account impersonation boundary for experimental public channels", () =
     expect(
       screen.getByText("حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة."),
     ).toBeInTheDocument();
+  });
+
+  it("does not pass target_user_id to my_workspaces when not impersonating", async () => {
+    vi.spyOn(impersonationModule, "useImpersonation").mockReturnValue({
+      isImpersonating: false,
+      impersonatedUser: null,
+      loading: false,
+      startImpersonation: vi.fn(),
+      stopImpersonation: vi.fn(),
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(supabase?.rpc).toHaveBeenCalledWith("my_workspaces", {});
+    });
+    expect(supabase?.rpc).not.toHaveBeenCalledWith(
+      "my_workspaces",
+      expect.objectContaining({
+        target_user_id: expect.anything(),
+      }),
+    );
+    expect(supabase?.from).not.toHaveBeenCalledWith("workspaces");
+  });
+
+  it("fails closed without querying from('workspaces') when my_workspaces fails", async () => {
+    vi.spyOn(impersonationModule, "useImpersonation").mockReturnValue({
+      isImpersonating: false,
+      impersonatedUser: null,
+      loading: false,
+      startImpersonation: vi.fn(),
+      stopImpersonation: vi.fn(),
+    });
+
+    vi.mocked(supabase!.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { message: "tenant isolation error", code: "42501" },
+    } as never);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("تعذر تحميل مساحات العمل")).toBeInTheDocument();
+    });
+
+    expect(supabase?.from).not.toHaveBeenCalledWith("workspaces");
+    expect(screen.queryByText("مساحة العمل التجريبية")).toBeNull();
   });
 });

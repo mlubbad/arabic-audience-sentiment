@@ -38,6 +38,11 @@ const ImpersonationContext = createContext<ImpersonationContextType>({
   loading: false,
 });
 
+function isDemoMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).has("demo");
+}
+
 export function ImpersonationProvider({ children }: { children: ReactNode }) {
   const S = useStrings();
   const queryClient = useQueryClient();
@@ -62,6 +67,14 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     async (user: AdminUser | { id: string; email: string | null }) => {
       setLoading(true);
       try {
+        const isDemo = isDemoMode();
+        if (!supabase && !isDemo) {
+          console.error("Cannot impersonate without Supabase client");
+          toast({ title: S.adminImpersonateError });
+          setLoading(false);
+          return;
+        }
+
         if (supabase) {
           const { error } = await supabase.rpc("admin_start_impersonation", {
             p_target_user_id: user.id,
@@ -110,10 +123,14 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
         if (targetWsId) {
           selectWorkspace(user.id, targetWsId);
           toast({ title: S.adminImpersonateStarting });
-          navigate(`/dashboard?ws=${targetWsId}`);
+          navigate(
+            isDemo
+              ? `/dashboard?demo=1&ws=${targetWsId}`
+              : `/dashboard?ws=${targetWsId}`,
+          );
         } else {
           toast({ title: S.adminImpersonateStarting });
-          navigate("/dashboard");
+          navigate(isDemo ? "/dashboard?demo=1" : "/dashboard");
         }
       } catch (e) {
         console.error("Error during startImpersonation:", e);
@@ -127,7 +144,15 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
 
   const stopImpersonation = useCallback(async () => {
     setLoading(true);
+    const isDemo = isDemoMode();
     try {
+      if (!supabase && !isDemo) {
+        console.error("Cannot stop impersonation without Supabase client");
+        toast({ title: S.adminImpersonateError });
+        setLoading(false);
+        return;
+      }
+
       if (supabase && impersonatedUser) {
         const { error } = await supabase.rpc("admin_stop_impersonation", {
           p_target_user_id: impersonatedUser.id,
@@ -154,7 +179,7 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
     setImpersonatedUser(null);
     await queryClient.invalidateQueries();
     toast({ title: S.adminImpersonateStopping });
-    navigate("/admin/users");
+    navigate(isDemo ? "/admin/users?demo=1" : "/admin/users");
     setLoading(false);
   }, [impersonatedUser, navigate, queryClient, S]);
 

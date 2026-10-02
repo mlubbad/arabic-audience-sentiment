@@ -157,7 +157,7 @@ export const ar = {
   shareWorkspaceLead:
     "شارك هذه المساحة مع حسابات أخرى بالبريد الإلكتروني برتبة محددة.",
   shareWorkspaceAccountsCount: (count: number, limit: number | null) =>
-    limit
+    limit !== null
       ? `${count} من ${limit} حسابات مستخدمة`
       : `${count} حسابات (غير محدود)`,
   shareWorkspaceEmailLabel: "البريد الإلكتروني للحساب",

@@ -155,7 +155,7 @@ export const en: Strings = {
   shareWorkspaceLead:
     "Share this workspace with other accounts by email under a specific role.",
   shareWorkspaceAccountsCount: (count: number, limit: number | null) =>
-    limit
+    limit !== null
       ? `${count} of ${limit} accounts used`
       : `${count} accounts (unlimited)`,
   shareWorkspaceEmailLabel: "Account email address",
