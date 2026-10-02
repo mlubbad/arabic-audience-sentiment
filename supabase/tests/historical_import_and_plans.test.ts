@@ -264,7 +264,7 @@ describe("historical data import and dynamic plan limits", () => {
         result: {
           ok: boolean;
           status: string;
-          historical_days_limit: number;
+          historical_days_limit: number | null;
           job_id: string;
         };
       }>(
@@ -280,7 +280,7 @@ describe("historical data import and dynamic plan limits", () => {
       const data = res.rows[0].result;
       expect(data.ok).toBe(true);
       expect(data.status).toBe("queued");
-      expect(data.historical_days_limit).toBe(-1); // -1 signifies unlimited
+      expect(data.historical_days_limit).toBeNull(); // NULL signifies unlimited
     });
   });
 

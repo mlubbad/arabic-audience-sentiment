@@ -53,7 +53,7 @@ class BrightDataClient:
             if resp.status_code == 200:
                 return resp.json().get("value", {"ready": True})
             return {"ready": False, "status_code": resp.status_code}
-        except Exception as exc:
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
             return {"ready": False, "error": str(exc)}
 
     def _scrape_dataset(self, dataset_id: str, urls: list[dict | str]) -> list[dict]:
@@ -92,7 +92,7 @@ class BrightDataClient:
                     return data["data"]
                 return [data]
             return []
-        except Exception:
+        except (ValueError, KeyError, TypeError):
             raise CollectionError("invalid_response_format", "failed") from None
 
     def scrape_x_profile(self, handle: str, max_items: int = 25) -> list[dict]:

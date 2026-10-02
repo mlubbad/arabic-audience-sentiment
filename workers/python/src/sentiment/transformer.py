@@ -165,7 +165,7 @@ class LogitsAdapter:
             return out
         try:
             logits = self._infer([plains[i] for i in askable])
-        except Exception:
+        except Exception:  # noqa: BLE001 — inference failure recorded as failed, never neutral
             # Inference failed for the batch. Failure is recorded as failure:
             # it is never allowed to become "neutral", which would be a verdict
             # about the audience rather than about the run.

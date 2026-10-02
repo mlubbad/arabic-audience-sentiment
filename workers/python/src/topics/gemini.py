@@ -159,7 +159,7 @@ class GeminiTopicClassifier:
                         raise TopicError("gemini_credits_depleted")
                 except TopicError:
                     raise
-                except Exception:
+                except (ValueError, KeyError, TypeError, json.JSONDecodeError):
                     pass
                 raise TopicError("gemini_refused")
             try:

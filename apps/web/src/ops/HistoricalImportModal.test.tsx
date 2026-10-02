@@ -287,4 +287,133 @@ describe("HistoricalImportModal", () => {
       expect(onSuccess).toHaveBeenCalled();
     });
   });
+
+  it("shows 5 MB and 1,000-row caps in the file import tab", async () => {
+    const user = userEvent.setup();
+    render(
+      <HistoricalImportModal
+        open={true}
+        onClose={vi.fn()}
+        workspaceId="w_123"
+        channelId="c_123"
+        plan={mockPlan}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("tab-file-import"));
+    expect(screen.getByText(/5.*(MB|ميجابايت|ميغابايت)/i)).toBeInTheDocument();
+    expect(screen.getByText(/1[,.]?000/)).toBeInTheDocument();
+  });
+
+  it("rejects files exceeding 5 MB limit immediately before parsing", async () => {
+    const user = userEvent.setup();
+    render(
+      <HistoricalImportModal
+        open={true}
+        onClose={vi.fn()}
+        workspaceId="w_123"
+        channelId="c_123"
+        plan={mockPlan}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("tab-file-import"));
+
+    // Mock a large file by overriding size property
+    const largeFile = new File(["dummy"], "large.csv", { type: "text/csv" });
+    Object.defineProperty(largeFile, "size", { value: 6 * 1024 * 1024 });
+
+    const fileInput = screen.getByTestId("input-file-import");
+    await user.upload(fileInput, largeFile);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByTestId("btn-submit-file-import")).toBeDisabled();
+    });
+  });
+
+  it("clears previous parse result when a new file is selected", async () => {
+    const user = userEvent.setup();
+    render(
+      <HistoricalImportModal
+        open={true}
+        onClose={vi.fn()}
+        workspaceId="w_123"
+        channelId="c_123"
+        plan={mockPlan}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("tab-file-import"));
+
+    // Upload valid file first
+    const validFile = new File(
+      ["video_id,comment_id,text\nv1,c1,Hello"],
+      "valid.csv",
+      { type: "text/csv" },
+    );
+    const fileInput = screen.getByTestId("input-file-import");
+    await user.upload(fileInput, validFile);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-submit-file-import")).toBeEnabled();
+    });
+
+    // Upload an invalid/corrupted file
+    const invalidFile = new File(["some,bad,random,columns"], "bad.csv", {
+      type: "text/csv",
+    });
+    await user.upload(fileInput, invalidFile);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-submit-file-import")).toBeDisabled();
+    });
+  });
+
+  it("maps server error codes like batch_too_large to localized message", async () => {
+    const user = userEvent.setup();
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "batch_too_large: payload exceeds maximum batch size" },
+    });
+
+    render(
+      <HistoricalImportModal
+        open={true}
+        onClose={vi.fn()}
+        workspaceId="w_123"
+        channelId="c_123"
+        plan={mockPlan}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("tab-file-import"));
+
+    const validFile = new File(
+      ["video_id,comment_id,text\nv1,c1,Test text"],
+      "valid.csv",
+      { type: "text/csv" },
+    );
+    const fileInput = screen.getByTestId("input-file-import");
+    await user.upload(fileInput, validFile);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-submit-file-import")).toBeEnabled();
+    });
+
+    await user.click(screen.getByTestId("btn-submit-file-import"));
+
+    await waitFor(() => {
+      const alert = screen.getByRole("alert");
+      expect(alert).toBeInTheDocument();
+      // Should not be the raw unmapped message
+      expect(alert.textContent).not.toBe(
+        "batch_too_large: payload exceeds maximum batch size",
+      );
+    });
+  });
 });
