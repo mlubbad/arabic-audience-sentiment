@@ -12,6 +12,20 @@
   width: 100%;
   cursor: pointer;
 }
+.db-video-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.db-video-thumbnail {
+  width: 56px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-hover);
+}
 .db-video:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-2);

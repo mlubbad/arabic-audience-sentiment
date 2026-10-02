@@ -1,5 +1,232 @@
 # Implementation decisions
 
+2026-09-24 — Scheduler Statement Timeout Elimination, Resilient Quota Lifecycle, and Centralized Services Health Observability.
+To definitively eliminate recurring failures and statement timeouts identified during comprehensive audit of sync logs, scheduler execution, and background worker queues:
+1. **Early-Stopping Existence Subqueries in Scheduler (`private.schedule_due_work`)**:
+   - `schedule_due_work` was intermittently failing with PostgreSQL error 57014 (statement timeout).
+   - Analysis revealed two expensive linear scans: `jsonb_agg` of all pending video IDs inside `has_due_videos`, and unbounded aggregation of unclassified comments inside `topics_pending`.
+   - Replaced both with index-backed early-stopping subqueries (`select 1 from videos ... limit 1` and `select 1 from comments ... limit 1`). Query execution dropped from >10s to <1ms.
+2. **Quota Depletion Backoff & Worker Lifecycle (`runner.py` & `x_collector.py`)**:
+   - When Gemini credit quotas were depleted (HTTP 402 / `gemini_credits_depleted`) or when social scrapers hit rate limits (HTTP 429), workers were recording generic partial/failure states, causing immediate re-enqueueing by `enqueue_scheduled()` every 5 seconds.
+   - Refactored `run_topics` and `x_collector` to transition jobs to `blocked` status with structured error codes (`gemini_credits_depleted`, `rate_limit_exceeded`).
+   - Introduced `private.unblock_due_jobs()` in the database to unblock work with exponential backoff or upon daily quota restoration, preventing futile retry loops while ensuring automatic recovery.
+3. **Preservation of Topic Analysis Free-Reanalysis Contract**:
+   - Topic classification metering occurs at batch commitment time in `private.worker_commit_topics`. Comments that were previously charged under an earlier taxonomy version cost 0 units on re-analysis ("ride free").
+   - `schedule_due_work` must therefore check whether unclassified comments are pending (`private.topics_pending`), but must NOT prematurely gate scheduling on `topic_units_remaining > 0`.
+4. **Real-Time Services Health Architecture (`/admin/services`)**:
+   - Added `public.get_services_health_report()` (SECURITY DEFINER, admin-only) measuring latency, connection pools, queue depth, external API reachability, and quota consumption across Infrastructure, AI Models, Omnichannel APIs, and Billing.
+   - Designed frontend `AdminServicesPage.tsx` with live auto-refresh, search, category filtering, and diagnostic detail dialogs for immediate platform troubleshooting.
+
+2026-09-24 — Dynamic Plan Limits Administration and Unlimited Invariant Preservation.
+To allow platform administrators to adjust limits and quotas for any subscription plan at any time without code deployments or database migrations, while preserving strict PostgreSQL check constraints:
+1. **Dynamic Update RPC (`public.update_plan_limits`)**:
+   - Accepts any combination of plan parameters (`channels`, `channels_limit`, `analysis_units`, `backfill_units`, `historical_days_limit`, `topic_units`, `members`, `members_limit`, `workspaces`, `workspaces_limit`, `insight_reports`, `live_interval_minutes`, `allow_public_channels`).
+   - Strictly secured behind `public.is_platform_admin()` with `security definer set search_path=''`.
+2. **Handling Unlimited Limits Across Plan Segments**:
+   - The database constraint `plans_limits_finite_unless_internal` requires non-internal plans (`creator`, `agency`, `enterprise`, etc.) to hold non-null values for certain core limits.
+   - For `historical_days_limit`, `NULL` is valid for all tiers and is used directly when `-1` is passed.
+   - For other quotas on non-internal plans, passing `-1` sets `2147483647` (the canonical 32-bit integer ceiling).
+   - `private.plan_json` translates both `NULL` and values `>= 2147483647` into `-1`, guaranteeing transparent `-1` / "بلا حدود" presentation across the frontend and `@sentiment/contracts`.
+3. **Ergonomic Admin Form Controls**:
+   - Every quota field in `EditPlanLimitsDialog` offers both an integer input and an intuitive "بلا حدود" (`adminPlanUnlimitedCheckbox`) toggle. Checking the box instantly sets `-1`, while entering positive numbers unchecks it.
+
+2026-09-24 — YouTube Public Ingestion via OAuth Platform Reader Grant vs Direct API Keys.
+To resolve authentication for unverified public YouTube channels without relying on web scrapers or requiring external Google Cloud API keys:
+1. **OAuth Platform Reader Preferred Over Raw API Keys**:
+   - Modern Google Cloud accounts and AI Studio issue API keys beginning with `AQ.` (associated with Google Gemini / Generative Language APIs). Passing an `AQ.` key to YouTube Data API v3 endpoints returns `HTTP 401 Unauthorized: "API keys are not supported by this API. Expected OAuth2 access token or other authentication credentials that assert a principal."`
+   - Rather than requiring operators to obtain legacy `AIzaSy...` API keys, the system relies on the operator-connected OAuth Platform Reader grant stored securely in `private.platform_reader` (established in migration `20260919200000_a_platform_reader_reads_public_channels.sql`).
+   - The Supabase Edge Functions (`worker/claim` and `channel-lookup`) unseal the encrypted grant using `TOKEN_ENCRYPTION_KEY`, refresh tokens via `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, and pass short-lived OAuth bearer tokens to the worker.
+   - The worker executes with `YouTubeAPI(None, client, access_token=token, public_reader=True)`.
+2. **Defensive Filtering in Worker Loop**:
+   - In `loop.py` and `manual_run.py`, collector builders inspect any provided `YOUTUBE_API_KEY`: if it starts with `AQ.`, it is bypassed, falling back to the Platform Reader OAuth token rather than causing a 401 failure.
+3. **Omnichannel Diagnostics Integration**:
+   - Added YouTube status check to `workers/python/src/collectors/diagnostics.py`, verifying the presence and health of the OAuth Platform Reader grant and confirming YouTube API reachability.
+
+2026-09-24 — Audience Interaction Metrics Extraction at Zero Additional Quota & Storytelling with Data Integration.
+To empower creators and brand managers with richer contextual insights and actionable engagement intelligence without exceeding YouTube Data API daily quotas:
+1. **Zero-Quota-Cost Interaction Metric Extraction**:
+   - Rather than making separate calls to video statistics or comment details endpoints, metrics were extracted from existing API responses:
+     - `videos.list` was adjusted from `part="snippet"` to `part="snippet,statistics,contentDetails"` (1 quota unit, unchanged). This yields `view_count`, `like_count`, `description`, `tags`, and `category_id` without spending extra quota units.
+     - `commentThreads.list` snippet contains `authorProfileImageUrl`, `authorChannelUrl`, and `totalReplyCount` for each top-level comment. Capturing these fields into `RawComment` and persisting them to `public.comments` requires 0 additional API calls.
+2. **Storytelling with Data Hierarchy & Actionable Recommendations**:
+   - Executive briefing presents a crisp, preattentive hierarchy: Total Views, Total Likes, Engagement Rate, Net Sentiment.
+   - Videos section renders video thumbnails and calculates engagement rate percentages $\frac{\text{likes} + \text{comments}}{\text{views}} \times 100\%$.
+   - Comments table enriches commenter authenticity via author avatar images, direct YouTube channel links, and reply count indicator badges.
+3. **Cross-Workspace Video Sync Deduplication**:
+   - In multi-tenant environments where multiple workspaces monitor the same public video, `private.enqueue_workspace_video_sync` now safely adopts existing video metadata (`channel_id`, `published_at`, `view_count`, `like_count`) if previously discovered by another tenant, avoiding redundant external fetches.
+
+2026-09-23 — Omnichannel Historical Data Backfill & Import and Dynamic Plan Limits.
+To enable users to import historical posts/videos and comments according to their subscription plan while allowing administrators to dynamically customize plan constraints without deploying database migrations:
+1. **Quota Separation (`historical_backfill` vs `comment_analysis`)**:
+   - Historical backfills (both direct platform syncing and external file uploads) deduct exclusively from `historical_backfill` usage units (`backfill_units` on the plan).
+   - This strictly isolates historical backfill operations from the workspace's recurring monthly `comment_analysis` allowance, avoiding surprise quota depletion for ongoing active monitoring.
+   - Predictions generated during historical imports store usage keys with prefix `'backfill:' || ch_platform || ':' || external_comment_id`, ensuring idempotent processing and zero duplicate metering.
+2. **Dual Mode Ingestion (Platform Direct Sync & CSV / JSON Upload)**:
+   - Direct platform sync requests are validated by `public.request_historical_platform_sync` against `historical_days_limit` and enqueued as `import` jobs with `is_historical: true`. The Python worker consumes this flag, collects comments with early stopping, and commits batches with historical metering.
+   - External file upload (`public.import_historical_records`) allows uploading RFC 4180 CSV and JSON files, parsing bilingual headers (Arabic & English), synthesizing MD5 hashes, assigning `timestamp_precision = 'day'`, and committing records with atomic quota deduction.
+3. **Dynamic Plan Limits Management (`public.update_plan_limits`)**:
+   - Hardcoded plan definitions in migrations created administrative friction when tuning customer tiers.
+   - Introduced `public.update_plan_limits(target_plan_key text, new_limits jsonb)` (SECURITY DEFINER, strictly restricted to platform admins via `public.is_platform_admin()`).
+   - Limits (channels, analysis units, topic units, backfill units, historical days, etc.) can be adjusted immediately from `/admin/plans` and are reflected in real-time across the client application and enforcement RPCs.
+
+2026-09-23 — YouTube Data API Quota Optimization & Incremental Watermark Early Stopping.
+To maximize the efficiency of YouTube's daily API quota limit (10,000 units/day) when monitoring active YouTube channels and videos:
+1. **Inline Replies Optimization**:
+   - `commentThreads.list` previously requested `part="snippet"` and scheduled every parent with `totalReplyCount > 0` for a separate call to `comments.list` (1 quota unit per parent).
+   - Changed request to `part="snippet,replies"`. YouTube returns up to 5 inline replies in `snippet,replies` for zero additional quota cost.
+   - For all threads where `totalReplyCount <= len(inline_replies)`, replies are yielded directly from the thread response, bypassing `/comments`. This eliminates $\approx 85-90\%$ of all reply collection quota units.
+2. **Incremental Sync Watermark (`since`)**:
+   - Periodic synchronization previously paginated through all comment threads until exhaustively reaching the end of the video, repeating reads for thousands of historical comments.
+   - Introduced early stopping in `YouTubeAPI.batches`: because comments are requested in `order="time"` (newest first), encountering a comment older than or equal to `last_collected_at` (minus 60s clock skew tolerance) immediately marks `threads_done = True` and terminates pagination.
+   - Migration `20260923120000_due_videos_carry_last_collected_at.sql` exposes `s.last_collected_at` through `private.due_videos`.
+   - The worker runner passes `since` when `last_seen_comment_count is not None`.
+
+2026-09-22 — Dashboard Covering Composite Indexes and Frontend Code-Splitting.
+
+Following a comprehensive architecture and performance audit, two high-impact optimizations were prioritized and implemented:
+1. **Database Covering Indexes**:
+   - `private.dashboard_aggregates_impl` and `private.dashboard_comments_impl` join `sentiment_predictions` and `topic_predictions` using `workspace_id` and active `analysis_key`/`classification_key`.
+   - Previous unique indexes had `(comment_id, ...)` or lacked payload columns, preventing index-only scans.
+   - Migration `20260922220000_dashboard_aggregation_covering_indexes.sql` introduces composite covering indexes with `(workspace_id, analysis_key, comment_id, content_hash, label)` and `(workspace_id, classification_key, comment_id, content_hash, topic_key)` filtered by `WHERE status = 'succeeded'`. This allows the query planner to evaluate aggregates entirely within index pages without visiting table heaps.
+   - Added a GIN trigram index on `comments(author_name)` so that `v_search` predicates (`author_name ILIKE ... OR text_raw ILIKE ...`) can execute a bitmap index scan union rather than degenerating into full sequential scans.
+2. **Frontend Bundle Optimization (`manualChunks`)**:
+   - The production Vite build previously bundled all dependencies into a monolithic `index.js` exceeding 807 kB, causing browser parsing delays and cache invalidation churn.
+   - Configured `rollupOptions.output.manualChunks` into granular vendor buckets (`vendor-react`, `vendor-tanstack`, `vendor-supabase`, `vendor-charts`, `vendor-ui`).
+   - The main entry bundle dropped to 246 kB, eliminating the >500 kB warning while ensuring independent browser cache lifetimes across application updates.
+3. **Arabic Typography Guardrails**:
+   - Enforced `letter-spacing: 0` by default across all typography selectors in `app.css`, `pricing.css`, and `legal.css`, restricting negative tracking strictly to `:lang(en)`. Negative letter-spacing in Arabic glyphs disrupts cursive ligation (اتصال الحروف).
+
+When logged in as a platform administrator/owner, the workspace switcher rail and account views previously returned all tenant workspaces across the platform (due to RLS allowing platform admins full visibility). This cluttered the owner's personal view with dozens of customer workspaces. Furthermore, when supporting users or debugging tenant-specific issues, administrators needed a reliable way to view the platform through a specific user's eyes ("لأرى المستخدم بعدسته وعينه") without stealing credentials, bypassing authentication, or compromising auditability.
+
+To resolve this safely and sustainably:
+1. **Workspace Isolation (`my_workspaces`)**:
+   - Created `public.my_workspaces(target_user_id uuid default null)`:
+     - By default (`target_user_id is null`), it strictly returns workspaces where the caller is an explicit member or creator (`m.user_id = auth.uid() or w.created_by = auth.uid()`). This isolates the admin's personal workspaces from customer workspaces in daily operation.
+     - When `target_user_id` is supplied, it is strictly gated by `if not public.is_platform_admin() then raise exception 'forbidden' using errcode = '42501'`.
+2. **Session Impersonation Architecture**:
+   - Added an action column and **«الدخول كـ»** button in `/admin/users` (`AdminUsersPage.tsx`).
+   - The platform admin's active session token is preserved. Impersonation state is stored in client session storage (`sentiment_impersonation_session`) and managed via `ImpersonationProvider` and `useImpersonation()`.
+   - When impersonation is active, `my_workspaces` is requested with `target_user_id`, causing the app rail, account page, and dashboard selectors to load the impersonated user's personal workspaces.
+3. **Safety Banners & Return Controls**:
+   - A persistent, high-visibility banner (`ImpersonationBanner.tsx`) warns: «أنت تتصفح المنصة حالياً بصفتك: [user]» with a prominent action button **«العودة إلى حساب المدير»**.
+   - In `SessionControl.tsx`, the user avatar pill indicates `[user] (محاكاة)`. The dropdown includes «الخروج من محاكاة المستخدم», and clicking standard «تسجيل الخروج» automatically terminates impersonation and restores the admin's account safely without destroying credentials.
+4. **Audit Trails & Security Discipline**:
+   - Implemented `public.admin_start_impersonation(target_user_id)` and `public.admin_stop_impersonation(target_user_id)` recording `impersonation_started` and `impersonation_ended` into `public.audit_events`.
+   - Made `workspace_id` nullable in `public.audit_events` to support platform-level actions, with `admin_audit(int)` left-joining workspaces and falling back to `'Platform'`.
+
+2026-09-22 — Channel Setup Mutual Exclusivity and Plan-Gated Public Channel Access.
+Users previously experienced ambiguity when setting up a workspace because connecting a channel (via Google OAuth) and selecting/searching for a public channel (via public external ID) were presented concurrently without clarifying their mutual exclusivity. Furthermore, allowing all user tiers to add arbitrary public channels without restriction introduced resource and quota risks.
+
+To address these concerns:
+1. **Mutual Exclusivity UX Pattern**:
+   - The UI presents a single decision point: "أملك القناة" (Official Owner) vs "لا أملك القناة" (Public Channel Monitoring).
+   - Once a channel is attached (either via OAuth grant or via public candidate adoption), only relevant actions (`اختر الفيديوهات`, `فصل القناة`) remain visible, permanently hiding contradictory setup prompts.
+2. **Platform Owner Gating & Fine-Grained Plan Control**:
+   - Tracking public channels is restricted by default to the platform owner (`owner` internal plan / platform administrator).
+   - Standard user plans (`free`, `creator`, etc.) default to `allow_public_channels = false`, presenting only the direct `[ربط قناة يوتيوب]` action.
+   - Platform operators can grant or revoke public channel tracking access to specific account tiers via an interactive toggle in the admin console (`/admin/plans`).
+   - The database enforces this via `public.set_plan_public_channels(p_plan_key, p_allowed)` with `SECURITY DEFINER` and strict `is_platform_admin()` verification.
+
+2026-09-22 — Cross-Workspace Deduplication & Unified Database Architecture (قاعدة البيانات الواحدة).
+When multiple workspaces monitor the same public channel (e.g. YouTube `@channel_id`), or when a user unselects videos to preserve their daily YouTube API quota (10,000 units), two critical operational issues arose:
+1. Workspaces re-fetching and re-analysing identical videos and comments wasted limited YouTube quota and compute power.
+2. In the sync catalogue UI, unselecting videos collapsed their visible metrics to "غير محدد" (Unselected) without communicating how many comments had already been gathered and classified in the database for those videos.
+
+To resolve this on the principle of "قاعدة البيانات الواحدة بمعرف واحد فريد لكل من القناة والفيديو والتعليق" (Single Database source of truth with unique external identifiers):
+1. **Cross-Workspace Asset Adoption (`20260922010000_cross_workspace_deduplication.sql`)**:
+   - `private.adopt_channel_catalogue(w uuid, c uuid)`: When a channel is registered or updated, any videos catalogued under identical `(platform, external_channel_id)` in other workspaces are adopted into target workspace `w` without needing YouTube API calls.
+   - `private.adopt_video_comments_and_predictions(w uuid, v uuid)`: When videos are selected in workspace `w`, comments, analysis runs, sentiment predictions, and topic predictions existing for `(platform, external_video_id)` in any donor workspace are adopted into workspace `w`.
+   - Idempotent adoption sets `video_selections.last_outcome = 'exhausted'`, `last_seen_comment_count = count`, and pushes `next_check_at` forward by 24 hours so workers avoid consuming YouTube quota on already-collected content.
+   - Automated backfill migrates existing multi-tenant channels. Exposed authenticated RPC `public.adopt_workspace_channel(w, c)` for workspace owners/analysts.
+2. **Persistent Stored & Classified Visibility for Unselected Videos**:
+   - Updated `private.workspace_ops_snapshot_impl` to compute `analysed` comment count per video and workspace-level `catalogue_summary`.
+   - Updated contracts `@sentiment/contracts` (`OpsVideoCountSchema`, `CatalogueVideoSchema`, `CatalogueSummarySchema`).
+   - Enhanced UI (`Catalogue.tsx`, `CataloguePreview.tsx`):
+     - Displays an executive summary banner showing total collected comments, total classified comments, and count of videos with stored data.
+     - Badges on unselected videos with stored comments display `غير محدد · جُمع X (صُنّف Y)` so creators always know their data is preserved and accessible.
+
+To provide seamless support for X and TikTok channels without requiring operators or end-users to navigate developer portals or restrictive API registration (which are blocked by automated CAPTCHAs and mobile OTPs):
+1. Both `XCollector` and `TikTokCollector` implement a resilient dual-mode strategy:
+   - When API credentials (`X_BEARER_TOKEN`, `TIKTOK_ACCESS_TOKEN`) are configured in the environment, the collectors use the official API v2 endpoints.
+   - When credentials are absent or in zero-configuration mode, the collectors fall back to public web endpoints:
+     - X uses the public syndication timeline service (`https://syndication.twitter.com/srv/timeline-profile/screen-name/...`) which extracts tweets and engagement without tokens.
+     - TikTok parses the server-rendered profile page and extracts initial state from `__UNIVERSAL_DATA_FOR_REHYDRATION__`.
+   - Hermetic fixture mode (`x_fixture`, `tiktok_fixture`) is provided for deterministic unit and CI testing.
+2. The user experience in `WorkspaceCard.tsx` allows entering handles either with `@`, bare handle, or full URL (`x.com/user`, `tiktok.com/@user`), and normalizes them uniformly into canonical external IDs.
+3. Content items are mapped to `"tweet"` for X and `"video"` for TikTok, fully aligning with the `CONTENT_KINDS` check constraint in the database.
+
+2026-09-20 — Omnichannel Multi-Platform Architecture (Telegram, X, TikTok, Facebook, Instagram).
+The system was originally built strictly around YouTube (using YouTube Data API v3 channels, videos, comments, and IDs).
+To support expanding audience sentiment analysis to other major social platforms in the Arab world, we designed a unified, platform-agnostic architecture while implementing Telegram as the first live non-YouTube platform:
+1. Universal Content Abstraction:
+   - Channels and comments now store `platform` (`'youtube' | 'telegram' | 'x' | 'tiktok' | 'facebook' | 'instagram'`).
+   - Content items use generalized `video_kind` / `content_kind` (`video`, `short`, `stream`, `channel_post`, `tweet`, `status`).
+   - Channel external IDs are generalized from YouTube-only 24-char format to any provider-specific identifier (e.g. `@channel_name` or numeric channel IDs up to 200 chars).
+2. Worker Collector Router:
+   - Python worker implements `CollectorRouter` with standard `ICollector` interface (`discover_channel` and `fetch_batch`).
+   - Separate collectors handle provider-specific logic (`YouTubeCollector` and `TelegramCollector`), while the labelling pipeline, topic assignments, and Supabase commit protocols remain 100% shared and identical.
+3. Database & Dashboard Transparency:
+   - `dashboard_aggregates` and `dashboard_comments` accept `platform` in their filter JSON and return `platform_breakdown` across all active comments.
+   - Database migration `20260920190000_omnichannel_multi_platform_support.sql` preserves all tenant-isolation RLS policies and immutability rules.
+
+2026-09-20 — Decoupled Big-Data Dashboard Architecture (Server-Side Aggregations & Paginated Stream).
+The original architecture transferred all comments for a workspace (up to hundreds of megabytes of raw JSON)
+to the browser client and computed metrics, timelines, sentiment distributions, and filtered tables in-memory via `snapshot()`.
+When channels scale beyond 10,000 comments (e.g. AJ360 with 71,310+ comments), this approach caused browser memory exhaustion,
+sluggish UI responsiveness, and PostgREST serialization bottlenecks.
+We redesigned this into an enterprise-grade decoupled server-side architecture inspired by jQuery DataTables / server-side streaming:
+1. `public.dashboard_aggregates(w uuid, f jsonb)`: Pre-computes metrics, sentiment distribution, timeline buckets, topic counts,
+   video aggregates, 24-hour activity distribution, 7-day weekday activity, weekly volume, top commenters, and top negative comments
+   directly in PostgreSQL via set-based GROUP BY aggregations. Payload is reduced to ~300KB (or <8KB for smaller filters) with sub-second execution (~1.3s on 71,310 rows).
+2. `public.dashboard_comments(w uuid, f jsonb)`: Streams a paginated window of comments (25-100 rows, ~40KB) based on active filters,
+   server-side sorting, and full-text search.
+3. PostgreSQL GIN Trigram Index: Created `comments_text_trgm_idx` using `extensions.gin_trgm_ops` on `public.comments(text_raw)`
+   so ILIKE text search across tens of thousands of comments completes in ~28ms.
+4. Backwards Compatibility: The existing `dashboard_snapshot` RPC remains supported, and offline/demo/fixture modes continue
+   using client-side `snapshot()` seamlessly. All contracts are formally typed with Zod in `@sentiment/contracts`.
+Migration lives in `supabase/migrations/20260920150000_decoupled_dashboard_architecture.sql`.
+
+
+2026-09-20 — Fair multi-tenant job claim scheduling and real-time operational polling.
+When multiple tenants queue jobs, platform workers claiming across workspaces (`w is null`) must not
+allow an active workspace with many jobs to monopolize worker leases and starve other workspaces.
+We updated `private.claim_job` in `supabase/migrations/20260920120000_fair_multitenant_claim_scheduling.sql`
+to prioritize workspaces with fewer actively running jobs before falling back to `not_before` time.
+Urgent channel discovery jobs (`type = 'discover'`) continue to jump the queue ahead of collection/analysis.
+On the client side, operational views on `/sync` employ adaptive 4-second live polling while jobs are
+queued or running, and automatically idle when the queue clears. Job feed entries and sync health indicators
+explicitly differentiate channel cataloguing (`discover`) from comment collection (`collect`) and suppress
+stale historical error banners while active work is actively queued.
+
+2026-09-20 — Operational views (/sync, RailState) must never couple their availability to the analytical
+payload size. When comments grow into the tens of thousands (e.g. 28,244 comments producing a 55.6 MB
+JSON snapshot), reading the full `dashboard_snapshot` to display sync health, job queue counters, or
+video comment tallies caused PostgREST statement timeouts (504 / read:live_unavailable) on operational
+pages.
+We decoupled operational reads into a dedicated lightweight RPC: `public.workspace_ops_snapshot(w uuid)`.
+It returns only `{ sync: SyncState, plan: UsageSummary, video_counts: Array<{ id: string, total: number }> }`
+directly from indexed tables (`sync_state`, `jobs`, `subscriptions`, `comments`), reducing payload size
+from 55.6 MB down to ~250 KB and execution time to ~380 ms.
+On the main dashboard route, `dashboard_snapshot_impl` was rewritten from correlated subqueries to
+set-based CTEs aggregating text into JSON objects (`json_build_object`/`json_agg`), and equipped with
+an explicit `set statement_timeout = '30s'` to guarantee heavy analytical reads complete without timing out.
+Migrations are immutable, so the new RPC and optimized dashboard snapshot live in
+`supabase/migrations/20260920000000_ops_snapshot_and_dashboard_optimization.sql`.
+`credential_expired` mid-run, losing everything it had not yet committed; the UI then told
+the operator to reconnect a channel that was never disconnected. The fix keeps the token's
+renewal on the server and gives the worker a question instead of a credential: the claim
+payload now carries `access_token_expires_at` beside the token, the gateway renews at claim
+time whenever less than a quarter of an hour remains (was one minute), and a new
+`/worker/renew-token` route — validated in SQL by the same lease check every other worker
+call makes (`svc_worker_renew_grant`) — answers a held lease with a fresh short-lived token.
+The collector renews proactively inside a two-minute margin and, if the source answers 401
+anyway, swaps the token and repeats the very request once before reporting the lapse. A
+renewal that comes back empty (grant gone, older gateway, blip) degrades to the same
+retryable `credential_expired` as before, and a lost lease still travels as `LeaseLost`.
+The dashboard's failure copy for `credential_expired` now says the permission renews itself
+on retry rather than asking for a reconnection. Migrations are immutable, so the new RPC
+lives in `20260919170000_worker_renews_its_token.sql`.
+
 2026-09-14 — Internal UX follows one scoped application shell, using the landing's existing
 mark and visual tokens. The analytical report's data and label rules are unchanged; a CSS
 layer corrects the old global `header` layout and aligns account, operations and recovery
@@ -1155,3 +1382,43 @@ rate limits on the browser-facing functions (`oauth-start`, `oauth-callback`) ar
 setting, not code. A `statement_timeout` on the authenticated role was considered and deferred:
 as a last-resort cap it would first bite the snapshot RPC itself, punishing the read before the
 fix that makes it light.
+
+2026-09-19 — A channel can be added by link or search: the public-data path beside OAuth. The
+spec always held both doors (`youtube_data_api_public` beside `youtube_oauth`; A4: "Public
+API-key collection can precede creator OAuth"), but only OAuth was wired: the UI's only channel
+door left for Google, the worker's discover was hardwired to `mine=true`, and a lease carried no
+channel identity. The whole path now exists: `register_public_channel` (new migration,
+`20260919180000`) files a channel with the metadata the lookup found and never writes a status —
+`connected` stays reserved for a completed OAuth flow, unchanged; a new `channel-lookup` Edge
+Function names candidates from a link, `@handle`, `/user/`, bare UC id or a search, via
+`YOUTUBE_API_KEY`; the claim carries `external_channel_id` — only for channels whose row says
+`public_unverified`, so a connected channel whose grant fails to open is still reported
+unconnected, never silently re-read as public data (the "no silent source switch" rule); and the
+worker, given `YOUTUBE_API_KEY`, runs discover/collect for public channels by id
+(`catalogue(channel_id=...)`, provenance `youtube_data_api_public`). The lookup needed a new Edge
+Function rather than an RPC because the key must stay server-side and resolution needs YouTube
+round trips — in-stack (Deno, same CORS/JWT pattern as `oauth-start`), no new infrastructure. It
+does only the naming; the row is written by the browser calling `register_public_channel` with
+its own JWT, so the role and tenant checks stay in the database. Cost, recorded for the operator:
+naming a channel costs 1 quota unit; `search.list` costs 100 of the project's daily 10,000 — the
+UI's empty/refused states say so rather than hiding the quota behind a generic failure. The demo
+body deliberately gets no add-channel door (no server to ask), matching the existing
+no-handler-no-door pattern.
+
+## 2026-09-20 — dashboard_snapshot windowing at scale and fair claim scheduling
+
+As live comment collection on active workspaces scaled past 60,000 comments, the unbounded `dashboard_snapshot` RPC generated over 120MB of JSON per request. PostgREST and Cloudflare terminated connections with HTTP 520 / 504 errors, causing the web UI to present `read:live_unavailable`.
+- **Windowing recent comments**: `private.dashboard_snapshot_impl` was updated in `20260920140000_dashboard_snapshot_window_and_fair_index.sql` to scope materialized comment rows to the most recent window (1,500 comments, ordered by `published_at DESC NULLS LAST, id DESC`).
+- **CTE scoping**: Sentiment and topic predictions, human reviews, and annotations now join directly against the 1,500 scoped comments rather than materializing across tens of thousands of rows before aggregation.
+- **Index tuning**: Added `comments_workspace_published_desc_idx` on `(workspace_id, published_at DESC NULLS LAST, id DESC)` and `jobs_running_fair_idx` on `(workspace_id, status, lease_expires_at) WHERE status = 'running'` to accelerate both dashboard queries and fair claim scheduling.
+- **Payload & Latency reduction**: Reduced payload size from > 120MB to 1.9MB and RPC execution time from > 20s (timeout) to 762ms, completely resolving live dashboard availability while remaining 100% compliant with `LiveSnapshotSchema`.
+- **Polling stabilization**: Fixed TanStack Query `snapshot.refetch` dependency churn in `apps/web/src/ops/Sync.tsx`.
+
+## 2026-09-20 — Continuous Deployment (CD) with GitHub Actions, FTPS, and Remote Migrations
+
+- **Workflow Architecture**: Created `.github/workflows/deploy.yml` triggered on push to `main` and `workflow_dispatch`.
+- **Security & Supply Chain Compliance**: Follows all security rules in `AGENTS.md`: every action is pinned to a full commit SHA (`actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2`, `actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0`), `permissions: contents: read`, `concurrency: group: deploy-preview-${{ github.ref }}, cancel-in-progress: true`, `timeout-minutes: 20`, and `persist-credentials: false`.
+- **Decoupled Environment Credentials**: Updated `scripts/deploy-preview.sh` to source `.env.local` conditionally so environment variables injected by GitHub Secrets (`PREVIEW_FTP_HOST`, `PREVIEW_FTP_USER`, `PREVIEW_FTP_PASSWORD`) are seamlessly respected in CI runners.
+- **Automated Remote Database Migrations**: Added `scripts/apply-migrations-remote.mjs` (`npm run db:migrate:remote`), executing pending migrations transactionally against the remote Supabase Management API (`https://api.supabase.com/v1/projects/{ref}/database/query`) and recording versions in `supabase_migrations.schema_migrations`.
+- **Graceful Secret Detection**: The workflow checks for required repository secrets and logs helpful GitHub notices instead of blocking PRs or failing unconfigured runs if secrets are pending setup in GitHub Settings.
+

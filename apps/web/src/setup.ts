@@ -76,13 +76,18 @@ export function setupProgress(
     channel: { status: ChannelStatus | string } | null;
     /** The most recent job for the workspace, or null when none was ever asked for. */
     latestJob: { status: JobStatus | string } | null;
+    /** Whether public channels are enabled for this workspace (owner-only experiment). */
+    allowPublicChannels?: boolean;
   },
   S: Strings,
 ): SetupStep[] {
-  const { channel, latestJob } = input;
+  const { channel, latestJob, allowPublicChannels } = input;
   const [workspace, link, collect] = setupSteps.map((step) => ({
     key: step.key,
-    title: S[step.title],
+    title:
+      step.key === "channel" && allowPublicChannels
+        ? S.stepChannelWithPublic
+        : S[step.title],
   }));
 
   // Being on this list at all means the first step happened.
@@ -93,12 +98,11 @@ export function setupProgress(
   else if (channel.status === "connected")
     second = { ...link, status: "done", detail: null };
   else if (channel.status === "public_unverified")
-    // The operator seeded a public channel into this workspace and nobody has
-    // proved they own it yet. That is step two not yet taken, not step two
-    // gone wrong: the instruction is still "connect", with the reason said.
+    // A public channel chosen/added for monitoring without OAuth ownership.
+    // Step two is accomplished (channel selected), unlocking step three (collect).
     second = {
       ...link,
-      status: "next",
+      status: "done",
       detail: S.stepChannelSeeded,
     };
   else

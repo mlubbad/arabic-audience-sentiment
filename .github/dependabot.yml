@@ -19,3 +19,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+
+  # The Python worker image (python:3.12-slim, pinned by digest). Dependabot
+  # opens a PR when a newer digest is published so the base image stays patched.
+  - package-ecosystem: docker
+    directory: /workers/python
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

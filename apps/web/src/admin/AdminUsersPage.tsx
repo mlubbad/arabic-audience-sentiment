@@ -10,14 +10,21 @@ import type { AdminUser } from "@sentiment/contracts";
 import { useStrings } from "../strings";
 import { failureCode } from "../failure";
 import { Card } from "../ui/Card";
+import { ChartEmpty, LoadError, Loading } from "../pageStates/PageStates";
 import {
-  ChartEmpty,
-  LoadError,
-  Loading,
-} from "../pageStates/PageStates";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "../ui/Table";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "../ui/Table";
+import { Button } from "../ui/Button";
+import { useSession } from "../session";
+import { useImpersonation } from "../impersonation";
 import { readAdminUsers } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
+import { DEMO_USERS, DEMO_OWNER_ID } from "./adminDemo";
 
 const NONE = "—";
 
@@ -25,15 +32,23 @@ const day = (iso: string | null | undefined) => iso?.slice(0, 10) ?? NONE;
 
 export function AdminUsersPage() {
   const S = useStrings();
+  const demo =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("demo");
   const { admin, shell } = useAdminShell();
+  const { session } = useSession();
+  const currentUserId = demo ? DEMO_OWNER_ID : session?.user.id;
+  const { startImpersonation, loading: impersonateLoading } =
+    useImpersonation();
   const list = useQuery({
-    queryKey: ["admin", "users"],
-    queryFn: readAdminUsers,
+    queryKey: ["admin", "users", demo ? "demo" : "live"],
+    queryFn: () => (demo ? Promise.resolve(DEMO_USERS) : readAdminUsers()),
     enabled: admin,
   });
 
   let body: ReactNode;
-  if (!admin) body = null; // the shell is already showing the gate's sentence
+  if (!admin)
+    body = null; // the shell is already showing the gate's sentence
   else if (list.isPending)
     body = <Loading S={S} label={S.adminUsersLoading} shape="ops" />;
   else if (list.isError)
@@ -46,7 +61,9 @@ export function AdminUsersPage() {
       />
     );
   else if (list.data.length === 0)
-    body = <ChartEmpty testId="admin-users-empty">{S.adminUsersEmpty}</ChartEmpty>;
+    body = (
+      <ChartEmpty testId="admin-users-empty">{S.adminUsersEmpty}</ChartEmpty>
+    );
   else
     body = (
       <section className="db-section" aria-labelledby="admin-users-heading">
@@ -62,11 +79,18 @@ export function AdminUsersPage() {
                 <TableHeaderCell>{S.adminUsersLastSeen}</TableHeaderCell>
                 <TableHeaderCell>{S.adminUsersWorkspaces}</TableHeaderCell>
                 <TableHeaderCell>{S.adminUsersOwned}</TableHeaderCell>
+                <TableHeaderCell>{S.adminUsersActions}</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {list.data.map((u) => (
-                <UserRow key={u.id} user={u} />
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  isCurrent={currentUserId === u.id}
+                  onImpersonate={startImpersonation}
+                  disabled={impersonateLoading}
+                />
               ))}
             </TableBody>
           </Table>
@@ -85,15 +109,50 @@ export function AdminUsersPage() {
   );
 }
 
-function UserRow({ user }: { user: AdminUser }) {
+function UserRow({
+  user,
+  isCurrent,
+  onImpersonate,
+  disabled,
+}: {
+  user: AdminUser;
+  isCurrent: boolean;
+  onImpersonate: (user: AdminUser) => void;
+  disabled: boolean;
+}) {
   const S = useStrings();
   return (
     <TableRow>
-      <TableCell data-testid="admin-user-email">{user.email ?? S.adminUsersNoEmail}</TableCell>
+      <TableCell data-testid="admin-user-email">
+        {user.email ?? S.adminUsersNoEmail}
+      </TableCell>
       <TableCell>{day(user.created_at)}</TableCell>
       <TableCell>{day(user.last_sign_in_at)}</TableCell>
       <TableCell>{user.workspace_count}</TableCell>
       <TableCell>{user.owner_count}</TableCell>
+      <TableCell>
+        {isCurrent ? (
+          <span className="admin-user-current" data-testid="admin-user-current">
+            {S.adminUserCurrent}
+          </span>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="admin-impersonate-btn"
+            disabled={disabled}
+            onClick={() => onImpersonate(user)}
+            data-testid={`admin-impersonate-${user.id}`}
+            aria-label={`${S.adminUserImpersonate} ${user.email ?? user.id}`}
+          >
+            <span aria-hidden="true" className="admin-impersonate-icon">
+              🎭
+            </span>
+            <span>{S.adminUserImpersonate}</span>
+          </Button>
+        )}
+      </TableCell>
     </TableRow>
   );
 }

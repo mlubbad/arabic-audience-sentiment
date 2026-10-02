@@ -159,7 +159,7 @@ def main() -> None:
     chosen: dict[str, object] = {}
     survey: dict[str, object] = {}
 
-    def build(token: str):
+    def build(token: str, expires_at: str | None = None, renew=None):
         report = survey_uploads(token, client, consider=args.videos)
         survey.update(report)
         if report["chosen"] is None:
@@ -169,13 +169,28 @@ def main() -> None:
             return None, None
         chosen.update(report["chosen"])
         build.video_title = report["chosen"]["title"] or None
-        return YouTubeAPI(None, client, access_token=token), report["chosen"]["video_id"]
+        return YouTubeAPI(None, client, access_token=token, expires_at=expires_at,
+                          renew=renew), report["chosen"]["video_id"]
 
     if args.backfill:
         # Which videos to read is the server's decision, carried on the
         # lease — this only has to build a collector for the claimed token.
-        worked = run_backfill(control, lambda token: YouTubeAPI(None, client, access_token=token),
-                              analyzer=analyzer)
+        # A lease without one is a public channel: with the project's API key
+        # in the environment the by-hand run can read it too; without it the
+        # None the runner receives ends the job blocked with the code that
+        # names the gap.
+        def backfill_build(token, expires_at=None, renew=None, channel_id=None):
+            if token:
+                return YouTubeAPI(None, client, access_token=token,
+                                  expires_at=expires_at, renew=renew)
+            if channel_id and os.environ.get("YOUTUBE_API_KEY") and not os.environ["YOUTUBE_API_KEY"].startswith("AQ."):
+                return YouTubeAPI(os.environ["YOUTUBE_API_KEY"], client)
+            return None
+        worked = run_backfill(
+            control,
+            backfill_build,
+            analyzer=analyzer,
+        )
     else:
         worked = run_once(
             control,

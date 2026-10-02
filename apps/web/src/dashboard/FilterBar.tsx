@@ -95,13 +95,14 @@ export function FilterBar({
   // observer — so neither can drift from what is actually on screen.
   // Guarded for the prerender (no `window`) and for jsdom (no observer).
   useEffect(() => {
+    if (!onPinnedHeight) return;
     const el = barRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const root = document.documentElement;
     const publish = () => {
       const h = el.getBoundingClientRect().height;
       root.style.setProperty(PINNED_HEIGHT_VAR, `${Math.round(h)}px`);
-      onPinnedHeight?.(h);
+      onPinnedHeight(h);
     };
     publish();
     const observer = new ResizeObserver(publish);
@@ -208,6 +209,36 @@ export function FilterBar({
       <SelectItem value="video">{S.kindVideo}</SelectItem>
       <SelectItem value="short">{S.kindShort}</SelectItem>
       <SelectItem value="stream">{S.kindStream}</SelectItem>
+      <SelectItem value="channel_post">{S.kindPost}</SelectItem>
+    </Labelled>
+  );
+
+  const platformSelect = (
+    <Labelled
+      id="f-platform"
+      label={S.platformFilterLabel}
+      value={values.platform || ALL}
+      onValueChange={(v) => onChange({ platform: v === ALL ? "" : v })}
+    >
+      <SelectItem value={ALL}>{S.allPlatforms}</SelectItem>
+      <SelectItem value="youtube">{S.platformYouTube}</SelectItem>
+      <SelectItem value="telegram">{S.platformTelegram}</SelectItem>
+      <SelectItem
+        value="x"
+        disabled
+      >{`${S.platformX} (${S.platformSoon})`}</SelectItem>
+      <SelectItem
+        value="tiktok"
+        disabled
+      >{`${S.platformTikTok} (${S.platformSoon})`}</SelectItem>
+      <SelectItem
+        value="facebook"
+        disabled
+      >{`${S.platformFacebook} (${S.platformSoon})`}</SelectItem>
+      <SelectItem
+        value="instagram"
+        disabled
+      >{`${S.platformInstagram} (${S.platformSoon})`}</SelectItem>
     </Labelled>
   );
 
@@ -329,6 +360,7 @@ export function FilterBar({
   const moreControls = (
     <>
       {topicSelect}
+      {platformSelect}
       {videoKindSelect}
       {participationSelect}
       {commentTypeSelect}

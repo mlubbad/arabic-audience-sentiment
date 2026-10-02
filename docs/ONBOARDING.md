@@ -85,6 +85,8 @@ Chromium. `uv` must be installed separately.
 | `npm run worker:test` | Python worker via uv/pytest | 124 passed on 2026-09-14 |
 | `npm run test:e2e` | Playwright against a dev server it starts itself | 50 passed on 2026-09-14 |
 | `npm run test:e2e:live` | Signed-in workspace switch and sign-out in a browser against local fake Auth/API responses | 1 passed on 2026-09-14; no real account used |
+| `npm run db:migrate:remote` | Applies pending SQL migrations transactionally to remote Supabase Management API | 78 migrations applied on 2026-09-20 |
+| `npm run deploy:preview` | Uploads built web assets via FTPS to `app.sky-develop.net` (used in CI/CD & manual fallback) | verified clean on 2026-09-20 |
 
 `npm run check` does **not** include `test:e2e`. Run that separately; it starts its own dev
 server and refuses to adopt one that is already listening — see the port trap below.
@@ -222,6 +224,9 @@ What still holds, and is not enforced by anything:
   change; the split is deliberate.
 - **Run `npm run check` before committing**, and `npm run test:e2e` when you touched the
   dashboard. Nothing runs them for you.
+- **Pushing to `main` deploys automatically via CI/CD.** `.github/workflows/deploy.yml` builds and
+  deploys the web frontend to `https://app.sky-develop.net` via FTPS and applies pending database
+  migrations to Supabase with `npm run db:migrate:remote`. Never push code that breaks `npm run check`.
 - **Say what you actually ran.** `docs/verification.md` is the record, and its value is
   entirely in it being true.
 

@@ -32,50 +32,55 @@ export function Engaged({ s, S }: { s: Snapshot; S: Strings }) {
       data-testid="engaged-panel"
     >
       <header>
-        <h2 id="engaged-heading">{S.engagedTitle}</h2>
+        <h2 id="engaged-heading">{S.secEngagedTitle}</h2>
       </header>
       <p className="db-muted">{S.engagedLead}</p>
       {s.most_engaged_negative.length === 0 ? (
         <p data-testid="engaged-empty">{S.engagedEmpty}</p>
       ) : (
-        /* A heading promising a ranking, over a run of sentences that began
-           with a number. Ranked things want a rank: the count is the mark,
-           the text is the row, and the bar under each is that row's share
-           of the top one — which is the only reason to order them in the
-           first place. */
-        <ol className="db-engaged">
-          {s.most_engaged_negative.map((c) => {
-            const top = s.most_engaged_negative[0].likes_value ?? 0;
-            const likes = c.likes_value ?? 0;
-            return (
-              <li key={c.id} data-testid={`engaged-${c.id}`}>
-                <Card className="db-engaged-row">
-                  <span className="db-engaged-count">
-                    <Badge numeric tone="negative">
-                      {c.likes_raw ?? c.likes_value}
-                    </Badge>
-                    <span className="db-engaged-unit">{S.unitLikes}</span>
-                  </span>
-                  <span className="db-engaged-body">
-                    <span className="db-engaged-text">{commentText(c, S)}</span>
-                    {c.reviewed && <small>{S.humanReview}</small>}
-                    <span
-                      className="db-engaged-bar"
-                      aria-hidden="true"
-                      style={{
-                        // Relative to the most-liked row, not to the page:
-                        // these five are the top of a longer list, and a
-                        // bar drawn against a total the reader cannot see
-                        // measures nothing.
-                        inlineSize: `${top > 0 ? Math.max((likes / top) * 100, 2) : 0}%`,
-                      }}
-                    />
-                  </span>
-                </Card>
-              </li>
-            );
-          })}
-        </ol>
+        <>
+          <aside className="db-engaged-tip" data-testid="engaged-creator-tip">
+            <span className="db-engaged-tip-icon" aria-hidden="true">
+              💡
+            </span>
+            <p className="db-engaged-tip-text">{S.engagedCreatorTip}</p>
+          </aside>
+          <ol className="db-engaged">
+            {s.most_engaged_negative.map((c) => {
+              const top = s.most_engaged_negative[0].likes_value ?? 0;
+              const likes = c.likes_value ?? 0;
+              return (
+                <li key={c.id} data-testid={`engaged-${c.id}`}>
+                  <Card className="db-engaged-row">
+                    <span className="db-engaged-count">
+                      <Badge numeric tone="negative">
+                        {c.likes_raw ?? c.likes_value}
+                      </Badge>
+                      <span className="db-engaged-unit">{S.unitLikes}</span>
+                    </span>
+                    <span className="db-engaged-body">
+                      <span className="db-engaged-text">
+                        {commentText(c, S)}
+                      </span>
+                      {c.reviewed && <small>{S.humanReview}</small>}
+                      <span
+                        className="db-engaged-bar"
+                        aria-hidden="true"
+                        style={{
+                          // Relative to the most-liked row, not to the page:
+                          // these five are the top of a longer list, and a
+                          // bar drawn against a total the reader cannot see
+                          // measures nothing.
+                          inlineSize: `${top > 0 ? Math.max((likes / top) * 100, 2) : 0}%`,
+                        }}
+                      />
+                    </span>
+                  </Card>
+                </li>
+              );
+            })}
+          </ol>
+        </>
       )}
       {s.negative_ranked > s.most_engaged_negative.length && (
         <p className="db-muted" data-testid="engaged-truncated">

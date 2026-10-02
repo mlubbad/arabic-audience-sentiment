@@ -51,7 +51,12 @@ test("mobile landing has working navigation, keyboard access, and no page overfl
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.keyboard.press("Tab");
+  // Headless Chromium (CI) loads a page with focus on nothing, so a bare
+  // page.keyboard.press("Tab") is swallowed and never reaches the document.
+  // Pressing from <body> seats focus inside the page first, so Tab lands on
+  // the first tabbable element — the skip link. (Local browsers focus the
+  // document on load, which is why this only reproduces in CI.)
+  await page.locator("body").press("Tab");
   await expect(page.locator(".lp-skip")).toBeFocused();
   // Radix's Dialog sets `aria-hidden` on the header while the sheet is open
   // (correct isolation for assistive tech), which takes the trigger out of

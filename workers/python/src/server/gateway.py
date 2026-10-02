@@ -75,7 +75,7 @@ def content_hash(text: str) -> str:
 
 
 def _comment(c: RawComment) -> dict[str, Any]:
-    return {
+    d = {
         "external_comment_id": c.id,
         "external_parent_id": c.parent_id,
         "is_reply": c.is_reply,
@@ -95,15 +95,28 @@ def _comment(c: RawComment) -> dict[str, Any]:
         "source": c.source,
         "field_provenance": c.field_provenance,
     }
+    if c.author_profile_image_url is not None:
+        d["author_profile_image_url"] = c.author_profile_image_url
+    if c.author_channel_url is not None:
+        d["author_channel_url"] = c.author_channel_url
+    if c.reply_count:
+        d["reply_count"] = c.reply_count
+    if c.updated_at is not None:
+        d["updated_at"] = c.updated_at
+    return d
 
 
 def _canonicalise(value: Any) -> Any:
-    """Render numbers the way JSON does, so both languages agree.
+    """Render numbers the way JSON does, and strip NUL bytes and lone surrogates that PostgreSQL rejects.
 
     Python writes an integral float as 1.0 and JavaScript writes 1. Hashing the
     raw form makes the same payload produce two different digests, which turns a
     legitimate replay into a batch_conflict on the server.
+    PostgreSQL rejects NUL (\u0000) characters and unpaired surrogates with 22P05.
     """
+    if isinstance(value, str):
+        s = value.replace("\x00", "")
+        return s.encode("utf-8", "replace").decode("utf-8")
     if isinstance(value, bool):
         return value
     if isinstance(value, float) and value.is_integer():
@@ -123,18 +136,18 @@ def build_batch(
     comments: Iterable[RawComment],
     predictions: Iterable[dict[str, Any]] = (),
 ) -> tuple[dict[str, Any], str]:
-    payload = {
+    payload = _canonicalise({
         "external_video_id": video_id,
         "video_title": video_title,
         "checkpoint": checkpoint,
         "outcome": outcome,
         "comments": [_comment(c) for c in comments],
         "predictions": list(predictions),
-    }
+    })
     # Canonical form: the same content must hash identically however the dict
     # was built, or a legitimate replay would look like a conflicting payload.
     canonical = json.dumps(
-        _canonicalise(payload), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
     return payload, hashlib.sha256(canonical.encode()).hexdigest()
 
@@ -180,6 +193,22 @@ class ControlPlane:
         """
         body = {"types": job_types} if job_types else {}
         return self._post("/worker/claim", body)
+
+    def renew_token(self, lease: dict[str, Any]) -> dict[str, Any] | None:
+        """A fresh access token for this job's channel, mid-run.
+
+        The claim handed down a token that can lapse before the run ends. This
+        asks the server for a new one against the lease still held, so a long
+        collection does not lose everything to an hour-old credential. A lost
+        lease travels as LeaseLost, exactly as every other leased call; a
+        channel whose grant is gone answers with no token at all, which the
+        collector turns into the same retryable credential lapse as before.
+        None also covers an older gateway without the route, whose 404 keeps
+        the run's fallback behaviour intact.
+        """
+        return self._post("/worker/renew-token", {
+            "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+        })
 
     def heartbeat(self, lease: dict[str, Any]) -> None:
         self._post("/worker/heartbeat", {"job_id": lease["job_id"], "lease_token": lease["lease_token"]})
@@ -230,7 +259,7 @@ class ControlPlane:
     def commit_catalogue(self, lease: dict[str, Any], videos: list[dict[str, Any]]) -> dict[str, Any] | None:
         return self._post(
             "/worker/commit-catalogue",
-            {"job_id": lease["job_id"], "lease_token": lease["lease_token"], "payload": videos},
+            {"job_id": lease["job_id"], "lease_token": lease["lease_token"], "payload": _canonicalise(videos)},
         )
 
     def video_finished(self, lease: dict[str, Any], video_id: str, outcome: str,
@@ -271,5 +300,5 @@ class ControlPlane:
                       records: list[dict[str, Any]]) -> dict[str, Any] | None:
         return self._post("/worker/commit-topics", {
             "job_id": lease["job_id"], "lease_token": lease["lease_token"],
-            "batch_key": batch_key, "records": records,
+            "batch_key": batch_key, "records": _canonicalise(records),
         })

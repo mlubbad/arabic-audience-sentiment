@@ -17,13 +17,6 @@
 .lp-hero-copy h1 {
   margin: 0;
 }
-.lp-youtube {
-  color: var(--ink-on-dark);
-  background: var(--ml-rose);
-  font: 10px var(--font-latin);
-  padding: 3px 7px;
-  border-radius: 6px;
-}
 .lp-actions {
   display: flex;
   flex-wrap: wrap;

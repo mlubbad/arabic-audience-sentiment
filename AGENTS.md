@@ -1,35 +1,65 @@
-# Project instructions
+# Project instructions (every agent: Codex, Gemini, Claude)
 
-> **Before writing anything, read `docs/coordination/ACTIVE.md`.**
-> More than one agent works in this checkout — Claude Code, Antigravity, Codex —
-> and they have no channel to each other. That file is the channel: who holds
-> which paths, what collides silently, and the one mistake that permanently
-> destroys work here (there is no git remote).
+> **Read first, in this order, and nothing else until your work order tells you to:**
+> 1. `docs/agents/CONTEXT.md`: the project in under 200 lines (layout, commands, invariants).
+> 2. `docs/engineering/PLAYBOOK.md`: team rules, Definition of Done, code standards, review checklist.
+> 3. Your work-order issue on GitHub (linked from the tracker issue #7).
+>
+> Do **not** read `docs/progress.md`, `docs/verification.md`, `docs/superpowers/**`,
+> `docs/coordination/**` or `docs/agent-reports/**` unless your work order names a section.
+> They are long historical logs. Reading them wastes your budget and several parts are stale.
 
-Read docs/Codex-Build-Handoff.md completely before implementation.
-The latest explicit user instructions take precedence over historical proposals.
+## Team and how work flows
 
-Build the Arabic-first, multi-tenant YouTube sentiment MVP described there.
-Inspect existing code/assets first. Reuse the design and repair its data flow.
-Use React/TypeScript/Vite + Chart.js, Supabase control functions/Postgres/Auth,
-and a separate Python worker. Do not add FastAPI or extra infrastructure
-without a concrete need recorded in docs/decisions.md.
+| Role | Who | Owns |
+| --- | --- | --- |
+| Owner, final approver | Mohammed (@mlubbad) | Product decisions, money and accounts, merging, production deploys and migrations, credential rotation |
+| PM, architect, QA, DevOps, data lead | Claude Code | Work orders, architecture decisions (`docs/adr/`), reviews, quality gates, the canonical docs |
+| Precision engineer | Codex | Small, high-stakes, fully specified work orders |
+| Volume engineer | Gemini | Refactors, test suites, UI, worker restructuring, investigations |
+| DX / schema-tooling engineer | VS Code | Local tooling, schema snapshots, editor-driven config and DX chores |
+| Reviewer & GitHub-native chore engineer | GitHub Copilot | First-pass PR reviews; small, fully-specified, low-risk chores it owns end to end |
 
-Keep UI publication private. Do not enable paid services or real billing
-without explicit approval. Never expose tokens or server keys in VITE_*.
-Keep real raw datasets out of tracked source; use sanitized test fixtures.
+**GitHub Copilot** is the team's automated first-pass reviewer and small-chore agent. It reviews
+every PR before Claude's PM review (its findings are advisory — Claude still runs the binding
+review and the owner still merges). For build work it takes only self-contained, fully-specified,
+low-risk chores (added test coverage, docs, mechanical refactors, config/dependency hygiene) on a
+`copilot/wo-N-slug` branch → one PR, like everyone else. It **never** touches security-critical or
+cross-cutting code: not `.github/workflows/**`, the five CI gates, SHA/digest pins or secrets
+(Claude/DevOps + Codex own those); not OAuth, DB security or RLS (Codex); not large features
+(Gemini); not the Claude-owned docs. Because its coding agent runs in GitHub Actions and consumes
+Actions minutes, it holds build chores while the account is out of minutes and does review-only
+work (which costs no Actions minutes) until the quota resets or the education benefit lands.
+
+Work arrives as a **GitHub issue (work order)**. You build it on your own branch, open a PR,
+and Claude reviews it. Only the owner merges. The playbook has the details; the short form is:
+
+- One work order → one branch (`<agent>/wo-N-slug`) → one PR (`WO-N: …`, body starts `Closes #N`).
+- Touch only the paths your work order lists as owned. Ask on the issue before touching anything else.
+- **Never push to `main`, never merge, never deploy, never apply migrations remotely.**
+- Paste real command output. For every new test, show that it fails on the old code.
+- `docs/progress.md`, `docs/verification.md`, `docs/decisions.md`, `docs/adr/`, `AGENTS.md`,
+  `CLAUDE.md` and `GEMINI.md` are edited by Claude only, so they never conflict between agents.
+
+## Product rules
+
+Build the Arabic-first, multi-tenant audience-sentiment product (YouTube, X, TikTok, Telegram).
+Inspect existing code first; reuse the design and repair its data flow. Stack: React/TypeScript/Vite
++ Chart.js, Supabase (Postgres, Auth, Edge Functions) and a separate Python worker. Do not add
+FastAPI or other infrastructure without an accepted ADR in `docs/adr/`.
+
+Do not enable paid services or real billing without the owner's explicit approval. Never expose
+tokens or server keys in `VITE_*`. Keep real raw datasets out of tracked source; use sanitized
+fixtures.
 
 All dashboard views and exports share the same filter and effective-label rules.
 Preserve Mixed sentiment, timestamp precision, text versions, and provenance.
-Treat collection failures as partial/failed, never as successful empty datasets.
+Treat collection failures as partial/failed/blocked, never as successful empty datasets.
+Unknown is `null`/`None`, never 0 and never "now".
 Make ingestion, analysis, job retries, and metering idempotent.
 Test tenant isolation against direct requests, not just hidden UI controls.
-
-Proceed through M0–M6 with reviewable increments. Continue local work if external
-credentials are missing. Distinguish mocked, fixture-tested, and live-tested flows.
-Update docs/progress.md, docs/decisions.md, and docs/verification.md after milestones.
-Use the repository's actual lint/build/test commands and report real results.
-Do not stop at planning or leave clickable controls without working behavior.
+Distinguish mocked, fixture-tested, and live-tested flows. Use the repository's actual
+lint/build/test commands and report real results.
 
 ## Security and CI rules — binding for every agent
 
@@ -71,8 +101,13 @@ locally-equivalent checks (`semgrep scan --metrics=off ...`,
 `gitleaks detect --source .`), and confirm the workflow on a branch before
 merging to `main`.
 
-One writer, one branch: `main` in this checkout. The multi-agent worktree protocol ran
-on 2026-09-13 and is closed; docs/coordination/README.md records what it was and why it
-ended. Read docs/ONBOARDING.md before starting. Migrations are immutable once applied —
-add a new timestamped file. Keep changes reviewable: small coherent commits carrying the
-commands and results that back them.
+## Branches, migrations and deployment
+
+- `main` is protected and deploys to production (`app.sky-develop.net` plus the one Supabase
+  project). Changes reach it only through a reviewed PR merged by the owner.
+- Migrations are immutable once merged. Add a new timestamped file inside the timestamp range
+  your work order gives you. Never edit an existing migration.
+- Continuous deployment runs from `.github/workflows/deploy.yml` on `main`. Agents never run
+  `npm run deploy:preview`, `npm run db:migrate:remote`, `supabase db push` or
+  `supabase functions deploy`, and never call live paid services from tests.
+- Keep changes reviewable: small coherent commits carrying the commands and results that back them.

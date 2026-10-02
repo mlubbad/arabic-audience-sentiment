@@ -8,22 +8,44 @@
  */
 import { z } from "zod";
 
+export const SOURCE_PLATFORMS = [
+  "youtube",
+  "telegram",
+  "x",
+  "tiktok",
+  "facebook",
+  "instagram",
+] as const;
+export type SourcePlatform = (typeof SOURCE_PLATFORMS)[number];
+
+export const CONTENT_KINDS = [
+  "video",
+  "short",
+  "stream",
+  "channel_post",
+  "tweet",
+  "status",
+] as const;
+export type ContentKind = (typeof CONTENT_KINDS)[number];
+
 export const CatalogueVideoSchema = z
   .object({
     id: z.string().min(1),
-    external_video_id: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+    external_video_id: z.string().min(1).max(100),
     title: z.string(),
-    kind: z.enum(["video", "short", "stream"]),
+    kind: z.enum(CONTENT_KINDS),
     published_at: z.string().nullable(),
     thumbnail_url: z.string().nullable(),
     // Null is unknown. Never 0 for unknown.
     reported_comment_count: z.number().int().nonnegative().nullable(),
     comments_state: z.enum(["unknown", "open", "disabled"]),
     collected: z.number().int().nonnegative(),
+    analysed: z.number().int().nonnegative().optional(),
     selected: z.boolean(),
     last_collected_at: z.string().nullable(),
     last_outcome: z.string().nullable(),
     next_check_at: z.string().nullable(),
+    platform: z.string().optional().nullable(),
   })
   .strict();
 export type CatalogueVideo = z.infer<typeof CatalogueVideoSchema>;

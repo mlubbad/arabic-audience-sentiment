@@ -1,6 +1,6 @@
 """Adapter contracts. Exhaustion describes source traversal, never 100% coverage."""
 from dataclasses import dataclass, field
-from typing import Literal, Protocol, Iterator
+from typing import Any, Iterator, Literal, Protocol
 
 Outcome = Literal["partial", "exhausted", "explicitly_disabled", "unavailable", "failed", "blocked"]
 
@@ -18,9 +18,14 @@ class RawComment:
     timestamp_precision: str = "unknown"
     author_channel_id: str | None = None
     author_name: str = ""
+    author_profile_image_url: str | None = None
+    author_channel_url: str | None = None
+    reply_count: int = 0
+    updated_at: str | None = None
     likes_raw: str | None = None
     likes_value: int | None = None
     source: str = "sanitized_fixture"
+    platform: str = "youtube"
     field_provenance: dict = field(default_factory=dict)
 
 
@@ -50,4 +55,12 @@ class Collector(Protocol):
     source: str
     revision: str
 
-    def batches(self, video_id: str, checkpoint: str | None) -> Iterator[Batch]: ...
+    def batches(
+        self,
+        video_id: str,
+        checkpoint: str | None,
+        since: str | None = None,
+        max_items: int | None = None,
+        **kwargs: Any,
+    ) -> Iterator[Batch]: ...
+

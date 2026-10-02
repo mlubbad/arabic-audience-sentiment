@@ -292,6 +292,18 @@ export function WorkspaceRow({
     />
   );
 
+  const inspect = (
+    <Button
+      variant="outline"
+      size="sm"
+      asChild
+      className="db-admin-inspect-btn"
+      data-testid={`inspect-${w.id}`}
+    >
+      <a href={`/dashboard?ws=${w.id}`}>{S.adminInspectWorkspace}</a>
+    </Button>
+  );
+
   if (stacked)
     return (
       <Card className="db-admin-card" data-testid={`admin-row-${w.id}`}>
@@ -330,7 +342,10 @@ export function WorkspaceRow({
             {packForm}
           </div>
         </div>
-        <div className="db-row-actions">{remove}</div>
+        <div className="db-row-actions">
+          {inspect}
+          {remove}
+        </div>
       </Card>
     );
 
@@ -346,7 +361,12 @@ export function WorkspaceRow({
         <TableCell>{row.status}</TableCell>
         <TableCell className="ui-num">{row.periodEnd}</TableCell>
         <TableCell>{row.provider}</TableCell>
-        <TableCell className="db-admin-delete">{remove}</TableCell>
+        <TableCell className="db-admin-delete">
+          <div className="db-admin-cell-actions">
+            {inspect}
+            {remove}
+          </div>
+        </TableCell>
       </TableRow>
       <TableRow className="db-admin-levers-row">
         <TableCell colSpan={6}>

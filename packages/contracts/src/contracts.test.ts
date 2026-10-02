@@ -9,6 +9,8 @@ import {
   applyReview,
   effectiveLabel,
   snapshot,
+  DashboardAggregatesSchema,
+  ServicesHealthReportSchema,
   type Comment,
 } from "./index";
 const workspace = "00000000-0000-4000-8000-000000000001";
@@ -18,6 +20,7 @@ const base = {
   channel_id: "channel",
   video_id: "v1",
   video_title: "حلقة تجريبية",
+  platform: "youtube" as const,
   video_kind: "video" as const,
   author_channel_id: "author",
   by_channel_owner: false,
@@ -665,6 +668,50 @@ describe("human corrections", () => {
       }).success,
     ).toBe(true);
   });
+  it("accepts comments across multi-platform sources and refuses empty source", () => {
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "tg1",
+        source: "telegram_mtproto",
+        platform: "telegram",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "tg2",
+        source: "telegram_http",
+        platform: "telegram",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "x1",
+        source: "x_api",
+        platform: "x",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "tt1",
+        source: "tiktok_display_api",
+        platform: "tiktok",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({
+        ...base,
+        id: "yt1",
+        source: "youtube_data_api_public",
+      }).success,
+    ).toBe(true);
+    expect(
+      CommentSchema.safeParse({ ...base, id: "bad", source: "" }).success,
+    ).toBe(false);
+  });
   it("aggregates each video in the same pass, on its own denominator", () => {
     const across: Comment[] = [
       { ...base, id: "v1a", video_id: "v1", prediction: pred("positive") },
@@ -831,5 +878,84 @@ describe("the sync contract survives its two halves deploying separately", () =>
         last_run: null,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("DashboardAggregatesSchema handles workspaces without connected channels", () => {
+  it("accepts null for channel and kpis without throwing invalid_type error", () => {
+    const raw = {
+      workspace_total: 0,
+      channel_own_comments: 0,
+      total: 0,
+      analysed: 0,
+      unanalysed: 0,
+      sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      kpis: null,
+      channel: null,
+      measurable: ["positive", "negative", "neutral", "mixed"],
+      negative_ranked: 0,
+      negative_unranked: 0,
+      timeline: {},
+      topic_counts: {},
+      platform_breakdown: {},
+      videos: [],
+      hours: [],
+      weekdays: [],
+      weeks: [],
+      people: [],
+      most_engaged_negative: [],
+      comment_types: [],
+      video_options: [],
+      topics: [],
+      active_analysis_key: null,
+      active_topic_key: null,
+      revision: "empty",
+    };
+
+    const parsed = DashboardAggregatesSchema.parse(raw);
+    expect(parsed.channel).toBeNull();
+    expect(parsed.kpis).toBeNull();
+    expect(parsed.total).toBe(0);
+  });
+});
+
+describe("ServicesHealthReportSchema and ServiceHealthItemSchema", () => {
+  it("parses valid services health report and items", () => {
+    const report = {
+      overall_status: "healthy",
+      checked_at: "2026-09-24T12:00:00Z",
+      summary: {
+        total: 15,
+        healthy: 14,
+        degraded: 1,
+        down: 0,
+        unconfigured: 0,
+        avg_latency_ms: 45.2,
+      },
+      services: [
+        {
+          id: "supabase_postgres",
+          name_ar: "قاعدة بيانات Supabase Postgres",
+          name_en: "Supabase Postgres Database",
+          category: "infrastructure",
+          status: "healthy",
+          latency_ms: 22,
+          quota_used: 125,
+          quota_total: 1000,
+          quota_unit: "MB",
+          details: "الاتصالات النشطة: 8/100 · مساحة التخزين: 125 MB",
+          last_checked_at: "2026-09-24T12:00:00Z",
+          endpoint: "postgresql://postgres@db:5432",
+          error_code: null,
+          remediation: null,
+        },
+      ],
+    };
+
+    const parsed = ServicesHealthReportSchema.parse(report);
+    expect(parsed.overall_status).toBe("healthy");
+    expect(parsed.services).toHaveLength(1);
+    expect(parsed.services[0].id).toBe("supabase_postgres");
+    expect(parsed.summary.avg_latency_ms).toBe(45.2);
   });
 });

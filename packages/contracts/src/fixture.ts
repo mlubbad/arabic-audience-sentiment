@@ -49,3 +49,121 @@ export const LiveSnapshotSchema = z.object({
 
 export type Fixture = z.infer<typeof FixtureSchema>;
 export type LiveSnapshot = z.infer<typeof LiveSnapshotSchema>;
+
+export const DashboardAggregatesSchema = z.object({
+  workspace_total: z.number().int(),
+  channel_own_comments: z.number().int(),
+  total: z.number().int(),
+  analysed: z.number().int(),
+  unanalysed: z.number().int(),
+  sentiments: z.object({
+    positive: z.number().int(),
+    negative: z.number().int(),
+    neutral: z.number().int(),
+    mixed: z.number().int(),
+  }),
+  kpis: z
+    .object({
+      total_views: z.number().nullable().optional(),
+      total_likes: z.number().nullable().optional(),
+      total_comments: z.number().nullable().optional(),
+      engagement_rate: z.number().nullable().optional(),
+      net_sentiment: z.number().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  channel: z
+    .object({
+      id: z.string().optional(),
+      title: z.string().nullable().optional(),
+      avatar_url: z.string().nullable().optional(),
+      subscriber_count: z.number().nullable().optional(),
+      view_count: z.number().nullable().optional(),
+      video_count: z.number().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  measurable: z.array(z.string()),
+  negative_ranked: z.number().int(),
+  negative_unranked: z.number().int(),
+  timeline: z.record(z.string(), z.number().int()),
+  topic_counts: z.record(z.string(), z.number().int()),
+  platform_breakdown: z.record(z.string(), z.number().int()).default({}),
+  videos: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string().nullable(),
+      total: z.number().int(),
+      analysed: z.number().int(),
+      replies: z.number().int(),
+      sentiments: z.object({
+        positive: z.number().int(),
+        negative: z.number().int(),
+        neutral: z.number().int(),
+        mixed: z.number().int(),
+      }),
+      thumbnail_url: z.string().nullable().optional(),
+      view_count: z.number().nullable().optional(),
+      like_count: z.number().nullable().optional(),
+      reported_comment_count: z.number().nullable().optional(),
+    }),
+  ),
+  hours: z.array(z.number().int()),
+  weekdays: z.array(z.number().int()),
+  weeks: z.array(
+    z.object({
+      week: z.string(),
+      count: z.number().int(),
+    }),
+  ),
+  people: z.array(
+    z.object({
+      name: z.string(),
+      channel_id: z.string().nullable(),
+      avatar_url: z.string().nullable().optional(),
+      channel_url: z.string().nullable().optional(),
+      comments_count: z.number().int(),
+      likes_count: z.number().int(),
+    }),
+  ),
+  most_engaged_negative: z.array(
+    z.object({
+      id: z.string(),
+      video_id: z.string().nullable(),
+      video_title: z.string().nullable(),
+      text_raw: z.string(),
+      author_name: z.string().nullable(),
+      author_profile_image_url: z.string().nullable().optional(),
+      published_at: z.string().nullable(),
+      likes_value: z.number().nullable(),
+      label: z.string().nullable(),
+      topic: z.string().nullable(),
+    }),
+  ),
+  comment_types: z.array(z.string()),
+  video_options: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string().nullable(),
+    }),
+  ),
+  topics: z.array(TopicSchema).default([]),
+  active_analysis_key: z.string().nullable(),
+  active_topic_key: z.string().nullable(),
+  revision: z.string().nullable(),
+});
+
+export type DashboardAggregates = z.infer<typeof DashboardAggregatesSchema>;
+
+export const DashboardCommentsResponseSchema = z.object({
+  total: z.number().int(),
+  comments: z.array(CommentSchema),
+  limit: z.number().int(),
+  offset: z.number().int(),
+  has_more: z.boolean(),
+  next_cursor: z.string().nullable(),
+});
+
+export type DashboardCommentsResponse = z.infer<
+  typeof DashboardCommentsResponseSchema
+>;

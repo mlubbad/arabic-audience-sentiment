@@ -33,10 +33,13 @@ export type JobRow = {
   attempt: number;
   error_code: string | null;
   created_at: string;
+  counters?: Record<string, unknown> | null;
 };
 
 export type JobEntry = {
   id: string;
+  type: string;
+  status: JobRow["status"];
   severity: "ok" | "warning" | "critical" | "muted";
   /** The state, in two or three words. */
   headline: string;
@@ -44,6 +47,7 @@ export type JobEntry = {
   detail: string;
   attempt: number;
   createdAt: string;
+  durationSeconds?: number | null;
   /** Queued work can be withdrawn; a leased job belongs to its worker. */
   cancellable: boolean;
   /** Finished without success — worth another attempt. */
@@ -76,6 +80,8 @@ function explain(code: string, S: Strings): string | null {
     case "comments_disabled":
     case "explicitly_disabled":
       return S.jobCommentsDisabled;
+    case "telegram_discussion_requires_auth":
+      return S.jobTelegramDiscussionRequiresAuth;
     case "no_upload_has_comments": {
       // `12_checked_0_disabled` — counts, not prose, so they are read out.
       const m = tail.match(/^(\d+)_checked_(\d+)_disabled$/);
@@ -92,6 +98,8 @@ function explain(code: string, S: Strings): string | null {
       return S.catStateUnchanged;
     case "channel_not_connected":
       return S.jobChannelNotConnected;
+    case "channel_not_public":
+      return S.jobChannelNotPublic;
     case "credential_expired":
       return S.jobCredentialExpired;
     case "quota_exceeded":
@@ -139,6 +147,8 @@ function explain(code: string, S: Strings): string | null {
       return S.jobGeminiBadResponse;
     case "gemini_refused":
       return S.jobGeminiRefused;
+    case "gemini_credits_depleted":
+      return S.jobGeminiCreditsDepleted;
     default:
       // The shared table, before giving up.
       //
@@ -159,11 +169,15 @@ export function describeJob(
   S: Strings,
 ): JobEntry {
   const entry = describeJobStatus(job, opts, S);
-  // A topic job is a different kind of work and is named as such in the log,
-  // so a blocked topic job is not read as a stalled collection.
-  return job.type === "analyse"
-    ? { ...entry, headline: `${S.jobKindTopics} — ${entry.headline}` }
-    : entry;
+  // A topic or catalogue job is a different kind of work and is named as such in the log,
+  // so a catalogue or topic job is not read as a comment collection.
+  if (job.type === "analyse") {
+    return { ...entry, headline: `${S.jobKindTopics} — ${entry.headline}` };
+  }
+  if (job.type === "discover") {
+    return { ...entry, headline: `${S.jobKindCatalogue} — ${entry.headline}` };
+  }
+  return entry;
 }
 
 /** The status half: the same sentences for every kind of job. */
@@ -172,10 +186,20 @@ function describeJobStatus(
   opts: { workerConnected: boolean },
   S: Strings,
 ): JobEntry {
+  const durationSeconds =
+    typeof job.counters?.duration_seconds === "number"
+      ? (job.counters.duration_seconds as number)
+      : typeof job.counters?.duration_ms === "number"
+        ? Math.round((job.counters.duration_ms as number) / 1000)
+        : null;
+
   const base = {
     id: job.id,
+    type: job.type,
+    status: job.status,
     attempt: job.attempt,
     createdAt: job.created_at,
+    durationSeconds,
     // Mirrors what cancel_job and retry_job will accept. The database decides;
     // this only avoids offering a button that is going to be refused.
     cancellable: job.status === "queued",
@@ -198,7 +222,9 @@ function describeJobStatus(
         severity: opts.workerConnected ? "warning" : "critical",
         headline: S.jobQueuedHeadline,
         detail: opts.workerConnected
-          ? S.jobQueuedWithWorker
+          ? job.type === "discover"
+            ? S.jobCatalogueQueuedWithWorker
+            : S.jobQueuedWithWorker
           : S.jobQueuedNoWorker,
       };
     case "running":
@@ -206,7 +232,10 @@ function describeJobStatus(
         ...base,
         severity: "ok",
         headline: S.jobRunningHeadline,
-        detail: S.jobRunningDetail,
+        detail:
+          job.type === "discover"
+            ? S.jobCatalogueRunningDetail
+            : S.jobRunningDetail,
       };
     case "succeeded":
       return {
@@ -216,7 +245,10 @@ function describeJobStatus(
         // Deliberately not "جُمعت التعليقات": a run can end successfully having
         // read a video that has none, and claiming otherwise would put a
         // success next to an empty table.
-        detail: S.jobSucceededDetail,
+        detail:
+          job.type === "discover"
+            ? S.jobCatalogueSucceededDetail
+            : S.jobSucceededDetail,
       };
     case "partial":
       return {

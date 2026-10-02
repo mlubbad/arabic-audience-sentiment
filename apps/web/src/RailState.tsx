@@ -24,8 +24,9 @@ import { useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useSession, useWorkspaces } from "./session";
 import { useWorkspaceSelection } from "./workspaceSelection";
+import { useImpersonation } from "./impersonation";
 import { workspaceState } from "./workspace";
-import { configuredMode, fixtureWorkspace, loadSource } from "./data";
+import { configuredMode, fixtureWorkspace, loadOpsSource } from "./data";
 import { syncHealth } from "./syncHealth";
 import { useStrings } from "./strings";
 import {
@@ -42,9 +43,13 @@ const SCOPED = new Set(["/dashboard", "/sync"]);
 export function WorkspaceSwitch() {
   const S = useStrings();
   const { session } = useSession();
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
   const { workspaces } = useWorkspaces(session);
   const { pathname } = useLocation();
-  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
+  const [chosen, setChosen] = useWorkspaceSelection(effectiveUserId, {
     route: SCOPED.has(pathname),
   });
   if (!session || configuredMode !== "live") return null;
@@ -93,8 +98,12 @@ export function WorkspaceSwitch() {
 export function CollectionState() {
   const S = useStrings();
   const { session } = useSession();
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
   const { workspaces } = useWorkspaces(session);
-  const [chosen] = useWorkspaceSelection(session?.user.id ?? null);
+  const [chosen] = useWorkspaceSelection(effectiveUserId);
   const place = workspaceState({
     mode: configuredMode,
     fixtureWorkspace,
@@ -103,26 +112,19 @@ export function CollectionState() {
     selectedId: chosen,
   });
   const workspaceId = place.kind === "ready" ? place.id : null;
-  // The overview's and the operations page's entry, under their key: whichever
-  // of the three asks first pays for the read, the others find it in cache.
+  // The rail reads the lightweight ops snapshot: worker health, sync state and quotas,
+  // without loading the heavy comment history. Shared with the operations page.
   const source = useQuery({
     queryKey: [
-      "dashboard-source",
+      "ops-source",
       session?.user.id ?? "visitor",
       "live",
       workspaceId,
     ],
-    queryFn: ({ signal }) => loadSource("live", workspaceId!, signal),
+    queryFn: ({ signal }) => loadOpsSource("live", workspaceId!, signal),
     enabled: !!session && configuredMode === "live" && !!workspaceId,
   });
   if (!session || configuredMode !== "live" || !workspaceId) return null;
-  if (source.isPending)
-    return (
-      <p className="app-rail-collection" data-testid="rail-collection">
-        <span className="app-rail-caption">{S.railCollectionCaption}</span>
-        <span data-severity="unknown">{S.railCollectionReading}</span>
-      </p>
-    );
   if (source.isError)
     return (
       <p className="app-rail-collection" data-testid="rail-collection">
@@ -130,7 +132,14 @@ export function CollectionState() {
         <span data-severity="unknown">{S.railCollectionUnavailable}</span>
       </p>
     );
-  const health = syncHealth(source.data.sync ?? null, new Date());
+  if (source.isPending || !source.data)
+    return (
+      <p className="app-rail-collection" data-testid="rail-collection">
+        <span className="app-rail-caption">{S.railCollectionCaption}</span>
+        <span data-severity="unknown">{S.railCollectionReading}</span>
+      </p>
+    );
+  const health = syncHealth(source.data.sync, new Date());
   return (
     <p className="app-rail-collection" data-testid="rail-collection">
       <span className="app-rail-caption">{S.railCollectionCaption}</span>

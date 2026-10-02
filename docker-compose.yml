@@ -1,0 +1,31 @@
+services:
+  sentiment-worker:
+    build:
+      context: ./workers/python
+      dockerfile: Dockerfile
+    image: sentiment-worker:latest
+    container_name: sentiment-worker
+    restart: unless-stopped
+    env_file:
+      - path: .env.local
+        required: false
+      - path: .env
+        required: false
+    environment:
+      - WORKER_API_BASE_URL=${WORKER_API_BASE_URL}
+      - WORKER_CREDENTIAL=${WORKER_CREDENTIAL}
+      - SENTIMENT_MODEL=${SENTIMENT_MODEL:-camelbert-da}
+      - TOPIC_MODEL=${TOPIC_MODEL:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_SESSION_STRING=${TELEGRAM_SESSION_STRING}
+      - WORKER_IDLE_SECONDS=${WORKER_IDLE_SECONDS:-30}
+      - WORKER_MAX_IDLE=${WORKER_MAX_IDLE:-30}
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 512M

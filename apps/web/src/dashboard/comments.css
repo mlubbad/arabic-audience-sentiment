@@ -24,6 +24,56 @@
   justify-content: space-between;
   gap: var(--space-2);
 }
+.db-comment-author-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.db-comment-author-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.db-comment-author-info-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.db-comment-replies-badge {
+  font-size: var(--fs-micro) !important;
+  color: var(--text-3);
+  margin-inline-start: var(--space-1);
+}
+.db-comment-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-hover);
+}
+.db-comment-avatar-fallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ml-indigo-50, #e0e7ff);
+  color: var(--ml-indigo, #4f46e5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+.db-comment-author-link {
+  color: inherit;
+  text-decoration: none;
+}
+.db-comment-author-link:hover {
+  text-decoration: underline;
+  color: var(--ml-indigo);
+}
 .db-comment-who {
   font-weight: 600;
   font-size: var(--fs-small);
@@ -55,15 +105,68 @@
   font-variant-numeric: tabular-nums;
   margin-inline-start: 3px;
 }
-/* The topic chip sits beside the sentiment chip and must not read as one:
-   sentiment has a colour scale, a topic is a name. Filled, muted, no hue. */
 .db-chip-topic {
   margin-inline-start: var(--space-2);
 }
 .db-chip-topic[data-topic="none"] {
-  border: 1px dashed var(--border-2);
+  border: 1px dashed var(--border-1);
   background: transparent;
   color: var(--text-3);
+  opacity: 0.55;
+}
+.db-chip-unanalysed {
+  opacity: 0.55;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border-1) !important;
+  color: var(--text-3) !important;
+  font-weight: 400;
+}
+.table-wrap .db-row-actions {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: var(--space-2) !important;
+  white-space: nowrap !important;
+}
+.table-wrap th:first-child,
+.table-wrap td:first-child {
+  white-space: nowrap;
+  width: 14%;
+}
+.table-wrap th:nth-child(3),
+.table-wrap td:nth-child(3) {
+  white-space: nowrap;
+  width: 16%;
+}
+.table-wrap th:nth-child(4),
+.table-wrap td:nth-child(4) {
+  white-space: nowrap;
+  width: 12%;
+}
+.table-wrap th:last-child,
+.table-wrap td:last-child {
+  white-space: nowrap;
+  width: 1%;
+  min-width: 160px;
+  text-align: end;
+}
+.db-action-btn {
+  font-size: var(--fs-micro) !important;
+  padding: 3px 8px !important;
+  height: 26px !important;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-1) !important;
+  background: var(--surface-1) !important;
+  color: var(--text-2) !important;
+  white-space: nowrap !important;
+  transition: all 0.15s ease-in-out;
+}
+.db-action-btn:hover {
+  background: var(--surface-2) !important;
+  color: var(--text-1) !important;
+  border-color: var(--border-2) !important;
 }
 .db-export {
   display: flex;

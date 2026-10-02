@@ -246,4 +246,26 @@ describe("videoLinks", () => {
       "https://www.youtube-nocookie.com/embed/abcDEF12345?autoplay=1&rel=0",
     );
   });
+  it("formats telegram links correctly", () => {
+    const links = videoLinks(
+      "100",
+      "channel_post",
+      "telegram",
+      "@news_channel",
+    );
+    expect(links.watch).toBe("https://t.me/news_channel/100");
+    expect(links.embed).toBe("https://t.me/news_channel/100?embed=1");
+  });
+  it("formats x links correctly", () => {
+    const links = videoLinks("1234567890", "tweet", "x", "@elonmusk");
+    expect(links.watch).toBe("https://x.com/elonmusk/status/1234567890");
+    expect(links.embed).toBe(
+      "https://platform.twitter.com/embed/Tweet.html?id=1234567890",
+    );
+  });
+  it("formats tiktok links correctly", () => {
+    expect(
+      videoLinks("7123456789012345678", "video", "tiktok", "@khaby.lame").watch,
+    ).toBe("https://www.tiktok.com/@khaby.lame/video/7123456789012345678");
+  });
 });

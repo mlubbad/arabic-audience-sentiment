@@ -18,7 +18,10 @@ revoke all on function public.svc_worker_claim(text, text[]) from public, anon, 
 grant execute on function public.svc_worker_claim(text, text[]) to service_role;
 
 -- The introspection probes this fault was found with. They answer 42 and are
--- nobody's API.
-drop function public.__pgrst_probe();
-drop function public.__pgrst_probe2(text);
-drop function public.__pgrst_probe2(text, text[]);
+-- nobody's API. They were created directly on the live database during the
+-- investigation and exist in no earlier migration, so the drops must tolerate
+-- their absence — a fresh database (db reset, test:db bootstrap, a new
+-- project) runs this file without them.
+drop function if exists public.__pgrst_probe();
+drop function if exists public.__pgrst_probe2(text);
+drop function if exists public.__pgrst_probe2(text, text[]);

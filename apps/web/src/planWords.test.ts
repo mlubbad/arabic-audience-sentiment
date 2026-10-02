@@ -47,6 +47,7 @@ const titled = (used: number) => ({
     price_yearly_cents: 0,
     self_serve: false,
     provider_prices: {},
+    allow_public_channels: false,
     limits: {
       analysis_units: 25000,
       topic_units: 10000,

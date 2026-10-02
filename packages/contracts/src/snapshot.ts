@@ -13,6 +13,10 @@ export type VideoAggregate = {
   analysed: number;
   replies: number;
   sentiments: Record<Label, number>;
+  thumbnail_url?: string | null;
+  view_count?: number | null;
+  like_count?: number | null;
+  reported_comment_count?: number | null;
 };
 
 export type LabelledComment = Comment & {
@@ -54,6 +58,7 @@ function filteredRows(
         (f.channel_id && c.channel_id !== f.channel_id)
       )
         return false;
+      if (f.platform && c.platform !== f.platform) return false;
       if (
         (f.video_ids.length && !f.video_ids.includes(c.video_id)) ||
         (f.video_kind && c.video_kind !== f.video_kind)
@@ -258,11 +263,30 @@ export function snapshot(
     unanalysed: rows.length - analysed,
     sentiments,
     topic_counts,
+    platform_breakdown: rows.reduce<Record<string, number>>((acc, c) => {
+      acc[c.platform] = (acc[c.platform] ?? 0) + 1;
+      return acc;
+    }, {}),
     replies: rows.filter((c) => c.is_reply).length,
     unknown_dates: rows.filter((c) => !c.published_at).length,
     unique_authors: new Set(
       rows.flatMap((c) => (c.author_channel_id ? [c.author_channel_id] : [])),
     ).size,
+    kpis: {
+      total_views: null,
+      total_likes: rows.reduce((sum, c) => sum + (c.likes_value ?? 0), 0),
+      total_comments: rows.length,
+      engagement_rate: null,
+      net_sentiment:
+        analysed > 0
+          ? Number(
+              (
+                ((sentiments.positive - sentiments.negative) / analysed) *
+                100
+              ).toFixed(1),
+            )
+          : null,
+    },
     // Busiest first, ties broken by id so the order does not wobble.
     videos: [...videos.values()].sort(
       (a, b) => b.total - a.total || a.id.localeCompare(b.id, "en"),

@@ -68,6 +68,23 @@ describe("sync health", () => {
     }
   });
 
+  it("treats queued work with a connected worker as queued rather than a fatal blocker", () => {
+    const retrying = state({
+      queued_jobs: 2,
+      last_run: {
+        ...state().last_run!,
+        status: "blocked",
+        error_code: "quota_exceeded",
+      },
+    });
+    expect(syncHealth(retrying, now)).toMatchObject({
+      severity: "warning",
+      key: "queued",
+      queued: 2,
+      errorCode: "quota_exceeded",
+    });
+  });
+
   it("treats queued work with no worker as stalled, whatever the last run said", () => {
     const stalled = state({
       queued_jobs: 4,
@@ -130,5 +147,45 @@ describe("sync health", () => {
       key: "running",
     });
     expect(syncHealth(running, now).staleHours).toBeNull();
+  });
+
+  it("reports quota_paused when blocked by quota_exceeded on the same UTC day", () => {
+    const blockedQuota = state({
+      queued_jobs: 0,
+      last_run: {
+        ...state().last_run!,
+        status: "blocked",
+        error_code: "quota_exceeded",
+        ended_at: "2026-09-12T10:00:00Z",
+      },
+    });
+    const sameDay = new Date("2026-09-12T18:00:00Z");
+    expect(syncHealth(blockedQuota, sameDay)).toMatchObject({
+      severity: "warning",
+      key: "quota_paused",
+      errorCode: "quota_exceeded",
+    });
+  });
+
+  it("recovers to healthy after midnight UTC if worker is connected", () => {
+    const blockedQuota = state({
+      queued_jobs: 0,
+      worker: {
+        connected: true,
+        busy: false,
+        last_heartbeat_at: "2026-09-13T01:00:00Z",
+      },
+      last_run: {
+        ...state().last_run!,
+        status: "blocked",
+        error_code: "quota_exceeded",
+        ended_at: "2026-09-12T10:00:00Z",
+      },
+    });
+    const nextDay = new Date("2026-09-13T01:05:00Z");
+    expect(syncHealth(blockedQuota, nextDay)).toMatchObject({
+      severity: "ok",
+      key: "healthy",
+    });
   });
 });

@@ -8,36 +8,110 @@ directly.
 import json
 import re
 from collections.abc import Iterator
+from datetime import datetime, timezone, timedelta
 import httpx
 from .protocol import Batch, Catalogue, CollectionError, RawComment
+
+# How soon before expiry the token is swapped for a fresh one. An access
+# token that lapses mid-collection costs the whole run, so anything inside
+# this margin is renewed before the next request is sent rather than after
+# the source refuses it.
+_RENEW_MARGIN_SECONDS = 120
 
 
 class YouTubeAPI:
     source = "youtube_data_api_public"
     revision = "api-v3-adapter-v1"
 
-    def __init__(self, api_key: str | None, client: httpx.Client, access_token: str | None = None):
+    def __init__(self, api_key: str | None, client: httpx.Client,
+                 access_token: str | None = None, expires_at: str | None = None,
+                 renew=None, public_reader: bool = False):
         # Exactly one. Sending both would let a stale key silently answer for a
         # revoked token, and the row would record the wrong provenance.
         if bool(api_key) == bool(access_token):
             raise ValueError("need_exactly_one_credential")
         self.key, self.token, self.client = api_key, access_token, client
+        # When the token lapses and who can hand over a fresh one. The renewal
+        # itself happens on the server — the refresh token and the sealing key
+        # never leave it — so this is a question asked against a lease, not a
+        # credential held here.
+        self.renew = renew
+        self._expiry = self._parse_expiry(expires_at)
         # The provenance travels with every row, so a comment read on the
-        # owner's authority is never filed as public data.
-        self.source = "youtube_oauth" if access_token else "youtube_data_api_public"
+        # owner's authority is never filed as public data. Reader mode is the
+        # reverse case, and it matters just as much: a channel read by id
+        # through the platform's own grant is public data — the credential
+        # opened the door, it does not own the channel — so the OAuth token
+        # must not file the rows as `youtube_oauth` either.
+        self.public_reader = bool(public_reader and access_token)
+        self.source = ("youtube_data_api_public"
+                       if (api_key or self.public_reader) else "youtube_oauth")
+
+    @property
+    def credential_kind(self) -> str:
+        """Which kind of credential opened the door, for field provenance."""
+        if self.public_reader:
+            return "platform_reader"
+        return "api_key" if self.key else "owner_grant"
+
+    @staticmethod
+    def _parse_expiry(value: str | None):
+        """RFC 3339 to an aware datetime, or None when the source said nothing."""
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    def _refresh(self):
+        """Swap in a fresh token, or say the credential lapsed.
+
+        The renewal is a question to the server, answered against the lease
+        this run still holds. An empty answer means the channel's grant is
+        gone — the next claim hands the job back unconnected, which is the
+        operator's signal to reconnect — so the run ends as the same retryable
+        credential lapse it would have hit at the next request anyway.
+        """
+        fresh = self.renew() if self.renew else None
+        token = fresh.get("access_token") if isinstance(fresh, dict) else None
+        if not token:
+            raise CollectionError("credential_expired", "failed", retryable=True)
+        self.token = token
+        self._expiry = self._parse_expiry(fresh.get("access_token_expires_at"))
+
+    def _bearer(self) -> str:
+        """The credential for the next request, renewed when it is about to lapse."""
+        if self.token and self._expiry is not None and self.renew is not None:
+            remaining = (self._expiry - datetime.now(timezone.utc)).total_seconds()
+            if remaining < _RENEW_MARGIN_SECONDS:
+                self._refresh()
+        return self.token
+
+    def _send(self, resource, query, headers):
+        return self.client.get(f"https://www.googleapis.com/youtube/v3/{resource}",
+                               params=query, headers=headers,
+                               timeout=20, follow_redirects=False)
 
     def _get(self, resource, params, allow_404=False):
-        headers = {"authorization": f"Bearer {self.token}"} if self.token else {}
+        headers = {"authorization": f"Bearer {self._bearer()}"} if self.token else {}
         query = params if self.token else {**params, "key": self.key}
         try:
-            response = self.client.get(f"https://www.googleapis.com/youtube/v3/{resource}",
-                                       params=query, headers=headers,
-                                       timeout=20, follow_redirects=False)
+            response = self._send(resource, query, headers)
         except httpx.HTTPError:
             raise CollectionError("network_failure", retryable=True) from None
         # An expired access token is not a refusal; it is a credential that
         # needs renewing. Reported as retryable so the caller refreshes rather
         # than marking the channel blocked and stopping collection for good.
+        # With a renewal route, the run swaps the token and repeats the very
+        # request, so a lapse mid-collection no longer costs the run.
+        if response.status_code == 401 and self.token and self.renew is not None:
+            self._refresh()
+            try:
+                response = self._send(resource, query,
+                                      {"authorization": f"Bearer {self.token}"})
+            except httpx.HTTPError:
+                raise CollectionError("network_failure", retryable=True) from None
         if response.status_code == 401:
             raise CollectionError("credential_expired", "failed", retryable=True)
         if response.status_code in (403, 429):
@@ -58,12 +132,19 @@ class YouTubeAPI:
                 f"source_access_denied:{reason}" if reason else "source_access_denied",
                 "blocked",
             )
-        if response.status_code == 404 and allow_404:
-            return None
+        if response.status_code == 404:
+            if allow_404:
+                return None
+            reason = self._reason(response)
+            raise CollectionError(
+                "video_not_found" if (reason == "videoNotFound" or not reason) else f"not_found:{reason}",
+                "unavailable",
+            )
         if response.status_code >= 500:
             raise CollectionError("source_unavailable", retryable=True)
         if response.status_code != 200:
             raise CollectionError("source_http_error")
+
         try:
             data = response.json()
             if not isinstance(data, dict) or not isinstance(data.get("items"), list):
@@ -81,32 +162,60 @@ class YouTubeAPI:
         except (ValueError, KeyError, TypeError, IndexError):
             return ""
 
-    def _comment(self, item, video, parent=None):
+    def _comment(self, item, video, parent=None, reply_count=0):
         try:
             s = item["snippet"]
             parent = s.get("parentId", parent)
+            r_count = reply_count or s.get("totalReplyCount", 0)
             return RawComment(id=item["id"], video_id=video, text=s["textOriginal"],
                               parent_id=parent, is_reply=parent is not None,
                               parent_source="api" if parent else "unknown",
                               author_channel_id=s.get("authorChannelId", {}).get("value"),
                               author_name=s.get("authorDisplayName", ""),
+                              author_profile_image_url=s.get("authorProfileImageUrl"),
+                              author_channel_url=s.get("authorChannelUrl"),
+                              reply_count=int(r_count) if r_count is not None else 0,
+                              updated_at=s.get("updatedAt"),
                               published_time_raw=s.get("publishedAt"), published_at=s.get("publishedAt"),
                               timestamp_precision="second" if s.get("publishedAt") else "unknown",
                               likes_value=s.get("likeCount"), source=self.source,
-                              field_provenance={"source": self.source, "adapter_revision": self.revision})
+                              field_provenance={"source": self.source, "adapter_revision": self.revision,
+                                                "credential_kind": self.credential_kind})
         except (KeyError, TypeError, AttributeError):
             raise CollectionError("invalid_comment") from None
 
-    def batches(self, video_id: str, checkpoint: str | None) -> Iterator[Batch]:
+    @staticmethod
+    def _is_before_or_at(pub_str: str | None, since_str: str | None) -> bool:
+        """Check if publishedAt is older than or equal to since (with 60s clock skew tolerance)."""
+        if not pub_str or not since_str:
+            return False
+        try:
+            pub_dt = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+            since_dt = datetime.fromisoformat(since_str.replace("Z", "+00:00"))
+            return pub_dt <= (since_dt - timedelta(seconds=60))
+        except (ValueError, TypeError):
+            return False
+
+    def batches(
+        self,
+        video_id: str,
+        checkpoint: str | None = None,
+        since: str | None = None,
+        max_items: int | None = None,
+        **kwargs,
+    ) -> Iterator[Batch]:
         if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+
             raise ValueError("invalid_video_id")
         try:
             state = json.loads(checkpoint) if checkpoint else {
-                "video_id": video_id, "page": None, "parents": [], "reply_page": None, "threads_done": False}
+                "video_id": video_id, "page": None, "parents": [], "reply_page": None,
+                "threads_done": False, "since": since}
             if state["video_id"] != video_id or not isinstance(state["parents"], list):
                 raise ValueError()
         except (KeyError, ValueError, TypeError):
             raise CollectionError("invalid_checkpoint") from None
+        effective_since = state.get("since") or since
         while True:
             if state["parents"]:
                 parent = state["parents"][0]
@@ -122,22 +231,41 @@ class YouTubeAPI:
                 if not next_page:
                     state["parents"].pop(0)
             elif not state["threads_done"]:
-                params = {"part": "snippet", "videoId": video_id, "maxResults": 100,
+                params = {"part": "snippet,replies", "videoId": video_id, "maxResults": 100,
                           "order": "time", "textFormat": "plainText"}
                 if state["page"]:
                     params["pageToken"] = state["page"]
                 data = self._get("commentThreads", params)
                 try:
-                    comments = [self._comment(i["snippet"]["topLevelComment"], video_id) for i in data["items"]]
-                    state["parents"] = [i["snippet"]["topLevelComment"]["id"] for i in data["items"]
-                                        if i["snippet"]["totalReplyCount"] > 0]
+                    comments = []
+                    parents = []
+                    cutoff_reached = False
+                    for i in data.get("items", []):
+                        top = i["snippet"]["topLevelComment"]
+                        top_pub = top.get("snippet", {}).get("publishedAt")
+                        if effective_since and top_pub and self._is_before_or_at(top_pub, effective_since):
+                            cutoff_reached = True
+                            break
+                        total_replies = i["snippet"].get("totalReplyCount", 0)
+                        comments.append(self._comment(top, video_id, reply_count=total_replies))
+                        inline = i.get("replies", {}).get("comments", [])
+                        if total_replies <= len(inline):
+                            for r in inline:
+                                comments.append(self._comment(r, video_id, parent=top["id"]))
+                        else:
+                            parents.append(top["id"])
+                    state["parents"] = parents
                 except (KeyError, TypeError):
                     raise CollectionError("invalid_thread") from None
-                next_page = data.get("nextPageToken")
-                if next_page and next_page == state["page"]:
-                    raise CollectionError("repeated_page_token", "partial")
-                state["page"] = next_page
-                state["threads_done"] = next_page is None
+                if cutoff_reached:
+                    state["threads_done"] = True
+                    state["page"] = None
+                else:
+                    next_page = data.get("nextPageToken")
+                    if next_page and next_page == state["page"]:
+                        raise CollectionError("repeated_page_token", "partial")
+                    state["page"] = next_page
+                    state["threads_done"] = next_page is None
             else:
                 yield Batch([], None, "exhausted")
                 return
@@ -145,6 +273,7 @@ class YouTubeAPI:
             yield Batch(comments, None if done else json.dumps(state), "exhausted" if done else "partial")
             if done:
                 return
+
 
     def comment_counts(self, video_ids: list[str]) -> dict[str, int | None]:
         """The source's commentCount for each video, fifty ids per unit.
@@ -203,17 +332,36 @@ class YouTubeAPI:
             if not page:
                 return ids
 
-    def catalogue(self) -> Catalogue:
+    def catalogue(self, channel_id: str | None = None) -> Catalogue:
         """The channel's videos across its three tabs, with the source's counts.
 
         Cost: about two quota units per fifty videos. The tab playlists are the
         uploads id with LF/SH/LV inserted after UU; a 404 on one is an empty
         tab. If all three are absent the plain uploads list stands in and the
         kind is recorded as unclassified rather than guessed.
+
+        With `channel_id` the channel is named, not inferred. Two credentials
+        can carry that request: the project API key, or the platform's reader
+        grant (`public_reader=True`) — an OAuth token whose authority is the
+        platform's, not the channel owner's, so the rows it reads are still
+        public data. What is refused is the one combination that would read a
+        channel its credential was never granted for: an owner token plus an
+        id. An id that names no channel is a blocked dead end, not an empty
+        catalogue.
         """
-        data = self._get("channels", {"part": "contentDetails", "mine": "true"})
+        if channel_id is not None:
+            if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id):
+                raise ValueError("invalid_channel_id")
+            if self.token and not self.public_reader:
+                raise ValueError("owner_token_reads_mine_only")
+            params = {"part": "contentDetails", "id": channel_id}
+        else:
+            params = {"part": "contentDetails", "mine": "true"}
+        data = self._get("channels", params)
         if not data["items"]:
-            raise CollectionError("no_channel_for_credential", "blocked")
+            raise CollectionError(
+                "channel_not_found" if channel_id else "no_channel_for_credential", "blocked"
+            )
         try:
             uploads = data["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
         except (KeyError, TypeError):
@@ -248,8 +396,13 @@ class YouTubeAPI:
                 try:
                     vid = item["id"]
                     s = item.get("snippet", {})
-                    raw = item.get("statistics", {}).get("commentCount")
+                    stat = item.get("statistics", {})
+                    raw = stat.get("commentCount")
+                    raw_views = stat.get("viewCount")
+                    raw_likes = stat.get("likeCount")
+                    raw_fav = stat.get("favoriteCount")
                     provenance = {"source": self.source, "adapter_revision": self.revision,
+                                  "credential_kind": self.credential_kind,
                                   "discovered_in_tabs": found[vid]["tabs"]}
                     if unclassified:
                         provenance["kind_unclassified"] = True
@@ -262,6 +415,12 @@ class YouTubeAPI:
                         "duration_sec": self._seconds(item.get("contentDetails", {}).get("duration")),
                         # None is the setting being off, never a count of zero.
                         "reported_comment_count": None if raw is None else int(raw),
+                        "view_count": None if raw_views is None else int(raw_views),
+                        "like_count": None if raw_likes is None else int(raw_likes),
+                        "favorite_count": None if raw_fav is None else int(raw_fav),
+                        "tags": s.get("tags") or [],
+                        "description": s.get("description") or "",
+                        "category_id": s.get("categoryId"),
                         "field_provenance": provenance,
                     })
                 except (KeyError, TypeError, ValueError):

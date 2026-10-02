@@ -12,18 +12,18 @@
  * decision, so the demo has an operations page too and the two can never
  * disagree about what the sync state is.
  */
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   configuredMode,
-  deriveSnapshot,
   fixtureWorkspace,
-  loadSource,
+  loadOpsSource,
   resolveMode,
 } from "../data";
 import { supabase } from "../supabase";
 import { useSession, useWorkspaces } from "../session";
 import { useWorkspaceSelection } from "../workspaceSelection";
+import { useImpersonation } from "../impersonation";
 import { WorkspaceGate } from "../WorkspaceGate";
 import { workspaceState, readableWorkspace } from "../workspace";
 import { syncHealth } from "../syncHealth";
@@ -31,7 +31,6 @@ import { useLocale } from "../locale";
 import { useStrings } from "../strings";
 import { describeJob, type JobEntry, type JobRow } from "../jobFeed";
 import { failureCode } from "../failure";
-import { storedPerVideo } from "../catalogue";
 import { Badge } from "../ui/Badge";
 import { EmptyState, Loading, LoadError } from "../pageStates/PageStates";
 import { Catalogue } from "./Catalogue";
@@ -48,10 +47,15 @@ export function Sync() {
     loading: workspacesLoading,
     failed: workspacesFailed,
   } = useWorkspaces(session);
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
+
   // One selection for the whole product. This was `useState(null)` here
   // and again in the other page; both routes are lazy, so the answer died
   // on every navigation and the question came back.
-  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
+  const [chosen, setChosen] = useWorkspaceSelection(effectiveUserId, {
     route: true,
   });
   const S = useStrings();
@@ -62,6 +66,17 @@ export function Sync() {
     workspaces,
     selectedId: chosen,
   });
+
+  // Reconcile if the place became ready with a workspace that differs from chosen
+  useEffect(() => {
+    if (
+      place.kind === "ready" &&
+      chosen !== place.id &&
+      workspaces.length > 0
+    ) {
+      setChosen(place.id);
+    }
+  }, [place, chosen, workspaces.length, setChosen]);
   // An explicit way in to the demo of this page. Not a workaround for the line
   // below: the fixture operations page is the only surface on which the
   // product's hardest guarantees can be exercised without a live account —
@@ -155,14 +170,13 @@ function SyncBody({
 }) {
   const S = useStrings();
   const lang = useLocale();
-  // The same cache entry the overview reads, under the same key. This page
-  // used to fetch the whole source again under a key of its own, so the rail
-  // — which now shows collection state on every screen — would have been a
-  // third reader of one 600KB read. One entry, three readers; the sync state
-  // is a field of the source, and the derivation is pure.
+  const queryClient = useQueryClient();
+  // The operations page reads the lightweight ops snapshot: worker health,
+  // sync state, quota usage and comment counts per video. Shared with the
+  // rail indicator under the "ops-source" key.
   const snapshot = useQuery({
-    queryKey: ["dashboard-source", userId, mode, workspaceId],
-    queryFn: ({ signal }) => loadSource(mode, workspaceId, signal),
+    queryKey: ["ops-source", userId, mode, workspaceId],
+    queryFn: ({ signal }) => loadOpsSource(mode, workspaceId, signal),
   });
 
   // The attempt log is a live-only thing: the fixture has no job table, and
@@ -200,10 +214,13 @@ function SyncBody({
       void snapshot.refetch();
     });
   };
-  // Re-read the live-only rows and the snapshot together, after an action.
+  // Re-read the live-only rows, the snapshot, and the catalogue together, after an action.
   const refresh = () => {
     setTick((t) => t + 1);
     void snapshot.refetch();
+    void queryClient.invalidateQueries({
+      queryKey: ["catalogue", mode, workspaceId],
+    });
   };
   useEffect(() => {
     if (!supabase || mode !== "live") {
@@ -220,44 +237,123 @@ function SyncBody({
       .then(({ data }) => {
         if (!active) return;
         const connectedChannel = (data ?? []).find(
-          (c) => c.status === "connected",
+          (c) => c.status === "connected" || c.status === "public_unverified",
         );
         setChannelId(connectedChannel?.channel_id ?? null);
       });
     void db
       .from("jobs")
-      .select("id,type,status,attempt,error_code,created_at")
+      .select("id,type,status,attempt,error_code,created_at,counters")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(50)
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (!active) return;
         setJobsFailed(!!error);
-        setJobs(error ? [] : ((data ?? []) as JobRow[]));
+        if (error || !data) {
+          setJobs([]);
+          return;
+        }
+        const rows = data as JobRow[];
+        const missingDurationIds = rows
+          .filter(
+            (j) =>
+              j.status !== "queued" &&
+              j.status !== "running" &&
+              j.counters?.duration_seconds == null,
+          )
+          .map((j) => j.id);
+
+        if (missingDurationIds.length > 0) {
+          const { data: runs } = await db
+            .from("sync_runs")
+            .select("job_id,started_at,ended_at")
+            .in("job_id", missingDurationIds);
+
+          if (runs && runs.length > 0) {
+            const runMap = new Map(
+              runs.map((r) => [
+                r.job_id,
+                r.ended_at && r.started_at
+                  ? Math.max(
+                      1,
+                      Math.round(
+                        (new Date(r.ended_at).getTime() -
+                          new Date(r.started_at).getTime()) /
+                          1000,
+                      ),
+                    )
+                  : null,
+              ]),
+            );
+            for (const row of rows) {
+              const dur = runMap.get(row.id);
+              if (dur != null) {
+                row.counters = {
+                  ...(row.counters ?? {}),
+                  duration_seconds: dur,
+                };
+              }
+            }
+          }
+        }
+        if (!active) return;
+        setJobs(rows);
       });
     return () => {
       active = false;
     };
   }, [mode, workspaceId, tick]);
 
-  const s = useMemo(
-    () =>
-      snapshot.data
-        ? deriveSnapshot(snapshot.data, mode, { workspace_id: workspaceId })
-        : undefined,
-    [snapshot.data, mode, workspaceId],
-  );
-  // What is stored per video, for the catalogue's price. From the source's
-  // comments, not from `s.videos`: that aggregate has already dropped the
-  // channel's own replies, and the server counts them (see `storedPerVideo`).
+  const sync = snapshot.data?.sync ?? null;
+  const plan = snapshot.data?.plan ?? null;
+  // What is stored per video, for the catalogue's price. Counted on the server
+  // inside `workspace_ops_snapshot` without loading comment rows.
   const stored = useMemo(
-    () =>
-      snapshot.data ? storedPerVideo(snapshot.data.comments, workspaceId) : [],
-    [snapshot.data, workspaceId],
+    () => snapshot.data?.video_counts ?? [],
+    [snapshot.data],
   );
-  const health = syncHealth(s?.sync ?? null, new Date());
-  const run = s?.sync?.last_run ?? null;
-  const connected = !!s?.sync?.worker.connected;
+  const health = syncHealth(sync, new Date());
+  const run = sync?.last_run ?? null;
+  const connected = !!sync?.worker.connected;
+
+  // Adaptive polling: when work is in progress or waiting in the queue, poll
+  // every 4 seconds so the operator sees progress live without manual refreshing.
+  // When the queue is quiet and nothing is running, no interval is set.
+  const hasActiveWork = useMemo(() => {
+    if (mode !== "live") return false;
+    if ((sync?.queued_jobs ?? 0) > 0) return true;
+    if (sync?.last_run?.status === "running") return true;
+    return (jobs ?? []).some(
+      (j) => j.status === "queued" || j.status === "running",
+    );
+  }, [mode, sync?.queued_jobs, sync?.last_run?.status, jobs]);
+
+  const refetch = snapshot.refetch;
+  const prevActiveWorkRef = useRef(hasActiveWork);
+  useEffect(() => {
+    if (prevActiveWorkRef.current && !hasActiveWork) {
+      // Background jobs just transitioned from running to finished:
+      // invalidate both catalogue and ops-source queries so UI updates immediately.
+      void queryClient.invalidateQueries({
+        queryKey: ["catalogue", mode, workspaceId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["ops-source", userId, mode, workspaceId],
+      });
+    }
+    prevActiveWorkRef.current = hasActiveWork;
+  }, [hasActiveWork, queryClient, mode, workspaceId, userId]);
+
+  useEffect(() => {
+    if (!hasActiveWork) return;
+    const interval = setInterval(() => {
+      setTick((t) => t + 1);
+      void refetch();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [hasActiveWork, refetch]);
+
   const entries: JobEntry[] = (jobs ?? []).map((j) =>
     describeJob(j, { workerConnected: connected }, S),
   );
@@ -304,26 +400,11 @@ function SyncBody({
         />
       ) : (
         <>
-          {/* The action first, the diagnosis after it: what the channel has
-              and what is chosen, then whether collection is running and what
-              it costs. The catalogue reads the plan's remaining figure from
-              the same snapshot the plan panel prints, so its estimate and the
-              meter below it can never disagree. */}
-          <Catalogue
-            mode={mode}
-            workspaceId={workspaceId}
-            plan={s?.plan ?? null}
-            stored={stored}
-            jobs={jobs}
-            workerConnected={connected}
-            onChanged={refresh}
-          />
-          {/* Health and allowance are parallel questions: side by side on
-              the dashboard's two-column grid, one under the other on a
-              phone. */}
+          {/* Health and allowance first: the operator sees system connectivity
+              and remaining quota before picking videos to collect. */}
           <div className="db-grid db-grid--2">
             <SyncHealth
-              s={s}
+              sync={sync}
               health={health}
               run={run}
               mode={mode}
@@ -331,8 +412,18 @@ function SyncBody({
               lang={lang}
               S={S}
             />
-            <PlanBudgets plan={s?.plan} lang={lang} S={S} />
+            <PlanBudgets plan={plan} lang={lang} S={S} />
           </div>
+          <Catalogue
+            mode={mode}
+            workspaceId={workspaceId}
+            plan={plan}
+            stored={stored}
+            jobs={jobs}
+            workerConnected={connected}
+            channelId={channelId}
+            onChanged={refresh}
+          />
           <Attempts
             mode={mode}
             jobsFailed={jobsFailed}

@@ -1,51 +1,29 @@
 # Connecting a YouTube channel — the flow, screen by screen
 
-2026-09-16. Written after the owner's own screenshots of the flow showed a screen this
-document did not previously exist to explain: Google's "hasn't verified this app" warning.
-This is the formal record — every screen, every URL, every source file behind it, and the
-one thing about it that is provisional rather than finished.
+2026-09-16 (updated 2026-09-19 upon Google OAuth verification approval). This is the formal record — every screen, every URL, every source file behind it.
 
 ## 0. Why this exists
 
-No document described this flow start to finish before now. `docs/youtube-quota-extension.md`
-covers the API-usage side of the OAuth grant (scopes, quota, retention); this covers the
-**user experience** of getting from "ربط قناة يوتيوب" to a working connection, including the
-two Google-side warnings a reader will see until [§5](#5-the-one-open-item-oauth-verification)
-is closed.
+`docs/youtube-quota-extension.md` covers the API-usage side of the OAuth grant (scopes, quota, retention); this covers the **user experience** of getting from "ربط قناة يوتيوب" to a working connection.
+
+Following Google OAuth verification approval in production (verified application), the intermediate "before you continue" warning question and Google's unverified warning screen were removed. Clicking "ربط قناة يوتيوب" or "إعادة الربط لحفظ اسم القناة" now navigates directly to Google OAuth.
 
 ## 1. The screens, in order
 
 | # | Screen | URL | Source |
 | --- | --- | --- | --- |
-| 1 | Account page, connect button | `/account` | `apps/web/src/WorkspaceCard.tsx` |
-| 2 | **New: "before you continue" question** | same page | `apps/web/src/WorkspaceCard.tsx` (this change) |
-| 3 | Google account chooser | `accounts.google.com/v3/signin/accountchooser` | Google's own |
-| 4 | **"Google hasn't verified this app"** | `accounts.google.com/signin/oauth/warning` | Google's own — see §4 |
-| 5 | Scope consent ("… wants access to your Google Account") | `accounts.google.com/signin/oauth/v2/consentsummary` | Google's own |
-| 6 | Redirect back, success or error | `/connected` | `apps/web/src/Connected.tsx` |
+| 1 | Account page, connect button | `/account` | `apps/web/src/account/WorkspaceCard.tsx` |
+| 2 | Google account chooser | `accounts.google.com/v3/signin/accountchooser` | Google's own |
+| 3 | Scope consent ("… wants access to your Google Account") | `accounts.google.com/signin/oauth/v2/consentsummary` | Google's own |
+| 4 | Redirect back, success or error | `/connected` | `apps/web/src/Connected.tsx` |
 
-## 2. Screen 1 → 2: the question this change adds
+*(Historical note: Prior to Google OAuth verification approval, an inline warning card was shown before redirecting to warn users about Google's unverified app screen. Both were retired once verification succeeded on 2026-09-19.)*
 
-Pressing "ربط قناة يوتيوب" (`WorkspaceCard.tsx`, `data-testid="connect-{workspaceId}"`) no
-longer redirects immediately. It opens a question in place — the same two-step pattern the
-disconnect and retire doors already use (`role="group"`, a sentence, two buttons):
+## 2. Screen 1: The connect and relink doors
 
-- **متابعة إلى Google** (`data-testid="connect-continue-{workspaceId}"`) — only this button
-  calls `beginConnect()` (`apps/web/src/connect.ts`) and navigates.
-- **إلغاء** (reuses `renameCancel` — the same word, one key, per the codebase's rule against
-  a sentence repeated under two keys) — closes the question, nothing happens.
+Pressing "ربط قناة يوتيوب" (`WorkspaceCard.tsx`, `data-testid="connect-{workspaceId}"`) or "إعادة الربط لحفظ اسم القناة" (`data-testid="relink-{workspaceId}"`) calls `beginConnect()` (`apps/web/src/connect.ts`) and navigates directly to Google OAuth.
 
-The relink door (`data-testid="relink-{workspaceId}"`, shown when a connected channel has no
-stored name) goes through the identical question — it is the same redirect and the same two
-warnings on the other side.
-
-The sentence itself (`S.connectAboutGoogle`) says three things before the reader leaves this
-page: that the next screen is Google's, that a warning about the app being unverified is
-expected and not a sign of risk, and the three buttons on Google's own screens that get past
-it (`Advanced` → `Go to … (unsafe)` → `Continue`). Written this way on purpose: a reader who
-is told what to expect and why does not abandon the flow at screen 4.
-
-## 3. Screen 3: the account chooser
+## 3. Screen 2: the account chooser
 
 Standard Google UI, unaffected by this project's own configuration beyond the domain it
 names as the continuing party — see §4 for why that domain, not "Audience Sentiment",

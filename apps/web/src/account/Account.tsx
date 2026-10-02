@@ -15,9 +15,16 @@
  * one mounts from two values that never change within a page load.
  */
 import { useState, useEffect, type FormEvent, type ReactNode } from "react";
+import { useSearchParams } from "react-router";
 import type { Session } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ChannelLookupResponseSchema,
+  type ChannelCandidate,
+  type SourcePlatform,
+} from "@sentiment/contracts";
 import { supabase } from "../supabase";
+import { usePlanCatalogue } from "../planCatalogue";
 import {
   authErrorMessage,
   authSuccessMessage,
@@ -39,6 +46,7 @@ import {
   type AccountDemoAction,
 } from "./accountDemo";
 import { useIsPlatformAdmin } from "../adminAccess";
+import { useImpersonation } from "../impersonation";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 import { Loading, LoadError } from "../pageStates/PageStates";
@@ -60,8 +68,25 @@ type Workspace = { id: string; name: string };
  *  one reader, and two open confirmations would be two ways to press wrong. */
 type Asking = {
   ws: string;
-  what: "connect" | "disconnect" | "rename" | "retire";
+  what: "disconnect" | "rename" | "retire" | "addchannel";
 } | null;
+
+/** The lookup refusal's own code, however the client wrapped it. The function
+ *  answers `{code}` in the body; the relay puts its refusal elsewhere, and a
+ *  network failure puts it nowhere. */
+async function lookupCode(error: unknown): Promise<string> {
+  const e = error as { context?: Response; code?: unknown; message?: unknown };
+  if (e?.context && typeof e.context.json === "function") {
+    try {
+      const body = (await e.context.json()) as { code?: unknown };
+      if (typeof body?.code === "string") return body.code;
+    } catch {
+      // The body had no code; the fallbacks decide.
+    }
+  }
+  if (typeof e?.code === "string" && e.code) return e.code;
+  return "";
+}
 
 /** The page's notes and its "working…" — one place per message, shared by
  *  the live body and the demo body so both print through the same line. */
@@ -251,9 +276,21 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
     { id: string; workspace_id: string }[]
   >([]);
   const [channels, setChannels] = useState<ChannelRow[]>([]);
+  // The public-channel lookup's answers, held for the card whose form is
+  // open. The registration itself is the database's to refuse; what arrives
+  // here has already passed the contract's check on its shape.
+  const [lookup, setLookup] = useState<{
+    ws: string;
+    candidates: ChannelCandidate[] | null;
+    error: string | null;
+  }>({ ws: "", candidates: null, error: null });
   // The newest job per workspace is enough to place it on the three steps.
   // Row-level security scopes the table to this account's workspaces.
   const [jobs, setJobs] = useState<JobRow[]>([]);
+  const catalogue = usePlanCatalogue();
+  const [subscriptions, setSubscriptions] = useState<
+    { workspace_id: string; plan_key: string }[]
+  >([]);
   useEffect(() => {
     let active = true;
     void client.auth.getSession().then(({ data, error }) => {
@@ -284,6 +321,10 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
     setReloads((n) => n + 1);
     void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
   };
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
   const [asking, setAsking] = useState<Asking>(null);
   useEffect(() => {
     if (!session) {
@@ -292,8 +333,22 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
       return;
     }
     let active = true;
+    const fetchWs = async () => {
+      try {
+        const { data, error } = await client.rpc("my_workspaces", {
+          target_user_id: effectiveUserId,
+        });
+        if (!error && Array.isArray(data)) {
+          return { data: data as { id: string; name: string }[], error: null };
+        }
+      } catch {
+        // fallback
+      }
+      return client.from("workspaces").select("id,name");
+    };
+
     void Promise.all([
-      client.from("workspaces").select("id,name"),
+      fetchWs(),
       client.from("clients").select("id,workspace_id"),
       // Every column the view exposes, rather than a list. `title` arrives
       // with migration 20260915080000, and a build that names it against a
@@ -306,19 +361,23 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
         .select("workspace_id,status,created_at")
         .order("created_at", { ascending: false })
         .limit(200),
-    ]).then(([w, c, ch, j]) => {
+      client.from("subscriptions").select("workspace_id,plan_key"),
+    ]).then(([w, c, ch, j, s]) => {
       if (!active) return;
-      setLoadedWorkspaceUserId(session.user.id);
+      setLoadedWorkspaceUserId(effectiveUserId);
       if (w.error) say("page", S.workspacesLoadFailed);
       else setWorkspaces(w.data ?? []);
       setClients(c.data ?? []);
       setChannels(ch.data ?? []);
       setJobs(j.data ?? []);
+      setSubscriptions(
+        (s?.data as { workspace_id: string; plan_key: string }[]) ?? [],
+      );
     });
     return () => {
       active = false;
     };
-  }, [session, reloads]);
+  }, [session, effectiveUserId, reloads]);
   async function auth(
     action: AuthAction,
     creds: { email: string; password: string },
@@ -342,6 +401,19 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
       setBusy(null);
     }
   }
+  /** The lookup refusal, in the reader's language. The server's codes are
+   *  the ones the lookup function raises; anything else is a failure to
+   *  reach it, which reads as the same sentence the other doors use. */
+  const lookupErrorMessage = (code: string) =>
+    code === "lookup_not_configured"
+      ? S.addChannelNotConfigured
+      : code === "quota_exceeded"
+        ? S.addChannelQuota
+        : code === "invalid_query"
+          ? S.addChannelQueryInvalid
+          : code === "channel_not_public" || code === "channel_not_found"
+            ? S.channelNotFoundOnPlatform
+            : S.addChannelFailed;
   async function createWorkspace(e: FormEvent) {
     e.preventDefault();
     setBusy("create");
@@ -354,13 +426,30 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
         say("create", S.createWorkspaceFailed);
         return;
       }
-      const { data, error: loadError } = await client
-        .from("workspaces")
-        .select("id,name");
-      if (loadError) say("create", S.createWorkspaceListFailed);
+      const [wRes, cRes] = await Promise.all([
+        (async () => {
+          try {
+            const { data, error } = await client.rpc("my_workspaces", {
+              target_user_id: effectiveUserId,
+            });
+            if (!error && Array.isArray(data)) {
+              return {
+                data: data as { id: string; name: string }[],
+                error: null,
+              };
+            }
+          } catch {
+            // fallback
+          }
+          return client.from("workspaces").select("id,name");
+        })(),
+        client.from("clients").select("id,workspace_id"),
+      ]);
+      if (wRes.error || cRes.error) say("create", S.createWorkspaceListFailed);
       else {
-        setWorkspaces(data ?? []);
-        void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+        setWorkspaces(wRes.data ?? []);
+        setClients(cRes.data ?? []);
+        workspacesChanged();
         setName("");
         say("create", S.createWorkspaceDone);
       }
@@ -400,20 +489,36 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
           <PlanPanel
             session={session}
             workspaces={workspaces}
-            loading={loadedWorkspaceUserId !== session.user.id}
+            loading={loadedWorkspaceUserId !== effectiveUserId}
           />
           <Workspaces
-            loading={loadedWorkspaceUserId !== session.user.id}
+            loading={loadedWorkspaceUserId !== effectiveUserId}
             workspaces={workspaces}
             card={(w, i) => {
               const workspaceClient = clients.find(
                 (c) => c.workspace_id === w.id,
               );
               const scope: Scope = `ws:${w.id}`;
+              const sub = subscriptions.find((s) => s.workspace_id === w.id);
+              const plan = catalogue.data?.find((p) => p.key === sub?.plan_key);
+              const isPlatformAdmin = Boolean(
+                !isImpersonating && session && access.data === true,
+              );
+              // "لا أملك القناة" (Public channel tracking) is an internal experiment under testing.
+              // It has not been published to standard users or included in any customer plan yet,
+              // so it is strictly restricted to the platform owner when not impersonating a regular user.
+              const allowPublicChannels = Boolean(
+                !isImpersonating &&
+                  (isPlatformAdmin ||
+                    (plan
+                      ? plan.allow_public_channels
+                      : sub?.plan_key === "owner")),
+              );
               return (
                 <WorkspaceCard
                   key={w.id}
                   workspace={w}
+                  allowPublicChannels={allowPublicChannels}
                   tourAnchor={i === 0 ? "workspace" : undefined}
                   hasClient={!!workspaceClient}
                   channel={
@@ -441,20 +546,19 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                     if (!channel) return;
                     setBusy(scope);
                     setNote(null);
-                    void client
-                      .rpc("oauth_disconnect", {
-                        w: w.id,
-                        channel: channel.channel_id,
-                      })
-                      .then(({ error }) => {
-                        setBusy(null);
-                        setAsking(null);
-                        say(
-                          scope,
-                          error ? S.disconnectFailed : S.disconnectDone,
-                        );
-                        if (!error) setReloads((n) => n + 1);
-                      });
+                    const isOAuth = channel.status === "connected";
+                    const rpcName = isOAuth
+                      ? "oauth_disconnect"
+                      : "remove_channel";
+                    const rpcArgs = isOAuth
+                      ? { w: w.id, channel: channel.channel_id }
+                      : { w: w.id, c: channel.channel_id };
+                    void client.rpc(rpcName, rpcArgs).then(({ error }) => {
+                      setBusy(null);
+                      setAsking(null);
+                      say(scope, error ? S.disconnectFailed : S.disconnectDone);
+                      if (!error) setReloads((n) => n + 1);
+                    });
                   }}
                   renaming={asking?.ws === w.id && asking.what === "rename"}
                   onRename={(step, name) => {
@@ -516,21 +620,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                         }
                       : undefined
                   }
-                  confirmingConnect={
-                    asking?.ws === w.id && asking.what === "connect"
-                  }
-                  onConnect={(step) => {
-                    // The redirect goes to Google, which shows its own two
-                    // warnings while this application is pending Google's
-                    // review — the question here says so before the reader
-                    // ever leaves this page, rather than after they land on
-                    // an alarming screen with no context.
-                    if (step !== "continue") {
-                      setAsking(
-                        step === "ask" ? { ws: w.id, what: "connect" } : null,
-                      );
-                      return;
-                    }
+                  onConnect={() => {
                     if (!workspaceClient) return;
                     setBusy(scope);
                     setNote(null);
@@ -544,6 +634,136 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                       else window.location.assign(out.url);
                     });
                   }}
+                  addingChannel={
+                    asking?.ws === w.id && asking.what === "addchannel"
+                  }
+                  channelCandidates={
+                    lookup.ws === w.id ? lookup.candidates : null
+                  }
+                  channelLookupError={lookup.ws === w.id ? lookup.error : null}
+                  onAddChannel={(
+                    step,
+                    value,
+                    candidate,
+                    platform?: SourcePlatform,
+                  ) => {
+                    if (step === "open") {
+                      setAsking({ ws: w.id, what: "addchannel" });
+                      setLookup({ ws: w.id, candidates: null, error: null });
+                      return;
+                    }
+                    if (step === "cancel") {
+                      setAsking(null);
+                      setLookup({ ws: w.id, candidates: null, error: null });
+                      return;
+                    }
+                    if (step === "clear-error") {
+                      setLookup((prev) => ({ ...prev, error: null }));
+                      return;
+                    }
+                    if (step === "search") {
+                      const q = (value ?? "").trim();
+                      if (!q) {
+                        setLookup({
+                          ws: w.id,
+                          candidates: null,
+                          error: S.addChannelQueryInvalid,
+                        });
+                        return;
+                      }
+                      setLookup({ ws: w.id, candidates: null, error: null });
+                      setBusy(scope);
+                      setNote(null);
+                      void client.functions
+                        .invoke("channel-lookup", {
+                          body: {
+                            workspace_id: w.id,
+                            query: q,
+                            platform: platform ?? "youtube",
+                          },
+                        })
+                        .then(async ({ data, error }) => {
+                          setBusy(null);
+                          if (error) {
+                            console.error("Channel lookup failed:", error);
+                            setLookup({
+                              ws: w.id,
+                              candidates: null,
+                              error: lookupErrorMessage(
+                                await lookupCode(error),
+                              ),
+                            });
+                            return;
+                          }
+                          const parsed =
+                            ChannelLookupResponseSchema.safeParse(data);
+                          if (!parsed.success) {
+                            console.error(
+                              "Channel lookup schema mismatch:",
+                              parsed.error,
+                              data,
+                            );
+                          }
+                          setLookup({
+                            ws: w.id,
+                            candidates: parsed.success
+                              ? parsed.data.candidates
+                              : null,
+                            error: parsed.success ? null : S.addChannelFailed,
+                          });
+                        });
+                      return;
+                    }
+                    // step === "add": file the candidate. The RPC re-checks
+                    // the role and the tenant and re-validates the id; the
+                    // conflict paths — the same channel again, or one this
+                    // workspace already holds under another client — read as
+                    // "already added" rather than as a failure.
+                    if (!workspaceClient || !candidate) return;
+                    setBusy(scope);
+                    setNote(null);
+                    void client
+                      .rpc("register_public_channel", {
+                        w: w.id,
+                        c: workspaceClient.id,
+                        external: candidate.external_channel_id,
+                        handle: candidate.handle,
+                        title: candidate.title,
+                        p_platform: candidate.platform ?? "youtube",
+                      })
+                      .then(({ data, error }) => {
+                        setBusy(null);
+                        if (error) {
+                          say(
+                            scope,
+                            /channel_claimed_by_other_client/.test(
+                              error.message,
+                            )
+                              ? S.addChannelExists
+                              : S.addChannelFailed,
+                          );
+                          return;
+                        }
+                        const newChannelId = (data as { id?: string } | null)
+                          ?.id;
+                        if (newChannelId) {
+                          void client
+                            .rpc("request_discovery", {
+                              w: w.id,
+                              c: newChannelId,
+                            })
+                            .then(() => {});
+                        }
+                        setAsking(null);
+                        setLookup({
+                          ws: "",
+                          candidates: null,
+                          error: null,
+                        });
+                        say(scope, S.addChannelDone);
+                        setReloads((n) => n + 1);
+                      });
+                  }}
                 />
               );
             }}
@@ -555,7 +775,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
             feedback={feedback("create")}
             onSubmit={createWorkspace}
             tourAnchor={
-              loadedWorkspaceUserId === session.user.id &&
+              loadedWorkspaceUserId === effectiveUserId &&
               workspaces.length === 0
                 ? "workspace"
                 : undefined
@@ -602,10 +822,16 @@ function DemoAccount() {
  *  ever "working…" — the note lands on the next render. */
 function DemoBody({ initial }: { initial: AccountDemo }) {
   const S = useStrings();
+  const [searchParams] = useSearchParams();
   const [state, setState] = useState<AccountDemo>(initial);
   const { setNote, say, feedback, pending } = useFeedback(null);
   const [name, setName] = useState("");
   const [asking, setAsking] = useState<Asking>(null);
+  const [lookup, setLookup] = useState<{
+    ws: string;
+    candidates: ChannelCandidate[] | null;
+    error: string | null;
+  }>({ ws: "", candidates: null, error: null });
   /** One action over the current rows; `onRefused` maps the reducer's
    *  refusal to the sentence the live page would print for the RPC's.
    *  Optional: `reduceAccountDemo` only ever throws for `rename` and
@@ -660,10 +886,20 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
         card={(w, i) => {
           const scope: Scope = `ws:${w.id}`;
           const hasClient = state.clients.some((c) => c.workspace_id === w.id);
+          const usage = state.usage[w.id];
+          const isOwnerOrAdmin =
+            searchParams.get("owner") === "1" ||
+            searchParams.get("admin") === "1";
+          const allowPublicChannels = Boolean(
+            isOwnerOrAdmin ||
+              usage?.plan?.allow_public_channels ||
+              usage?.plan_key === "owner",
+          );
           return (
             <WorkspaceCard
               key={w.id}
               workspace={w}
+              allowPublicChannels={allowPublicChannels}
               tourAnchor={i === 0 ? "workspace" : undefined}
               hasClient={hasClient}
               channel={
@@ -724,22 +960,62 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
                     ),
                 );
               }}
-              confirmingConnect={
-                asking?.ws === w.id && asking.what === "connect"
-              }
-              onConnect={(step) => {
-                if (step !== "continue") {
-                  setAsking(
-                    step === "ask" ? { ws: w.id, what: "connect" } : null,
-                  );
-                  return;
-                }
+              onConnect={() => {
                 // Google's consent screen is a full navigation the demo
                 // cannot make; the card says so where the redirect would
-                // have started, and the question closes.
+                // have started.
                 act({ type: "connect", w: w.id }, () =>
                   say(scope, S.demoExternalNote),
                 );
+              }}
+              addingChannel={
+                asking?.ws === w.id && asking.what === "addchannel"
+              }
+              channelCandidates={lookup.ws === w.id ? lookup.candidates : null}
+              channelLookupError={lookup.ws === w.id ? lookup.error : null}
+              onAddChannel={(step, value, _candidate, platform) => {
+                if (step === "open") {
+                  setAsking({ ws: w.id, what: "addchannel" });
+                  setLookup({ ws: w.id, candidates: null, error: null });
+                  return;
+                }
+                if (step === "cancel") {
+                  setAsking(null);
+                  setLookup({ ws: w.id, candidates: null, error: null });
+                  return;
+                }
+                if (step === "clear-error") {
+                  setLookup((prev) => ({ ...prev, error: null }));
+                  return;
+                }
+                if (step === "search") {
+                  const q = (value ?? "").trim();
+                  if (!q) {
+                    setLookup({
+                      ws: w.id,
+                      candidates: null,
+                      error: S.addChannelQueryInvalid,
+                    });
+                    return;
+                  }
+                  setLookup({
+                    ws: w.id,
+                    candidates: [
+                      {
+                        platform: platform ?? "youtube",
+                        external_channel_id: "UC_demo_preview_channel",
+                        title: `${q} (قناة توضيحية)`,
+                        handle: `@${q.replace(/^@/, "")}`,
+                        thumbnail_url: null,
+                      },
+                    ],
+                    error: null,
+                  });
+                  return;
+                }
+                if (step === "add") {
+                  say(scope, S.demoExternalNote);
+                }
               }}
             />
           );

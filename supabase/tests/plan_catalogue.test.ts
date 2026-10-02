@@ -136,4 +136,57 @@ describe("plan catalogue", () => {
       /permission denied|forbidden/,
     );
   });
+
+  it("exposes allow_public_channels and allows platform admin to toggle it via set_plan_public_channels", async () => {
+    await db.exec("reset role");
+    await db.query("insert into private.platform_admins(user_id) values ($1)", [
+      OWNER,
+    ]);
+    await as(OWNER);
+
+    // Read admin catalogue to verify default allow_public_channels
+    const initial = await db.query<{
+      admin_plan_catalogue: { key: string; allow_public_channels: boolean }[];
+    }>("select admin_plan_catalogue()");
+    const plans = initial.rows[0].admin_plan_catalogue;
+
+    const ownerPlan = plans.find((p) => p.key === "owner");
+    const creatorPlan = plans.find((p) => p.key === "creator");
+
+    expect(ownerPlan?.allow_public_channels).toBe(true);
+    expect(creatorPlan?.allow_public_channels).toBe(false);
+
+    // Admin grants creator plan access to public channels
+    const updateRes = await db.query<{
+      set_plan_public_channels: {
+        ok: boolean;
+        plan_key: string;
+        allow_public_channels: boolean;
+      };
+    }>("select set_plan_public_channels('creator', true)");
+    expect(updateRes.rows[0].set_plan_public_channels).toEqual({
+      ok: true,
+      plan_key: "creator",
+      allow_public_channels: true,
+    });
+
+    // Verify change reflected in catalogue
+    const updated = await db.query<{
+      admin_plan_catalogue: { key: string; allow_public_channels: boolean }[];
+    }>("select admin_plan_catalogue()");
+    const updatedCreator = updated.rows[0].admin_plan_catalogue.find(
+      (p) => p.key === "creator",
+    );
+    expect(updatedCreator?.allow_public_channels).toBe(true);
+
+    // Non-admin is refused
+    await db.exec("reset role");
+    await db.query("delete from private.platform_admins where user_id=$1", [
+      OWNER,
+    ]);
+    await as(OWNER);
+    await expect(
+      db.query("select set_plan_public_channels('creator', false)"),
+    ).rejects.toThrow(/forbidden/);
+  });
 });

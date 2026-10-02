@@ -9,6 +9,8 @@
  * (they are a pure function of the filtered rows, computed once and passed
  * down) and the chart `data` objects are unchanged.
  */
+import { useEffect, useRef } from "react";
+import type { Chart as ChartJS } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
 import { plottable, type Bucketed } from "../analytics";
 import { Card } from "../ui/Card";
@@ -34,11 +36,57 @@ export function Timing({
   weekdays: Bucketed;
   weeks: Bucketed;
 }) {
+  const peakHourBucket = [...hours.buckets].sort(
+    (a, b) => b.count - a.count,
+  )[0];
+  const peakDayBucket = [...weekdays.buckets].sort(
+    (a, b) => b.count - a.count,
+  )[0];
+  const maxHour = Math.max(0, ...hours.buckets.map((b) => b.count));
+  const maxDay = Math.max(0, ...weekdays.buckets.map((b) => b.count));
+  const hasTimingData =
+    peakHourBucket &&
+    peakHourBucket.count > 0 &&
+    peakDayBucket &&
+    peakDayBucket.count > 0;
+
+  const weeklyChartRef = useRef<ChartJS<"line"> | null>(null);
+  const hourlyChartRef = useRef<ChartJS<"bar"> | null>(null);
+  const weekdayChartRef = useRef<ChartJS<"bar"> | null>(null);
+
+  useEffect(() => {
+    weeklyChartRef.current?.resize();
+    hourlyChartRef.current?.resize();
+    weekdayChartRef.current?.resize();
+  }, [weeks, hours, weekdays]);
+
   return (
     <section className="db-section" id="rp-timing">
       <header>
-        <h2>{S.timingTitle}</h2>
+        <h2>{S.secTimingTitle}</h2>
         <p className="db-lead">{S.timingLead}</p>
+        {hasTimingData && (
+          <div className="db-timing-takeaways" data-testid="timing-takeaways">
+            <div className="db-timing-pill">
+              <span className="db-timing-pill-badge">{S.timingPeakBadge}</span>
+              <span className="db-timing-pill-text">
+                {S.timingPeakHeadline(
+                  peakDayBucket.label,
+                  peakHourBucket.label,
+                  n(peakHourBucket.count),
+                )}
+              </span>
+            </div>
+            <div className="db-timing-meta-pills">
+              <span className="db-timing-subpill">
+                {S.timingDayPeak(peakDayBucket.label)}
+              </span>
+              <span className="db-timing-subpill">
+                {S.timingHourPeak(peakHourBucket.label)}
+              </span>
+            </div>
+          </div>
+        )}
       </header>
       <div className="db-grid--charts">
         <Card>
@@ -55,6 +103,7 @@ export function Timing({
               data-testid="chart-weekly"
             >
               <Line
+                ref={weeklyChartRef}
                 data={{
                   labels: weeks.buckets.map((b) => b.label),
                   datasets: [
@@ -99,12 +148,17 @@ export function Timing({
               data-testid="chart-hourly"
             >
               <Bar
+                ref={hourlyChartRef}
                 data={{
                   labels: hours.buckets.map((b) => b.label),
                   datasets: [
                     {
                       data: hours.buckets.map((b) => b.count),
-                      backgroundColor: VOLUME,
+                      backgroundColor: hours.buckets.map((b) =>
+                        b.count > 0 && b.count === maxHour
+                          ? VOLUME
+                          : "rgba(75, 52, 201, 0.35)",
+                      ),
                       borderRadius: 4,
                     },
                   ],
@@ -140,12 +194,17 @@ export function Timing({
               data-testid="chart-weekday"
             >
               <Bar
+                ref={weekdayChartRef}
                 data={{
                   labels: weekdays.buckets.map((b) => b.label),
                   datasets: [
                     {
                       data: weekdays.buckets.map((b) => b.count),
-                      backgroundColor: VOLUME,
+                      backgroundColor: weekdays.buckets.map((b) =>
+                        b.count > 0 && b.count === maxDay
+                          ? VOLUME
+                          : "rgba(75, 52, 201, 0.35)",
+                      ),
                       borderRadius: 4,
                     },
                   ],

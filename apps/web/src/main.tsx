@@ -15,6 +15,7 @@ import {
   Link,
   Outlet,
   useLocation,
+  Navigate,
 } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DirectionProvider } from "@radix-ui/react-direction";
@@ -38,6 +39,7 @@ import { BrandMark } from "./BrandMark";
 import { useSession } from "./session";
 import { useIsPlatformAdmin } from "./adminAccess";
 import { ToastHost } from "./ui/Toast";
+import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { carriedSearch } from "./workspaceUrl";
 import {
   applyToDocument,
@@ -53,6 +55,9 @@ import { LegalLinks } from "./LegalLinks";
 import { publicPath, resolvePublicPath } from "./publicPaths";
 import { publicRoutes } from "./publicRoutes";
 import { SessionControl } from "./SessionControl";
+import { AdminInspectionBanner } from "./AdminInspectionBanner";
+import { ImpersonationBanner } from "./ImpersonationBanner";
+import { ImpersonationProvider, useImpersonation } from "./impersonation";
 import { TourProvider } from "./tour/TourProvider";
 import { TourEntry } from "./tour/TourEntry";
 const Dashboard = lazy(() =>
@@ -86,8 +91,16 @@ const AdminChannels = lazy(() =>
     default: m.AdminChannelsPage,
   })),
 );
+const AdminPlans = lazy(() =>
+  import("./admin/AdminPlansPage").then((m) => ({ default: m.AdminPlansPage })),
+);
 const AdminOps = lazy(() =>
   import("./admin/AdminOpsPage").then((m) => ({ default: m.AdminOpsPage })),
+);
+const AdminServices = lazy(() =>
+  import("./admin/AdminServicesPage").then((m) => ({
+    default: m.AdminServicesPage,
+  })),
 );
 const AdminAudit = lazy(() =>
   import("./admin/AdminAuditPage").then((m) => ({ default: m.AdminAuditPage })),
@@ -98,7 +111,12 @@ const LegalPage = lazy(() =>
   import("./LegalPage").then((m) => ({ default: m.LegalPage })),
 );
 const client = new QueryClient({
-  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  defaultOptions: {
+    queries: {
+      retry: (failureCount) => failureCount < 1,
+      refetchOnWindowFocus: false,
+    },
+  },
 });
 
 function NavIcon({ to }: { to: string }) {
@@ -275,9 +293,10 @@ function AppLayout() {
   const S = useStrings();
   // Signed out, nothing is asked; signed in, one query the admin page shares.
   const { session } = useSession();
+  const { isImpersonating } = useImpersonation();
   const access = useIsPlatformAdmin(session);
   const destinations = DESTINATIONS.filter(
-    (d) => !("admin" in d) || access.data === true,
+    (d) => !("admin" in d) || (access.data === true && !isImpersonating),
   );
   // The language lands on <html> before paint, where CSS `:lang()` and the
   // bidi algorithm read it. The shell is the only surface that speaks two
@@ -320,6 +339,8 @@ function AppLayout() {
           <span>{S.announcementLead}</span>
           <LanguageSwitch />
         </div>
+        <AdminInspectionBanner />
+        <ImpersonationBanner />
         {/* A rail, not a bar.
             Four links across the top said "this is a page with some links on
             it"; a standing rail says "this is a product, and these are its
@@ -407,18 +428,20 @@ function AppLayout() {
           </div>
         </aside>
         <main id="content" className="app-main">
-          <Suspense
-            fallback={
-              <div className="app-state" role="status">
-                <span className="app-state-symbol" aria-hidden="true">
-                  ◌
-                </span>
-                <p>{S.pageOpening}</p>
-              </div>
-            }
-          >
-            <Outlet />
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense
+              fallback={
+                <div className="app-state" role="status">
+                  <span className="app-state-symbol" aria-hidden="true">
+                    ◌
+                  </span>
+                  <p>{S.pageOpening}</p>
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </main>
         <footer className="app-footer">
           <div>
@@ -463,33 +486,45 @@ function DirectionRoot({ children }: { children: React.ReactNode }) {
   );
 }
 
+function OpsRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/sync${location.search}${location.hash}`} replace />;
+}
+
 /** Everything under the router, for either way of mounting it. */
 const app = (
   <React.StrictMode>
     <QueryClientProvider client={client}>
       <DirectionRoot>
         <BrowserRouter>
-          <Routes>
-            {/* The public pages, beside the landing and not inside the
-                shell: read signed out, in the language their address names,
-                and served prerendered — see publicPaths.ts. The pricing and
-                legal pages load on demand. */}
-            {publicRoutes({ Landing, Pricing, LegalPage }, (element) => (
-              <Suspense fallback={null}>{element}</Suspense>
-            ))}
-            <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/account" element={<Account />} />
-              <Route path="/sync" element={<Sync />} />
-              <Route path="/connected" element={<Connected />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              <Route path="/admin/channels" element={<AdminChannels />} />
-              <Route path="/admin/ops" element={<AdminOps />} />
-              <Route path="/admin/audit" element={<AdminAudit />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
+          <ImpersonationProvider>
+            <ErrorBoundary>
+              <Routes>
+                {/* The public pages, beside the landing and not inside the
+                    shell: read signed out, in the language their address names,
+                    and served prerendered — see publicPaths.ts. The pricing and
+                    legal pages load on demand. */}
+                {publicRoutes({ Landing, Pricing, LegalPage }, (element) => (
+                  <Suspense fallback={null}>{element}</Suspense>
+                ))}
+                <Route element={<AppLayout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/account" element={<Account />} />
+                  <Route path="/sync" element={<Sync />} />
+                  <Route path="/ops" element={<OpsRedirect />} />
+                  <Route path="/connected" element={<Connected />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/admin/users" element={<AdminUsers />} />
+                  <Route path="/admin/channels" element={<AdminChannels />} />
+                  <Route path="/admin/plans" element={<AdminPlans />} />
+                  <Route path="/admin/ops" element={<AdminOps />} />
+                  <Route path="/admin/services" element={<AdminServices />} />
+                  <Route path="/admin/audit" element={<AdminAudit />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
+              </Routes>
+            </ErrorBoundary>
+          </ImpersonationProvider>
         </BrowserRouter>
         <ToastHost />
       </DirectionRoot>

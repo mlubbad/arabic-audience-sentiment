@@ -53,7 +53,7 @@ export function Videos({
   return (
     <section className="db-section" id="rp-videos">
       <header>
-        <h2>{S.secVideos}</h2>
+        <h2>{S.secVideosTitle}</h2>
         <p className="db-lead">{S.videosLead}</p>
       </header>
       <div className="db-videos">
@@ -98,8 +98,47 @@ export function Videos({
                 }
               }}
             >
-              <h3 className="db-card-title">{videoLabel(v.id, v.title)}</h3>
+              <div className="db-video-header">
+                {v.thumbnail_url && (
+                  <img
+                    src={v.thumbnail_url}
+                    alt=""
+                    className="db-video-thumbnail"
+                    loading="lazy"
+                  />
+                )}
+                <h3 className="db-card-title">{videoLabel(v.id, v.title)}</h3>
+              </div>
               <div className="db-row-actions">
+                {v.id === s.videos[0]?.id && s.videos.length > 1 && (
+                  <Badge tone="warning">{S.videoTagTopVolume}</Badge>
+                )}
+                {v.analysed >= 5 &&
+                  v.sentiments.negative / v.analysed >= 0.3 && (
+                    <Badge tone="negative">{S.videoTagHighNegative}</Badge>
+                  )}
+                {v.analysed >= 5 &&
+                  v.sentiments.positive / v.analysed >= 0.7 && (
+                    <Badge tone="positive">{S.videoTagTopPositive}</Badge>
+                  )}
+                {v.view_count != null && (
+                  <Badge numeric>
+                    {n(v.view_count)} {S.kpiViews}
+                  </Badge>
+                )}
+                {v.like_count != null && (
+                  <Badge numeric>
+                    {n(v.like_count)} {S.kpiLikes}
+                  </Badge>
+                )}
+                {v.view_count != null && v.view_count > 0 && (
+                  <Badge numeric tone="sentiment-neutral">
+                    {Math.round(
+                      (((v.like_count ?? 0) + v.total) / v.view_count) * 1000,
+                    ) / 10}
+                    ٪ {S.kpiEngagement}
+                  </Badge>
+                )}
                 <Badge numeric>{S.countComments(n(v.total))}</Badge>
                 <Badge numeric>{S.countReplies(n(v.replies))}</Badge>
                 <Badge numeric>{S.countAnalysed(n(v.analysed))}</Badge>

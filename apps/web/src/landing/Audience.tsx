@@ -71,7 +71,6 @@ export function Audience({ locale }: { locale: Locale }) {
           </span>
           <span className="lp-mini-label">{p.space}</span>
           <div className="lp-video-row">
-            <span className="lp-youtube">▶</span>
             <div>
               <b>{S.lpVideoRow}</b>
               <i />

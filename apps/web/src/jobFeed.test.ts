@@ -133,9 +133,30 @@ describe("describeJob", () => {
       ar.jobGeminiBadResponse,
     );
     expect(explainCode("gemini_refused", ar)).toBe(ar.jobGeminiRefused);
+    expect(explainCode("gemini_credits_depleted", ar)).toBe(
+      ar.jobGeminiCreditsDepleted,
+    );
     expect(explainCode("topic_model_not_active", ar)).toBe(
       ar.jobTopicModelNotActive,
     );
+    expect(explainCode("telegram_discussion_requires_auth", ar)).toBe(
+      ar.jobTelegramDiscussionRequiresAuth,
+    );
+  });
+
+  it("names a discover job as catalogue and does not promise comments", () => {
+    const discover = describeJob(
+      {
+        ...row(),
+        type: "discover",
+        status: "succeeded",
+      },
+      { workerConnected: true },
+      ar,
+    );
+    expect(discover.headline).toContain(ar.jobKindCatalogue);
+    expect(discover.detail).toBe(ar.jobCatalogueSucceededDetail);
+    expect(discover.detail).not.toContain("تعليق");
   });
 });
 

@@ -52,11 +52,36 @@ export function People({
           {people.ranked.slice(0, 20).map((c, i) => (
             <li key={c.key} data-testid={`rp-person-${i}`}>
               <Card className="db-person">
-                <span className="db-rank">{i + 1}</span>
+                <span className={i === 0 ? "db-rank db-rank--top" : "db-rank"}>
+                  {i + 1}
+                </span>
+                {c.avatar_url ? (
+                  <img
+                    src={c.avatar_url}
+                    alt=""
+                    className="db-person-avatar"
+                    loading="lazy"
+                  />
+                ) : (
+                  <span className="db-person-avatar-fallback">
+                    {c.name.slice(0, 1)}
+                  </span>
+                )}
                 {/* `<bdi>` keeps a Latin handle reading left-to-right
                     (`@abu_faisal`, not `abu_faisal@`) inside the RTL row. */}
                 <span className="db-person-name">
-                  <bdi>{c.name}</bdi>
+                  {c.channel_url ? (
+                    <a
+                      href={c.channel_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="db-person-link"
+                    >
+                      <bdi>{c.name}</bdi>
+                    </a>
+                  ) : (
+                    <bdi>{c.name}</bdi>
+                  )}
                 </span>
                 <Badge numeric>{S.countComments(n(c.comments))}</Badge>
                 <span className="db-person-likes">
@@ -79,7 +104,7 @@ export function People({
   return (
     <section className="db-section" id="rp-people">
       <header>
-        <h2>{S.secPeople}</h2>
+        <h2>{S.secPeopleTitle}</h2>
         <p className="db-lead">{S.peopleLead}</p>
       </header>
       <Tabs value={by} onValueChange={(v) => onBy(v as "comments" | "likes")}>

@@ -30,7 +30,26 @@ describe("cross-origin permission", () => {
     expect(response.headers.get("access-control-allow-headers")).toContain(
       "authorization",
     );
+    expect(response.headers.get("access-control-allow-headers")).toContain(
+      "x-client-info",
+    );
     expect(preflight(from("https://app.sky-develop.net"), ALLOWED)).toBeNull();
+
+    // When the browser asks for specific headers via access-control-request-headers
+    const preflightWithReqHeaders = preflight(
+      new Request("https://x.invalid/channel-lookup", {
+        method: "OPTIONS",
+        headers: {
+          origin: "https://app.sky-develop.net",
+          "access-control-request-headers":
+            "authorization, content-type, apikey, x-client-info",
+        },
+      }),
+      ALLOWED,
+    )!;
+    expect(
+      preflightWithReqHeaders.headers.get("access-control-allow-headers"),
+    ).toBe("authorization, content-type, apikey, x-client-info");
   });
 
   it("gives permission to our origins and to no others", () => {

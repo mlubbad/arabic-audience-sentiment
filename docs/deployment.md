@@ -41,20 +41,42 @@ channel, with RLS deciding which rows that means.
 So the deployed page carries three layers between a passer-by and real data: the host's basic
 auth, a session, and row-level security. Only the last of those is load-bearing.
 
-## Redeploying
+## Deployment and CI/CD Pipeline
+
+Deployment is automated via **GitHub Actions** (`.github/workflows/deploy.yml`), with manual local fallback when needed.
+
+### 1. Primary: Automated CI/CD (Continuous Deployment)
+
+Pushing to `main` triggers `.github/workflows/deploy.yml` (and it can be dispatched manually from GitHub Actions tab).
+The pipeline:
+1. Installs pinned dependencies (`npm ci`).
+2. Runs the production build (`npm run build`).
+3. Evaluates GitHub Secrets:
+   - If `PREVIEW_FTP_*` secrets are configured: runs `scripts/deploy-preview.sh` over FTPS to `app.sky-develop.net`.
+   - If `SUPABASE_ACCESS_TOKEN` is configured: executes `npm run db:migrate:remote` (`scripts/apply-migrations-remote.mjs`) to apply pending migrations transactionally to the remote Supabase project.
+
+#### Required GitHub Secrets (Settings ➔ Secrets and variables ➔ Actions):
+- `PREVIEW_FTP_HOST`: DirectAdmin/FTP hostname for the preview host.
+- `PREVIEW_FTP_USER`: FTP username for preview document root.
+- `PREVIEW_FTP_PASSWORD`: FTP password.
+- `SUPABASE_ACCESS_TOKEN`: *(Optional)* Personal access token for automated Supabase Management API database migrations.
+
+### 2. Secondary: Manual Local Deployment Fallback
+
+If you need to trigger deployment or migrations directly from this checkout:
 
 ```bash
+# Deploy web frontend to preview host:
 npm run build
 npm run deploy:preview
+
+# Apply pending database migrations to live Supabase project:
+npm run db:migrate:remote
 ```
 
-Credentials come from `.env.local`, which is gitignored. The FTP account is scoped to the
-preview document root, so a mistake in the deploy script cannot reach the other sites on this
-shared host — and there are several, including a live WordPress install on the main domain.
+Credentials for local execution are read from `.env.local` (or existing shell environment). The FTP account is scoped to the preview document root, so a mistake in the deploy script cannot reach the other sites on this shared host.
 
-`--ftp-ssl-control` encrypts the login but not the data channel: this server refuses TLS on
-the data connection. That is acceptable only because everything shipped here is public by
-design. Never send anything else over it.
+`--ftp-ssl-control` encrypts the login but not the data channel: this server refuses TLS on the data connection. That is acceptable only because everything shipped here is public by design. Never send anything else over it.
 
 ## Superseded assets, and two traps in removing them
 

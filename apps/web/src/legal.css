@@ -10,9 +10,12 @@
 }
 .legal-head h1 {
   font-size: clamp(32px, 4vw, 46px);
-  letter-spacing: -1px;
+  letter-spacing: 0;
   line-height: 1.15;
   margin-bottom: 10px;
+}
+.legal-head h1:lang(en) {
+  letter-spacing: -1px;
 }
 .legal-head {
   padding-bottom: 6px;

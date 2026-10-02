@@ -22,12 +22,14 @@ import type { Strings } from "../strings";
 
 export function CataloguePreview({
   video,
+  handle,
   kindLabel,
   onClose,
   returnTo,
   S,
 }: {
   video: CatalogueVideo | null;
+  handle?: string | null;
   /** The kind, already in the reader's words — the owner has the table. */
   kindLabel: string;
   onClose: () => void;
@@ -37,6 +39,9 @@ export function CataloguePreview({
   S: Strings;
 }) {
   const content = useRef<HTMLDivElement | null>(null);
+  const links = video
+    ? videoLinks(video.external_video_id, video.kind, video.platform, handle)
+    : null;
   return (
     <Dialog
       open={!!video}
@@ -72,15 +77,43 @@ export function CataloguePreview({
           <DialogTitle asChild>
             <h3 className="db-preview-title">{video.title}</h3>
           </DialogTitle>
-          <iframe
-            className="db-preview-frame"
-            data-testid="cat-preview-frame"
-            src={videoLinks(video.external_video_id, video.kind).embed}
-            title={video.title}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+          {links?.embed ? (
+            <iframe
+              className="db-preview-frame"
+              data-testid="cat-preview-frame"
+              src={links.embed}
+              title={video.title}
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : (
+            <div
+              className="db-preview-fallback"
+              data-testid="cat-preview-fallback"
+            >
+              {video.thumbnail_url ? (
+                <img
+                  src={video.thumbnail_url}
+                  alt={video.title}
+                  className="db-preview-thumb-img"
+                  data-testid="cat-preview-thumb"
+                />
+              ) : (
+                <div className="db-preview-placeholder">
+                  <span>
+                    {video.platform === "telegram"
+                      ? S.catOpenTelegram
+                      : video.platform === "x"
+                        ? S.catOpenX
+                        : video.platform === "tiktok"
+                          ? S.catOpenTikTok
+                          : S.catOpenYouTube}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           <footer className="db-preview-foot">
             <span>
               {kindLabel}
@@ -88,13 +121,25 @@ export function CataloguePreview({
               {video.reported_comment_count === null
                 ? S.catCountUnknown
                 : video.reported_comment_count}
+              {video.collected > 0 && (
+                <>
+                  {" · "}
+                  {S.catPreviewCollectedInfo(
+                    video.collected,
+                    video.analysed ?? 0,
+                  )}
+                </>
+              )}
             </span>
-            <a
-              href={videoLinks(video.external_video_id, video.kind).watch}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {S.catOpenYouTube} ↗
+            <a href={links?.watch} target="_blank" rel="noopener noreferrer">
+              {video.platform === "telegram"
+                ? S.catOpenTelegram
+                : video.platform === "x"
+                  ? S.catOpenX
+                  : video.platform === "tiktok"
+                    ? S.catOpenTikTok
+                    : S.catOpenYouTube}{" "}
+              ↗
             </a>
             <small className="db-note">{S.catPreviewHint}</small>
           </footer>

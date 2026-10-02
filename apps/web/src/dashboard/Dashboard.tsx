@@ -13,7 +13,14 @@ import {
   Tooltip,
 } from "chart.js";
 import "../pages.css";
-import { byHour, byWeek, byWeekday, commenters } from "../analytics";
+import {
+  byHour,
+  byWeek,
+  byWeekday,
+  hoursToBucketed,
+  weekdaysToBucketed,
+  weeksToBucketed,
+} from "../analytics";
 import { pageSlice } from "../videoPaging";
 import {
   type Filters,
@@ -22,10 +29,15 @@ import {
 } from "@sentiment/contracts";
 import {
   buildExport,
+  EXPORT_ROW_CAP,
   type DataMode,
   deriveSnapshot,
   fixtureWorkspace,
   loadSource,
+  loadDashboardAggregates,
+  loadDashboardComments,
+  filtersToRpc,
+  toLabelledComment,
   reviewsArePersisted,
   configuredMode,
   resolveMode,
@@ -33,8 +45,10 @@ import {
   submitTopicReview,
 } from "../data";
 import { failureCode } from "../failure";
+import { supabase } from "../supabase";
 import { useSession, useWorkspaces } from "../session";
 import { useWorkspaceSelection } from "../workspaceSelection";
+import { useImpersonation } from "../impersonation";
 import { WorkspaceGate } from "../WorkspaceGate";
 import { workspaceState, readableWorkspace } from "../workspace";
 import { useLocale } from "../locale";
@@ -43,6 +57,7 @@ import { describeSource } from "../dataSource";
 import { useChannelStatus } from "../channelStatus";
 import { latestJobFromSync, setupProgress } from "../setup";
 import { SetupPath } from "../SetupPath";
+import { toast } from "../ui/Toast";
 import { n } from "./format";
 import { FilterBar } from "./FilterBar";
 import { ActiveFilters } from "./ActiveFilters";
@@ -53,9 +68,6 @@ import { Summary } from "./Summary";
 import { Videos } from "./Videos";
 import { Voice } from "./Voice";
 import { Timing } from "./Timing";
-import { People } from "./People";
-import { Compare } from "./Compare";
-import { Engaged } from "./Engaged";
 import { Comments } from "./Comments";
 import { ReviewDialog } from "./ReviewDialog";
 import {
@@ -82,9 +94,10 @@ ChartJS.register(
   Legend,
 );
 
-/** Video cards per page of the videos section. The same size as the comments
- *  pager's default, so the two lists turn at the same rhythm. */
-const VIDEOS_PER_PAGE = 25;
+/** Video cards per page of the videos section. Showing the top 6 busiest
+ *  videos keeps vertical scrolling compact while pagination lets the user
+ *  explore the rest. */
+const VIDEOS_PER_PAGE = 6;
 
 const defaults: Filters = { workspace_id: fixtureWorkspace };
 export type Snapshot = ReturnType<typeof deriveSnapshot>;
@@ -98,10 +111,15 @@ export function Dashboard() {
     loading: workspacesLoading,
     failed: workspacesFailed,
   } = useWorkspaces(session);
+  const { isImpersonating, impersonatedUser } = useImpersonation();
+  const effectiveUserId = isImpersonating
+    ? (impersonatedUser?.id ?? null)
+    : (session?.user.id ?? null);
+
   // One selection for the whole product. This was `useState(null)` here
   // and again in the other page; both routes are lazy, so the answer died
   // on every navigation and the question came back.
-  const [chosen, setChosen] = useWorkspaceSelection(session?.user.id ?? null, {
+  const [chosen, setChosen] = useWorkspaceSelection(effectiveUserId, {
     route: true,
   });
   const S = useStrings();
@@ -112,13 +130,26 @@ export function Dashboard() {
     workspaces,
     selectedId: chosen,
   });
+
+  // Reconcile if the place became ready with a workspace that differs from chosen
+  // (e.g. if the route had a stale admin workspace ws= parameter when switching contexts)
+  useEffect(() => {
+    if (
+      place.kind === "ready" &&
+      chosen !== place.id &&
+      workspaces.length > 0
+    ) {
+      setChosen(place.id);
+    }
+  }, [place, chosen, workspaces.length, setChosen]);
+
   const live = readableWorkspace(place);
   const mode = resolveMode({ signedIn: !!session, workspace: live });
   // In fixture mode the id is the fixture's, never a real one left over from a
   // previous render: a correction addressed to the wrong pair is exactly what
   // the old build-time constant existed to prevent.
   const workspaceId = mode === "live" && live ? live : fixtureWorkspace;
-  const userId = session?.user.id ?? "visitor";
+  const userId = effectiveUserId ?? "visitor";
   // A new identity remounts the whole report, including any open review dialog.
   // No comment or pending correction from a previous tenant survives the switch.
   return (
@@ -176,6 +207,7 @@ function DashboardBody({
   const [replies, setReplies] = useState<"all" | "comments" | "replies">("all");
   const [dateMode, setDateMode] = useState<"all" | "known" | "unknown">("all");
   const [videoKind, setVideoKind] = useState("");
+  const [platform, setPlatform] = useState("");
   const [commentType, setCommentType] = useState("");
   const [reviewStatus, setReviewStatus] = useState<
     "all" | "reviewed" | "unreviewed"
@@ -185,6 +217,9 @@ function DashboardBody({
   // for the filtered set it was produced from.
   const [cursors, setCursors] = useState<string[]>([]);
   const [limit, setLimit] = useState(25);
+  const [cardTab, setCardTab] = useState<"liked" | "recent" | "critical">(
+    "liked",
+  );
   // The videos section's own page, 0-based. It is a slice of a list already
   // in memory, not a cursor, so it is not part of `page` below and does not
   // reach the read. Cleared with the cursors: a page into a filtered list is
@@ -198,22 +233,102 @@ function DashboardBody({
   };
   // Keyed on exactly what the read depends on, and on nothing else.
   //
-  // `dashboard_snapshot(w)` takes a workspace. The filters below are applied
-  // afterwards, here, to rows already in memory — so a filter cannot change
-  // what this request returns. The key used to carry the whole filter object
-  // anyway, which made every filter change a fresh 611KB read of the same
-  // bytes, and every one of those an independent chance to fail while nothing
-  // about the data had changed.
-  //
-  // The identity part is load-bearing and stays: user, mode and workspace are
-  // in the key, so one tenant's rows can never be served from another's cache
-  // entry. That was previously enforced by a placeholder callback comparing
-  // old keys against new; it is now a property of the key itself, which cannot
-  // be got wrong by a later edit to a callback.
+  // In fixture mode (and unit tests where shared cache provides the source),
+  // loadSource provides the full fixture dataset. In live mode, read is disabled
+  // in favour of decoupled RPC aggregations and paginated comment stream.
   const read = useQuery({
     queryKey: ["dashboard-source", userId, mode, workspaceId],
     queryFn: ({ signal }) => loadSource(mode, workspaceId, signal),
+    enabled: mode !== "live",
   });
+
+  const filterParamsKey = useMemo(
+    () => JSON.stringify(filtersToRpc(page)),
+    [page],
+  );
+  const aggregatesQuery = useQuery({
+    queryKey: [
+      "dashboard-aggregates",
+      userId,
+      mode,
+      workspaceId,
+      filterParamsKey,
+    ],
+    queryFn: ({ signal }) =>
+      loadDashboardAggregates(mode, workspaceId, page, signal),
+    enabled: mode === "live" && !read.data,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  const pageOffset = cursors.length * limit;
+  const commentsParamsKey = useMemo(
+    () =>
+      JSON.stringify({
+        ...filtersToRpc(page),
+        offset: pageOffset,
+        limit,
+      }),
+    [page, pageOffset, limit],
+  );
+  const commentsQuery = useQuery({
+    queryKey: [
+      "dashboard-comments",
+      userId,
+      mode,
+      workspaceId,
+      commentsParamsKey,
+    ],
+    queryFn: ({ signal }) =>
+      loadDashboardComments(
+        mode,
+        workspaceId,
+        {
+          ...filtersToRpc(page),
+          offset: pageOffset,
+          limit,
+        },
+        signal,
+      ),
+    enabled:
+      mode === "live" &&
+      !read.data &&
+      (aggregatesQuery.isSuccess || Boolean(aggregatesQuery.data)),
+    retry: 2,
+    retryDelay: (attempt) => attempt * 1000,
+  });
+
+  const cardsParamsKey = useMemo(
+    () =>
+      JSON.stringify({
+        ...filtersToRpc(page),
+        card_tab: cardTab,
+        limit: 12,
+      }),
+    [page, cardTab],
+  );
+  const cardsQuery = useQuery({
+    queryKey: ["dashboard-cards", userId, mode, workspaceId, cardsParamsKey],
+    queryFn: ({ signal }) =>
+      loadDashboardComments(
+        mode,
+        workspaceId,
+        {
+          ...filtersToRpc(page),
+          card_tab: cardTab,
+          limit: 12,
+          offset: 0,
+        },
+        signal,
+      ),
+    enabled:
+      mode === "live" &&
+      !read.data &&
+      (aggregatesQuery.isSuccess || Boolean(aggregatesQuery.data)),
+    retry: 2,
+    retryDelay: (attempt) => attempt * 1000,
+  });
+
   // For the empty state's setup path only; live only, and cheap.
   const channel = useChannelStatus(mode, workspaceId);
   // Filters are a pure function of a read, so they are computed rather than
@@ -234,33 +349,159 @@ function DashboardBody({
       // notice with a way out.
       return { ok: false as const, error: error as Error };
     }
-    // `page` is deliberately absent: `pageKey` is its serialisation, and
-    // listing the object as well would defeat the memo it was serialised for —
-    // `page` is a fresh object on every render.
   }, [read.data, mode, pageKey]);
+
+  const isLiveServer = mode === "live" && !read.data;
+
+  const liveSnapshot = useMemo(() => {
+    if (
+      !isLiveServer ||
+      !aggregatesQuery.data ||
+      !aggregatesQuery.data.timeline
+    )
+      return null;
+    const agg = aggregatesQuery.data;
+    const commentsRes = commentsQuery.data;
+    const commentsList = (commentsRes?.comments ?? []).map((c) =>
+      toLabelledComment(
+        c,
+        agg.active_analysis_key ?? "",
+        agg.active_topic_key ?? "",
+      ),
+    );
+    const totalCount = agg.total;
+    const offset = pageOffset;
+    const hasMore = commentsRes
+      ? commentsRes.has_more
+      : offset + limit < totalCount;
+    const nextCursor = hasMore
+      ? (commentsRes?.next_cursor ?? String(cursors.length + 1))
+      : null;
+
+    const rawMeasurable = (agg.measurable ?? []) as Label[];
+    // A model cannot measure a class it lacks (see migration 20260914120000).
+    // If the active model does not support mixed (e.g. CAMeLBERT-DA is 3-class)
+    // or if mixed is omitted from measurable, ensure mixed is not treated as measurable.
+    const isThreeClass =
+      Boolean(
+        agg.active_analysis_key &&
+          agg.active_analysis_key.toLowerCase().includes("camelbert"),
+      ) || !rawMeasurable.includes("mixed");
+    const measurableLabels = isThreeClass
+      ? rawMeasurable.filter((l) => l !== "mixed")
+      : rawMeasurable;
+
+    return {
+      workspace_total: agg.workspace_total,
+      channel_own_comments: agg.channel_own_comments,
+      total: agg.total,
+      analysed: agg.analysed,
+      unanalysed: agg.unanalysed,
+      sentiments: agg.sentiments,
+      measurable: new Set(measurableLabels),
+      negative_ranked: agg.negative_ranked ?? 0,
+      negative_unranked: agg.negative_unranked ?? 0,
+      timeline: Object.entries(agg.timeline ?? {})
+        .map(([date, total]) => ({ date, total }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      topic_counts: agg.topic_counts ?? {},
+      platform_breakdown: agg.platform_breakdown ?? {},
+      videos: agg.videos ?? [],
+      hours: agg.hours ?? [],
+      weekdays: agg.weekdays ?? [],
+      weeks: agg.weeks ?? [],
+      people: agg.people ?? [],
+      most_engaged_negative: (agg.most_engaged_negative ?? []).map((c) =>
+        toLabelledComment(
+          c,
+          agg.active_analysis_key ?? "",
+          agg.active_topic_key ?? "",
+        ),
+      ),
+      comment_types: agg.comment_types ?? [],
+      video_options: agg.video_options ?? [],
+      topics: agg.topics ?? [],
+      active_analysis_key: agg.active_analysis_key ?? "",
+      active_topic_key: agg.active_topic_key ?? "",
+      revision: agg.revision ?? "",
+      mode,
+      plan: null,
+      sync: null,
+      comments: commentsList,
+      filtered: commentsList,
+      next_cursor: nextCursor,
+      cursor_reset: false,
+      replies: 0,
+      unknown_dates: 0,
+      unique_authors: (agg.people ?? []).length,
+      kpis: agg.kpis,
+      channel: agg.channel,
+      comparison: (agg.videos ?? []).slice(0, 10),
+      comparison_truncated: (agg.videos ?? []).length > 10,
+    } as Snapshot;
+  }, [
+    isLiveServer,
+    aggregatesQuery.data,
+    commentsQuery.data,
+    mode,
+    read.data,
+    pageOffset,
+    limit,
+    cursors.length,
+  ]);
+
   const result = {
-    data: derived?.ok ? derived.value : undefined,
-    isPending: read.isPending,
-    isFetching: read.isFetching,
-    // A read that failed and a filter that cannot be applied are both "this
-    // screen has no answer", and both are recovered from the same button.
-    isError: read.isError || derived?.ok === false,
-    refetch: read.refetch,
-    // Which half failed, and how. Without this the notice is the same sentence
-    // for a lost connection, a server that changed shape and a filter that
-    // cannot be applied — three problems with three different answers, and the
-    // reader is told to try again for all of them.
-    failure: read.isError
-      ? failureCode("read", read.error)
-      : derived?.ok === false
-        ? failureCode("view", derived.error)
-        : null,
+    data: isLiveServer
+      ? (liveSnapshot ?? undefined)
+      : derived?.ok
+        ? derived.value
+        : undefined,
+    isPending: isLiveServer ? aggregatesQuery.isPending : read.isPending,
+    isFetching: isLiveServer
+      ? aggregatesQuery.isFetching || commentsQuery.isFetching
+      : read.isFetching,
+    isError: isLiveServer
+      ? aggregatesQuery.isError ||
+        (commentsQuery.isError &&
+          !aggregatesQuery.isSuccess &&
+          !aggregatesQuery.data)
+      : read.isError || derived?.ok === false,
+    refetch: () => {
+      if (isLiveServer) {
+        if (supabase) {
+          void supabase.auth.refreshSession().finally(() => {
+            aggregatesQuery.refetch();
+            commentsQuery.refetch();
+            cardsQuery.refetch();
+          });
+        } else {
+          aggregatesQuery.refetch();
+          commentsQuery.refetch();
+          cardsQuery.refetch();
+        }
+      } else {
+        read.refetch();
+      }
+    },
+    failure: isLiveServer
+      ? aggregatesQuery.isError
+        ? failureCode("read", aggregatesQuery.error)
+        : !aggregatesQuery.isSuccess &&
+            !aggregatesQuery.data &&
+            commentsQuery.isError
+          ? failureCode("read", commentsQuery.error)
+          : null
+      : read.isError
+        ? failureCode("read", read.error)
+        : derived?.ok === false
+          ? failureCode("view", derived.error)
+          : null,
   };
   // A topic is stored by key and shown by name, in the reader's language. The
   // key is the fallback so a retired or unknown key is still visible as itself
   // rather than as nothing.
   const topicName = (key: string) =>
-    result.data?.topics.find((t) => t.key === key)?.[
+    result.data?.topics?.find((t) => t.key === key)?.[
       lang === "ar" ? "name_ar" : "name_en"
     ] ?? key;
   // Sticky, because recovery re-requests page one and that response no longer
@@ -308,7 +549,12 @@ function DashboardBody({
       // sentiment denominator and the review filter all move together. Keep
       // the form open until the refreshed read is ready: closing it first
       // allowed an immediate reopen to show the old review history.
-      await client.invalidateQueries({ queryKey: ["dashboard-source"] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["dashboard-source"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-aggregates"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-comments"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-cards"] }),
+      ]);
       closeReview();
       setReason("");
     },
@@ -325,14 +571,19 @@ function DashboardBody({
     onSuccess: async () => {
       // The same re-read as a sentiment correction, for the same reason: the
       // chip, the topic chart and the topic filter must move together.
-      await client.invalidateQueries({ queryKey: ["dashboard-source"] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["dashboard-source"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-aggregates"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-comments"] }),
+        client.invalidateQueries({ queryKey: ["dashboard-cards"] }),
+      ]);
       closeReview();
       setReason("");
     },
   });
   const exporting = useMutation({
     mutationFn: () => buildExport(mode, page),
-    onSuccess: ({ csv, filename }) => {
+    onSuccess: ({ csv, filename, truncated, totalRows }) => {
       const url = URL.createObjectURL(
         new Blob([csv], { type: "text/csv;charset=utf-8" }),
       );
@@ -341,6 +592,11 @@ function DashboardBody({
       link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+      if (truncated) {
+        toast({
+          title: S.exportTruncatedNotice(EXPORT_ROW_CAP, totalRows),
+        });
+      }
     },
   });
   function startReview(c: LabelledComment, trigger: HTMLButtonElement) {
@@ -393,6 +649,7 @@ function DashboardBody({
       sentiment?: string;
       topic?: string;
       videoKind?: string;
+      platform?: string;
       replies?: "all" | "comments" | "replies";
       commentType?: string;
       reviewStatus?: "all" | "reviewed" | "unreviewed";
@@ -406,6 +663,7 @@ function DashboardBody({
     const chosenSentiment = over.sentiment ?? sentiment;
     const chosenTopic = over.topic ?? topic;
     const chosenVideoKind = over.videoKind ?? videoKind;
+    const chosenPlatform = over.platform ?? platform;
     const chosenReplies = over.replies ?? replies;
     const chosenCommentType = over.commentType ?? commentType;
     const chosenReviewStatus = over.reviewStatus ?? reviewStatus;
@@ -420,6 +678,7 @@ function DashboardBody({
       q: chosenQuery,
       video_ids: chosenVideo ? [chosenVideo] : [],
       video_kind: (chosenVideoKind || undefined) as Filters["video_kind"],
+      platform: (chosenPlatform || undefined) as Filters["platform"],
       sentiments: chosenSentiment ? [chosenSentiment as Label] : [],
       topics: chosenTopic ? [chosenTopic] : [],
       replies: chosenReplies,
@@ -467,6 +726,7 @@ function DashboardBody({
     setReplies("all");
     setDateMode("all");
     setVideoKind("");
+    setPlatform("");
     setCommentType("");
     setReviewStatus("all");
     setCursorNotice(false);
@@ -485,6 +745,7 @@ function DashboardBody({
     sentiment,
     topic,
     videoKind,
+    platform,
     replies,
     commentType,
     reviewStatus,
@@ -499,6 +760,7 @@ function DashboardBody({
     if ("sentiment" in p) setSentiment(p.sentiment!);
     if ("topic" in p) setTopic(p.topic!);
     if ("videoKind" in p) setVideoKind(p.videoKind!);
+    if ("platform" in p) setPlatform(p.platform!);
     if ("replies" in p) setReplies(p.replies!);
     if ("commentType" in p) setCommentType(p.commentType!);
     if ("reviewStatus" in p) setReviewStatus(p.reviewStatus!);
@@ -540,6 +802,10 @@ function DashboardBody({
         setVideoKind(EMPTY_FILTERS.videoKind);
         applyFilters({ videoKind: EMPTY_FILTERS.videoKind });
         break;
+      case "platform":
+        setPlatform(EMPTY_FILTERS.platform);
+        applyFilters({ platform: EMPTY_FILTERS.platform });
+        break;
       case "commentType":
         setCommentType(EMPTY_FILTERS.commentType);
         applyFilters({ commentType: EMPTY_FILTERS.commentType });
@@ -565,22 +831,78 @@ function DashboardBody({
   }
   const chips = chipsFor(values, { S, labels, topicName });
   const s = result.data;
-  // The pinned bar's height as `FilterBar` last measured it — the section
-  // observer's top edge. Zero until the first measurement lands.
+
+  useEffect(() => {
+    if (sentiment && s?.measurable && !s.measurable.has(sentiment as Label)) {
+      setSentiment(EMPTY_FILTERS.sentiment);
+      applyFilters({ sentiment: EMPTY_FILTERS.sentiment });
+    }
+  }, [sentiment, s?.measurable]);
+
+  // The pinned bar's height as `db-sticky-bar` measures it (FilterBar + SectionNav).
+  // Zero until the first measurement lands.
   const [pinnedHeight, setPinnedHeight] = useState(0);
   const active = useActiveSection(!!s && s.total > 0, pinnedHeight);
+  const stickyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = stickyRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const publish = () => {
+      const h = el.getBoundingClientRect().height;
+      root.style.setProperty("--db-pinned-h", `${Math.round(h)}px`);
+      setPinnedHeight(h);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--db-pinned-h");
+    };
+  }, []);
   // Aggregations for the charts, over every row the filters admit rather than
   // the page on screen. Memoised on the filtered array itself: it is a new
   // array only when the read or the filters actually changed.
+  interface PrecomputedDashboardState {
+    hours?: number[];
+    weekdays?: number[];
+    weeks?: Array<{ week: string; count: number }>;
+    people?: Array<{
+      name: string;
+      channel_id: string | null;
+      comments_count: number;
+      likes_count: number;
+    }>;
+  }
   const rows = s?.filtered ?? [];
-  const hours = useMemo(() => byHour(rows), [rows]);
-  const weekdays = useMemo(() => byWeekday(rows, S.weekdays), [rows, S]);
-  const weeks = useMemo(() => byWeek(rows), [rows]);
-  const [peopleBy, setPeopleBy] = useState<"comments" | "likes">("comments");
-  const people = useMemo(() => commenters(rows, peopleBy), [rows, peopleBy]);
-  const [cardTab, setCardTab] = useState<"liked" | "recent" | "critical">(
-    "liked",
-  );
+  const pre = s as (Snapshot & PrecomputedDashboardState) | undefined;
+  const hours = useMemo(() => {
+    if (pre?.hours && Array.isArray(pre.hours) && pre.hours.length === 24) {
+      return hoursToBucketed(pre.hours);
+    }
+    return byHour(rows);
+  }, [pre, rows]);
+
+  const weekdays = useMemo(() => {
+    if (
+      pre?.weekdays &&
+      Array.isArray(pre.weekdays) &&
+      pre.weekdays.length === 7
+    ) {
+      return weekdaysToBucketed(pre.weekdays, S.weekdays);
+    }
+    return byWeekday(rows, S.weekdays);
+  }, [pre, rows, S]);
+
+  const weeks = useMemo(() => {
+    if (pre?.weeks && Array.isArray(pre.weeks) && pre.weeks.length > 0) {
+      return weeksToBucketed(pre.weeks);
+    }
+    return byWeek(rows);
+  }, [pre, rows]);
+
   // The videos on screen: 25 of the filtered list, busiest first. The index
   // is clamped inside pageSlice, so a filter that shrinks the list under a
   // reader on page four shows the last page that still exists, not a blank.
@@ -606,23 +928,38 @@ function DashboardBody({
     applyFilters({ video: next });
   }
   const cards = useMemo(() => {
+    if (cardsQuery.data?.comments && cardsQuery.data.comments.length > 0) {
+      return cardsQuery.data.comments.map((c) =>
+        toLabelledComment(
+          c,
+          s?.active_analysis_key ?? "",
+          s?.active_topic_key ?? "",
+        ),
+      );
+    }
     const list = [...rows];
     if (cardTab === "critical")
       return list
         .filter((c) => c.label === "negative")
         .sort((a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1))
-        .slice(0, 12);
+        .slice(0, 3);
     if (cardTab === "recent")
       return list
         .filter((c) => c.published_at)
         .sort((a, b) => (a.published_at! < b.published_at! ? 1 : -1))
-        .slice(0, 12);
+        .slice(0, 3);
     // Unknown like counts sort last rather than as zero, so a comment whose
     // count could not be read is never presented as the least liked.
     return list
       .sort((a, b) => (b.likes_value ?? -1) - (a.likes_value ?? -1))
-      .slice(0, 12);
-  }, [rows, cardTab]);
+      .slice(0, 3);
+  }, [
+    cardsQuery.data,
+    s?.active_analysis_key,
+    s?.active_topic_key,
+    rows,
+    cardTab,
+  ]);
   // Every sentence in the header comes from the values that decide behaviour,
   // so the label and the truth cannot drift apart.
   const source = describeSource({
@@ -640,6 +977,18 @@ function DashboardBody({
     span.length > 0
       ? `${span[0].date} — ${span[span.length - 1].date}`
       : S.noKnownDates;
+
+  const effectiveLabels = useMemo(() => {
+    if (!s?.measurable) return labels;
+    const res: Partial<Record<Label, string>> = {};
+    for (const [k, v] of Object.entries(labels) as [Label, string][]) {
+      if (s.measurable.has(k)) {
+        res[k] = v;
+      }
+    }
+    return res as Record<Label, string>;
+  }, [labels, s?.measurable]);
+
   return (
     <div className="db-page">
       <Hero
@@ -649,44 +998,45 @@ function DashboardBody({
         range={range}
         labels={labels}
       />
-      <FilterBar
-        values={values}
-        onChange={onChange}
-        onApply={applyFilters}
-        onReset={reset}
-        onLimitChange={onLimitChange}
-        formError={formError}
-        videoOptions={s?.video_options ?? []}
-        topics={
-          result.data?.active_topic_key ? (result.data?.topics ?? []) : null
-        }
-        commentTypes={result.data?.comment_types ?? []}
-        S={S}
-        lang={lang}
-        labels={labels}
-        appliedCount={chips.length}
-        chips={
-          // Only while something is applied: the pinned pane pays for every
-          // row, and the no-filter fallback (the source's scope sentence) is
-          // already on the Provenance strip below.
-          chips.length > 0 ? (
-            <ActiveFilters
-              chips={chips}
-              onClear={onClear}
-              onReset={reset}
-              S={S}
-            />
-          ) : null
-        }
-        onPinnedHeight={setPinnedHeight}
-      />
+      <div className="db-sticky-bar" ref={stickyRef}>
+        <FilterBar
+          values={values}
+          onChange={onChange}
+          onApply={applyFilters}
+          onReset={reset}
+          onLimitChange={onLimitChange}
+          formError={formError}
+          videoOptions={s?.video_options ?? []}
+          topics={
+            result.data?.active_topic_key ? (result.data?.topics ?? []) : null
+          }
+          commentTypes={result.data?.comment_types ?? []}
+          S={S}
+          lang={lang}
+          labels={effectiveLabels}
+          appliedCount={chips.length}
+          chips={
+            // Only while something is applied: the pinned pane pays for every
+            // row, and the no-filter fallback (the source's scope sentence) is
+            // already on the Provenance strip below.
+            chips.length > 0 ? (
+              <ActiveFilters
+                chips={chips}
+                onClear={onClear}
+                onReset={reset}
+                S={S}
+              />
+            ) : null
+          }
+        />
+        {/* Two sections were missing from this list and two more were being
+            offered on a page that had none: at zero rows every section below is
+            unrendered, and the nav went on linking to six of them. A control
+            that does nothing when pressed is worse than an absent one — the
+            reader concludes the page is broken rather than empty. */}
+        <SectionNav active={active} S={S} show={!!s && s.total > 0} />
+      </div>
       <p className="db-note db-filterbar-note">{S.periodNote}</p>
-      {/* Two sections were missing from this list and two more were being
-          offered on a page that had none: at zero rows every section below is
-          unrendered, and the nav went on linking to six of them. A control
-          that does nothing when pressed is worse than an absent one — the
-          reader concludes the page is broken rather than empty. */}
-      <SectionNav active={active} S={S} show={!!s && s.total > 0} />
       <Provenance source={source} />
       {result.isPending && <Loading S={S} />}
       {!result.isPending && result.isFetching && <Updating S={S} />}
@@ -699,7 +1049,9 @@ function DashboardBody({
       )}
       {s && (
         <>
-          <Summary s={s} S={S} />
+          {s.workspace_total > 0 && (
+            <Summary s={s} S={S} topicName={topicName} />
+          )}
           {s.total === 0 ? (
             /* Two different zeros, and for years one message.
                A workspace whose collection has not run yet and a filter that
@@ -747,6 +1099,7 @@ function DashboardBody({
             )
           ) : (
             <>
+              <Voice s={s} S={S} labels={labels} topicName={topicName} />
               <Videos
                 s={s}
                 S={S}
@@ -755,7 +1108,6 @@ function DashboardBody({
                 onTurn={turnVideoPage}
                 onPick={pickVideo}
               />
-              <Voice s={s} S={S} labels={labels} topicName={topicName} />
               <Timing
                 s={s}
                 S={S}
@@ -763,9 +1115,6 @@ function DashboardBody({
                 weekdays={weekdays}
                 weeks={weeks}
               />
-              <People S={S} people={people} by={peopleBy} onBy={setPeopleBy} />
-              <Compare s={s} S={S} labels={labels} onPick={pickVideo} />
-              <Engaged s={s} S={S} />
               <Comments
                 s={s}
                 S={S}

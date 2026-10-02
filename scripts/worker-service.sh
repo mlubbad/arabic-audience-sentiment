@@ -20,14 +20,19 @@
 # that should fetch the model.
 set -eu
 cd "$(dirname "$0")/.."
+set -a
 . ./.env.local
+set +a
 : "${WORKER_API_BASE_URL:?set WORKER_API_BASE_URL in .env.local}"
 : "${WORKER_CREDENTIAL:?set WORKER_CREDENTIAL in .env.local}"
 
 credentials="$WORKER_CREDENTIAL${WORKER_CREDENTIAL_WS2:+,$WORKER_CREDENTIAL_WS2}"
 # The topic classifier's key. Exported only when set: without it the loop runs
 # `--topics none` and reports analyse jobs blocked, which is the honest state.
-export PYTHONPATH=src HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}" WORKER_API_BASE_URL ${GEMINI_API_KEY:+GEMINI_API_KEY}
+# YOUTUBE_API_KEY is the same bargain for the public-channel path: without it
+# a public job ends blocked public_collection_not_configured, and the loop's
+# startup line says `public=no` instead of `public=yes`.
+export PYTHONPATH=src HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}" WORKER_API_BASE_URL ${GEMINI_API_KEY:+GEMINI_API_KEY} ${YOUTUBE_API_KEY:+YOUTUBE_API_KEY}
 
 exec "${UV_BIN:-$HOME/.local/bin/uv}" --directory workers/python --cache-dir "${UV_CACHE_DIR:-../../.cache/uv}" \
   run --frozen python -m server.loop \

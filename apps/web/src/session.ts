@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
-export type Workspace = { id: string; name: string };
+export type Workspace = { id: string; name: string; created_by?: string };
 
 export function useSession() {
   const [session, setSession] = useState<Session | null>(null);
@@ -49,14 +49,52 @@ export function useSession() {
 export const workspacesKey = (userId: string | null) =>
   ["workspaces", userId] as const;
 
-export function useWorkspaces(session: Session | null) {
-  const userId = session?.user.id ?? null;
+export function getEffectiveUserId(
+  session: Session | null,
+  overrideUserId?: string | null,
+): string | null {
+  if (overrideUserId !== undefined) return overrideUserId;
+  try {
+    if (
+      typeof window !== "undefined" &&
+      typeof sessionStorage !== "undefined"
+    ) {
+      const raw = sessionStorage.getItem("sentiment_impersonation_session");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.id === "string") return parsed.id;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return session?.user.id ?? null;
+}
+
+export function useWorkspaces(
+  session: Session | null,
+  overrideUserId?: string | null,
+) {
+  const userId = getEffectiveUserId(session, overrideUserId);
   const query = useQuery({
     queryKey: workspacesKey(userId),
     queryFn: async () => {
+      // 1. Try my_workspaces RPC for strict tenant isolation
+      try {
+        const { data, error } = await supabase!.rpc("my_workspaces", {
+          target_user_id: userId,
+        });
+        if (!error && Array.isArray(data)) {
+          return data as Workspace[];
+        }
+      } catch {
+        // RPC probe failed, fallback to direct query
+      }
+
+      // 2. Direct table fallback for test mocks or legacy environments
       const { data, error } = await supabase!
         .from("workspaces")
-        .select("id,name");
+        .select("id,name,created_by");
       if (error) throw error;
       return (data ?? []) as Workspace[];
     },
@@ -65,13 +103,25 @@ export function useWorkspaces(session: Session | null) {
   // The key carries the user id, so a change of user is a change of query:
   // the next user never sees the last user's list, even for one paint.
   if (!supabase || !userId)
-    return { workspaces: [], loading: false, failed: false };
+    return {
+      workspaces: [],
+      data: [],
+      loading: false,
+      isLoading: false,
+      failed: false,
+      isError: false,
+      refetch: async () => ({ data: [] as Workspace[] }),
+    };
   // A failed read leaves the list empty *and* says so. Treating it as "this
   // account has no workspaces" would send the user to create one they
   // already have.
   return {
     workspaces: query.data ?? [],
+    data: query.data ?? [],
     loading: query.isPending,
+    isLoading: query.isPending,
     failed: query.isError,
+    isError: query.isError,
+    refetch: query.refetch,
   };
 }

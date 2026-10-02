@@ -15,6 +15,7 @@ const base = {
   channel_id: "channel",
   video_id: "v1",
   video_title: "حلقة تجريبية",
+  platform: "youtube" as const,
   video_kind: "video" as const,
   author_channel_id: "author",
   by_channel_owner: false,

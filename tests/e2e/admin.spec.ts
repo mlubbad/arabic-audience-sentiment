@@ -180,3 +180,53 @@ test("at 390px the six rows are six cards and nothing scrolls sideways", async (
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(390);
 });
+
+test("navigates to users tab and tests user impersonation with escape hatch", async ({
+  page,
+}, testInfo) => {
+  await page.getByRole("link", { name: "المستخدمون" }).click();
+  await expect(page).toHaveURL(/\/admin\/users\?demo=1/);
+
+  // Users table is rendered
+  await expect(page.getByTestId("admin-users")).toBeVisible();
+
+  // Screenshot 1: Admin Users page with "حسابك الحالي" and "الدخول كـ" buttons
+  await page.screenshot({
+    path: testInfo.outputPath("ui-admin-users.png"),
+    fullPage: true,
+  });
+
+  // Current admin row has "(حسابك الحالي)"
+  await expect(page.getByTestId("admin-user-current")).toBeVisible();
+  await expect(page.getByTestId("admin-user-current")).toHaveText(
+    "(حسابك الحالي)",
+  );
+
+  // Client users have "الدخول كـ" buttons
+  const impersonateBtn = page.getByTestId(
+    "admin-impersonate-00000000-0000-4000-8000-0000000000c2",
+  );
+  await expect(impersonateBtn).toBeVisible();
+
+  // Click impersonate on client (reem@cooking.example)
+  await impersonateBtn.click();
+
+  // Impersonation banner is visible with user info
+  const banner = page.getByTestId("impersonation-banner");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText("reem@cooking.example");
+
+  // Screenshot 2: Active Impersonation state with banner and escape hatch
+  await page.screenshot({
+    path: testInfo.outputPath("ui-impersonating-user.png"),
+    fullPage: true,
+  });
+
+  // Exit button works to return to admin
+  const exitBtn = page.getByTestId("impersonation-return-btn");
+  await expect(exitBtn).toBeVisible();
+  await exitBtn.click();
+
+  // Banner disappears after exit
+  await expect(banner).toHaveCount(0);
+});

@@ -35,7 +35,12 @@ vi.mock("./session", () => ({
 }));
 vi.mock("./data", async (importOriginal) => {
   const real = await importOriginal<typeof import("./data")>();
-  return { ...real, configuredMode: "live", loadSource: vi.fn() };
+  return {
+    ...real,
+    configuredMode: "live",
+    loadSource: vi.fn(),
+    loadOpsSource: vi.fn(),
+  };
 });
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => shared.query,

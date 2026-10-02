@@ -28,13 +28,13 @@ describe("where a workspace is on the three steps", () => {
     }
   });
 
-  it("a public channel the operator seeded is step two not yet taken, not step two gone wrong", () => {
+  it("a public channel chosen for monitoring completes step two and unlocks step three", () => {
     const steps = setupProgress(
       { channel: { status: "public_unverified" }, latestJob: null },
       ar,
     );
-    expect(statuses(steps)).toEqual(["done", "next", "later"]);
-    expect(steps[1].detail).toContain("ملكيتها");
+    expect(statuses(steps)).toEqual(["done", "done", "next"]);
+    expect(steps[1].detail).toContain("القناة العامة");
   });
 
   it("a job that ran counts, partial included; one in flight is pending; one that stopped needs attention", () => {
@@ -56,10 +56,28 @@ describe("where a workspace is on the three steps", () => {
     expect(steps.map((s) => s.title)).toEqual(
       setupSteps.map((s) => ar[s.title]),
     );
+    expect(steps[1].title).toBe("اربط قناة يوتيوب بعد موافقتك على الإذن.");
     // And the English reads the same three keys, in the same order.
     expect(
       setupProgress({ channel: null, latestJob: null }, en).map((s) => s.title),
     ).toEqual(setupSteps.map((s) => en[s.title]));
+    expect(setupProgress({ channel: null, latestJob: null }, en)[1].title).toBe(
+      "Connect a YouTube channel after granting permission.",
+    );
+  });
+
+  it("uses the dual-path sentence when allowPublicChannels is true (owner experiment)", () => {
+    const stepsAr = setupProgress(
+      { channel: null, latestJob: null, allowPublicChannels: true },
+      ar,
+    );
+    expect(stepsAr[1].title).toBe(ar.stepChannelWithPublic);
+
+    const stepsEn = setupProgress(
+      { channel: null, latestJob: null, allowPublicChannels: true },
+      en,
+    );
+    expect(stepsEn[1].title).toBe(en.stepChannelWithPublic);
   });
 });
 

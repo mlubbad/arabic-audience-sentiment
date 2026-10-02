@@ -27,9 +27,10 @@ class Plan:
     def __init__(self, pages: dict[str, list[Batch]]):
         self.pages, self.asked = pages, []
 
-    def batches(self, video_id, checkpoint):
+    def batches(self, video_id, checkpoint, since=None, **kwargs):
         self.asked.append((video_id, checkpoint))
         yield from self.pages.get(video_id, [])
+
 
 
 def drive(pages, videos, checkpoint=None, access_token="ya29.ok"):
@@ -66,7 +67,7 @@ def drive(pages, videos, checkpoint=None, access_token="ya29.ok"):
     collector = Plan(pages)
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
-    worked = run_backfill(plane, lambda token: collector)
+    worked = run_backfill(plane, lambda token, expires_at=None, renew=None: collector)
     return worked, sent, collector
 
 
@@ -172,10 +173,11 @@ def test_a_lease_with_no_due_list_at_all_is_blocked_not_an_empty_success():
 
 def test_a_disabled_video_is_reported_and_skipped_not_the_whole_run():
     class Refusing(Plan):
-        def batches(self, video_id, checkpoint):
+        def batches(self, video_id, checkpoint, *args, **kwargs):
             if video_id == "off":
                 raise CollectionError("comments_disabled", "explicitly_disabled")
-            yield from super().batches(video_id, checkpoint)
+            yield from super().batches(video_id, checkpoint, *args, **kwargs)
+
 
     sent = {"video_finished": [], "finish": None}
 
@@ -196,7 +198,7 @@ def test_a_disabled_video_is_reported_and_skipped_not_the_whole_run():
 
     collector = Refusing({"on": [Batch([comment("c", "on")], None, "exhausted")]})
     plane = ControlPlane("https://c.invalid", "cred", httpx.Client(transport=httpx.MockTransport(handler)))
-    assert run_backfill(plane, lambda token: collector) is True
+    assert run_backfill(plane, lambda token, expires_at=None, renew=None: collector) is True
     assert sent["video_finished"] == [("u-off", "blocked", "comments_disabled"), ("u-on", "exhausted", None)]
     assert sent["finish"] == "succeeded"
 
@@ -225,7 +227,7 @@ def test_a_plan_refusal_ends_the_job_blocked_rather_than_dropping_the_lease():
     collector = Plan({"v1": [Batch([comment("c1")], None, "exhausted")]})
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
-    assert run_backfill(plane, lambda token: collector) is True
+    assert run_backfill(plane, lambda token, expires_at=None, renew=None: collector) is True
     assert sent["commits"] == 1
     assert (sent["finish"], sent["error_code"]) == ("blocked", "quota_exceeded")
 
@@ -248,7 +250,7 @@ def test_a_transient_control_plane_failure_still_escapes():
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
     with pytest.raises(ControlPlaneError):
-        run_backfill(plane, lambda token: collector)
+        run_backfill(plane, lambda token, expires_at=None, renew=None: collector)
 
 
 class Counting(Plan):
@@ -289,7 +291,7 @@ def drive_counts(collector, videos, counts_response=None, counts_status=200):
 
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
-    worked = run_backfill(plane, lambda token: collector)
+    worked = run_backfill(plane, lambda token, expires_at=None, renew=None: collector)
     return worked, sent
 
 
@@ -388,3 +390,109 @@ def test_a_lost_lease_on_the_counts_step_still_escapes():
     with pytest.raises(LeaseLost):
         drive_counts(collector, THREE, counts_response={"code": "lease_lost"}, counts_status=409)
     assert collector.asked == []
+
+
+def test_historical_import_passes_since_and_preserves_is_historical_checkpoint():
+    class SinceRecordingCollector(Plan):
+        def __init__(self, pages):
+            super().__init__(pages)
+            self.kwargs_received = []
+
+        def batches(self, video_id, checkpoint=None, **kwargs):
+            self.kwargs_received.append((video_id, kwargs))
+            yield from super().batches(video_id, checkpoint)
+
+    sent = {"commits": [], "finish": None}
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        if path == "claim":
+            return httpx.Response(200, json={
+                "job_id": "j-hist-1", "lease_token": "t-hist-1", "type": "import",
+                "checkpoint": {
+                    "is_historical": True,
+                    "since": "2026-01-01T00:00:00Z",
+                    "max_items": 500,
+                },
+                "videos": [{"video_id": "v1", "external_video_id": "v1", "title": "تاريخي"}],
+                "access_token": "ya29.ok",
+            })
+        if path == "commit-batch":
+            body = json.loads(request.content)["payload"]
+            sent["commits"].append(body)
+        if path == "video-finished":
+            pass
+        if path == "finish":
+            sent["finish"] = json.loads(request.content)["outcome"]
+        return httpx.Response(200, json={})
+
+    collector = SinceRecordingCollector({"v1": [Batch([comment("c1")], None, "exhausted")]})
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    worked = run_backfill(plane, lambda token, expires_at=None, renew=None: collector)
+    assert worked is True
+    assert len(collector.kwargs_received) == 1
+    assert collector.kwargs_received[0][1]["since"] == "2026-01-01T00:00:00Z"
+    assert collector.kwargs_received[0][1]["max_items"] == 500
+    assert len(sent["commits"]) == 1
+    committed_checkpoint = sent["commits"][0]["checkpoint"]
+    assert committed_checkpoint["is_historical"] is True
+    assert sent["finish"] == "succeeded"
+
+
+def test_run_job_claims_import_when_no_classifier():
+    from server.runner import run_job
+
+    claimed_types = []
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        if path == "claim":
+            body = json.loads(request.content) if request.content else {}
+            claimed_types.append(body.get("types"))
+            return httpx.Response(204)
+        return httpx.Response(200, json={})
+
+    plane = ControlPlane("https://c.invalid", "cred",
+                         httpx.Client(transport=httpx.MockTransport(handler)))
+    worked = run_job(plane, lambda token, expires_at=None, renew=None: None, classifier=None)
+    assert worked is False
+    assert claimed_types == [["collect", "discover", "import"]]
+
+
+def test_backfill_video_with_reported_comments_and_zero_collected_is_partial_not_exhausted():
+    """WO-3 Invariant 2: Failure never becomes success.
+    If a video has reported_comment_count > 0, but collector yields 0 comments with outcome 'exhausted',
+    the runner MUST NOT declare the video 'exhausted' or the job 'succeeded'.
+    It must record outcome as 'partial' (so it retries and does not update last_seen_comment_count).
+    """
+    worked, sent, _ = drive(
+        {"v1": [Batch([], None, "exhausted")]},
+        [{"video_id": "v1", "external_video_id": "v1", "title": "الفيديو", "reported_comment_count": 10}],
+    )
+    assert sent["video_finished"] == [("v1", "partial", "zero_comments_reported")]
+    assert sent["finish"] == "partial"
+
+
+def test_backfill_yielded_explicitly_disabled_skips_video_as_blocked():
+    """A yielded explicitly_disabled or unavailable batch outcome is a property of the video,
+    not of the run. It must skip the video, mark it blocked with its error code in the catalogue,
+    and proceed to read the next video without failing the whole run.
+    """
+    worked, sent, _ = drive(
+        {
+            "v1": [Batch([], None, "explicitly_disabled")],
+            "v2": [Batch([comment("c2")], None, "exhausted")],
+        },
+        [
+            {"video_id": "v1", "external_video_id": "v1", "title": "الأولى"},
+            {"video_id": "v2", "external_video_id": "v2", "title": "الثانية"},
+        ],
+    )
+    assert worked is True
+    assert ("v1", "blocked", "explicitly_disabled") in sent["video_finished"]
+    assert ("v2", "exhausted", None) in sent["video_finished"]
+    assert sent["finish"] == "succeeded"
+
+
+

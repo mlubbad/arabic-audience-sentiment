@@ -100,8 +100,10 @@ export const ar = {
   // ---- the three steps (setup.ts) and the card (WorkspaceCard.tsx) ----
   stepWorkspace: "أنشئ حسابك ومساحة العمل الخاصة بك.",
   stepChannel: "اربط قناة يوتيوب بعد موافقتك على الإذن.",
+  stepChannelWithPublic: "حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة.",
   stepCollect: "اختر الفيديوهات التي تُجمع، ثم تابع حالتها في صفحة التشغيل.",
-  stepChannelSeeded: "القناة مسجَّلة بلا إذن بعد؛ اربطها لتأكيد ملكيتها.",
+  stepChannelSeeded:
+    "تم اختيار القناة العامة للمتابعة؛ الخطوة التالية اختيار الفيديوهات.",
   stepChannelLapsed: "القناة تحتاج إعادة ربط؛ الإذن السابق لم يعد صالحًا.",
   stepCollectPending: "الطلب قائم؛ تفاصيل التقدّم في صفحة التشغيل.",
   stepCollectFailed: "آخر محاولة لم تكتمل؛ السبب في صفحة التشغيل.",
@@ -112,11 +114,26 @@ export const ar = {
   stepStateAttention: "يحتاج انتباهك",
   stepsLabel: "خطوات الإعداد",
   channelConnected: "قناة مرتبطة: ",
-  channelSeeded: "قناة عامة بلا إذن بعد: ",
+  channelSeeded: "قناة عامة (متابعة): ",
   channelNeedsRelink: (status: string) =>
     `القناة تحتاج إعادة ربط (${status}): `,
   channelIdLabel: "المعرّف",
   channelNone: "لا توجد قناة مرتبطة بعد",
+  channelSetupHeading: "تحديد قناة مساحة العمل",
+  channelSetupSubheading:
+    "اختر مساراً واحداً لإضافة القناة بحسب ملكيتك لها (الخياران متبادلان):",
+  channelOptionOwnerBadge: "مالك رسمي",
+  channelOptionOwnerTitle: "أملك القناة",
+  channelOptionOwnerDesc:
+    "ربط القناة بحساب Google الرسمي لتأكيد الملكية وصلاحيات القراءة المباشرة والتحليل الشامل.",
+  channelOptionOwnerAction: "ربط قناة يوتيوب عبر Google",
+  channelOptionPublicBadge: "متابعة عامة",
+  channelOptionPublicTitle: "لا أملك القناة",
+  channelOptionPublicDesc:
+    "البحث عن أي قناة عامة بالرابط أو المعرّف (YouTube, Telegram, X, TikTok) لمتابعتها دون الحاجة لحساب المالك.",
+  channelOptionPublicAction: "البحث عن قناة واختيارها",
+  searchPublicChannelHeading:
+    "البحث عن قناة عامة للمتابعة (لا تتطلب ملكية أو تسجيل دخول)",
   disconnectChannel: "فصل القناة",
   disconnectConfirm:
     "سيتوقف الجمع وتُلغى صلاحية الوصول إلى القناة. ما جُمع يبقى. هل تفصلها؟",
@@ -135,11 +152,82 @@ export const ar = {
   retireDone: "انتهت المساحة وانتقلت إلى مشغّل الخدمة.",
   retireLast: "لا يمكن إنهاء آخر مساحة لك؛ أنشئ أخرى أولًا.",
   retireFailed: "تعذّر إنهاء المساحة.",
-  connectAboutGoogle:
-    "يفتح هذا صفحة Google. لأن هذا التطبيق قيد مراجعة أمنية من Google، قد تظهر رسالة تحذير تقول إن التطبيق غير موثَّق — هذا متوقَّع ولا يعني وجود خطر. اضغط «Advanced» ثم «Go to … (unsafe)»، وبعدها «Continue» لإكمال ربط القناة.",
-  connectContinueToGoogle: "متابعة إلى Google",
+  shareWorkspace: "مشاركة المساحة",
+  shareWorkspaceTitle: (name: string) => `مشاركة مساحة «${name}»`,
+  shareWorkspaceLead:
+    "شارك هذه المساحة مع حسابات أخرى بالبريد الإلكتروني برتبة محددة.",
+  shareWorkspaceAccountsCount: (count: number, limit: number | null) =>
+    limit
+      ? `${count} من ${limit} حسابات مستخدمة`
+      : `${count} حسابات (غير محدود)`,
+  shareWorkspaceEmailLabel: "البريد الإلكتروني للحساب",
+  shareWorkspaceEmailPlaceholder: "name@example.com",
+  shareWorkspaceRoleLabel: "الرتبة",
+  shareWorkspaceRoleAnalyst: "محلل (تحليل ومزامنة ومراجعة)",
+  shareWorkspaceRoleViewer: "مشاهد (قراءة واطلاع فقط)",
+  shareWorkspaceSubmit: "مشاركة المساحة",
+  shareWorkspaceAccountsList: "الحسابات التي تملك وصولًا",
+  shareWorkspaceRoleOwner: "المالك",
+  shareWorkspaceRoleAnalystBadge: "محلل",
+  shareWorkspaceRoleViewerBadge: "مشاهد",
+  shareWorkspaceUnshare: "إلغاء المشاركة",
+  shareWorkspaceUnshareConfirm: (email: string) =>
+    `هل تريد إلغاء مشاركة هذه المساحة مع ${email}؟`,
+  shareWorkspaceUserNotFound:
+    "هذا البريد غير مسجل في المنصة. يرجى تسجيل الحساب أولًا.",
+  shareWorkspaceLimitReached:
+    "تم بلوغ الحد الأقصى للحسابات المسموح بها في خطتك.",
+  shareWorkspaceAlreadyMember: "هذا الحساب مضاف بالفعل إلى هذه المساحة.",
+  shareWorkspaceDone: "تمت مشاركة المساحة بنجاح.",
+  shareWorkspaceUnsharedDone: "تم إلغاء المشاركة بنجاح.",
+  shareWorkspaceRoleUpdatedDone: "تم تعديل رتبة الحساب بنجاح.",
+  shareWorkspaceFailed: (err: string) => `تعذّرت مشاركة المساحة: ${err}`,
+  shareWorkspaceClose: "إغلاق",
   connectChannel: "ربط قناة يوتيوب",
   relinkForName: "إعادة الربط لحفظ اسم القناة",
+  addChannel: "إضافة قناة بالرابط أو بالبحث",
+  addChannelLead:
+    "ألصق رابط القناة أو معرّفها (@المعرّف) أو اكتب اسمًا للبحث. تُجمع البيانات العامة دون ربط حساب القناة، ويمكن ربطه لاحقًا.",
+  addChannelPlaceholder: "youtube.com/@القناة أو @المعرّف أو اسم للبحث",
+  addChannelSearch: "بحث",
+  addChannelNone:
+    "لم يُعثر على قنوات مطابقة. جرّب صيغة أخرى للمعرّف أو اسمًا آخر.",
+  addChannelAdd: "إضافة",
+  addChannelCancel: "إلغاء",
+  addChannelDone: "أُضيفت القناة كبيانات عامة. الخطوة التالية حصر الفيديوهات.",
+  addChannelExists: "هذه القناة مضافة في هذه المساحة بالفعل.",
+  addChannelFailed: "تعذّر البحث عن القنوات. حاول من جديد.",
+  addChannelQueryInvalid: "أدخل رابط قناة صالحًا أو معرّفًا أو اسمًا للبحث.",
+  addChannelNotConfigured: "البحث عن القنوات غير مهيأ على الخادم بعد.",
+  addChannelQuota:
+    "حصة البحث اليومية من يوتيوب منتهية. جرّب غدًا أو أدخل معرّف القناة مباشرة.",
+  selectPlatform: "اختر المنصة",
+  addTelegramChannel: "إضافة قناة تليجرام عامة",
+  addTelegramLead:
+    "أدخل معرّف قناة تليجرام عامة (مثل @channel) أو رابطها (t.me/...). تنبيه: يجب أن تكون القناة عامة وتتيح المعاينة المباشرة؛ الحسابات الشخصية والمجموعات الخاصة لا يمكن استيرادها.",
+  addTelegramPlaceholder: "@اسم_القناة أو t.me/اسم_القناة",
+  addTelegramInvalidHandle:
+    "أدخل معرّف قناة تليجرام صالحًا (مثال: @channel أو رابط t.me/channel).",
+  addXChannel: "إضافة حساب X (تويتر) عام",
+  addXLead:
+    "أدخل اسم المستخدم (@المعرّف) أو رابط الحساب على X (تويتر). يتم جمع التغريدات والردود عليها تلقائيًا.",
+  addXPlaceholder: "@username أو x.com/username",
+  addXInvalidHandle:
+    "أدخل اسم مستخدم صالحًا على X (مثال: @username أو رابط x.com/username).",
+  addTikTokChannel: "إضافة حساب تيك توك عام",
+  addTikTokLead:
+    "أدخل اسم المستخدم (@المعرّف) أو رابط الحساب على تيك توك. يتم جمع المقاطع والتعليقات تلقائيًا.",
+  addTikTokPlaceholder: "@username أو tiktok.com/@username",
+  addTikTokInvalidHandle:
+    "أدخل اسم مستخدم صالحًا على تيك توك (مثال: @username أو رابط tiktok.com/@username).",
+  addDirectAvailable: "إضافة مباشرة (بناءً على الإتاحة)",
+  addDirectAvailableAction: "إضافة القناة مباشرة بناءً على الإتاحة",
+  addDirectAvailableDesc:
+    "في حال كانت المنصة لا تدعم البحث المسبق بالاسم، يمكنك المتابعة وإضافة القناة مباشرة بالمعرّف المتاح.",
+  platformSearchNotPermitted:
+    "البحث المسبق غير متاح أو مقيّد على هذه المنصة. تم التحقق من المعرّف ويمكنك إضافته بناءً على الإتاحة.",
+  channelNotFoundOnPlatform:
+    "لم يتم العثور على القناة عبر المعاينة المباشرة أو أنها ليست عامة. يمكنك إضافتها مباشرة بناءً على الإتاحة.",
 
   // ---- the gate (WorkspaceGate.tsx) ----
   gateResolvingAccount: "جارٍ تحديد حسابك…",
@@ -290,6 +378,13 @@ export const ar = {
   adminFailed: (code: string) => `تعذّر التنفيذ: ${code}`,
   adminDemoLead:
     "هذه نسخة توضيحية من صفحة الإدارة: التغييرات تبقى في هذه الجلسة فقط.",
+  adminInspectWorkspace: "استعراض المساحة",
+  adminInspectionBadge: "وضع المشرف",
+  adminInspectionBanner: (name: string, owner?: string) =>
+    owner
+      ? `وضع المشرف: تتصفح مساحة «${name}» (المالك: ${owner})`
+      : `وضع المشرف: تتصفح مساحة «${name}»`,
+  adminInspectionReturn: "العودة للوحة الإدارة",
 
   // ---- the admin observability pages (phase one of the admin roadmap) ----
   // Five screens, one room: tabs under every admin page head.
@@ -297,11 +392,48 @@ export const ar = {
   adminTabWorkspaces: "مساحات العمل",
   adminTabUsers: "المستخدمون",
   adminTabChannels: "القنوات",
+  adminTabPlans: "أنواع الحسابات",
   adminTabOps: "التشغيل",
+  adminTabServices: "الخدمات والمؤشرات",
   adminTabAudit: "سجل التدقيق",
+  // plans & account types
+  adminPlansTitle: "أنواع الحسابات والصلاحيات",
+  adminPlansLead:
+    "إدارة أنواع الحسابات والتحكم في إتاحة ميزة تتبع القنوات العامة (خيار «لا أملك القناة») لكل باقة.",
+  adminPlansLoading: "جارٍ قراءة أنواع الحسابات…",
+  adminPlansEmpty: "لا توجد باقات مسجلة.",
+  adminPlansHeading: "أنواع الحسابات المتاحة",
+  adminPlanColName: "نوع الحساب",
+  adminPlanColKey: "المعرّف",
+  adminPlanColSegment: "الشريحة",
+  adminPlanColPrice: "السعر الشهري",
+  adminPlanColPublicChannels: "خيار «لا أملك القناة»",
+  adminPlanColLimits: "القيود والاستهلاك",
+  adminPlanEditLimits: "تعديل القيود",
+  adminPlanEditLimitsTitle: "تعديل قيود نوع الحساب",
+  adminPlanChannelsLimit: "الحد الأقصى للقنوات",
+  adminPlanAnalysisUnits: "وحدات التحليل الشهرية",
+  adminPlanBackfillUnits: "وحدات الجلب والاستيراد التاريخي",
+  adminPlanHistoricalDays: "أقصى عمق للأيام التاريخية (يوم)",
+  adminPlanRetentionDays: "مدة الاحتفاظ بالبيانات (أيام)",
+  adminPlanTopicUnits: "وحدات تصنيف المواضيع الشهرية",
+  adminPlanMembersLimit: "الحد الأقصى لأعضاء الفريق",
+  adminPlanWorkspacesLimit: "الحد الأقصى لمساحات العمل",
+  adminPlanUnlimitedCheckbox: "بلا حدود",
+  adminPlanUnlimitedHelp: "أدخل -1 أو فعّل «بلا حدود» لإتاحة غير محدودة",
+  adminPlanSaveLimits: "حفظ القيود",
+  adminPlanSavingLimits: "جارٍ الحفظ…",
+  adminPlanLimitsUpdated: "تم تحديث قيود الباقة بنجاح.",
+  adminPlanLimitsUpdateFailed: "تعذر تحديث قيود الباقة.",
+  adminPlanOwnerAlwaysActive: "مفعّل دائماً للمالك",
+  adminPlanPublicChannelsAllowed: "مسموح",
+  adminPlanPublicChannelsBlocked: "معطّل",
+  adminPlanToggleSuccess: "تم تحديث صلاحية نوع الحساب بنجاح.",
+  adminPlanToggleFailed: "تعذر تحديث صلاحية نوع الحساب.",
   // users
   adminUsersTitle: "المستخدمون",
-  adminUsersLead: "كل من سجّل في المنصة، ومتى آخر ظهور له، وكيف توزّع على مساحات العمل.",
+  adminUsersLead:
+    "كل من سجّل في المنصة، ومتى آخر ظهور له، وكيف توزّع على مساحات العمل.",
   adminUsersLoading: "جارٍ قراءة المستخدمين…",
   adminUsersEmpty: "لا مستخدمين بعد.",
   adminUsersHeading: "المستخدمون",
@@ -311,11 +443,24 @@ export const ar = {
   adminUsersWorkspaces: "المساحات",
   adminUsersOwned: "منها يملكها",
   adminUsersNoEmail: "بلا بريد",
+  adminUsersActions: "الإجراءات",
+  adminUserImpersonate: "الدخول كـ",
+  adminUserCurrent: "(حسابك الحالي)",
+  adminImpersonationBadge: "وضع محاكاة المستخدم",
+  adminImpersonationBanner: (email: string) =>
+    `أنت تتصفح المنصة حالياً بصفتك: ${email}`,
+  adminImpersonationReturn: "العودة إلى حساب المدير",
+  adminImpersonationActive: "محاكاة",
+  adminImpersonationExitAction: "الخروج من محاكاة المستخدم والعودة للمدير",
+  adminImpersonateStarting: "جارٍ الانتقال لحساب المستخدم…",
+  adminImpersonateStopping: "جارٍ العودة لحساب المدير…",
+  adminImpersonateError: "تعذر بدء وضع المحاكاة لهذا الحساب.",
   adminUsersPiiNote:
     "البريد بيانات شخصية: يظهر هنا لأن القاعدة تتحقق من صفتك كمشغّل، ويُسجّل في السجل كل استخدام إداري قادم.",
   // channels
   adminChannelsTitle: "القنوات",
-  adminChannelsLead: "كل قناة مرتبطة، والمساحة التي تخدمها، وحصادها من الفيديوهات والتعليقات، وحالة آخر مزامنة.",
+  adminChannelsLead:
+    "كل قناة مرتبطة، والمساحة التي تخدمها، وحصادها من الفيديوهات والتعليقات، وحالة آخر مزامنة.",
   adminChannelsLoading: "جارٍ قراءة القنوات…",
   adminChannelsEmpty: "لا قنوات بعد.",
   adminChannelsHeading: "القنوات",
@@ -332,7 +477,8 @@ export const ar = {
   adminChannelsNeverSynced: "لم تُزامن بعد",
   // ops
   adminOpsTitle: "التشغيل",
-  adminOpsLead: "أرقام المنصة اليوم، وآخر المزامنات الفاشلة — ما ينبغي أن تُشعر به الإشعارات لاحقًا قبل المستخدم.",
+  adminOpsLead:
+    "أرقام المنصة اليوم، وآخر المزامنات الفاشلة — ما ينبغي أن تُشعر به الإشعارات لاحقًا قبل المستخدم.",
   adminOpsLoading: "جارٍ قراءة حالة التشغيل…",
   adminOpsHeading: "حالة المنصة",
   adminOpsWorkspaces: "مساحات العمل",
@@ -356,7 +502,8 @@ export const ar = {
   adminOpsFailedNoChannel: "قناة محذوفة",
   // audit
   adminAuditTitle: "سجل التدقيق",
-  adminAuditLead: "ما فُعل من يد المشغّل: على أي مساحة، ومن أي حساب، ومتى — والسجل لا يُعدَّل ولا يُحذف.",
+  adminAuditLead:
+    "ما فُعل من يد المشغّل: على أي مساحة، ومن أي حساب، ومتى — والسجل لا يُعدَّل ولا يُحذف.",
   adminAuditLoading: "جارٍ قراءة السجل…",
   adminAuditEmpty: "السجل فارغ.",
   adminAuditHeading: "السجل",
@@ -366,6 +513,61 @@ export const ar = {
   adminAuditActor: "الفاعل",
   adminAuditAction: "الإجراء",
   adminAuditTarget: "الهدف",
+
+  // ---- services health & telemetry dashboard ----
+  adminServicesTitle: "صحة الخدمات ومؤشرات الأداء",
+  adminServicesLead:
+    "مراقبة الحالة الصحية، أزمنة الاستجابة، وحدود الاستهلاك لجميع الخدمات الخارجية والداخلية مع تحديث تلقائي دوري.",
+  adminServicesRefreshLabel: "التحديث التلقائي",
+  adminServicesRefreshPaused: "إيقاف مؤقت",
+  adminServicesRefresh10s: "10 ثوانٍ (مكثف)",
+  adminServicesRefresh30s: "30 ثانية (موصى به)",
+  adminServicesRefresh1m: "دقيقة واحدة",
+  adminServicesRefresh5m: "5 دقائق",
+  adminServicesRefreshNow: "تحديث فوري",
+  adminServicesRefreshing: "جارٍ التحديث…",
+  adminServicesNextRefresh: (seconds: number) =>
+    `التحديث القادم خلال ${seconds} ثانية`,
+  adminServicesLastChecked: (relative: string) => `آخر فحص: ${relative}`,
+  adminServicesJustNow: "الآن",
+  adminServicesSecondsAgo: (n: number) => `منذ ${n} ثانية`,
+  adminServicesMinutesAgo: (n: number) => `منذ ${n} دقيقة`,
+  adminServicesSearchPlaceholder: "البحث في الخدمات أو المعرّفات…",
+  adminServicesFilterAll: "الكل",
+  adminServicesFilterHealthy: "سليم",
+  adminServicesFilterDegraded: "تحذير",
+  adminServicesFilterDown: "عطل",
+  adminServicesFilterUnconfigured: "غير مهيأ",
+  adminServicesKpiOverall: "الحالة العامة للمنصة",
+  adminServicesKpiServicesCount: "الخدمات المراقبة",
+  adminServicesKpiAvgLatency: "متوسط زمن الاستجابة",
+  adminServicesKpiQuotaAlerts: "استهلاك الحصص الحرجة",
+  adminServicesStatusHealthySentence: "جميع الخدمات الرئيسية تعمل بكفاءة",
+  adminServicesStatusDegradedSentence: "توجد خدمات بحاجة إلى انتباه",
+  adminServicesStatusDownSentence: "توجد خدمات متوقفة عن العمل",
+  adminServicesMsUnit: "مللي ثانية",
+  adminServicesServicesUnit: (count: number) => `${count} خدمة`,
+  adminServicesCatInfrastructure: "البنية التحتية والاستضافة وقواعد البيانات",
+  adminServicesCatAi: "محركات التحليل الذكي ومعالجة البيانات",
+  adminServicesCatIngestion: "منصات جمع البيانات والقنوات متعددة المصادر",
+  adminServicesCatBilling: "المدفوعات والفوترة والخدمات المساندة",
+  adminServicesLatency: "الاستجابة",
+  adminServicesQuotaUsage: "الاستهلاك",
+  adminServicesQuotaRemaining: (rem: string, pct: string) =>
+    `المتبقي: ${rem} (${pct})`,
+  adminServicesNoQuota: "بدون قيود حصص",
+  adminServicesDetailsBtn: "التشخيص الفني",
+  adminServicesDialogTitle: "التشخيص الفني وحالة الخدمة",
+  adminServicesDialogClose: "إغلاق النافذة",
+  adminServicesDialogEndpoint: "الرابط ونقطة الاتصال",
+  adminServicesDialogStatus: "الحالة الحالية",
+  adminServicesDialogLatency: "زمن الاستجابة",
+  adminServicesDialogQuota: "الحصة وحدود الاستخدام",
+  adminServicesDialogDetails: "المؤشرات والرسائل الفنية",
+  adminServicesDialogErrorCode: "رمز الخطأ البرمجي",
+  adminServicesDialogRemediation: "إجراء المعالجة الموصى به",
+  adminServicesLoading: "جارٍ قراءة حالة ومؤشرات الخدمات…",
+  adminServicesEmpty: "لم يتم العثور على خدمات مطابقة لمعايير البحث.",
 
   // ---- the account page (Account.tsx) ----
   working: "جارٍ تنفيذ الطلب…",
@@ -458,12 +660,15 @@ export const ar = {
   syncMessages: {
     healthy: "آخر مزامنة اكتملت حديثًا",
     running: "مزامنة قيد التنفيذ الآن؛ النتيجة غير معروفة بعد",
+    queued: "توجد مهام في الانتظار؛ بانتظار دورها في المعالجة",
     stale: "مضى وقت طويل على آخر مزامنة؛ قد تكون البيانات قديمة",
     partial: "آخر مزامنة توقفت قبل نهايتها؛ التغطية جزئية وليست اكتمالًا",
     incomplete_coverage:
       "انتهى المصدر دون إثبات التغطية الكاملة؛ لا يعني ذلك جمع كل التعليقات",
     failed: "فشلت آخر مزامنة",
     blocked: "تعذّر الوصول إلى المصدر في آخر مزامنة",
+    quota_paused:
+      "تم بلوغ الحصة اليومية لمصدر YouTube؛ ستُستأنف المزامنة تلقائيًا بعد تجدد الحصة عند 00:00 UTC",
     stalled: "توجد مهام منتظرة والجمع متوقّف — لا شيء يعمل لتنفيذها",
     never_run: "لم تُنفذ أي مزامنة بعد",
     never_run_no_worker: "لم تُنفذ أي مزامنة بعد، والجمع متوقّف الآن",
@@ -497,6 +702,8 @@ export const ar = {
   // ---- the attempts log (jobFeed.ts) ----
   jobCommentsDisabled:
     "التعليقات مُعطَّلة على هذا الفيديو. لا شيء يمكن جمعه منه، وهذا إعداد في الفيديو نفسه لا خلل في الأداة.",
+  jobTelegramDiscussionRequiresAuth:
+    "مجموعة النقاش والتعليقات المرتبطة بهذه القناة خاصة أو مقيّدة وتتطلب تسجيل الدخول في تطبيق تليجرام، وتمنع سياسة تليجرام قراءتها عبر الويب دون مصادقة.",
   jobNoUploadHasComments: "لا يحمل أيٌّ من الفيديوهات المفحوصة تعليقات بعد.",
   jobNoUploadHasCommentsCounted: (checked: string, disabled: number) =>
     `فُحص ${checked} من أحدث الفيديوهات، ولا يحمل أيٌّ منها تعليقًا بعد.${
@@ -507,10 +714,21 @@ export const ar = {
   jobNoVideo: "لم يُعثر على فيديو صالح للجمع في هذه القناة.",
   jobChannelNotConnected:
     "لا توجد قناة مرتبطة بهذه المهمة. اربط قناة يوتيوب أولًا.",
-  jobCredentialExpired: "انتهت صلاحية الإذن الممنوح. أعد ربط القناة لتجديده.",
+  jobCredentialExpired:
+    "انقطع توكن التفويض مؤقتًا أثناء التجميع. لا حاجة لإعادة ربط القناة؛ أعد المحاولة وستُجدد الصلاحية تلقائيًا.",
   jobQuotaExceeded:
     "استُنفدت حصة يوتيوب اليومية. تتجدد تلقائيًا، وتُعاد المحاولة بعدها.",
   jobKindTopics: "تصنيف الموضوعات",
+  jobKindCatalogue: "فهرسة القناة",
+  jobCatalogueQueuedWithWorker: "في الطابور، بانتظار بدء فهرسة القناة.",
+  jobCatalogueRunningDetail: "فهرسة فيديوهات القناة قيد التنفيذ الآن.",
+  jobCatalogueRunningDetailTelegram: "فهرسة منشورات القناة قيد التنفيذ الآن.",
+  jobCatalogueRunningDetailX: "فهرسة تغريدات الحساب قيد التنفيذ الآن.",
+  jobCatalogueRunningDetailTikTok: "فهرسة مقاطع الحساب قيد التنفيذ الآن.",
+  jobCatalogueSucceededDetail:
+    "تم استكشاف فيديوهات القناة وتحديث القائمة بنجاح.",
+  jobChannelNotPublic:
+    "هذا المعرّف يخص حساباً شخصياً أو قناة خاصة لا تتيح المعاينة العامة. تأكد من إدخال اسم مستخدم لقناة تليجرام عامة (Public Channel)، أو تحقق من اختيار المنصة الصحيحة (مثل X أو يوتيوب).",
   jobNoTopicClassifier:
     "لا يوجد مصنِّف موضوعات مهيّأ لدى العامل. أضف مفتاح Gemini إلى إعدادات العامل ليعمل التصنيف.",
   jobTopicModelNotActive:
@@ -522,6 +740,8 @@ export const ar = {
     "أجاب Gemini بصيغة غير متوقعة لبعض التعليقات؛ ستُعاد محاولتها.",
   jobGeminiRefused:
     "رفض Gemini الطلب. تحقق من مفتاح Gemini وقيوده في إعدادات العامل.",
+  jobGeminiCreditsDepleted:
+    "استُنفد رصيد حساب Gemini في Google AI Studio. اشحن رصيد الحساب لتفعيل تصنيف الموضوعات (تحليل المشاعر الأساسي يعمل بشكل طبيعي).",
   jobInsufficientPermissions:
     "الإذن الممنوح لا يكفي لقراءة التعليقات. أعد ربط القناة لتجديد النطاق.",
   jobAccessDeniedWith: (reason: string) => `رفض يوتيوب الوصول (${reason}).`,
@@ -649,6 +869,17 @@ export const ar = {
   opsShare: (share: number, message: string) => `${share}٪ — ${message}`,
   opsAttemptsTitle: "سجل المحاولات",
   opsAttemptsLead: "كل محاولة جمع بترتيب زمني عكسي، ومعها سبب ما حدث.",
+  opsAttemptsFilterAll: "الكل",
+  opsAttemptsFilterRunning: "قيد التشغيل",
+  opsAttemptsFilterSucceeded: "مكتملة بنجاح",
+  opsAttemptsFilterFailed: "بحاجة انتباه",
+  opsAttemptsCountTotal: "إجمالي المحاولات",
+  opsAttemptsCountRunning: "قيد التنفيذ",
+  opsAttemptsCountSucceeded: "ناجحة",
+  opsAttemptsCountAttention: "واجهت مشكلة",
+  opsAttemptsPageOf: (page: number, pages: number) =>
+    `صفحة ${page} من ${pages}`,
+  opsAttemptsNoMatch: "لا توجد محاولات تطابق هذا التصنيف.",
   opsDemoNoLogStrong: "العرض التجريبي لا يحمل سجل مهام",
   opsDemoNoLogLead:
     "المهام تخص حسابًا حقيقيًا وقناة مرتبطة. لن يُعرض هنا سجل مُختلق ليبدو المكان ممتلئًا.",
@@ -658,6 +889,19 @@ export const ar = {
   opsNoAttemptsStrong: "لا توجد محاولات بعد",
   opsNoAttemptsLead: "اختر فيديوهات من القائمة أعلاه لتبدأ محاولة.",
   opsAttemptN: (n: number) => ` · المحاولة ${n}`,
+  opsRunningDuration: (duration: string) => ` · مستمرة منذ ${duration}`,
+  opsCompletedDuration: (duration: string) => ` · استغرقت ${duration}`,
+  opsQueuedDuration: (duration: string) => ` · في الانتظار منذ ${duration}`,
+  opsEstimatedCompletion: (eta: string) => ` · الوقت المتوقع للإنجاز: ${eta}`,
+  opsDurationTaken: (duration: string) => `المدة المستغرقة: ${duration}`,
+  opsQueuedWithEta: (n: number, eta: string) =>
+    `مهام منتظرة: ${n} (الوقت المتوقع للإنجاز: ${eta})`,
+  opsWorkerBusyEta: (eta: string) =>
+    `قيد التنفيذ (الوقت المتوقع للإنجاز: ${eta})`,
+  opsEstimatedTimeDiscover: "حوالي 15–30 ثانية",
+  opsEstimatedTimeCollect: "حوالي 30–60 ثانية",
+  opsEstimatedTimeAnalyse: "حوالي 20–45 ثانية",
+  opsEstimatedTimeDefault: "خلال دقيقة تقريباً",
   opsCancel: "سحب من الطابور",
   refresh: "تحديث",
   opsCancelFailed: "تعذّر سحب المهمة — قد يكون عامل قد بدأها بالفعل.",
@@ -674,6 +918,58 @@ export const ar = {
   catNeverRefreshed: "لم تُبنَ القائمة بعد.",
   catRequested: "طُلب بناء القائمة؛ تظهر النتيجة عند اكتمالها.",
   catRequestFailed: "تعذّر طلب بناء القائمة.",
+  historicalImportButton: "جلب / استيراد تاريخي",
+  historicalImportTitle: "جلب واستيراد البيانات التاريخية",
+  historicalImportLead:
+    "جلب المنشورات والتعليقات السابقة من المنصة أو استيرادها عبر ملفات CSV / JSON وفقاً لقيود باقتك.",
+  historicalTabPlatform: "جلب تلقائي من المنصة",
+  historicalTabFile: "رفع ملف خارجي (CSV / JSON)",
+  historicalDaysLimitNotice: (days: number) =>
+    `باقتك الحالية تسمح بجلب بيانات حتى ${days} يوماً سابقة.`,
+  historicalBackfillQuotaNotice: (remaining: number) =>
+    `الرصيد المتبقي للجلب التاريخي: ${remaining.toLocaleString()} وحدة.`,
+  historicalDaysBack: "المدة السابقة المراد جلبها (بالأيام)",
+  historicalMaxItems: "الحد الأقصى للعناصر (فيديوهات/تعليقات)",
+  historicalStartDate: "تاريخ البداية (اختياري)",
+  historicalStartSync: "بدء الجلب التاريخي",
+  historicalStartingSync: "جارٍ جدولة الجلب…",
+  historicalSyncQueued: "تمت جدولة مهمة الجلب التاريخي بنجاح.",
+  historicalSyncFailed: "تعذر جدولة الجلب التاريخي.",
+  historicalSyncPlanNotAllowed:
+    "الجلب التاريخي غير متاح في خطتك الحالية. يرجى ترقية الخطة للوصول إلى هذه الميزة.",
+  historicalFileUploadLabel: "اختر أو أسقط ملف CSV أو JSON",
+  historicalFileDropzone: "انقر لاختيار ملف أو اسحبه إلى هنا (يدعم CSV و JSON)",
+  historicalDownloadCsvTemplate: "تحميل نموذج CSV التجريبي",
+  historicalParsingFile: "جارٍ قراءة الملف والتحقق منه…",
+  historicalFileInvalid: "الملف غير صالح أو لا يحتوي على الأعمدة المطلوبة.",
+  historicalPreviewTitle: "معاينة البيانات قبل الاستيراد",
+  historicalPreviewPostsCount: (count: number) => `${count} منشور/فيديو`,
+  historicalPreviewCommentsCount: (count: number) => `${count} تعليق`,
+  historicalStartImport: "تأكيد واستيراد البيانات",
+  historicalImporting: "جارٍ الاستيراد وحفظ البيانات…",
+  historicalImportSuccess: (posts: number, comments: number) =>
+    `تم استيراد ${posts} منشور و ${comments} تعليق بنجاح.`,
+  historicalImportFailed: "تعذر استيراد البيانات.",
+  historicalImportQuotaExceeded:
+    "عدد التعليقات في الملف يتجاوز الرصيد المتبقي في باقتك.",
+  historicalNoChannelSelected: "يرجى اختيار القناة أولاً.",
+  historicalFileCapsHint: (maxMb: number, maxRows: number) =>
+    `الحد الأقصى: ${maxMb} ميجابايت وحتى ${maxRows.toLocaleString("ar-EG")} تعليق (1,000).`,
+  historicalFileTooLarge:
+    "حجم الملف يتجاوز الحد الأقصى المسموح به (5 ميجابايت).",
+  historicalBatchTooLarge:
+    "حجم الدفعة كبير جداً؛ الحد الأقصى للاستيراد هو 1,000 تعليق في المرة الواحدة.",
+  historicalForbidden: "ليس لديك الصلاحية لتنفيذ هذا الإجراء.",
+  historicalChannelNotFound: "لم يتم العثور على القناة المحددة.",
+  historicalInvalidPayload:
+    "بيانات الاستيراد غير صالحة أو تفتقر إلى الحقول الإجبارية.",
+  historicalDateBeyondPlanLimit: (days: number) =>
+    `التاريخ المحدد يتجاوز الحد الأقصى المسموح به في باقتك (${days} يوماً).`,
+  historicalCloseModal: "إغلاق النافذة",
+  catDiscoveringRunning: (elapsed: string, estimated: string) =>
+    `جارية منذ ${elapsed} · الوقت التقديري عادة: ${estimated}`,
+  catDiscoveringQueued: (elapsed: string, estimated: string) =>
+    `في الانتظار منذ ${elapsed} · الوقت التقديري عادة: ${estimated}`,
   catSearch: "ابحث في العناوين",
   catKindAll: "الكل",
   catKindVideo: "فيديو",
@@ -689,6 +985,9 @@ export const ar = {
   catNext: "التالية",
   catJump: "انتقل إلى صفحة",
   catOpenYouTube: "فتح في يوتيوب",
+  catOpenTelegram: "فتح في تليجرام",
+  catOpenX: "فتح في X",
+  catOpenTikTok: "فتح في تيك توك",
   catPreview: (title: string) => `معاينة: ${title}`,
   catPreviewHint:
     "المشاهدة داخل المنصة عبر مشغّل يوتيوب؛ لا يحفظ ملفات تعريف قبل الضغط على تشغيل.",
@@ -717,7 +1016,19 @@ export const ar = {
   catStateWaiting: "بانتظار الجمع",
   catStateCollecting: "يُجمع الآن",
   catStateCollected: (n: number, when: string) => `جُمع ${n} في ${when}`,
+  catStateCollectedOnly: (n: number) => `جُمع ${n}`,
+  catStateAnalysedOnly: (n: number) => `صُنّف ${n}`,
+  catStateCollectedAnalysed: (col: number, ana: number) =>
+    `جُمع ${col} (صُنّف ${ana})`,
+  catSummaryTitle: "ملخص المحتوى المحفوظ من القناة",
+  catTotalCollected: (n: number) => `إجمالي المحفوظ: ${n} تعليقاً`,
+  catTotalAnalysed: (n: number) => `المصنّف: ${n}`,
+  catVideosStored: (n: number) => `فيديوهات محفوظة: ${n}`,
+  catNextSyncSelected: (n: number) => `محدد للمزامنة القادمة: ${n}`,
+  catPreviewCollectedInfo: (col: number, ana: number) =>
+    `المحفوظ في القاعدة: ${col} تعليق (صُنّف منها ${ana})`,
   catStateDisabled: "تعليقات معطّلة",
+  catStateTelegramAuthRequired: "تتطلب تطبيق تليجرام",
   catStatePartial: "جزئي",
   // The live check found the comment count where the last read left it:
   // up to date, not a stoppage.
@@ -738,11 +1049,96 @@ export const ar = {
   secCompare: "المقارنة",
   secEngaged: "الأكثر تفاعلًا",
   secComments: "التعليقات",
+  secSummaryTitle: "الملخص التنفيذي ونبض الجمهور",
+  secVideosTitle: "أداء الفيديوهات: خريطة التفاعل والرضا",
+  secVoiceTitle: "صوت الجمهور: توازن المشاعر ومحركات النقاش",
+  secTimingTitle: "توقيت التفاعل: متى يتفاعل جمهورك بأعلى كثافة؟",
+  secPeopleTitle: "أبرز المعلّقين: الأصوات الأكثر تفاعلاً وتأثيراً",
+  secCompareTitle: "مقارنة الحلقات: كشف التباين في مشاعر المتابعين",
+  secEngagedTitle: "بؤر الاهتمام: أبرز التعليقات التي تحتاج متابعة",
+  secCommentsTitle: "سجل التعليقات والتدقيق البشري: مراجعة دقة التصنيف",
+
+  // Executive Story Briefing
+  storyBriefingEyebrow: "موجز القصة والرؤية التنفيذية",
+  storyBriefingTitle: "نبض الجمهور والخلاصة التحليلية",
+  netSentimentScoreLabel: "صافي مؤشر الرضا",
+  netSentimentScoreDesc: "الفارق النسبي بين الإيجابية والسلبية المحللة",
+  pulseStrongPositive: "نبض إيجابي مرتفع",
+  pulseModeratePositive: "نبض إيجابي معتدل",
+  pulseBalanced: "نبض متوازن / محايد",
+  pulseNegativeAttention: "نبض سلبي ملحوظ",
+  pulseCriticalAlert: "نبض سلبي حاد / أزمة تفاعل",
+  storyAct1Title: "١. النبض والاتجاه العام",
+  storyAct1DominantPos: (posPct: number, negPct: number) =>
+    `المشاعر الإيجابية تُمثّل ${posPct}٪ من التفاعل المحلل مقابل ${negPct}٪ سلبي، مما يعكس رضا وثقة مرتفعة من المتابعين.`,
+  storyAct1DominantNeg: (negPct: number, posPct: number) =>
+    `المشاعر السلبية تُمثّل ${negPct}٪ متفوقة على الإيجابية (${posPct}٪)، مما يشير إلى وجود تحفظات نقدية واسعة تستوجب المتابعة.`,
+  storyAct1Balanced: (posPct: number, negPct: number) =>
+    `المشاعر متقاربة بنسبة ${posPct}٪ إيجابية و${negPct}٪ سلبية، مما يعكس انقساماً أو حواراً متكافئاً في الآراء.`,
+  storyAct2Title: "٢. بؤرة الاهتمام والنقاش",
+  storyAct2DominantTopic: (name: string, count: string, pct: number) =>
+    `الموضوع الأكثر استقطاباً للتفاعل: «${name}» بـ ${count} تعليقاً (${pct}٪ من النقاش المصنَّف).`,
+  storyAct2TopVideo: (title: string, count: string, pct: number) =>
+    `أعلى فيديو استقطاباً: «${title}» بـ ${count} تعليقاً (${pct}٪ من التفاعل).`,
+  storyAct2General: "التفاعل يتوزع عبر عدة محاور دون هيمنة موضوع واحد محدد.",
+  storyAct3Title: "٣. التوصية الإجرائية",
+  storyAct3RecCritical:
+    "يُنصح بالتركيز على الرد على التعليقات النقدية الأكثر تفاعلاً لإزالة اللبس وامتصاص الانتقادات.",
+  storyAct3RecPositive:
+    "الجمهور يظهر تفاعلاً إيجابياً عالياً؛ استثمر هذا الزخم بالاستمرار في نفس وتيرة الطرح ومكافأة تفاعلهم.",
+  storyAct3RecGeneral:
+    "تابع وتيرة النشر وحافظ على مراجعة عينات من التعليقات دورياً لضبط دقة النماذج التحليلية.",
+
+  // Donut & Voice enhancements
+  donutCenterNet: "صافي الرضا",
+
+  // Timing takeaway & highlighting
+  timingPeakHeadline: (day: string, hour: string, count: string) =>
+    `أعلى ذروة للتفاعل: يوم ${day} عند الساعة ${hour}:00 (${count} تعليق).`,
+  timingPeakBadge: "فترة الذروة",
+  timingDayPeak: (day: string) => `اليوم الأكثر تفاعلاً: ${day}`,
+  timingHourPeak: (hour: string) => `الساعة الأكثر نشاطاً: ${hour}:00`,
+
+  // Video performance filters & outlier badges
+  videoFilterAll: "كل الفيديوهات",
+  videoFilterCritical: "الأعلى نقداً",
+  videoFilterPositive: "الأكثر إيجابية",
+  videoFilterVolume: "الأعلى تفاعلاً",
+  videoTagHighNegative: "نقد مرتفع",
+  videoTagTopPositive: "إيجابي متميز",
+  videoTagTopVolume: "أعلى تفاعل",
+
+  // Engaged creator tip
+  engagedCreatorTip:
+    "توصية إجرائية: هذه التعليقات حازت على إعجاب واسع من المتابعين؛ الرد عليها أو توضيحها رسمياً يمتص الجدل ويعزز ثقة الجمهور.",
+
+  // Storytelling with Data KPIs & Actionable Steps
+  kpiViews: "المشاهدات",
+  kpiViewsNote: "إجمالي المشاهدات للفيديوهات المحللة",
+  kpiLikes: "الإعجابات",
+  kpiLikesNote: "إجمالي التفاعل بالإعجاب",
+  kpiNetSentiment: "صافي الرضا",
+  kpiNetSentimentNote: "الفارق بين الإيجابي والسلبي",
+  kpiEngagement: "معدل التفاعل",
+  kpiEngagementNote: "(التعليقات + الإعجابات) / المشاهدات",
+  actionableStepsTitle: "خطوات مقترحة ومسارات تحسين",
+  actionStep1Critical:
+    "الرد الاستباقي على بؤر النقد الأكثر انتشاراً لتصحيح المفاهيم وتخفيف الاحتقان.",
+  actionStep2Positive:
+    "تعزيز المحاور الأكثر إيجابية في الحلقات القادمة وتكريم المعلّقين المخلصين.",
+  actionStep3Timing:
+    "استغلال فترات الذروة الزمنية للنشر لضمان وصول المحتوى إلى أوسع شريحة متفاعلة.",
+  actionStep4Engagement:
+    "تثبيت تعليقات توضيحية أو فتح استطلاعات رأي حول الموضوعات الأكثر جدلاً.",
+  actionStepGeneral:
+    "مواصلة رصد ومتابعة نبض الجمهور دورياً مع كل إصدار جديد للحفاظ على نمو الرضا.",
+
   dateOrderError: "يجب أن يسبق تاريخ البداية تاريخ النهاية",
   chipSearch: (q: string) => `بحث: «${q}»`,
   chipVideo: "فيديو محدَّد",
   chipSentiment: (label: string) => `المشاعر: ${label}`,
   chipVideoKind: "نوع فيديو",
+  chipPlatform: (p: string) => `المنصة: ${p}`,
   chipCommentType: "نوع تعليق",
   chipRepliesOnly: "الردود فقط",
   chipCommentsOnly: "التعليقات فقط",
@@ -766,8 +1162,9 @@ export const ar = {
   showAll: "اعرض الكل",
   hideFilters: "إخفاء الفلاتر",
   showFilters: "إظهار الفلاتر",
-  moreFilters: (n: number) => (n > 0 ? `المزيد (${n})` : "المزيد"),
-  filtersButton: (n: number) => (n > 0 ? `الفلاتر (${n})` : "الفلاتر"),
+  moreFilters: (n: number) =>
+    n === 0 ? "المزيد من المرشحات" : `المزيد من المرشحات (${n})`,
+  filtersButton: (n: number) => (n === 0 ? "الفلاتر" : `الفلاتر (${n})`),
   removeFilter: (label: string) => `إزالة الفلتر: ${label}`,
   filtersLabel: "فلاتر التقرير",
   searchLabel: "البحث في التعليقات والمؤلفين",
@@ -780,6 +1177,16 @@ export const ar = {
   kindVideo: "فيديو",
   kindShort: "شورت",
   kindStream: "بث",
+  kindPost: "منشور",
+  platformFilterLabel: "المنصة",
+  allPlatforms: "كل المنصات",
+  platformYouTube: "يوتيوب",
+  platformTelegram: "تليجرام",
+  platformX: "إكس (تويتر)",
+  platformTikTok: "تيك توك",
+  platformFacebook: "فيسبوك",
+  platformInstagram: "انستغرام",
+  platformSoon: "قريباً",
   participationLabel: "نوع المشاركة",
   commentsAndReplies: "تعليقات وردود",
   originalOnly: "تعليقات أصلية فقط",
@@ -963,8 +1370,12 @@ export const ar = {
   noLabel: "بلا تصنيف",
   cursorReset: "تغيّرت النتائج فأُعيد العرض من الصفحة الأولى.",
   exportCsv: "تصدير CSV",
-  exportNote: (total: number) =>
-    `يصدّر كل التعليقات المطابقة للفلاتر الحالية (${total}) وليس الصفحة المعروضة فقط. تُعطَّل صيغ الجداول في الملف دون تغيير النص المخزن.`,
+  exportNote: (total: number, cap = 10000) =>
+    total > cap
+      ? `يصدّر أول ${cap.toLocaleString("en-US")} تعليق من إجمالي ${total.toLocaleString("en-US")} مطابق للفلاتر لحماية أداء المتصفح. تُعطَّل صيغ الجداول في الملف دون تغيير النص المخزن.`
+      : `يصدّر كل التعليقات المطابقة للفلاتر الحالية (${total}) وليس الصفحة المعروضة فقط. تُعطَّل صيغ الجداول في الملف دون تغيير النص المخزن.`,
+  exportTruncatedNotice: (cap: number, total: number) =>
+    `تم تصدير أول ${cap.toLocaleString("en-US")} تعليق فقط (من أصل ${total.toLocaleString("en-US")}) لضمان كفاءة المتصفح.`,
   exportFailed: "تعذر إنشاء ملف التصدير. حاول مرة أخرى.",
   commentsCaption: "التعليقات ضمن الفلاتر",
   colAuthor: "المؤلف",

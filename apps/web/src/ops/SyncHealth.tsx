@@ -10,10 +10,9 @@
  */
 import { Card } from "../ui/Card";
 import { Badge, type BadgeProps } from "../ui/Badge";
-import type { deriveSnapshot } from "../data";
 import type { Health } from "../syncHealth";
 import type { SyncState } from "@sentiment/contracts";
-import { displayDate } from "../i18n";
+import { displayDate, formatDuration, formatElapsed } from "../i18n";
 import type { Locale } from "../locale";
 import type { Strings } from "../strings";
 import { explainCode } from "../jobFeed";
@@ -27,6 +26,7 @@ const SEVERITY_TONE: Record<Health["severity"], BadgeProps["tone"]> = {
 
 export function SyncHealth({
   s,
+  sync,
   health,
   run,
   mode,
@@ -34,7 +34,8 @@ export function SyncHealth({
   lang,
   S,
 }: {
-  s: ReturnType<typeof deriveSnapshot> | undefined;
+  s?: { sync: SyncState | null } | undefined;
+  sync?: SyncState | null;
   health: Health;
   run: SyncState["last_run"] | null;
   mode: "live" | "sanitized_fixture";
@@ -44,6 +45,9 @@ export function SyncHealth({
   lang: Locale;
   S: Strings;
 }) {
+  const currentSync = sync ?? s?.sync;
+  const busy = currentSync?.worker?.busy ?? false;
+
   return (
     <section
       className="db-section"
@@ -66,14 +70,25 @@ export function SyncHealth({
           </p>
         )}
         {health.queued > 0 && (
-          <p data-testid="sync-queued">{S.opsQueued(health.queued)}</p>
+          <p data-testid="sync-queued">
+            {S.opsQueuedWithEta(
+              health.queued,
+              health.queued === 1
+                ? lang === "ar"
+                  ? "خلال 30–60 ثانية تقريباً"
+                  : "~30–60s"
+                : lang === "ar"
+                  ? `خلال ~${Math.ceil((health.queued * 30) / 60)}–${Math.ceil((health.queued * 60) / 60)} دقيقة`
+                  : `~${Math.ceil((health.queued * 30) / 60)}–${Math.ceil((health.queued * 60) / 60)} mins`,
+            )}
+          </p>
         )}
         <p data-testid="sync-worker">
           {S.opsWorkerLabel}{" "}
-          {s?.sync?.worker.connected
-            ? S.opsWorkerConnected(
-                displayDate(s.sync.worker.last_heartbeat_at, lang),
-              )
+          {currentSync?.worker.connected
+            ? `${S.opsWorkerConnected(
+                displayDate(currentSync.worker.last_heartbeat_at, lang),
+              )}${busy ? ` · ${S.opsWorkerBusyEta(lang === "ar" ? "خلال دقيقة تقريباً" : "within ~1 min")}` : ""}`
             : S.opsWorkerDisconnected}
         </p>
         {/* The remedy used to be a "request sync" button here. It is the
@@ -98,6 +113,32 @@ export function SyncHealth({
             {run.coverage.complete
               ? S.opsTraversalComplete
               : S.opsTraversalUnproven}
+            {run.ended_at && run.started_at ? (
+              <>
+                {" "}
+                ·{" "}
+                {S.opsDurationTaken(
+                  formatDuration(
+                    Math.max(
+                      1,
+                      Math.round(
+                        (new Date(run.ended_at).getTime() -
+                          new Date(run.started_at).getTime()) /
+                          1000,
+                      ),
+                    ),
+                    lang,
+                  ),
+                )}
+              </>
+            ) : !run.ended_at ? (
+              <>
+                {S.opsRunningDuration(formatElapsed(run.started_at, lang))}
+                {S.opsEstimatedCompletion(
+                  lang === "ar" ? "خلال دقيقة تقريباً" : "within ~1 min",
+                )}
+              </>
+            ) : null}
           </p>
         ) : (
           <p data-testid="sync-last-run">{S.opsNoPreviousRun}</p>

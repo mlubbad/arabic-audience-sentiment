@@ -28,26 +28,34 @@ const failed = (error: unknown): never => {
 };
 
 /**
- * Opens the channel grant for a claimed job and returns a usable access token.
+ * How soon before expiry a token is considered stale.
  *
- * Renewed here rather than by the worker, and written back, so the next claim
- * does not renew again. A grant Google has revoked marks the channel for
- * reconnection instead of being retried: nothing on the worker's side can fix
- * a withdrawn authorisation, and retrying it would collect nothing while the
- * channel looked connected.
+ * A collection run can last longer than the hour its token starts with, and
+ * a token that lapses mid-run costs the whole run. Renewing whenever less
+ * than a quarter of an hour remains keeps the renewal at claim time for the
+ * ordinary job, and leaves the mid-run renewal as a backstop for the long
+ * ones rather than the normal way a run survives.
  */
-async function accessTokenFor(
-  credentialHash: string,
-  jobId: string,
-): Promise<string | null> {
-  const { data, error } = await db.rpc("svc_worker_channel_grant", {
-    credential_hash: credentialHash,
-    j: jobId,
-  });
-  // No grant is a fact about the channel, not a failure to retry.
-  if (error || !data?.length) return null;
+const RENEW_MARGIN_MS = 15 * 60_000;
 
-  const grant = data[0] as { connection_id: string; encrypted_tokens: string };
+/**
+ * Opens the channel grant and returns a usable access token, renewing and
+ * writing back when the stored one is near its end, so the next request does
+ * not renew again.
+ *
+ * A grant Google has revoked marks the channel for reconnection instead of
+ * being retried: nothing on the worker's side can fix a withdrawn
+ * authorisation, and retrying it would collect nothing while the channel
+ * looked connected.
+ */
+async function issueToken(
+  credentialHash: string,
+  grant: { connection_id: string; encrypted_tokens: string; job_id: string },
+  kind: "channel" | "reader" = "channel",
+): Promise<{
+  access_token: string;
+  access_token_expires_at: string;
+} | null> {
   const key = await importSealingKey(env("TOKEN_ENCRYPTION_KEY"));
   // bytea arrives from PostgREST as a \x-prefixed hex literal.
   const hex = grant.encrypted_tokens.replace(/^\\x/, "");
@@ -60,9 +68,11 @@ async function accessTokenFor(
     expires_at: string;
   };
 
-  // A minute of margin: a token that expires mid-collection costs a whole run.
-  if (Date.parse(tokens.expires_at) - Date.now() > 60_000)
-    return tokens.access_token;
+  if (Date.parse(tokens.expires_at) - Date.now() > RENEW_MARGIN_MS)
+    return {
+      access_token: tokens.access_token,
+      access_token_expires_at: tokens.expires_at,
+    };
 
   try {
     const renewed = await refreshAccessToken(
@@ -78,27 +88,131 @@ async function accessTokenFor(
     );
     const { sealTokens } = await import("../_shared/oauth-callback.ts");
     const resealed = await sealTokens(key, renewed);
-    await db.rpc("svc_worker_store_grant", {
-      credential_hash: credentialHash,
-      connection: grant.connection_id,
-      tokens:
-        "\\x" +
-        [...resealed].map((b) => b.toString(16).padStart(2, "0")).join(""),
-    });
-    return renewed.access_token;
-  } catch (e) {
-    if (e instanceof RevokedError)
-      await db.rpc("svc_worker_mark_revoked", {
+    const hexToken =
+      "\\x" +
+      [...resealed].map((b) => b.toString(16).padStart(2, "0")).join("");
+    // The reader's renewal is written back to the reader's own row, never to
+    // the connection its seal was copied from.
+    await db.rpc(
+      kind === "reader"
+        ? "svc_worker_store_reader_grant"
+        : "svc_worker_store_grant",
+      {
         credential_hash: credentialHash,
-        j: jobId,
-      });
+        connection: grant.connection_id,
+        tokens: hexToken,
+      },
+    );
+    return {
+      access_token: renewed.access_token,
+      access_token_expires_at: renewed.expires_at,
+    };
+  } catch (e) {
+    if (e instanceof RevokedError) {
+      if (kind === "reader")
+        await db.rpc("svc_worker_reader_revoked", {
+          credential_hash: credentialHash,
+          connection: grant.connection_id,
+        });
+      else
+        await db.rpc("svc_worker_mark_revoked", {
+          credential_hash: credentialHash,
+          j: grant.job_id,
+        });
+    }
     return null;
   }
+}
+
+async function accessTokenFor(
+  credentialHash: string,
+  jobId: string,
+): Promise<{ access_token: string; access_token_expires_at: string } | null> {
+  const { data, error } = await db.rpc("svc_worker_channel_grant", {
+    credential_hash: credentialHash,
+    j: jobId,
+  });
+  // No grant is a fact about the channel, not a failure to retry.
+  if (error || !data?.length) return null;
+  const grant = data[0] as { connection_id: string; encrypted_tokens: string };
+  return issueToken(credentialHash, { ...grant, job_id: jobId });
+}
+
+/**
+ * The platform reader's token, for a public channel whose job has no grant of
+ * its own. Any valid worker credential may ask: every tenant's public jobs
+ * are collected with this one grant. Null when no active reader — the claim
+ * then answers with the channel's id alone, and a key-carrying worker (or
+ * none) takes it from there.
+ */
+async function readerTokenFor(
+  credentialHash: string,
+): Promise<{ access_token: string; access_token_expires_at: string } | null> {
+  const { data, error } = await db.rpc("svc_worker_reader_grant", {
+    credential_hash: credentialHash,
+  });
+  if (error || !data?.length) return null;
+  const grant = data[0] as { connection_id: string; encrypted_tokens: string };
+  return issueToken(credentialHash, { ...grant, job_id: "" }, "reader");
+}
+
+/**
+ * A fresh token for a run in progress, against a lease the worker still holds.
+ *
+ * The lease is validated in the database by the same private seam as every
+ * other leased call, so a worker that lost its lease is refused here rather
+ * than minted tokens for a job someone else holds. Null means the channel's
+ * grant is gone; the worker stops asking and the retry path reports it.
+ */
+async function renewToken(
+  credentialHash: string,
+  jobId: string,
+  leaseToken: string,
+): Promise<{ access_token: string; access_token_expires_at: string } | null> {
+  const { data, error } = await db.rpc("svc_worker_renew_grant", {
+    credential_hash: credentialHash,
+    j: jobId,
+    t: leaseToken,
+  });
+  // A channel whose grant vanished mid-run answers the same thing the claim
+  // path does — no token — rather than a 500 the worker would have to guess
+  // at. For a public channel that refusal is the expected answer (there is no
+  // channel grant to renew), and the public branch below takes it from there;
+  // anything else is a real failure. A lost lease is left to travel as its
+  // own refusal: the run ends.
+  if (error) {
+    if ((error as { message?: string }).message !== "channel_not_connected")
+      failed(error);
+  } else if (data?.length) {
+    const grant = data[0] as {
+      connection_id: string;
+      encrypted_tokens: string;
+    };
+    return issueToken(credentialHash, { ...grant, job_id: jobId });
+  }
+  // A public job has no channel grant to renew; its run renews the platform
+  // reader instead, but only when the job's channel really is public — the
+  // reader is never handed to a connected channel's run.
+  const { data: job } = await db
+    .from("jobs")
+    .select("channel_id")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (!job?.channel_id) return null;
+  const { data: channel } = await db
+    .from("channels")
+    .select("status")
+    .eq("id", job.channel_id)
+    .maybeSingle();
+  if (channel?.status !== "public_unverified") return null;
+  return readerTokenFor(credentialHash);
 }
 
 Deno.serve((request) =>
   handleWorkerRequest(request, {
     accessTokenFor,
+    readerTokenFor,
+    renewToken,
     claim: async (hash, jobTypes) => {
       // A null/empty list calls the single-argument RPC: an unscoped claim.
       const rpcArgs =
@@ -107,7 +221,33 @@ Deno.serve((request) =>
           : { credential_hash: hash };
       const { data, error } = await db.rpc("svc_worker_claim", rpcArgs);
       if (error) failed(error);
-      return data?.[0] ?? null;
+      const claimed = data?.[0] ?? null;
+      if (!claimed) return null;
+      // A public channel has no grant to open, and until now that made it
+      // uncollectable: the worker saw no token and no identity, and could
+      // only report the job blocked. When the claimed job's channel is
+      // registered as public data, its platform id travels with the lease so
+      // the worker can read the public catalogue and comments by id. A
+      // connected channel's id deliberately does not travel — a grant that
+      // failed to open is the worker's signal to report the channel
+      // unconnected, not an invitation to fall back to public collection
+      // without anyone deciding that.
+      if (claimed.channel_id) {
+        const { data: channel } = await db
+          .from("channels")
+          .select("external_channel_id,status,platform")
+          .eq("id", claimed.channel_id)
+          .maybeSingle();
+        if (
+          channel?.status === "public_unverified" &&
+          channel.external_channel_id
+        )
+          claimed.external_channel_id = channel.external_channel_id;
+        if (channel?.platform) {
+          claimed.platform = channel.platform;
+        }
+      }
+      return claimed;
     },
     heartbeat: async (hash, j, t) => {
       const { error } = await db.rpc("svc_worker_heartbeat", {

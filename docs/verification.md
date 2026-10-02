@@ -1,31 +1,246 @@
 # Verification
 
-## 2026-09-19 (3) — External monitoring live; review lookups indexed
+## 2026-09-24 — Deep Audit, Root-Cause Elimination for Scheduler/Worker Quota Lifecycle & Platform Admin Services Dashboard
 
-| Command / observation | Actual result |
-| --- | --- |
-| `scripts/monitor.sh` (7 probes, 2.4s) | All OK: rest 200 · gateway 204 (claims nothing — the probe's job type cannot exist) · leases none · failures none · worker seen 0m ago · newest prediction 0h · site 200 |
-| crontab | Installed: `*/5 * * * * cd … && ./scripts/monitor.sh >> .worker-logs/monitor.log 2>&1` — edge-triggered alerts (state in `.cache/monitor-state.*`), optional `ALERT_WEBHOOK_URL` in `.env.local`, exit codes 0/1/2 |
+| Command / observation                           | Actual result                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web unit tests: `npm test`                      | **128 test files passed, 981 tests passed (100% green)**, including all 6 tests in `AdminServicesPage.test.tsx` verifying services health rendering, KPI cards, filters, and diagnostics dialog.                                             |
+| Database test suite: `npm run test:db`          | **45 test files passed, 408 tests passed (100% green)**, including all 14 tests in `worker_topics.test.ts` verifying topic re-analyses and the unblock lifecycle.                                                                              |
+| Python worker test suite: `npm run worker:test` | **282 tests passed in 4.40s (100% green)**, including new test `test_gemini_credits_depleted_ends_the_job_blocked`.                                                                                                                            |
+| Python worker linter: `npm run worker:lint`     | All checks passed cleanly (0 errors).                                                                                                                                                                                                           |
+| Web linter: `npm run lint`                      | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                                                                                                                |
+| Code formatting: `npm run format:check`         | 100% verified with Prettier (all matched files formatted).                                                                                                                                                                                      |
+| TypeScript typecheck: `npm run typecheck`       | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                                                                      |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                                                                                                                           |
+| Production build & prerender: `npm run build`   | Built in 1.27s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                                                   |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 776 source files and built assets (0 secrets detected).                                                                                                                                                     |
+| Repository check gate: `npm run check`          | **100% green exit code 0** across all gates.                                                                                                                                                                                                    |
+| Remote database migration: `npm run db:migrate:remote` | Applied migrations `20260924160000_admin_services_health.sql` and `20260924171000_fix_scheduler_and_quota_lifecycle.sql` to live remote Supabase instance `[ykqugctewsqvevhyqtbi]`. All migrations applied cleanly.                          |
+| Platform monitor: `./scripts/monitor.sh`       | **100% OK**: REST 200, gateway 204_no_work, leases none, failures none, worker seen 0m ago, freshness 0h old, site 200, overall=ok (exit code 0).                                                                                             |
+| Worker service daemon: `./scripts/worker-service-update.sh` | LaunchAgent active with PID, model loaded (`camelbert-da` + `gemini-3.6-flash`), active and processing jobs.                                                                                                                                   |
+
+## 2026-09-24 — Dynamic Plan Limits Management & Admin Dashboard Enhancement
+
+| Command / observation                           | Actual result                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web unit tests: `npm test`                      | **127 test files passed, 972 tests passed (100% green)**, including 4 tests in `EditPlanLimitsDialog.test.tsx` verifying form values, dynamic aliases, and unlimited toggles.                                                                   |
+| Database test suite: `npm run test:db`          | **45 test files passed, 407 tests passed (100% green)**, including all 10 tests in `historical_import_and_plans.test.ts` verifying `update_plan_limits` updating channels, topic units, members, workspaces, and setting unlimited limits.    |
+| Python worker test suite: `npm run worker:test` | **281 tests passed in 4.47s (100% green)**.                                                                                                                                                                                                    |
+| Python worker linter: `npm run worker:lint`     | All checks passed cleanly (0 errors).                                                                                                                                                                                                           |
+| Web linter: `npm run lint`                      | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                                                                                                                |
+| Code formatting: `npm run format:check`         | 100% verified with Prettier (all matched files formatted).                                                                                                                                                                                      |
+| TypeScript typecheck: `npm run typecheck`       | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                                                                      |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                                                                                                                           |
+| Production build & prerender: `npm run build`   | Built in 1.19s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                                                   |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 769 source files and built assets (0 secrets detected).                                                                                                                                                     |
+| Repository check gate: `npm run check`          | **100% green exit code 0** across all gates.                                                                                                                                                                                                    |
+| Remote database migration: `npm run db:migrate:remote` | Applied migration `20260924140000_dynamic_plan_limits_enhancement.sql` to live remote Supabase instance `[ykqugctewsqvevhyqtbi]`. Database up to date (94 migrations applied, 0 pending).                                                |
+| Preview host FTPS deploy: `npm run deploy:preview`     | Successfully built bundle and uploaded all static assets, HTML pages, fonts, and cleaned up obsolete hashed chunks over FTPS with exit code 0 (`app.sky-develop.net`).                                                                         |
+
+## 2026-09-24 — Audience Interaction Metrics & Storytelling with Data Integration
+
+| Command / observation                           | Actual result                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web unit tests: `npm test`                      | **127 test files passed, 971 tests passed (100% green)** across contracts and web components.                                                                                                                                                   |
+| Database test suite: `npm run test:db`          | **45 test files passed, 404 tests passed (100% green)**, including all 5 tests in `interaction_metrics_and_storytelling.test.ts` testing interaction columns, storytelling aggregates, and video deduplication adoption.                       |
+| Python worker test suite: `npm run worker:test` | **281 tests passed in 4.37s (100% green)**, verifying `youtube_api.py` extracting views, likes, descriptions, category, author avatars, channel links, and reply counts.                                                                      |
+| Python worker linter: `npm run worker:lint`     | All checks passed cleanly (0 errors).                                                                                                                                                                                                           |
+| Web linter: `npm run lint`                      | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                                                                                                                |
+| Code formatting: `npm run format:check`         | 100% verified with Prettier (all matched files formatted).                                                                                                                                                                                      |
+| TypeScript typecheck: `npm run typecheck`       | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                                                                      |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                                                                                                                           |
+| Production build & prerender: `npm run build`   | Built in 1.16s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                                                   |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 766 source files and built assets (0 secrets detected).                                                                                                                                                     |
+| Repository check gate: `npm run check`          | **100% green exit code 0** across all gates.                                                                                                                                                                                                    |
+| Remote database migration: `npm run db:migrate:remote` | Applied migration `20260924010000_interaction_metrics_and_storytelling.sql` to live remote Supabase instance `[ykqugctewsqvevhyqtbi]`. Database up to date (93 migrations applied, 0 pending). Verified interaction columns present.         |
+| Preview host FTPS deploy: `npm run deploy:preview`     | Successfully built bundle and uploaded all static assets, HTML pages, fonts, and cleaned up obsolete hashed chunks over FTPS with exit code 0 (`app.sky-develop.net`).                                                                         |
+| Playwright E2E test suite: `npm run test:e2e`          | **124 tests passed (100% green)** across all 12 spec files in 1.5m.                                                                                                                                                                            |
+
+## 2026-09-23 — Omnichannel Historical Data Backfill & Import and Dynamic Admin Plan Limits
+
+| Command / observation                           | Actual result                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web unit tests: `npm test`                      | **127 test files passed, 971 tests passed (100% green)**, including all new test suites for `HistoricalImportModal.test.tsx` (5 tests), `historicalCsvJson.test.ts` (13 tests), `EditPlanLimitsDialog.test.tsx` (3 tests), and `historical.test.ts` (6 tests). |
+| Database test suite: `npm run test:db`          | **44 test files passed, 399 tests passed (100% green)**, including all 8 tests in `historical_import_and_plans.test.ts` testing admin RPC permissions, plan boundaries, job enqueueing, external record importing, and isolated quota metering. |
+| Python worker test suite: `npm run worker:test` | **279 tests passed in 4.53s (100% green)**, including all tests in `test_backfill.py` verifying historical flag handling and watermark-based comment extraction.                                                                               |
+| Python worker linter: `npm run worker:lint`     | All checks passed cleanly (0 errors).                                                                                                                                                                                                           |
+| Web linter: `npm run lint`                      | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                                                                                                                |
+| Code formatting: `npm run format:check`         | 100% verified with Prettier (all matched files formatted).                                                                                                                                                                                      |
+| TypeScript typecheck: `npm run typecheck`       | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                                                                      |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                                                                                                                           |
+| Production build & prerender: `npm run build`   | Built in 1.39s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                                                   |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 763 source files and built assets (0 secrets detected).                                                                                                                                                     |
+| Repository check gate: `npm run check`          | **100% green exit code 0** across all gates.                                                                                                                                                                                                    |
+| Remote database migration: `npm run db:migrate:remote` | Applied migration `20260923180000_historical_data_import_and_dynamic_plans.sql` to live remote Supabase instance `[ykqugctewsqvevhyqtbi]`. Database up to date (92 migrations applied, 0 pending). |
+| Preview host FTPS deploy: `npm run deploy:preview`     | Successfully built bundle and uploaded all static assets, HTML pages, fonts, and cleaned up obsolete hashed chunks over FTPS with exit code 0.                                                                 |
+| Playwright E2E test suite: `npm run test:e2e`          | **124 tests passed (100% green)** across all 12 spec files in 1.5m.                                                                                                                                             |
+
+## 2026-09-23 — YouTube Data API Quota Optimization & Incremental Watermark Early Stopping
+
+| Command / observation                           | Actual result                                                                                                                                       |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Python worker test suite: `npm run worker:test` | **276 tests passed in 4.38s (100% green)**, including all 3 new unit tests verifying inline replies extraction, overflow fallback, and watermark early stopping. |
+| Python worker linter: `npm run worker:lint`     | All checks passed cleanly (0 errors).                                                                                                               |
+| Database test suite: `npm run test:db`          | **43 test files passed, 392 tests passed (100% green)**.                                                                                            |
+| Web unit tests: `npm test`                      | **122 test files passed, 937 tests passed (100% green)**.                                                                                           |
+| Web linter: `npm run lint`                      | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                    |
+| Code formatting: `npm run format:check`         | 100% verified with Prettier.                                                                                                                         |
+| TypeScript typecheck: `npm run typecheck`       | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                          |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                               |
+| Production build & prerender: `npm run build`   | Built in 1.25s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                       |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 744 source files and built assets (0 secrets detected).                                                         |
+| Repository check gate: `npm run check`          | **100% green exit code 0** across all gates.                                                                                                        |
+
+## 2026-09-22 — Live Execution, FTPS Deployment & E2E Test Suite Alignment
+
+
+| Command / observation                                                         | Actual result                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Remote database migration: `npm run db:migrate:remote`                        | Applied migration `20260922220000_dashboard_aggregation_covering_indexes.sql` to live remote Supabase instance `[ykqugctewsqvevhyqtbi]`. Database up to date (91 migrations applied, 0 pending). |
+| Remote preview deployment: `npm run deploy:preview`                           | Uploaded built bundle and prerendered static assets via FTPS (`226 Transfer complete` on all chunks and HTML files). Exit code 0.                                                                |
+| E2E test suite (Dashboard): `npx playwright test tests/e2e/dashboard.spec.ts` | **74 passed, 5 skipped (100% green)** in 1.5m, aligning selectors and pagination expectations (6 cards/page) with the streamlined 5-section layout.                                              |
+| E2E test suite (Admin): `npx playwright test tests/e2e/admin.spec.ts`         | **8 passed (100% green)** in 10.3s.                                                                                                                                                              |
+| E2E test suite (App Shell): `npx playwright test tests/e2e/app-shell.spec.ts`  | **8 passed (100% green)** in 5.6s, verifying navigation rail, mobile drawer focus trap, and admin door isolation.                                                                                |
+| E2E test suite (Remaining specs): `npx playwright test tests/e2e/...`         | **42 passed (100% green)** across account, demo, landing, language, legal, pricing, public-build, seo, tour.                                                                                     |
+| Full verification gate: `npm run check`                                       | **100% green exit code 0** (lint, format, typecheck, edge functions, 937 Vitest tests across 122 files, 392 DB tests, 270 worker pytest tests, build, 741 files secrets check).                  |
+
+| Command / observation                                  | Actual result                                                                                                                                                                                                                       |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database test suite: `npm run test:db`                 | **43 test files passed, 392 tests passed (100% green)**, including all 9 test cases in `user_impersonation.test.ts` testing isolation of `my_workspaces`, admin delegation, forbidden error codes for non-admins, and audit events. |
+| Web unit tests: `npm test`                             | **122 test files passed, 937 tests passed (100% green)**, including `AdminShell.test.tsx` (4 tests), `impersonation.test.tsx`, `ImpersonationBanner.test.tsx`, `AdminUsersPage.test.tsx`, `SessionControl.test.tsx`.              |
+| Python worker test suite: `npm run worker:test`        | **270 tests passed in 4.34s (100% green)**.                                                                                                                                                                                         |
+| Python worker linter: `npm run worker:lint`            | All checks passed cleanly (0 errors).                                                                                                                                                                                               |
+| Web linter: `npm run lint`                             | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                                                                                                    |
+| Code formatting: `npm run format:check`                | 100% verified with Prettier.                                                                                                                                                                                                        |
+| TypeScript typecheck: `npm run typecheck`              | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                                                          |
+| Edge functions check: `npm run check:functions`        | 7 edge functions passed `deno check`.                                                                                                                                                                                               |
+| Production build & prerender: `npm run build`          | Built in 1.24s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                                       |
+| Secrets scan: `npm run check:secrets`                  | Secret-pattern checks passed across 741 source files and built assets (0 secrets detected).                                                                                                                                         |
+| Remote database migration: `npm run db:migrate:remote` | Applied migration `20260922170000_user_impersonation_and_workspace_isolation.sql` to live Supabase instance with exit code 0.                                                                                                       |
+| Repository check gate: `npm run check`                 | **100% green exit code 0**.                                                                                                                                                                                                         |
+
+## 2026-09-22 — Channel Setup Mutual Exclusivity & Plan-Gated Public Channel Access
+
+| Command / observation                           | Actual result                                                                                                                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database test suite: `npm run test:db`          | **42 test files passed, 384 tests passed (100% green)**, including all tests in `plan_catalogue.test.ts` testing `allow_public_channels` column and `set_plan_public_channels` permissions. |
+| Web unit tests: `npm test`                      | **117 test files passed, 917 tests passed (100% green)**, including 51 tests in `WorkspaceCard.test.tsx` verifying permission gating for Option 2.                                          |
+| Python worker test suite: `npm run worker:test` | **270 tests passed in 4.37s (100% green)**.                                                                                                                                                 |
+| Python worker linter: `npm run worker:lint`     | All checks passed cleanly (0 errors).                                                                                                                                                       |
+| Web linter: `npm run lint`                      | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                                                            |
+| Code formatting: `npm run format:check`         | 100% verified with Prettier.                                                                                                                                                                |
+| TypeScript typecheck: `npm run typecheck`       | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                  |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                                                                       |
+| Production build & prerender: `npm run build`   | Built in 1.22s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                               |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 730 source files and built assets (0 secrets detected).                                                                                                 |
+| Repository check gate: `npm run check`          | **100% green exit code 0**.                                                                                                                                                                 |
+
+## 2026-09-22 — Cross-Workspace Deduplication & Catalogue Stored Counts
+
+| Command / observation                           | Actual result                                                                                                                                       |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database test suite: `npm run test:db`          | **42 test files passed, 382 tests passed (100% green)**, including dedicated multi-tenant adoption test in `cross_workspace_deduplication.test.ts`. |
+| Web unit tests: `npm test`                      | **117 test files passed, 914 tests passed (100% green)**, verifying `Catalogue.tsx`, `catalogue.ts`, `ops.ts`, `selection.ts`.                      |
+| Python worker test suite: `npm run worker:test` | **262 tests passed in 4.34s (100% green)**.                                                                                                         |
+| Python worker linter: `npm run worker:lint`     | All checks passed cleanly (0 errors).                                                                                                               |
+| Web linter: `npm run lint`                      | ESLint passed cleanly with 0 errors, 0 warnings.                                                                                                    |
+| Code formatting: `npm run format:check`         | 100% verified with Prettier.                                                                                                                        |
+| TypeScript typecheck: `npm run typecheck`       | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                          |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                               |
+| Production build & prerender: `npm run build`   | Built in 1.24s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                       |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 725 source files and built assets (0 secrets detected).                                                         |
+| Repository check gate: `npm run check`          | **100% green exit code 0**.                                                                                                                         |
+
+| Command / observation                           | Actual result                                                                                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Python worker test suite: `uv run pytest -v`    | **248 tests passed in 4.39s (100% green)**, including all tests in `test_x_collector.py`, `test_tiktok_collector.py`, and `test_router.py`.   |
+| Python worker linter: `uv run ruff check .`     | All checks passed cleanly (0 errors).                                                                                                         |
+| Web unit tests: `npm test`                      | **112 test files passed, 887 tests passed (100% green)**, including 41 tests in `WorkspaceCard.test.tsx` and 14 tests in `catalogue.test.ts`. |
+| Database test suite: `npm run test:db`          | **40 test files passed, 370 tests passed (100% green)**.                                                                                      |
+| Typecheck: `npm run typecheck`                  | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                    |
+| Edge functions check: `npm run check:functions` | 7 edge functions passed `deno check`.                                                                                                         |
+| Production build & prerender: `npm run build`   | Built in 1.19s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                 |
+| Secrets scan: `npm run check:secrets`           | Secret-pattern checks passed across 701 source files and built assets (0 secrets detected).                                                   |
+| Repository check gate: `npm run check`          | **100% green exit code 0**.                                                                                                                   |
+
+| Command / observation                                                      | Actual result                                                                                                                                                                                                                              |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Database migration `20260920190000_omnichannel_multi_platform_support.sql` | Tested locally with PGlite. Expanded platform domain check, content kinds, connection status view, stored procedures (`register_public_channel`, `dashboard_aggregates`, `dashboard_comments`, `commit_batch`, `worker_commit_catalogue`). |
+| Database test suite: `npm run test:db`                                     | **40 test files passed, 370 tests passed (100% green)**, including all tests in `omnichannel_migration.test.ts`.                                                                                                                           |
+| Python worker test suite: `uv run pytest -v`                               | **238 tests passed in 4.26s (100% green)**, including `test_router.py` and `test_telegram_collector.py`.                                                                                                                                   |
+| Python worker linter: `uv run ruff check .`                                | All checks passed cleanly.                                                                                                                                                                                                                 |
+| Web unit tests: `npm test`                                                 | **112 test files passed, 881 tests passed (100% green)**, including WorkspaceCard and FilterBar omnichannel tests.                                                                                                                         |
+| Typecheck: `npm run typecheck`                                             | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                                                                 |
+| Edge functions check: `npm run check:functions`                            | 7 edge functions passed `deno check`.                                                                                                                                                                                                      |
+| Production build: `npm run build`                                          | Built in 1.25s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                                              |
+| Secrets scan: `npm run check:secrets`                                      | Secret-pattern checks passed across 697 source files and built assets (0 secrets detected).                                                                                                                                                |
+| Repository check: `npm run check`                                          | **100% green exit code 0**.                                                                                                                                                                                                                |
+
+## 2026-09-20 — Decoupled Big-Data Dashboard Architecture & Server-Side Paginated Stream
+
+| Command / observation                                                            | Actual result                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Migration `20260920150000_decoupled_dashboard_architecture.sql`                  | Tested locally and deployed remotely to Supabase project `ykqugctewsqvevhyqtbi`. Added `comments_text_trgm_idx` GIN trigram index, `dashboard_aggregates(w uuid, f jsonb)`, and `dashboard_comments(w uuid, f jsonb)`.   |
+| Live benchmark: `public.dashboard_aggregates` on AJ360 channel (71,310 comments) | **1.3s** execution time, payload ~300KB (down from 120MB raw comment dump). Returns full sentiment distribution, timeline, topic counts, video aggregates, hourly & weekday activity buckets, and top negative comments. |
+| Live benchmark: `public.dashboard_comments` on AJ360 channel (71,310 comments)   | **35ms** execution time, payload ~40KB (50 comments with next cursor, server-side sorting, and full metadata).                                                                                                           |
+| Trigram text search benchmark: `public.dashboard_comments(w, '{"q":"شكرا"}')`    | **28ms** execution time using `comments_text_trgm_idx` (GIN Trigram index).                                                                                                                                              |
+| Web unit test suite: `npm test`                                                  | **111 test files passed, 874 tests passed (100% green)**.                                                                                                                                                                |
+| Production bundle & prerender: `npm run build`                                   | Built in 1.20s; 8 prerendered static pages generated cleanly; 0 build errors.                                                                                                                                            |
+| Typecheck: `npm run typecheck`                                                   | Passed cleanly (`tsc --noEmit`, 0 errors).                                                                                                                                                                               |
+| SAST Security scan: `semgrep scan --metrics=off --severity ERROR ...`            | Completed with 0 blocking code findings.                                                                                                                                                                                 |
+
+## 2026-09-20 — Sync Experience Optimization, Real-Time Live Polling, Fair Multi-Tenant Scheduling, and Live Deployment
+
+| Command / observation                                            | Actual result                                                                                                                                                                                  |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration `20260920120000_fair_multitenant_claim_scheduling.sql` | Tested locally with PGlite and deployed remotely to Supabase project `ykqugctewsqvevhyqtbi` via Management API. Applied in transaction, registered in `supabase_migrations.schema_migrations`. |
+| Git remote push: `git push origin main`                          | Pushed commits `f1626e8` and `fd0b788` to `https://github.com/mlubbad/arabic-audience-sentiment.git`. Branch `main` is clean and up-to-date.                                                   |
+| Production preview deployment: `npm run deploy:preview`          | 100% uploaded cleanly to preview host `app.sky-develop.net` over FTP. Cleaned orphaned chunks. Site answers HTTP 200.                                                                          |
+| Live health monitoring: `./scripts/monitor.sh`                   | Rest 200 · Gateway 204 · Leases none · Worker seen 0m ago · Predictions fresh · Site 200 OK.                                                                                                   |
+| Web unit tests: `npm test`                                       | 111 test files passed, 874 tests passed (100% green).                                                                                                                                          |
+| Database test suite: `npm run test:db`                           | 39 test files passed, 365 tests passed (100% green, including `scoped_claim.test.ts` fair interleaving).                                                                                       |
+| Worker tests: `npm run worker:test`                              | 229 tests passed in 4.26s (100% green).                                                                                                                                                        |
+| Linter & Typecheck: `npm run lint && npm run typecheck`          | Passed cleanly (0 errors).                                                                                                                                                                     |
+| Secret check: `npm run check:secrets`                            | Passed on 685 source files and built assets (0 secrets detected).                                                                                                                              |
+| Build: `npm run build`                                           | 8 prerendered pages + SPA template generated cleanly.                                                                                                                                          |
+
+| Command / observation                                                                                        | Actual result                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration `20260920000000_ops_snapshot_and_dashboard_optimization.sql`                                       | Applied locally and deployed remotely to Supabase project `ykqugctewsqvevhyqtbi`. Added `workspace_ops_snapshot(w uuid)` and optimized `dashboard_snapshot(w uuid)`. |
+| Remote query benchmark: `workspace_ops_snapshot` on AJ360 workspace (`d0c3b9fc-b813-439e-a32b-71dd357f0bb4`) | **386.9 ms** total execution time, payload ~252 KB. Returns `{ sync, plan, video_counts }` with 2,423 videos counted across 28,244 comments.                         |
+| Remote query benchmark: `dashboard_snapshot` on AJ360 workspace                                              | Returned full 55.6 MB payload in **10.2s** without timing out (protected by `set statement_timeout = '30s'`).                                                        |
+| Contracts test: `npx vitest run packages/contracts/src/ops.test.ts`                                          | 3 passed (100% green)                                                                                                                                                |
+| Database test suite: `npm run test:db`                                                                       | 39 test files passed, 364 tests passed (100% green)                                                                                                                  |
+| Web unit tests: `npm test`                                                                                   | 111 test files passed, 871 tests passed (100% green)                                                                                                                 |
+| Worker tests: `npm run worker:test`                                                                          | 229 tests passed in 4.29s (100% green)                                                                                                                               |
+| Linter & Typecheck: `npm run lint && npm run typecheck`                                                      | Passed cleanly (exit 0)                                                                                                                                              |
+| Secret check: `npm run check:secrets`                                                                        | Passed on 679 source files (exit 0)                                                                                                                                  |
+| Security audit: `npm audit --omit=dev --audit-level=high`                                                    | 0 vulnerabilities found                                                                                                                                              |
+
+| Command / observation                                            | Actual result                                                                                                                                                                                                                                                                                |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/monitor.sh` (7 probes, 2.4s)                            | All OK: rest 200 · gateway 204 (claims nothing — the probe's job type cannot exist) · leases none · failures none · worker seen 0m ago · newest prediction 0h · site 200                                                                                                                     |
+| crontab                                                          | Installed: `*/5 * * * * cd … && ./scripts/monitor.sh >> .worker-logs/monitor.log 2>&1` — edge-triggered alerts (state in `.cache/monitor-state.*`), optional `ALERT_WEBHOOK_URL` in `.env.local`, exit codes 0/1/2                                                                           |
 | Migration `20260919140000_reviews_are_looked_up_not_scanned.sql` | Applied and registered: `comment_reviews(workspace_id, comment_id)` and `topic_reviews(workspace_id, comment_id)`. Before: the dashboard's per-comment review lookup seq-scanned both tables — 18,875 scans per page load. `EXPLAIN` with seqscan off confirms Index Scan on the new indexes |
-| PostgREST schema cache | Reloaded on its own after the index DDL (no restart needed for indexes; functions needed one earlier today) |
+| PostgREST schema cache                                           | Reloaded on its own after the index DDL (no restart needed for indexes; functions needed one earlier today)                                                                                                                                                                                  |
 
 ## 2026-09-19 (2) — Lease semantics and scoped claims hardened
 
 The 2026-09-19 incident class is closed at the source: a replayed platform request no longer reads
 as a worker fight, and a claim can no longer take work its caller cannot run.
 
-| Command / observation | Actual result |
-| --- | --- |
-| Migration `20260919120000_a_replayed_claim_is_not_a_fight.sql` | Applied and registered. Adds `jobs.heartbeats`, rebuilt `claim_job` (reclaims count only leases that were heartbeated and then lapsed; silent lapses resume free), heartbeat lease floor raised to 5 minutes (was 60s — an early heartbeat used to shorten the lease), and `private.claim_job(w, job_types)` plus `public.svc_worker_claim(text, text[])` |
-| Transactional dry-run on live Postgres (BEGIN → DDL → 6 behavioural probes → ROLLBACK) | All probes correct: scoped claim returns only the asked type; silent lapse → `reclaims=0`, no backoff; heartbeated lapse → `reclaims=1`; early heartbeat leaves 300s lease; unscoped claim unchanged |
-| Migration `20260919130000_the_rpc_argument_is_named_for_the_gateway.sql` | Applied and registered. The scoped RPC's first parameter was named `token_hash` while the gateway sends `credential_hash`; PostgREST resolves RPCs by parameter name, so every scoped claim answered PGRST202. Overload dropped and rebuilt with the gateway's name |
-| `pytest` (workers/python) | 198 passed (scoped-claim body tests added to `test_gateway.py` and `test_backfill.py`) |
-| `ruff check .` | Pass |
-| `tsc --noEmit` | Pass |
-| Edge function `worker` redeployed (Management API, `verify_jwt=false`) | v16 ACTIVE; a stray duplicate function created by the first deploy attempt was deleted |
-| Live differential: `POST /worker/claim` `{"types":["collect"]}` | **204** — no collect job exists, and the queued analyse job is left untouched (the exact theft this prevents) |
-| Live differential: `POST /worker/claim` `{"types":["analyse"]}` | 200 with the analyse job; the orphan lease this probe left lapses and resumes without penalty under the new semantics |
-| `vitest` / `npm run test:db` | **Not run in this session** — no pinned Node 22 on this machine. `lease_recovery.test.ts` was rewritten for the new contract (silent lapse never counts; heartbeated lapse counts; heartbeats reset per lease), and `scoped_claim.test.ts` added. Run under `nvm use` before the next deploy |
+| Command / observation                                                                  | Actual result                                                                                                                                                                                                                                                                                                                                             |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration `20260919120000_a_replayed_claim_is_not_a_fight.sql`                         | Applied and registered. Adds `jobs.heartbeats`, rebuilt `claim_job` (reclaims count only leases that were heartbeated and then lapsed; silent lapses resume free), heartbeat lease floor raised to 5 minutes (was 60s — an early heartbeat used to shorten the lease), and `private.claim_job(w, job_types)` plus `public.svc_worker_claim(text, text[])` |
+| Transactional dry-run on live Postgres (BEGIN → DDL → 6 behavioural probes → ROLLBACK) | All probes correct: scoped claim returns only the asked type; silent lapse → `reclaims=0`, no backoff; heartbeated lapse → `reclaims=1`; early heartbeat leaves 300s lease; unscoped claim unchanged                                                                                                                                                      |
+| Migration `20260919130000_the_rpc_argument_is_named_for_the_gateway.sql`               | Applied and registered. The scoped RPC's first parameter was named `token_hash` while the gateway sends `credential_hash`; PostgREST resolves RPCs by parameter name, so every scoped claim answered PGRST202. Overload dropped and rebuilt with the gateway's name                                                                                       |
+| `pytest` (workers/python)                                                              | 198 passed (scoped-claim body tests added to `test_gateway.py` and `test_backfill.py`)                                                                                                                                                                                                                                                                    |
+| `ruff check .`                                                                         | Pass                                                                                                                                                                                                                                                                                                                                                      |
+| `tsc --noEmit`                                                                         | Pass                                                                                                                                                                                                                                                                                                                                                      |
+| Edge function `worker` redeployed (Management API, `verify_jwt=false`)                 | v16 ACTIVE; a stray duplicate function created by the first deploy attempt was deleted                                                                                                                                                                                                                                                                    |
+| Live differential: `POST /worker/claim` `{"types":["collect"]}`                        | **204** — no collect job exists, and the queued analyse job is left untouched (the exact theft this prevents)                                                                                                                                                                                                                                             |
+| Live differential: `POST /worker/claim` `{"types":["analyse"]}`                        | 200 with the analyse job; the orphan lease this probe left lapses and resumes without penalty under the new semantics                                                                                                                                                                                                                                     |
+| `vitest` / `npm run test:db`                                                           | **Not run in this session** — no pinned Node 22 on this machine. `lease_recovery.test.ts` was rewritten for the new contract (silent lapse never counts; heartbeated lapse counts; heartbeats reset per lease), and `scoped_claim.test.ts` added. Run under `nvm use` before the next deploy                                                              |
 
 PostgREST schema-cache notes, for the next schema change: `NOTIFY pgrst, 'reload schema'` did not
 refresh the cache through the Management API path, but functions created there did appear without a
@@ -37,13 +252,13 @@ surfaces as PGRST202, not as a SQL error; check `pg_get_function_identity_argume
 Node not available in this session (pinned Node 22 not installed on this machine); Python work verified
 with uv-managed 3.12 (`uv sync --frozen`, plus `--group inference` for the live run).
 
-| Command / observation | Actual result |
-| --- | --- |
-| `tsc --noEmit` | Pass (exit 0) |
-| `node scripts/check-secrets.mjs` | Pass (643 source files + built assets) |
-| `pytest` (workers/python) | 196 passed in 0.24s |
-| `ruff check .` (workers/python) | All checks passed |
-| `vitest` / `npm run test:db` | **Not run in this session** — the machine lacks pinned Node 22; run under `nvm use` before the next deploy |
+| Command / observation            | Actual result                                                                                              |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `tsc --noEmit`                   | Pass (exit 0)                                                                                              |
+| `node scripts/check-secrets.mjs` | Pass (643 source files + built assets)                                                                     |
+| `pytest` (workers/python)        | 196 passed in 0.24s                                                                                        |
+| `ruff check .` (workers/python)  | All checks passed                                                                                          |
+| `vitest` / `npm run test:db`     | **Not run in this session** — the machine lacks pinned Node 22; run under `nvm use` before the next deploy |
 
 ### Code change
 
@@ -61,84 +276,81 @@ with uv-managed 3.12 (`uv sync --frozen`, plus `--group inference` for the live 
 
 ### Live re-analysis (pilot workspace “الجزيرة 360”, channel UCWxc7ue-jGlL5ypOHX_i0Bg)
 
-| Step | Actual result |
-| --- | --- |
-| Supabase PostgREST | Found returning 504 after 60s for every request (worker path dead since 2026-09-18 ~16:00). `POST /v1/projects/…/restart` (200) restored it; claim answered in 2.4s |
-| Selection reset (operator SQL) | 459 comment-bearing videos due, 4,009 empty videos deferred 2h; collect job checkpoint reset, reclaims zeroed |
-| `manual_run --backfill --model camelbert-da` | Comment counts survey: 0 unchanged, 459 to read; job finished **succeeded** |
-| Predictions under v2 | **18,850** succeeded (v1 history preserved at 17,627); 1,223+ comments were new since the first collection; total comments now 18,875 |
-| Label distribution v1 → v2 | negative 45.6% → 47.4%, neutral 17.9% → 17.9%, positive 36.5% → 34.8% (same model; shift from normalization + new rows) |
-| `channels.active_analysis_key` | Switched to `…@b0df630d…+strip-html-arabic-norm-v2+a272ec5cfcf7` — the dashboard's effective labels now come from v2 |
-| Effective-label coverage | 18,850 of 18,875 comments carry a v2 verdict |
-| Incidental: analyse job `99cfa273` | Claimed and finished by the first (mis-aimed) backfill attempt; reset to queued so topics classification still runs |
-| Incidental: Supabase restart | Project restarted (~1 min) to clear a wedged PostgREST/pool; data untouched |
-| Signed-in dashboard walkthrough | **Not done** — needs a browser session with a real user token; the `forbidden` response to a no-JWT snapshot call confirms tenant isolation is intact |
+| Step                                         | Actual result                                                                                                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supabase PostgREST                           | Found returning 504 after 60s for every request (worker path dead since 2026-09-18 ~16:00). `POST /v1/projects/…/restart` (200) restored it; claim answered in 2.4s |
+| Selection reset (operator SQL)               | 459 comment-bearing videos due, 4,009 empty videos deferred 2h; collect job checkpoint reset, reclaims zeroed                                                       |
+| `manual_run --backfill --model camelbert-da` | Comment counts survey: 0 unchanged, 459 to read; job finished **succeeded**                                                                                         |
+| Predictions under v2                         | **18,850** succeeded (v1 history preserved at 17,627); 1,223+ comments were new since the first collection; total comments now 18,875                               |
+| Label distribution v1 → v2                   | negative 45.6% → 47.4%, neutral 17.9% → 17.9%, positive 36.5% → 34.8% (same model; shift from normalization + new rows)                                             |
+| `channels.active_analysis_key`               | Switched to `…@b0df630d…+strip-html-arabic-norm-v2+a272ec5cfcf7` — the dashboard's effective labels now come from v2                                                |
+| Effective-label coverage                     | 18,850 of 18,875 comments carry a v2 verdict                                                                                                                        |
+| Incidental: analyse job `99cfa273`           | Claimed and finished by the first (mis-aimed) backfill attempt; reset to queued so topics classification still runs                                                 |
+| Incidental: Supabase restart                 | Project restarted (~1 min) to clear a wedged PostgREST/pool; data untouched                                                                                         |
+| Signed-in dashboard walkthrough              | **Not done** — needs a browser session with a real user token; the `forbidden` response to a no-JWT snapshot call confirms tenant isolation is intact               |
 
 ## 2026-09-14 — Private preview deployment and live origin verification
 
 Deployed to private preview hosting (`app.sky-develop.net`, origin `91.204.209.217`) via `npm run deploy:preview`:
 
-| Probe / Request | Actual result |
-| --- | --- |
-| `GET /` without basic auth | **401 Unauthorized** (private protection strictly enforced) |
-| `GET /` with basic auth | **200 OK** |
-| `GET /index.html` | **200 OK** (803 bytes) |
-| `GET /fixtures/dashboard.json` | **200 OK** (11,283 bytes) |
-| `GET /landing/arabic-bold.ttf` | **200 OK** (229,352 bytes) |
-| `GET /robots.txt` | **200 OK** (26 bytes) |
-| `GET /dashboard` (SPA route fallback) | **200 OK** (serves `index.html`) |
-| `GET /sync` (SPA route fallback) | **200 OK** (serves `index.html`) |
-| `GET /account` (SPA route fallback) | **200 OK** (serves `index.html`) |
-| `GET /.htaccess` | **403 Forbidden** (direct configuration access prevented) |
-| `GET /assets/report-KE-usfQc.css` | **200 OK** (19,393 bytes) |
-| `GET /assets/Dashboard-MT9GcQVq.js` | **200 OK** (231,257 bytes) |
-| `GET /assets/index-BuQPClQp.js` | **200 OK** (509,440 bytes) |
-| Stale asset cleanup | 8 obsolete bundles deleted via FTP DELE (`gone`) |
+| Probe / Request                       | Actual result                                               |
+| ------------------------------------- | ----------------------------------------------------------- |
+| `GET /` without basic auth            | **401 Unauthorized** (private protection strictly enforced) |
+| `GET /` with basic auth               | **200 OK**                                                  |
+| `GET /index.html`                     | **200 OK** (803 bytes)                                      |
+| `GET /fixtures/dashboard.json`        | **200 OK** (11,283 bytes)                                   |
+| `GET /landing/arabic-bold.ttf`        | **200 OK** (229,352 bytes)                                  |
+| `GET /robots.txt`                     | **200 OK** (26 bytes)                                       |
+| `GET /dashboard` (SPA route fallback) | **200 OK** (serves `index.html`)                            |
+| `GET /sync` (SPA route fallback)      | **200 OK** (serves `index.html`)                            |
+| `GET /account` (SPA route fallback)   | **200 OK** (serves `index.html`)                            |
+| `GET /.htaccess`                      | **403 Forbidden** (direct configuration access prevented)   |
+| `GET /assets/report-KE-usfQc.css`     | **200 OK** (19,393 bytes)                                   |
+| `GET /assets/Dashboard-MT9GcQVq.js`   | **200 OK** (231,257 bytes)                                  |
+| `GET /assets/index-BuQPClQp.js`       | **200 OK** (509,440 bytes)                                  |
+| Stale asset cleanup                   | 8 obsolete bundles deleted via FTP DELE (`gone`)            |
 
 ## 2026-09-14 — Comment confidence score display and live test alignment
 
-
 Node 22.14.0, Python 3.12.10. Verified on `main`:
 
-| Command / observation | Actual result |
-| --- | --- |
-| `npm run check` | Pass: lint, format, typecheck, Deno check, 225 unit tests, 139 SQL tests, 127 Python tests, Vite build, secret scan |
-| `E2E_PORT=5350 npm run test:e2e` | 68 passed in 59.5s |
-| `E2E_LIVE_PORT=5355 npm run test:e2e:live` | 1 passed in 3.9s; workspace switching and sign-out isolation verified with new navigation destinations |
+| Command / observation                      | Actual result                                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                            | Pass: lint, format, typecheck, Deno check, 225 unit tests, 139 SQL tests, 127 Python tests, Vite build, secret scan |
+| `E2E_PORT=5350 npm run test:e2e`           | 68 passed in 59.5s                                                                                                  |
+| `E2E_LIVE_PORT=5355 npm run test:e2e:live` | 1 passed in 3.9s; workspace switching and sign-out isolation verified with new navigation destinations              |
 
 ## 2026-09-14 — Arabic NLP sentiment engine and text normalization verification
 
-
 Node 22.14.0, Python 3.12.10. Verified on `main`:
 
-| Command / observation | Actual result |
-| --- | --- |
-| `pytest tests/test_sentiment.py tests/test_transformer.py` | 27 passed; verified Arabic normalization, tatweel/tashkeel stripping, elongation reduction, 4-class prediction and error handling |
-| `npm run worker:test` | 127 passed in 0.67s across 14 test suites |
-| `npm run worker:lint` | Ruff: All checks passed! |
-| `npm run check` | Full check passed: lint, Ruff, format, typecheck, Deno check, 225 unit tests, 135 SQL tests, 127 Python tests, Vite build and secret scan |
-| `E2E_PORT=5340 npm run test:e2e` | 68 passed in 1.0m (Chromium E2E suite covering app shell, dashboard, landing, and mobile UX) |
+| Command / observation                                      | Actual result                                                                                                                             |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `pytest tests/test_sentiment.py tests/test_transformer.py` | 27 passed; verified Arabic normalization, tatweel/tashkeel stripping, elongation reduction, 4-class prediction and error handling         |
+| `npm run worker:test`                                      | 127 passed in 0.67s across 14 test suites                                                                                                 |
+| `npm run worker:lint`                                      | Ruff: All checks passed!                                                                                                                  |
+| `npm run check`                                            | Full check passed: lint, Ruff, format, typecheck, Deno check, 225 unit tests, 135 SQL tests, 127 Python tests, Vite build and secret scan |
+| `E2E_PORT=5340 npm run test:e2e`                           | 68 passed in 1.0m (Chromium E2E suite covering app shell, dashboard, landing, and mobile UX)                                              |
 
 ## 2026-09-14 — Internal UI redesign and Sync identity boundary
-
 
 All commands used Node 22.14.0 via `PATH=/Users/mlubbad/.nvm/versions/node/v22.14.0/bin:$PATH`.
 The browser suites started their own Vite servers on the indicated ports with
 `reuseExistingServer: false` and `--strictPort`.
 
-| Command / observation | Actual result |
-| --- | --- |
-| `E2E_PORT=5334 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` before the mobile filter control | Failed waiting for `إظهار الفلاتر`; after implementation, 1 passed |
-| `npm run check` first attempt | Lint, format, typecheck and Edge Function check passed; 3 server-rendered Dashboard identity unit tests failed because `window` was read during state initialization |
-| `npm test` after guarding browser-only viewport access | 150 passed in 19 files |
-| `npm run check` after the fix | Passed: lint, Ruff, format, typecheck, Deno check, 150 unit, 126 SQL, 124 Python tests, Vite build and secret scan |
-| `E2E_PORT=5335 npm run test:e2e -- --reporter=line` first full run | 47 passed, 2 failed: old mobile navigation test bypassed the new menu, and the disconnected-worker test expected obsolete machine-specific copy |
-| `E2E_PORT=5335 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'mobile shell\|states plainly' --reporter=line` | 2 passed after updating those assertions to the intended UX |
-| `E2E_PORT=5335 npm run test:e2e -- --reporter=line` final full run | 50 passed in 41.6s, including mobile filter disclosure, callback and 404 recovery |
-| `E2E_LIVE_PORT=5336 npm run test:e2e:live -- --reporter=line` | 1 passed; fake local Auth/API responses proved the Sync workspace choice appears before any snapshot and tenant A's comments never paint under tenant B or after sign-out |
-| Desktop screenshots at 1280×800; mobile browser pass at 390px | Account, Sync and Dashboard hierarchy inspected; hero title/description stacking corrected; mobile menu, filter disclosure and horizontal-overflow assertion passed |
-| `npm run check` and `E2E_PORT=5335 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` after the mobile spacing adjustment | Full check passed again with the same counts; 2/2 targeted browser tests passed. A 390px Sync screenshot confirmed the reduced empty space in the health card |
-| `npm run format:check`, `npm run build`, and `E2E_PORT=5335 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` after styling the no-Auth account fallback | All passed; 2/2 browser tests. The credential-free account state was inspected in a 1280px screenshot |
+| Command / observation                                                                                                                                                   | Actual result                                                                                                                                                             |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `E2E_PORT=5334 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` before the mobile filter control                                                        | Failed waiting for `إظهار الفلاتر`; after implementation, 1 passed                                                                                                        |
+| `npm run check` first attempt                                                                                                                                           | Lint, format, typecheck and Edge Function check passed; 3 server-rendered Dashboard identity unit tests failed because `window` was read during state initialization      |
+| `npm test` after guarding browser-only viewport access                                                                                                                  | 150 passed in 19 files                                                                                                                                                    |
+| `npm run check` after the fix                                                                                                                                           | Passed: lint, Ruff, format, typecheck, Deno check, 150 unit, 126 SQL, 124 Python tests, Vite build and secret scan                                                        |
+| `E2E_PORT=5335 npm run test:e2e -- --reporter=line` first full run                                                                                                      | 47 passed, 2 failed: old mobile navigation test bypassed the new menu, and the disconnected-worker test expected obsolete machine-specific copy                           |
+| `E2E_PORT=5335 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'mobile shell\|states plainly' --reporter=line`                                                   | 2 passed after updating those assertions to the intended UX                                                                                                               |
+| `E2E_PORT=5335 npm run test:e2e -- --reporter=line` final full run                                                                                                      | 50 passed in 41.6s, including mobile filter disclosure, callback and 404 recovery                                                                                         |
+| `E2E_LIVE_PORT=5336 npm run test:e2e:live -- --reporter=line`                                                                                                           | 1 passed; fake local Auth/API responses proved the Sync workspace choice appears before any snapshot and tenant A's comments never paint under tenant B or after sign-out |
+| Desktop screenshots at 1280×800; mobile browser pass at 390px                                                                                                           | Account, Sync and Dashboard hierarchy inspected; hero title/description stacking corrected; mobile menu, filter disclosure and horizontal-overflow assertion passed       |
+| `npm run check` and `E2E_PORT=5335 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` after the mobile spacing adjustment                                 | Full check passed again with the same counts; 2/2 targeted browser tests passed. A 390px Sync screenshot confirmed the reduced empty space in the health card             |
+| `npm run format:check`, `npm run build`, and `E2E_PORT=5335 npm run test:e2e -- tests/e2e/app-shell.spec.ts --reporter=line` after styling the no-Auth account fallback | All passed; 2/2 browser tests. The credential-free account state was inspected in a 1280px screenshot                                                                     |
 
 The live-mode browser test intercepts a local fake Supabase origin. It does **not** prove
 that the redesigned pages work against the deployed project's Auth, PostgREST, OAuth or
@@ -149,19 +361,19 @@ deployment or real-model validation was performed in this increment.
 
 On `0ea0ca0` plus the shared working-tree changes (Claude Code was editing the new report and model path concurrently), Node 22.14.0:
 
-| Command / observation | Actual result |
-| --- | --- |
-| `npx vitest run apps/web/src/Dashboard.identity.test.ts --reporter=dot` before the identity fix | 2 failed initially: a previous tenant's comment rendered under the next workspace and after sign-out. After adding the pending-workspace case, 3 failed; the new case showed the fixture path while a signed-in workspace list was still loading |
-| `npx vitest run apps/web/src/session.test.ts --reporter=dot` before the workspace-loading fix | 1 failed: a signed-in user was initially reported as having finished loading before the workspace request began |
-| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'actual pending fetch\|video filter offers'` before the copy/video fixes | Both failed: the hero reported zero while a request was held, and the selector lacked the unfamiliar video id supplied by the test fixture |
-| `npx vitest run apps/web/src/session.test.ts apps/web/src/Dashboard.identity.test.ts --reporter=dot` after the fix | 4 passed |
-| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'Arabic fixture shell filters\|actual pending fetch\|video filter offers'` after the fix | 3 passed |
-| `npm run check` | Passed: lint, format, typecheck, Edge Function check, 140 unit tests, 116 SQL tests, 108 worker tests, build, and secret scan |
-| `E2E_PORT=5332 npm run test:e2e` initial full run | 47 passed, 1 failed: review history was reopened before the invalidated snapshot had refreshed |
-| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'history says who reviewed'` after keeping the correction form open until refresh | 1 passed |
-| `E2E_PORT=5332 npm run test:e2e` final full run | 48 passed (52.5s) |
-| `npx vitest run apps/web/src/Dashboard.identity.test.ts apps/web/src/dataSource.test.ts --reporter=dot` after retaining the workspace selector and showing its name | 12 passed; the new selector/name assertion was observed failing before implementation |
-| `npm run test:e2e:live` | 1 passed (3.8s): fake local Auth/PostgREST responses, A then delayed B, then sign-out; A's text was absent during B loading and after sign-out |
+| Command / observation                                                                                                                                               | Actual result                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npx vitest run apps/web/src/Dashboard.identity.test.ts --reporter=dot` before the identity fix                                                                     | 2 failed initially: a previous tenant's comment rendered under the next workspace and after sign-out. After adding the pending-workspace case, 3 failed; the new case showed the fixture path while a signed-in workspace list was still loading |
+| `npx vitest run apps/web/src/session.test.ts --reporter=dot` before the workspace-loading fix                                                                       | 1 failed: a signed-in user was initially reported as having finished loading before the workspace request began                                                                                                                                  |
+| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'actual pending fetch\|video filter offers'` before the copy/video fixes                      | Both failed: the hero reported zero while a request was held, and the selector lacked the unfamiliar video id supplied by the test fixture                                                                                                       |
+| `npx vitest run apps/web/src/session.test.ts apps/web/src/Dashboard.identity.test.ts --reporter=dot` after the fix                                                  | 4 passed                                                                                                                                                                                                                                         |
+| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'Arabic fixture shell filters\|actual pending fetch\|video filter offers'` after the fix      | 3 passed                                                                                                                                                                                                                                         |
+| `npm run check`                                                                                                                                                     | Passed: lint, format, typecheck, Edge Function check, 140 unit tests, 116 SQL tests, 108 worker tests, build, and secret scan                                                                                                                    |
+| `E2E_PORT=5332 npm run test:e2e` initial full run                                                                                                                   | 47 passed, 1 failed: review history was reopened before the invalidated snapshot had refreshed                                                                                                                                                   |
+| `E2E_PORT=5332 npm run test:e2e -- tests/e2e/dashboard.spec.ts --grep 'history says who reviewed'` after keeping the correction form open until refresh             | 1 passed                                                                                                                                                                                                                                         |
+| `E2E_PORT=5332 npm run test:e2e` final full run                                                                                                                     | 48 passed (52.5s)                                                                                                                                                                                                                                |
+| `npx vitest run apps/web/src/Dashboard.identity.test.ts apps/web/src/dataSource.test.ts --reporter=dot` after retaining the workspace selector and showing its name | 12 passed; the new selector/name assertion was observed failing before implementation                                                                                                                                                            |
+| `npm run test:e2e:live`                                                                                                                                             | 1 passed (3.8s): fake local Auth/PostgREST responses, A then delayed B, then sign-out; A's text was absent during B loading and after sign-out                                                                                                   |
 
 The identity test renders the real Dashboard component with a controlled previous query result, so it asserts the user-visible absence of another tenant's text. The dynamic-video and loading tests run the actual Vite UI against sanitized fixtures. The separate live-mode browser test signs in through a local fake API and delays the second workspace's response; it exercises the actual UI and query lifecycle without external credentials. It is **mocked integration**, not proof against a deployed Supabase project. Model inference against real comments and the corrected private deploy also remain unproven by these checks.
 
@@ -169,14 +381,14 @@ The identity test renders the real Dashboard component with a controlled previou
 
 At `0ea0ca0` plus the landing working-tree changes, with concurrent uncommitted live-dashboard work outside this increment:
 
-| Command / observation | Actual result |
-| --- | --- |
-| `E2E_PORT=5322 npm run test:e2e -- tests/e2e/landing.spec.ts` | 2 passed (5.5s), including working links, FAQ, mobile navigation, accessibility and image loading |
-| `npx prettier --check apps/web/src/Landing.tsx apps/web/src/landing.css tests/e2e/landing.spec.ts` | Passed after formatting the landing test |
-| `npx eslint apps/web/src/Landing.tsx tests/e2e/landing.spec.ts` | Passed |
-| `npm run build` | Passed, 171 modules transformed, 2.65s |
-| Chromium screenshots at 1440px and 390px | Full page visually inspected; original bright glass chart sits in the hero without clipping |
-| `shasum -a 256 apps/web/public/landing/audience-growth-original.png` | `5f800bc3d9fb7e2004c5de245653021f123f2a4cedbf29f7aee8e6ca5f22cdbe` |
+| Command / observation                                                                              | Actual result                                                                                     |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `E2E_PORT=5322 npm run test:e2e -- tests/e2e/landing.spec.ts`                                      | 2 passed (5.5s), including working links, FAQ, mobile navigation, accessibility and image loading |
+| `npx prettier --check apps/web/src/Landing.tsx apps/web/src/landing.css tests/e2e/landing.spec.ts` | Passed after formatting the landing test                                                          |
+| `npx eslint apps/web/src/Landing.tsx tests/e2e/landing.spec.ts`                                    | Passed                                                                                            |
+| `npm run build`                                                                                    | Passed, 171 modules transformed, 2.65s                                                            |
+| Chromium screenshots at 1440px and 390px                                                           | Full page visually inspected; original bright glass chart sits in the hero without clipping       |
+| `shasum -a 256 apps/web/public/landing/audience-growth-original.png`                               | `5f800bc3d9fb7e2004c5de245653021f123f2a4cedbf29f7aee8e6ca5f22cdbe`                                |
 
 Formatting checks initially found wrapping issues in the landing test and then the illustration mask rule; both were corrected before the final passing checks. This increment did not re-run the full repository suite or redeploy the site, because the signed-in dashboard is being edited concurrently. The 65 live comments and tenant boundary were verified by the other development session, as described in the user-supplied handoff; this landing verification did not independently exercise its live OAuth, worker, model or authenticated dashboard path.
 
@@ -184,13 +396,13 @@ Formatting checks initially found wrapping issues in the landing test and then t
 
 Node 22.14.0; load average sampled at 3.13 / 3.30 / 3.25. Code reviewed against `cffb9fa` plus the landing working-tree changes. Concurrent Python/OAuth commits are outside this increment.
 
-| Command / observation | Actual result |
-| --- | --- |
-| `npm run check` after final code changes | Pass: lint, formatting, typecheck, 107 unit tests, 98 SQL tests, 91 worker tests, build and secret scan |
-| `E2E_PORT=5322 npm run test:e2e` after route integration and lazy loading | 47 passed (45 existing dashboard cases + 2 landing cases), 50.7s |
+| Command / observation                                                                                     | Actual result                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check` after final code changes                                                                  | Pass: lint, formatting, typecheck, 107 unit tests, 98 SQL tests, 91 worker tests, build and secret scan                                                                                                       |
+| `E2E_PORT=5322 npm run test:e2e` after route integration and lazy loading                                 | 47 passed (45 existing dashboard cases + 2 landing cases), 50.7s                                                                                                                                              |
 | `E2E_PORT=5322 npm run test:e2e -- tests/e2e/landing.spec.ts` after final illustrative-chart/copy changes | 2 passed, 5.9s; includes chart/comment filter agreement, FAQ, audience tabs, account and dashboard navigation, reload, mobile menu, keyboard skip link, image loading, and 320/390/768/1440px overflow checks |
-| Visual inspection | Chromium screenshots at 1440px desktop and 390px mobile; inspected hero, Arabic hierarchy and full-page section layout |
-| Build output | Landing entry JS 272.93 kB (86.85 kB gzip); Dashboard, Account and Supabase emitted as separate deferred chunks |
+| Visual inspection                                                                                         | Chromium screenshots at 1440px desktop and 390px mobile; inspected hero, Arabic hierarchy and full-page section layout                                                                                        |
+| Build output                                                                                              | Landing entry JS 272.93 kB (86.85 kB gzip); Dashboard, Account and Supabase emitted as separate deferred chunks                                                                                               |
 
 The first full browser run had one failed landing test: an exact text locator included the decorative FAQ `+` and could not match. It was corrected to target the semantic summary element. The other 46 tests passed on that run; all 47 passed on the rerun. No application failure was hidden by increasing a timeout.
 
@@ -204,18 +416,18 @@ commands were run with Node 22.14.0 first on `PATH`, matching `.nvmrc`.
 
 ## Checks
 
-| Command | Result |
-| --- | --- |
-| `npm run lint` | Pass — ESLint clean; Ruff "All checks passed!" |
-| `npm run format:check` | Pass |
-| `npm run typecheck` | Pass — no `tsc` diagnostics |
+| Command                   | Result                                                      |
+| ------------------------- | ----------------------------------------------------------- |
+| `npm run lint`            | Pass — ESLint clean; Ruff "All checks passed!"              |
+| `npm run format:check`    | Pass                                                        |
+| `npm run typecheck`       | Pass — no `tsc` diagnostics                                 |
 | `npm run check:functions` | Pass — `deno check` on the three Edge Function entry points |
-| `npm test` | Pass — **83 tests, 10 files** |
-| `npm run test:db` | Pass — **103 tests, 11 files** |
-| `npm run worker:test` | Pass — **94 tests, 11 files** |
-| `npm run build` | Pass |
-| `npm run check:secrets` | Pass |
-| `npm run test:e2e` | Pass — **47 tests, Chromium** (45 dashboard, 2 landing) |
+| `npm test`                | Pass — **83 tests, 10 files**                               |
+| `npm run test:db`         | Pass — **103 tests, 11 files**                              |
+| `npm run worker:test`     | Pass — **94 tests, 11 files**                               |
+| `npm run build`           | Pass                                                        |
+| `npm run check:secrets`   | Pass                                                        |
+| `npm run test:e2e`        | Pass — **47 tests, Chromium** (45 dashboard, 2 landing)     |
 
 `npm run check` runs everything except `test:e2e` and passed end to end.
 
@@ -225,74 +437,74 @@ A test that cannot fail is not coverage. Every security or correctness guarantee
 below was checked by breaking the code and confirming a test caught it. Each mutation was
 reverted and the suite returned to green.
 
-| Mutation | Tests broken |
-| --- | --- |
-| Let a quota shortfall through instead of refusing the batch | 1 |
-| Accept a reused batch key carrying a different payload | 1 |
-| Allow an OAuth state to be reused | 1 |
-| Drop the cross-workspace seizure check on channel claim | 1 |
-| Drop the cross-workspace check on a leased job | 2 |
-| Let a revoked worker credential through | 2 |
-| Let a failed collection report success | 1 |
-| Put the endpoint into a client error message | 2 |
-| Pass the raw worker credential to the database | 1 |
-| Return the internal error message from the edge handler | 1 |
-| Open the audit trail to any member | 1 |
-| Drop the import path scoping | 1 |
-| Remove the lease-duration guard | 1 |
-| Neutralise the retry backoff | 1 |
-| Accept a prediction for a comment absent from the batch | 1 |
-| Accept the same comment twice in one batch | 1 |
-| Flatten the golden fixture back to the pre-split shape | 3 |
-| Hash a prediction over different text than its comment row | 1 |
-| Accept an adapter returning fewer verdicts than rows | 1 |
-| Let a failed analysis finish the run as succeeded | 1 |
-| Commit an empty prediction list, as before the wiring | 1 |
-| Go back to never writing analysis parameters | 2 |
-| Drop parameters from the prediction-to-run join | 1 |
-| Fingerprint an analysis without its settings | 1 |
-| Prune a connection that is still in flight | 1 |
-| Reuse one nonce for every sealed grant | 1 |
-| Accept a grant with no refresh token | 1 |
-| Return Google's error body as the reason | 2 |
-| Trust the first channel when an account has several | 1 |
-| Overwrite the stored refresh token on renewal | 1 |
-| Retry a revoked grant instead of ending it | 1 |
-| Treat an expired token as a blocked channel | 1 |
-| File comments-disabled as an access refusal | 1 |
-| Send the API key alongside the bearer token | 1 |
-| Leave the prune job executable by tenants | 1 |
-| Show a verdict about text the comment no longer has | 1 |
-| Turn unknown engagement into zero on the live read | 1 |
-| Leave the platform parent id unresolved | 1 |
-| Let a configured project alone flip the data source | 4 |
-| Let the browser suite inherit the machine's .env.local | 1 |
-| Report accuracy as the headline instead of macro F1 | 1 |
-| Skip classes the model never predicts | 1 |
-| Count an unclear gold row as a model error | 1 |
-| Use the normal approximation for the interval | 1 |
-| Purge the text but leave the author | 1 |
-| Let a purge take the prediction with it | 2 |
-| Stop a refresh clearing the purge marker | 3 |
-| Ignore the retention window and purge everything | 1 |
-| Trust the server's answer without parsing it | 1 |
-| Show the model's answer in the labelling sheet | 1 |
-| Stop neutralising spreadsheet formulas in the sheet | 1 |
-| Drop unanalysable rows without counting them | 1 |
-| Let the booster reuse estimate rows | 1 |
-| Sample uniformly instead of proportionally by video | 1 |
-| Match the loopback redirect by substring instead of host | 1 |
-| Accept any http redirect URI | 2 |
-| Send the verifier instead of its challenge | 1 |
-| Store the OAuth state raw instead of hashed | 1 |
-| Allow an http redirect URI | 1 |
-| Drop the verifier charset and length check | 1 |
+| Mutation                                                    | Tests broken |
+| ----------------------------------------------------------- | ------------ |
+| Let a quota shortfall through instead of refusing the batch | 1            |
+| Accept a reused batch key carrying a different payload      | 1            |
+| Allow an OAuth state to be reused                           | 1            |
+| Drop the cross-workspace seizure check on channel claim     | 1            |
+| Drop the cross-workspace check on a leased job              | 2            |
+| Let a revoked worker credential through                     | 2            |
+| Let a failed collection report success                      | 1            |
+| Put the endpoint into a client error message                | 2            |
+| Pass the raw worker credential to the database              | 1            |
+| Return the internal error message from the edge handler     | 1            |
+| Open the audit trail to any member                          | 1            |
+| Drop the import path scoping                                | 1            |
+| Remove the lease-duration guard                             | 1            |
+| Neutralise the retry backoff                                | 1            |
+| Accept a prediction for a comment absent from the batch     | 1            |
+| Accept the same comment twice in one batch                  | 1            |
+| Flatten the golden fixture back to the pre-split shape      | 3            |
+| Hash a prediction over different text than its comment row  | 1            |
+| Accept an adapter returning fewer verdicts than rows        | 1            |
+| Let a failed analysis finish the run as succeeded           | 1            |
+| Commit an empty prediction list, as before the wiring       | 1            |
+| Go back to never writing analysis parameters                | 2            |
+| Drop parameters from the prediction-to-run join             | 1            |
+| Fingerprint an analysis without its settings                | 1            |
+| Prune a connection that is still in flight                  | 1            |
+| Reuse one nonce for every sealed grant                      | 1            |
+| Accept a grant with no refresh token                        | 1            |
+| Return Google's error body as the reason                    | 2            |
+| Trust the first channel when an account has several         | 1            |
+| Overwrite the stored refresh token on renewal               | 1            |
+| Retry a revoked grant instead of ending it                  | 1            |
+| Treat an expired token as a blocked channel                 | 1            |
+| File comments-disabled as an access refusal                 | 1            |
+| Send the API key alongside the bearer token                 | 1            |
+| Leave the prune job executable by tenants                   | 1            |
+| Show a verdict about text the comment no longer has         | 1            |
+| Turn unknown engagement into zero on the live read          | 1            |
+| Leave the platform parent id unresolved                     | 1            |
+| Let a configured project alone flip the data source         | 4            |
+| Let the browser suite inherit the machine's .env.local      | 1            |
+| Report accuracy as the headline instead of macro F1         | 1            |
+| Skip classes the model never predicts                       | 1            |
+| Count an unclear gold row as a model error                  | 1            |
+| Use the normal approximation for the interval               | 1            |
+| Purge the text but leave the author                         | 1            |
+| Let a purge take the prediction with it                     | 2            |
+| Stop a refresh clearing the purge marker                    | 3            |
+| Ignore the retention window and purge everything            | 1            |
+| Trust the server's answer without parsing it                | 1            |
+| Show the model's answer in the labelling sheet              | 1            |
+| Stop neutralising spreadsheet formulas in the sheet         | 1            |
+| Drop unanalysable rows without counting them                | 1            |
+| Let the booster reuse estimate rows                         | 1            |
+| Sample uniformly instead of proportionally by video         | 1            |
+| Match the loopback redirect by substring instead of host    | 1            |
+| Accept any http redirect URI                                | 2            |
+| Send the verifier instead of its challenge                  | 1            |
+| Store the OAuth state raw instead of hashed                 | 1            |
+| Allow an http redirect URI                                  | 1            |
+| Drop the verifier charset and length check                  | 1            |
 
 ## What the suites prove
 
 **Contracts (74).** One filter implementation drives views and exports, so they cannot
 disagree. Half-open date ranges, unknown dates as their own category, the newest human review
-matching the *current* text winning, stale and failed predictions excluded from the sentiment
+matching the _current_ text winning, stale and failed predictions excluded from the sentiment
 denominator, cursor walking without repeats, CSV neutralising spreadsheet formulas on output
 while the stored text is untouched, likes never weighting sentiment, plan thresholds on both
 sides of each boundary, and a batch payload that carries no workspace field at all.
@@ -322,20 +534,20 @@ against white.
 
 ## Not verified — do not represent these as working
 
-| Area | Why |
-| --- | --- |
-| Live YouTube collection | No API key; no live request has ever been issued |
-| Google OAuth exchange | Authorization URL, code exchange, PKCE, `channels.list` and the redirect page are not written. Only the server-side state and ownership logic exists |
-| Deployed Supabase | No project. GoTrue, PostgREST, Storage HTTP and Edge Function deployment are untested |
+| Area                                              | Why                                                                                                                                                                                                                                                        |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live YouTube collection                           | No API key; no live request has ever been issued                                                                                                                                                                                                           |
+| Google OAuth exchange                             | Authorization URL, code exchange, PKCE, `channels.list` and the redirect page are not written. Only the server-side state and ownership logic exists                                                                                                       |
+| Deployed Supabase                                 | No project. GoTrue, PostgREST, Storage HTTP and Edge Function deployment are untested                                                                                                                                                                      |
 | Real HTTP between the worker and the edge handler | `end_to_end.test.ts` now runs the real handler against the real SQL with a payload the real Python client produced, so the two no longer only meet through stand-ins. What is still untested is an actual network hop and a deployed Edge Function runtime |
-| Database behaviour beyond SQL and RLS | PGlite runs the real SQL and RLS but is not Supabase |
-| Concurrent overspend | PGlite is single-connection, so two simultaneous transactions cannot be staged. The row lock is the mechanism; the tests prove no *sequence* exceeds an allowance |
-| Sentiment model quality | No model downloaded, no inference run, no benchmark. No accuracy figure is claimed anywhere |
-| Legacy import and the topic-count discrepancies | Source CSVs and amendment file missing; no reconciliation performed |
-| CI | `.github/workflows/ci.yml` exists but has never executed — there is no remote |
-| Deployment | The **front end only** is deployed, at `app.sky-develop.net`, behind a password and serving fixtures. No Edge Function, no worker, no live data path is deployed |
-| Spreadsheet behaviour | Formula neutralisation is verified as bytes in the file. No spreadsheet application was opened |
-| Final dashboard styling | Original dashboard HTML, ZIP and brand assets not supplied |
+| Database behaviour beyond SQL and RLS             | PGlite runs the real SQL and RLS but is not Supabase                                                                                                                                                                                                       |
+| Concurrent overspend                              | PGlite is single-connection, so two simultaneous transactions cannot be staged. The row lock is the mechanism; the tests prove no _sequence_ exceeds an allowance                                                                                          |
+| Sentiment model quality                           | No model downloaded, no inference run, no benchmark. No accuracy figure is claimed anywhere                                                                                                                                                                |
+| Legacy import and the topic-count discrepancies   | Source CSVs and amendment file missing; no reconciliation performed                                                                                                                                                                                        |
+| CI                                                | `.github/workflows/ci.yml` exists but has never executed — there is no remote                                                                                                                                                                              |
+| Deployment                                        | The **front end only** is deployed, at `app.sky-develop.net`, behind a password and serving fixtures. No Edge Function, no worker, no live data path is deployed                                                                                           |
+| Spreadsheet behaviour                             | Formula neutralisation is verified as bytes in the file. No spreadsheet application was opened                                                                                                                                                             |
+| Final dashboard styling                           | Original dashboard HTML, ZIP and brand assets not supplied                                                                                                                                                                                                 |
 
 ## The seam test, and what it found
 
@@ -439,7 +651,7 @@ discarded.
 
 The prediction-to-run join now matches on parameters too. The first version of that test
 counted rows and passed under the mutation that removed the join condition — the count was
-right and the *linkage* was not, so a verdict could be filed under the wrong run. The test
+right and the _linkage_ was not, so a verdict could be filed under the wrong run. The test
 now asserts which run each verdict points at, and the mutation fails it.
 
 **`private.oauth_states` was never pruned.** Every connection attempt left a row permanently:
@@ -574,14 +786,14 @@ what the tests run is what a real Postgres accepts.
 Tenant isolation was then probed **over real HTTP through PostgREST**, as an anonymous caller
 holding the publishable key, because that is the boundary a stranger actually reaches:
 
-| Request | Result |
-| --- | --- |
-| `GET /rest/v1/comments`, `workspaces`, `memberships` | 401, SQLSTATE 42501 |
-| `GET /rest/v1/jobs` | 401 — no grant exists at all |
-| `GET /rest/v1/connection_status` | 401 — the view is security_invoker, so it inherits the refusal |
-| `GET /rest/v1/oauth_states` | 404 — the `private` schema is not exposed by PostgREST |
-| `POST /rest/v1/rpc/dashboard_snapshot` | 401, permission denied for function |
-| `POST /rest/v1/rpc/usage_summary` | 401, permission denied for function |
+| Request                                              | Result                                                         |
+| ---------------------------------------------------- | -------------------------------------------------------------- |
+| `GET /rest/v1/comments`, `workspaces`, `memberships` | 401, SQLSTATE 42501                                            |
+| `GET /rest/v1/jobs`                                  | 401 — no grant exists at all                                   |
+| `GET /rest/v1/connection_status`                     | 401 — the view is security_invoker, so it inherits the refusal |
+| `GET /rest/v1/oauth_states`                          | 404 — the `private` schema is not exposed by PostgREST         |
+| `POST /rest/v1/rpc/dashboard_snapshot`               | 401, permission denied for function                            |
+| `POST /rest/v1/rpc/usage_summary`                    | 401, permission denied for function                            |
 
 This retires one specific caveat: the grants and the schema separation hold in a deployed
 Supabase and not only in an embedded Postgres. It does **not** retire the others.
@@ -598,10 +810,10 @@ as that member. None of this could run in PGlite, which has no GoTrue.
 tenant was created through the Auth admin API and signed in. Against the deployed project,
 over HTTP, as a real authenticated user:
 
-| Probe | Result |
-| --- | --- |
-| Does the bootstrap trigger fire for a second user | Yes — their own personal workspace |
-| Can B list A's workspaces | `[]` |
+| Probe                                              | Result                              |
+| -------------------------------------------------- | ----------------------------------- |
+| Does the bootstrap trigger fire for a second user  | Yes — their own personal workspace  |
+| Can B list A's workspaces                          | `[]`                                |
 | Can B read A's dashboard by asking for it directly | **403, SQLSTATE 42501 `forbidden`** |
 
 That is the property the whole tenancy model exists for, and it is now proven against a real
@@ -611,14 +823,14 @@ directly, not by checking that a control was hidden.
 **The handler and the SQL have now spoken over a real network hop.** Three Edge Functions are
 deployed — `worker`, `oauth-start`, `oauth-callback` — and answered from the live project:
 
-| Request | Result |
-| --- | --- |
-| `POST /worker/worker/claim`, no credential | 401 `invalid_worker_credential` |
-| Same, with a credential never issued | 401, **the same shape** — nothing distinguishes them |
-| `POST /worker/worker/typo` | 404 `not_found`, not a malformed-request error |
-| `GET` on a POST-only route | 405 |
-| `POST /oauth-start` with no session | 401 `unauthenticated` |
-| `GET /oauth-callback` with no code | an Arabic page, 400, no stack trace |
+| Request                                    | Result                                               |
+| ------------------------------------------ | ---------------------------------------------------- |
+| `POST /worker/worker/claim`, no credential | 401 `invalid_worker_credential`                      |
+| Same, with a credential never issued       | 401, **the same shape** — nothing distinguishes them |
+| `POST /worker/worker/typo`                 | 404 `not_found`, not a malformed-request error       |
+| `GET` on a POST-only route                 | 405                                                  |
+| `POST /oauth-start` with no session        | 401 `unauthenticated`                                |
+| `GET /oauth-callback` with no code         | an Arabic page, 400, no stack trace                  |
 
 The second row is the one that matters: that request reached the database. The handler split
 the bearer, hashed it, called `svc_worker_claim` through PostgREST, and SQL refused it. Until
@@ -634,13 +846,13 @@ holding any key. None of the wrappers takes a workspace, which is asserted again
 **The connect flow is verified up to the human click.** Against the deployed project, as a
 freshly created account behaving exactly as a new user would:
 
-| Step | Result |
-| --- | --- |
-| Sign up, then read the workspace and client the account was given | One of each |
-| `POST /functions/v1/oauth-start` with that session | 200, a Google authorization URL |
-| Parameters | `response_type=code`, `code_challenge_method=S256`, `access_type=offline`, `prompt=consent`, the deployed callback as `redirect_uri`, the youtube.readonly scope |
-| Is the verifier in the URL | **No** — 43-char state and challenge only |
-| Fetching that URL from Google | **200, redirected to Google's own sign-in** |
+| Step                                                              | Result                                                                                                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign up, then read the workspace and client the account was given | One of each                                                                                                                                                      |
+| `POST /functions/v1/oauth-start` with that session                | 200, a Google authorization URL                                                                                                                                  |
+| Parameters                                                        | `response_type=code`, `code_challenge_method=S256`, `access_type=offline`, `prompt=consent`, the deployed callback as `redirect_uri`, the youtube.readonly scope |
+| Is the verifier in the URL                                        | **No** — 43-char state and challenge only                                                                                                                        |
+| Fetching that URL from Google                                     | **200, redirected to Google's own sign-in**                                                                                                                      |
 
 The last row is the one worth having. Google did not answer `redirect_uri_mismatch`,
 `invalid_client` or `access_blocked`; it echoed `app_domain=https://ykqugctewsqvevhyqtbi.supabase.co`
@@ -705,7 +917,7 @@ model, and each is mutation-checked:
 
 The interval is Wilson, not the textbook normal approximation. That mutation initially
 **survived**, because the test only checked 20/20 and 0/20, where both methods agree. The
-approximation breaks *near* the edge — at 19/20 it returns an upper bound of about 1.045 —
+approximation breaks _near_ the edge — at 19/20 it returns an upper bound of about 1.045 —
 and a rare class lands exactly there. The test now checks 19/20 and 1/20, and the mutation
 fails.
 
@@ -741,7 +953,7 @@ disagreeing.
 
 Two judgements worth naming. `likes_value` is kept and `likes_raw` is not: the verbatim string
 the source displayed is content, the parsed number is a metric feeding an aggregate. And a
-write that sets both text and marker is *corrected* rather than refused — refusing would fail
+write that sets both text and marker is _corrected_ rather than refused — refusing would fail
 a legitimate re-collection of any row older than thirty days, which is the ordinary case.
 
 Downstream, absence is not emptiness. Search never matches a purged row rather than matching
@@ -762,8 +974,8 @@ for it: fabricated testimonials, invented accuracy figures and borrowed brand as
 exactly what belongs on one and exactly what this project refuses to publish.
 
 Audited after the fact. It is honest, and unusually so for marketing copy. It answers "is the
-demo real channel data?" with *no, synthetic and clearly labelled*; "can I connect my channel
-now?" with *not yet*; and "is sentiment analysis always accurate?" with *no*, naming sarcasm,
+demo real channel data?" with _no, synthetic and clearly labelled_; "can I connect my channel
+now?" with _not yet_; and "is sentiment analysis always accurate?" with _no_, naming sarcasm,
 dialect and context, and stating that no accuracy figure has been adopted for a live model.
 There are no testimonials, no customer logos and no invented metrics — the only large numbers
 in the file are SVG coordinates. Fonts are self-hosted with their OFL licence alongside.
@@ -809,7 +1021,7 @@ Applying the brand added a stylesheet link, and one test failed — deterministi
 a row, so not flakiness. The cause was not the stylesheet.
 
 The test holds the fixture request to observe the pending state, but StrictMode mounts twice
-and it held only the *first* request; the second returned 503 immediately and settled the
+and it held only the _first_ request; the second returned 503 immediately and settled the
 query. Whether the loading indicator was ever observable came down to whether the assertion
 arrived before that. It had been passing on scheduling for months, and a render-blocking
 stylesheet delaying `goto` was enough to lose the race.
@@ -837,7 +1049,7 @@ before it: the state was consumed, the code was exchanged for tokens, and it fai
 **CORS.** The button failed with a bare network error because the function sent no
 access-control headers and answered `OPTIONS` with 405, so the browser refused to send at all.
 Every curl check had passed, because curl does not enforce CORS. That is the whole lesson:
-*verified with curl* was not *works in a browser*, and only a browser was going to find it. An
+_verified with curl_ was not _works in a browser_, and only a browser was going to find it. An
 allowlist now, not `*` — these functions are reached with a user's token in a header, so a
 permissive origin would let any page start a connection with a token it had obtained. An unset
 allowlist permits nobody, which is the direction that fails safely.
@@ -871,7 +1083,7 @@ What shipped through that gap was a one-argument call to a two-argument function
 had gained an `allowed` parameter; one call site kept the old shape, `allowed` was `undefined`,
 `.includes` threw, and every POST to `oauth-start` returned 500 with no CORS headers — which
 the browser reports as `TypeError: Failed to fetch`, indistinguishable from the CORS problem
-that had just been fixed. The preflight kept working, because that call site *had* been
+that had just been fixed. The preflight kept working, because that call site _had_ been
 updated, which made it look like a CORS fault rather than a crash.
 
 `npm run check:functions` runs `deno check` over the three entry points and is part of
@@ -1034,7 +1246,7 @@ into `apps/web/dist` for the script to read.
 Evidence is the transfer log: 27 files at 226, including `static/index-CEmKVrNK.js`
 (511.09 kB) and `index-D9msRF2r.css`; the sweep then removed the eight superseded hashed
 assets. Probing the origin proves nothing either way and this time proved it twice over: the
-new bundle answers 401 (basic auth, as every path does) while the *previous* bundle
+new bundle answers 401 (basic auth, as every path does) while the _previous_ bundle
 `index-Bp6sxIUa.js` still answers 200 — `server: cloudflare`, `age: 9641`, `immutable` — a
 CDN cache hit for a file the host no longer has. A green probe on an old asset is not a
 rollback and not a failed deploy; it is a cache.
@@ -1239,12 +1451,12 @@ chosen, `Sync-DS6msJBp.js` 17.60 kB), `check:secrets` 0 (298 source files, plus 
 **Mutation checks, two.**
 
 1. **The quota guard in `select_videos`** (Task 2 Step 5, from its report). The `raise
-   exception 'quota_exceeded'` branch in `private.select_videos_impl` was deleted from a copy
+exception 'quota_exceeded'` branch in `private.select_videos_impl` was deleted from a copy
    of `20260915131000_select_videos.sql`; `npx vitest run supabase/tests/selection.test.ts`
    went red on exactly the mutated behaviour — the call that should have been refused
    succeeded instead (`AssertionError: expected [Function] to throw error matching
-   /quota_exceeded/ but got { ... "estimate": 40, "job_id": "393f69c0-...", "queued": true,
-   "remaining_after": -10, ... }`), plus one cascading failure in the next test from the state
+/quota_exceeded/ but got { ... "estimate": 40, "job_id": "393f69c0-...", "queued": true,
+"remaining_after": -10, ... }`), plus one cascading failure in the next test from the state
    the ungated call had written. The migration was restored from a backup and diffed
    byte-identical before the fix was re-verified green (16/16).
 2. **The `next_check_at` reschedule in `worker_video_finished`** (this task, Step 3). In
@@ -1252,7 +1464,7 @@ chosen, `Sync-DS6msJBp.js` 17.60 kB), `check:secrets` 0 (298 source files, plus 
    `next_check_at = now() + make_interval(mins => iv)` line was removed from the `exhausted`
    branch's `update public.video_selections` statement, leaving `last_collected_at` and
    `last_outcome` updated but `next_check_at` untouched. `npx vitest run
-   supabase/tests/worker_catalogue.test.ts` went red, 3 of 8 failing (the other two are
+supabase/tests/worker_catalogue.test.ts` went red, 3 of 8 failing (the other two are
    downstream of the same fixture row staying due when it should not). The assertion that
    names the mutation directly:
 
@@ -1275,7 +1487,7 @@ chosen, `Sync-DS6msJBp.js` 17.60 kB), `check:secrets` 0 (298 source files, plus 
    just-finished video was still due.) The file was restored from a backup made before the
    edit; `git diff --stat` was empty afterward (confirmed both immediately after restoring and
    again before staging this commit), and `npx vitest run
-   supabase/tests/worker_catalogue.test.ts` was re-run green, 8/8. The mutation was never
+supabase/tests/worker_catalogue.test.ts` was re-run green, 8/8. The mutation was never
    staged or committed.
 
 **Seen in the browser.** Task 9's report names the screenshots taken in fixture mode at
@@ -1371,7 +1583,6 @@ three before it in `docs/coordination/ACTIVE.md`); `already_running` has not bee
 a signed-in browser against a real running job, and the backoff has not been watched across
 a real hour — both are PGlite-only, like the rest of this feature's server side.
 
-
 ## 2026-09-15 — the first live run of selective sync, and what it found
 
 Pushed by the user in this order: migrations `20260915130000`–`140000` (`db push --linked`,
@@ -1398,7 +1609,7 @@ load-bearing after all. `catalogue.ts` now reads `videos` and `video_selections`
 two ranges and an exact 1,000 through a second, empty one, and is red without the paging.
 
 **The collect was not ours.** AJ360's `collect` was claimed at 20:17:36Z — two minutes
-before this session's worker came up at 20:19:53Z — walked 30 *recent uploads* (the old
+before this session's worker came up at 20:19:53Z — walked 30 _recent uploads_ (the old
 `build_plan` survey; the checkpoint's `done` list is their external ids), committed 418
 comments, finished `succeeded`, and called `video-finished` for none of them: the 39
 selection rows kept the backfill's `next_check_at`. `worker_seen` keeps advancing on both
@@ -1411,7 +1622,7 @@ collects and reading the channel's newest uploads regardless of the selection.
 with a live lease (39 due videos handed down, access token present), one call for
 `0271170f…` → `last_collected_at` now, `next_check_at` +24 h, `last_outcome` exhausted, in
 1.1 s. The probe job and its run row were then deleted. Two `worker_job`-guarded routes
-called with a *dead* lease hung for over two minutes before answering 500
+called with a _dead_ lease hung for over two minutes before answering 500
 `control_plane_error` rather than 409 `lease_lost` in ~1 s; `worker_tick` (no lease) answers
 in 0.8 s. `lease_lost` is raised with SQLSTATE `40001`, which PostgREST treats as a
 serialization failure and retries with backoff. Latent since 2026-09-13; not hit by any
@@ -1425,7 +1636,7 @@ loop runs with `HF_HUB_OFFLINE=1`: same model id, same revision, same analysis k
 probes scored 0.99 positive / 0.99 negative. A local-cache workaround, not a repository
 change; any machine with torch ≥ 2.6 needs none of it.
 
-Not verified: a `collect` run by the *new* worker over a due list end to end (the old
+Not verified: a `collect` run by the _new_ worker over a due list end to end (the old
 worker took the only one); `select_videos` from a signed-in browser (the web bundle is not
 deployed yet); pg_cron.
 
@@ -1603,7 +1814,7 @@ attempted.
   and finds no `GEMINI_API_KEY` value anywhere tracked (only the variable's name, in
   `.env.example` and `workers/deploy/README.md`, as documentation).
 - These counts equal what the individual tasks last reported (`npm test` 343, `npm run
-  test:db` 198, `npm run worker:test` 168) — nothing drifted between then and this session's
+test:db` 198, `npm run worker:test` 168) — nothing drifted between then and this session's
   run, only the `format:check` regression is new and it is upstream of this task's scope.
 - `npm run test:e2e -- tests/e2e/dashboard.spec.ts` was not re-run in this task; the count
   last reported by Task 10 was 73.
@@ -1623,17 +1834,17 @@ gateway and seam tests in `f074d01`, the dashboard gate, e2e test and docs in th
 that carries this entry). `npm run check` exited 0; gate by gate, in the order the script
 runs them:
 
-| Gate | Command | Result |
-| --- | --- | --- |
-| lint | `eslint . && ruff check .` | pass, "All checks passed!" |
-| format:check | `prettier --check …` | pass, "All matched files use Prettier code style!" — the four files the previous entry recorded as unformatted were fixed in `cf84011` |
-| typecheck | `tsc --noEmit` | pass |
-| check:functions | `deno check` over the three edge functions | pass |
-| test | `vitest run --exclude "supabase/tests/**"` | **344 passed, 42 files** (343 before; `workerGateway.test.ts` gained the `max_rows` refusal) |
-| test:db | `vitest run supabase/tests` | **202 passed, 20 files** (198 before; `worker_topics.test.ts` 13, of which four are new — the quota cap, the `quota_exceeded` block, the no-plan case, and `worker_due_videos` refusing an `analyse` job — plus `topics_stored` assertions in an existing one; `end_to_end.test.ts` 5, the topics seam through the real handler new) |
-| worker:test | `uv run pytest` | **175 passed** (168 before; `test_run_topics.py` 9 — one-round stop, 25+5 slices, blocked due list new, the batch-key assertion changed — and `test_gemini.py` 17 — safety settings, bisection, a half failing again, a single item not split new) |
-| build | `vite build` | pass, built in 2.49s |
-| check:secrets | `node scripts/check-secrets.mjs` | pass, 323 source files plus built assets |
+| Gate            | Command                                    | Result                                                                                                                                                                                                                                                                                                                               |
+| --------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| lint            | `eslint . && ruff check .`                 | pass, "All checks passed!"                                                                                                                                                                                                                                                                                                           |
+| format:check    | `prettier --check …`                       | pass, "All matched files use Prettier code style!" — the four files the previous entry recorded as unformatted were fixed in `cf84011`                                                                                                                                                                                               |
+| typecheck       | `tsc --noEmit`                             | pass                                                                                                                                                                                                                                                                                                                                 |
+| check:functions | `deno check` over the three edge functions | pass                                                                                                                                                                                                                                                                                                                                 |
+| test            | `vitest run --exclude "supabase/tests/**"` | **344 passed, 42 files** (343 before; `workerGateway.test.ts` gained the `max_rows` refusal)                                                                                                                                                                                                                                         |
+| test:db         | `vitest run supabase/tests`                | **202 passed, 20 files** (198 before; `worker_topics.test.ts` 13, of which four are new — the quota cap, the `quota_exceeded` block, the no-plan case, and `worker_due_videos` refusing an `analyse` job — plus `topics_stored` assertions in an existing one; `end_to_end.test.ts` 5, the topics seam through the real handler new) |
+| worker:test     | `uv run pytest`                            | **175 passed** (168 before; `test_run_topics.py` 9 — one-round stop, 25+5 slices, blocked due list new, the batch-key assertion changed — and `test_gemini.py` 17 — safety settings, bisection, a half failing again, a single item not split new)                                                                                   |
+| build           | `vite build`                               | pass, built in 2.49s                                                                                                                                                                                                                                                                                                                 |
+| check:secrets   | `node scripts/check-secrets.mjs`           | pass, 323 source files plus built assets                                                                                                                                                                                                                                                                                             |
 
 Outside `npm run check`: `npm run test:e2e -- tests/e2e/dashboard.spec.ts` — **74 passed**
 in 1.1m (73 before; the appended not-run test new). The new test failed first against the
@@ -1693,10 +1904,10 @@ on had been dropped). After the migration: 4 passed.
 Mutations, each applied to the new migration, run, and the file restored byte-identical
 from a scratchpad copy (`diff` empty) — never `git checkout`:
 
-| Mutation | Test that went red |
-| --- | --- |
+| Mutation                                                                             | Test that went red                                                                                 |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | Drop `where public.sentiment_predictions.status = 'failed'` from the conflict clause | "never overwrites a final verdict with a later attempt" — the later `failed` overwrote the success |
-| Drop the `adopt_first_analysis_on_update` trigger | "adopts the retried success as the channel's first analysis" — key stayed null |
+| Drop the `adopt_first_analysis_on_update` trigger                                    | "adopts the retried success as the channel's first analysis" — key stayed null                     |
 
 Gates at this head: `npm run test:db` **207 passed, 21 files** (202 before); `tsc --noEmit`
 exit 0; `eslint` and `prettier --check` clean on the new test.
@@ -1711,11 +1922,11 @@ one migration the live project lacks; it is listed in `docs/coordination/ACTIVE.
 6 passed. Mutations applied to `videoPaging.ts`, each run and the file restored from a
 scratchpad copy (`diff` empty):
 
-| Mutation | Test that went red |
-| --- | --- |
-| Drop the upper clamp (`Math.max(page, 0)` alone) | "clamps a page index past the end to the last page" |
-| `Math.max(0, …)` for the page count | "is one empty page for an empty list, not zero pages" |
-| `from: start + 1` unconditionally | the empty-list test — `from` read 1 of nothing |
+| Mutation                                         | Test that went red                                    |
+| ------------------------------------------------ | ----------------------------------------------------- |
+| Drop the upper clamp (`Math.max(page, 0)` alone) | "clamps a page index past the end to the last page"   |
+| `Math.max(0, …)` for the page count              | "is one empty page for an empty list, not zero pages" |
+| `from: start + 1` unconditionally                | the empty-list test — `from` read 1 of nothing        |
 
 `tests/e2e/dashboard.spec.ts`, two blocks appended. The first rewrites the fixture route
 into 30 videos of 6 comments (180 total), asserts 25 cards and "الصفحة 1 من 2 — عرض 1–25
@@ -1894,16 +2105,16 @@ Against the deployed `paddle-webhook`, each body signed with the real secret
 (`HMAC-SHA256(secret, ts:body)`, `Paddle-Signature: ts=…;h1=…`) for the probe workspace
 `18e093a5…` (owner `connect-probe-1789332349@`):
 
-| sent | answered | live row afterwards |
-| --- | --- | --- |
-| `subscription.activated`, price `creator:month` | `{"outcome":"applied"}` 200 | `pilot → creator`, `provider=paddle`, `sub_walk_001`, `ctm_walk_001`, `month` |
-| the same event again | `duplicate` 200 | unchanged |
-| the same signature, body with `active→paused` | `bad_signature` 401 | unchanged |
-| `transaction.completed`, price `pack_10k:pack` | `applied` 200 | `usage_grants`: 10,000 `comment_analysis`, `txn_walk_002` |
-| `transaction.completed`, a subscription price | `ignored` 200 | unchanged |
-| `subscription.updated`, `scheduled_change.action=cancel` | `applied` 200 | `cancel_at_period_end=true` |
-| `subscription.updated` dated 2026-09-15 (older) | `stale` 200 | unchanged |
-| `subscription.past_due` | `applied` 200 | `status=past_due` |
+| sent                                                     | answered                    | live row afterwards                                                           |
+| -------------------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------- |
+| `subscription.activated`, price `creator:month`          | `{"outcome":"applied"}` 200 | `pilot → creator`, `provider=paddle`, `sub_walk_001`, `ctm_walk_001`, `month` |
+| the same event again                                     | `duplicate` 200             | unchanged                                                                     |
+| the same signature, body with `active→paused`            | `bad_signature` 401         | unchanged                                                                     |
+| `transaction.completed`, price `pack_10k:pack`           | `applied` 200               | `usage_grants`: 10,000 `comment_analysis`, `txn_walk_002`                     |
+| `transaction.completed`, a subscription price            | `ignored` 200               | unchanged                                                                     |
+| `subscription.updated`, `scheduled_change.action=cancel` | `applied` 200               | `cancel_at_period_end=true`                                                   |
+| `subscription.updated` dated 2026-09-15 (older)          | `stale` 200                 | unchanged                                                                     |
+| `subscription.past_due`                                  | `applied` 200               | `status=past_due`                                                             |
 
 Audit rows in order: `plan_paddle_activated`, `pack_paddle comment_analysis:10000`,
 `plan_paddle_updated`, `plan_paddle_past_due`. Then, over `supabase db query`, the row's
@@ -1953,8 +2164,9 @@ test')` ran as his user id over `db query` — the same RPC the admin page calls
 rows read `owner / admin / active` again, the client still bound to the root.
 
 Two things the invoice shows for the pricing decisions:
+
 1. **Both lines were tax-inclusive.** The pack read "$5.00 inc. VAT" (4.17 + 0.83), and
-   the subscription's $12.00 was $10.00 plus $2.00 *withheld* — Paddle treated the table's
+   the subscription's $12.00 was $10.00 plus $2.00 _withheld_ — Paddle treated the table's
    $12 as the price including tax and took the tax out of it, so the seller received $10
    before Paddle's fee, not $12. (An earlier reading of this invoice as "$10 exclusive plus
    $2 on top" was wrong: the price in the table is $12, and $12 is what was charged.) The
@@ -2039,9 +2251,9 @@ The owner's channel `b7de589f…` holds 789 selections, all read yesterday on th
 interval. One hundred of the exhausted ones were set due by hand (`next_check_at = now()`),
 because none carried `last_seen_comment_count` yet:
 
-| pass | worker log | what it cost |
-| --- | --- | --- |
-| first | `comment counts: 0 unchanged, 100 to read` | 2 `videos.list` units + the reads — every selection was unseen, so every one was read; afterwards 100 rows carry `last_seen_comment_count` |
+| pass                                | worker log                                 | what it cost                                                                                                                                                                |
+| ----------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| first                               | `comment counts: 0 unchanged, 100 to read` | 2 `videos.list` units + the reads — every selection was unseen, so every one was read; afterwards 100 rows carry `last_seen_comment_count`                                  |
 | second (the same 100 set due again) | `comment counts: 100 unchanged, 0 to read` | **2 `videos.list` units, no `commentThreads` call**; 100 rows read `last_outcome = 'unchanged'`, `next_check_at` moved a `live_interval` ahead; the collect job `succeeded` |
 
 The pass before this change would have paged `commentThreads` for all 100 (≥ 100 units).
@@ -2186,24 +2398,24 @@ in the same checkout on the workspace-deletion migration; its uncommitted
 `supabase/tests/workspace_lifecycle.test.ts` fails `format:check`, so `npm run check` was
 run as its parts, with the format check scoped to the files this work touched.
 
-| Command / observation | Actual result |
-| --- | --- |
-| `npm run lint` (eslint + ruff) | clean |
-| `prettier --check 'apps/web/src/**/*.{ts,tsx,css}' 'apps/web/scripts/*.mjs' 'tests/e2e/*.ts' '*.json'` | all matched files formatted |
-| `npm run typecheck` | 0 errors |
-| `npm run check:functions` | clean |
-| `npm test` | 75 files, 512 passed (before `prerender.test.ts`: +5, all passing) |
-| `npm run test:db` | 31 files, 302 passed |
-| `npm run worker:test` | 195 passed |
-| `npm run build` | `prerender: catalogue read at build time, 6 plans` · `8 pages, sitemap, robots.txt (noindex)`; every per-page check passed |
-| `VITE_SITE_PUBLIC=true npm run build` | `robots.txt (public)`: `Allow: /`, product routes disallowed, `Sitemap:` line; `dist/.htaccess` carries no `X-Robots-Tag`; `index.html` and `en/pricing/index.html` say `index, follow`; `app.html` still says `noindex, nofollow`. Rebuilt without the flag afterwards: `Disallow: /`, header present, meta `noindex` |
-| `npm run check:secrets` | passed (479 source files, plus built assets) |
-| `E2E_PORT=5399 npx playwright test` | **103 passed** (1.4 m), including the new `seo.spec.ts` (5) and the updated landing, pricing and language specs |
-| Hydration, development React bundle (`NODE_ENV=development vite build --mode development --minify false`, prerender, Chromium via Playwright over a static server that mirrors `.htaccess`) | `/`, `/en`, `/pricing`, `/en/pricing`, `/privacy-policy`, `/en/privacy-policy`, `/terms`, `/en/terms`, `/dashboard`, `/account`: **0 errors each**. Before the fixes: React #418 on every page (missing `ToastHost` sibling), then on the six lazy pages (missing `Suspense` boundary) |
-| Production bundle in the browser pane, `/en/pricing` after hydration | one `<title>`, one description, one canonical, three alternates, one JSON-LD; four offers (`Free 0.00`, `Creator 12.00`, `Creator Plus 29.00`, `Agency 99.00`); switch `href="/pricing"`, brand `href="/en"`, legal links `/en/…`; `localStorage.audience.locale = "en"` |
-| Production bundle, `/` → click the switch | URL `/en`, `lang="en"`, canonical `…/en`, one `<title>`, English H1 |
-| `dist/index.html` head | title, description, robots, canonical, `hreflang` ar/en/x-default (lower-case attribute), OG and Twitter tags, `<link rel="preload" as="image">` for the WebP hero (React's own); JSON-LD in the body with `Organization`, `WebSite`, `SoftwareApplication`, `WebPage`, `FAQPage` (8 questions) |
-| Hero image | `audience-growth-original.webp` 29,194 bytes (PNG: 1,191,081), 1536×1024; share image `og-audience-sentiment.jpg` 71,179 bytes, 1200×630 |
+| Command / observation                                                                                                                                                                       | Actual result                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint` (eslint + ruff)                                                                                                                                                              | clean                                                                                                                                                                                                                                                                                                                  |
+| `prettier --check 'apps/web/src/**/*.{ts,tsx,css}' 'apps/web/scripts/*.mjs' 'tests/e2e/*.ts' '*.json'`                                                                                      | all matched files formatted                                                                                                                                                                                                                                                                                            |
+| `npm run typecheck`                                                                                                                                                                         | 0 errors                                                                                                                                                                                                                                                                                                               |
+| `npm run check:functions`                                                                                                                                                                   | clean                                                                                                                                                                                                                                                                                                                  |
+| `npm test`                                                                                                                                                                                  | 75 files, 512 passed (before `prerender.test.ts`: +5, all passing)                                                                                                                                                                                                                                                     |
+| `npm run test:db`                                                                                                                                                                           | 31 files, 302 passed                                                                                                                                                                                                                                                                                                   |
+| `npm run worker:test`                                                                                                                                                                       | 195 passed                                                                                                                                                                                                                                                                                                             |
+| `npm run build`                                                                                                                                                                             | `prerender: catalogue read at build time, 6 plans` · `8 pages, sitemap, robots.txt (noindex)`; every per-page check passed                                                                                                                                                                                             |
+| `VITE_SITE_PUBLIC=true npm run build`                                                                                                                                                       | `robots.txt (public)`: `Allow: /`, product routes disallowed, `Sitemap:` line; `dist/.htaccess` carries no `X-Robots-Tag`; `index.html` and `en/pricing/index.html` say `index, follow`; `app.html` still says `noindex, nofollow`. Rebuilt without the flag afterwards: `Disallow: /`, header present, meta `noindex` |
+| `npm run check:secrets`                                                                                                                                                                     | passed (479 source files, plus built assets)                                                                                                                                                                                                                                                                           |
+| `E2E_PORT=5399 npx playwright test`                                                                                                                                                         | **103 passed** (1.4 m), including the new `seo.spec.ts` (5) and the updated landing, pricing and language specs                                                                                                                                                                                                        |
+| Hydration, development React bundle (`NODE_ENV=development vite build --mode development --minify false`, prerender, Chromium via Playwright over a static server that mirrors `.htaccess`) | `/`, `/en`, `/pricing`, `/en/pricing`, `/privacy-policy`, `/en/privacy-policy`, `/terms`, `/en/terms`, `/dashboard`, `/account`: **0 errors each**. Before the fixes: React #418 on every page (missing `ToastHost` sibling), then on the six lazy pages (missing `Suspense` boundary)                                 |
+| Production bundle in the browser pane, `/en/pricing` after hydration                                                                                                                        | one `<title>`, one description, one canonical, three alternates, one JSON-LD; four offers (`Free 0.00`, `Creator 12.00`, `Creator Plus 29.00`, `Agency 99.00`); switch `href="/pricing"`, brand `href="/en"`, legal links `/en/…`; `localStorage.audience.locale = "en"`                                               |
+| Production bundle, `/` → click the switch                                                                                                                                                   | URL `/en`, `lang="en"`, canonical `…/en`, one `<title>`, English H1                                                                                                                                                                                                                                                    |
+| `dist/index.html` head                                                                                                                                                                      | title, description, robots, canonical, `hreflang` ar/en/x-default (lower-case attribute), OG and Twitter tags, `<link rel="preload" as="image">` for the WebP hero (React's own); JSON-LD in the body with `Organization`, `WebSite`, `SoftwareApplication`, `WebPage`, `FAQPage` (8 questions)                        |
+| Hero image                                                                                                                                                                                  | `audience-growth-original.webp` 29,194 bytes (PNG: 1,191,081), 1536×1024; share image `og-audience-sentiment.jpg` 71,179 bytes, 1200×630                                                                                                                                                                               |
 
 Not verified here: the deployed host (no deploy was made in this work — the owner decides
 deploys), Cloudflare's `robots.txt` override, and Core Web Vitals on the CDN.
@@ -2215,16 +2427,16 @@ front end). Transfer log: every file `226`, including the new `app.html`, `sitem
 `en/index.html`, `en/pricing/index.html`, `pricing/index.html`, the two legal pairs, the
 WebP hero and the share image; twenty stale hashed assets removed (`gone`).
 
-| Probe (`curl`, no session) | Actual result |
-| --- | --- |
-| `/`, `/en`, `/pricing`, `/en/pricing`, `/terms`, `/en/privacy-policy` | `200`; `<html lang>` matches the address; each carries its own `<title>`, an `<h1>`, `noindex, nofollow` and its canonical |
-| `/pricing/` (trailing slash) | `200`, same document, canonical `…/pricing` — no `301` from mod_dir |
-| `/dashboard`, `/account` | `200`, 921 bytes: `app.html`, empty root, `noindex` |
-| `/robots.txt` | `200`, **26 bytes — our file**, not the 1836-byte Cloudflare one `deployment.md` recorded; worth re-checking on the day the flag flips |
-| `/sitemap.xml` | `200`, 2954 bytes |
-| `/en/pricing` headers | `x-robots-tag: noindex, nofollow`, `cache-control: no-cache`, `cf-cache-status: DYNAMIC` |
-| `/landing/audience-growth-original.webp` | `200`, `image/webp`, 29,194 bytes |
-| `/landing/og-audience-sentiment.jpg` | `200`, `image/jpeg`, 71,179 bytes |
+| Probe (`curl`, no session)                                                  | Actual result                                                                                                                                                  |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`, `/en`, `/pricing`, `/en/pricing`, `/terms`, `/en/privacy-policy`       | `200`; `<html lang>` matches the address; each carries its own `<title>`, an `<h1>`, `noindex, nofollow` and its canonical                                     |
+| `/pricing/` (trailing slash)                                                | `200`, same document, canonical `…/pricing` — no `301` from mod_dir                                                                                            |
+| `/dashboard`, `/account`                                                    | `200`, 921 bytes: `app.html`, empty root, `noindex`                                                                                                            |
+| `/robots.txt`                                                               | `200`, **26 bytes — our file**, not the 1836-byte Cloudflare one `deployment.md` recorded; worth re-checking on the day the flag flips                         |
+| `/sitemap.xml`                                                              | `200`, 2954 bytes                                                                                                                                              |
+| `/en/pricing` headers                                                       | `x-robots-tag: noindex, nofollow`, `cache-control: no-cache`, `cf-cache-status: DYNAMIC`                                                                       |
+| `/landing/audience-growth-original.webp`                                    | `200`, `image/webp`, 29,194 bytes                                                                                                                              |
+| `/landing/og-audience-sentiment.jpg`                                        | `200`, `image/jpeg`, 71,179 bytes                                                                                                                              |
 | Chromium via Playwright against the live host, `pageerror` + console errors | `/`, `/en`, `/pricing`, `/en/pricing`, `/terms`, `/en/privacy-policy`, `/dashboard`: **0 errors each** — the production bundle hydrates every prerendered page |
 
 ## 2026-09-17 — indexing turned on and deployed, at the owner's instruction
@@ -2233,13 +2445,13 @@ WebP hero and the share image; twenty stale hashed assets removed (`gone`).
 (`robots.txt (public)`, `dist/.htaccess` without `X-Robots-Tag`, `index.html` → `index, follow`,
 `app.html` → `noindex, nofollow`); `npm run deploy:preview`.
 
-| Probe (`curl`, from outside) | Actual result |
-| --- | --- |
-| `/`, `/en`, `/pricing`, `/en/pricing`, `/terms` | no `x-robots-tag` header; `<meta name="robots" content="index, follow">` |
-| `/dashboard` | `noindex, nofollow` (app.html) |
-| `/sitemap.xml` | the new file, `cache-control: no-cache`, `cf-cache-status: DYNAMIC` |
-| `/robots.txt` | **stale**: the closed 26-byte copy, `cf-cache-status: HIT`, `cache-control: max-age=14400`; a `HEAD` got a `MISS` with the new 188-byte length, a `GET` still the old body. Cloudflare's zone rule overrides the origin's cache headers for `.txt` and the edge holds the old copy; no purge credential here |
-| Fix shipped | `.htaccess` `no-cache` rule now covers `.txt` and `.xml` as well as `.html` and `.json` (`htaccess.test.ts` still green); redeployed. Prevents the next such hold, does not clear this one |
+| Probe (`curl`, from outside)                    | Actual result                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`, `/en`, `/pricing`, `/en/pricing`, `/terms` | no `x-robots-tag` header; `<meta name="robots" content="index, follow">`                                                                                                                                                                                                                                     |
+| `/dashboard`                                    | `noindex, nofollow` (app.html)                                                                                                                                                                                                                                                                               |
+| `/sitemap.xml`                                  | the new file, `cache-control: no-cache`, `cf-cache-status: DYNAMIC`                                                                                                                                                                                                                                          |
+| `/robots.txt`                                   | **stale**: the closed 26-byte copy, `cf-cache-status: HIT`, `cache-control: max-age=14400`; a `HEAD` got a `MISS` with the new 188-byte length, a `GET` still the old body. Cloudflare's zone rule overrides the origin's cache headers for `.txt` and the edge holds the old copy; no purge credential here |
+| Fix shipped                                     | `.htaccess` `no-cache` rule now covers `.txt` and `.xml` as well as `.html` and `.json` (`htaccess.test.ts` still green); redeployed. Prevents the next such hold, does not clear this one                                                                                                                   |
 
 The owner purged the Cloudflare cache; fetched again from outside: `/robots.txt` is the
 188-byte open file (`Allow: /`, the five product routes and `/fixtures/` disallowed,
@@ -2254,12 +2466,12 @@ The owner submitted `https://app.sky-develop.net/sitemap.xml` in Search Console 
 
 Google's Rich Results Test, run from the browser pane against the live pages:
 
-| Page | Result |
-| --- | --- |
-| `/` | crawled 00:53:57; **Software Apps: 1 valid item** («مشاعر الجمهور»); two optional fields flagged: `aggregateRating` (no ratings exist — not written) and `offers` (the landing carries no catalogue; the pricing page does). `FAQPage` is not listed: since 2023 Google shows FAQ rich results only for government and health sites, so the tool does not report it — the data is still valid JSON-LD and read by the page's own FAQ |
-| `/pricing`, first run | Software Apps valid; 5 non-critical: `aggregateRating`, and **"Invalid object type for field priceSpecification"** on each of the four offers |
-| Fix | `offersFrom` no longer writes a `UnitPriceSpecification`; each offer carries `name`, `price`, `priceCurrency`, `availability`, `url`. `seo.test.ts` asserts none is written. Built and deployed |
-| `/en/pricing`, after the fix | crawled 00:57:36; Software Apps valid; **1 non-critical** (`aggregateRating`, optional) |
+| Page                         | Result                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`                          | crawled 00:53:57; **Software Apps: 1 valid item** («مشاعر الجمهور»); two optional fields flagged: `aggregateRating` (no ratings exist — not written) and `offers` (the landing carries no catalogue; the pricing page does). `FAQPage` is not listed: since 2023 Google shows FAQ rich results only for government and health sites, so the tool does not report it — the data is still valid JSON-LD and read by the page's own FAQ |
+| `/pricing`, first run        | Software Apps valid; 5 non-critical: `aggregateRating`, and **"Invalid object type for field priceSpecification"** on each of the four offers                                                                                                                                                                                                                                                                                        |
+| Fix                          | `offersFrom` no longer writes a `UnitPriceSpecification`; each offer carries `name`, `price`, `priceCurrency`, `availability`, `url`. `seo.test.ts` asserts none is written. Built and deployed                                                                                                                                                                                                                                      |
+| `/en/pricing`, after the fix | crawled 00:57:36; Software Apps valid; **1 non-critical** (`aggregateRating`, optional)                                                                                                                                                                                                                                                                                                                                              |
 
 ## 2026-09-17 — Core Web Vitals on the live host, and the fix wave they asked for
 
@@ -2267,23 +2479,23 @@ PageSpeed Insights' keyless API answered `429` (daily quota, shared project), so
 12 was run locally (`npx lighthouse@12`, Chrome 141, `--headless=new`, default simulated
 throttling; `--preset=desktop` for the desktop rows) against the deployed pages.
 
-| Page, form | Before | After |
-| --- | --- | --- |
-| `/` mobile | perf 57 · LCP 4.2 s · FCP 3.9 s · **CLS 0.279** · SI 7.1 s · a11y 96 | perf **86** · LCP 4.1 s · FCP 1.8 s · CLS 0 · SI 1.9 s · a11y 100 |
-| `/en` mobile | perf 67 · LCP 5.3 s · FCP 4.6 s · CLS 0 · SI 5.3 s | perf 84 · LCP 3.8 s · FCP 2.5 s · CLS 0 · SI 3.2 s |
-| `/pricing` mobile | perf 72 · LCP 4.6 s · FCP 3.9 s · SI 5.3 s | perf 77 · LCP 4.7 s · FCP 3.2 s · SI 3.3 s (measured before the low-priority bundle change) |
-| `/`, `/en`, `/pricing` desktop | perf 98 / 96 / 98 · LCP 0.9–1.1 s · CLS ≤ 0.04 | not re-run |
-| SEO / best practices | 100 / 79 on every page | 100 / 79 |
+| Page, form                     | Before                                                               | After                                                                                       |
+| ------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `/` mobile                     | perf 57 · LCP 4.2 s · FCP 3.9 s · **CLS 0.279** · SI 7.1 s · a11y 96 | perf **86** · LCP 4.1 s · FCP 1.8 s · CLS 0 · SI 1.9 s · a11y 100                           |
+| `/en` mobile                   | perf 67 · LCP 5.3 s · FCP 4.6 s · CLS 0 · SI 5.3 s                   | perf 84 · LCP 3.8 s · FCP 2.5 s · CLS 0 · SI 3.2 s                                          |
+| `/pricing` mobile              | perf 72 · LCP 4.6 s · FCP 3.9 s · SI 5.3 s                           | perf 77 · LCP 4.7 s · FCP 3.2 s · SI 3.3 s (measured before the low-priority bundle change) |
+| `/`, `/en`, `/pricing` desktop | perf 98 / 96 / 98 · LCP 0.9–1.1 s · CLS ≤ 0.04                       | not re-run                                                                                  |
+| SEO / best practices           | 100 / 79 on every page                                               | 100 / 79                                                                                    |
 
 What Lighthouse named, and what was changed for each:
 
-| Finding | Change |
-| --- | --- |
-| `cdn.paddle.com/paddle/v2/paddle.js` render-blocking, est. 926 ms | `defer` on the script in `index.html`; checkout reads `window.Paddle` at click time |
-| Layout shift on `section.lp-hero`, CLS 0.279 — the H1 swapping into the display bold after first paint | `arabic-regular.woff2` / `arabic-bold.woff2` (67,828 / 69,436 bytes; TTF kept as fallback) listed first in `landing.css`; the prerender preloads both on Arabic pages and `readex-latin-700/400` on English ones; checked per page by the prerender |
-| Bundle (218 kB) fetched at High priority on a page whose words are already in the HTML | `fetchpriority="low"` on the module script of prerendered pages only (`app.html` untouched) |
-| `color-contrast` on `.lp-hero-word` (1.14:1, decorative, `aria-hidden`) | the word is drawn by `::after { content: attr(data-word) }` — no text node |
-| `label-content-name-mismatch` on the language switch (`aria-label` in one language over a word in the other) | `aria-label` removed; the visible word is the name; `switchLabel` deleted from both string files |
+| Finding                                                                                                      | Change                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cdn.paddle.com/paddle/v2/paddle.js` render-blocking, est. 926 ms                                            | `defer` on the script in `index.html`; checkout reads `window.Paddle` at click time                                                                                                                                                                 |
+| Layout shift on `section.lp-hero`, CLS 0.279 — the H1 swapping into the display bold after first paint       | `arabic-regular.woff2` / `arabic-bold.woff2` (67,828 / 69,436 bytes; TTF kept as fallback) listed first in `landing.css`; the prerender preloads both on Arabic pages and `readex-latin-700/400` on English ones; checked per page by the prerender |
+| Bundle (218 kB) fetched at High priority on a page whose words are already in the HTML                       | `fetchpriority="low"` on the module script of prerendered pages only (`app.html` untouched)                                                                                                                                                         |
+| `color-contrast` on `.lp-hero-word` (1.14:1, decorative, `aria-hidden`)                                      | the word is drawn by `::after { content: attr(data-word) }` — no text node                                                                                                                                                                          |
+| `label-content-name-mismatch` on the language switch (`aria-label` in one language over a word in the other) | `aria-label` removed; the visible word is the name; `switchLabel` deleted from both string files                                                                                                                                                    |
 
 Left as measured: LCP ≈ 4 s on simulated slow 4G is the H1's swap into the 69 kB display
 bold (render delay 3.2–3.6 s of it); options recorded in `docs/seo.md` §6. Best practices
@@ -2300,14 +2512,14 @@ At the owner's instruction. Three fallback families in `apps/web/src/landing.css
 `size-adjust`, `ascent-override`, `descent-override`, `line-gap-override`, listed after
 `"Audience Arabic"` in the landing's stack.
 
-| Step | Actual result |
-| --- | --- |
-| Shaped width of the hero + lead + section headings, HarfBuzz (`uharfbuzz`), Plex over each fallback | Geeza Pro 105.12 % / bold 95.25 %; Noto Naskh Arabic 104.47 % / bold 107.31 %; Noto Sans Arabic 92.89 % / bold 90.83 % (SF Arabic 99.12 %, not usable by `local()` — hidden system face) |
-| `local("Geeza Pro")` | matched nothing in Chromium; the full name ("Geeza Pro Regular") and PostScript name ("GeezaPro") both match — every rule now lists both |
-| Chrome canvas, adjusted Geeza against Plex, same passages | regular 0.978 / 0.989, bold 1.013 / 1.034 → size-adjust corrected to 103.39 % / 97.48 %; after: 0.994, 1.004, 0.990, 1.010 |
-| `swap-check.mjs`: 390 px, web font blocked vs loaded | H1 `[221, 309]` both · lead `[552, 115]` both · CTA `[696, 92]` both · "why" heading `[1461, 109]` both · FAQ title 5606 vs 5581 (one wrap, far below the fold) · document 7311 vs 7286 px |
-| Lighthouse 12 mobile, live host, two runs each | `/`: perf 95 / 80 · LCP 2.7 / 3.9 s · FCP 1.7 / 2.9 s · CLS 0 · SI 1.7 / 4.7 s; `/pricing`: perf 79 / 79 · LCP 4.5 / 4.6 s · CLS 0. The LCP render delay (2.3–4.1 s) is still the H1's swap render |
-| `tests/e2e` landing, seo, pricing | 12 passed; web unit tests 410 passed; build and deploy green |
+| Step                                                                                                | Actual result                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shaped width of the hero + lead + section headings, HarfBuzz (`uharfbuzz`), Plex over each fallback | Geeza Pro 105.12 % / bold 95.25 %; Noto Naskh Arabic 104.47 % / bold 107.31 %; Noto Sans Arabic 92.89 % / bold 90.83 % (SF Arabic 99.12 %, not usable by `local()` — hidden system face)           |
+| `local("Geeza Pro")`                                                                                | matched nothing in Chromium; the full name ("Geeza Pro Regular") and PostScript name ("GeezaPro") both match — every rule now lists both                                                           |
+| Chrome canvas, adjusted Geeza against Plex, same passages                                           | regular 0.978 / 0.989, bold 1.013 / 1.034 → size-adjust corrected to 103.39 % / 97.48 %; after: 0.994, 1.004, 0.990, 1.010                                                                         |
+| `swap-check.mjs`: 390 px, web font blocked vs loaded                                                | H1 `[221, 309]` both · lead `[552, 115]` both · CTA `[696, 92]` both · "why" heading `[1461, 109]` both · FAQ title 5606 vs 5581 (one wrap, far below the fold) · document 7311 vs 7286 px         |
+| Lighthouse 12 mobile, live host, two runs each                                                      | `/`: perf 95 / 80 · LCP 2.7 / 3.9 s · FCP 1.7 / 2.9 s · CLS 0 · SI 1.7 / 4.7 s; `/pricing`: perf 79 / 79 · LCP 4.5 / 4.6 s · CLS 0. The LCP render delay (2.3–4.1 s) is still the H1's swap render |
+| `tests/e2e` landing, seo, pricing                                                                   | 12 passed; web unit tests 410 passed; build and deploy green                                                                                                                                       |
 
 Not measured: the Noto faces in Chrome on Android — no such device or font here; their
 ratios are HarfBuzz's, uncorrected.
@@ -2317,11 +2529,11 @@ ratios are HarfBuzz's, uncorrected.
 Deployed with `optional` on the two Arabic faces, then measured; then put back to `swap`
 and deployed again. What decided it:
 
-| Measurement | swap | optional |
-| --- | --- | --- |
-| Lighthouse 12 mobile, live host (simulated) | perf 73–95 · sim LCP 2.8–4.5 s · CLS 0 | perf 74–79 · sim LCP 4.0–4.4 s · CLS 0 |
-| The same traces, **observed** FCP / LCP | 697 / 697 ms and 2249 / 2249 ms (two runs — the host varies that much) | 2398 / 2398 and 2329 / 2329 ms |
-| A/B under control (`.cache/scratch/paint-ab.mjs`: both builds served locally, CDP slow-4G 1.6 Mbps / 150 ms, 4× CPU, cache disabled, 390 px phone, 4 cold runs each) | FCP = LCP 2372–2408 ms · CLS 0 · H1 in the web face | FCP = LCP 2360–2428 ms · CLS 0 · H1 in the web face |
+| Measurement                                                                                                                                                          | swap                                                                   | optional                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| Lighthouse 12 mobile, live host (simulated)                                                                                                                          | perf 73–95 · sim LCP 2.8–4.5 s · CLS 0                                 | perf 74–79 · sim LCP 4.0–4.4 s · CLS 0              |
+| The same traces, **observed** FCP / LCP                                                                                                                              | 697 / 697 ms and 2249 / 2249 ms (two runs — the host varies that much) | 2398 / 2398 and 2329 / 2329 ms                      |
+| A/B under control (`.cache/scratch/paint-ab.mjs`: both builds served locally, CDP slow-4G 1.6 Mbps / 150 ms, 4× CPU, cache disabled, 390 px phone, 4 cold runs each) | FCP = LCP 2372–2408 ms · CLS 0 · H1 in the web face                    | FCP = LCP 2360–2428 ms · CLS 0 · H1 in the web face |
 
 The two are indistinguishable. In every trace the H1 is the LCP element and paints at
 first paint (observed FCP = observed LCP); the later LCP Lighthouse prints is Lantern's
@@ -2510,10 +2722,9 @@ regression of this change.
 
 **The deploy: built, verified against the host, not uploaded.** `curl` of `PREVIEW_URL/`
 found the host serving `static/index-BmIMt0s_.js` with no `tour:v1` marker in it. A detached
-worktree at `46ec419` (node_modules linked in, `@sentiment/*` re-pointed at the worktree's
-own packages, `.env.local` copied) built to exactly `index-BmIMt0s_.js` — so the host is at
-`46ec419`. `699bbba` cherry-picked onto it built to `index-CxI1oaAs.js`, and its `Sync-*` chunk
-carries the new `unlimited` branch. `scripts/deploy-preview.sh` from that worktree was refused
+worktree at `46ec419` (node*modules linked in, `@sentiment/*` re-pointed at the worktree's
+own packages, `.env.local` copied) built to exactly `index-BmIMt0s*.js`— so the host is at`46ec419`. `699bbba`cherry-picked onto it built to`index-CxI1oaAs.js`, and its `Sync-\*`chunk
+carries the new`unlimited`branch.`scripts/deploy-preview.sh` from that worktree was refused
 by the Claude Code auto-mode guard ("Production Deploy") and was not retried; the worktree is
 left in place under the session's scratch directory for the operator to run the script from,
 or to grant the permission. Until then the host still refuses the owner's selections.
@@ -2525,7 +2736,7 @@ the owner's own session and the upload above.
 code and the service log, not fixed.**
 
 - `public.worker_seen` is written per workspace by `claim_job`, and `sync_state.worker.connected`
-  reads it: a workspace is "connected" only if a worker asked *that workspace* for work in the
+  reads it: a workspace is "connected" only if a worker asked _that workspace_ for work in the
   last three minutes (`20260914200000`). A worker asks on behalf of one credential, and a
   credential is bound to one workspace (`private.worker_credentials.workspace_id`, not null).
 - The service (`scripts/worker-service.sh`) holds exactly two: `WORKER_CREDENTIAL` and
@@ -2615,16 +2826,16 @@ in an `extensions` schema, as Supabase installs it, so `svc_register_platform_wo
 hashes for real rather than the suite inserting digests by hand. Per task, watched red first:
 
 - Task 1 (the column and the doors): red in `beforeAll` — `function
-  public.svc_register_platform_worker_credential(unknown, unknown) does not exist`; once the
+public.svc_register_platform_worker_credential(unknown, unknown) does not exist`; once the
   migration existed, `schema "extensions" does not exist` — the suite's own gap, closed by
   loading `@electric-sql/pglite/contrib/pgcrypto`; 2/2 green.
 - Task 2 (the claim and the sighting): 4 red on `invalid_worker_credential` — the fourth an
   artefact: a failing assertion had left `set role authenticated` on the suite's one connection,
   now reset in a `finally`; after the two rewrites the sighting case was still red on six
   workspaces where three were expected, because the migrations seed workspaces of their own —
-  the assertion now says *every* workspace; 6/6 green.
+  the assertion now says _every_ workspace; 6/6 green.
 - Task 3 (the guard, the grants, the tick): 3 red — `null value in column "workspace_id" of
-  relation "videos"` (the guard's null reaching a catalogue commit), `forbidden`
+relation "videos"` (the guard's null reaching a catalogue commit), `forbidden`
   (`worker_mark_revoked`), `no_active_plan` (the tick pricing a null workspace); after the
   rewrites 2 red — `Invalid input for bytea type` (the driver takes bytes; the test now passes a
   `::bytea` literal) and the scoped tick answering `{discover, collect, analyse}`:
@@ -2674,7 +2885,7 @@ host — their own session.
   literal placeholder refused `weak_credential` (the 32-character floor, working as designed);
   second call with the 64-hex secret answered id `7abfe195-b3d4-4fe6-9527-7d4f4b022bf2`.
 - Service log after `scripts/worker-service-update.sh` on the corrected env: `worker up,
-  model=camelbert-da, tenants=1, topics=gemini` at 12:59:53 local; `invalid_worker_credential`
+model=camelbert-da, tenants=1, topics=gemini` at 12:59:53 local; `invalid_worker_credential`
   count since then: 0 (it was ~1/minute since 2026-09-17 01:23).
 - `svc_retire_worker_credentials('d0c3b9fc-b813-439e-a32b-71dd357f0bb4', '{}')` → `1`: the
   empty keep accepted live because an active platform credential exists — the guard rebuilt in
@@ -2707,3 +2918,202 @@ a successful claim or discover, only `comment counts` lines during a collect.
   blocked by the toolchain above; the vitest file `supabase/tests/admin_observability.test.ts`
   mirrors the standalone script and is the one the repo gate runs. The browser pages were not
   exercised live against the hosted project either — no session here.
+
+**Addendum, same day — the security and technical review:**
+
+- Secrets scan (`scripts/check-secrets.mjs`) passed over 661 source files.
+- No `dangerouslySetInnerHTML`/`innerHTML` anywhere in the new admin code; errors surface as
+  codes only, rows render through React's escaping.
+- All four RPCs: `security definer` + `set search_path=''` + fully qualified names, the
+  `is_platform_admin()` raise at the head, `revoke all` then `grant execute to authenticated` —
+  four for four, matching the house pattern. No dynamic SQL; the one parameter (`p_limit`) is an
+  int range-checked at both ends. PII (emails) flows only through the gated RPCs and from
+  `auth.users` columns alone — no raw_user_meta_data, no tokens.
+- Performance: three indexes added to `20260919160000` before it applies anywhere —
+  `sync_runs_channel_started` (the per-channel lateral was a full sync_runs scan per channel;
+  `sync_runs_recent` leads with workspace_id and cannot serve it), `sync_runs_failed_recent`
+  (partial, the failed-runs list and phase two's health tick), `comments_first_seen` (the weekly
+  count was a full scan of a grow-only table; phase two's scheduled signals ask the same).
+  Verified created in the bootstrap; the standalone 30/30 run re-passed on top of them.
+- Known, deliberate: admin reads write no audit rows (phase four's writes will, each with its
+  own guard); the reads are platform-wide by design, which is what the page is for.
+
+## 2026-09-19 — the TypeSafe topic classifier: what was actually run
+
+- Unit: `pytest tests/test_typesafe.py` under the project venv, 13/13, plus the
+  existing `tests/test_gemini.py` and `tests/test_topics.py` (24) green on the same
+  tree — 37 passed in one run against the current dirty worktree.
+- Live, through the adapter (not a mock): `TypeSafeTopicClassifier(key, httpx.Client())`
+  against the real `api.typesafe.ai/v1/systemone` with the default taxonomy and 7 items
+  (including the "آمين"-with-parent reply and a purged text). Verdicts correct on all
+  classifiable items, the purged text returned `skipped` and its bytes were confirmed
+  absent from the request state, total wall time under one second.
+- Head-to-head, same batch of 12 comments to both providers: Gemini `gemini-3.6-flash`
+  with the exact production request shape from `topics/gemini.py` (temperature 0,
+  thinkingBudget 0, responseSchema enum, BLOCK_NONE safety settings) vs TypeSafe
+  `jev-latest` — 11/12 same topic; the disagreement is a genuinely ambiguous comment
+  (criticism vs discussion) where TypeSafe's distribution said 0.68/0.30 and Gemini's
+  self-reported confidence said 0.95. Router variant: one request with 15 parallel
+  `noul` questions over 14 comments classified 5 as no-topic skips and preserved the
+  project's reply-context semantics (0.77 interpretable → passed, matching what the
+  Gemini prompt does today).
+- Honest limits: 12 comments is a demonstration, not a benchmark; thresholds (0.5
+  routing, escalation confidence) are uncalibrated until run over a real channel's
+  comments. Token counts are not comparable across the two providers' tokenizers;
+  cost depends on each provider's pricing. The loop.py wiring is pending, see the
+  progress entry of the same date.
+
+## 2026-09-19 — the live push and what the operator should click through
+
+- `supabase db push --linked` (CLI v2.117.0, downloaded release binary): applied
+  `20260919160000_admin_observability` + `20260919170000_worker_renews_its_token`; "Finished".
+- REST probe with the service-role key: `admin_users`, `admin_channels`, `admin_ops`,
+  `admin_audit(p_limit:0)` → HTTP 403 `42501 forbidden` × 4. Existence + gate, both live. (A
+  signed-in-as-admin probe was deliberately not attempted — minting an admin `sub` token would
+  forge the identity the row-based gate exists to honour.)
+- Host `app.sky-develop.net` HTTP 200; serving the previous bundle still.
+
+**Operator checklist, once `npm run build && npm run deploy:preview` ships the new bundle —
+sign in as the platform admin and walk:**
+
+1. `/admin` — the tab strip appears under the head (demo mode keeps it hidden, as designed).
+2. `/admin/users` — one row per signed-up user; the owner's counts include their personal
+   workspace (bootstrap trigger); the PII note under the table.
+3. `/admin/channels` — AJ360's real counts, its last run verdict; a channel whose last run
+   failed shows the error code under its name.
+4. `/admin/ops` — the seven cards; `worker_fresh` says «العامل يعمل» while the worker service
+   polls; the failed-runs table lists the last two weeks, «قناة محذوفة» if a handle is gone.
+5. `/admin/audit` — the trail with actor emails; the 100/300/500 rungs re-query.
+6. Signed out, or signed in as a non-admin: every one of the five screens says one sentence and
+   shows no table (`admin-forbidden`), and the rail's «الإدارة» link is absent.
+
+## 2026-09-19 — token-renewal lane: check gates and the worker v17 deploy
+
+- **Live project, via Management API:** `20260919170000_worker_renews_its_token`
+  is present in `supabase_migrations.schema_migrations` (queried, not assumed
+  from `db push` output — no push was needed).
+- **Deployed `worker` v17** (`supabase functions deploy worker
+--project-ref ykqugctewsqvevhyqtbi --no-verify-jwt`, run from a clean
+  worktree at `b3c3b95` so only committed code shipped). Function API reads
+  back `version 17, verify_jwt false, status ACTIVE`.
+- **Live probe:** `POST /functions/v1/worker/claim` with a bogus credential →
+  `HTTP 401 {"code":"invalid_worker_credential"}` — the request reaches the
+  gateway's own auth layer (Supabase JWT verification is off, as before) and
+  the function executes. The renewal route itself is covered by its five
+  handler tests, now actually executed (`87ff30a`).
+- **Gates at `b3c3b95`:** lint ✓ · format:check ✓ · typecheck ✓ ·
+  check:functions ✓ · unit 110 files / 863 tests ✓ · python worker 218 ✓ ·
+  build ✓ · check:secrets ✓ (671 files + built assets). **Not green:
+  `npm run test:db` = 334 passed / 5 failed** — `scoped_claim.test.ts` (3,
+  incl. the `jobs_one_outstanding_collect` constraint violation) and
+  `end_to_end.test.ts` (2). Those files are the Bionic session's 2026-09-19
+  work, recorded there as never executed; not this lane's to rewrite.
+- Not verified here: no live claim was taken (that would consume a real job),
+  so the renewal route was not exercised against the deployed function with a
+  real credential; the first long collection run will.
+
+2026-09-19, the channel-lookup lane (public-data channel addition): every gate run
+locally, all green.
+
+- **Gates:** lint ✓ · format:check ✓ · typecheck ✓ · check:functions (deno) ✓ ·
+  unit 110 files / 867 tests ✓ · **test:db 37 files / 353 tests ✓** · python
+  worker 227 tests ✓ (incl. the new `test_public_channel.py`) · build ✓ (8
+  prerendered pages) · check:secrets ✓ (672 files + built assets).
+- **New coverage:** `channel_query.test.ts` (the link/handle/id/search parser),
+  `public_channel.test.ts` (register: metadata filed, public status only,
+  re-add idempotent, non-member/viewer/other-client refusals, blank-null,
+  overlong refused, discovery reachable without a plan gap), gateway handler
+  public-id presence/absence, worker public discover/collect/blocked paths and
+  key-only catalogue by id.
+- **Repaired on first execution** (the Bionic lane's 2026-09-19 files, recorded
+  there as never run; fixture fixes only, no product SQL): `scoped_claim.test.ts`
+  — jobs bled across tests into `jobs_one_outstanding_collect`, and the ordering
+  test raced on same-microsecond `not_before` (now strictly ordered, and the
+  order is asserted across two claims, since one claim hands out one job);
+  `end_to_end.test.ts` — the pinned claim key list predated
+  `access_token_expires_at` (token-renewal lane) and `external_channel_id` (this
+  lane), and the topics-due failure was its cascade (the commit under test never
+  ran); `worker_video_counts.test.ts` — due-list order asserted over random
+  video uuids, now seeded ordered.
+- **Not verified (blocked on credentials/deploy):** no live Data API call was
+  made — `YOUTUBE_API_KEY` is not set in this environment, so the lookup
+  function and the worker's public path are fixture-tested only; the migration
+  is not applied to the live project; the `channel-lookup` function is not
+  deployed (`supabase secrets set YOUTUBE_API_KEY`, then `supabase functions
+deploy channel-lookup`, then `db push` — operator steps, in that order); and
+  the door was not walked in a browser signed in, because the browser suite
+  runs signed out. The e2e gap is the account page's standing one, not new.
+
+2026-09-19, live rollout of the public-channel path: `20260919180000` applied
+and read back via the Management API migration table; `channel-lookup` v1 and
+`worker` v18 ACTIVE (channel-lookup verify_jwt=true: no/bad JWT → 401 /
+UNAUTHORIZED_INVALID_JWT, probed live; worker verify_jwt=false as before);
+`ALLOWED_ORIGINS` present, `YOUTUBE_API_KEY` absent in the secrets list. The
+lookup function has not answered a real lookup yet — that needs the operator's
+API key — so `YOUTUBE_API_KEY`-dependent behaviour remains fixture-tested only.
+The worker service itself was left untouched: the update script run from this
+second account (`muhammed`) produced an EX_CONFIG crash loop against the
+hard-coded `mlubbad` paths and was uninstalled here; the script now templates
+the home paths, so rerunning it from the service's own account applies main
+cleanly.
+
+## 2026-09-19 — live verification: platform OAuth reader and public channel discovery
+
+- **Live Channel Lookup Verification**:
+  - Probed Edge Function `channel-lookup` via POST with JWT membership:
+    - Handle `@alaa_jaber_official`: correctly parsed handle, fetched channel from YouTube Data API v3 via platform reader grant (`channel_lookup_reader_grant`), returning title "علاء جابر | Alaa Jaber", channel ID `UC-7b_c5pT2t1p7y9p_b69sw`, thumbnail, and video count (194).
+    - Query "علاء جابر": executed search query against YouTube Data API v3, returning 5 matching channel candidates with Arabic titles.
+- **Live Channel Registration & Video Discovery**:
+  - Registered channel `ebb2cff8-58eb-4228-ab9c-3daa2e66d123` into workspace `d0c3b9fc-34bf-4ec6-8fef-93c4a22ad31e` with status `public_unverified`.
+  - Triggered catalogue discovery job `request_discovery`: claimed by worker via gateway, authenticated using platform reader access token, discovered and stored 194 videos into `videos` table.
+- **Automated Test Gates**:
+  - `npm test`: 110 test files passed, 865 tests passed.
+  - `npm run test:db`: 38 test files passed, 361 tests passed (including `public_channel.test.ts` and `platform_reader.test.ts`).
+  - Python worker pytest: 229 passed in 4.24s.
+  - TypeScript typecheck: `tsc --noEmit` clean.
+  - Edge function checks: `npx deno check supabase/functions/*/index.ts` clean.
+  - Production web build: `npm run build` completed, 8 prerendered pages.
+  - Secret scan: `node scripts/check-secrets.mjs` passed with zero secrets.
+  - Preview deploy: `npm run deploy:preview` uploaded assets cleanly to preview host.
+
+## 2026-09-19 — live verification: CORS preflight with x-client-info
+
+- **Root Cause Verified**:
+  Simulating browser preflight request with curl:
+  `curl -i -X OPTIONS "https://ykqugctewsqvevhyqtbi.supabase.co/functions/v1/channel-lookup" -H "Origin: https://app.sky-develop.net" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: authorization,content-type,apikey,x-client-info"`
+  Failed to include `x-client-info` in `access-control-allow-headers`, causing browser preflight refusal.
+- **Fixed & Verified**:
+  After updating `_shared/cors.ts` and redeploying `channel-lookup`, live curl preflight test returned:
+  `HTTP/2 204`
+  `access-control-allow-origin: https://app.sky-develop.net`
+  `access-control-allow-headers: authorization,content-type,apikey,x-client-info`
+  `access-control-allow-methods: POST, OPTIONS`
+- **Unit test**:
+  `npx vitest run supabase/tests/cors.test.ts` passed (4/4 tests).
+- **Full verification check**:
+  `npm run check` passed completely green across all gates (lint, format, typecheck, check:functions, test, test:db, worker:test, build, check:secrets).
+- **Preview deployed**:
+  `npm run deploy:preview` uploaded cleanly (HTTP 226 / gone, exit code 0).
+
+## 2026-09-20 — verification: Continuous Deployment with GitHub Actions, FTPS, and Remote Migrations
+
+- **Workflow Syntax Validation**:
+  - Python YAML safe_load check: `.github/workflows/deploy.yml` parsed valid with keys `['name', True, 'permissions', 'concurrency', 'jobs']`.
+- **Security & SHA Pinning Audit**:
+  - Actions pinned to commit SHAs: `actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683` (v4.2.2), `actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020` (v4.4.0).
+  - Security gates: Semgrep SAST completed without new blocking findings; `check-secrets.mjs` confirmed zero committed secrets in source and built bundles.
+- **Local Remote Migration Validation (`npm run db:migrate:remote`)**:
+  - Executed against live Supabase project `ykqugctewsqvevhyqtbi`:
+    `Connecting to Supabase project [ykqugctewsqvevhyqtbi]...`
+    `Database is up to date (78 migrations applied, 0 pending).`
+  - Exit code 0, 0 pending.
+- **Full Gate Verification (`npm run check`)**:
+  - ESLint + Ruff: clean.
+  - Prettier formatting: clean.
+  - TypeScript typecheck: clean (0 errors).
+  - Edge Functions: Deno check clean.
+  - Web unit tests: 111 test files, 874 passed.
+  - DB tests (PGlite): 39 test files, 365 passed.
+  - Worker tests (pytest): 229 passed in 4.27s.
+  - Production build: Vite + prerender 8 pages clean.
+  - Secret scan: 688 source files + built assets clean.

@@ -1,14 +1,16 @@
 /** The one filter contract every view, export and query must obey. */
 import { z } from "zod";
 import { LabelSchema, timestamp } from "./primitives";
+import { SOURCE_PLATFORMS, CONTENT_KINDS } from "./selection";
 
 export const FiltersSchema = z
   .object({
     workspace_id: z.string().uuid(),
     client_id: z.string().optional(),
     channel_id: z.string().optional(),
+    platform: z.enum(SOURCE_PLATFORMS).optional(),
     video_ids: z.array(z.string()).max(100).default([]),
-    video_kind: z.enum(["video", "short", "stream"]).optional(),
+    video_kind: z.enum(CONTENT_KINDS).optional(),
     from: timestamp.optional(),
     to: timestamp.optional(),
     date_mode: z.enum(["all", "known", "unknown"]).default("all"),

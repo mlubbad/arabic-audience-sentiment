@@ -22,7 +22,7 @@ const shared = vi.hoisted(() => ({
     data: undefined as unknown,
     isPending: false,
     isError: false,
-    refetch: () => Promise.resolve(),
+    refetch: vi.fn(() => Promise.resolve()),
   },
 }));
 vi.mock("@tanstack/react-query", () => ({
@@ -136,7 +136,7 @@ beforeEach(() => {
     },
     isPending: false,
     isError: false,
-    refetch: () => Promise.resolve(),
+    refetch: vi.fn(() => Promise.resolve()),
   };
 });
 
@@ -288,7 +288,7 @@ describe("the catalogue before it exists", () => {
     const html = markup({ jobs: [job()] });
     expect(html).toContain('data-testid="cat-discovering"');
     expect(html).toContain(ar.jobQueuedHeadline);
-    expect(html).toContain(ar.jobQueuedWithWorker);
+    expect(html).toContain(ar.jobCatalogueQueuedWithWorker);
     expect(html).not.toContain(ar.catEmpty);
     // With no worker the same job reads as the log reads it: stalled.
     const stalled = markup({ jobs: [job()], workerConnected: false });
@@ -402,5 +402,67 @@ describe("what a selected video's state cell says", () => {
       // outcome to it.
       expect(explainCode("unchanged", S)).toBe(S.catStateUnchanged);
     }
+  });
+
+  it("renders warning state when Telegram discussion requires auth", () => {
+    expect(cell("telegram_discussion_requires_auth")).toBe(
+      ar.catStateTelegramAuthRequired,
+    );
+  });
+});
+
+describe("reactive lifecycle updates", () => {
+  it("refetches catalogue when a discover job transitions from running to finished", () => {
+    const refetch = vi.fn(() => Promise.resolve());
+    shared.query.refetch = refetch;
+
+    const { rerender } = render(
+      <Catalogue {...props({ jobs: [job({ status: "running" })] })} />,
+    );
+    expect(refetch).not.toHaveBeenCalled();
+
+    // The discover job finishes: jobs now has a succeeded job (or no active job)
+    rerender(
+      <Catalogue {...props({ jobs: [job({ status: "succeeded" })] })} />,
+    );
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches catalogue when an active collect job transitions from running to finished", () => {
+    const refetch = vi.fn(() => Promise.resolve());
+    shared.query.refetch = refetch;
+
+    const { rerender } = render(
+      <Catalogue
+        {...props({
+          jobs: [job({ type: "collect", status: "running" })],
+        })}
+      />,
+    );
+    expect(refetch).not.toHaveBeenCalled();
+
+    // The collect job finishes
+    rerender(
+      <Catalogue
+        {...props({
+          jobs: [job({ type: "collect", status: "succeeded" })],
+        })}
+      />,
+    );
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches when catalogue is uncatalogued but a succeeded discover job exists", () => {
+    const refetch = vi.fn(() => Promise.resolve());
+    shared.query.refetch = refetch;
+    shared.query.data = {
+      videos: [],
+      selections: [],
+      channelId: "ch1",
+      cataloguedAt: null,
+    };
+
+    render(<Catalogue {...props({ jobs: [job({ status: "succeeded" })] })} />);
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

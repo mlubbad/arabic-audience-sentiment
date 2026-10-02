@@ -33,6 +33,7 @@ import type { Snapshot } from "./Dashboard";
 import type { Locale } from "../locale";
 import { commentText, displayDate } from "../i18n";
 import { n } from "./format";
+import { EXPORT_ROW_CAP } from "../data";
 import { CommentsTable, confidencePct } from "./CommentsTable";
 import "./comments.css";
 
@@ -95,7 +96,7 @@ export function Comments({
             fallback target, for when the row that opened it is gone (a
             reviewed row can drop out of the "غير المراجَع" filter on save). */}
         <h2 id="rp-comments-title" tabIndex={-1}>
-          {S.secComments}
+          {S.secCommentsTitle}
         </h2>
         <p className="db-lead">{S.commentsLead}</p>
       </header>
@@ -121,13 +122,34 @@ export function Comments({
             <li key={c.id}>
               <Card className="db-comment">
                 <div className="db-comment-head">
-                  <span className="db-comment-who">
-                    {/* A purged author is named as purged, not left blank
-                        and not replaced with a plausible name. `<bdi>` keeps
-                        a Latin handle reading left-to-right (`@abu_faisal`,
-                        not `abu_faisal@`) inside the surrounding RTL text. */}
-                    <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
-                  </span>
+                  <div className="db-comment-author-info">
+                    {c.author_profile_image_url ? (
+                      <img
+                        src={c.author_profile_image_url}
+                        alt=""
+                        className="db-comment-avatar"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="db-comment-avatar-fallback">
+                        {(c.author_name ?? "؟").slice(0, 1)}
+                      </span>
+                    )}
+                    <span className="db-comment-who">
+                      {c.author_channel_url ? (
+                        <a
+                          href={c.author_channel_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="db-comment-author-link"
+                        >
+                          <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
+                        </a>
+                      ) : (
+                        <bdi>{c.author_name ?? S.purgedAuthor}</bdi>
+                      )}
+                    </span>
+                  </div>
                   <Badge tone={c.label ? SENTIMENT_TONE[c.label] : "neutral"}>
                     {c.label ? labels[c.label] : S.noLabel}
                     {score !== null && (
@@ -173,7 +195,7 @@ export function Comments({
         >
           {S.exportCsv}
         </Button>
-        <p className="db-muted">{S.exportNote(s.total)}</p>
+        <p className="db-muted">{S.exportNote(s.total, EXPORT_ROW_CAP)}</p>
         {exporting.isError && (
           <p role="alert" data-testid="export-error">
             {S.exportFailed}

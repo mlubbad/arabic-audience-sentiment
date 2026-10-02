@@ -58,6 +58,24 @@ def _still_to_read(control: ControlPlane, collector, lease: dict, videos: list[d
     return kept
 
 
+def _renew_for(control: ControlPlane, lease: dict):
+    """The renewal the collector may ask for, narrowed to what it may learn.
+
+    A control-plane refusal — an older gateway without the route, a blip —
+    becomes "no renewal", which ends the run as the retryable credential
+    lapse it would have been anyway. A lost lease is not narrowed: someone
+    else holds the job, and ending quietly would write over their result.
+    """
+    def renew():
+        try:
+            return control.renew_token(lease)
+        except LeaseLost:
+            raise
+        except ControlPlaneError:
+            return None
+    return renew
+
+
 def _resume_cursor(lease: dict) -> str | None:
     """Unwrap the stored checkpoint.
 
@@ -119,7 +137,9 @@ def run_once(
         # The callback returns both, because which video to collect can only
         # be answered with the token: the channel's uploads are not public
         # knowledge to the worker until it has one.
-        collector, video_id = build_collector(token)
+        collector, video_id = build_collector(
+            token, lease.get("access_token_expires_at"), _renew_for(control, lease)
+        )
         # The builder is the only thing that knows which video it chose, so it
         # is also the only thing that knows the title. Without this the server
         # stored the platform id as the title — correct as a fallback, wrong
@@ -150,6 +170,9 @@ def run_once(
             # lease lapse underneath the write that follows it.
             control.heartbeat(lease)
             control.commit_batch(lease, video_id, video_title, batch, predictions)
+            if batch.outcome in ("explicitly_disabled", "unavailable"):
+                control.finish(lease, "blocked", batch.outcome)
+                return True
             outcome = batch.outcome if batch.outcome in _DECLARABLE else "failed"
             if batch.outcome != "partial":
                 break
@@ -173,19 +196,69 @@ def run_once(
     return True
 
 
+def _collector_for(control: ControlPlane, lease: dict, build_collector):
+    """The collector the lease can support, or a reason it cannot be built.
+
+    A token names the OAuth path, as it always has. A lease without one but
+    with an `external_channel_id` is a public channel: the builder decides
+    with the project API key whether this worker can read public data, and
+    None there is a configuration gap on the worker, not a fault in the
+    channel. Neither token nor id is the old answer, unchanged: nobody has
+    connected this channel.
+    """
+    token = lease.get("access_token")
+    channel_id = lease.get("external_channel_id")
+    platform = lease.get("platform") or "youtube"
+
+    def _call(tok, exp=None, ren=None, ch=None):
+        try:
+            return build_collector(
+                tok, exp, ren, channel_id=ch, platform=platform
+            )
+        except TypeError:
+            try:
+                return build_collector(
+                    tok, exp, ren, channel_id=ch
+                )
+            except TypeError:
+                return build_collector(tok, exp, ren)
+
+    if token:
+        # The token is the channel owner's when the lease names no channel —
+        # and the platform reader's when it does: same build, and the collector
+        # files its rows as public data only in the reader case. The id is
+        # passed only when present, so builders that only ever see owner
+        # grants keep their old shape.
+        if channel_id:
+            return _call(
+                token, lease.get("access_token_expires_at"),
+                _renew_for(control, lease), ch=channel_id,
+            ), None, channel_id
+        return _call(
+            token, lease.get("access_token_expires_at"), _renew_for(control, lease)
+        ), None, None
+    if not channel_id:
+        return None, "channel_not_connected", None
+    collector = _call(None, ch=channel_id)
+    if collector is None:
+        return None, "public_collection_not_configured", None
+    return collector, None, channel_id
+
+
 def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
     """List the channel's videos and commit the list. The lease is already claimed.
 
     An incomplete listing is partial: the videos it did find are real, the
     claim that this is the whole channel is not.
     """
-    token = lease.get("access_token")
-    if not token:
-        control.finish(lease, "blocked", "channel_not_connected")
+    collector, reason, channel_id = _collector_for(control, lease, build_collector)
+    if collector is None:
+        control.finish(lease, "blocked", reason)
         return True
     try:
-        collector = build_collector(token)
-        result = collector.catalogue()
+        # The OAuth collector reads the channel its grant names; the public
+        # collector is told which id it was built for.
+        result = collector.catalogue(channel_id)
         control.heartbeat(lease)
         control.commit_catalogue(lease, result.videos)
         control.finish(lease, "exhausted" if result.complete else "partial",
@@ -220,9 +293,9 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     A video whose comments are switched off is reported and skipped; anything
     else that stops early leaves the run partial with the cursor held.
     """
-    token = lease.get("access_token")
-    if not token:
-        control.finish(lease, "blocked", "channel_not_connected")
+    collector, reason, _ = _collector_for(control, lease, build_collector)
+    if collector is None:
+        control.finish(lease, "blocked", reason)
         return True
     # An explicit empty list is a channel with nothing due. No list at all is a
     # gateway that never computed one, and a run that read nothing because it
@@ -230,7 +303,6 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     if "videos" not in lease:
         control.finish(lease, "blocked", "no_due_list")
         return True
-    collector = build_collector(token)
     videos = [v for v in (lease.get("videos") or []) if isinstance(v, dict)]
 
     done, current = _resume_progress(lease)
@@ -249,8 +321,21 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
             # issued.
             start = cursor if vid == current else None
             video_outcome = "partial"
+            chk = lease.get("checkpoint") or {}
+            is_hist = bool(chk.get("is_historical") or lease.get("type") == "import")
+            kwargs = {}
+            if chk.get("since"):
+                kwargs["since"] = chk["since"]
+            elif video.get("last_seen_comment_count") is not None and video.get("last_collected_at"):
+                kwargs["since"] = video["last_collected_at"]
+            if chk.get("max_items"):
+                kwargs["max_items"] = chk["max_items"]
             try:
-                for batch in collector.batches(vid, start):
+                batch_iter = collector.batches(vid, start, **kwargs)
+                collected_for_video = 0
+                video_skipped_blocked = False
+                for batch in batch_iter:
+                    collected_for_video += len(batch.comments)
                     predictions: list = []
                     if analyzer is not None:
                         try:
@@ -258,23 +343,50 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                         except AnalysisError:
                             analysis_failed = True
                     control.heartbeat(lease)
+                    progress_dict = {"video": vid, "done": sorted(done)}
+                    if is_hist:
+                        progress_dict["is_historical"] = True
                     control.commit_batch(
                         lease, vid, video.get("title"), batch, predictions,
-                        progress={"video": vid, "done": sorted(done)},
+                        progress=progress_dict,
                     )
+                    if batch.outcome in ("explicitly_disabled", "unavailable"):
+                        control.video_finished(lease, video["video_id"], "blocked", batch.outcome)
+                        done.add(vid)
+                        video_skipped_blocked = True
+                        break
                     video_outcome = (
                         batch.outcome if batch.outcome in _DECLARABLE else "failed"
                     )
                     if batch.outcome != "partial":
                         break
+                if video_skipped_blocked:
+                    continue
             except CollectionError as exc:
-                if exc.code != "comments_disabled":
+                if exc.code == "telegram_discussion_requires_auth":
+                    for v in videos:
+                        try:
+                            control.video_finished(lease, v["video_id"], "blocked", exc.code)
+                        except Exception:  # noqa: BLE001 — best-effort notification on fatal auth failure before re-raising
+                            pass
                     raise
-                # A property of the video, not of the run. Learned back into
-                # the catalogue and the next video is read.
-                control.video_finished(lease, video["video_id"], "blocked", exc.code)
-                done.add(vid)
-                continue
+                if exc.code in ("comments_disabled", "video_not_found") or exc.outcome in ("explicitly_disabled", "unavailable"):
+                    # A property of the video, not of the run. Learned back into
+                    # the catalogue and the next video is read.
+                    control.video_finished(lease, video["video_id"], "blocked", exc.code)
+                    done.add(vid)
+                    continue
+                raise
+
+            # WO-3 Invariant 2: Failure never becomes success.
+            # If the video had reported comments > 0, but 0 comments were collected,
+            # this cannot be declared exhausted (which would set last_seen_comment_count = reported_comment_count
+            # and permanently suppress future collection). It must be treated as partial.
+            if video_outcome == "exhausted" and collected_for_video == 0 and (video.get("reported_comment_count") or 0) > 0:
+                control.video_finished(lease, video["video_id"], "partial", "zero_comments_reported")
+                outcome = "partial"
+                break
+
             if video_outcome != "exhausted":
                 # Stop the run here. The checkpoint names this video and the
                 # ones behind it, so the next attempt continues rather than
@@ -284,6 +396,7 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                 break
             control.video_finished(lease, video["video_id"], "exhausted")
             done.add(vid)
+
         if analysis_failed and outcome == "exhausted":
             outcome = "partial"
         control.finish(lease, outcome)
@@ -404,7 +517,13 @@ def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
             if stopped or not any_final:
                 first_failure = first_failure or "classification_failed"
                 break
-        control.finish(lease, "partial" if first_failure else "exhausted", first_failure)
+        outcome = "exhausted"
+        if first_failure:
+            if first_failure in ("gemini_credits_depleted", "quota_exceeded", "invalid_credentials", "insufficient_quota"):
+                outcome = "blocked"
+            else:
+                outcome = "partial"
+        control.finish(lease, outcome, first_failure)
     except LeaseLost:
         raise
     except ControlPlaneError as exc:
@@ -424,7 +543,7 @@ def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=No
     # without a topic classifier claiming unscoped would take a topics job,
     # hold its lease, and finish it blocked — five minutes the queue waited
     # for nothing. Scope the claim to what can actually be dispatched.
-    job_types = None if classifier is not None else ["collect", "discover"]
+    job_types = None if classifier is not None else ["collect", "discover", "import"]
     lease = control.claim(job_types)
     if lease is None:
         return False

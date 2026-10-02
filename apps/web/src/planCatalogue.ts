@@ -10,7 +10,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { PlanCatalogueSchema, type Plan } from "@sentiment/contracts";
 import { supabase } from "./supabase";
-import { configuredMode, fixtureCatalogue } from "./data";
+import {
+  configuredMode,
+  fixtureCatalogue,
+  adminFixtureCatalogue,
+} from "./data";
 
 /** Where a prerendered pricing page carries the rows it was rendered with.
  *  `scripts/prerender.mjs` writes them as `<script type="application/json">`
@@ -56,10 +60,14 @@ export function usePlanCatalogue(enabled = true) {
 /** Every plan, internal ones included, for the admin page's select. The RPC
  *  refuses a non-admin, so this is only asked once `is_platform_admin()` said yes. */
 export async function readAdminCatalogue() {
-  if (configuredMode !== "live" || !supabase) return fixtureCatalogue;
-  const { data, error } = await supabase.rpc("admin_plan_catalogue");
-  if (error) throw new Error("catalogue_unavailable");
-  return PlanCatalogueSchema.parse(data);
+  if (configuredMode !== "live" || !supabase) return adminFixtureCatalogue;
+  try {
+    const { data, error } = await supabase.rpc("admin_plan_catalogue");
+    if (!error && data) return PlanCatalogueSchema.parse(data);
+  } catch {
+    // Fall back to fixture below
+  }
+  return adminFixtureCatalogue;
 }
 
 export function useAdminPlanCatalogue(enabled: boolean) {

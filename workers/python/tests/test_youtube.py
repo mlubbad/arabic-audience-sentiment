@@ -175,3 +175,366 @@ def test_comment_counts_refuses_an_id_it_would_not_read():
     with _responding(200, {"items": []}) as client:
         with pytest.raises(ValueError):
             YouTubeAPI("fixture-key", client).comment_counts(["https://internal"])
+
+
+def _token_source(requests, responses):
+    """A renew callable that answers from a list, recording the ask."""
+    def renew():
+        requests.append("renew")
+        answer = responses[len([r for r in requests if r == "renew"]) - 1]
+        return answer if isinstance(answer, dict) else None
+    return renew
+
+
+def test_a_lapsed_token_is_swapped_mid_run_and_the_request_is_repeated():
+    # The whole run used to end at the first 401. With a renewal route the
+    # very request is repeated under the fresh token, and the batch completes.
+    state = {"calls": 0}
+    def handler(request):
+        state["calls"] += 1
+        if state["calls"] == 1:
+            return httpx.Response(401, json={"error": {"errors": []}})
+        return httpx.Response(200, json={"items": []})
+
+    renews = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.stale",
+                             renew=_token_source(renews, [{"access_token": "ya29.fresh",
+                                                           "access_token_expires_at": None}]))
+        batch = next(adapter.batches("abcdefghijk", None))
+    assert batch.outcome == "exhausted"
+    assert renews == ["renew"]
+    assert adapter.token == "ya29.fresh"
+
+
+def test_a_renewal_that_comes_back_empty_is_a_retryable_credential_lapse():
+    def handler(request):
+        return httpx.Response(401, json={"error": {"errors": []}})
+
+    renews = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.stale",
+                             renew=_token_source(renews, [None]))
+        with pytest.raises(CollectionError) as e:
+            next(adapter.batches("abcdefghijk", None))
+    assert e.value.code == "credential_expired"
+    assert e.value.outcome == "failed" and e.value.retryable is True
+    assert renews == ["renew"]
+
+
+def test_a_token_nearing_its_end_is_renewed_before_the_source_is_asked():
+    # Without the proactive swap the first request would spend the run's
+    # remaining seconds collecting a page it then loses to the lapse.
+    import datetime
+    nearly_gone = (datetime.datetime.now(datetime.timezone.utc)
+                   + datetime.timedelta(seconds=30)).isoformat()
+    fresh = (datetime.datetime.now(datetime.timezone.utc)
+             + datetime.timedelta(hours=1)).isoformat()
+
+    seen_auth = []
+    def handler(request):
+        seen_auth.append(request.headers.get("authorization"))
+        return httpx.Response(200, json={"items": []})
+
+    renews = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.old", expires_at=nearly_gone,
+                             renew=_token_source(renews, [{"access_token": "ya29.new",
+                                                           "access_token_expires_at": fresh}]))
+        next(adapter.batches("abcdefghijk", None))
+    assert renews == ["renew"]
+    assert seen_auth == ["Bearer ya29.new"]
+
+
+def test_a_token_with_time_left_is_not_renewed_at_all():
+    import datetime
+    fine = (datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(hours=1)).isoformat()
+
+    seen_auth = []
+    def handler(request):
+        seen_auth.append(request.headers.get("authorization"))
+        return httpx.Response(200, json={"items": []})
+
+    renews = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.kept", expires_at=fine,
+                             renew=_token_source(renews, [{"access_token": "ya29.other"}]))
+        next(adapter.batches("abcdefghijk", None))
+    assert renews == []
+    assert seen_auth == ["Bearer ya29.kept"]
+
+
+def test_without_a_renewal_route_a_lapse_stays_a_retryable_credential_lapse():
+    # The old behaviour, kept for a gateway that predates the route.
+    def handler(request):
+        return httpx.Response(401, json={"error": {"errors": []}})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI(None, client, access_token="ya29.stale")
+        with pytest.raises(CollectionError) as e:
+            next(adapter.batches("abcdefghijk", None))
+    assert e.value.code == "credential_expired"
+    assert e.value.retryable is True
+
+
+def test_inline_replies_yielded_without_calling_comments_endpoint():
+    # When commentThreads returns inline replies and totalReplyCount <= len(inline),
+    # all replies are extracted inline with 0 extra quota units spent calling /comments.
+    seen_paths = []
+
+    def handler(request):
+        seen_paths.append(request.url.path)
+        if request.url.path.endswith("/commentThreads"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "snippet": {
+                                "topLevelComment": {
+                                    "id": "t1",
+                                    "snippet": {"textOriginal": "تعليق رئيسي"},
+                                },
+                                "totalReplyCount": 2,
+                            },
+                            "replies": {
+                                "comments": [
+                                    {
+                                        "id": "r1",
+                                        "snippet": {
+                                            "textOriginal": "رد أول",
+                                            "parentId": "t1",
+                                        },
+                                    },
+                                    {
+                                        "id": "r2",
+                                        "snippet": {
+                                            "textOriginal": "رد ثان",
+                                            "parentId": "t1",
+                                        },
+                                    },
+                                ]
+                            },
+                        }
+                    ]
+                },
+            )
+        return httpx.Response(404)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI("fixture-key", client)
+        batches = list(adapter.batches("abcdefghijk", None))
+        assert len(batches) == 1
+        assert batches[0].outcome == "exhausted"
+        comments = batches[0].comments
+        assert [c.id for c in comments] == ["t1", "r1", "r2"]
+        assert comments[1].parent_id == "t1"
+        assert comments[2].parent_id == "t1"
+        assert all(c.video_id == "abcdefghijk" for c in comments)
+        # Absolutely no call to /comments:
+        assert not any(p.endswith("/comments") for p in seen_paths)
+
+
+def test_overflow_replies_fallback_to_comments_endpoint():
+    # When totalReplyCount > len(inline) (e.g. 1 inline but 3 total), the thread
+    # is scheduled for explicit reply pagination via /comments to fetch complete history.
+    seen_paths = []
+
+    def handler(request):
+        seen_paths.append(request.url.path)
+        if request.url.path.endswith("/commentThreads"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "snippet": {
+                                "topLevelComment": {
+                                    "id": "t1",
+                                    "snippet": {"textOriginal": "تعليق رئيسي"},
+                                },
+                                "totalReplyCount": 3,
+                            },
+                            "replies": {
+                                "comments": [
+                                    {
+                                        "id": "r1",
+                                        "snippet": {
+                                            "textOriginal": "رد أول",
+                                            "parentId": "t1",
+                                        },
+                                    }
+                                ]
+                            },
+                        }
+                    ]
+                },
+            )
+        if request.url.path.endswith("/comments"):
+            return httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "r1_full",
+                            "snippet": {
+                                "textOriginal": "رد أول كامل",
+                                "parentId": "t1",
+                            },
+                        },
+                        {
+                            "id": "r2_full",
+                            "snippet": {
+                                "textOriginal": "رد ثان كامل",
+                                "parentId": "t1",
+                            },
+                        },
+                        {
+                            "id": "r3_full",
+                            "snippet": {
+                                "textOriginal": "رد ثالث كامل",
+                                "parentId": "t1",
+                            },
+                        },
+                    ]
+                },
+            )
+        return httpx.Response(404)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI("fixture-key", client)
+        batches = list(adapter.batches("abcdefghijk", None))
+        # Batch 1 yielded top comment t1, Batch 2 yielded replies from /comments
+        all_comments = [c for b in batches for c in b.comments]
+        assert [c.id for c in all_comments] == ["t1", "r1_full", "r2_full", "r3_full"]
+        assert any(p.endswith("/comments") for p in seen_paths)
+
+
+def test_early_stopping_on_since_watermark():
+    # When since is provided, thread pagination terminates immediately upon encountering
+    # a comment older than or equal to the since cutoff, skipping older pages.
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.params.get("pageToken"))
+        if not request.url.params.get("pageToken"):
+            return httpx.Response(
+                200,
+                json={
+                    "nextPageToken": "page2_token",
+                    "items": [
+                        {
+                            "snippet": {
+                                "topLevelComment": {
+                                    "id": "new_c",
+                                    "snippet": {
+                                        "textOriginal": "جديد",
+                                        "publishedAt": "2026-09-23T10:00:00Z",
+                                    },
+                                },
+                                "totalReplyCount": 0,
+                            }
+                        },
+                        {
+                            "snippet": {
+                                "topLevelComment": {
+                                    "id": "old_c",
+                                    "snippet": {
+                                        "textOriginal": "قديم",
+                                        "publishedAt": "2026-09-21T08:00:00Z",
+                                    },
+                                },
+                                "totalReplyCount": 0,
+                            }
+                        },
+                    ],
+                },
+            )
+        # Should NOT be reached because early stopping halted at old_c
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "snippet": {
+                            "topLevelComment": {
+                                "id": "ancient_c",
+                                "snippet": {
+                                    "textOriginal": "أقدم",
+                                    "publishedAt": "2026-09-19T00:00:00Z",
+                                },
+                            },
+                            "totalReplyCount": 0,
+                        }
+                    }
+                ]
+            },
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI("fixture-key", client)
+        batches = list(
+            adapter.batches("abcdefghijk", None, since="2026-09-22T00:00:00Z")
+        )
+        assert len(batches) == 1
+        assert batches[0].outcome == "exhausted"
+        assert [c.id for c in batches[0].comments] == ["new_c"]
+        # Crucial check: page2 was NEVER called!
+        assert calls == [None]
+
+
+def test_youtube_interaction_fields_extracted():
+    def handler(request):
+        if request.url.path.endswith('/commentThreads'):
+            return httpx.Response(200, json={
+                'items': [{
+                    'snippet': {
+                        'topLevelComment': {
+                            'id': 'c_rich',
+                            'snippet': {
+                                'textOriginal': 'تعليق تفاعلي',
+                                'authorDisplayName': 'المعلق الفعال',
+                                'authorChannelId': {'value': 'UCcommenter123'},
+                                'authorProfileImageUrl': 'https://yt3.ggpht.com/avatar.jpg',
+                                'authorChannelUrl': 'http://www.youtube.com/channel/UCcommenter123',
+                                'publishedAt': '2026-09-23T10:00:00Z',
+                                'updatedAt': '2026-09-23T10:05:00Z',
+                                'likeCount': 42,
+                            }
+                        },
+                        'totalReplyCount': 2
+                    }
+                }]
+            })
+        if request.url.path.endswith('/comments'):
+            return httpx.Response(200, json={
+                'items': [{
+                    'id': 'reply_1',
+                    'snippet': {
+                        'textOriginal': 'رد رائع',
+                        'parentId': 'c_rich',
+                        'authorDisplayName': 'المجيب',
+                        'authorProfileImageUrl': 'https://yt3.ggpht.com/reply_avatar.jpg',
+                        'publishedAt': '2026-09-23T11:00:00Z',
+                    }
+                }]
+            })
+        return httpx.Response(404, json={})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI("fixture-key", client)
+        batches = list(adapter.batches("abcdefghijk", None))
+        assert len(batches) == 2
+        c = batches[0].comments[0]
+        assert c.author_name == "المعلق الفعال"
+        assert c.author_channel_id == "UCcommenter123"
+        assert c.author_profile_image_url == "https://yt3.ggpht.com/avatar.jpg"
+        assert c.author_channel_url == "http://www.youtube.com/channel/UCcommenter123"
+        assert c.reply_count == 2
+        assert c.updated_at == "2026-09-23T10:05:00Z"
+        assert c.likes_value == 42
+        r = batches[1].comments[0]
+        assert r.author_profile_image_url == "https://yt3.ggpht.com/reply_avatar.jpg"
+        assert r.is_reply is True
+

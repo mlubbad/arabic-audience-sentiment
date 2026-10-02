@@ -56,3 +56,50 @@ export function commentText(
   if (c.text_raw !== null) return c.text_raw;
   return c.content_purged_at ? S.purgedText : "";
 }
+
+/** Format duration into natural Arabic or English terms. */
+export function formatDuration(seconds: number, lang: Locale): string {
+  const s = Math.max(1, Math.round(seconds));
+  if (lang === "ar") {
+    if (s < 60) {
+      if (s === 1) return "ثانية واحدة";
+      if (s === 2) return "ثانيتان";
+      if (s >= 3 && s <= 10) return `${s} ثوانٍ`;
+      return `${s} ثانية`;
+    }
+    const mins = Math.floor(s / 60);
+    const remSec = s % 60;
+    let minStr = "";
+    if (mins === 1) minStr = "دقيقة واحدة";
+    else if (mins === 2) minStr = "دقيقتان";
+    else if (mins >= 3 && mins <= 10) minStr = `${mins} دقائق`;
+    else minStr = `${mins} دقيقة`;
+
+    if (remSec === 0) return minStr;
+    let secStr = "";
+    if (remSec === 1) secStr = "ثانية واحدة";
+    else if (remSec === 2) secStr = "ثانيتان";
+    else if (remSec >= 3 && remSec <= 10) secStr = `${remSec} ثوانٍ`;
+    else secStr = `${remSec} ثانية`;
+
+    return `${minStr} و${secStr}`;
+  }
+
+  // English
+  if (s < 60) {
+    return `${s}s`;
+  }
+  const mins = Math.floor(s / 60);
+  const remSec = s % 60;
+  return remSec > 0 ? `${mins}m ${remSec}s` : `${mins}m`;
+}
+
+/** Calculate elapsed time since a given date and format it. */
+export function formatElapsed(
+  since: string | Date | number,
+  lang: Locale,
+): string {
+  const time = typeof since === "number" ? since : new Date(since).getTime();
+  const elapsedSec = Math.max(0, (Date.now() - time) / 1000);
+  return formatDuration(elapsedSec, lang);
+}

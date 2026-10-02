@@ -25,6 +25,42 @@ export const ADMIN_DEMO_FIXTURE = "/fixtures/admin.json";
  *  fixture — the personal workspace and a client workspace retired to it. */
 export const DEMO_OWNER_ID = "00000000-0000-4000-8000-0000000000aa";
 
+/** Demo users matching the fixture workspaces for demo and E2E verification. */
+export const DEMO_USERS = [
+  {
+    id: DEMO_OWNER_ID,
+    email: "owner@sentiment.internal",
+    created_at: "2026-01-01T00:00:00Z",
+    last_sign_in_at: "2026-09-22T10:00:00Z",
+    workspace_count: 2,
+    owner_count: 2,
+  },
+  {
+    id: "00000000-0000-4000-8000-0000000000c2",
+    email: "reem@cooking.example",
+    created_at: "2026-03-01T00:00:00Z",
+    last_sign_in_at: "2026-09-20T14:30:00Z",
+    workspace_count: 1,
+    owner_count: 1,
+  },
+  {
+    id: "00000000-0000-4000-8000-0000000000c3",
+    email: "nabd@agency.example",
+    created_at: "2026-04-15T00:00:00Z",
+    last_sign_in_at: "2026-09-21T09:15:00Z",
+    workspace_count: 1,
+    owner_count: 1,
+  },
+  {
+    id: "00000000-0000-4000-8000-0000000000c4",
+    email: "mada@studio.example",
+    created_at: "2026-05-10T00:00:00Z",
+    last_sign_in_at: "2026-09-18T16:45:00Z",
+    workspace_count: 1,
+    owner_count: 1,
+  },
+];
+
 /** Row 1's id: the workspace every other row would bill through, had the
  *  fixture modelled more than one. `delete` refuses to remove it while it is
  *  still a billing root, the same refusal `delete_workspace` raises for the

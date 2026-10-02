@@ -9,13 +9,16 @@ import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useStrings } from "../strings";
 import { failureCode } from "../failure";
-import {
-  ChartEmpty,
-  LoadError,
-  Loading,
-} from "../pageStates/PageStates";
+import { ChartEmpty, LoadError, Loading } from "../pageStates/PageStates";
 import { Badge } from "../ui/Badge";
-import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "../ui/Table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "../ui/Table";
 import { readAdminOps } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
 
@@ -59,23 +62,33 @@ export function AdminOpsPage() {
               warn={ops.data.sync_failed_7d > 0}
             />
             <Metric label={S.adminOpsJobsOpen} value={ops.data.jobs_open} />
-            <WorkerCard fresh={ops.data.worker_fresh} lastSeen={ops.data.worker_last_seen} />
+            <WorkerCard
+              fresh={ops.data.worker_fresh}
+              lastSeen={ops.data.worker_last_seen}
+            />
           </div>
         </section>
-        <section className="db-section" aria-labelledby="admin-ops-failed-heading">
+        <section
+          className="db-section"
+          aria-labelledby="admin-ops-failed-heading"
+        >
           <header>
             <h2 id="admin-ops-failed-heading">{S.adminOpsFailedHeading}</h2>
             <p>{S.adminOpsFailedLead}</p>
           </header>
           {ops.data.failed_runs.length === 0 ? (
-            <ChartEmpty testId="admin-ops-failed-empty">{S.adminOpsFailedEmpty}</ChartEmpty>
+            <ChartEmpty testId="admin-ops-failed-empty">
+              {S.adminOpsFailedEmpty}
+            </ChartEmpty>
           ) : (
             <div className="table-wrap db-admin-wrap">
               <Table data-testid="admin-ops-failed">
                 <TableHead>
                   <TableRow>
                     <TableHeaderCell>{S.adminOpsFailedWhen}</TableHeaderCell>
-                    <TableHeaderCell>{S.adminOpsFailedWorkspace}</TableHeaderCell>
+                    <TableHeaderCell>
+                      {S.adminOpsFailedWorkspace}
+                    </TableHeaderCell>
                     <TableHeaderCell>{S.adminOpsFailedChannel}</TableHeaderCell>
                     <TableHeaderCell>{S.adminOpsFailedMode}</TableHeaderCell>
                     <TableHeaderCell>{S.adminOpsFailedStatus}</TableHeaderCell>
@@ -84,10 +97,16 @@ export function AdminOpsPage() {
                 </TableHead>
                 <TableBody>
                   {ops.data.failed_runs.map((r, i) => (
-                    <TableRow key={`${r.workspace_id}:${r.channel_id}:${r.started_at}:${i}`}>
-                      <TableCell>{r.started_at.slice(0, 16).replace("T", " ")}</TableCell>
+                    <TableRow
+                      key={`${r.workspace_id}:${r.channel_id}:${r.started_at}:${i}`}
+                    >
+                      <TableCell>
+                        {r.started_at.slice(0, 16).replace("T", " ")}
+                      </TableCell>
                       <TableCell>{r.workspace_name}</TableCell>
-                      <TableCell>{r.handle ?? S.adminOpsFailedNoChannel}</TableCell>
+                      <TableCell>
+                        {r.handle ?? S.adminOpsFailedNoChannel}
+                      </TableCell>
                       <TableCell>{r.mode}</TableCell>
                       <TableCell>{r.status}</TableCell>
                       <TableCell>{r.error_code ?? "—"}</TableCell>
@@ -120,13 +139,20 @@ function Metric({
 }) {
   return (
     <div className={`admin-metric${warn ? " admin-metric-warn" : ""}`}>
-      <span className="admin-metric-value">{value}</span>
+      {/* A figure wears the numeric face: brand.css's rule for every count. */}
+      <span className="admin-metric-value ui-num">{value}</span>
       <span className="admin-metric-label">{label}</span>
     </div>
   );
 }
 
-function WorkerCard({ fresh, lastSeen }: { fresh: boolean; lastSeen: string | null }) {
+function WorkerCard({
+  fresh,
+  lastSeen,
+}: {
+  fresh: boolean;
+  lastSeen: string | null;
+}) {
   const S = useStrings();
   return (
     <div className="admin-metric">

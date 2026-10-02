@@ -91,10 +91,12 @@ export const en: Strings = {
 
   stepWorkspace: "Create your account and your workspace.",
   stepChannel: "Connect a YouTube channel after granting permission.",
+  stepChannelWithPublic:
+    "Select a channel by connecting as owner or choosing a public one.",
   stepCollect:
     "Choose the videos to collect, then follow their status on the operations page.",
   stepChannelSeeded:
-    "The channel is registered without permission yet; connect it to confirm ownership.",
+    "Public channel chosen for monitoring; next step is choosing videos.",
   stepChannelLapsed:
     "The channel needs reconnecting; the previous permission is no longer valid.",
   stepCollectPending:
@@ -108,11 +110,26 @@ export const en: Strings = {
   stepStateAttention: "Needs your attention",
   stepsLabel: "Setup steps",
   channelConnected: "Connected channel: ",
-  channelSeeded: "Public channel, no permission yet: ",
+  channelSeeded: "Public channel (monitored): ",
   channelNeedsRelink: (status: string) =>
     `The channel needs reconnecting (${status}): `,
   channelIdLabel: "ID",
   channelNone: "No channel connected yet",
+  channelSetupHeading: "Workspace channel setup",
+  channelSetupSubheading:
+    "Choose one path based on channel ownership (mutually exclusive):",
+  channelOptionOwnerBadge: "Official owner",
+  channelOptionOwnerTitle: "I own the channel",
+  channelOptionOwnerDesc:
+    "Connect via official Google account to verify ownership and grant full read & analysis access.",
+  channelOptionOwnerAction: "Connect YouTube via Google",
+  channelOptionPublicBadge: "Public monitoring",
+  channelOptionPublicTitle: "I don't own the channel",
+  channelOptionPublicDesc:
+    "Search and select any public channel (YouTube, Telegram, X, TikTok) to monitor without owner login.",
+  channelOptionPublicAction: "Search & select channel",
+  searchPublicChannelHeading:
+    "Search for a public channel to monitor (no login or ownership needed)",
   disconnectChannel: "Disconnect channel",
   disconnectConfirm:
     "Collection stops and access to the channel is revoked. What was collected stays. Disconnect it?",
@@ -133,11 +150,85 @@ export const en: Strings = {
     "The workspace is retired and now belongs to the service operator.",
   retireLast: "Your last workspace cannot be retired; create another first.",
   retireFailed: "The workspace could not be retired.",
-  connectAboutGoogle:
-    "This opens a Google page. Because this application is pending a Google security review, you may see a warning that the app is not verified — that is expected and not a sign of risk. Click “Advanced”, then “Go to … (unsafe)”, then “Continue” to finish connecting the channel.",
-  connectContinueToGoogle: "Continue to Google",
+  shareWorkspace: "Share workspace",
+  shareWorkspaceTitle: (name: string) => `Share workspace "${name}"`,
+  shareWorkspaceLead:
+    "Share this workspace with other accounts by email under a specific role.",
+  shareWorkspaceAccountsCount: (count: number, limit: number | null) =>
+    limit
+      ? `${count} of ${limit} accounts used`
+      : `${count} accounts (unlimited)`,
+  shareWorkspaceEmailLabel: "Account email address",
+  shareWorkspaceEmailPlaceholder: "name@example.com",
+  shareWorkspaceRoleLabel: "Role",
+  shareWorkspaceRoleAnalyst: "Analyst (analyze, sync, and review)",
+  shareWorkspaceRoleViewer: "Viewer (read-only access)",
+  shareWorkspaceSubmit: "Share workspace",
+  shareWorkspaceAccountsList: "Accounts with access",
+  shareWorkspaceRoleOwner: "Owner",
+  shareWorkspaceRoleAnalystBadge: "Analyst",
+  shareWorkspaceRoleViewerBadge: "Viewer",
+  shareWorkspaceUnshare: "Remove access",
+  shareWorkspaceUnshareConfirm: (email: string) =>
+    `Are you sure you want to remove access for ${email}?`,
+  shareWorkspaceUserNotFound:
+    "This email is not registered on the platform. Please create an account first.",
+  shareWorkspaceLimitReached:
+    "The maximum number of accounts allowed for your plan has been reached.",
+  shareWorkspaceAlreadyMember:
+    "This account is already a member of this workspace.",
+  shareWorkspaceDone: "Workspace shared successfully.",
+  shareWorkspaceUnsharedDone: "Access removed successfully.",
+  shareWorkspaceRoleUpdatedDone: "Role updated successfully.",
+  shareWorkspaceFailed: (err: string) => `Could not share workspace: ${err}`,
+  shareWorkspaceClose: "Close",
   connectChannel: "Connect a YouTube channel",
   relinkForName: "Reconnect to store the channel's name",
+  addChannel: "Add a channel by link or search",
+  addChannelLead:
+    "Paste the channel's link, its handle (@handle), or type a name to search. Public data is collected without linking the channel's account, which can be linked later.",
+  addChannelPlaceholder: "youtube.com/@channel, @handle, or a name to search",
+  addChannelSearch: "Search",
+  addChannelNone: "No matching channels found. Try another id form or name.",
+  addChannelAdd: "Add",
+  addChannelCancel: "Cancel",
+  addChannelDone:
+    "The channel was added as public data. The next step is listing its videos.",
+  addChannelExists: "This channel is already added to this workspace.",
+  addChannelFailed: "The channel search failed. Try again.",
+  addChannelQueryInvalid:
+    "Enter a valid channel link, a handle, or a name to search.",
+  addChannelNotConfigured:
+    "Channel lookup is not configured on the server yet.",
+  addChannelQuota:
+    "YouTube's daily search quota is spent. Try tomorrow, or enter the channel id directly.",
+  selectPlatform: "Select platform",
+  addTelegramChannel: "Add a public Telegram channel",
+  addTelegramLead:
+    "Enter a public Telegram channel handle (@handle) or link (t.me/...). Note: must be a public broadcast channel; personal user accounts and private groups cannot be imported.",
+  addTelegramPlaceholder: "@channel_name or t.me/channel_name",
+  addTelegramInvalidHandle:
+    "Please enter a valid Telegram channel handle or link (e.g. @channel or t.me/channel).",
+  addXChannel: "Add a public X (Twitter) account",
+  addXLead:
+    "Enter the X (Twitter) handle (@username) or profile link. Tweets and replies are collected automatically.",
+  addXPlaceholder: "@username or x.com/username",
+  addXInvalidHandle:
+    "Please enter a valid X handle or profile link (e.g. @username or x.com/username).",
+  addTikTokChannel: "Add a public TikTok account",
+  addTikTokLead:
+    "Enter the TikTok handle (@username) or profile link. Videos and comments are collected automatically.",
+  addTikTokPlaceholder: "@username or tiktok.com/@username",
+  addTikTokInvalidHandle:
+    "Please enter a valid TikTok handle or profile link (e.g. @username or tiktok.com/@username).",
+  addDirectAvailable: "Direct add (based on availability)",
+  addDirectAvailableAction: "Add channel directly based on availability",
+  addDirectAvailableDesc:
+    "If the platform does not permit pre-search by name, you can proceed with direct add using the available handle.",
+  platformSearchNotPermitted:
+    "Pre-search is not permitted or restricted on this platform. The handle was verified and can be added based on availability.",
+  channelNotFoundOnPlatform:
+    "Channel not found via live preview or is not public. You can add it directly based on availability.",
 
   gateResolvingAccount: "Identifying your account…",
   gateLoadingWorkspaces: "Loading workspaces…",
@@ -283,6 +374,13 @@ export const en: Strings = {
   adminFailed: (code: string) => `Could not apply: ${code}`,
   adminDemoLead:
     "An illustrative copy of the admin page: changes stay in this session.",
+  adminInspectWorkspace: "Inspect workspace",
+  adminInspectionBadge: "Supervisor Mode",
+  adminInspectionBanner: (name: string, owner?: string) =>
+    owner
+      ? `Supervisor mode: inspecting workspace "${name}" (Owner: ${owner})`
+      : `Supervisor mode: inspecting workspace "${name}"`,
+  adminInspectionReturn: "Return to Admin",
 
   // ---- the admin observability pages (phase one of the admin roadmap) ----
   // Five screens, one room: tabs under every admin page head.
@@ -290,8 +388,44 @@ export const en: Strings = {
   adminTabWorkspaces: "Workspaces",
   adminTabUsers: "Users",
   adminTabChannels: "Channels",
+  adminTabPlans: "Account Types",
   adminTabOps: "Operations",
+  adminTabServices: "Services & Health",
   adminTabAudit: "Audit trail",
+  // plans & account types
+  adminPlansTitle: "Account Types & Permissions",
+  adminPlansLead:
+    "Manage account tiers and control access to public channel tracking (the 'Don't own channel' option) per plan.",
+  adminPlansLoading: "Reading account types…",
+  adminPlansEmpty: "No plans recorded yet.",
+  adminPlansHeading: "Available Account Types",
+  adminPlanColName: "Account Type",
+  adminPlanColKey: "Key",
+  adminPlanColSegment: "Segment",
+  adminPlanColPrice: "Monthly Price",
+  adminPlanColPublicChannels: "Public Channels Option",
+  adminPlanColLimits: "Limits & Quota",
+  adminPlanEditLimits: "Edit Limits",
+  adminPlanEditLimitsTitle: "Edit Plan Limits",
+  adminPlanChannelsLimit: "Max Channels",
+  adminPlanAnalysisUnits: "Monthly Analysis Units",
+  adminPlanBackfillUnits: "Historical Backfill Units",
+  adminPlanHistoricalDays: "Historical Depth Limit (Days)",
+  adminPlanRetentionDays: "Data Retention (Days)",
+  adminPlanTopicUnits: "Monthly Topic Units",
+  adminPlanMembersLimit: "Max Team Members",
+  adminPlanWorkspacesLimit: "Max Workspaces",
+  adminPlanUnlimitedCheckbox: "Unlimited",
+  adminPlanUnlimitedHelp: "Enter -1 or check «Unlimited» for no ceiling",
+  adminPlanSaveLimits: "Save Limits",
+  adminPlanSavingLimits: "Saving…",
+  adminPlanLimitsUpdated: "Plan limits updated successfully.",
+  adminPlanLimitsUpdateFailed: "Failed to update plan limits.",
+  adminPlanOwnerAlwaysActive: "Always active for owner",
+  adminPlanPublicChannelsAllowed: "Allowed",
+  adminPlanPublicChannelsBlocked: "Blocked",
+  adminPlanToggleSuccess: "Account type permission updated successfully.",
+  adminPlanToggleFailed: "Failed to update account type permission.",
   // users
   adminUsersTitle: "Users",
   adminUsersLead:
@@ -305,6 +439,18 @@ export const en: Strings = {
   adminUsersWorkspaces: "Workspaces",
   adminUsersOwned: "Owned",
   adminUsersNoEmail: "No email",
+  adminUsersActions: "Actions",
+  adminUserImpersonate: "Log in as",
+  adminUserCurrent: "(Your account)",
+  adminImpersonationBadge: "User Impersonation Mode",
+  adminImpersonationBanner: (email: string) =>
+    `You are currently viewing the platform as: ${email}`,
+  adminImpersonationReturn: "Return to Admin Account",
+  adminImpersonationActive: "Impersonating",
+  adminImpersonationExitAction: "Exit Impersonation & Return to Admin",
+  adminImpersonateStarting: "Switching to user view…",
+  adminImpersonateStopping: "Returning to admin account…",
+  adminImpersonateError: "Failed to start impersonation for this account.",
   adminUsersPiiNote:
     "Email is personal data: it shows here because the database checked that you are an operator, and every admin action to come is written to the trail.",
   // channels
@@ -363,6 +509,60 @@ export const en: Strings = {
   adminAuditActor: "Actor",
   adminAuditAction: "Action",
   adminAuditTarget: "Target",
+
+  // ---- services health & telemetry dashboard ----
+  adminServicesTitle: "Services Health & Observability",
+  adminServicesLead:
+    "Live health status, response latencies, and quota consumption across all third-party and internal services with configurable auto-refresh.",
+  adminServicesRefreshLabel: "Auto-refresh",
+  adminServicesRefreshPaused: "Paused",
+  adminServicesRefresh10s: "10 seconds (intensive)",
+  adminServicesRefresh30s: "30 seconds (recommended)",
+  adminServicesRefresh1m: "1 minute",
+  adminServicesRefresh5m: "5 minutes",
+  adminServicesRefreshNow: "Refresh now",
+  adminServicesRefreshing: "Refreshing…",
+  adminServicesNextRefresh: (seconds: number) => `Next refresh in ${seconds}s`,
+  adminServicesLastChecked: (relative: string) => `Last checked: ${relative}`,
+  adminServicesJustNow: "just now",
+  adminServicesSecondsAgo: (n: number) => `${n}s ago`,
+  adminServicesMinutesAgo: (n: number) => `${n}m ago`,
+  adminServicesSearchPlaceholder: "Search services or identifiers…",
+  adminServicesFilterAll: "All",
+  adminServicesFilterHealthy: "Healthy",
+  adminServicesFilterDegraded: "Degraded",
+  adminServicesFilterDown: "Down",
+  adminServicesFilterUnconfigured: "Unconfigured",
+  adminServicesKpiOverall: "Platform Health",
+  adminServicesKpiServicesCount: "Monitored Services",
+  adminServicesKpiAvgLatency: "Average Latency",
+  adminServicesKpiQuotaAlerts: "Critical Quotas",
+  adminServicesStatusHealthySentence: "All core services operational",
+  adminServicesStatusDegradedSentence: "Some services need attention",
+  adminServicesStatusDownSentence: "One or more services experiencing outages",
+  adminServicesMsUnit: "ms",
+  adminServicesServicesUnit: (count: number) => `${count} services`,
+  adminServicesCatInfrastructure: "Infrastructure, Hosting & Database",
+  adminServicesCatAi: "AI Engines & ML Processing",
+  adminServicesCatIngestion: "Data Ingestion & Omnichannel APIs",
+  adminServicesCatBilling: "Billing & Supporting Services",
+  adminServicesLatency: "Latency",
+  adminServicesQuotaUsage: "Usage",
+  adminServicesQuotaRemaining: (rem: string, pct: string) =>
+    `Remaining: ${rem} (${pct})`,
+  adminServicesNoQuota: "No quota limits",
+  adminServicesDetailsBtn: "Technical Diagnostics",
+  adminServicesDialogTitle: "Technical Diagnostics & Service Details",
+  adminServicesDialogClose: "Close",
+  adminServicesDialogEndpoint: "Endpoint",
+  adminServicesDialogStatus: "Current Status",
+  adminServicesDialogLatency: "Response Latency",
+  adminServicesDialogQuota: "Quota & Limits",
+  adminServicesDialogDetails: "Diagnostics & Indicators",
+  adminServicesDialogErrorCode: "Error Code",
+  adminServicesDialogRemediation: "Recommended Remediation",
+  adminServicesLoading: "Reading services health & indicators…",
+  adminServicesEmpty: "No services matching the search criteria.",
 
   working: "Working…",
   ssoNeedsDomain:
@@ -453,6 +653,7 @@ export const en: Strings = {
   syncMessages: {
     healthy: "The last sync completed recently",
     running: "A sync is running now; the outcome is not known yet",
+    queued: "Work is in the queue; waiting for its turn to process",
     stale: "It has been a long time since the last sync; the data may be old",
     partial:
       "The last sync stopped before its end; coverage is partial, not complete",
@@ -460,6 +661,8 @@ export const en: Strings = {
       "The source ended without proving full coverage; that does not mean every comment was collected",
     failed: "The last sync failed",
     blocked: "The source could not be reached in the last sync",
+    quota_paused:
+      "YouTube daily API quota reached; sync will resume automatically at 00:00 UTC",
     stalled:
       "Jobs are waiting and collection is stopped — nothing is running to take them",
     never_run: "No sync has run yet",
@@ -495,6 +698,8 @@ export const en: Strings = {
 
   jobCommentsDisabled:
     "Comments are disabled on this video. There is nothing to collect from it, and that is a setting on the video itself, not a fault in the tool.",
+  jobTelegramDiscussionRequiresAuth:
+    "This channel's discussion group is private or restricted and requires opening the Telegram app; Telegram prevents unauthenticated web access to it.",
   jobNoUploadHasComments: "None of the videos checked has any comments yet.",
   jobNoUploadHasCommentsCounted: (checked: string, disabled: number) =>
     `${checked} of the latest videos were checked, and none has a comment yet.${
@@ -506,10 +711,21 @@ export const en: Strings = {
   jobChannelNotConnected:
     "No channel is connected to this job. Connect a YouTube channel first.",
   jobCredentialExpired:
-    "The granted permission has expired. Reconnect the channel to renew it.",
+    "The access token lapsed mid-collection. No need to reconnect the channel — retry, and the permission renews itself.",
   jobQuotaExceeded:
     "The daily YouTube quota is used up. It renews automatically, and the attempt is retried afterwards.",
   jobKindTopics: "Topic classification",
+  jobKindCatalogue: "Channel cataloguing",
+  jobCatalogueQueuedWithWorker:
+    "In the queue, waiting for channel cataloguing to start.",
+  jobCatalogueRunningDetail: "Channel cataloguing is running now.",
+  jobCatalogueRunningDetailTelegram: "Channel post cataloguing is running now.",
+  jobCatalogueRunningDetailX: "Account tweet cataloguing is running now.",
+  jobCatalogueRunningDetailTikTok: "Account video cataloguing is running now.",
+  jobCatalogueSucceededDetail:
+    "Channel videos catalogued and list updated successfully.",
+  jobChannelNotPublic:
+    "This handle belongs to a personal account, private channel, or another platform without public web preview. Ensure you enter a public Telegram channel handle, or verify that the correct platform was selected (e.g. X or YouTube).",
   jobNoTopicClassifier:
     "The worker has no topic classifier configured. Add the Gemini key to the worker's settings for classification to run.",
   jobTopicModelNotActive:
@@ -521,6 +737,8 @@ export const en: Strings = {
     "Gemini answered in an unexpected shape for some comments; they will be retried.",
   jobGeminiRefused:
     "Gemini refused the request. Check the Gemini key and its restrictions in the worker's settings.",
+  jobGeminiCreditsDepleted:
+    "Gemini prepayment credits are depleted in Google AI Studio. Add credits to enable topic classification (core sentiment analysis remains active).",
   jobInsufficientPermissions:
     "The granted permission is not enough to read comments. Reconnect the channel to renew the scope.",
   jobAccessDeniedWith: (reason: string) =>
@@ -654,6 +872,17 @@ export const en: Strings = {
   opsAttemptsTitle: "Attempt log",
   opsAttemptsLead:
     "Every collection attempt, newest first, with the reason for what happened.",
+  opsAttemptsFilterAll: "All",
+  opsAttemptsFilterRunning: "Running",
+  opsAttemptsFilterSucceeded: "Succeeded",
+  opsAttemptsFilterFailed: "Needs Attention",
+  opsAttemptsCountTotal: "Total Attempts",
+  opsAttemptsCountRunning: "Running",
+  opsAttemptsCountSucceeded: "Succeeded",
+  opsAttemptsCountAttention: "Needs Attention",
+  opsAttemptsPageOf: (page: number, pages: number) =>
+    `Page ${page} of ${pages}`,
+  opsAttemptsNoMatch: "No attempts match this filter.",
   opsDemoNoLogStrong: "The demo carries no job log",
   opsDemoNoLogLead:
     "Jobs belong to a real account and a connected channel. No invented log is shown here to make the place look full.",
@@ -663,6 +892,18 @@ export const en: Strings = {
   opsNoAttemptsStrong: "No attempts yet",
   opsNoAttemptsLead: "Choose videos from the catalogue above to start one.",
   opsAttemptN: (n: number) => ` · attempt ${n}`,
+  opsRunningDuration: (duration: string) => ` · running for ${duration}`,
+  opsCompletedDuration: (duration: string) => ` · completed in ${duration}`,
+  opsQueuedDuration: (duration: string) => ` · in queue for ${duration}`,
+  opsEstimatedCompletion: (eta: string) => ` · estimated completion: ${eta}`,
+  opsDurationTaken: (duration: string) => `time taken: ${duration}`,
+  opsQueuedWithEta: (n: number, eta: string) =>
+    `queued: ${n} (estimated completion: ${eta})`,
+  opsWorkerBusyEta: (eta: string) => `running (estimated completion: ${eta})`,
+  opsEstimatedTimeDiscover: "~15–30s",
+  opsEstimatedTimeCollect: "~30–60s",
+  opsEstimatedTimeAnalyse: "~20–45s",
+  opsEstimatedTimeDefault: "within ~1 min",
   opsCancel: "Withdraw from the queue",
   refresh: "Refresh",
   opsCancelFailed:
@@ -681,6 +922,58 @@ export const en: Strings = {
   catRequested:
     "A list build was requested; the result appears once it completes.",
   catRequestFailed: "Could not request a list build.",
+  historicalImportButton: "Historical Backfill & Import",
+  historicalImportTitle: "Historical Data Backfill & Import",
+  historicalImportLead:
+    "Backfill previous posts and comments directly from platforms or import via CSV/JSON files according to your plan quota.",
+  historicalTabPlatform: "Platform Backfill",
+  historicalTabFile: "External File Upload (CSV / JSON)",
+  historicalDaysLimitNotice: (days: number) =>
+    `Your current plan allows fetching up to ${days} days back.`,
+  historicalBackfillQuotaNotice: (remaining: number) =>
+    `Remaining historical backfill quota: ${remaining.toLocaleString()} units.`,
+  historicalDaysBack: "Timeframe to fetch (days back)",
+  historicalMaxItems: "Maximum items (posts/comments)",
+  historicalStartDate: "Start Date (optional)",
+  historicalStartSync: "Start Historical Sync",
+  historicalStartingSync: "Scheduling sync…",
+  historicalSyncQueued: "Historical sync task queued successfully.",
+  historicalSyncFailed: "Failed to queue historical sync.",
+  historicalSyncPlanNotAllowed:
+    "Historical sync is not allowed on your current plan. Please upgrade to access this feature.",
+  historicalFileUploadLabel: "Select or drop a CSV or JSON file",
+  historicalFileDropzone:
+    "Click to select a file or drag & drop here (CSV and JSON supported)",
+  historicalDownloadCsvTemplate: "Download Sample CSV Template",
+  historicalParsingFile: "Parsing and validating file…",
+  historicalFileInvalid: "Invalid file format or missing required columns.",
+  historicalPreviewTitle: "Data Preview Before Import",
+  historicalPreviewPostsCount: (count: number) => `${count} posts/videos`,
+  historicalPreviewCommentsCount: (count: number) => `${count} comments`,
+  historicalStartImport: "Confirm & Import Data",
+  historicalImporting: "Importing and saving data…",
+  historicalImportSuccess: (posts: number, comments: number) =>
+    `Successfully imported ${posts} posts and ${comments} comments.`,
+  historicalImportFailed: "Failed to import data.",
+  historicalImportQuotaExceeded:
+    "Number of comments in file exceeds your remaining plan quota.",
+  historicalNoChannelSelected: "Please select a channel first.",
+  historicalFileCapsHint: (maxMb: number, maxRows: number) =>
+    `Maximum file size: ${maxMb} MB and up to ${maxRows.toLocaleString()} comments (1,000).`,
+  historicalFileTooLarge: "File size exceeds the 5 MB limit.",
+  historicalBatchTooLarge:
+    "Batch too large: maximum import size is 1,000 comments per upload.",
+  historicalForbidden: "You do not have permission to perform this action.",
+  historicalChannelNotFound: "The selected channel was not found.",
+  historicalInvalidPayload:
+    "Invalid import payload or missing required fields.",
+  historicalDateBeyondPlanLimit: (days: number) =>
+    `The specified date exceeds your plan's historical limit (${days} days).`,
+  historicalCloseModal: "Close dialog",
+  catDiscoveringRunning: (elapsed: string, estimated: string) =>
+    `running for ${elapsed} · typical estimated time: ${estimated}`,
+  catDiscoveringQueued: (elapsed: string, estimated: string) =>
+    `in queue for ${elapsed} · typical estimated time: ${estimated}`,
   catSearch: "Search titles",
   catKindAll: "All",
   catKindVideo: "Video",
@@ -694,8 +987,11 @@ export const en: Strings = {
   catPage: (n: number, of: number) => `Page ${n} of ${of}`,
   catPrev: "Previous",
   catNext: "Next",
-  catJump: "Go to page",
+  catJump: "Jump to page",
   catOpenYouTube: "Open on YouTube",
+  catOpenTelegram: "Open on Telegram",
+  catOpenX: "Open on X",
+  catOpenTikTok: "Open on TikTok",
   catPreview: (title: string) => `Preview: ${title}`,
   catPreviewHint:
     "Watched here through YouTube's player; it sets no cookies until you press play.",
@@ -727,7 +1023,19 @@ export const en: Strings = {
   catStateWaiting: "Waiting to be collected",
   catStateCollecting: "Collecting now",
   catStateCollected: (n: number, when: string) => `Collected ${n} on ${when}`,
+  catStateCollectedOnly: (n: number) => `Collected ${n}`,
+  catStateAnalysedOnly: (n: number) => `Classified ${n}`,
+  catStateCollectedAnalysed: (col: number, ana: number) =>
+    `Collected ${col} (${ana} classified)`,
+  catSummaryTitle: "Saved channel content summary",
+  catTotalCollected: (n: number) => `Total stored: ${n} comments`,
+  catTotalAnalysed: (n: number) => `Classified: ${n}`,
+  catVideosStored: (n: number) => `Stored videos: ${n}`,
+  catNextSyncSelected: (n: number) => `Selected for next sync: ${n}`,
+  catPreviewCollectedInfo: (col: number, ana: number) =>
+    `Stored in database: ${col} comments (${ana} classified)`,
   catStateDisabled: "Comments disabled",
+  catStateTelegramAuthRequired: "Requires Telegram app",
   catStatePartial: "Partial",
   catStateUnchanged: "Unchanged since the last read",
   catEmpty: "No videos in the list yet.",
@@ -745,11 +1053,98 @@ export const en: Strings = {
   secCompare: "Comparison",
   secEngaged: "Most engaged",
   secComments: "Comments",
+  secSummaryTitle: "Executive Summary & Audience Pulse",
+  secVideosTitle: "Video Performance: Engagement & Sentiment Map",
+  secVoiceTitle: "Audience Voice: Sentiment & Discussion Drivers",
+  secTimingTitle: "Engagement Timing: When Does Your Audience Speak Up?",
+  secPeopleTitle: "Top Commenters: Most Active & Influential Voices",
+  secCompareTitle: "Video Comparison: Variance in Audience Sentiment",
+  secEngagedTitle: "Critical Feedback: High-Impact Comments Needing Attention",
+  secCommentsTitle: "Comments Stream & Human Review Verification",
+
+  // Executive Story Briefing
+  storyBriefingEyebrow: "Executive Story & Narrative Briefing",
+  storyBriefingTitle: "Audience Pulse & Analytical Takeaway",
+  netSentimentScoreLabel: "Net Sentiment Score",
+  netSentimentScoreDesc:
+    "Relative spread between analysed positive and negative sentiment",
+  pulseStrongPositive: "Strong Positive Pulse",
+  pulseModeratePositive: "Moderate Positive Pulse",
+  pulseBalanced: "Balanced / Neutral Pulse",
+  pulseNegativeAttention: "Notable Negative Sentiment",
+  pulseCriticalAlert: "Critical Negative Backlash",
+  storyAct1Title: "1. Overall Sentiment Pulse",
+  storyAct1DominantPos: (posPct: number, negPct: number) =>
+    `Positive sentiment represents ${posPct}% of analysed feedback vs ${negPct}% negative, showing strong audience satisfaction.`,
+  storyAct1DominantNeg: (negPct: number, posPct: number) =>
+    `Negative sentiment represents ${negPct}% outpacing positive (${posPct}%), pointing to widespread critical feedback requiring attention.`,
+  storyAct1Balanced: (posPct: number, negPct: number) =>
+    `Sentiment is closely divided at ${posPct}% positive and ${negPct}% negative, showing balanced opinions.`,
+  storyAct2Title: "2. Topic & Content Focus",
+  storyAct2DominantTopic: (name: string, count: string, pct: number) =>
+    `Primary discussion driver: “${name}” with ${count} comments (${pct}% of classified talk).`,
+  storyAct2TopVideo: (title: string, count: string, pct: number) =>
+    `Top video by engagement: “${title}” with ${count} comments (${pct}% of interactions).`,
+  storyAct2General:
+    "Engagement is distributed across topics without a single dominant theme.",
+  storyAct3Title: "3. Actionable Recommendation",
+  storyAct3RecCritical:
+    "Prioritize responding to top critical comments to clarify misunderstandings and address concerns.",
+  storyAct3RecPositive:
+    "Audience reception is strongly positive; sustain this momentum with similar content and acknowledge top contributors.",
+  storyAct3RecGeneral:
+    "Maintain publishing consistency and periodically review sample comments to ensure model accuracy.",
+
+  // Donut & Voice enhancements
+  donutCenterNet: "Net Pulse",
+
+  // Timing takeaway & highlighting
+  timingPeakHeadline: (day: string, hour: string, count: string) =>
+    `Peak engagement window: ${day} at ${hour}:00 (${count} comments).`,
+  timingPeakBadge: "Peak Window",
+  timingDayPeak: (day: string) => `Busiest day: ${day}`,
+  timingHourPeak: (hour: string) => `Busiest hour: ${hour}:00`,
+
+  // Video performance filters & outlier badges
+  videoFilterAll: "All videos",
+  videoFilterCritical: "Highest criticism",
+  videoFilterPositive: "Most positive",
+  videoFilterVolume: "Most comments",
+  videoTagHighNegative: "High criticism",
+  videoTagTopPositive: "Top positive",
+  videoTagTopVolume: "Top engagement",
+
+  // Engaged creator tip
+  engagedCreatorTip:
+    "Actionable tip: These comments received widespread viewer agreement; replying or clarifying officially mitigates controversy and builds trust.",
+
+  // Storytelling with Data KPIs & Actionable Steps
+  kpiViews: "Views",
+  kpiViewsNote: "Total views across analysed videos",
+  kpiLikes: "Likes",
+  kpiLikesNote: "Total likes interaction",
+  kpiNetSentiment: "Net Sentiment",
+  kpiNetSentimentNote: "Positive minus negative ratio",
+  kpiEngagement: "Engagement Rate",
+  kpiEngagementNote: "(Comments + Likes) / Views",
+  actionableStepsTitle: "Actionable Recommendations & Next Steps",
+  actionStep1Critical:
+    "Proactively address top critical comments to clarify misunderstandings and defuse tension.",
+  actionStep2Positive:
+    "Amplify high-performing positive themes in upcoming content and engage loyal fans.",
+  actionStep3Timing:
+    "Leverage peak engagement hours for publishing to maximize reach and response.",
+  actionStep4Engagement:
+    "Pin clarifying comments or run community polls around trending debate topics.",
+  actionStepGeneral:
+    "Maintain continuous audience sentiment monitoring with every new release to sustain positive growth.",
+
   dateOrderError: "The start date must come before the end date",
   chipSearch: (q: string) => `search: “${q}”`,
   chipVideo: "one video",
   chipSentiment: (label: string) => `sentiment: ${label}`,
   chipVideoKind: "video kind",
+  chipPlatform: (p: string) => `platform: ${p}`,
   chipCommentType: "comment type",
   chipRepliesOnly: "replies only",
   chipCommentsOnly: "comments only",
@@ -782,11 +1177,21 @@ export const en: Strings = {
   allVideos: "All videos",
   sentimentLabel: "Sentiment",
   allSentiments: "All sentiments",
-  videoKindLabel: "Video kind",
+  videoKindLabel: "Content type",
   allKinds: "All kinds",
   kindVideo: "Video",
   kindShort: "Short",
   kindStream: "Stream",
+  kindPost: "Post",
+  platformFilterLabel: "Platform",
+  allPlatforms: "All platforms",
+  platformYouTube: "YouTube",
+  platformTelegram: "Telegram",
+  platformX: "X (Twitter)",
+  platformTikTok: "TikTok",
+  platformFacebook: "Facebook",
+  platformInstagram: "Instagram",
+  platformSoon: "Soon",
   participationLabel: "Participation",
   commentsAndReplies: "Comments and replies",
   originalOnly: "Original comments only",
@@ -969,8 +1374,12 @@ export const en: Strings = {
   cursorReset:
     "The results changed, so the view restarted from the first page.",
   exportCsv: "Export CSV",
-  exportNote: (total: number) =>
-    `Exports every comment matching the current filters (${total}), not only the page shown. Spreadsheet formulas are neutralised in the file without changing the stored text.`,
+  exportNote: (total: number, cap = 10000) =>
+    total > cap
+      ? `Exports the first ${cap.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} comments matching the current filters to protect browser performance. Spreadsheet formulas are neutralised in the file without changing the stored text.`
+      : `Exports every comment matching the current filters (${total}), not only the page shown. Spreadsheet formulas are neutralised in the file without changing the stored text.`,
+  exportTruncatedNotice: (cap: number, total: number) =>
+    `Exported first ${cap.toLocaleString("en-US")} comments only (out of ${total.toLocaleString("en-US")}) for browser stability.`,
   exportFailed: "The export file could not be created. Try again.",
   commentsCaption: "Comments within the filters",
   colAuthor: "Author",

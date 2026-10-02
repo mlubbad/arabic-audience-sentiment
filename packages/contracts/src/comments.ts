@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { LabelSchema, timestamp, type Label } from "./primitives";
 import { TopicPredictionSchema, TopicReviewSchema } from "./topics";
+import { SOURCE_PLATFORMS, CONTENT_KINDS } from "./selection";
 
 export const PredictionSchema = z
   .object({
@@ -36,6 +37,24 @@ export const ReviewSchema = z
       v.origin !== "human" || (v.reason !== null && v.reason.trim().length > 0),
     "a human review must state a reason",
   );
+export const KNOWN_COMMENT_SOURCES = [
+  "sanitized_fixture",
+  "youtube_data_api_public",
+  "youtube_public_scrape",
+  "youtube_oauth",
+  "legacy_import",
+  "telegram_mtproto",
+  "telegram_http",
+  "x_api",
+  "x_apify",
+  "x_brightdata",
+  "tiktok_display_api",
+  "tiktok_apify",
+  "tiktok_brightdata",
+  "youtube_apify_scrape",
+  "youtube_brightdata_scrape",
+] as const;
+
 export const CommentSchema = z
   .object({
     id: z.string().min(1),
@@ -47,7 +66,8 @@ export const CommentSchema = z
     // dashboard fell back to printing the raw id because this was never
     // carried, which reads as a database key where a person expects a name.
     video_title: z.string().nullable().default(null),
-    video_kind: z.enum(["video", "short", "stream"]),
+    platform: z.enum(SOURCE_PLATFORMS).default("youtube"),
+    video_kind: z.enum(CONTENT_KINDS).default("video"),
     author_channel_id: z.string().nullable(),
     // Written by the channel itself rather than by its audience. Derived from
     // the author's channel id and the channel's own, never stored: a derived
@@ -81,13 +101,7 @@ export const CommentSchema = z
     is_reply: z.boolean(),
     parent_comment_id: z.string().nullable(),
     parent_source: z.enum(["api", "extractor", "inferred_id", "unknown"]),
-    source: z.enum([
-      "sanitized_fixture",
-      "youtube_data_api_public",
-      "youtube_public_scrape",
-      "youtube_oauth",
-      "legacy_import",
-    ]),
+    source: z.string().min(1),
     field_provenance: z.record(z.unknown()),
     comment_type: z.string().nullable(),
     // When the text was removed under the retention rule; null while retained.
@@ -99,6 +113,10 @@ export const CommentSchema = z
     // dashboard then shows "no topic classification has run yet".
     topic_prediction: TopicPredictionSchema.nullable().default(null),
     topic_reviews: z.array(TopicReviewSchema).default([]),
+    author_profile_image_url: z.string().nullable().optional(),
+    author_channel_url: z.string().nullable().optional(),
+    reply_count: z.number().int().nonnegative().optional(),
+    updated_at: timestamp.nullable().optional(),
   })
   .strict();
 export type Comment = z.infer<typeof CommentSchema>;

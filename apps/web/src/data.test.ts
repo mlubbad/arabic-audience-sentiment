@@ -343,3 +343,219 @@ describe("a topic correction in fixture mode", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 });
+
+describe("loadOpsSource operational snapshot", () => {
+  it("computes video counts and returns ops state in fixture mode", async () => {
+    const { loadOpsSource, fixtureWorkspace } = await loadModule();
+    const ops = await loadOpsSource("sanitized_fixture", fixtureWorkspace);
+    expect(ops.sync).toBeDefined();
+    expect(ops.plan).toBeDefined();
+    expect(ops.video_counts.length).toBeGreaterThan(0);
+    expect(ops.video_counts[0]).toHaveProperty("id");
+    expect(ops.video_counts[0]).toHaveProperty("total");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("calls workspace_ops_snapshot RPC in live mode", async () => {
+    const { loadOpsSource } = await loadModule();
+    const mockOps = {
+      sync: {
+        worker: { connected: true, last_heartbeat_at: null, busy: false },
+        queued_jobs: 0,
+        last_run: null,
+      },
+      plan: null,
+      video_counts: [{ id: "vid-1", total: 42 }],
+    };
+    rpc.mockResolvedValueOnce({ data: mockOps, error: null });
+
+    const ops = await loadOpsSource(
+      "live",
+      "00000000-0000-4000-8000-000000000001",
+    );
+    expect(rpc).toHaveBeenCalledWith("workspace_ops_snapshot", {
+      w: "00000000-0000-4000-8000-000000000001",
+    });
+    expect(ops.video_counts).toEqual([{ id: "vid-1", total: 42 }]);
+  });
+
+  it("throws live_unavailable when RPC returns error", async () => {
+    const { loadOpsSource } = await loadModule();
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "timeout" } });
+
+    await expect(
+      loadOpsSource("live", "00000000-0000-4000-8000-000000000001"),
+    ).rejects.toThrow("live_unavailable");
+  });
+});
+
+describe("loadDashboardComments multi-platform source compatibility", () => {
+  it("successfully parses comments with telegram_mtproto and other sources in live mode", async () => {
+    const { loadDashboardComments } = await loadModule();
+    const commentWithTelegramSource = {
+      id: "tg_msg_100",
+      workspace_id: "00000000-0000-4000-8000-000000000001",
+      client_id: "client",
+      channel_id: "channel",
+      video_id: "post_1",
+      video_title: "منشور تيليجرام",
+      platform: "telegram",
+      video_kind: "channel_post",
+      author_channel_id: "user_1",
+      by_channel_owner: false,
+      author_name: "متابع",
+      text_raw: "تعليق من تيليجرام",
+      content_hash: "hash_tg_1",
+      likes_raw: null,
+      likes_value: null,
+      published_at: "2026-09-23T10:00:00Z",
+      published_time_raw: "2026-09-23T10:00:00Z",
+      timestamp_precision: "second",
+      is_reply: false,
+      parent_comment_id: null,
+      parent_source: "unknown",
+      source: "telegram_mtproto",
+      field_provenance: {},
+      comment_type: null,
+      content_purged_at: null,
+      prediction: null,
+      reviews: [],
+      topic_prediction: null,
+      topic_reviews: [],
+    };
+    const mockRpcResponse = {
+      total: 1,
+      comments: [commentWithTelegramSource],
+      limit: 50,
+      offset: 0,
+      has_more: false,
+      next_cursor: null,
+    };
+    rpc.mockResolvedValueOnce({ data: mockRpcResponse, error: null });
+
+    const result = await loadDashboardComments(
+      "live",
+      "00000000-0000-4000-8000-000000000001",
+      { limit: 50 },
+    );
+    expect(result.total).toBe(1);
+    expect(result.comments[0].source).toBe("telegram_mtproto");
+    expect(result.comments[0].platform).toBe("telegram");
+  });
+});
+
+describe("loadDashboardAggregates null channel handling", () => {
+  it("successfully parses live aggregates when workspace has no channel (channel: null)", async () => {
+    const { loadDashboardAggregates } = await loadModule();
+    const mockAggregates = {
+      workspace_total: 0,
+      channel_own_comments: 0,
+      total: 0,
+      analysed: 0,
+      unanalysed: 0,
+      sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      kpis: {
+        total_views: 0,
+        total_likes: 0,
+        total_comments: 0,
+        engagement_rate: null,
+        net_sentiment: null,
+      },
+      channel: null,
+      measurable: ["positive", "negative", "neutral", "mixed"],
+      negative_ranked: 0,
+      negative_unranked: 0,
+      timeline: {},
+      topic_counts: {},
+      platform_breakdown: {},
+      videos: [],
+      hours: [],
+      weekdays: [],
+      weeks: [],
+      people: [],
+      most_engaged_negative: [],
+      comment_types: [],
+      video_options: [],
+      topics: [],
+      active_analysis_key: null,
+      active_topic_key: null,
+      revision: "empty",
+    };
+    rpc.mockResolvedValueOnce({ data: mockAggregates, error: null });
+
+    const result = await loadDashboardAggregates(
+      "live",
+      "00000000-0000-4000-8000-000000000001",
+    );
+    expect(result.channel).toBeNull();
+    expect(result.total).toBe(0);
+    expect(result.kpis?.total_comments).toBe(0);
+  });
+
+  describe("buildExport cap and deriveSnapshot kpis", () => {
+    it("buildExport returns rows capped at EXPORT_ROW_CAP and flags truncation", async () => {
+      const { buildExport, EXPORT_ROW_CAP } = await loadModule();
+      expect(EXPORT_ROW_CAP).toBe(10_000);
+
+      // Create a large fixture with 10_005 comments
+      const manyComments = Array.from({ length: 10_005 }, (_, i) => ({
+        ...target,
+        id: `comment_${i}`,
+        content_hash: `hash_${i}`,
+        text_raw: `تعليق رقم ${i}`,
+        published_at: "2026-09-20T00:00:00Z",
+      }));
+      const largeFixture = JSON.stringify({
+        ...JSON.parse(fixtureJson),
+        comments: manyComments,
+      });
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(largeFixture, { status: 200 })),
+      );
+
+      const result = await buildExport("sanitized_fixture", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+
+      expect(result.totalRows).toBe(10_005);
+      expect(result.rows).toBe(10_000);
+      expect(result.truncated).toBe(true);
+      expect(result.csv.split("\n").length).toBe(10_002); // Header + 10,000 rows + trailing empty line
+    });
+
+    it("deriveSnapshot preserves total_likes from base kpis", async () => {
+      const { deriveSnapshot } = await loadModule();
+      const mockSource = {
+        revision: "rev1",
+        comments: [
+          {
+            ...target,
+            id: "c1",
+            likes_value: 42,
+            published_at: "2026-09-20T00:00:00Z",
+          },
+          {
+            ...target,
+            id: "c2",
+            likes_value: 58,
+            published_at: "2026-09-20T00:00:00Z",
+          },
+        ],
+        active_analysis_key: null,
+        active_analysis_labels: ["positive", "negative", "neutral"],
+        active_topic_key: null,
+        cursor_reset: false,
+      };
+
+      // @ts-expect-error minimal mock source
+      const snapshot = deriveSnapshot(mockSource, "sanitized_fixture", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+
+      expect(snapshot.kpis?.total_likes).toBe(100);
+      expect(snapshot.kpis?.total_comments).toBe(2);
+    });
+  });
+});

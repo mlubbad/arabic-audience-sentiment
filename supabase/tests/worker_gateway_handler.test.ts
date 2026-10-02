@@ -19,7 +19,12 @@ const base = (): WorkerDb => ({
   commitTopics: vi.fn(async () => ({})),
   tick: vi.fn(async () => ({ discover: 0, collect: 0 })),
 });
-const post = (db: WorkerDb, path = "/worker/claim", bearer = "cred") =>
+const post = (
+  db: WorkerDb,
+  path = "/worker/claim",
+  bearer = "cred",
+  body: unknown = {},
+) =>
   handleWorkerRequest(
     new Request(`https://edge.invalid${path}`, {
       method: "POST",
@@ -27,10 +32,20 @@ const post = (db: WorkerDb, path = "/worker/claim", bearer = "cred") =>
         authorization: `Bearer ${bearer}`,
         "content-type": "application/json",
       },
-      body: "{}",
+      body: JSON.stringify(body),
     }),
     db,
   );
+
+const sha256Hex = async (value: string) => {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+};
 
 describe("what a claim hands the worker", () => {
   it("gives a short-lived token, and never the refresh token", async () => {
@@ -45,25 +60,110 @@ describe("what a claim hands the worker", () => {
         checkpoint: null,
         type: "collect",
       }),
-      accessTokenFor: async () => "ya29.short-lived",
+      accessTokenFor: async () => ({
+        access_token: "ya29.short-lived",
+        access_token_expires_at: "2026-09-19T17:00:00Z",
+      }),
     };
     const body = (await (await post(db)).json()) as Record<string, unknown>;
     expect(body.access_token).toBe("ya29.short-lived");
+    // The expiry travels with the token, so the worker can ask for a fresh
+    // one before the current lapses mid-run instead of losing the run to it.
+    expect(body.access_token_expires_at).toBe("2026-09-19T17:00:00Z");
     expect(Object.keys(body).sort()).toEqual([
       "access_token",
+      "access_token_expires_at",
       "checkpoint",
+      "external_channel_id",
       "job_id",
       "lease_token",
+      "platform",
       "type",
       "videos",
     ]);
     expect(JSON.stringify(body)).not.toContain("refresh");
   });
 
+  it("hands the platform id only for a public channel", async () => {
+    // A channel registered as public data has no grant to open; its id is
+    // what lets a key-carrying worker know what it was sent to read. A
+    // connected channel's id never travels: a failed grant is the worker's
+    // signal to report the channel unconnected, not a door to public
+    // collection nobody decided on.
+    const db: WorkerDb = {
+      ...base(),
+      claim: async () => ({
+        id: "job-2",
+        lease_token: "l",
+        checkpoint: null,
+        type: "discover",
+        external_channel_id: "UCTPIL6f7yNpK8yc-H3cEtFg",
+      }),
+      accessTokenFor: async () => null,
+    };
+    const first = (await (await post(db)).json()) as Record<string, unknown>;
+    expect(first.access_token).toBeNull();
+    expect(first.external_channel_id).toBe("UCTPIL6f7yNpK8yc-H3cEtFg");
+
+    const connected: WorkerDb = {
+      ...base(),
+      claim: async () => ({ id: "job-3", lease_token: "l", checkpoint: null }),
+      accessTokenFor: async () => null,
+    };
+    const second = (await (await post(connected)).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(second.external_channel_id).toBeNull();
+  });
+
+  it("a public claim without a grant reads through the platform reader", async () => {
+    // The chain at claim time: the channel's own grant first (none here),
+    // then the platform reader — the operator's one grant that reads any
+    // public channel. Its token answers in the same field the owner's would;
+    // the id travels beside it either way.
+    const readerTokenFor = vi.fn(async () => ({
+      access_token: "ya29.platform-reader",
+      access_token_expires_at: "2026-09-19T17:00:00Z",
+    }));
+    const db: WorkerDb = {
+      ...base(),
+      claim: async () => ({
+        id: "job-4",
+        lease_token: "l",
+        checkpoint: null,
+        type: "discover",
+        external_channel_id: "UCTPIL6f7yNpK8yc-H3cEtFg",
+      }),
+      accessTokenFor: async () => null,
+      readerTokenFor,
+    };
+    const body = (await (await post(db)).json()) as Record<string, unknown>;
+    expect(body.access_token).toBe("ya29.platform-reader");
+    expect(body.external_channel_id).toBe("UCTPIL6f7yNpK8yc-H3cEtFg");
+    expect(readerTokenFor).toHaveBeenCalledWith(expect.any(String));
+    // A connected channel never reaches for the reader — its grant decides.
+    const connected: WorkerDb = {
+      ...base(),
+      claim: async () => ({ id: "job-5", lease_token: "l", checkpoint: null }),
+      accessTokenFor: async () => null,
+      readerTokenFor,
+    };
+    const second = (await (await post(connected)).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(second.access_token).toBeNull();
+    expect(readerTokenFor).toHaveBeenCalledTimes(1);
+  });
+
   it("asks for the token against the claimed job, not against anything sent", async () => {
     // The lookup is keyed on the credential and the job, so a worker cannot
     // request a grant belonging to a workspace it does not own.
-    const accessTokenFor = vi.fn(async () => "t");
+    const accessTokenFor = vi.fn(async () => ({
+      access_token: "t",
+      access_token_expires_at: "2026-09-19T17:00:00Z",
+    }));
     const db: WorkerDb = {
       ...base(),
       claim: async () => ({ id: "job-7", lease_token: "l", checkpoint: null }),
@@ -94,7 +194,10 @@ describe("what a claim hands the worker", () => {
   });
 
   it("says there is no work without asking for a token at all", async () => {
-    const accessTokenFor = vi.fn(async () => "t");
+    const accessTokenFor = vi.fn(async () => ({
+      access_token: "t",
+      access_token_expires_at: "2026-09-19T17:00:00Z",
+    }));
     const response = await post({ ...base(), accessTokenFor });
     expect(response.status).toBe(204);
     expect(accessTokenFor).not.toHaveBeenCalled();
@@ -305,17 +408,99 @@ describe("the due list and the catalogue", () => {
   it("passes the requested kinds of work to the data layer, cleaned", async () => {
     // A collection-only run asks for collections. A body whose types are
     // malformed asks for anything: an unparseable scope must never become a
-    // narrower one by accident.
+    // narrower one by accident. The data layer sees the hashed credential,
+    // never the bearer as sent.
+    const hash = await sha256Hex("cred");
     const db = base();
     await send(db, "/worker/claim", { types: ["collect"] });
-    expect(db.claim).toHaveBeenCalledWith("cred", ["collect"]);
+    expect(db.claim).toHaveBeenCalledWith(hash, ["collect"]);
     await send(db, "/worker/claim", { types: ["collect", 7, "discover"] });
-    expect(db.claim).toHaveBeenCalledWith("cred", ["collect", "discover"]);
+    expect(db.claim).toHaveBeenCalledWith(hash, ["collect", "discover"]);
     await send(db, "/worker/claim", { types: [] });
-    expect(db.claim).toHaveBeenCalledWith("cred", null);
+    expect(db.claim).toHaveBeenCalledWith(hash, null);
     await send(db, "/worker/claim", { types: "collect" });
-    expect(db.claim).toHaveBeenCalledWith("cred", null);
+    expect(db.claim).toHaveBeenCalledWith(hash, null);
     await send(db, "/worker/claim", {});
-    expect(db.claim).toHaveBeenCalledWith("cred", null);
+    expect(db.claim).toHaveBeenCalledWith(hash, null);
+  });
+});
+
+describe("the mid-run token renewal", () => {
+  const renew = (db: WorkerDb, body: Record<string, unknown>) =>
+    post(db, "/worker/renew-token", "cred", body);
+
+  it("hands a fresh token and its expiry against a held lease", async () => {
+    const renewToken = vi.fn(async () => ({
+      access_token: "ya29.renewed",
+      access_token_expires_at: "2026-09-19T18:00:00Z",
+    }));
+    const r = await renew(
+      { ...base(), renewToken },
+      {
+        job_id: "j",
+        lease_token: "l",
+      },
+    );
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({
+      access_token: "ya29.renewed",
+      access_token_expires_at: "2026-09-19T18:00:00Z",
+    });
+  });
+
+  it("carries the hashed credential and the lease the request named", async () => {
+    const renewToken = vi.fn(async () => null);
+    await renew(
+      { ...base(), renewToken },
+      {
+        job_id: "job-2",
+        lease_token: "lease-2",
+        workspace_id: "forged",
+      },
+    );
+    expect(renewToken).toHaveBeenCalledWith(
+      expect.any(String),
+      "job-2",
+      "lease-2",
+    );
+    // The workspace is derived inside the data layer, never read from the body.
+    const [passedHash] = renewToken.mock.calls[0] as unknown as [string];
+    expect(passedHash).not.toBe("cred");
+  });
+
+  it("answers without a token when the channel's grant is gone", async () => {
+    // A fact about the channel, not a fault to retry: the worker stops
+    // asking, and the retry path reports the channel to the operator.
+    const r = await renew(
+      { ...base(), renewToken: async () => null },
+      { job_id: "j", lease_token: "l" },
+    );
+    expect(r.status).toBe(200);
+    expect(await r.json()).toBeNull();
+  });
+
+  it("maps a lost lease to its own refusal, not a 500", async () => {
+    // Someone else holds the job. Minting them no tokens, and telling the
+    // worker which refusal it was, ends the run without overwriting results.
+    const r = await renew(
+      {
+        ...base(),
+        renewToken: async () => {
+          throw { message: "lease_lost" };
+        },
+      },
+      { job_id: "j", lease_token: "l" },
+    );
+    expect(r.status).toBe(409);
+    expect(await r.json()).toEqual({ code: "lease_lost" });
+  });
+
+  it("a gateway without the binding answers the route as not found", async () => {
+    // A worker built after this route against a gateway built before it:
+    // the 404 the worker's renewal step treats as "no renewal", and the run
+    // falls back to the retryable credential lapse it always reported.
+    const r = await renew(base(), { job_id: "j", lease_token: "l" });
+    expect(r.status).toBe(404);
+    expect(await r.json()).toEqual({ code: "not_found" });
   });
 });

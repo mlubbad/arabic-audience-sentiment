@@ -30,10 +30,11 @@ export function workspaceState(input: {
   mode: DataMode;
   fixtureWorkspace: string;
   signedIn: boolean;
-  workspaces: WorkspaceOption[];
+  workspaces?: WorkspaceOption[] | null;
   selectedId: string | null;
 }): WorkspaceState {
-  const { mode, fixtureWorkspace, signedIn, workspaces, selectedId } = input;
+  const { mode, fixtureWorkspace, signedIn, selectedId } = input;
+  const workspaces = input.workspaces ?? [];
   if (mode === "sanitized_fixture")
     return { kind: "fixture", id: fixtureWorkspace };
   if (!signedIn) return { kind: "needs_auth" };

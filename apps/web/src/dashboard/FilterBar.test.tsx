@@ -75,6 +75,7 @@ describe("FilterBar", () => {
       await screen.findByLabelText(ar.participationLabel),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(ar.reviewStatusLabel)).toBeInTheDocument();
+    expect(screen.getByLabelText(ar.platformFilterLabel)).toBeInTheDocument();
     expect(screen.getByLabelText(ar.videoKindLabel)).toBeInTheDocument();
     expect(screen.getByLabelText(ar.perPageLabel)).toBeInTheDocument();
   });
@@ -149,5 +150,25 @@ describe("FilterBar", () => {
     expect(
       screen.getByRole("button", { name: ar.filtersButton(0) }),
     ).toHaveFocus();
+  });
+
+  it("only displays sentiment options provided in the labels prop", async () => {
+    const limitedLabels = {
+      positive: "إيجابي",
+      negative: "سلبي",
+      neutral: "محايد",
+    } as unknown as typeof ar.labels;
+
+    renderBar({ labels: limitedLabels });
+    const sentimentCombo = screen.getByLabelText(ar.sentimentLabel);
+    await userEvent.click(sentimentCombo);
+
+    // positive, negative, neutral should be options, but mixed should not
+    expect(screen.getByRole("option", { name: "إيجابي" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "سلبي" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "محايد" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "مختلط" }),
+    ).not.toBeInTheDocument();
   });
 });

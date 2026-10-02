@@ -170,7 +170,7 @@ def test_the_collector_is_built_from_the_token_the_server_granted():
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
 
-    def build(token):
+    def build(token, expires_at=None, renew=None):
         seen["token"] = token
         return Collector(Batch([comment("c1")], None, "exhausted")), "abcdefghijk"
 
@@ -201,7 +201,7 @@ def test_a_job_whose_channel_is_not_connected_is_blocked_not_failed():
                          httpx.Client(transport=httpx.MockTransport(handler)))
     called = []
     assert run_once(plane, None, "abcdefghijk",
-                    build_collector=lambda t: (called.append(t), None)) is True
+                    build_collector=lambda t, expires_at=None, renew=None: (called.append(t), None)) is True
     assert rec.finished == "blocked"
     assert rec.error_code == "channel_not_connected"
     # And the collector is never built, so nothing reaches YouTube without a token.
@@ -230,7 +230,7 @@ def test_a_channel_with_no_video_to_collect_is_blocked_not_failed():
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
     assert run_once(plane, None, "abcdefghijk",
-                    build_collector=lambda t: (None, None)) is True
+                    build_collector=lambda t, expires_at=None, renew=None: (None, None)) is True
     assert rec.finished == "blocked"
     assert rec.error_code == "no_video_to_collect"
     assert "commit-batch" not in rec.calls
@@ -262,7 +262,7 @@ def test_the_builder_can_say_why_it_found_nothing():
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
 
-    def build(token):
+    def build(token, expires_at=None, renew=None):
         build.reason = "no_upload_has_comments:12_checked_0_disabled"
         return None, None
 
@@ -297,9 +297,24 @@ def test_the_builder_carries_the_title_it_already_knows():
     plane = ControlPlane("https://c.invalid", "cred",
                          httpx.Client(transport=httpx.MockTransport(handler)))
 
-    def build(token):
+    def build(token, expires_at=None, renew=None):
         build.video_title = "رسالة من أسامة بن لادن"
         return Collector(Batch([comment("c1")], None, "exhausted")), "mFnJS2hxHrU"
 
     assert run_once(plane, None, "", build_collector=build) is True
     assert rec.error_code == "رسالة من أسامة بن لادن"
+
+
+def test_explicitly_disabled_yielded_batch_finishes_as_blocked():
+    rec = Recorder()
+    collector = Collector(Batch([], None, "explicitly_disabled"))
+    assert run_once(rec.plane(), collector, "abcdefghijk") is True
+    assert rec.finished == "blocked"
+
+
+def test_unavailable_yielded_batch_finishes_as_blocked():
+    rec = Recorder()
+    collector = Collector(Batch([], None, "unavailable"))
+    assert run_once(rec.plane(), collector, "abcdefghijk") is True
+    assert rec.finished == "blocked"
+

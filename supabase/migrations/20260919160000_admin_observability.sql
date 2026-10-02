@@ -117,6 +117,30 @@ end $$;
 revoke all on function public.admin_ops() from public, anon;
 grant execute on function public.admin_ops() to authenticated;
 
+-- Three indexes the reads above lean on, added by the technical review
+-- before this migration ever applied anywhere:
+--
+-- sync_runs_channel_started: admin_channels' lateral (the last run per
+-- channel) seeks by channel alone; sync_runs_recent leads with workspace_id
+-- and cannot serve it, so the lateral would be a scan of sync_runs per
+-- channel, on a table that only grows.
+create index if not exists sync_runs_channel_started
+  on public.sync_runs(channel_id, started_at desc);
+
+-- sync_runs_failed_recent: admin_ops' failed-runs list (status + recency),
+-- and phase two's every-15-minutes health tick, read exactly this shape —
+-- the recent tail of a rare status.
+create index if not exists sync_runs_failed_recent
+  on public.sync_runs(started_at desc) where status in ('failed','partial');
+
+-- comments_first_seen: the ops overview's weekly count asks what arrived
+-- recently over a table that only grows; comments_video_date leads with
+-- workspace_id and comments_retention is partial on last_seen_at, so this
+-- count was a full scan. Phase two's signals ask the same question on a
+-- schedule, so the index is theirs too.
+create index if not exists comments_first_seen
+  on public.comments(first_seen_at);
+
 -- The audit trail, newest first, bounded: the caller asks for how much it
 -- wants, between one and five hundred rows. The join is for names — the
 -- trail itself stays short and bounded by its own checks.

@@ -30,6 +30,7 @@ import {
 import { supabase } from "../supabase";
 import { useSession } from "../session";
 import { useIsPlatformAdmin } from "../adminAccess";
+import { useImpersonation } from "../impersonation";
 import { useAdminPlanCatalogue } from "../planCatalogue";
 import { fixtureCatalogue } from "../data";
 import { useLocale } from "../locale";
@@ -118,10 +119,11 @@ export function AdminPage() {
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("demo");
   const { session, loading } = useSession();
+  const { isImpersonating } = useImpersonation();
   // The demo asks nothing of the server: no admin check on the visitor's
   // behalf, no catalogue read the RPC would refuse them anyway.
   const access = useIsPlatformAdmin(demo ? null : session);
-  const admin = !demo && access.data === true;
+  const admin = !demo && !isImpersonating && access.data === true;
   const list = useQuery({
     queryKey: ["admin", "workspaces"],
     queryFn: readWorkspaces,
@@ -134,7 +136,7 @@ export function AdminPage() {
     enabled: demo,
   });
 
-  const shell = (body: ReactNode) => (
+  const shell = (body: ReactNode, showTabs = true) => (
     <div className="db-page">
       <header className="db-hero">
         <Badge tone="neutral">
@@ -142,10 +144,7 @@ export function AdminPage() {
         </Badge>
         <h1>{S.adminTitle}</h1>
         <p>{demo ? S.adminDemoLead : S.adminLead}</p>
-        {/* The observability pages the roadmap's phase one added sit under
-            the same room: one rail entry, five screens. The demo keeps its
-            own tabs out — a fixture page has no users or runs to show. */}
-        {!demo && <AdminTabs />}
+        {showTabs && <AdminTabs />}
       </header>
       {body}
     </div>
@@ -187,6 +186,7 @@ export function AdminPage() {
           {S.adminForbidden}
         </p>
       </Card>,
+      false,
     );
   if (list.isPending)
     return shell(<Loading S={S} label={S.adminLoading} shape="ops" />);

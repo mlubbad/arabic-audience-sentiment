@@ -23,6 +23,7 @@ export type RawVideo = {
   thumbnail_url: string | null;
   reported_comment_count: number | null;
   comments_state: string;
+  platform?: string | null;
 };
 export type RawSelection = {
   video_id: string;
@@ -34,10 +35,12 @@ export type RawCatalogue = { videos: RawVideo[]; selections: RawSelection[] };
 export type CatalogueRead = RawCatalogue & {
   channelId: string | null;
   cataloguedAt: string | null;
+  platform?: string | null;
+  handle?: string | null;
 };
 
 /** How many rows of a video are in the database. */
-export type StoredCount = { id: string; total: number };
+export type StoredCount = { id: string; total: number; analysed?: number };
 
 /**
  * Rows stored per video, from the source's comments.
@@ -72,13 +75,15 @@ export function mergeCatalogue(
   raw: RawCatalogue,
   collected: StoredCount[],
 ): CatalogueVideo[] {
-  const stored = new Map(collected.map((v) => [v.id, v.total]));
+  const stored = new Map(collected.map((v) => [v.id, v]));
   const chosen = new Map(raw.selections.map((s) => [s.video_id, s]));
   return raw.videos.map((v) => {
     const s = chosen.get(v.id);
+    const countInfo = stored.get(v.id);
     return CatalogueVideoSchema.parse({
       ...v,
-      collected: stored.get(v.id) ?? 0,
+      collected: countInfo?.total ?? 0,
+      analysed: countInfo?.analysed ?? 0,
       selected: !!s,
       last_collected_at: s?.last_collected_at ?? null,
       last_outcome: s?.last_outcome ?? null,
@@ -125,7 +130,7 @@ async function readLive(workspaceId: string): Promise<CatalogueRead> {
   const [videos, selections, channel] = await Promise.all([
     readAll<RawVideo>(
       "videos",
-      "id,external_video_id,title,kind,published_at,thumbnail_url,reported_comment_count,comments_state",
+      "id,external_video_id,title,kind,published_at,thumbnail_url,reported_comment_count,comments_state,platform",
       "id",
       workspaceId,
     ),
@@ -137,16 +142,20 @@ async function readLive(workspaceId: string): Promise<CatalogueRead> {
     ),
     db
       .from("connection_status")
-      .select("channel_id,status,catalogued_at")
+      .select("channel_id,status,catalogued_at,platform,handle")
       .eq("workspace_id", workspaceId),
   ]);
   if (channel.error) throw new Error("catalogue_unavailable");
-  const connected = (channel.data ?? []).find((c) => c.status === "connected");
+  const connected = (channel.data ?? []).find(
+    (c) => c.status === "connected" || c.status === "public_unverified",
+  );
   return {
     videos,
     selections,
     channelId: connected?.channel_id ?? null,
     cataloguedAt: connected?.catalogued_at ?? null,
+    platform: (connected?.platform as string | undefined) ?? null,
+    handle: (connected?.handle as string | undefined) ?? null,
   };
 }
 
@@ -172,9 +181,44 @@ export function pageOf<T>(
   return { rows: rows.slice(start, start + size), page: current, pages };
 }
 
-/** Where a video lives on YouTube, and where it embeds. The privacy-enhanced
+/** Where a video lives on YouTube/Telegram, and where it embeds. The privacy-enhanced
  *  host sets no cookies until the viewer presses play. */
-export function videoLinks(external_video_id: string, kind: string) {
+export function videoLinks(
+  external_video_id: string,
+  kind: string,
+  platform?: string | null,
+  handle?: string | null,
+) {
+  if (platform === "telegram") {
+    const clean = (handle ?? "").replace(/^@/, "");
+    return {
+      watch: clean
+        ? `https://t.me/${clean}/${external_video_id}`
+        : `https://t.me/c/${external_video_id}`,
+      embed: clean
+        ? `https://t.me/${clean}/${external_video_id}?embed=1`
+        : null,
+    };
+  }
+  if (platform === "x") {
+    const clean = (handle ?? "").replace(/^@/, "");
+    const id = encodeURIComponent(external_video_id);
+    return {
+      watch: clean
+        ? `https://x.com/${clean}/status/${id}`
+        : `https://x.com/i/status/${id}`,
+      embed: `https://platform.twitter.com/embed/Tweet.html?id=${id}`,
+    };
+  }
+  if (platform === "tiktok") {
+    const clean = (handle ?? "").replace(/^@/, "");
+    return {
+      watch: clean
+        ? `https://www.tiktok.com/@${clean}/video/${external_video_id}`
+        : `https://www.tiktok.com/video/${external_video_id}`,
+      embed: null,
+    };
+  }
   const id = encodeURIComponent(external_video_id);
   return {
     watch:

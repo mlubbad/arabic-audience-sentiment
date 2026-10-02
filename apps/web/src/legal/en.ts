@@ -6,7 +6,8 @@ import type { LegalSet } from "./types";
 
 const GOOGLE_PRIVACY = "https://policies.google.com/privacy";
 const YOUTUBE_TERMS = "https://www.youtube.com/t/terms";
-const GOOGLE_PERMISSIONS = "https://myaccount.google.com/permissions";
+const GOOGLE_PERMISSIONS =
+  "https://myaccount.google.com/connections?filters=3,4&hl=en";
 const GOOGLE_USER_DATA_POLICY =
   "https://developers.google.com/terms/api-services-user-data-policy";
 const YOUTUBE_API_TERMS =
@@ -16,7 +17,7 @@ const PADDLE_PRIVACY = "https://www.paddle.com/legal/privacy";
 const SUPABASE_PRIVACY = "https://supabase.com/privacy";
 const CLOUDFLARE_PRIVACY = "https://www.cloudflare.com/privacypolicy/";
 const SKY_DEVELOP = "https://sky-develop.net";
-const UPDATED = "2026-09-17";
+const UPDATED = "2026-09-23";
 
 export const legalEn: LegalSet = {
   privacy: {
@@ -29,7 +30,7 @@ export const legalEn: LegalSet = {
         heading: "Who we are and how to reach us",
         paragraphs: [
           "Audience Sentiment is a product of [Sky Develop](https://sky-develop.net), offered at app.sky-develop.net. In this policy, “we” and “the service” mean this product and its operator.",
-          `For any question about this policy, or to exercise any of the rights it describes, contact us through the channels published on the [Sky Develop](${SKY_DEVELOP}) website.`,
+          `For any questions, concerns, or requests regarding this Privacy Policy or your data, or to exercise any of the rights described herein, contact us directly by email at support@sky-develop.net or privacy@sky-develop.net, or through our website at [Sky Develop](${SKY_DEVELOP}).`,
         ],
       },
       {
@@ -58,14 +59,14 @@ export const legalEn: LegalSet = {
         id: "use",
         heading: "How we use it",
         paragraphs: [
-          "We use the data above to provide the service itself, that is:",
+          "We use and process the data collected above and authorized YouTube API data strictly to provide, maintain, and improve the service, specifically:",
         ],
         bullets: [
-          "Collecting your channel's comments and classifying their sentiment (positive, negative, neutral, mixed) with open-source Arabic language models running on our own servers. No comment is sent to an external AI provider.",
-          "Showing aggregated results in the dashboard, comparing videos, and producing the exports you request.",
-          "Keeping your label corrections and showing them to you and to those who share your workspace.",
-          "Metering what a workspace consumes of its plan's allowance, and activating the plan you paid for.",
-          "Operating and securing the service and detecting faults and abuse.",
+          "Collecting your channel's public comments and metadata, and processing them locally on our dedicated secure servers to classify their sentiment (positive, negative, neutral, mixed) using self-hosted open-source Arabic NLP models. No comment or user data is ever sent to external third-party AI providers.",
+          "Showing aggregated analytics and sentiment trends in the dashboard, comparing videos, and producing downloadable reports and exports upon request.",
+          "Keeping your manual sentiment corrections and displaying updated analytics to you and members who share your workspace.",
+          "Metering consumption against the workspace plan's allowance, and activating subscribed features and quotas.",
+          "Operating, maintaining, and securing the service, monitoring system performance, and detecting faults, unauthorized access, and abuse.",
         ],
       },
       {
@@ -73,19 +74,19 @@ export const legalEn: LegalSet = {
         heading: "Google and YouTube data",
         paragraphs: [
           `The service uses YouTube API Services. By using it you agree to the [YouTube Terms of Service](${YOUTUBE_TERMS}), and the [Google Privacy Policy](${GOOGLE_PRIVACY}) applies to the data Google processes.`,
-          "We ask Google for exactly one permission, youtube.force-ssl, and use it only to read: your channel and its video list, and the comments and replies on the videos you choose. Google offers no narrower permission that allows reading a channel's comments as its owner, which is why this one is requested. We do not write to your channel, publish, delete, or reply to anyone in your name. We do not use your email to prove channel ownership; the authorisation itself proves it.",
-          `Our use of information received from Google APIs, and its transfer to any other app, adheres to the [Google API Services User Data Policy](${GOOGLE_USER_DATA_POLICY}), including its Limited Use requirements. We do not sell this data, do not use it for advertising, and no human reads it except with your consent for support or security, or where the law requires it.`,
-          "Stored YouTube data is refreshed or deleted within thirty days: the comment text and the author's name and id are erased from our database thirty days after collection, and only what the dashboard's numbers need remains (a content fingerprint, the date, the like count, the label).",
-          `You can revoke the service's access from your Google account at any time on the [permissions page of your Google Account](${GOOGLE_PERMISSIONS}), and collection stops at once.`,
+          "We ask Google for exactly one permission, youtube.force-ssl, and use it only to read: your channel and its video list, and the public comments and replies on the videos you choose. Google offers no narrower permission that allows reading a channel's comments as its owner, which is why this one is requested. We do not write to your channel, publish, delete, or reply to anyone in your name. We do not use your email to prove channel ownership; the authorisation itself proves it.",
+          `Our use of information received from Google APIs, and its transfer to any other app, adheres to the [Google API Services User Data Policy](${GOOGLE_USER_DATA_POLICY}), including its Limited Use requirements. We do not sell this data, do not use it for advertising, and no human reads it except with your explicit consent for technical support or security, or where the law requires it.`,
+          "Stored YouTube data is refreshed or deleted within thirty days: the comment text and the author's name and id are permanently erased from our database thirty days after collection by an automated database purge, and only non-identifying aggregated metrics needed for dashboard statistics remain (a content fingerprint, the date, the like count, the sentiment label).",
+          `Users can revoke that API Client's access to their data at any time via the Google security settings page at [https://myaccount.google.com/connections?filters=3,4&hl=en](${GOOGLE_PERMISSIONS}). Upon revocation, the service's access is immediately terminated, stored authorization tokens are invalidated, and all automated data collection stops at once.`,
         ],
       },
       {
         id: "retention",
         heading: "Retention and deletion",
         paragraphs: [
-          "Comment text and author identity: thirty days from collection, then erased automatically. Aggregated results and labels: for as long as the workspace exists, because they are the dashboard you read.",
-          "Authorisation tokens: until you disconnect the channel inside the service or revoke access at Google, or when Google invalidates them. Temporary sign-in states: deleted automatically once they expire.",
-          "Account, workspace and billing data: for as long as your account exists. If you ask us to delete your account or workspace, we complete the deletion within seven days of the request, keeping only the billing records the law requires us to keep.",
+          "Procedure for deleting stored YouTube data: Raw YouTube comment text and author identifying data (author name and channel ID) are automatically and permanently deleted from our database thirty days after collection via a scheduled daily purging routine. Non-identifying statistical aggregates (fingerprint, timestamp, like count, sentiment label) are retained to preserve historical dashboard analytics for as long as the workspace remains active.",
+          "Procedure for disconnecting a channel and deleting tokens: You can disconnect your YouTube channel at any time from within the workspace settings or revoke access via Google security settings. Disconnecting the channel immediately invalidates and permanently purges stored OAuth access and refresh tokens from our systems, and cancels all scheduled data synchronization.",
+          "Procedure for requesting complete data deletion: You can request the complete and permanent deletion of your account, workspace, and all associated stored data at any time by sending an email to support@sky-develop.net or privacy@sky-develop.net. Upon receiving and verifying your request, we permanently delete your account, workspace configuration, and all stored data from our active databases within seven days of the request, keeping only minimal financial transaction records strictly required by tax and legal regulations.",
           "Server logs: for the short period operation and security require, then deleted.",
         ],
       },
@@ -93,10 +94,12 @@ export const legalEn: LegalSet = {
         id: "sharing",
         heading: "Who we share it with",
         paragraphs: [
-          "We do not sell or rent your data. We share it only with providers we depend on to run the service, each processing it on our behalf and only as far as needed:",
+          "We do not sell, rent, trade, or monetize your personal information or YouTube data under any circumstances. User data is processed and shared strictly between internal and external parties as follows:",
+          "Internal parties: Access to user and YouTube data within our organization is strictly limited on a need-to-know basis to authorized engineering and technical support personnel solely for system administration, infrastructure maintenance, security monitoring, and resolving user-initiated support requests. All personnel are bound by strict contractual confidentiality obligations. No team member reads user channel comments or data unless expressly requested by the user for technical troubleshooting.",
+          "External parties: We share data solely with vetted third-party service providers (data sub-processors) strictly necessary for hosting, infrastructure, payment, and security, under binding data protection commitments, or when legally compelled:",
         ],
         bullets: [
-          `Supabase: the database, authentication and backend functions that run the service ([Supabase privacy policy](${SUPABASE_PRIVACY})).`,
+          `Supabase: cloud PostgreSQL database, authentication, and secure backend functions running in the EU ([Supabase privacy policy](${SUPABASE_PRIVACY})).`,
           `Paddle: payment, invoicing and tax; the merchant of record you buy the plan from ([Paddle privacy policy](${PADDLE_PRIVACY})).`,
           `Google / YouTube: the source of your channel's data, and a sign-in provider ([Google Privacy Policy](${GOOGLE_PRIVACY})).`,
           `Cloudflare and the hosting provider: delivering and protecting the site's pages ([Cloudflare privacy policy](${CLOUDFLARE_PRIVACY})).`,
@@ -121,8 +124,8 @@ export const legalEn: LegalSet = {
         id: "rights",
         heading: "Your rights",
         paragraphs: [
-          "You may ask to access your data, correct it, delete it, receive a copy of it, restrict or object to its processing, and withdraw your consent at any time (withdrawal does not affect what was done before it). Exporting results is available to you directly from the dashboard, and disconnecting the channel from inside the service or from your Google account. For other requests contact us through the channel in the first section; we answer within a reasonable time not exceeding thirty days. If you are in a region that gives you the right to complain to a data protection authority, that right is yours.",
-          "A note for comment authors: the comments we analyse are public on YouTube. If you wrote a comment and want its text or your name removed from the service before its automatic erasure after thirty days, contact us and we will act.",
+          "You may ask to access your data, correct it, delete it, receive a copy of it, restrict or object to its processing, and withdraw your consent at any time (withdrawal does not affect what was done before it). Exporting results is available to you directly from the dashboard, and disconnecting the channel from inside the service or from your Google security settings. For data deletion requests or other inquiries, contact us directly at support@sky-develop.net or privacy@sky-develop.net; we answer and process requests within a reasonable time not exceeding thirty days. If you are in a region that gives you the right to complain to a data protection authority, that right is yours.",
+          "A note for comment authors: the comments we analyse are public on YouTube. If you wrote a comment and want its text or your name removed from the service before its automatic erasure after thirty days, contact us at support@sky-develop.net and we will act.",
         ],
       },
       {
@@ -175,7 +178,7 @@ export const legalEn: LegalSet = {
         heading: "Your YouTube channel",
         paragraphs: [
           `The service depends on YouTube API Services. By connecting your channel you confirm that you own it or are authorised to manage it, you agree to the [YouTube Terms of Service](${YOUTUBE_TERMS}), and you acknowledge that the [Google Privacy Policy](${GOOGLE_PRIVACY}) applies to what Google processes.`,
-          `We only read from your channel and never write to it, and we do not exceed the two permissions you grant. You can disconnect the channel at any time inside the service or on the [permissions page of your Google Account](${GOOGLE_PERMISSIONS}). For our part we comply with the [YouTube API Services Terms of Service](${YOUTUBE_API_TERMS}), including refreshing or deleting stored YouTube data within thirty days.`,
+          `We only read from your channel and never write to it, and we do not exceed the permissions you grant. You can disconnect the channel at any time inside the service or on the [permissions page of your Google Account](${GOOGLE_PERMISSIONS}). For our part we comply with the [YouTube API Services Terms of Service](${YOUTUBE_API_TERMS}), including refreshing or deleting stored YouTube data within thirty days.`,
         ],
       },
       {
@@ -256,7 +259,7 @@ export const legalEn: LegalSet = {
         id: "contact",
         heading: "Contact",
         paragraphs: [
-          `For any question about these terms, contact us through the channels published on the [Sky Develop](${SKY_DEVELOP}) website.`,
+          `For any questions about these terms, contact us directly by email at support@sky-develop.net or through the channels published on the [Sky Develop](${SKY_DEVELOP}) website.`,
         ],
       },
     ],

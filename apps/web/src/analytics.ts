@@ -123,6 +123,8 @@ export function byWeek(comments: LabelledComment[]): Bucketed {
 export type Commenter = {
   key: string;
   name: string;
+  avatar_url?: string | null;
+  channel_url?: string | null;
   comments: number;
   /** Null when no comment of theirs carried a parsable like count. */
   likes: number | null;
@@ -157,6 +159,8 @@ export function commenters(
     const found = acc.get(key) ?? {
       key,
       name: c.author_name,
+      avatar_url: c.author_profile_image_url ?? null,
+      channel_url: c.author_channel_url ?? null,
       comments: 0,
       likes: null,
       sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 } as Record<
@@ -164,6 +168,12 @@ export function commenters(
         number
       >,
     };
+    if (!found.avatar_url && c.author_profile_image_url) {
+      found.avatar_url = c.author_profile_image_url;
+    }
+    if (!found.channel_url && c.author_channel_url) {
+      found.channel_url = c.author_channel_url;
+    }
     found.comments++;
     // Unknown likes stay unknown. Treating null as 0 would rank a commenter
     // whose counts could not be read below one with genuinely zero likes.
@@ -191,4 +201,85 @@ export function commenters(
  */
 export function plottable(b: Bucketed, minimum = 2): boolean {
   return b.buckets.filter((x) => x.count > 0).length >= minimum;
+}
+
+export function hoursToBucketed(hours: number[], unplaceable = 0): Bucketed {
+  return {
+    buckets: hours.map((count, h) => ({
+      key: String(h),
+      label: `${h}`,
+      count,
+    })),
+    unplaceable,
+  };
+}
+
+export function weekdaysToBucketed(
+  weekdays: number[],
+  dayNames: readonly string[],
+  unplaceable = 0,
+): Bucketed {
+  return {
+    buckets: dayNames.slice(0, WEEK).map((label, i) => ({
+      key: String(i),
+      label,
+      count: weekdays[i] ?? 0,
+    })),
+    unplaceable,
+  };
+}
+
+export function weeksToBucketed(
+  weeks: Array<{
+    date?: string;
+    week?: string;
+    count: number;
+  }>,
+  unplaceable = 0,
+): Bucketed {
+  return {
+    buckets: weeks.map((item) => {
+      const key = item.week ?? item.date ?? "";
+      return {
+        key,
+        label: key,
+        count: item.count,
+      };
+    }),
+    unplaceable,
+  };
+}
+
+export function peopleToCommenters(
+  peopleList: Array<{
+    name: string;
+    channel_id?: string | null;
+    avatar_url?: string | null;
+    channel_url?: string | null;
+    comments_count?: number;
+    likes_count?: number;
+    key?: string;
+    comments?: number;
+    likes?: number | null;
+    sentiments?: Record<string, number>;
+  }>,
+  anonymous = 0,
+): Commenters {
+  return {
+    ranked: peopleList.map((p) => ({
+      key: p.key ?? p.channel_id ?? p.name,
+      name: p.name,
+      avatar_url: p.avatar_url ?? null,
+      channel_url: p.channel_url ?? null,
+      comments: p.comments ?? p.comments_count ?? 0,
+      likes: p.likes ?? p.likes_count ?? null,
+      sentiments: {
+        positive: p.sentiments?.positive ?? 0,
+        negative: p.sentiments?.negative ?? 0,
+        neutral: p.sentiments?.neutral ?? 0,
+        mixed: p.sentiments?.mixed ?? 0,
+      },
+    })),
+    anonymous,
+  };
 }

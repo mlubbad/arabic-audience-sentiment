@@ -25,7 +25,13 @@ cp "$REPO/.env.local" "$CO/.env.local"
 # service is the one process that loads it.
 UV_CACHE_DIR="$SVC/uv-cache" "${UV_BIN:-$HOME/.local/bin/uv}" --directory "$CO/workers/python" sync --frozen --group inference >/dev/null
 
-cp "$CO/scripts/$LABEL.plist" "$PLIST"
+# The repo plist hard-codes the operator's home — launchd expands no
+# variables — so the install rewrites it to the account running this script.
+# On the operator's own account the rewrite is a no-op; run anywhere else it
+# produces a working plist instead of an EX_CONFIG crash loop (witnessed
+# 2026-09-19: an install on a second account looped because every path
+# pointed at a home that does not exist there).
+sed "s|/Users/mlubbad|$HOME|g" "$CO/scripts/$LABEL.plist" > "$PLIST"
 # bootout is a no-op error when the agent is not loaded; the restart is the point.
 # It sends SIGTERM, and the loop finishes the job in hand before it exits — a
 # bootstrap issued while the old run is still leaving fails with "Input/output

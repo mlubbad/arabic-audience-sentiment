@@ -12,6 +12,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { ar } from "../strings/ar";
+import type { ChannelCandidate } from "@sentiment/contracts";
 import { WorkspaceCard, type ChannelRow } from "./WorkspaceCard";
 
 const W = "00000000-0000-4000-8000-0000000000a2";
@@ -31,7 +32,10 @@ type Props = Parameters<typeof WorkspaceCard>[0];
  *  the role query would find four. */
 const card = () => document.querySelector("ul > li") as HTMLElement;
 
-function mount(over: Partial<Props> = {}) {
+function mount(
+  over: Partial<Props> = {},
+  customRerender?: (ui: React.ReactElement) => void,
+) {
   const props: Props = {
     workspace: { id: W, name: "مطبخ ريم" },
     hasClient: true,
@@ -39,17 +43,23 @@ function mount(over: Partial<Props> = {}) {
     latestJob: null,
     pending: false,
     feedback: null,
+    allowPublicChannels: true,
     onConnect: vi.fn(),
     ...over,
   };
-  const result = render(
+  const ui = (
     <MemoryRouter initialEntries={["/account"]}>
       <ul>
         <WorkspaceCard {...props} />
       </ul>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
-  return { ...props, unmount: result.unmount };
+  if (customRerender) {
+    customRerender(ui);
+    return { ...props, unmount: () => {}, rerender: customRerender };
+  }
+  const result = render(ui);
+  return { ...props, unmount: result.unmount, rerender: result.rerender };
 }
 
 describe("WorkspaceCard", () => {
@@ -95,6 +105,16 @@ describe("WorkspaceCard", () => {
       );
       expect(onRename).toHaveBeenCalledWith("cancel");
       expect(onRename).not.toHaveBeenCalledWith("save", expect.anything());
+    });
+  });
+
+  describe("share", () => {
+    it("the share door opens the share workspace dialog", async () => {
+      mount();
+      const shareBtn = screen.getByTestId(`share-${W}`);
+      expect(shareBtn).toHaveTextContent(ar.shareWorkspace);
+      await userEvent.click(shareBtn);
+      expect(screen.getByTestId(`share-dialog-${W}`)).toBeInTheDocument();
     });
   });
 
@@ -177,6 +197,30 @@ describe("WorkspaceCard", () => {
       expect(screen.queryByTestId(`relink-${W}`)).not.toBeInTheDocument();
     });
 
+    it("public channel: sync and disconnect doors shown, but never connect door", () => {
+      mount({
+        channel: { ...connected, status: "public_unverified" },
+        onDisconnect: vi.fn(),
+      });
+      expect(screen.getByTestId(`sync-${W}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`disconnect-${W}`)).toBeInTheDocument();
+      expect(screen.queryByTestId(`connect-${W}`)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(`channel-setup-${W}`),
+      ).not.toBeInTheDocument();
+    });
+
+    it("no channel: displays unified channel setup explaining owner vs public options", () => {
+      const onAddChannel = vi.fn();
+      mount({ channel: null, onAddChannel });
+      expect(screen.getByTestId(`channel-setup-${W}`)).toBeInTheDocument();
+      expect(screen.getByText(ar.channelSetupHeading)).toBeInTheDocument();
+      expect(screen.getByText(ar.channelOptionOwnerTitle)).toBeInTheDocument();
+      expect(screen.getByText(ar.channelOptionPublicTitle)).toBeInTheDocument();
+      expect(screen.getByTestId(`connect-${W}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`addchannel-${W}`)).toBeInTheDocument();
+    });
+
     it("a channel that needs relinking gets the connect door, not disconnect", () => {
       mount({
         channel: { ...connected, status: "reconnect_required" },
@@ -232,63 +276,25 @@ describe("WorkspaceCard", () => {
       });
       expect(screen.getByTestId(`connect-${W}`)).toBeDisabled();
       round3.unmount();
-
-      // The consent step's own continue and cancel, once the door was pressed.
-      mount({
-        channel: null,
-        hasClient: true,
-        pending: true,
-        onConnect: vi.fn(),
-        confirmingConnect: true,
-      });
-      expect(screen.getByTestId(`connect-continue-${W}`)).toBeDisabled();
-      expect(
-        screen.getByRole("button", { name: ar.renameCancel }),
-      ).toBeDisabled();
     });
   });
 
   describe("connect", () => {
-    it("the door asks first; the consent step is inline and continues to Google", async () => {
+    it("connects directly to Google when the connect door is clicked", async () => {
       const onConnect = vi.fn();
       mount({ channel: null, onConnect });
       await userEvent.click(screen.getByTestId(`connect-${W}`));
-      expect(onConnect).toHaveBeenCalledWith("ask");
-      expect(screen.queryByText(ar.connectAboutGoogle)).not.toBeInTheDocument();
+      expect(onConnect).toHaveBeenCalledTimes(1);
     });
 
-    it("while asking, the sentence and the continue door replace the connect door", async () => {
-      const onConnect = vi.fn();
-      mount({ channel: null, onConnect, confirmingConnect: true });
-      expect(screen.queryByTestId(`connect-${W}`)).not.toBeInTheDocument();
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      const group = screen.getByRole("group", { name: ar.connectChannel });
-      expect(group).toHaveTextContent(ar.connectAboutGoogle);
-      await userEvent.click(screen.getByTestId(`connect-continue-${W}`));
-      expect(onConnect).toHaveBeenCalledWith("continue");
-      await userEvent.click(
-        within(group).getByRole("button", { name: ar.renameCancel }),
-      );
-      expect(onConnect).toHaveBeenCalledWith("cancel");
-    });
-
-    it("the relink door asks through the same step", async () => {
+    it("relinks directly to Google when the relink door is clicked", async () => {
       const onConnect = vi.fn();
       mount({
         channel: { ...connected, title: null, handle: null },
         onConnect,
       });
       await userEvent.click(screen.getByTestId(`relink-${W}`));
-      expect(onConnect).toHaveBeenCalledWith("ask");
-    });
-
-    it("the relink door hides while the question is open", () => {
-      mount({
-        channel: { ...connected, title: null, handle: null },
-        confirmingConnect: true,
-      });
-      expect(screen.queryByTestId(`relink-${W}`)).not.toBeInTheDocument();
-      expect(screen.getByTestId(`connect-continue-${W}`)).toBeInTheDocument();
+      expect(onConnect).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -348,6 +354,33 @@ describe("WorkspaceCard", () => {
       await userEvent.keyboard("{Escape}");
       expect(onDisconnect).not.toHaveBeenCalled();
     });
+
+    it("public_unverified channel renders disconnect door and confirm dialog", async () => {
+      const publicChannel: ChannelRow = {
+        workspace_id: W,
+        channel_id: "e4047855-7a05-4ca9-9194-3c95a5e75455",
+        status: "public_unverified",
+        external_channel_id: "SkyNewsArabia_B",
+        title: "Sky News Arabia",
+        handle: "SkyNewsArabia_B",
+        platform: "telegram",
+      };
+      const onDisconnect = vi.fn();
+      mount({ channel: publicChannel, onDisconnect });
+      expect(screen.getByTestId(`disconnect-${W}`)).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId(`disconnect-${W}`));
+      expect(onDisconnect).toHaveBeenCalledWith("ask");
+
+      mount({
+        channel: publicChannel,
+        onDisconnect,
+        confirmingDisconnect: true,
+      });
+      const dialog = await screen.findByRole("dialog", {
+        name: ar.disconnectChannel,
+      });
+      expect(dialog).toBeInTheDocument();
+    });
   });
 
   describe("retire", () => {
@@ -401,5 +434,365 @@ describe("WorkspaceCard", () => {
     expect(
       sync.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  describe("add channel by link or search", () => {
+    const candidate = {
+      external_channel_id: "UCTPIL6f7yNpK8yc-H3cEtFg",
+      handle: "@alaa_jaber_official",
+      title: "علاء جابر",
+      thumbnail_url: "https://i.ytimg.com/a.jpg",
+    };
+
+    it("the door is offered while no channel is named, and not otherwise", () => {
+      const onAddChannel = vi.fn();
+      const open = mount({ onAddChannel });
+      expect(screen.getByTestId(`addchannel-${W}`)).toBeInTheDocument();
+      open.unmount();
+      // A workspace that already names a channel — public or connected — has
+      // no second one to add: the server would refuse.
+      const named = mount({ onAddChannel, channel: connected });
+      expect(screen.queryByTestId(`addchannel-${W}`)).not.toBeInTheDocument();
+      named.unmount();
+      mount({ channel: connected });
+      expect(screen.queryByTestId(`addchannel-${W}`)).not.toBeInTheDocument();
+    });
+
+    it("the form's search hands the typed query back", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      const form = screen.getByTestId(`addchannel-form-${W}`);
+      const field = within(form).getByLabelText(ar.addChannel);
+      await userEvent.type(field, "youtube.com/@alaa_jaber_official");
+      await userEvent.click(
+        within(form).getByRole("button", { name: ar.addChannelSearch }),
+      );
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "youtube.com/@alaa_jaber_official",
+        undefined,
+        "youtube",
+      );
+    });
+
+    it("each candidate carries its own add door", async () => {
+      const onAddChannel = vi.fn();
+      mount({
+        onAddChannel,
+        addingChannel: true,
+        channelCandidates: [candidate],
+      });
+      await userEvent.click(
+        screen.getByTestId(`addchannel-add-${candidate.external_channel_id}`),
+      );
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, candidate);
+    });
+
+    it("an empty answer and a refusal each read as their own sentence", () => {
+      mount({
+        onAddChannel: vi.fn(),
+        addingChannel: true,
+        channelCandidates: [],
+      });
+      expect(screen.getByText(ar.addChannelNone)).toBeInTheDocument();
+      mount({
+        onAddChannel: vi.fn(),
+        addingChannel: true,
+        channelLookupError: ar.addChannelFailed,
+      });
+      expect(screen.getByText(ar.addChannelFailed)).toBeInTheDocument();
+    });
+
+    it("typing in the query field clears a displayed lookup error", async () => {
+      const onAddChannel = vi.fn();
+      mount({
+        onAddChannel,
+        addingChannel: true,
+        channelLookupError: ar.addChannelFailed,
+      });
+      const form = screen.getByTestId(`addchannel-form-${W}`);
+      const field = within(form).getByLabelText(ar.addChannel);
+      await userEvent.type(field, "a");
+      expect(onAddChannel).toHaveBeenCalledWith("clear-error");
+    });
+
+    it("switches to Telegram and adds a channel by handle or URL", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTelegram }),
+      );
+      const form = screen.getByTestId(`addtelegram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTelegramChannel);
+      await userEvent.type(field, "https://t.me/tech_news_arabic");
+      await userEvent.click(screen.getByTestId(`addtelegram-submit-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "@tech_news_arabic",
+        handle: "@tech_news_arabic",
+        title: "@tech_news_arabic",
+        thumbnail_url: null,
+        platform: "telegram",
+      });
+    });
+
+    it("validates Telegram handle and shows error for invalid input", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTelegram }),
+      );
+      const form = screen.getByTestId(`addtelegram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTelegramChannel);
+      await userEvent.type(field, "???");
+      await userEvent.click(screen.getByTestId(`addtelegram-submit-${W}`));
+      expect(screen.getByText(ar.addTelegramInvalidHandle)).toBeInTheDocument();
+      expect(onAddChannel).not.toHaveBeenCalledWith(
+        "add",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("displays Telegram badge on connected Telegram channel", () => {
+      mount({
+        channel: {
+          ...connected,
+          platform: "telegram",
+          title: "@tech_news_arabic",
+        },
+      });
+      expect(screen.getByText(ar.platformTelegram)).toBeInTheDocument();
+    });
+
+    it("switches to X and adds an account by handle or URL", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(screen.getByRole("button", { name: ar.platformX }));
+      const form = screen.getByTestId(`addx-form-${W}`);
+      const field = within(form).getByLabelText(ar.addXChannel);
+      await userEvent.type(field, "https://x.com/aljazeera");
+      await userEvent.click(screen.getByTestId(`addx-submit-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "aljazeera",
+        handle: "@aljazeera",
+        title: "@aljazeera",
+        thumbnail_url: null,
+        platform: "x",
+      });
+    });
+
+    it("validates X handle and shows error for invalid input", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(screen.getByRole("button", { name: ar.platformX }));
+      const form = screen.getByTestId(`addx-form-${W}`);
+      const field = within(form).getByLabelText(ar.addXChannel);
+      await userEvent.type(field, "invalid handle with spaces!");
+      await userEvent.click(screen.getByTestId(`addx-submit-${W}`));
+      expect(screen.getByText(ar.addXInvalidHandle)).toBeInTheDocument();
+      expect(onAddChannel).not.toHaveBeenCalledWith(
+        "add",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("displays X badge on connected X channel", () => {
+      mount({
+        channel: {
+          ...connected,
+          platform: "x",
+          title: "@aljazeera",
+        },
+      });
+      expect(screen.getByText(ar.platformX)).toBeInTheDocument();
+    });
+
+    it("switches to TikTok and adds an account by handle or URL", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTikTok }),
+      );
+      const form = screen.getByTestId(`addtiktok-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTikTokChannel);
+      await userEvent.type(field, "https://www.tiktok.com/@khaby.lame");
+      await userEvent.click(screen.getByTestId(`addtiktok-submit-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "khaby.lame",
+        handle: "@khaby.lame",
+        title: "@khaby.lame",
+        thumbnail_url: null,
+        platform: "tiktok",
+      });
+    });
+
+    it("validates TikTok handle and shows error for invalid input", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTikTok }),
+      );
+      const form = screen.getByTestId(`addtiktok-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTikTokChannel);
+      await userEvent.type(field, "a"); // too short (<2 chars)
+      await userEvent.click(screen.getByTestId(`addtiktok-submit-${W}`));
+      expect(screen.getByText(ar.addTikTokInvalidHandle)).toBeInTheDocument();
+      expect(onAddChannel).not.toHaveBeenCalledWith(
+        "add",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("displays TikTok badge on connected TikTok channel", () => {
+      mount({
+        channel: {
+          ...connected,
+          platform: "tiktok",
+          title: "@khaby.lame",
+        },
+      });
+      expect(screen.getByText(ar.platformTikTok)).toBeInTheDocument();
+    });
+
+    it("switches to Telegram, searches channel, sees candidate, and adds it", async () => {
+      const onAddChannel = vi.fn();
+      const telegramCandidate: ChannelCandidate = {
+        external_channel_id: "@tech_news_arabic",
+        handle: "@tech_news_arabic",
+        title: "أخبار التقنية",
+        thumbnail_url: "https://example.com/tg.jpg",
+        platform: "telegram",
+      };
+      const { rerender } = mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTelegram }),
+      );
+      const form = screen.getByTestId(`addtelegram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTelegramChannel);
+      await userEvent.type(field, "https://t.me/tech_news_arabic");
+      await userEvent.click(screen.getByTestId(`addtelegram-search-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "@tech_news_arabic",
+        undefined,
+        "telegram",
+      );
+
+      mount(
+        {
+          onAddChannel,
+          addingChannel: true,
+          channelCandidates: [telegramCandidate],
+        },
+        rerender,
+      );
+      expect(screen.getByText("أخبار التقنية")).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByTestId(
+          `addchannel-add-${telegramCandidate.external_channel_id}`,
+        ),
+      );
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "add",
+        undefined,
+        telegramCandidate,
+      );
+    });
+
+    it("switches to Telegram and shows fallback direct add button on lookup error", async () => {
+      const onAddChannel = vi.fn();
+      const { rerender } = mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTelegram }),
+      );
+      const form = screen.getByTestId(`addtelegram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTelegramChannel);
+      await userEvent.type(field, "telegram_channel");
+
+      mount(
+        {
+          onAddChannel,
+          addingChannel: true,
+          channelLookupError: "حدث خطأ في البحث",
+        },
+        rerender,
+      );
+      expect(screen.getByText("حدث خطأ في البحث")).toBeInTheDocument();
+      const fallbackBtn = screen.getByTestId(`addchannel-direct-fallback-${W}`);
+      expect(fallbackBtn).toBeInTheDocument();
+      await userEvent.click(fallbackBtn);
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "@telegram_channel",
+        handle: "@telegram_channel",
+        title: "@telegram_channel",
+        thumbnail_url: null,
+        platform: "telegram",
+      });
+    });
+
+    it("switches to X and searches account before adding", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(screen.getByRole("button", { name: ar.platformX }));
+      const form = screen.getByTestId(`addx-form-${W}`);
+      const field = within(form).getByLabelText(ar.addXChannel);
+      await userEvent.type(field, "https://x.com/aljazeera");
+      await userEvent.click(screen.getByTestId(`addx-search-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "aljazeera",
+        undefined,
+        "x",
+      );
+    });
+
+    it("switches to TikTok and searches account before adding", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformTikTok }),
+      );
+      const form = screen.getByTestId(`addtiktok-form-${W}`);
+      const field = within(form).getByLabelText(ar.addTikTokChannel);
+      await userEvent.type(field, "https://www.tiktok.com/@khaby.lame");
+      await userEvent.click(screen.getByTestId(`addtiktok-search-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "khaby.lame",
+        undefined,
+        "tiktok",
+      );
+    });
+  });
+
+  describe("permission gating for public channels", () => {
+    it("hides public channel choice when allowPublicChannels is false", () => {
+      mount({ allowPublicChannels: false });
+      expect(screen.queryByTestId(`channel-setup-${W}`)).toBeNull();
+      expect(screen.queryByTestId(`addchannel-${W}`)).toBeNull();
+      expect(screen.getByTestId(`connect-${W}`)).toBeInTheDocument();
+      expect(
+        screen.getByText("اربط قناة يوتيوب بعد موافقتك على الإذن."),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          "حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة.",
+        ),
+      ).toBeNull();
+    });
+
+    it("displays both choices when allowPublicChannels is true", () => {
+      mount({ allowPublicChannels: true, onAddChannel: vi.fn() });
+      expect(screen.getByTestId(`channel-setup-${W}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`connect-${W}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`addchannel-${W}`)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "حدد القناة إما بالربط كمالك أو بالاختيار كقناة عامة.",
+        ),
+      ).toBeInTheDocument();
+    });
   });
 });

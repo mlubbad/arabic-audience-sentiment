@@ -131,16 +131,19 @@ describe("the live check by comment count", () => {
       );
     }
     // Three catalogued videos in A, one in B, all selected and due.
-    for (const [w, external, count] of [
-      [A, V1, 10],
-      [A, V2, 20],
-      [A, V3, 30],
-      [B, VB, 40],
+    for (const [w, external, count, n] of [
+      [A, V1, 10, 1],
+      [A, V2, 20, 2],
+      [A, V3, 30, 3],
+      [B, VB, 40, 4],
     ] as const) {
       await db.query(
-        `insert into videos(workspace_id,channel_id,external_video_id,title,reported_comment_count,comments_state)
-         values ($1,$1,$2,$2,$3,'open')`,
-        [w, external, count],
+        `insert into videos(id,workspace_id,channel_id,external_video_id,title,reported_comment_count,comments_state)
+         values ($4,$1,$1,$2,$2,$3,'open')`,
+        // An explicit id, ordered like the external ids: the due list is
+        // ordered by (next_check_at, id), and a random uuid would shuffle
+        // videos that are due together — an order this file asserts on.
+        [w, external, count, `00000000-0000-4000-8000-00000000000${n}`],
       );
       await db.query(
         `insert into video_selections(workspace_id,channel_id,video_id)

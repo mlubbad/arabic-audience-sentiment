@@ -19,6 +19,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { useSession } from "./session";
+import { useImpersonation } from "./impersonation";
 import { supabase } from "./supabase";
 import { useStrings } from "./strings";
 import {
@@ -30,6 +31,12 @@ import {
 
 export function SessionControl() {
   const { session, loading } = useSession();
+  const {
+    isImpersonating,
+    impersonatedUser,
+    stopImpersonation,
+    loading: impLoading,
+  } = useImpersonation();
   const S = useStrings();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -42,27 +49,60 @@ export function SessionControl() {
         {S.signIn}
       </Link>
     );
-  const who = session.user.email ?? S.yourAccount;
+
+  const displayEmail = isImpersonating
+    ? (impersonatedUser?.email ?? S.yourAccount)
+    : (session.user.email ?? S.yourAccount);
+
   return (
-    <div className="app-session">
+    <div className="app-session" data-testid="app-session">
       <DropdownMenu>
         {/* A plain button, deliberately: app.css already paints any button
             inside .app-rail .app-session as the rail's translucent pill in
             --ink-on-dark. The light ui-btn box belongs on cards, not here.
             The menu itself portals to <body> and wears ui/'s light panel. */}
         <DropdownMenuTrigger asChild>
-          <button type="button" title={session.user.email ?? undefined}>
-            <span className="app-session-who">{who}</span>
-            <span aria-hidden="true">▾</span>
+          <button
+            type="button"
+            title={displayEmail}
+            className={
+              isImpersonating ? "app-session-trigger--impersonating" : undefined
+            }
+          >
+            {isImpersonating && <span aria-hidden="true">🎭 </span>}
+            <span className="app-session-who">{displayEmail}</span>
+            {isImpersonating && (
+              <span className="app-session-impersonate-tag">
+                ({S.adminImpersonationActive})
+              </span>
+            )}
+            <span aria-hidden="true"> ▾</span>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
             <Link to="/account">{S.yourAccount}</Link>
           </DropdownMenuItem>
+          {isImpersonating && (
+            <DropdownMenuItem
+              disabled={impLoading}
+              onSelect={() => void stopImpersonation()}
+              data-testid="session-return-admin"
+            >
+              {impLoading
+                ? S.adminImpersonateStopping
+                : S.adminImpersonationExitAction}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
-            disabled={busy}
+            disabled={busy || impLoading}
+            data-testid="session-signout"
             onSelect={() => {
+              // When impersonating, signing out exits the impersonated session and returns to admin
+              if (isImpersonating) {
+                void stopImpersonation();
+                return;
+              }
               if (!supabase) return;
               setBusy(true);
               setFailed(false);

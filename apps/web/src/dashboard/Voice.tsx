@@ -13,13 +13,7 @@ import { UNCLASSIFIED, type Label } from "@sentiment/contracts";
 import { Card } from "../ui/Card";
 import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
-import {
-  AXIS_TEXT,
-  GRID_LINE,
-  SENTIMENT,
-  UNMEASURABLE,
-  VOLUME,
-} from "../chartTheme";
+import { AXIS_TEXT, GRID_LINE, SENTIMENT, VOLUME } from "../chartTheme";
 import { barOptions, doughnutOptions } from "./chartOptions";
 import { ChartFigures } from "./ChartFigures";
 import { ChartEmpty } from "../pageStates/PageStates";
@@ -41,10 +35,22 @@ export function Voice({
    *  the page that decides what a topic key is called. */
   topicName: (key: string) => string;
 }) {
+  const pos = s.sentiments.positive ?? 0;
+  const neg = s.sentiments.negative ?? 0;
+  const netScore =
+    s.analysed > 0 ? Math.round(((pos - neg) / s.analysed) * 100) : 0;
+  const netSign = netScore > 0 ? `+${netScore}٪` : `${netScore}٪`;
+
+  const isMeasurable = (k: Label) =>
+    s.measurable ? s.measurable.has(k) : true;
+  const measurableKeys = (Object.keys(s.sentiments) as Label[]).filter(
+    isMeasurable,
+  );
+
   return (
     <section className="db-section" id="rp-voice">
       <header>
-        <h2>{S.secVoice}</h2>
+        <h2>{S.secVoiceTitle}</h2>
         <p className="db-lead">{S.voiceLead(n(s.analysed))}</p>
       </header>
       <div className="db-grid db-grid--2">
@@ -57,62 +63,55 @@ export function Voice({
                 aria-hidden="true"
                 data-testid="chart-donut"
               >
-                <Doughnut
-                  data={{
-                    labels: Object.values(labels),
-                    datasets: [
-                      {
-                        data: Object.values(s.sentiments),
-                        // One scale, shared with the chips and the bars.
-                        // Keyed by label so the four colours cannot drift out
-                        // of step with the four counts beside them. Labels
-                        // accompany every slice; colour is never the only
-                        // carrier.
-                        backgroundColor: (
-                          Object.keys(s.sentiments) as Label[]
-                        ).map((k) =>
-                          s.measurable.has(k) ? SENTIMENT[k] : UNMEASURABLE,
-                        ),
-                        // White, the card's own colour: the gap is what keeps
-                        // two touching slices two.
-                        borderColor: "#ffffff",
-                        borderWidth: 2,
-                      },
-                    ],
-                  }}
-                  options={doughnutOptions}
-                />
+                <div className="db-donut-wrap">
+                  <Doughnut
+                    data={{
+                      labels: measurableKeys.map((k) => labels[k]),
+                      datasets: [
+                        {
+                          data: measurableKeys.map((k) => s.sentiments[k] ?? 0),
+                          // One scale, shared with the chips and the bars.
+                          // Keyed by label so the colours cannot drift out
+                          // of step with the counts beside them.
+                          backgroundColor: measurableKeys.map(
+                            (k) => SENTIMENT[k],
+                          ),
+                          // White, the card's own colour: the gap is what keeps
+                          // two touching slices two.
+                          borderColor: "#ffffff",
+                          borderWidth: 2,
+                        },
+                      ],
+                    }}
+                    options={doughnutOptions}
+                  />
+                  <div className="db-donut-center">
+                    <span className="db-donut-center-val ui-num">
+                      {netSign}
+                    </span>
+                    <span className="db-donut-center-lbl">
+                      {S.donutCenterNet}
+                    </span>
+                  </div>
+                </div>
               </div>
               <ul className="db-legend">
-                {Object.entries(s.sentiments).map(([key, v]) => {
-                  // A class the analysis cannot express is reported as
-                  // unavailable, never as zero. On this channel about one
-                  // comment in twenty is genuinely mixed, and the active
-                  // model has no such class — so the zero was not
-                  // uninformative, it was wrong.
-                  const measurable = s.measurable.has(key);
+                {measurableKeys.map((key) => {
+                  const v = s.sentiments[key] ?? 0;
                   return (
                     <li key={key}>
                       <span>
                         <span
                           className="db-swatch"
                           style={{
-                            background: measurable
-                              ? `var(--sentiment-${key})`
-                              : "var(--border-2)",
+                            background: `var(--sentiment-${key})`,
                           }}
                           aria-hidden="true"
                         />
-                        {measurable ? (
-                          S.legendMeasured(
-                            labels[key as Label],
-                            n(v),
-                            s.analysed ? Math.round((v / s.analysed) * 100) : 0,
-                          )
-                        ) : (
-                          <span data-testid={`unmeasurable-${key}`}>
-                            {S.legendUnmeasured(labels[key as Label])}
-                          </span>
+                        {S.legendMeasured(
+                          labels[key],
+                          n(v),
+                          s.analysed ? Math.round((v / s.analysed) * 100) : 0,
                         )}
                       </span>
                     </li>
@@ -169,7 +168,9 @@ export function Voice({
                           datasets: [
                             {
                               data: buckets.map((b) => b.count),
-                              backgroundColor: VOLUME,
+                              backgroundColor: buckets.map((_, idx) =>
+                                idx === 0 ? VOLUME : "rgba(75, 52, 201, 0.4)",
+                              ),
                               borderRadius: 4,
                             },
                           ],
@@ -225,15 +226,15 @@ export function Voice({
           colour its slice wears above. */}
       <div className="db-figures-row">
         <article className="db-figure" data-tone="negative">
-          <strong>{n(s.sentiments.negative)}</strong>
+          <strong>{n(s.sentiments.negative ?? 0)}</strong>
           <p>{S.figureNegative}</p>
         </article>
         <article className="db-figure" data-tone="positive">
-          <strong>{n(s.sentiments.positive)}</strong>
+          <strong>{n(s.sentiments.positive ?? 0)}</strong>
           <p>{S.figurePositive}</p>
         </article>
         <article className="db-figure" data-tone="none">
-          <strong>{n(s.unanalysed)}</strong>
+          <strong>{n(s.unanalysed ?? 0)}</strong>
           <p>{S.figureUnanalysed}</p>
         </article>
       </div>
