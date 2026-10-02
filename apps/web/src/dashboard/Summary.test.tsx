@@ -96,4 +96,17 @@ describe("Summary Executive Story Briefing", () => {
     expect(briefing).toHaveTextContent(ar.pulseCriticalAlert);
     expect(briefing).toHaveTextContent(ar.storyAct3RecCritical);
   });
+
+  it("renders authors KPI count when known and dash when null/unknown", () => {
+    const { rerender } = render(<Summary s={baseSnapshot} S={ar} />);
+    expect(screen.getByTestId("authors-count")).toHaveTextContent("60");
+
+    const unknownAuthorsSnapshot = {
+      ...baseSnapshot,
+      unique_authors: null,
+    } as unknown as Snapshot;
+
+    rerender(<Summary s={unknownAuthorsSnapshot} S={ar} />);
+    expect(screen.getByTestId("authors-count")).toHaveTextContent("—");
+  });
 });

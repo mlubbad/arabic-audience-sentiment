@@ -30,6 +30,7 @@ import {
 import {
   buildExport,
   EXPORT_ROW_CAP,
+  LIVE_EXPORT_ROW_CAP,
   type DataMode,
   deriveSnapshot,
   fixtureWorkspace,
@@ -431,9 +432,18 @@ function DashboardBody({
       filtered: commentsList,
       next_cursor: nextCursor,
       cursor_reset: false,
-      replies: 0,
-      unknown_dates: 0,
-      unique_authors: (agg.people ?? []).length,
+      replies: (agg.videos ?? []).reduce((sum, v) => sum + (v.replies ?? 0), 0),
+      unknown_dates: Math.max(
+        0,
+        agg.total - (agg.hours ?? []).reduce((sum, h) => sum + h, 0),
+      ),
+      unique_authors:
+        agg.total === 0
+          ? 0
+          : (agg.people ?? []).length < 10 &&
+              agg.total <= (agg.people ?? []).length
+            ? (agg.people ?? []).length
+            : null,
       kpis: agg.kpis,
       channel: agg.channel,
       comparison: (agg.videos ?? []).slice(0, 10),
@@ -583,7 +593,7 @@ function DashboardBody({
   });
   const exporting = useMutation({
     mutationFn: () => buildExport(mode, page),
-    onSuccess: ({ csv, filename, truncated, totalRows }) => {
+    onSuccess: ({ csv, filename, truncated, totalRows, cap }) => {
       const url = URL.createObjectURL(
         new Blob([csv], { type: "text/csv;charset=utf-8" }),
       );
@@ -594,7 +604,10 @@ function DashboardBody({
       URL.revokeObjectURL(url);
       if (truncated) {
         toast({
-          title: S.exportTruncatedNotice(EXPORT_ROW_CAP, totalRows),
+          title: S.exportTruncatedNotice(
+            cap ?? (mode === "live" ? LIVE_EXPORT_ROW_CAP : EXPORT_ROW_CAP),
+            totalRows,
+          ),
         });
       }
     },

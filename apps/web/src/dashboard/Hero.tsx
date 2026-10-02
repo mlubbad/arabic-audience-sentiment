@@ -56,7 +56,9 @@ export function Hero({
           <div className="db-pills">
             <Badge numeric>{range}</Badge>
             <Badge numeric>{S.pillComments(n(s.total))}</Badge>
-            <Badge numeric>{S.pillAuthors(n(s.unique_authors))}</Badge>
+            {s.unique_authors !== null && (
+              <Badge numeric>{S.pillAuthors(n(s.unique_authors))}</Badge>
+            )}
           </div>
           {/* The answer, on the first screen.
               The page asks "ماذا يقول جمهورك؟" at the top and then made the

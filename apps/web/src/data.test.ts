@@ -557,5 +557,35 @@ describe("loadDashboardAggregates null channel handling", () => {
       expect(snapshot.kpis?.total_likes).toBe(100);
       expect(snapshot.kpis?.total_comments).toBe(2);
     });
+
+    it("buildExport respects LIVE_EXPORT_ROW_CAP (1,500) and reports truncation in live mode", async () => {
+      const { buildExport, LIVE_EXPORT_ROW_CAP } = await loadModule();
+      expect(LIVE_EXPORT_ROW_CAP).toBe(1_500);
+
+      const liveComments = Array.from({ length: 1_500 }, (_, i) => ({
+        ...target,
+        id: `live_c_${i}`,
+        content_hash: `hash_${i}`,
+        text_raw: `تعليق رقم ${i}`,
+        published_at: "2026-09-20T00:00:00Z",
+      }));
+
+      rpc.mockResolvedValueOnce({
+        data: {
+          ...JSON.parse(fixtureJson),
+          mode: "live",
+          comments: liveComments,
+        },
+        error: null,
+      });
+
+      const result = await buildExport("live", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+
+      expect(result.cap).toBe(1_500);
+      expect(result.rows).toBe(1_500);
+      expect(result.truncated).toBe(true);
+    });
   });
 });

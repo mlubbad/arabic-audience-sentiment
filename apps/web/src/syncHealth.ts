@@ -63,23 +63,25 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
 
   if (run.status === "failed" || run.status === "blocked") {
     if (run.status === "blocked" && run.error_code === "quota_exceeded") {
-      const endedDate = run.ended_at ? new Date(run.ended_at) : null;
-      const isPastMidnightUtc =
-        endedDate &&
-        (now.getUTCFullYear() > endedDate.getUTCFullYear() ||
-          now.getUTCMonth() > endedDate.getUTCMonth() ||
-          now.getUTCDate() > endedDate.getUTCDate());
-
-      if (isPastMidnightUtc) {
-        return state.worker.connected
-          ? { ...base, severity: "ok", key: "healthy", queued }
-          : { ...base, severity: "warning", key: "stale", queued };
+      const staleHours = run.ended_at
+        ? (now.getTime() - Date.parse(run.ended_at)) / 3_600_000
+        : null;
+      if (staleHours !== null && staleHours >= STALE_AFTER_HOURS) {
+        return {
+          ...base,
+          severity: "warning",
+          key: "stale",
+          queued,
+          staleHours,
+          errorCode,
+        };
       }
       return {
         ...base,
         severity: "warning",
         key: "quota_paused",
         queued,
+        staleHours,
         errorCode,
       };
     }

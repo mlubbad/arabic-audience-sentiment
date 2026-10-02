@@ -33,7 +33,7 @@ import type { Snapshot } from "./Dashboard";
 import type { Locale } from "../locale";
 import { commentText, displayDate } from "../i18n";
 import { n } from "./format";
-import { EXPORT_ROW_CAP } from "../data";
+import { EXPORT_ROW_CAP, LIVE_EXPORT_ROW_CAP } from "../data";
 import { CommentsTable, confidencePct } from "./CommentsTable";
 import "./comments.css";
 
@@ -195,7 +195,12 @@ export function Comments({
         >
           {S.exportCsv}
         </Button>
-        <p className="db-muted">{S.exportNote(s.total, EXPORT_ROW_CAP)}</p>
+        <p className="db-muted">
+          {S.exportNote(
+            s.total,
+            s.mode === "live" ? LIVE_EXPORT_ROW_CAP : EXPORT_ROW_CAP,
+          )}
+        </p>
         {exporting.isError && (
           <p role="alert" data-testid="export-error">
             {S.exportFailed}

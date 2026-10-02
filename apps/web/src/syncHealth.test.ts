@@ -167,7 +167,7 @@ describe("sync health", () => {
     });
   });
 
-  it("recovers to healthy after midnight UTC if worker is connected", () => {
+  it("remains quota_paused after midnight UTC rather than falsely claiming healthy", () => {
     const blockedQuota = state({
       queued_jobs: 0,
       worker: {
@@ -182,10 +182,20 @@ describe("sync health", () => {
         ended_at: "2026-09-12T10:00:00Z",
       },
     });
-    const nextDay = new Date("2026-09-13T01:05:00Z");
-    expect(syncHealth(blockedQuota, nextDay)).toMatchObject({
-      severity: "ok",
-      key: "healthy",
+    // Passing midnight UTC without a new run must NOT claim healthy
+    const nextDayMorning = new Date("2026-09-13T01:05:00Z");
+    expect(syncHealth(blockedQuota, nextDayMorning)).toMatchObject({
+      severity: "warning",
+      key: "quota_paused",
+      errorCode: "quota_exceeded",
+    });
+
+    // After STALE_AFTER_HOURS (24h), it transitions to stale
+    const nextDayAfternoon = new Date("2026-09-13T11:00:00Z");
+    expect(syncHealth(blockedQuota, nextDayAfternoon)).toMatchObject({
+      severity: "warning",
+      key: "stale",
+      errorCode: "quota_exceeded",
     });
   });
 });

@@ -271,7 +271,7 @@ export function snapshot(
     unknown_dates: rows.filter((c) => !c.published_at).length,
     unique_authors: new Set(
       rows.flatMap((c) => (c.author_channel_id ? [c.author_channel_id] : [])),
-    ).size,
+    ).size as number | null,
     kpis: {
       total_views: null,
       total_likes: rows.reduce((sum, c) => sum + (c.likes_value ?? 0), 0),

@@ -428,6 +428,7 @@ export function deriveSnapshot(
     );
     return {
       ...base,
+      unique_authors: base.unique_authors as number | null,
       // The snapshot already aggregates every video; the app only decides how
       // many to show and says when it has truncated.
       comparison: base.videos.slice(0, COMPARISON_LIMIT),
@@ -597,6 +598,7 @@ export async function submitTopicReview(mode: DataMode, raw: TopicReviewInput) {
 }
 
 export const EXPORT_ROW_CAP = 10_000;
+export const LIVE_EXPORT_ROW_CAP = 1_500;
 
 /**
  * Builds the export from the filters currently on screen, through the same
@@ -605,7 +607,8 @@ export const EXPORT_ROW_CAP = 10_000;
  * bucket, which is why the name already carries the workspace prefix the
  * storage policy checks.
  *
- * For browser stability and memory protection, rows are capped at EXPORT_ROW_CAP.
+ * For browser stability and memory protection, rows are capped at EXPORT_ROW_CAP
+ * in fixture mode and LIVE_EXPORT_ROW_CAP (1,500) in live mode (matching the server snapshot window).
  */
 export async function buildExport(mode: DataMode, filters: Filters) {
   const source = await loadSource(mode, filters.workspace_id);
@@ -615,11 +618,18 @@ export async function buildExport(mode: DataMode, filters: Filters) {
     source.active_analysis_key,
     source.active_topic_key,
   );
-  const cappedRows = rows.slice(0, EXPORT_ROW_CAP);
+  const effectiveCap = mode === "live" ? LIVE_EXPORT_ROW_CAP : EXPORT_ROW_CAP;
+  const isTruncated =
+    rows.length > effectiveCap ||
+    (mode === "live" &&
+      source.comments.length >= LIVE_EXPORT_ROW_CAP &&
+      rows.length >= LIVE_EXPORT_ROW_CAP);
+  const cappedRows = rows.slice(0, effectiveCap);
   return {
     rows: cappedRows.length,
     totalRows: rows.length,
-    truncated: rows.length > EXPORT_ROW_CAP,
+    truncated: isTruncated,
+    cap: effectiveCap,
     filename: exportObjectPath(filters.workspace_id, new Date())
       .split("/")
       .pop()!,

@@ -120,8 +120,8 @@ export function ShareWorkspaceDialog({
     try {
       const { error } = await supabase.rpc("share_workspace", {
         w: workspaceId,
-        target_email: targetEmail,
-        role_to_assign: role,
+        account_email: targetEmail,
+        account_role: role,
       });
 
       if (error) {
@@ -157,7 +157,7 @@ export function ShareWorkspaceDialog({
     try {
       const { error } = await supabase.rpc("unshare_workspace", {
         w: workspaceId,
-        target_user: targetUserId,
+        target_user_id: targetUserId,
       });
       if (error) {
         setErrorMsg(error.message);
@@ -185,7 +185,7 @@ export function ShareWorkspaceDialog({
     try {
       const { error } = await supabase.rpc("update_workspace_account_role", {
         w: workspaceId,
-        target_user: targetUserId,
+        target_user_id: targetUserId,
         new_role: newRole,
       });
       if (error) {

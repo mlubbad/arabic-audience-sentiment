@@ -207,7 +207,9 @@ export function Summary({
           <small className="db-note">{S.metricRepliesNote}</small>
         </Card>
         <Card className="db-kpi">
-          <strong className="db-kpi-value ui-num">{n(s.unique_authors)}</strong>
+          <strong className="db-kpi-value ui-num" data-testid="authors-count">
+            {s.unique_authors !== null ? n(s.unique_authors) : "—"}
+          </strong>
           <span className="db-kpi-label">{S.metricAuthors}</span>
           <small className="db-note">{S.metricAuthorsNote}</small>
         </Card>
