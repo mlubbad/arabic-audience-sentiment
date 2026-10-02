@@ -18,8 +18,9 @@ export function AccordionItem({
   );
 }
 
-export interface AccordionTriggerProps
-  extends React.ComponentProps<typeof AccordionPrimitive.Trigger> {
+export interface AccordionTriggerProps extends React.ComponentProps<
+  typeof AccordionPrimitive.Trigger
+> {
   headingLevel?: 2 | 3 | 4;
 }
 

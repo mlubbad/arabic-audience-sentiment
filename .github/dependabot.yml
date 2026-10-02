@@ -12,6 +12,14 @@ updates:
         update-types:
           - minor
           - patch
+    # Major npm upgrades break the build without code changes (react-router 8
+    # needs a newer Node, @vitejs/plugin-react 6 needs vite 8, zod 4 changes its
+    # API, @eslint/js 10 needs eslint 10; see #41-#44). They are planned as one
+    # upgrade work order instead of arriving as red PRs.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions
@@ -19,6 +27,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # CodeQL's init and analyze steps must run from the same commit. Without
+    # a group, Dependabot bumps each sub-action in its own PR (see #6).
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   # The Python worker image (python:3.12-slim, pinned by digest). Dependabot
   # opens a PR when a newer digest is published so the base image stays patched.

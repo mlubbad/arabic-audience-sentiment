@@ -11,8 +11,7 @@ import { OAUTH_BROWSER_NONCE_KEY } from "./connect";
 import { supabase } from "./supabase";
 
 export type PendingCompletion =
-  | { kind: "success"; channelId: string }
-  | { kind: "error"; code: string };
+  { kind: "success"; channelId: string } | { kind: "error"; code: string };
 
 export async function completePendingConnection(
   ticket: string,

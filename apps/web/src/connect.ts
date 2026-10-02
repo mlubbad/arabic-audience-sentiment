@@ -17,8 +17,7 @@ import type { StringKey, Strings } from "./strings";
  *  reader's language, and a server's own text — which can quote a URL, and a
  *  URL can carry a key — never reaches the screen. */
 export type ConnectOutcome =
-  | { kind: "redirect"; url: string }
-  | { kind: "error"; code: string };
+  { kind: "redirect"; url: string } | { kind: "error"; code: string };
 
 export const OAUTH_BROWSER_NONCE_KEY = "oauth_browser_nonce";
 
