@@ -1,11 +1,50 @@
 import { describe, expect, it } from "vitest";
 import {
+  generateDeterministicCommentId,
   generateSampleCsvTemplate,
   parseCsvRows,
   parseHistoricalCsv,
   parseHistoricalFile,
   parseHistoricalJson,
 } from "./historicalCsvJson";
+
+describe("generateDeterministicCommentId", () => {
+  it("varies both 32-bit halves for different same-length ASCII inputs", () => {
+    const first = generateDeterministicCommentId(
+      "video",
+      "author",
+      "2026-10-02T00:00:00Z",
+      0,
+      "alpha",
+    ).slice(-16);
+    const second = generateDeterministicCommentId(
+      "video",
+      "author",
+      "2026-10-02T00:00:00Z",
+      0,
+      "bravo",
+    ).slice(-16);
+
+    expect(first.slice(0, 8)).not.toBe(second.slice(0, 8));
+    expect(first.slice(8)).not.toBe(second.slice(8));
+  });
+
+  it("is deterministic and emits a versioned 64-bit hex ID", () => {
+    const args = [
+      "video",
+      "author",
+      "2026-10-02T00:00:00Z",
+      7,
+      "ASCII comment",
+    ] as const;
+
+    const first = generateDeterministicCommentId(...args);
+    const second = generateDeterministicCommentId(...args);
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^imp2_[0-9a-f]{16}$/);
+  });
+});
 
 describe("parseCsvRows RFC 4180 parsing", () => {
   it("splits simple comma-separated lines", () => {
@@ -133,7 +172,7 @@ describe("parseHistoricalCsv", () => {
       res2.payload?.comments[0].external_comment_id,
     );
     expect(res1.payload?.comments[0].external_comment_id).toMatch(
-      /^imp_[0-9a-f]+$/,
+      /^imp2_[0-9a-f]{16}$/,
     );
     expect(res1.payload?.comments[0].external_comment_id).not.toBe(
       res1.payload?.comments[1].external_comment_id,
@@ -221,7 +260,7 @@ describe("parseHistoricalJson", () => {
       res2.payload?.comments[0].external_comment_id,
     );
     expect(res1.payload?.comments[0].external_comment_id).toMatch(
-      /^imp_[0-9a-f]+$/,
+      /^imp2_[0-9a-f]{16}$/,
     );
     expect(res1.payload?.comments[0].external_comment_id).not.toBe(
       res1.payload?.comments[1].external_comment_id,
