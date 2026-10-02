@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ar } from "./strings/ar";
 
@@ -10,6 +12,7 @@ async function load() {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   getSession.mockResolvedValue({ data: { session: { access_token: "jwt" } } });
   vi.stubGlobal("fetch", vi.fn());
 });
@@ -21,7 +24,10 @@ describe("starting a connection from the browser", () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(
-          JSON.stringify({ url: "https://accounts.google.com/o/x" }),
+          JSON.stringify({
+            url: "https://accounts.google.com/o/x",
+            nonce: "browser-nonce",
+          }),
           {
             status: 200,
           },
@@ -34,6 +40,7 @@ describe("starting a connection from the browser", () => {
       kind: "redirect",
       url: "https://accounts.google.com/o/x",
     });
+    expect(sessionStorage.getItem("oauth_browser_nonce")).toBe("browser-nonce");
     const [, init] = fetchMock.mock.calls[0] as unknown as [
       string,
       RequestInit,
@@ -48,7 +55,9 @@ describe("starting a connection from the browser", () => {
   it("sends the session, so the server checks membership rather than trusting us", async () => {
     const fetchMock = vi.fn(
       async () =>
-        new Response(JSON.stringify({ url: "https://x" }), { status: 200 }),
+        new Response(JSON.stringify({ url: "https://x", nonce: "nonce" }), {
+          status: 200,
+        }),
     );
     vi.stubGlobal("fetch", fetchMock);
     const { beginConnect } = await load();

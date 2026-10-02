@@ -17,6 +17,8 @@
  * Pure, with injected transport and data layer, so the whole flow is testable
  * without Google and without a deployed project.
  */
+import { base64url } from "./oauth-start.ts";
+
 export interface CallbackConfig {
   client_id: string;
   client_secret: string;
@@ -29,15 +31,15 @@ export interface CallbackConfig {
 export interface CallbackDb {
   /** Single use. Returns the binding the state was created with, or throws. */
   consumeState(stateHash: string): Promise<{
+    state_id: string;
     user_id: string;
     workspace_id: string;
     client_id: string;
     code_verifier: string;
   }>;
-  attachChannel(input: {
-    userId: string;
-    workspaceId: string;
-    clientId: string;
+  createPending(input: {
+    stateId: string;
+    ticketHash: string;
     externalChannel: string;
     /** The channel's `@handle` and title as Google reports them, or null for
      *  each one Google leaves out. Names, not identity: the id is identity. */
@@ -46,7 +48,7 @@ export interface CallbackDb {
     sealedTokens: Uint8Array;
     keyVersion: string;
     scopes: string[];
-  }): Promise<string>;
+  }): Promise<void>;
 }
 
 /** Injected so tests need no network, and so nothing here can reach the internet by accident. */
@@ -64,6 +66,15 @@ export class ConnectError extends Error {
     // a redirect URI mismatch message carries the whole configuration.
     super(code);
   }
+}
+
+export function pendingRedirect(origin: string, ticket: string): string {
+  const target = new URL("/connected", origin);
+  target.search = new URLSearchParams({
+    connect: "pending",
+    ticket,
+  }).toString();
+  return target.toString();
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -239,8 +250,9 @@ export async function handleCallback(input: {
   db: CallbackDb;
   http: Http;
   key: CryptoKey;
-}): Promise<{ channelId: string; workspaceId: string }> {
-  const { code, state, error, config, db, http, key } = input;
+  random: (length: number) => Uint8Array;
+}): Promise<{ ticket: string; workspaceId: string }> {
+  const { code, state, error, config, db, http, key, random } = input;
   // The user declining is an outcome, not a failure to hide behind a generic code.
   if (error)
     throw new ConnectError(
@@ -254,11 +266,11 @@ export async function handleCallback(input: {
 
   const tokens = await exchangeCode(code, binding.code_verifier, config, http);
   const channel = await fetchOwnChannel(tokens.access_token, http);
+  const ticket = base64url(random(32));
 
-  const channelId = await db.attachChannel({
-    userId: binding.user_id,
-    workspaceId: binding.workspace_id,
-    clientId: binding.client_id,
+  await db.createPending({
+    stateId: binding.state_id,
+    ticketHash: await sha256Hex(ticket),
     externalChannel: channel.id,
     handle: channel.handle,
     title: channel.title,
@@ -272,7 +284,7 @@ export async function handleCallback(input: {
     keyVersion: config.key_version,
     scopes: tokens.scope ? tokens.scope.split(" ") : [],
   });
-  return { channelId, workspaceId: binding.workspace_id };
+  return { ticket, workspaceId: binding.workspace_id };
 }
 
 /**

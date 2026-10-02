@@ -517,10 +517,10 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
               // so it is strictly restricted to the platform owner when not impersonating a regular user.
               const allowPublicChannels = Boolean(
                 !isImpersonating &&
-                  (isPlatformAdmin ||
-                    (plan
-                      ? plan.allow_public_channels
-                      : sub?.plan_key === "owner")),
+                (isPlatformAdmin ||
+                  (plan
+                    ? plan.allow_public_channels
+                    : sub?.plan_key === "owner")),
               );
               return (
                 <WorkspaceCard
@@ -900,8 +900,8 @@ function DemoBody({ initial }: { initial: AccountDemo }) {
             searchParams.get("admin") === "1";
           const allowPublicChannels = Boolean(
             isOwnerOrAdmin ||
-              usage?.plan?.allow_public_channels ||
-              usage?.plan_key === "owner",
+            usage?.plan?.allow_public_channels ||
+            usage?.plan_key === "owner",
           );
           return (
             <WorkspaceCard

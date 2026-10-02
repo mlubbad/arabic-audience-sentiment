@@ -1,10 +1,64 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ar } from "./strings/ar";
-import { connectResult } from "./connectResult";
+import { completePendingConnection, connectResult } from "./connectResult";
+
+const getSession = vi.hoisted(() => vi.fn());
+vi.mock("./supabase", () => ({ supabase: { auth: { getSession } } }));
 
 const at = (q: string) => connectResult(new URLSearchParams(q), ar);
 
 describe("coming back from Google", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    getSession.mockResolvedValue({
+      data: { session: { access_token: "jwt" } },
+    });
+    vi.restoreAllMocks();
+  });
+
+  it("shows a safe in-flight state while OAuth completion is pending", () => {
+    const pending = at("connect=pending&ticket=ticket");
+    expect(pending.tone).toBe("notice");
+    expect(pending.detail).toContain("نتحقق");
+  });
+
+  it("posts the browser nonce once, clears it, and maps the attached channel", async () => {
+    sessionStorage.setItem("oauth_browser_nonce", "browser-nonce");
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ channel_id: "channel-id" }), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const completion = await completePendingConnection("ticket");
+    expect(completion).toEqual({ kind: "success", channelId: "channel-id" });
+    expect(sessionStorage.getItem("oauth_browser_nonce")).toBeNull();
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(String(init.body))).toEqual({
+      ticket: "ticket",
+      nonce: "browser-nonce",
+    });
+    expect(
+      connectResult(
+        new URLSearchParams("connect=pending&ticket=ticket"),
+        ar,
+        completion,
+      ).tone,
+    ).toBe("success");
+
+    const replay = await completePendingConnection("ticket");
+    expect(replay).toEqual({
+      kind: "error",
+      code: "oauth_binding_mismatch",
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
   it("says what to do about a project that has the API switched off", () => {
     // The failure this was written for. "channel_lookup_failed" told the person
     // nothing; the fix is not a prettier sentence but naming the one thing

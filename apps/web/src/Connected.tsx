@@ -1,12 +1,26 @@
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { connectResult } from "./connectResult";
+import {
+  completePendingConnection,
+  connectResult,
+  type PendingCompletion,
+} from "./connectResult";
 import { useStrings } from "./strings";
 
 /** Where Google's callback hands the person back, inside the product. */
 export function Connected() {
   const [params] = useSearchParams();
   const S = useStrings();
-  const result = connectResult(params, S);
+  const [completion, setCompletion] = useState<PendingCompletion | null>(null);
+  const started = useRef(false);
+  const ticket =
+    params.get("connect") === "pending" ? params.get("ticket") : null;
+  useEffect(() => {
+    if (params.get("connect") !== "pending" || started.current) return;
+    started.current = true;
+    void completePendingConnection(ticket ?? "").then(setCompletion);
+  }, [params, ticket]);
+  const result = connectResult(params, S, completion);
   return (
     <div className="app-state connect-result-page">
       <span className="app-state-symbol" aria-hidden="true">

@@ -23,8 +23,9 @@ export const DialogDescription = ({
   />
 );
 
-export interface DialogContentProps
-  extends React.ComponentProps<typeof DialogPrimitive.Content> {
+export interface DialogContentProps extends React.ComponentProps<
+  typeof DialogPrimitive.Content
+> {
   /** The built-in corner close button's accessible name. Required, not
    *  defaulted to a hard-coded word, so every call site supplies the
    *  current locale's string rather than this component silently speaking

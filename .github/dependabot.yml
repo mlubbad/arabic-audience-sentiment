@@ -12,6 +12,14 @@ updates:
         update-types:
           - minor
           - patch
+    # Major npm upgrades break the build without code changes (react-router 8
+    # needs a newer Node, @vitejs/plugin-react 6 needs vite 8, zod 4 changes its
+    # API, @eslint/js 10 needs eslint 10; see #41-#44). They are planned as one
+    # upgrade work order instead of arriving as red PRs.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions

@@ -26,8 +26,7 @@ const button = cva("ui-btn", {
 });
 
 export interface ButtonProps
-  extends React.ComponentPropsWithRef<"button">,
-    VariantProps<typeof button> {
+  extends React.ComponentPropsWithRef<"button">, VariantProps<typeof button> {
   /** Renders the child element with the button's classes and behaviour
    *  instead of a `<button>` — for a `Link` that should look like one. */
   asChild?: boolean;
