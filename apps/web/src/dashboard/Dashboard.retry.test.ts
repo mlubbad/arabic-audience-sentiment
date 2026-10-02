@@ -23,9 +23,10 @@ vi.mock("../supabase", () => ({
 import {
   loadDashboardAggregates,
   loadDashboardComments,
+  loadOpsSource,
   isStatementTimeout,
+  shouldRetryDashboardQuery,
 } from "../data";
-import { shouldRetryDashboardQuery } from "./Dashboard";
 
 const mockAggregates = {
   workspace_total: 0,
@@ -69,6 +70,12 @@ const mockComments = {
   offset: 0,
   has_more: false,
   next_cursor: null,
+};
+
+const mockOpsSnapshot = {
+  sync: null,
+  plan: null,
+  video_counts: [],
 };
 
 describe("Dashboard single retry layer and timeout isolation", () => {
@@ -146,6 +153,18 @@ describe("Dashboard single retry layer and timeout isolation", () => {
       { limit: 50 },
       controller.signal,
     );
+
+    expect(abortSignalMock).toHaveBeenCalledWith(controller.signal);
+  });
+
+  it("passes React Query abortSignal to PostgREST builder in loadOpsSource", async () => {
+    rpcMock.mockResolvedValue({
+      data: mockOpsSnapshot,
+      error: null,
+    });
+
+    const controller = new AbortController();
+    await loadOpsSource("live", "ws-1", controller.signal);
 
     expect(abortSignalMock).toHaveBeenCalledWith(controller.signal);
   });

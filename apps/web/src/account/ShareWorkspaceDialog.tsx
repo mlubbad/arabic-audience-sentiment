@@ -42,9 +42,7 @@ export function buildShareWorkspaceRpcArgs(
 ): { w: string; target_user_id: string; new_role: "analyst" | "viewer" };
 export function buildShareWorkspaceRpcArgs(
   action:
-    | "share_workspace"
-    | "unshare_workspace"
-    | "update_workspace_account_role",
+    "share_workspace" | "unshare_workspace" | "update_workspace_account_role",
   params: {
     w: string;
     account_email?: string;

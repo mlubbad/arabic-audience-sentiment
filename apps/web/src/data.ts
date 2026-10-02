@@ -28,6 +28,41 @@ import {
   type ContentKind,
 } from "@sentiment/contracts";
 import { supabase } from "./supabase";
+
+export function isStatementTimeout(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof error === "object") {
+    const err = error as {
+      code?: string;
+      message?: string;
+      details?: unknown;
+      cause?: unknown;
+    };
+    if (err.code === "57014") return true;
+    if (
+      typeof err.message === "string" &&
+      (err.message.includes("57014") ||
+        err.message.toLowerCase().includes("statement timeout") ||
+        err.message
+          .toLowerCase()
+          .includes("canceling statement due to statement timeout"))
+    ) {
+      return true;
+    }
+    if (err.cause && isStatementTimeout(err.cause)) return true;
+  }
+  return false;
+}
+
+export function shouldRetryDashboardQuery(
+  failureCount: number,
+  error: unknown,
+  maxRetries = 2,
+): boolean {
+  if (isStatementTimeout(error)) return false;
+  if (error instanceof Error && error.name === "AbortError") return false;
+  return failureCount < maxRetries;
+}
 /**
  * Who a fixture-mode correction is attributed to. Deliberately not a UUID and
  * clearly synthetic: there is no authenticated user in fixture mode, and
@@ -269,31 +304,6 @@ export class DashboardRpcError extends Error {
   }
 }
 
-export function isStatementTimeout(error: unknown): boolean {
-  if (!error) return false;
-  if (typeof error === "object") {
-    const err = error as {
-      code?: string;
-      message?: string;
-      details?: unknown;
-      cause?: unknown;
-    };
-    if (err.code === "57014") return true;
-    if (
-      typeof err.message === "string" &&
-      (err.message.includes("57014") ||
-        err.message.toLowerCase().includes("statement timeout") ||
-        err.message
-          .toLowerCase()
-          .includes("canceling statement due to statement timeout"))
-    ) {
-      return true;
-    }
-    if (err.cause && isStatementTimeout(err.cause)) return true;
-  }
-  return false;
-}
-
 /**
  * Executes a Supabase RPC call with proactive session verification and automatic
  * refresh-and-retry on auth/permission errors (42501 / PGRST301 / expired token).
@@ -449,7 +459,7 @@ export async function loadOpsSource(
   workspace: string,
   signal?: AbortSignal,
 ): Promise<OpsSnapshot> {
-  if (mode === "live") return readOpsLive(workspace);
+  if (mode === "live") return readOpsLive(workspace, signal);
   return readOpsFixture(signal);
 }
 

@@ -43,18 +43,10 @@ import {
   resolveMode,
   submitReview,
   submitTopicReview,
-  isStatementTimeout,
+  shouldRetryDashboardQuery,
 } from "../data";
 
-export function shouldRetryDashboardQuery(
-  failureCount: number,
-  error: unknown,
-  maxRetries = 2,
-): boolean {
-  if (isStatementTimeout(error)) return false;
-  if (error instanceof Error && error.name === "AbortError") return false;
-  return failureCount < maxRetries;
-}
+export { shouldRetryDashboardQuery };
 import { failureCode } from "../failure";
 import { supabase } from "../supabase";
 import { useSession, useWorkspaces } from "../session";
