@@ -1,8 +1,9 @@
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import { cn } from "./cn";
 
-export interface CheckboxProps
-  extends React.ComponentProps<typeof CheckboxPrimitive.Root> {
+export interface CheckboxProps extends React.ComponentProps<
+  typeof CheckboxPrimitive.Root
+> {
   label: string;
   /** The box alone, named by `label` but not captioned by it — for a row
    *  whose title is already printed beside the box (the catalogue's

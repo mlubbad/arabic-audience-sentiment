@@ -1,8 +1,9 @@
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import { cn } from "./cn";
 
-export interface SwitchProps
-  extends React.ComponentProps<typeof SwitchPrimitive.Root> {
+export interface SwitchProps extends React.ComponentProps<
+  typeof SwitchPrimitive.Root
+> {
   label: string;
 }
 
