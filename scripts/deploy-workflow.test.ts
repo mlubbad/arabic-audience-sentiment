@@ -64,6 +64,26 @@ describe("deployment verification gate", () => {
     expect(upload).toBeGreaterThan(migrate);
   });
 
+  test("builds with the public Supabase config and refuses to build without it", () => {
+    const build = workflow.slice(
+      workflow.indexOf("- name: Build frontend distribution"),
+      workflow.indexOf("- name: Apply remote database migrations"),
+    );
+    expect(build).toContain("VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}");
+    expect(build).toContain(
+      "VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}",
+    );
+    expect(build).toContain(
+      "for name in VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY; do",
+    );
+    expect(build).toContain("Missing required repository variable");
+    expect(build.indexOf("exit 1")).toBeLessThan(
+      build.indexOf("npm run build"),
+    );
+    // Public values only: a VITE_* name must never be fed from a secret.
+    expect(build).not.toMatch(/VITE_\w+: \$\{\{ secrets\./);
+  });
+
   test("verifies the live hostname serves the uploaded build, after the upload", () => {
     const upload = workflow.indexOf("run: sh scripts/deploy-preview.sh");
     const verify = workflow.indexOf("run: node scripts/verify-deploy.mjs");

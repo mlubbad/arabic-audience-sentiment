@@ -143,8 +143,35 @@ jobs:
       - name: Verify build safety and types
         run: npm run check:secrets && npm run typecheck
 
+      # The VITE_* values ship inside the bundle, so they are public by design
+      # and live in repository variables rather than tracked files. Without the
+      # Supabase pair the build quietly becomes the fixture-only preview with
+      # sign-in off, which is what every CI build was until 2026-10-03.
       - name: Build frontend distribution
-        run: npm run build
+        shell: bash
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+          VITE_SITE_PUBLIC: ${{ vars.VITE_SITE_PUBLIC }}
+          VITE_AUTH_PROVIDERS: ${{ vars.VITE_AUTH_PROVIDERS }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_PADDLE_CLIENT_TOKEN: ${{ vars.VITE_PADDLE_CLIENT_TOKEN }}
+          VITE_PADDLE_ENV: ${{ vars.VITE_PADDLE_ENV }}
+          VITE_DASHBOARD_SOURCE: ${{ vars.VITE_DASHBOARD_SOURCE }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            printf 'Missing required repository variable: %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+          npm run build
 
       - name: Apply remote database migrations
         env:
