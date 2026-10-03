@@ -7,6 +7,8 @@ whose token can't read issues. If they differ, ask.
 - **PR title:** `WO-9: precomputed ops counts and diagnosable read failures` (body starts
   `Closes #60` and fills the PR template: evidence, mutation proof, scope)
 - **No deploy and no remote migration.** CI applies the migration after the owner merges.
+- **Migration timestamp range:** `20261003120000`–`20261003235959` (WO-4c holds the morning
+  half).
 - Line numbers are from `main` at `a807eab`.
 
 ## Why
