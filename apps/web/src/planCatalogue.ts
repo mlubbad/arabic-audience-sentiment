@@ -61,13 +61,9 @@ export function usePlanCatalogue(enabled = true) {
  *  refuses a non-admin, so this is only asked once `is_platform_admin()` said yes. */
 export async function readAdminCatalogue() {
   if (configuredMode !== "live" || !supabase) return adminFixtureCatalogue;
-  try {
-    const { data, error } = await supabase.rpc("admin_plan_catalogue");
-    if (!error && data) return PlanCatalogueSchema.parse(data);
-  } catch {
-    // Fall back to fixture below
-  }
-  return adminFixtureCatalogue;
+  const { data, error } = await supabase.rpc("admin_plan_catalogue");
+  if (error) throw new Error("catalogue_unavailable");
+  return PlanCatalogueSchema.parse(data);
 }
 
 export function useAdminPlanCatalogue(enabled: boolean) {

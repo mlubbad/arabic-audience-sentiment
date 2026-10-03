@@ -645,6 +645,53 @@ export const EXPORT_ROW_CAP = 10_000;
  * For browser stability and memory protection, rows are capped at EXPORT_ROW_CAP.
  */
 export async function buildExport(mode: DataMode, filters: Filters) {
+  if (mode === "live") {
+    const agg = await loadDashboardAggregates(
+      mode,
+      filters.workspace_id,
+      filters,
+    );
+    const activeKey = agg.active_analysis_key ?? "";
+    const activeTopicKey = agg.active_topic_key ?? "";
+    const rpcFilters = filtersToRpc(filters);
+
+    const allComments: Comment[] = [];
+    let offset = 0;
+    const pageSize = 100;
+    let totalMatches = agg.total;
+    let hasMore = totalMatches > 0;
+
+    while (hasMore && allComments.length < EXPORT_ROW_CAP) {
+      const pageLimit = Math.min(pageSize, EXPORT_ROW_CAP - allComments.length);
+      const res = await loadDashboardComments(mode, filters.workspace_id, {
+        ...rpcFilters,
+        limit: pageLimit,
+        offset,
+      });
+      totalMatches = res.total;
+      allComments.push(...res.comments);
+      offset += res.comments.length;
+      hasMore = res.has_more && res.comments.length > 0;
+      if (allComments.length >= totalMatches) {
+        break;
+      }
+    }
+
+    const labelled = allComments.map((c) =>
+      toLabelledComment(c, activeKey, activeTopicKey),
+    );
+    const cappedRows = labelled.slice(0, EXPORT_ROW_CAP);
+    return {
+      rows: cappedRows.length,
+      totalRows: totalMatches,
+      truncated: totalMatches > EXPORT_ROW_CAP,
+      filename: exportObjectPath(filters.workspace_id, new Date())
+        .split("/")
+        .pop()!,
+      csv: toCsv(cappedRows),
+    };
+  }
+
   const source = await loadSource(mode, filters.workspace_id);
   const rows = exportRows(
     source.comments,

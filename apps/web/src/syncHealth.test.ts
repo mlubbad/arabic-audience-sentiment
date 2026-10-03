@@ -167,13 +167,13 @@ describe("sync health", () => {
     });
   });
 
-  it("recovers to healthy after midnight UTC if worker is connected", () => {
+  it("reports stale when blocked by quota 10 days ago with no run since, even if worker is connected", () => {
     const blockedQuota = state({
       queued_jobs: 0,
       worker: {
         connected: true,
         busy: false,
-        last_heartbeat_at: "2026-09-13T01:00:00Z",
+        last_heartbeat_at: "2026-09-22T10:00:00Z",
       },
       last_run: {
         ...state().last_run!,
@@ -182,10 +182,36 @@ describe("sync health", () => {
         ended_at: "2026-09-12T10:00:00Z",
       },
     });
-    const nextDay = new Date("2026-09-13T01:05:00Z");
-    expect(syncHealth(blockedQuota, nextDay)).toMatchObject({
-      severity: "ok",
-      key: "healthy",
+    const tenDaysLater = new Date("2026-09-22T10:00:00Z");
+    const health = syncHealth(blockedQuota, tenDaysLater);
+    expect(health).toMatchObject({
+      severity: "warning",
+      key: "stale",
+    });
+    expect(health.staleHours).toBe(240);
+  });
+
+  it("handles Dec 31 to Jan 1 rollover correctly for quota reset", () => {
+    const blockedOnNewYearsEve = state({
+      queued_jobs: 0,
+      last_run: {
+        ...state().last_run!,
+        status: "blocked",
+        error_code: "quota_exceeded",
+        ended_at: "2026-12-31T20:00:00Z",
+      },
+    });
+    // Same day before reset
+    const sameDay = new Date("2026-12-31T23:30:00Z");
+    expect(syncHealth(blockedOnNewYearsEve, sameDay)).toMatchObject({
+      severity: "warning",
+      key: "quota_paused",
+    });
+    // Jan 1 after reset: past reset time with no run -> stale
+    const nextDayJan1 = new Date("2027-01-01T00:30:00Z");
+    expect(syncHealth(blockedOnNewYearsEve, nextDayJan1)).toMatchObject({
+      severity: "warning",
+      key: "stale",
     });
   });
 });

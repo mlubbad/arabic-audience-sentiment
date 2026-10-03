@@ -11,13 +11,14 @@
 import { Bar, Doughnut } from "react-chartjs-2";
 import { UNCLASSIFIED, type Label } from "@sentiment/contracts";
 import { Card } from "../ui/Card";
+import type { Locale } from "../locale";
 import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import { AXIS_TEXT, GRID_LINE, SENTIMENT, VOLUME } from "../chartTheme";
 import { barOptions, doughnutOptions } from "./chartOptions";
 import { ChartFigures } from "./ChartFigures";
 import { ChartEmpty } from "../pageStates/PageStates";
-import { n } from "./format";
+import { formatPercent, n } from "./format";
 import "./voice.css";
 
 export function Voice({
@@ -25,6 +26,7 @@ export function Voice({
   S,
   labels,
   topicName,
+  lang,
 }: {
   s: Snapshot;
   S: Strings;
@@ -34,12 +36,17 @@ export function Voice({
    *  re-deriving `name_ar`/`name_en` from a locale, so there is one place on
    *  the page that decides what a topic key is called. */
   topicName: (key: string) => string;
+  lang?: Locale;
 }) {
+  const effectiveLang: Locale =
+    lang ?? (S.brandHomeLabel === "Audience Sentiment — home" ? "en" : "ar");
   const pos = s.sentiments.positive ?? 0;
   const neg = s.sentiments.negative ?? 0;
-  const netScore =
-    s.analysed > 0 ? Math.round(((pos - neg) / s.analysed) * 100) : 0;
-  const netSign = netScore > 0 ? `+${netScore}٪` : `${netScore}٪`;
+  const rawNet =
+    s.kpis?.net_sentiment ??
+    (s.analysed > 0 ? ((pos - neg) / s.analysed) * 100 : null);
+  const netScore = rawNet != null ? Math.round(rawNet) : null;
+  const netSign = formatPercent(netScore, effectiveLang, { sign: true });
 
   const isMeasurable = (k: Label) =>
     s.measurable ? s.measurable.has(k) : true;

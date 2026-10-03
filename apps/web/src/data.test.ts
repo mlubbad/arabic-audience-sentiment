@@ -557,5 +557,182 @@ describe("loadDashboardAggregates null channel handling", () => {
       expect(snapshot.kpis?.total_likes).toBe(100);
       expect(snapshot.kpis?.total_comments).toBe(2);
     });
+
+    it("pages through dashboard_comments in live mode for >1,500 comments", async () => {
+      const { buildExport } = await loadModule();
+      const totalCount = 1600;
+      const allMockComments = Array.from({ length: totalCount }, (_, i) => ({
+        ...target,
+        id: `c_${i}`,
+        content_hash: `hash_${i}`,
+        text_raw: `تعليق رقم ${i}`,
+        published_at: "2026-09-20T00:00:00Z",
+      }));
+
+      rpc.mockImplementation(async (name, args) => {
+        if (name === "dashboard_aggregates") {
+          return {
+            data: {
+              workspace_total: totalCount,
+              channel_own_comments: 0,
+              total: totalCount,
+              analysed: totalCount,
+              unanalysed: 0,
+              sentiments: {
+                positive: totalCount,
+                negative: 0,
+                neutral: 0,
+                mixed: 0,
+              },
+              kpis: {
+                total_views: 0,
+                total_likes: 0,
+                total_comments: totalCount,
+                engagement_rate: null,
+                net_sentiment: null,
+              },
+              channel: null,
+              measurable: ["positive", "negative", "neutral", "mixed"],
+              negative_ranked: 0,
+              negative_unranked: 0,
+              timeline: {},
+              topic_counts: {},
+              active_analysis_key: "k1",
+              active_topic_key: "tk1",
+              videos: [],
+              platform_breakdown: {},
+              hours: [],
+              weekdays: [],
+              weeks: [],
+              people: [],
+              most_engaged_negative: [],
+              comment_types: [],
+              video_options: [],
+              topics: [],
+              revision: "r1",
+            },
+            error: null,
+          };
+        }
+        if (name === "dashboard_comments") {
+          const f = (args?.f ?? {}) as { limit?: number; offset?: number };
+          const limit = f.limit ?? 100;
+          const offset = f.offset ?? 0;
+          const sliced = allMockComments.slice(offset, offset + limit);
+          return {
+            data: {
+              total: totalCount,
+              comments: sliced,
+              limit,
+              offset,
+              has_more: offset + limit < totalCount,
+              next_cursor: null,
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: null };
+      });
+
+      const result = await buildExport("live", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+
+      expect(result.totalRows).toBe(1600);
+      expect(result.rows).toBe(1600);
+      expect(result.truncated).toBe(false);
+      // Header + 1600 rows + trailing empty line
+      expect(result.csv.split("\n").length).toBe(1602);
+    });
+
+    it("pages through dashboard_comments in live mode up to EXPORT_ROW_CAP and flags truncation", async () => {
+      const { buildExport, EXPORT_ROW_CAP } = await loadModule();
+      const totalCount = 10_005;
+      const sampleComment = {
+        ...target,
+        id: "c_sample",
+        content_hash: "hash_sample",
+        text_raw: "تعليق تجريبي",
+        published_at: "2026-09-20T00:00:00Z",
+      };
+
+      rpc.mockImplementation(async (name, args) => {
+        if (name === "dashboard_aggregates") {
+          return {
+            data: {
+              workspace_total: totalCount,
+              channel_own_comments: 0,
+              total: totalCount,
+              analysed: totalCount,
+              unanalysed: 0,
+              sentiments: {
+                positive: totalCount,
+                negative: 0,
+                neutral: 0,
+                mixed: 0,
+              },
+              kpis: {
+                total_views: 0,
+                total_likes: 0,
+                total_comments: totalCount,
+                engagement_rate: null,
+                net_sentiment: null,
+              },
+              channel: null,
+              measurable: ["positive", "negative", "neutral", "mixed"],
+              negative_ranked: 0,
+              negative_unranked: 0,
+              timeline: {},
+              topic_counts: {},
+              active_analysis_key: "k1",
+              active_topic_key: "tk1",
+              videos: [],
+              platform_breakdown: {},
+              hours: [],
+              weekdays: [],
+              weeks: [],
+              people: [],
+              most_engaged_negative: [],
+              comment_types: [],
+              video_options: [],
+              topics: [],
+              revision: "r1",
+            },
+            error: null,
+          };
+        }
+        if (name === "dashboard_comments") {
+          const f = (args?.f ?? {}) as { limit?: number; offset?: number };
+          const limit = f.limit ?? 100;
+          const offset = f.offset ?? 0;
+          const count = Math.min(limit, Math.max(0, totalCount - offset));
+          const comments = Array.from({ length: count }, (_, i) => ({
+            ...sampleComment,
+            id: `c_${offset + i}`,
+          }));
+          return {
+            data: {
+              total: totalCount,
+              comments,
+              limit,
+              offset,
+              has_more: offset + limit < totalCount,
+              next_cursor: null,
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: null };
+      });
+
+      const result = await buildExport("live", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+
+      expect(result.totalRows).toBe(10_005);
+      expect(result.rows).toBe(EXPORT_ROW_CAP);
+      expect(result.truncated).toBe(true);
+      expect(result.csv.split("\n").length).toBe(EXPORT_ROW_CAP + 2);
+    });
   });
 });

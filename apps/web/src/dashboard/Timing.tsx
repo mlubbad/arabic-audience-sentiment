@@ -223,7 +223,9 @@ export function Timing({
           <p className="db-note">{S.weekdayNote}</p>
           <p className="db-note">
             {S.undatedLabel}{" "}
-            <span data-testid="unknown-dates">{s.unknown_dates}</span>
+            <span data-testid="unknown-dates">
+              {s.unknown_dates != null ? n(s.unknown_dates) : "—"}
+            </span>
           </p>
         </Card>
       </div>

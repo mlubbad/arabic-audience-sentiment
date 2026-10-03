@@ -87,58 +87,87 @@ export async function readAdminServicesHealth(options?: {
     return getDemoServicesHealth();
   }
 
-  try {
-    const t0 = performance.now();
-    const { data, error } = await supabase.rpc("admin_services_health");
-    const t1 = performance.now();
-    const dbLatencyMs = Math.round(t1 - t0);
+  const t0 = performance.now();
+  const { data, error } = await supabase.rpc("admin_services_health");
+  const t1 = performance.now();
+  const dbLatencyMs = Math.round(t1 - t0);
 
-    if (error || !data) {
-      // In case the migration hasn't been applied to remote yet or local fallback,
-      // return demo health with measured db latency.
-      const fallback = getDemoServicesHealth();
-      fallback.services[0].latency_ms = dbLatencyMs;
-      return fallback;
-    }
-
-    const baseDemo = getDemoServicesHealth();
-    const db = (
-      data as { database?: { size_mb?: number; active_connections?: number } }
-    ).database;
-    const worker = (
-      data as { worker?: { fresh?: boolean; jobs_queued?: number } }
-    ).worker;
-    const sync24h = (data as { sync_24h?: { youtube_runs?: number } }).sync_24h;
-
-    // Enhance base telemetry with live database telemetry
-    baseDemo.checked_at =
-      (data as { checked_at?: string }).checked_at || new Date().toISOString();
-
-    // Update postgres row
-    const pg = baseDemo.services.find((s) => s.id === "supabase_postgres");
-    if (pg) {
-      pg.latency_ms = dbLatencyMs;
-      if (db?.size_mb != null) pg.quota_used = db.size_mb;
-      if (db?.active_connections != null) {
-        pg.details = `الاتصالات النشطة: ${db.active_connections}/100 · مساحة التخزين: ${db.size_mb || 0} MB · سياسات RLS مفعّلة`;
-      }
-    }
-
-    // Update worker row
-    const w = baseDemo.services.find((s) => s.id === "python_worker");
-    if (w && worker) {
-      w.status = worker.fresh ? "healthy" : "degraded";
-      w.quota_used = worker.jobs_queued ?? 0;
-    }
-
-    // Update youtube row
-    const yt = baseDemo.services.find((s) => s.id === "youtube_api");
-    if (yt && sync24h?.youtube_runs != null) {
-      yt.quota_used = Math.min(10000, sync24h.youtube_runs * 100);
-    }
-
-    return ServicesHealthReportSchema.parse(baseDemo);
-  } catch {
-    return getDemoServicesHealth();
+  if (error) {
+    throw error;
   }
+  if (!data) {
+    throw new Error("services_health_unavailable");
+  }
+
+  const baseDemo = getDemoServicesHealth();
+  const db = (
+    data as { database?: { size_mb?: number; active_connections?: number } }
+  ).database;
+  const worker = (
+    data as { worker?: { fresh?: boolean; jobs_queued?: number } }
+  ).worker;
+  const sync24h = (data as { sync_24h?: { youtube_runs?: number } }).sync_24h;
+
+  baseDemo.checked_at =
+    (data as { checked_at?: string }).checked_at || new Date().toISOString();
+
+  // In live mode, mark services not covered by the live monitoring RPC as not_monitored
+  const reportedServiceIds = new Set<string>();
+
+  // Update postgres row
+  const pg = baseDemo.services.find((s) => s.id === "supabase_postgres");
+  if (pg) {
+    reportedServiceIds.add("supabase_postgres");
+    pg.latency_ms = dbLatencyMs;
+    if (db?.size_mb != null) pg.quota_used = db.size_mb;
+    if (db?.active_connections != null) {
+      pg.details = `الاتصالات النشطة: ${db.active_connections}/100 · مساحة التخزين: ${db.size_mb || 0} MB · سياسات RLS مفعّلة`;
+    }
+  }
+
+  // Update worker row
+  const w = baseDemo.services.find((s) => s.id === "python_worker");
+  if (w && worker) {
+    reportedServiceIds.add("python_worker");
+    w.status = worker.fresh ? "healthy" : "degraded";
+    w.quota_used = worker.jobs_queued ?? 0;
+  }
+
+  // Update youtube row
+  const yt = baseDemo.services.find((s) => s.id === "youtube_api");
+  if (yt && sync24h?.youtube_runs != null) {
+    reportedServiceIds.add("youtube_api");
+    yt.quota_used = Math.min(10000, sync24h.youtube_runs * 100);
+  }
+
+  // Any service NOT covered by the live monitoring query is honestly not_monitored
+  for (const s of baseDemo.services) {
+    if (!reportedServiceIds.has(s.id)) {
+      s.status = "not_monitored";
+      s.latency_ms = null;
+    }
+  }
+
+  baseDemo.summary = {
+    total: baseDemo.services.length,
+    healthy: baseDemo.services.filter((s) => s.status === "healthy").length,
+    degraded: baseDemo.services.filter((s) => s.status === "degraded").length,
+    down: baseDemo.services.filter((s) => s.status === "down").length,
+    unconfigured: baseDemo.services.filter((s) => s.status === "unconfigured")
+      .length,
+    not_monitored: baseDemo.services.filter((s) => s.status === "not_monitored")
+      .length,
+    avg_latency_ms: (() => {
+      const monitored = baseDemo.services.filter(
+        (s) => s.latency_ms !== null && s.status !== "not_monitored",
+      );
+      if (monitored.length === 0) return null;
+      return Math.round(
+        monitored.reduce((acc, s) => acc + (s.latency_ms ?? 0), 0) /
+          monitored.length,
+      );
+    })(),
+  };
+
+  return ServicesHealthReportSchema.parse(baseDemo);
 }

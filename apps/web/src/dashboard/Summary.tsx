@@ -12,43 +12,52 @@ import { UNCLASSIFIED } from "@sentiment/contracts";
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import type { Strings } from "../strings";
+import type { Locale } from "../locale";
 import type { Snapshot } from "./Dashboard";
-import { n } from "./format";
+import { formatPercent, n } from "./format";
 import "./summary.css";
 
 export function Summary({
   s,
   S,
   topicName,
+  lang,
 }: {
   s: Snapshot;
   S: Strings;
   topicName?: (key: string) => string;
+  lang?: Locale;
 }) {
+  const effectiveLang: Locale =
+    lang ?? (S.brandHomeLabel === "Audience Sentiment — home" ? "en" : "ar");
   const pos = s.sentiments.positive ?? 0;
   const neg = s.sentiments.negative ?? 0;
   const analysed = s.analysed;
   const posPct = analysed > 0 ? Math.round((pos / analysed) * 100) : 0;
   const negPct = analysed > 0 ? Math.round((neg / analysed) * 100) : 0;
-  const netScore =
-    analysed > 0 ? Math.round(((pos - neg) / analysed) * 100) : 0;
-  const netSign = netScore > 0 ? `+${netScore}٪` : `${netScore}٪`;
+  const rawNet =
+    s.kpis?.net_sentiment ??
+    (analysed > 0 ? ((pos - neg) / analysed) * 100 : null);
+  const netScore = rawNet != null ? Math.round(rawNet) : null;
+  const netSign = formatPercent(netScore, effectiveLang, { sign: true });
 
   let pulseBadge = S.pulseBalanced;
   let pulseTone: "positive" | "negative" | "sentiment-neutral" =
     "sentiment-neutral";
-  if (netScore >= 40) {
-    pulseBadge = S.pulseStrongPositive;
-    pulseTone = "positive";
-  } else if (netScore >= 10) {
-    pulseBadge = S.pulseModeratePositive;
-    pulseTone = "positive";
-  } else if (netScore <= -40) {
-    pulseBadge = S.pulseCriticalAlert;
-    pulseTone = "negative";
-  } else if (netScore <= -10) {
-    pulseBadge = S.pulseNegativeAttention;
-    pulseTone = "negative";
+  if (netScore != null) {
+    if (netScore >= 40) {
+      pulseBadge = S.pulseStrongPositive;
+      pulseTone = "positive";
+    } else if (netScore >= 10) {
+      pulseBadge = S.pulseModeratePositive;
+      pulseTone = "positive";
+    } else if (netScore <= -40) {
+      pulseBadge = S.pulseCriticalAlert;
+      pulseTone = "negative";
+    } else if (netScore <= -10) {
+      pulseBadge = S.pulseNegativeAttention;
+      pulseTone = "negative";
+    }
   }
 
   let act1Text = S.insightNoMatches;
@@ -178,9 +187,7 @@ export function Summary({
         </Card>
         <Card className="db-kpi db-kpi-highlight">
           <strong className="db-kpi-value ui-num" data-testid="kpi-engagement">
-            {s.kpis?.engagement_rate != null
-              ? `${s.kpis.engagement_rate}٪`
-              : "—"}
+            {formatPercent(s.kpis?.engagement_rate, effectiveLang)}
           </strong>
           <span className="db-kpi-label">{S.kpiEngagement}</span>
           <small className="db-note">{S.kpiEngagementNote}</small>
@@ -201,13 +208,15 @@ export function Summary({
         </Card>
         <Card className="db-kpi">
           <strong className="db-kpi-value ui-num" data-testid="replies-count">
-            {n(s.replies)}
+            {s.replies != null ? n(s.replies) : "—"}
           </strong>
           <span className="db-kpi-label">{S.metricReplies}</span>
           <small className="db-note">{S.metricRepliesNote}</small>
         </Card>
         <Card className="db-kpi">
-          <strong className="db-kpi-value ui-num">{n(s.unique_authors)}</strong>
+          <strong className="db-kpi-value ui-num">
+            {s.unique_authors != null ? n(s.unique_authors) : "—"}
+          </strong>
           <span className="db-kpi-label">{S.metricAuthors}</span>
           <small className="db-note">{S.metricAuthorsNote}</small>
         </Card>

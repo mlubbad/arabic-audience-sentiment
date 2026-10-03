@@ -68,4 +68,67 @@ describe("Videos", () => {
         ar.legendMeasured(ar.labels.negative, "1", 50),
     );
   });
+
+  it("renders em-dash for engagement rate when like_count is null", () => {
+    const videoNullLikes = {
+      ...video,
+      id: "v2",
+      view_count: 100,
+      like_count: null,
+      total: 10,
+    };
+    const sNull = {
+      ...s,
+      videos: [videoNullLikes],
+    } as unknown as Snapshot;
+    const sliceNull = {
+      ...slice,
+      items: [videoNullLikes],
+    };
+
+    render(
+      <Videos
+        s={sNull}
+        S={ar}
+        slice={sliceNull}
+        video=""
+        onTurn={() => {}}
+        onPick={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(`— ${ar.kpiEngagement}`)).toBeInTheDocument();
+  });
+
+  it("formats engagement rate with % in English locale when like_count is present", () => {
+    const videoWithLikes = {
+      ...video,
+      id: "v3",
+      view_count: 100,
+      like_count: 10,
+      total: 10, // (10 + 10) / 100 = 20%
+    };
+    const sEn = {
+      ...s,
+      videos: [videoWithLikes],
+    } as unknown as Snapshot;
+    const sliceEn = {
+      ...slice,
+      items: [videoWithLikes],
+    };
+
+    render(
+      <Videos
+        s={sEn}
+        S={ar}
+        slice={sliceEn}
+        video=""
+        onTurn={() => {}}
+        onPick={() => {}}
+        lang="en"
+      />,
+    );
+
+    expect(screen.getByText(`20% ${ar.kpiEngagement}`)).toBeInTheDocument();
+  });
 });

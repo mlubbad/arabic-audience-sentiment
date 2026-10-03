@@ -438,9 +438,9 @@ function DashboardBody({
       filtered: commentsList,
       next_cursor: nextCursor,
       cursor_reset: false,
-      replies: 0,
-      unknown_dates: 0,
-      unique_authors: (agg.people ?? []).length,
+      replies: agg.replies ?? null,
+      unknown_dates: agg.unknown_dates ?? null,
+      unique_authors: agg.unique_authors ?? null,
       kpis: agg.kpis,
       channel: agg.channel,
       comparison: (agg.videos ?? []).slice(0, 10),
@@ -1057,7 +1057,7 @@ function DashboardBody({
       {s && (
         <>
           {s.workspace_total > 0 && (
-            <Summary s={s} S={S} topicName={topicName} />
+            <Summary s={s} S={S} topicName={topicName} lang={lang} />
           )}
           {s.total === 0 ? (
             /* Two different zeros, and for years one message.
@@ -1106,7 +1106,13 @@ function DashboardBody({
             )
           ) : (
             <>
-              <Voice s={s} S={S} labels={labels} topicName={topicName} />
+              <Voice
+                s={s}
+                S={S}
+                labels={labels}
+                topicName={topicName}
+                lang={lang}
+              />
               <Videos
                 s={s}
                 S={S}
@@ -1114,6 +1120,7 @@ function DashboardBody({
                 video={video}
                 onTurn={turnVideoPage}
                 onPick={pickVideo}
+                lang={lang}
               />
               <Timing
                 s={s}

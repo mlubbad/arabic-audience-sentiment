@@ -32,7 +32,7 @@ import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import type { Locale } from "../locale";
 import { commentText, displayDate } from "../i18n";
-import { n } from "./format";
+import { formatPercent, n } from "./format";
 import { EXPORT_ROW_CAP } from "../data";
 import { CommentsTable, confidencePct } from "./CommentsTable";
 import "./comments.css";
@@ -154,8 +154,7 @@ export function Comments({
                     {c.label ? labels[c.label] : S.noLabel}
                     {score !== null && (
                       <span className="db-chip-score">
-                        {score}
-                        {lang === "ar" ? "٪" : "%"}
+                        {formatPercent(score, lang)}
                       </span>
                     )}
                   </Badge>

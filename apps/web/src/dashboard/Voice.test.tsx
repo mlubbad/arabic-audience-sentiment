@@ -81,5 +81,43 @@ describe("Voice - Conditional Mixed Sentiment Display", () => {
     expect(legend).toBeInTheDocument();
     expect(legend).toHaveTextContent(ar.labels.mixed);
     expect(legend).toHaveTextContent("10");
+
+    // Donut center should display net sentiment: (50 - 20) / 100 = +30% -> +30٪ in Arabic
+    const centerVal = document.querySelector(".db-donut-center-val");
+    expect(centerVal).toHaveTextContent("+30٪");
+  });
+
+  it("formats net sentiment with % in English locale", () => {
+    const s = {
+      analysed: 100,
+      unanalysed: 0,
+      sentiments: { positive: 50, negative: 20, neutral: 30, mixed: 0 },
+      measurable: new Set(["positive", "negative", "neutral"]),
+      topic_counts: {},
+      videos: [],
+    } as unknown as Snapshot;
+
+    render(
+      <Voice s={s} S={ar} labels={ar.labels} topicName={(k) => k} lang="en" />,
+    );
+    const centerVal = document.querySelector(".db-donut-center-val");
+    expect(centerVal).toHaveTextContent("+30%");
+  });
+
+  it("renders em-dash for net sentiment when nothing is analysed", () => {
+    const s = {
+      analysed: 0,
+      unanalysed: 10,
+      sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      measurable: new Set(["positive", "negative", "neutral"]),
+      topic_counts: {},
+      videos: [],
+      kpis: {
+        net_sentiment: null,
+      },
+    } as unknown as Snapshot;
+
+    render(<Voice s={s} S={ar} labels={ar.labels} topicName={(k) => k} />);
+    expect(screen.getByText(ar.noLabelsStrong)).toBeInTheDocument();
   });
 });

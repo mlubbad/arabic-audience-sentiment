@@ -76,7 +76,7 @@ describe("Summary Executive Story Briefing", () => {
       en.secSummaryTitle,
     );
     const briefing = screen.getByTestId("story-briefing");
-    expect(briefing).toHaveTextContent("+63٪");
+    expect(briefing).toHaveTextContent("+63%");
     expect(briefing).toHaveTextContent(en.pulseStrongPositive);
     expect(briefing).toHaveTextContent(en.storyAct1Title);
     expect(briefing).toHaveTextContent(en.storyAct3Title);
@@ -95,5 +95,24 @@ describe("Summary Executive Story Briefing", () => {
     expect(briefing).toHaveTextContent("-50٪");
     expect(briefing).toHaveTextContent(ar.pulseCriticalAlert);
     expect(briefing).toHaveTextContent(ar.storyAct3RecCritical);
+  });
+
+  it("renders em-dash for net sentiment when nothing is analysed", () => {
+    const unanalysedSnapshot = {
+      ...baseSnapshot,
+      analysed: 0,
+      unanalysed: 100,
+      sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      kpis: {
+        total_views: null,
+        total_likes: 0,
+        total_comments: 100,
+        engagement_rate: null,
+        net_sentiment: null,
+      },
+    } as unknown as Snapshot;
+
+    render(<Summary s={unanalysedSnapshot} S={ar} />);
+    expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent("—");
   });
 });

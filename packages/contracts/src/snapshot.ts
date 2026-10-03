@@ -267,11 +267,11 @@ export function snapshot(
       acc[c.platform] = (acc[c.platform] ?? 0) + 1;
       return acc;
     }, {}),
-    replies: rows.filter((c) => c.is_reply).length,
-    unknown_dates: rows.filter((c) => !c.published_at).length,
+    replies: rows.filter((c) => c.is_reply).length as number | null,
+    unknown_dates: rows.filter((c) => !c.published_at).length as number | null,
     unique_authors: new Set(
       rows.flatMap((c) => (c.author_channel_id ? [c.author_channel_id] : [])),
-    ).size,
+    ).size as number | null,
     kpis: {
       total_views: null,
       total_likes: rows.reduce((sum, c) => sum + (c.likes_value ?? 0), 0),

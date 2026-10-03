@@ -61,19 +61,31 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
   if (queued > 0)
     return { ...base, severity: "warning", key: "queued", queued, errorCode };
 
+  const staleHours = run.ended_at
+    ? (now.getTime() - Date.parse(run.ended_at)) / 3_600_000
+    : null;
+
   if (run.status === "failed" || run.status === "blocked") {
     if (run.status === "blocked" && run.error_code === "quota_exceeded") {
       const endedDate = run.ended_at ? new Date(run.ended_at) : null;
-      const isPastMidnightUtc =
-        endedDate &&
-        (now.getUTCFullYear() > endedDate.getUTCFullYear() ||
-          now.getUTCMonth() > endedDate.getUTCMonth() ||
-          now.getUTCDate() > endedDate.getUTCDate());
+      const resetAt = endedDate
+        ? Date.UTC(
+            endedDate.getUTCFullYear(),
+            endedDate.getUTCMonth(),
+            endedDate.getUTCDate() + 1,
+          )
+        : null;
+      const isPastMidnightUtc = resetAt !== null && now.getTime() >= resetAt;
 
       if (isPastMidnightUtc) {
-        return state.worker.connected
-          ? { ...base, severity: "ok", key: "healthy", queued }
-          : { ...base, severity: "warning", key: "stale", queued };
+        return {
+          ...base,
+          severity: "warning",
+          key: "stale",
+          queued,
+          staleHours,
+          errorCode,
+        };
       }
       return {
         ...base,
@@ -81,6 +93,7 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
         key: "quota_paused",
         queued,
         errorCode,
+        staleHours,
       };
     }
 
@@ -90,14 +103,19 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
       key: run.status,
       queued,
       errorCode,
+      staleHours,
     };
   }
   if (run.status === "partial")
-    return { ...base, severity: "warning", key: "partial", queued, errorCode };
+    return {
+      ...base,
+      severity: "warning",
+      key: "partial",
+      queued,
+      errorCode,
+      staleHours,
+    };
 
-  const staleHours = run.ended_at
-    ? (now.getTime() - Date.parse(run.ended_at)) / 3_600_000
-    : null;
   // Succeeded means the source stopped returning rows, not that everything was
   // retrieved, so unproven coverage outranks recency.
   if (!run.coverage.complete)

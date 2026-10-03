@@ -24,11 +24,12 @@
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
+import type { Locale } from "../locale";
 import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import type { PageSlice } from "../videoPaging";
 import { videoLabel } from "../i18n";
-import { n } from "./format";
+import { formatPercent, n } from "./format";
 import { splitAriaLabel, splitSegments } from "./splitBar";
 import "./videos.css";
 
@@ -39,6 +40,7 @@ export function Videos({
   video,
   onTurn,
   onPick,
+  lang,
 }: {
   s: Snapshot;
   S: Strings;
@@ -48,7 +50,10 @@ export function Videos({
   video: string;
   onTurn: (page: number) => void;
   onPick: (id: string) => void;
+  lang?: Locale;
 }) {
+  const effectiveLang: Locale =
+    lang ?? (S.brandHomeLabel === "Audience Sentiment — home" ? "en" : "ar");
   const labels = S.labels;
   return (
     <section className="db-section" id="rp-videos">
@@ -133,10 +138,14 @@ export function Videos({
                 )}
                 {v.view_count != null && v.view_count > 0 && (
                   <Badge numeric tone="sentiment-neutral">
-                    {Math.round(
-                      (((v.like_count ?? 0) + v.total) / v.view_count) * 1000,
-                    ) / 10}
-                    ٪ {S.kpiEngagement}
+                    {v.like_count != null
+                      ? `${formatPercent(
+                          Math.round(
+                            ((v.like_count + v.total) / v.view_count) * 1000,
+                          ) / 10,
+                          effectiveLang,
+                        )} ${S.kpiEngagement}`
+                      : `— ${S.kpiEngagement}`}
                   </Badge>
                 )}
                 <Badge numeric>{S.countComments(n(v.total))}</Badge>

@@ -178,4 +178,41 @@ describe("EditPlanLimitsDialog", () => {
       ).toBeInTheDocument();
     });
   });
+
+  it("does not coerce blank input to 0 and keeps original value on save", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onSuccess = vi.fn();
+    vi.mocked(adminRead.updatePlanLimits).mockResolvedValueOnce({
+      ok: true,
+      plan: mockPlan,
+    });
+
+    render(
+      <EditPlanLimitsDialog
+        plan={mockPlan}
+        open={true}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+
+    const backfillInput = screen.getByTestId("input-plan-backfill-units");
+    await user.clear(backfillInput);
+    // Blank input should NOT show 0
+    expect(backfillInput).not.toHaveValue(0);
+
+    const saveBtn = screen.getByTestId("btn-save-plan-limits");
+    await user.click(saveBtn);
+
+    await waitFor(() => {
+      expect(adminRead.updatePlanLimits).toHaveBeenCalledWith(
+        "creator",
+        expect.objectContaining({
+          // Must retain original 40000, NEVER 0
+          backfill_units: 40000,
+        }),
+      );
+    });
+  });
 });

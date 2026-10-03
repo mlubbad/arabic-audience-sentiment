@@ -1603,4 +1603,7 @@ export const en: Strings = {
   crUnauthenticated:
     "Your session ended. Sign in and start the connection again.",
   crUnreachable: "The connection service could not be reached. Try again.",
+  adminServicesFilterNotMonitored: "Not Monitored",
+  adminServicesNotMonitoredDetails:
+    "This service is not currently covered by automated health monitoring telemetry",
 };

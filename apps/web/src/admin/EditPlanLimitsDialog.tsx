@@ -18,6 +18,13 @@ import {
 } from "../ui/Dialog";
 import { updatePlanLimits } from "./adminRead";
 
+function parseLimitInput(val: string): number | "" {
+  const trimmed = val.trim();
+  if (trimmed === "") return "";
+  const parsed = parseInt(trimmed, 10);
+  return Number.isNaN(parsed) ? "" : parsed;
+}
+
 export function EditPlanLimitsDialog({
   plan,
   open,
@@ -32,21 +39,25 @@ export function EditPlanLimitsDialog({
   const S = useStrings();
   const locale = useLocale();
 
-  const [channels, setChannels] = useState<number>(plan?.limits.channels ?? 1);
-  const [analysisUnits, setAnalysisUnits] = useState<number>(
+  const [channels, setChannels] = useState<number | "">(
+    plan?.limits.channels ?? 1,
+  );
+  const [analysisUnits, setAnalysisUnits] = useState<number | "">(
     plan?.limits.analysis_units ?? 10000,
   );
-  const [backfillUnits, setBackfillUnits] = useState<number>(
+  const [backfillUnits, setBackfillUnits] = useState<number | "">(
     plan?.backfill_units ?? 40000,
   );
-  const [historicalDays, setHistoricalDays] = useState<number>(
+  const [historicalDays, setHistoricalDays] = useState<number | "">(
     plan?.historical_days_limit ?? -1,
   );
-  const [topicUnits, setTopicUnits] = useState<number>(
+  const [topicUnits, setTopicUnits] = useState<number | "">(
     plan?.limits.topic_units ?? 4000,
   );
-  const [members, setMembers] = useState<number>(plan?.limits.members ?? 1);
-  const [workspaces, setWorkspaces] = useState<number>(
+  const [members, setMembers] = useState<number | "">(
+    plan?.limits.members ?? 1,
+  );
+  const [workspaces, setWorkspaces] = useState<number | "">(
     plan?.limits.workspaces ?? 1,
   );
   const [allowPublic, setAllowPublic] = useState<boolean>(
@@ -67,18 +78,36 @@ export function EditPlanLimitsDialog({
     setSaving(true);
     setErrorMsg(null);
 
+    const finalChannels =
+      channels === "" ? (plan.limits.channels ?? 1) : channels;
+    const finalAnalysisUnits =
+      analysisUnits === ""
+        ? (plan.limits.analysis_units ?? 10000)
+        : analysisUnits;
+    const finalBackfillUnits =
+      backfillUnits === "" ? (plan.backfill_units ?? 40000) : backfillUnits;
+    const finalHistoricalDays =
+      historicalDays === ""
+        ? (plan.historical_days_limit ?? -1)
+        : historicalDays;
+    const finalTopicUnits =
+      topicUnits === "" ? (plan.limits.topic_units ?? 4000) : topicUnits;
+    const finalMembers = members === "" ? (plan.limits.members ?? 1) : members;
+    const finalWorkspaces =
+      workspaces === "" ? (plan.limits.workspaces ?? 1) : workspaces;
+
     try {
       await updatePlanLimits(plan.key, {
-        channels,
-        channels_limit: channels,
-        analysis_units: analysisUnits,
-        backfill_units: backfillUnits,
-        historical_days_limit: historicalDays,
-        topic_units: topicUnits,
-        members,
-        members_limit: members,
-        workspaces,
-        workspaces_limit: workspaces,
+        channels: finalChannels,
+        channels_limit: finalChannels,
+        analysis_units: finalAnalysisUnits,
+        backfill_units: finalBackfillUnits,
+        historical_days_limit: finalHistoricalDays,
+        topic_units: finalTopicUnits,
+        members: finalMembers,
+        members_limit: finalMembers,
+        workspaces: finalWorkspaces,
+        workspaces_limit: finalWorkspaces,
         allow_public_channels: allowPublic,
       });
       onSuccess();
@@ -151,8 +180,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={channels}
-              onChange={(e) => setChannels(parseInt(e.target.value, 10) || 0)}
-              required
+              onChange={(e) => setChannels(parseLimitInput(e.target.value))}
               data-testid="input-plan-channels"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
@@ -194,9 +222,8 @@ export function EditPlanLimitsDialog({
               min={-1}
               value={analysisUnits}
               onChange={(e) =>
-                setAnalysisUnits(parseInt(e.target.value, 10) || 0)
+                setAnalysisUnits(parseLimitInput(e.target.value))
               }
-              required
               data-testid="input-plan-analysis-units"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
@@ -238,9 +265,8 @@ export function EditPlanLimitsDialog({
               min={-1}
               value={backfillUnits}
               onChange={(e) =>
-                setBackfillUnits(parseInt(e.target.value, 10) || 0)
+                setBackfillUnits(parseLimitInput(e.target.value))
               }
-              required
               data-testid="input-plan-backfill-units"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
@@ -282,9 +308,8 @@ export function EditPlanLimitsDialog({
               min={-1}
               value={historicalDays}
               onChange={(e) =>
-                setHistoricalDays(parseInt(e.target.value, 10) || 0)
+                setHistoricalDays(parseLimitInput(e.target.value))
               }
-              required
               data-testid="input-plan-historical-days"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
@@ -323,8 +348,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={topicUnits}
-              onChange={(e) => setTopicUnits(parseInt(e.target.value, 10) || 0)}
-              required
+              onChange={(e) => setTopicUnits(parseLimitInput(e.target.value))}
               data-testid="input-plan-topic-units"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
@@ -363,8 +387,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={members}
-              onChange={(e) => setMembers(parseInt(e.target.value, 10) || 0)}
-              required
+              onChange={(e) => setMembers(parseLimitInput(e.target.value))}
               data-testid="input-plan-members"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>
@@ -403,8 +426,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={workspaces}
-              onChange={(e) => setWorkspaces(parseInt(e.target.value, 10) || 0)}
-              required
+              onChange={(e) => setWorkspaces(parseLimitInput(e.target.value))}
               data-testid="input-plan-workspaces"
             />
             <small className="db-muted">{S.adminPlanUnlimitedHelp}</small>

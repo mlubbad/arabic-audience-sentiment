@@ -12,6 +12,7 @@ export const ServiceStatusSchema = z.enum([
   "degraded",
   "down",
   "unconfigured",
+  "not_monitored",
 ]);
 
 export type ServiceStatus = z.infer<typeof ServiceStatusSchema>;
@@ -53,6 +54,7 @@ export const ServicesSummarySchema = z
     degraded: z.number().int().nonnegative(),
     down: z.number().int().nonnegative(),
     unconfigured: z.number().int().nonnegative(),
+    not_monitored: z.number().int().nonnegative().optional(),
     avg_latency_ms: z.number().nonnegative().nullable(),
   })
   .strict();

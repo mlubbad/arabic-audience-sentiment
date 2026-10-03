@@ -1614,6 +1614,9 @@ export const ar = {
   crUnauthenticated:
     "انتهت جلسة تسجيل الدخول. سجّل الدخول وابدأ الربط من جديد.",
   crUnreachable: "تعذر الوصول إلى خدمة الربط. حاول مرة أخرى.",
+  adminServicesFilterNotMonitored: "غير مراقب",
+  adminServicesNotMonitoredDetails:
+    "هذه الخدمة غير مشمولة في تقارير المراقبة الآلية الحالية",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,
