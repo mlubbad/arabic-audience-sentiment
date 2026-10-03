@@ -59,6 +59,29 @@ describe("coming back from Google", () => {
     });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
+
+  it("uses the binding fallback for a blank code and preserves a real code", async () => {
+    for (const [code, expected] of [
+      ["  ", "oauth_binding_mismatch"],
+      ["quota_exceeded", "quota_exceeded"],
+    ]) {
+      sessionStorage.setItem("oauth_browser_nonce", "browser-nonce");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify({ code }), {
+              status: 409,
+            }),
+        ),
+      );
+      await expect(completePendingConnection("ticket")).resolves.toEqual({
+        kind: "error",
+        code: expected,
+      });
+    }
+  });
+
   it("says what to do about a project that has the API switched off", () => {
     // The failure this was written for. "channel_lookup_failed" told the person
     // nothing; the fix is not a prettier sentence but naming the one thing

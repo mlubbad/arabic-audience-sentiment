@@ -145,12 +145,11 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
   const stopImpersonation = useCallback(async () => {
     setLoading(true);
     const isDemo = isDemoMode();
+    let auditFailed = false;
     try {
       if (!supabase && !isDemo) {
         console.error("Cannot stop impersonation without Supabase client");
-        toast({ title: S.adminImpersonateError });
-        setLoading(false);
-        return;
+        auditFailed = true;
       }
 
       if (supabase && impersonatedUser) {
@@ -159,16 +158,12 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("Failed to audit impersonation stop:", error);
-          toast({ title: S.adminImpersonateError });
-          setLoading(false);
-          return;
+          auditFailed = true;
         }
       }
     } catch (e) {
       console.error("Error during stopImpersonation audit:", e);
-      toast({ title: S.adminImpersonateError });
-      setLoading(false);
-      return;
+      auditFailed = true;
     }
 
     try {
@@ -177,10 +172,20 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
       // ignore
     }
     setImpersonatedUser(null);
-    await queryClient.invalidateQueries();
-    toast({ title: S.adminImpersonateStopping });
-    navigate(isDemo ? "/admin/users?demo=1" : "/admin/users");
-    setLoading(false);
+    try {
+      await queryClient.invalidateQueries();
+    } finally {
+      try {
+        toast({
+          title: auditFailed
+            ? S.adminImpersonateAuditWarning
+            : S.adminImpersonateStopping,
+        });
+        navigate(isDemo ? "/admin/users?demo=1" : "/admin/users");
+      } finally {
+        setLoading(false);
+      }
+    }
   }, [impersonatedUser, navigate, queryClient, S]);
 
   return (

@@ -70,7 +70,10 @@ export async function beginConnect(
       return {
         kind: "error",
         // A code we do not recognise is passed on as a code, never as server text.
-        code: body.code ?? String(response.status),
+        code:
+          typeof body.code === "string" && body.code.trim()
+            ? body.code
+            : String(response.status),
       };
     sessionStorage.setItem(OAUTH_BROWSER_NONCE_KEY, body.nonce);
     return { kind: "redirect", url: body.url };

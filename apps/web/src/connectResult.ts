@@ -44,7 +44,10 @@ export async function completePendingConnection(
     if (!response.ok || !body.channel_id)
       return {
         kind: "error",
-        code: body.code ?? "oauth_binding_mismatch",
+        code:
+          typeof body.code === "string" && body.code.trim()
+            ? body.code
+            : "oauth_binding_mismatch",
       };
     return { kind: "success", channelId: body.channel_id };
   } catch {
