@@ -1,17 +1,17 @@
-# Private preview deployment
+# Deployment
 
-`app.sky-develop.net`, on the shared DirectAdmin host (`skydevelop` account, `u92286`,
-origin `91.204.209.213`). Fixture-backed and password-protected.
+`app.sky-develop.net` is served from the shared DirectAdmin host `chronos.hostns.io`
+(origin `91.204.209.217`), account `u101542`. The domain's document root is
+`/home/u101542/domains/app.sky-develop.net/public_html/`, and Cloudflare sits in front:
+the hostname resolves to Cloudflare addresses (`104.21.9.166`, `172.67.160.214`, checked
+2026-10-03), not to the origin.
 
-**One of the two things keeping it out of search is not actually running.** The deploy
-ships a `robots.txt` reading `User-agent: * / Disallow: /`, but Cloudflare Managed Content
-serves its own in its place — 1836 bytes that disallow `GPTBot`, `Google-Extended` and
-`meta-externalagent` and say nothing about anyone else. Checked by fetching the live URL:
-our 26-byte file is not what comes back.
+The site is public. There has been no Basic Auth since 2026-09-16 (see the head of
+`apps/web/public/.htaccess`), and whether search engines may index the public pages is
+decided by one build flag, `VITE_SITE_PUBLIC`, described in `docs/seo.md`.
 
-The site is still not indexable, because every path answers `401` and a crawler cannot read
-what it cannot fetch. HTTP auth is the protection; the robots file was the belt to its
-braces, and the belt is missing. Worth knowing before anyone relaxes the password.
+Earlier versions of this file named the `skydevelop` account (`u92286`) and origin
+`91.204.209.213`. That is no longer where the site lives; do not deploy there.
 
 ## What is deployed
 
@@ -29,8 +29,9 @@ and the access token are not in it, which is asserted rather than assumed.
 
 **The dashboard is built live, and shows the demo to anyone not signed in.** This paragraph
 used to say the opposite — that `VITE_DASHBOARD_SOURCE` was unset and nothing on the page was
-real. It is set to `live` in `apps/web/.env.local`, which Vite loads because its root is
-`apps/web`; the shipped bundle proves it, since esbuild folded the mode constant and the
+real. It is set to `live`: in CI by the `VITE_DASHBOARD_SOURCE` repository Variable, locally by
+`apps/web/.env.local`, which Vite loads because its root is `apps/web`. The shipped bundle
+proves it, since esbuild folded the mode constant and the
 `sanitized_fixture` branch is not in `index-*.js` at all.
 
 What keeps a stranger out is not the build, it is `resolveMode`: live is a ceiling, and a
@@ -38,45 +39,104 @@ render only reaches it with a session **and** a resolved workspace. A signed-out
 the same URL gets the sanitized fixture, labelled as one. A signed-in owner gets their own
 channel, with RLS deciding which rows that means.
 
-So the deployed page carries three layers between a passer-by and real data: the host's basic
-auth, a session, and row-level security. Only the last of those is load-bearing.
+So the deployed page carries two layers between a passer-by and real data: a session and
+row-level security. The second is the one that is load-bearing.
 
 ## Deployment and CI/CD Pipeline
 
-Deployment is automated via **GitHub Actions** (`.github/workflows/deploy.yml`), with manual local fallback when needed.
+Deployment is automated by `.github/workflows/deploy.yml`. Agents never run it by hand and
+never apply remote migrations; the owner can dispatch it from the Actions tab.
 
-### 1. Primary: Automated CI/CD (Continuous Deployment)
+### When it runs
 
-Pushing to `main` triggers `.github/workflows/deploy.yml` (and it can be dispatched manually from GitHub Actions tab).
-The pipeline:
-1. Installs pinned dependencies (`npm ci`).
-2. Runs the production build (`npm run build`).
-3. Evaluates GitHub Secrets:
-   - If `PREVIEW_FTP_*` secrets are configured: runs `scripts/deploy-preview.sh` over FTPS to `app.sky-develop.net`.
-   - If `SUPABASE_ACCESS_TOKEN` is configured: executes `npm run db:migrate:remote` (`scripts/apply-migrations-remote.mjs`) to apply pending migrations transactionally to the remote Supabase project.
+It never runs on a push. It runs after the **Credential-free checks** workflow completes
+successfully for a push to `main` (or by `workflow_dispatch` on `main`), and its first job
+refuses to continue unless both of these passed for that exact commit:
 
-#### Required GitHub Secrets (Settings ➔ Secrets and variables ➔ Actions):
-- `PREVIEW_FTP_HOST`: DirectAdmin/FTP hostname for the preview host.
-- `PREVIEW_FTP_USER`: FTP username for preview document root.
-- `PREVIEW_FTP_PASSWORD`: FTP password.
-- `SUPABASE_ACCESS_TOKEN`: *(Optional)* Personal access token for automated Supabase Management API database migrations.
+- the `verify` job of `ci.yml`;
+- the Secret scan, Semgrep SAST and Dependency audit jobs of `security.yml`.
 
-### 2. Secondary: Manual Local Deployment Fallback
+### What it does, in order
 
-If you need to trigger deployment or migrations directly from this checkout:
+1. `npm ci`, then the build-safety checks (`check:secrets`, `typecheck`).
+2. **Build.** `npm run build` runs with the public `VITE_*` values from repository
+   Variables. It stops before anything else happens if `VITE_SUPABASE_URL` or
+   `VITE_SUPABASE_PUBLISHABLE_KEY` is missing (#58).
+3. **Migrate.** `npm run db:migrate:remote` applies pending migrations to the Supabase
+   project, each in its own transaction.
+4. **Upload.** `scripts/deploy-preview.sh` runs `check-secrets` against the built bundle,
+   uploads `dist/` over FTPS (`curl --ssl-reqd`, so TLS on both the control and data
+   channels), then deletes the previous build's hashed files from `static/`.
+5. **Verify.** `scripts/verify-deploy.mjs` fetches `/account` on the public host and
+   requires it to load the entry script this build produced (#57). Without this step an
+   upload to the wrong folder looks exactly like success; see the incident below.
 
-```bash
-# Deploy web frontend to preview host:
-npm run build
-npm run deploy:preview
+### Repository Secrets (Settings → Secrets and variables → Actions → Secrets)
 
-# Apply pending database migrations to live Supabase project:
-npm run db:migrate:remote
-```
+- `PREVIEW_FTP_HOST`: `chronos.hostns.io`. Use the server name, not the domain: the domain
+  resolves to Cloudflare, which does not carry FTP.
+- `PREVIEW_FTP_USER`: `deploy@app.sky-develop.net`, an FTP account whose root **is**
+  `public_html` (DirectAdmin → FTP Accounts). Never the account's main login.
+- `PREVIEW_FTP_PASSWORD`: that FTP account's password.
+- `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`: used for the remote migrations.
 
-Credentials for local execution are read from `.env.local` (or existing shell environment). The FTP account is scoped to the preview document root, so a mistake in the deploy script cannot reach the other sites on this shared host.
+### Repository Variables (same page → Variables)
 
-`--ftp-ssl-control` encrypts the login but not the data channel: this server refuses TLS on the data connection. That is acceptable only because everything shipped here is public by design. Never send anything else over it.
+These values are compiled into the bundle every visitor downloads, so they are public by
+design. They live in Variables, never in tracked files, and **only `VITE_*` names belong
+here**. Variables are shown in plain text, so a service-role key, an `sb_secret_` key, a
+Paddle API key or any password must never be stored as one. If such a value reaches the
+bundle, `check-secrets` blocks the upload.
+
+| Variable | Required | Notes |
+|---|---|---|
+| `VITE_SUPABASE_URL` | yes | `https://ykqugctewsqvevhyqtbi.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | yes | The `sb_publishable_…` key. A legacy `eyJ…` JWT fails `check-secrets`. |
+| `VITE_AUTH_PROVIDERS` | for sign-in | e.g. `google` |
+| `VITE_GOOGLE_CLIENT_ID` | for One Tap | public OAuth client id |
+| `VITE_DASHBOARD_SOURCE` | for live data | `live` |
+| `VITE_PADDLE_CLIENT_TOKEN`, `VITE_PADDLE_ENV` | for checkout | `test_…` with `sandbox`, `live_…` with `live` |
+| `VITE_SITE_URL`, `VITE_SITE_PUBLIC` | optional | see `docs/seo.md` |
+
+### Manual local fallback
+
+`npm run build && npm run deploy:preview` reads the same names from `.env.local`. Use the
+scoped `deploy@` FTP account there too. With the main account, files land in
+`/home/u101542/`, not on the site, and the upload still reports success.
+
+## Incident 2026-10-02/03: deploys that never went live, then a live build without sign-in
+
+**What happened.** Deploys #95–#98 reported FTP `226` for every file and finished green,
+but the site kept serving a build uploaded by hand on 2026-09-24. The OAuth Connect flow
+then failed in production with "unknown", because that old page did not handle
+`connect=pending`.
+
+**Cause 1: the wrong folder.** The secrets used the main DirectAdmin login, whose FTP root
+is `/home/u101542/`, so every CI build landed beside `domains/`, not inside `public_html`.
+
+- **Fix:** the owner created the scoped `deploy@app.sky-develop.net` account, rooted at
+  `public_html`, and changed `PREVIEW_FTP_HOST` to `chronos.hostns.io`.
+- **Result:** Deploy #99 swept the stale live build (`index-Bl0nMJSR.js` and its chunks).
+- **Guard:** #57 added the live-host verification step, which passed on #100 and #102.
+
+**Cause 2: no build configuration in CI.** The build step had never received any `VITE_*`
+values. Every CI build was therefore the fixture-only preview, with `vendor-supabase` at
+1 byte and sign-in disabled. Nobody noticed while those builds went to the wrong folder;
+the moment #99 put one live, production lost sign-in.
+
+- **Fix:** #58 reads the values from repository Variables and refuses to build without
+  the Supabase pair.
+- **Result:** Deploy #102 built `vendor-supabase` at 226 KB and was verified live
+  (`app.sky-develop.net serves /static/index-C2uKPfyQ.js`).
+
+**Lessons.**
+
+- An upload proves that bytes reached an FTP account, not that the site serves them.
+- A chunk of 1 byte where a library should be means the build is missing configuration.
+
+The CI uploads that landed outside `public_html` (`/home/u101542/en`, `static`, `landing`,
+`fonts`, `fixtures`, `privacy-policy`, `pricing`, `terms` and the top-level files of
+`dist/`) are not served and can be deleted from the panel.
 
 ## Superseded assets, and two traps in removing them
 
@@ -96,28 +156,12 @@ immutable-cached copy while the origin files were gone — a failure that would 
 hours later, to a user, as a blank page. Verify a deploy against the origin with
 `--resolve app.sky-develop.net:80:91.204.209.217`, not through the CDN.
 
-## It is private, and stays private across deploys
+## `.htaccess` travels with every build
 
-The whole site is behind HTTP basic auth. `.htpasswd_app` lives one level above the document
-root, so it cannot be served — `GET /.htpasswd_app` returns 403.
-
-`.htaccess` lives in `apps/web/public/`, not in `dist/`. That matters: the first version was
-written straight into `dist/`, which the next build silently deleted, taking the password with
-it on a deployment whose entire premise is that it is not published openly. Keeping it in
-`public/` makes protection the default state and removing it a deliberate edit.
-
-Verified at the origin after a redeploy: 401 on the page, the bundle and the fixture without
-credentials; 403 on the password file; 200 with them; `/account` falls back to `index.html`;
-and the security headers are present.
-
-## Cloudflare is in front, and does not point here
-
-`app.sky-develop.net` resolves to Cloudflare, and Cloudflare serves a DirectAdmin placeholder
-and its own generated `robots.txt` — not this origin. Requested directly against
-`91.204.209.213` with the right `Host` header, the deployment is correct and complete.
-
-So the deployment is done and the hostname is not yet wired to it. That is a Cloudflare-side
-DNS change, outside the DirectAdmin account and outside what this project can reach.
+`.htaccess` lives in `apps/web/public/`, not in `dist/`. The first version was written
+straight into `dist/`, and the next build silently deleted it. Keeping it in `public/` means
+every deploy ships the rewrite rules, cache headers and security headers. The Basic Auth
+block it once carried was removed on 2026-09-16 at the owner's instruction.
 
 ## The host's timing varies from one request to the next
 
@@ -146,8 +190,11 @@ What to do with that:
   origin answers evenly, or an edge cache for the prerendered HTML with a purge on deploy
   (this project has no purge credential today) — not in the bundle.
 
-## Not deployed
+## What is not part of this pipeline
 
-No Edge Function, no worker, no live data path. The Supabase project holds the schema and
-anonymous isolation is verified over HTTP, but every authenticated path still needs the
-service-role key.
+- **Edge Functions** (`supabase/functions/*`: `oauth-start`, `oauth-callback`,
+  `oauth-complete`, `channel-lookup`, `paddle-checkout`, `paddle-webhook`,
+  `billing-portal`, `worker`). The owner deploys these with `supabase functions deploy`;
+  CI does not.
+- **The Python worker.** It runs on the owner's machine as a LaunchAgent
+  (`scripts/worker-service-update.sh`).

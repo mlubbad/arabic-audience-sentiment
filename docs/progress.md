@@ -1,5 +1,36 @@
 # Progress
 
+## 2026-10-03 — Deploys reach the live site again, with sign-in; deploy now verifies itself
+
+- **Owner reports:**
+  - Connect failed with "unknown" (2026-10-02);
+  - after the deploy-target fix, the account page said sign-in is unavailable (2026-10-03).
+- **Root causes** (full write-up in `docs/deployment.md`, "Incident 2026-10-02/03"):
+  1. **Wrong FTP root.** The deploy secrets used the main DirectAdmin login (`u101542`),
+     whose root is `/home/u101542/`, so every CI upload landed outside
+     `domains/app.sky-develop.net/public_html/`. The site kept serving a build uploaded by
+     hand on 2026-09-24. Deploys #95–#98 were green and none of them went live.
+  2. **No build configuration in CI.** `npm run build` in the deploy job had never received
+     any `VITE_*` values. Every CI build was fixture-only, with `vendor-supabase` at 1 B and
+     sign-in disabled. This only showed once cause 1 was fixed.
+- **Fixes:**
+  - **Owner:** created the scoped FTP account `deploy@app.sky-develop.net`, rooted at
+    `public_html`. Set `PREVIEW_FTP_HOST` to `chronos.hostns.io` and the matching
+    user/password secrets. Added the `VITE_*` repository Variables.
+  - **#57:** the last deploy step, `scripts/verify-deploy.mjs`, requires the public host to
+    serve this build's entry script.
+  - **#58:** the build reads `VITE_*` from repository Variables and refuses to build without
+    `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+  - **Lockfile:** the dev-only `brace-expansion` moved 1.1.18 → 1.1.21, which clears the
+    high-severity advisory that every deploy's `npm ci` printed.
+- **Outcome:**
+  - Deploy #102 is live and verified (`app.sky-develop.net serves /static/index-C2uKPfyQ.js`).
+  - The owner reports the site is "almost all" working; the remaining issue is not named yet.
+- **Still open:**
+  - The owner to confirm the YouTube Connect smoke test (WO-5b step 5).
+  - Rotate the main-account password, which was exposed in chat.
+  - Delete the stray CI uploads in `/home/u101542/`.
+
 ## 2026-09-24 — Permanent Resolution of Dashboard Timeouts (134k+ Comments), Decoupled UI Failure, and Quota Lifecycle
 
 - **User Directives**:
