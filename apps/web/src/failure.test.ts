@@ -3,6 +3,25 @@ import { z } from "zod";
 import { failureCode } from "./failure";
 
 describe("what a failure is allowed to say", () => {
+  it("adds only a SQLSTATE or PostgREST code to a live read failure", () => {
+    const failure = (code?: unknown) =>
+      Object.assign(new Error("live_unavailable"), { code });
+
+    expect(failureCode("read", failure("57014"))).toBe(
+      "read:live_unavailable:57014",
+    );
+    expect(failureCode("read", failure("PGRST301"))).toBe(
+      "read:live_unavailable:PGRST301",
+    );
+    expect(failureCode("read", failure("57014; drop"))).toBe(
+      "read:live_unavailable",
+    );
+    expect(failureCode("read", new Error("live_unavailable"))).toBe(
+      "read:live_unavailable",
+    );
+    expect(failureCode("read", failure(57014))).toBe("read:live_unavailable");
+  });
+
   it("names the half that failed and the kind of failure", () => {
     expect(failureCode("read", new Error("live_unavailable"))).toBe(
       "read:live_unavailable",
