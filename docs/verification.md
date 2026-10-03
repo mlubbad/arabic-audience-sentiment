@@ -1,5 +1,19 @@
 # Verification
 
+## 2026-10-03 — Deploy target, build configuration and live verification
+
+| Command / observation | Actual result |
+| --- | --- |
+| Deploy #98 log (before the fix) | Every file `226`; the sweep removed only previous **CI** chunks (`index-Bu5SonCp.js`, …), never the live `index-Bl0nMJSR.js`, so the upload went to a folder the site does not serve. |
+| DirectAdmin file manager (owner screenshot) | `public_html` last written 2026-09-24 (its `robots.txt` was 188 B; CI ships 26 B); a stray `en/` sat in `/home/u101542/`. |
+| Deploy #99 (after the scoped FTP account) | Upload `226` per file; the sweep removed `index-Bl0nMJSR.js`, `Connected-DCxcLaz3.js`, `vendor-react-Cjl6uT9N.js` and the rest of the stale live build. |
+| Deploy #100 (`3af5cfd`, #57) | `Verify the live site serves this build` passed in 1 s. |
+| Deploy #101 (`a807eab`, #58, Variables not yet set) | Stopped at the build: `Missing required repository variable: VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`. No migration ran and nothing was uploaded. |
+| Deploy #102, attempt 1 | Blocked before the upload: `Secret scan failed in: …Connected-…js, …connect-…js, …index-…js, …pricing-…js` (the first key value matched a secret pattern). Nothing was uploaded. |
+| Deploy #102, attempt 2 | Build `vendor-supabase-BMz9DMJ_.js` **226.10 kB** (was 0.00 kB); every upload `226`; `app.sky-develop.net serves /static/index-C2uKPfyQ.js`. |
+| `npx vitest run scripts/deploy-workflow.test.ts scripts/verify-deploy.test.ts` | 18 passed. Mutations: weakening the entry comparison fails the incident test; feeding a `VITE_*` value from `secrets.` fails the workflow test. |
+| `npm audit` (local, after the lockfile bump) | `found 0 vulnerabilities` (was 1 high: `brace-expansion` 1.1.18 via `eslint` → `minimatch@3`, dev-only). `npm run lint`: all checks passed. |
+
 ## 2026-09-24 — Deep Audit, Root-Cause Elimination for Scheduler/Worker Quota Lifecycle & Platform Admin Services Dashboard
 
 | Command / observation                           | Actual result                                                                                                                                                                                                                                   |

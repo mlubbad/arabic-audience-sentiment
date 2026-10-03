@@ -31,8 +31,11 @@ const KNOWN = new Set([
 type ZodLike = {
   name?: string;
   message?: string;
+  code?: unknown;
   issues?: { code?: string; path?: (string | number | symbol)[] }[];
 };
+
+const SAFE_DATABASE_CODE = /^(?:[0-9A-Z]{5}|PGRST[0-9]{3})$/;
 
 /**
  * A short, safe description of a failure.
@@ -55,8 +58,15 @@ export function failureCode(stage: "read" | "view", error: unknown): string {
     return `${stage}:${issue.code ?? "invalid"}${where ? `@${where}` : ""}`;
   }
 
-  if (typeof e.message === "string" && KNOWN.has(e.message))
-    return `${stage}:${e.message}`;
+  if (typeof e.message === "string" && KNOWN.has(e.message)) {
+    const databaseCode =
+      e.message === "live_unavailable" &&
+      typeof e.code === "string" &&
+      SAFE_DATABASE_CODE.test(e.code)
+        ? `:${e.code}`
+        : "";
+    return `${stage}:${e.message}${databaseCode}`;
+  }
 
   // Anything else is a bug rather than a condition, and its message is of
   // unknown provenance. The constructor name is ours to show; the message is
