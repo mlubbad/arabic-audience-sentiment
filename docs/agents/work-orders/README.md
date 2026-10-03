@@ -11,3 +11,4 @@ not edit them.
 | [WO-5b.md](WO-5b.md) | #16 | Codex |
 | [WO-7.md](WO-7.md) | #37 | Codex |
 | [WO-8.md](WO-8.md) | #54 | Codex |
+| [WO-9.md](WO-9.md) | #60 | Codex |
