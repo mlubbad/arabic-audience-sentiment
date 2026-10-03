@@ -4,10 +4,12 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { ImpersonationProvider, useImpersonation } from "./impersonation";
+import { ar } from "./strings/ar";
 
 const mockNavigate = vi.fn();
 const mockInvalidateQueries = vi.fn().mockResolvedValue(undefined);
 const mockRpc = vi.fn();
+const mockToast = vi.hoisted(() => vi.fn());
 
 vi.mock("react-router", () => ({
   useNavigate: () => mockNavigate,
@@ -30,7 +32,7 @@ vi.mock("./supabase", () => ({
 }));
 
 vi.mock("./ui/Toast", () => ({
-  toast: vi.fn(),
+  toast: mockToast,
 }));
 
 describe("ImpersonationProvider and useImpersonation", () => {
@@ -44,6 +46,7 @@ describe("ImpersonationProvider and useImpersonation", () => {
     mockInvalidateQueries.mockResolvedValue(undefined);
     mockRpc.mockReset();
     mockRpc.mockResolvedValue({ data: null, error: null });
+    mockToast.mockReset();
   });
 
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -122,8 +125,15 @@ describe("ImpersonationProvider and useImpersonation", () => {
     ).toBeNull();
     expect(result.current.isImpersonating).toBe(false);
     expect(result.current.impersonatedUser).toBeNull();
+    expect(result.current.loading).toBe(false);
     expect(mockInvalidateQueries).toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
+    expect(mockToast).toHaveBeenCalledWith({
+      title: ar.adminImpersonateStopping,
+    });
+    expect(mockToast).not.toHaveBeenCalledWith({
+      title: ar.adminImpersonateAuditWarning,
+    });
   });
 
   it("fails closed on startImpersonation RPC error without updating session or navigating", async () => {
@@ -151,7 +161,7 @@ describe("ImpersonationProvider and useImpersonation", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("fails closed on stopImpersonation RPC error without clearing session or navigating", async () => {
+  it("exits impersonation and warns when the stop audit RPC returns an error", async () => {
     sessionStorage.setItem(
       "sentiment_impersonation_session",
       JSON.stringify({ id: "target-456", email: "target@example.com" }),
@@ -173,13 +183,15 @@ describe("ImpersonationProvider and useImpersonation", () => {
     });
     expect(
       sessionStorage.getItem("sentiment_impersonation_session"),
-    ).not.toBeNull();
-    expect(result.current.isImpersonating).toBe(true);
-    expect(result.current.impersonatedUser).toEqual({
-      id: "target-456",
-      email: "target@example.com",
+    ).toBeNull();
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatedUser).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(mockInvalidateQueries).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
+    expect(mockToast).toHaveBeenCalledWith({
+      title: ar.adminImpersonateAuditWarning,
     });
-    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("fails closed on startImpersonation when supabase client is null", async () => {
@@ -202,7 +214,7 @@ describe("ImpersonationProvider and useImpersonation", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("fails closed on stopImpersonation when supabase client is null", async () => {
+  it("exits impersonation and warns when the Supabase client is unavailable", async () => {
     sessionStorage.setItem(
       "sentiment_impersonation_session",
       JSON.stringify({ id: "target-456", email: "target@example.com" }),
@@ -219,13 +231,15 @@ describe("ImpersonationProvider and useImpersonation", () => {
 
     expect(
       sessionStorage.getItem("sentiment_impersonation_session"),
-    ).not.toBeNull();
-    expect(result.current.isImpersonating).toBe(true);
-    expect(result.current.impersonatedUser).toEqual({
-      id: "target-456",
-      email: "target@example.com",
+    ).toBeNull();
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatedUser).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(mockInvalidateQueries).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
+    expect(mockToast).toHaveBeenCalledWith({
+      title: ar.adminImpersonateAuditWarning,
     });
-    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("fails closed on startImpersonation on HTTP 500", async () => {
@@ -250,7 +264,7 @@ describe("ImpersonationProvider and useImpersonation", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("fails closed on stopImpersonation on HTTP 500", async () => {
+  it("exits impersonation and warns when the stop audit returns HTTP 500", async () => {
     sessionStorage.setItem(
       "sentiment_impersonation_session",
       JSON.stringify({ id: "target-456", email: "target@example.com" }),
@@ -269,13 +283,15 @@ describe("ImpersonationProvider and useImpersonation", () => {
 
     expect(
       sessionStorage.getItem("sentiment_impersonation_session"),
-    ).not.toBeNull();
-    expect(result.current.isImpersonating).toBe(true);
-    expect(result.current.impersonatedUser).toEqual({
-      id: "target-456",
-      email: "target@example.com",
+    ).toBeNull();
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatedUser).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(mockInvalidateQueries).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
+    expect(mockToast).toHaveBeenCalledWith({
+      title: ar.adminImpersonateAuditWarning,
     });
-    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("fails closed on startImpersonation on rejected fetch", async () => {
@@ -298,7 +314,7 @@ describe("ImpersonationProvider and useImpersonation", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("fails closed on stopImpersonation on rejected fetch", async () => {
+  it("exits impersonation and warns when the stop audit RPC throws", async () => {
     sessionStorage.setItem(
       "sentiment_impersonation_session",
       JSON.stringify({ id: "target-456", email: "target@example.com" }),
@@ -315,12 +331,14 @@ describe("ImpersonationProvider and useImpersonation", () => {
 
     expect(
       sessionStorage.getItem("sentiment_impersonation_session"),
-    ).not.toBeNull();
-    expect(result.current.isImpersonating).toBe(true);
-    expect(result.current.impersonatedUser).toEqual({
-      id: "target-456",
-      email: "target@example.com",
+    ).toBeNull();
+    expect(result.current.isImpersonating).toBe(false);
+    expect(result.current.impersonatedUser).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(mockInvalidateQueries).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("/admin/users");
+    expect(mockToast).toHaveBeenCalledWith({
+      title: ar.adminImpersonateAuditWarning,
     });
-    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

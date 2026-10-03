@@ -1603,4 +1603,6 @@ export const en: Strings = {
   crUnauthenticated:
     "Your session ended. Sign in and start the connection again.",
   crUnreachable: "The connection service could not be reached. Try again.",
+  adminImpersonateAuditWarning:
+    "The impersonation session ended, but its end event was not recorded.",
 };

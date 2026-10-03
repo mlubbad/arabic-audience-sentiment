@@ -1614,6 +1614,8 @@ export const ar = {
   crUnauthenticated:
     "انتهت جلسة تسجيل الدخول. سجّل الدخول وابدأ الربط من جديد.",
   crUnreachable: "تعذر الوصول إلى خدمة الربط. حاول مرة أخرى.",
+  adminImpersonateAuditWarning:
+    "انتهت جلسة المحاكاة، لكن تعذر تسجيل حدث انتهائها.",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,

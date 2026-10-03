@@ -127,6 +127,28 @@ describe("starting a connection from the browser", () => {
     expect(JSON.stringify(out)).not.toContain("apikey");
   });
 
+  it("uses the HTTP status for an empty code and preserves a real code", async () => {
+    for (const [code, expected] of [
+      ["", "500"],
+      ["quota_exceeded", "quota_exceeded"],
+    ]) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify({ code }), {
+              status: 500,
+            }),
+        ),
+      );
+      const { beginConnect } = await load();
+      await expect(beginConnect("ws-1", "client-1")).resolves.toEqual({
+        kind: "error",
+        code: expected,
+      });
+    }
+  });
+
   it("survives the service being unreachable", async () => {
     vi.stubGlobal(
       "fetch",
