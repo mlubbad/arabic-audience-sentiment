@@ -63,6 +63,15 @@ describe("deployment verification gate", () => {
     expect(migrate).toBeGreaterThan(-1);
     expect(upload).toBeGreaterThan(migrate);
   });
+
+  test("verifies the live hostname serves the uploaded build, after the upload", () => {
+    const upload = workflow.indexOf("run: sh scripts/deploy-preview.sh");
+    const verify = workflow.indexOf("run: node scripts/verify-deploy.mjs");
+    expect(verify).toBeGreaterThan(upload);
+    expect(workflow).toContain(
+      "DEPLOY_VERIFY_URL: https://app.sky-develop.net",
+    );
+  });
 });
 
 describe("remote migration safety", () => {
