@@ -16,10 +16,30 @@ revoke all on table private.video_comment_stats from public, anon, authenticated
 
 create function private.refresh_video_comment_stats(pairs jsonb)
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = ''
 as $$
+begin
+  insert into private.video_comment_stats(workspace_id, video_id, total, analysed)
+  select distinct p.workspace_id, p.video_id, 0, 0
+  from jsonb_to_recordset(coalesce(pairs, '[]'::jsonb))
+    as p(workspace_id uuid, video_id uuid)
+  on conflict (workspace_id, video_id) do nothing;
+
+  -- Serialize recomputes for each video. The following UPDATE is a separate
+  -- statement, so READ COMMITTED gives it a fresh snapshot after any lock
+  -- holder commits. Stable ordering prevents multi-video statements from
+  -- taking the same row locks in conflicting orders.
+  perform 1
+  from private.video_comment_stats s
+  join jsonb_to_recordset(coalesce(pairs, '[]'::jsonb))
+    as p(workspace_id uuid, video_id uuid)
+    on p.workspace_id = s.workspace_id
+   and p.video_id = s.video_id
+  order by s.workspace_id, s.video_id
+  for update of s;
+
   with affected as (
     select distinct p.workspace_id, p.video_id
     from jsonb_to_recordset(coalesce(pairs, '[]'::jsonb))
@@ -44,12 +64,13 @@ as $$
      and c.video_id = p.video_id
     group by p.workspace_id, p.video_id
   )
-  insert into private.video_comment_stats(workspace_id, video_id, total, analysed)
-  select workspace_id, video_id, total, analysed
+  update private.video_comment_stats s
+  set total = counts.total,
+      analysed = counts.analysed
   from counts
-  on conflict (workspace_id, video_id) do update
-  set total = excluded.total,
-      analysed = excluded.analysed;
+  where s.workspace_id = counts.workspace_id
+    and s.video_id = counts.video_id;
+end;
 $$;
 
 revoke all on function private.refresh_video_comment_stats(jsonb)

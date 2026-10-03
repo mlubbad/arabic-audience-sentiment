@@ -309,6 +309,19 @@ describe("precomputed ops snapshot video counters", () => {
     expect(definition).not.toContain("public.comments");
     expect(definition).not.toContain("public.sentiment_predictions");
 
+    const refreshDefinition = (
+      await db.query<{ definition: string }>(
+        `select pg_get_functiondef(
+           'private.refresh_video_comment_stats(jsonb)'::regprocedure
+         ) as definition`,
+      )
+    ).rows[0].definition.toLowerCase();
+    const lockPosition = refreshDefinition.indexOf("for update");
+    const countPosition = refreshDefinition.indexOf("count(c.id)");
+    expect(lockPosition).toBeGreaterThan(-1);
+    expect(refreshDefinition).toContain("order by s.workspace_id, s.video_id");
+    expect(countPosition).toBeGreaterThan(lockPosition);
+
     const triggers = await db.query<{ name: string; definition: string }>(
       `select tgname as name, pg_get_triggerdef(oid) as definition
        from pg_trigger

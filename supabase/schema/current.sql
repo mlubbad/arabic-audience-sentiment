@@ -188,6 +188,25 @@ alter table "private"."platform_reader" add constraint "platform_reader_status_n
 CREATE UNIQUE INDEX one_active_platform_reader ON private.platform_reader USING btree ((1)) WHERE (status = 'active'::text);
 CREATE UNIQUE INDEX platform_reader_pkey ON private.platform_reader USING btree (id);
 
+create table "private"."video_comment_stats" (
+  "workspace_id" uuid not null,
+  "video_id" uuid not null,
+  "total" integer not null,
+  "analysed" integer not null
+);
+alter table "private"."video_comment_stats" enable row level security;
+
+alter table "private"."video_comment_stats" add constraint "video_comment_stats_analysed_not_null" NOT NULL analysed;
+alter table "private"."video_comment_stats" add constraint "video_comment_stats_check" CHECK (analysed >= 0 AND analysed <= total);
+alter table "private"."video_comment_stats" add constraint "video_comment_stats_pkey" PRIMARY KEY (workspace_id, video_id);
+alter table "private"."video_comment_stats" add constraint "video_comment_stats_total_check" CHECK (total >= 0);
+alter table "private"."video_comment_stats" add constraint "video_comment_stats_total_not_null" NOT NULL total;
+alter table "private"."video_comment_stats" add constraint "video_comment_stats_video_id_not_null" NOT NULL video_id;
+alter table "private"."video_comment_stats" add constraint "video_comment_stats_workspace_id_not_null" NOT NULL workspace_id;
+alter table "private"."video_comment_stats" add constraint "video_comment_stats_workspace_id_video_id_fkey" FOREIGN KEY (workspace_id, video_id) REFERENCES videos(workspace_id, id) ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX video_comment_stats_pkey ON private.video_comment_stats USING btree (workspace_id, video_id);
+
 create table "private"."worker_credentials" (
   "id" uuid default gen_random_uuid() not null,
   "token_hash" text not null,
@@ -3245,6 +3264,219 @@ begin
   return removed;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats(pairs jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  insert into private.video_comment_stats(workspace_id, video_id, total, analysed)
+  select distinct p.workspace_id, p.video_id, 0, 0
+  from jsonb_to_recordset(coalesce(pairs, '[]'::jsonb))
+    as p(workspace_id uuid, video_id uuid)
+  on conflict (workspace_id, video_id) do nothing;
+
+  -- Serialize recomputes for each video. The following UPDATE is a separate
+  -- statement, so READ COMMITTED gives it a fresh snapshot after any lock
+  -- holder commits. Stable ordering prevents multi-video statements from
+  -- taking the same row locks in conflicting orders.
+  perform 1
+  from private.video_comment_stats s
+  join jsonb_to_recordset(coalesce(pairs, '[]'::jsonb))
+    as p(workspace_id uuid, video_id uuid)
+    on p.workspace_id = s.workspace_id
+   and p.video_id = s.video_id
+  order by s.workspace_id, s.video_id
+  for update of s;
+
+  with affected as (
+    select distinct p.workspace_id, p.video_id
+    from jsonb_to_recordset(coalesce(pairs, '[]'::jsonb))
+      as p(workspace_id uuid, video_id uuid)
+  ), counts as (
+    select
+      p.workspace_id,
+      p.video_id,
+      count(c.id)::int as total,
+      count(c.id) filter (
+        where exists (
+          select 1
+          from public.sentiment_predictions sp
+          where sp.workspace_id = c.workspace_id
+            and sp.comment_id = c.id
+            and sp.status = 'succeeded'
+        )
+      )::int as analysed
+    from affected p
+    left join public.comments c
+      on c.workspace_id = p.workspace_id
+     and c.video_id = p.video_id
+    group by p.workspace_id, p.video_id
+  )
+  update private.video_comment_stats s
+  set total = counts.total,
+      analysed = counts.analysed
+  from counts
+  where s.workspace_id = counts.workspace_id
+    and s.video_id = counts.video_id;
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_comment_delete()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pairs jsonb;
+begin
+  select coalesce(
+    jsonb_agg(jsonb_build_object(
+      'workspace_id', touched.workspace_id,
+      'video_id', touched.video_id
+    )),
+    '[]'::jsonb
+  )
+  into pairs
+  from (
+    select distinct workspace_id, video_id
+    from old_comments
+  ) touched;
+
+  perform private.refresh_video_comment_stats(pairs);
+  return null;
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_comment_insert()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pairs jsonb;
+begin
+  select coalesce(
+    jsonb_agg(jsonb_build_object(
+      'workspace_id', touched.workspace_id,
+      'video_id', touched.video_id
+    )),
+    '[]'::jsonb
+  )
+  into pairs
+  from (
+    select distinct workspace_id, video_id
+    from new_comments
+  ) touched;
+
+  perform private.refresh_video_comment_stats(pairs);
+  return null;
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_prediction_delete()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pairs jsonb;
+begin
+  select coalesce(
+    jsonb_agg(jsonb_build_object(
+      'workspace_id', touched.workspace_id,
+      'video_id', touched.video_id
+    )),
+    '[]'::jsonb
+  )
+  into pairs
+  from (
+    select distinct p.workspace_id, c.video_id
+    from old_predictions p
+    join public.comments c
+      on c.workspace_id = p.workspace_id
+     and c.id = p.comment_id
+  ) touched;
+
+  perform private.refresh_video_comment_stats(pairs);
+  return null;
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_prediction_insert()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pairs jsonb;
+begin
+  select coalesce(
+    jsonb_agg(jsonb_build_object(
+      'workspace_id', touched.workspace_id,
+      'video_id', touched.video_id
+    )),
+    '[]'::jsonb
+  )
+  into pairs
+  from (
+    select distinct p.workspace_id, c.video_id
+    from new_predictions p
+    join public.comments c
+      on c.workspace_id = p.workspace_id
+     and c.id = p.comment_id
+  ) touched;
+
+  perform private.refresh_video_comment_stats(pairs);
+  return null;
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_prediction_update()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pairs jsonb;
+begin
+  select coalesce(
+    jsonb_agg(jsonb_build_object(
+      'workspace_id', touched.workspace_id,
+      'video_id', touched.video_id
+    )),
+    '[]'::jsonb
+  )
+  into pairs
+  from (
+    select distinct changed.workspace_id, c.video_id
+    from (
+      select old_p.workspace_id, old_p.comment_id
+      from old_predictions old_p
+      join new_predictions new_p on new_p.id = old_p.id
+      where old_p.status is distinct from new_p.status
+      union
+      select new_p.workspace_id, new_p.comment_id
+      from new_predictions new_p
+      join old_predictions old_p on old_p.id = new_p.id
+      where old_p.status is distinct from new_p.status
+    ) changed
+    join public.comments c
+      on c.workspace_id = changed.workspace_id
+     and c.id = changed.comment_id
+  ) touched;
+
+  perform private.refresh_video_comment_stats(pairs);
+  return null;
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION private.register_channel_impl(w uuid, c uuid, external text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -4715,7 +4947,6 @@ begin
     raise exception 'forbidden' using errcode='42501';
   end if;
 
-  -- Collection health and worker status
   select jsonb_build_object(
     'worker', jsonb_build_object(
       'connected', coalesce(
@@ -4753,22 +4984,8 @@ begin
       order by s.started_at desc limit 1))
   into state;
 
-  -- Usage summary (plan, budgets, quotas)
   select private.usage_summary_impl(w) into plan_summary;
 
-  -- Single-pass computation of stored comments and analysed count across all videos
-  with stats as (
-    select c.video_id,
-           count(*)::int as total,
-           count(sp.comment_id)::int as analysed
-    from public.comments c
-    left join public.sentiment_predictions sp
-      on sp.workspace_id = w
-     and sp.comment_id = c.id
-     and sp.status = 'succeeded'
-    where c.workspace_id = w
-    group by c.video_id
-  )
   select
     coalesce(json_agg(json_build_object(
       'id', v.id::text,
@@ -4782,7 +4999,9 @@ begin
     )
   into video_counts, cat_summary
   from public.videos v
-  left join stats s on s.video_id = v.id
+  left join private.video_comment_stats s
+    on s.workspace_id = v.workspace_id
+   and s.video_id = v.id
   where v.workspace_id = w;
 
   return jsonb_build_object(
@@ -6521,6 +6740,13 @@ grant TRUNCATE on table "private"."platform_reader" to "postgres";
 grant UPDATE on table "private"."platform_reader" to "postgres";
 grant SELECT on table "private"."platform_reader" to "service_role";
 grant UPDATE on table "private"."platform_reader" to "service_role";
+grant DELETE on table "private"."video_comment_stats" to "postgres";
+grant INSERT on table "private"."video_comment_stats" to "postgres";
+grant REFERENCES on table "private"."video_comment_stats" to "postgres";
+grant SELECT on table "private"."video_comment_stats" to "postgres";
+grant TRIGGER on table "private"."video_comment_stats" to "postgres";
+grant TRUNCATE on table "private"."video_comment_stats" to "postgres";
+grant UPDATE on table "private"."video_comment_stats" to "postgres";
 grant DELETE on table "private"."worker_credentials" to "postgres";
 grant INSERT on table "private"."worker_credentials" to "postgres";
 grant REFERENCES on table "private"."worker_credentials" to "postgres";
@@ -7007,6 +7233,12 @@ grant EXECUTE on function private.prune_oauth_states(interval) to "postgres";
 grant EXECUTE on function private.prune_oauth_states(interval) to "service_role";
 grant EXECUTE on function private.purge_comment_text(interval) to "postgres";
 grant EXECUTE on function private.purge_comment_text(interval) to "service_role";
+grant EXECUTE on function private.refresh_video_comment_stats(jsonb) to "postgres";
+grant EXECUTE on function private.refresh_video_comment_stats_after_comment_delete() to "postgres";
+grant EXECUTE on function private.refresh_video_comment_stats_after_comment_insert() to "postgres";
+grant EXECUTE on function private.refresh_video_comment_stats_after_prediction_delete() to "postgres";
+grant EXECUTE on function private.refresh_video_comment_stats_after_prediction_insert() to "postgres";
+grant EXECUTE on function private.refresh_video_comment_stats_after_prediction_update() to "postgres";
 grant EXECUTE on function private.register_channel_impl(uuid,uuid,text) to "authenticated";
 grant EXECUTE on function private.register_channel_impl(uuid,uuid,text) to "postgres";
 grant EXECUTE on function private.register_platform_worker_credential(text,text) to "postgres";
