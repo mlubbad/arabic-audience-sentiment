@@ -1616,6 +1616,9 @@ export const ar = {
   crUnreachable: "تعذر الوصول إلى خدمة الربط. حاول مرة أخرى.",
   adminImpersonateAuditWarning:
     "انتهت جلسة المحاكاة، لكن تعذر تسجيل حدث انتهائها.",
+  adminChannelsLastSuccessfulCollection: "آخر جمع ناجح",
+  adminChannelsNeverCollected: "لم ينجح الجمع بعد",
+  adminChannelsCollectionStale: "الجمع متأخر",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,

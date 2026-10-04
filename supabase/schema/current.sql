@@ -5211,7 +5211,8 @@ begin
         where v.workspace_id = c.workspace_id
           and v.channel_id = c.id),
       'last_sync_at', to_jsonb(ls.started_at),
-      'last_sync_status', ls.status, 'last_sync_error', ls.error_code)
+      'last_sync_status', ls.status, 'last_sync_error', ls.error_code,
+      'last_collect_ok_at', to_jsonb(lc.collected_at))
     from public.channels c
     join public.workspaces w on w.id = c.workspace_id
     left join lateral (
@@ -5220,6 +5221,14 @@ begin
       where sr.channel_id = c.id
       order by sr.started_at desc
       limit 1) ls on true
+    left join lateral (
+      select coalesce(sr.ended_at, sr.started_at) as collected_at
+      from public.sync_runs sr
+      where sr.channel_id = c.id
+        and sr.mode = 'collect'
+        and sr.status in ('succeeded', 'partial')
+      order by sr.started_at desc
+      limit 1) lc on true
     order by w.created_at desc, c.external_channel_id;
 end $function$
 
