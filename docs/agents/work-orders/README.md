@@ -15,3 +15,4 @@ not edit them.
 | [WO-9.md](WO-9.md) | #60 | Codex |
 | [WO-10.md](WO-10.md) | #62 | Codex |
 | [WO-11.md](WO-11.md) | #66 | Codex |
+| [WO-12.md](WO-12.md) | #69 | Codex |
