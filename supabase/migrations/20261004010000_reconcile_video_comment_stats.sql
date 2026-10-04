@@ -37,8 +37,8 @@ begin
       e.workspace_id,
       e.total_comments,
       e.analysed_comments,
-      s.total as stored_total_comments,
-      s.analysed as stored_analysed_comments
+      coalesce(s.total, 0) as stored_total_comments,
+      coalesce(s.analysed, 0) as stored_analysed_comments
     from exact_counts e
     left join private.video_comment_stats s
       on s.video_id = e.video_id

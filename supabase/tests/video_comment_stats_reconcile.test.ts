@@ -389,4 +389,17 @@ describe("video comment stats reconciliation", () => {
       /cron\.schedule\(\s*'reconcile-video-comment-stats',\s*'37 2 \* \* \*'/,
     );
   });
+
+  it("does not count a video with no comments and no stats row as drift", async () => {
+    const empty = "30000000-0000-4000-8000-0000000000ee";
+    await insertVideo(A, channelA, empty, "video-a-empty");
+
+    const result = await reconcileWorkspace(A);
+
+    expect(result).toEqual({
+      workspace_id: A,
+      videos_checked: 4,
+      rows_corrected: 0,
+    });
+  });
 });
