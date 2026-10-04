@@ -3,6 +3,15 @@
 Mirror of GitHub issue #46. **The issue is the source of truth**; this copy exists for agents
 whose token can't read issues. If they differ, ask.
 
+> **Scope change (owner decision, 2026-10-04):** tasks **1 (KPIs)** and **2 (export)** moved to
+> Codex as **WO-14 (#76)**. Gemini keeps tasks **3, 4 and 5**.
+> - Drop from your branch the migration `20261003080000_honest_dashboard_aggregates.sql`, its
+>   test, the `buildExport` changes, the KPI mapping in `Dashboard.tsx` and the aggregates schema
+>   change in `fixture.ts`.
+> - After WO-14 merges, merge `origin/main` into your branch (no rebase, no force-push).
+> - Open the PR as `WO-4c: syncHealth truth, admin services, small UI bugs` (`Closes #46`).
+>   Details: the comment on #46 dated 2026-10-04.
+
 - **Branch:** `gemini/wo-4c-honest-numbers`, created from the **latest** `origin/main`
   (`a807eab` or newer, not `0423b62`).
 - **PR title:** `WO-4c: honest numbers, full export, status truth` (body starts `Closes #46`
