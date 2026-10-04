@@ -1,5 +1,43 @@
 # Progress
 
+## 2026-10-04 — WO-13 merged; local Codex dispatch rebuilt after its first three runs
+
+- **Owner directive:** *"راجع جميع الاخفاقات وجد حلا جذريا لكل منها ومن ثم نفذه"* — review every
+  failure of the day, fix each at the root, then carry on.
+- **WO-13 (#72)** shipped as PR #74 (`021d21b`, merged as `239979d`): the admin Channels page
+  shows the last successful collection per channel and flags stale ones (48 h). Codex reported
+  126 E2E passed / 5 skipped and 464 DB tests passed locally; all five gates green on the PR.
+- **What it took to get there** (the failures and their root fixes are tabulated in
+  `docs/engineering/codex-dispatch.md`):
+  1. Codex is not on PATH; it ships inside ChatGPT.app.
+  2. Run 1: Codex's `workspace-write` sandbox keeps `.git/` read-only by design, so it could not
+     branch — and instead built a bare repository under `/tmp` with `GIT_DIR` pointed at the
+     worktree. Stopped and reverted.
+  3. Runs 2–3 needed `--approve-for-me`, which Claude Code's auto-mode classifier refuses to
+     launch from the dispatcher even with an allow rule; the owner ran run 3 by hand.
+  4. `.agents/skills` was a tracked symlink to `~/.lmstudio/skills` (248+ skills), which
+     overflowed Codex's skills budget on every run and broke `git read-tree` in run 1.
+  5. The log watcher grepped raw text and fired on the playbook's own wording.
+  6. `gh` was missing, so Codex drove Chrome through fifteen UI steps to open the PR.
+  7. After run 3, macOS TCC revoked Terminal's `~/Documents` access, so the bridge session lost
+     every read in the repository (`Operation not permitted`); the fixes were built from a clone
+     in `/tmp`.
+- **Fixes (this entry's PR):** `scripts/codex-dispatch.sh` (the dispatcher owns branch, commit,
+  push, PR and the issue comment through `gh`; Codex only edits and tests inside its sandbox and
+  hands over through `.codex-handoff/`), `scripts/codex-watch.mjs` (+ tests: parses Codex's JSON
+  events, kills Codex on the first forbidden command), `docs/agents/dispatch/codex-constraints.md`
+  (appended to every prompt), `.agents/` removed and gitignored, `AGENTS.md` rule against routing
+  around a block, `docs/decisions.md` entry on the rejected alternatives, and the runbook.
+  On the Mac: `gh` 2.102.0 installed from the pinned release with checksum verification,
+  `~/.local/bin/codex` wrapper.
+- **Copilot / education benefit:** the owner's Copilot Student plan is active. `AGENTS.md` now
+  says what that plan does and does not include; the owner confirms the coding agent and code
+  review are enabled on the repository before the first Copilot chore.
+- **Still open (owner):** re-enable Terminal → Files and Folders → Documents Folder and start a
+  fresh bridge session; `gh auth login` once; decide whether to keep the `codex exec` allow rule
+  in the tracked `.claude/settings.local.json` (prefer `~/.claude/settings.json`); delete the
+  merged `codex/wo-13-collection-freshness` branch.
+
 ## 2026-10-03 — Deploys reach the live site again, with sign-in; deploy now verifies itself
 
 - **Owner reports:**

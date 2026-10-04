@@ -1,5 +1,26 @@
 # Verification
 
+## 2026-10-04 — Codex dispatch: sandbox facts, watcher, dispatcher dry run
+
+All from a clone in `/tmp/aas-src` (the bridge session's own checkout was unreadable, see
+`docs/progress.md`).
+
+| Command / observation | Actual result |
+| --- | --- |
+| `codex --version` via the ChatGPT.app bundle | `codex-cli 0.159.2`; `codex exec --help` lists `-s workspace-write`, `--approve-for-me`, `--json`, `-o`. |
+| Smoke test: `codex exec -s workspace-write -c sandbox_workspace_write.network_access=true` in a standalone clone, prompt = `git fetch origin main; git switch -c …` | Codex's own report: `git fetch origin main` → exit `255`, `error: cannot open '.git/FETCH_HEAD': Operation not permitted`; it stopped as instructed. Proves `.git/` is read-only under `workspace-write` even when `.git` is inside the workspace (not a worktree artefact). Claude Code's classifier allowed this launch form. |
+| Same smoke test, after `git rm .agents/skills .agents/skills.json` | No `Exceeded skills context budget` event in the JSON log (it was the first event of every earlier run). |
+| `npx vitest run scripts/codex-watch.test.ts` | 7 passed. |
+| Mutation: remove `\bGIT_DIR=\|\bgit\s+init\b` from `FORBIDDEN_PATTERNS` | 1 failed / 6 passed (the test that replays run 1's `/tmp` bare-repo command); restored → 7 passed. |
+| Live watcher, fake Codex writing JSONL then `GIT_DIR=/tmp/x git fetch` | `!! FORBIDDEN (git repository outside the workspace) … !! stopping codex (pid …)`; watcher exit 3 after 4 s; the fake process was killed. Clean log with `turn.completed` → exit 0. The first attempt exited 0 immediately: the entry guard compared `/tmp/…` with node's realpath `/private/tmp/…`; fixed with `realpathSync` on both sides. |
+| `CODEX_DRY_RUN=1 scripts/codex-dispatch.sh WO-13 72 codex/wo-13-dry-run` | Cloned `.codex-workspace/`, `codex/wo-13-dry-run @ 239979d (origin/main)`, printed the exact `codex exec` command and the full prompt (task line + constraints). First attempt failed on macOS bash 3.2 (`bad substitution` on a `$(cat)` inside a heredoc inside `$( )`); the prompt is now built with `printf`. |
+| `npx vitest run scripts` | 4 files, 48 passed. |
+| `npm run format:check`; `npx eslint scripts`; `bash -n scripts/codex-dispatch.sh` | All matched files use Prettier code style; no eslint findings; syntax OK. |
+| `npm run check:secrets` | Passed (832 source files, plus built assets). |
+| `gh --version` after install from `gh_2.102.0_macOS_arm64.zip` | sha256 `da922c20…c337e` matched `gh_2.102.0_checksums.txt`; `gh version 2.102.0 (2026-09-30)`; `gh auth status`: not logged in (owner action). |
+| PR #74 merge, read with `git ls-remote` and a depth-5 fetch | `main` = `239979d` "Merge pull request #74", parents `c609150` and `021d21b`. |
+| `git commit` with `core.hooksPath .githooks` on macOS (`/bin/bash` 3.2.57) | Before the fix: `.githooks/pre-commit: line 15: mapfile: command not found`, `line 16: staged: unbound variable`; no commit was created. After replacing `mapfile` with a `read -d ''` loop: the hook ran prettier and eslint over the staged files and the commit landed. |
+
 ## 2026-10-03 — Deploy target, build configuration and live verification
 
 | Command / observation | Actual result |
