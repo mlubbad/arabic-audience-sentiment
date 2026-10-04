@@ -4064,11 +4064,12 @@ begin
   -- Comments already in the database were already metered. A null count adds
   -- nothing to the sum and is reported apart, never as zero.
   select coalesce(sum(greatest(0, v.reported_comment_count
-           - (select count(*) from public.comments cm
-               where cm.workspace_id=w and cm.video_id=v.id))), 0)::bigint,
+           - coalesce(stats.total, 0))), 0)::bigint,
          count(*) filter (where v.reported_comment_count is null)::int
     into estimate, unknowns
     from public.videos v
+    left join private.video_comment_stats stats
+      on stats.workspace_id=w and stats.video_id=v.id
    where v.workspace_id=w and v.id = any(add)
      and not exists(select 1 from public.video_selections s
                      where s.workspace_id=w and s.video_id=v.id);
@@ -4076,11 +4077,12 @@ begin
   -- What is already chosen and not yet stored, priced the same way, across
   -- the whole workspace and before this call writes anything.
   select coalesce(sum(greatest(0, v.reported_comment_count
-           - (select count(*) from public.comments cm
-               where cm.workspace_id=w and cm.video_id=v.id))), 0)::bigint
+           - coalesce(stats.total, 0))), 0)::bigint
     into outstanding
     from public.video_selections s
     join public.videos v on v.workspace_id=w and v.id=s.video_id
+    left join private.video_comment_stats stats
+      on stats.workspace_id=w and stats.video_id=v.id
    where s.workspace_id=w and not (s.video_id = any(remove));
 
   -- A removal alone spends nothing and needs no plan: a paused tenant can still deselect.
@@ -5195,11 +5197,19 @@ begin
       'id', c.id, 'workspace_id', c.workspace_id, 'workspace_name', w.name,
       'external_channel_id', c.external_channel_id,
       'handle', c.handle, 'title', c.title, 'status', c.status,
-      'video_count', (select count(*) from public.videos v where v.channel_id = c.id),
+      'video_count', (
+        select count(*)
+        from public.videos v
+        where v.workspace_id = c.workspace_id
+          and v.channel_id = c.id),
       'comment_count', (
-        select count(*) from public.comments cm
-        join public.videos v on v.id = cm.video_id
-        where v.channel_id = c.id),
+        select coalesce(sum(s.total), 0)
+        from public.videos v
+        left join private.video_comment_stats s
+          on s.workspace_id = v.workspace_id
+         and s.video_id = v.id
+        where v.workspace_id = c.workspace_id
+          and v.channel_id = c.id),
       'last_sync_at', to_jsonb(ls.started_at),
       'last_sync_status', ls.status, 'last_sync_error', ls.error_code)
     from public.channels c
