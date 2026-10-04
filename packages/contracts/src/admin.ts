@@ -58,6 +58,7 @@ export const AdminChannelSchema = z
     last_sync_at: timestamp.nullable(),
     last_sync_status: z.string().nullable(),
     last_sync_error: z.string().nullable(),
+    last_collect_ok_at: timestamp.nullable(),
   })
   .strict();
 

@@ -1605,4 +1605,7 @@ export const en: Strings = {
   crUnreachable: "The connection service could not be reached. Try again.",
   adminImpersonateAuditWarning:
     "The impersonation session ended, but its end event was not recorded.",
+  adminChannelsLastSuccessfulCollection: "Last successful collection",
+  adminChannelsNeverCollected: "Never collected",
+  adminChannelsCollectionStale: "Collection stale",
 };

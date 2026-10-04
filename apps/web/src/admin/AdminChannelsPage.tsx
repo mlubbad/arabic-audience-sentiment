@@ -24,6 +24,7 @@ import { readAdminChannels } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
 
 const NONE = "—";
+export const COLLECTION_STALE_AFTER_MS = 48 * 60 * 60 * 1000;
 
 /** The channel's own status vocabulary, as the foundation migration states
  *  it. The first two are fine; the last two are the operator's work. */
@@ -78,6 +79,9 @@ export function AdminChannelsPage() {
                 <TableHeaderCell>{S.adminChannelsVideos}</TableHeaderCell>
                 <TableHeaderCell>{S.adminChannelsComments}</TableHeaderCell>
                 <TableHeaderCell>{S.adminChannelsLastSync}</TableHeaderCell>
+                <TableHeaderCell>
+                  {S.adminChannelsLastSuccessfulCollection}
+                </TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -105,6 +109,15 @@ function ChannelRow({ channel }: { channel: AdminChannel }) {
     channel.last_sync_at === null
       ? S.adminChannelsNeverSynced
       : `${channel.last_sync_at.slice(0, 10)} · ${channel.last_sync_status ?? NONE}`;
+  const collectionAge =
+    channel.last_collect_ok_at === null
+      ? null
+      : compactAge(Date.now() - Date.parse(channel.last_collect_ok_at));
+  const collectionIsStale =
+    channel.status === "connected" &&
+    (channel.last_collect_ok_at === null ||
+      Date.now() - Date.parse(channel.last_collect_ok_at) >
+        COLLECTION_STALE_AFTER_MS);
   return (
     <TableRow>
       <TableCell>
@@ -125,8 +138,29 @@ function ChannelRow({ channel }: { channel: AdminChannel }) {
       <TableCell>{channel.video_count}</TableCell>
       <TableCell>{channel.comment_count}</TableCell>
       <TableCell>{sync}</TableCell>
+      <TableCell>
+        {channel.last_collect_ok_at === null ? (
+          S.adminChannelsNeverCollected
+        ) : (
+          <time
+            dateTime={channel.last_collect_ok_at}
+            title={channel.last_collect_ok_at}
+          >
+            {collectionAge}
+          </time>
+        )}
+        {collectionIsStale ? (
+          <Badge tone="warning">{S.adminChannelsCollectionStale}</Badge>
+        ) : null}
+      </TableCell>
     </TableRow>
   );
+}
+
+function compactAge(ageMs: number): string {
+  const hours = Math.max(0, Math.floor(ageMs / (60 * 60 * 1000)));
+  if (hours < 48) return `${hours} h`;
+  return `${Math.floor(hours / 24)} d`;
 }
 
 function channelStatus(
