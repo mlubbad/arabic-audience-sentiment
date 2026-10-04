@@ -3224,6 +3224,23 @@ AS $function$
   select user_id from private.platform_admins order by added_at limit 1;
 $function$
 
+CREATE OR REPLACE FUNCTION private.prevent_comment_move()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if new.video_id is distinct from old.video_id
+     or new.workspace_id is distinct from old.workspace_id then
+    raise exception 'comments do not move between videos'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION private.prune_oauth_states(retain interval DEFAULT '7 days'::interval)
  RETURNS integer
  LANGUAGE plpgsql
@@ -3263,6 +3280,121 @@ begin
   get diagnostics removed = row_count;
   return removed;
 end $function$
+
+CREATE OR REPLACE FUNCTION private.reconcile_all_video_comment_stats()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  workspace record;
+  result jsonb;
+  workspaces_checked integer := 0;
+  videos_checked integer := 0;
+  rows_corrected integer := 0;
+  drifted jsonb := '[]'::jsonb;
+begin
+  for workspace in
+    select id
+    from public.workspaces
+    order by id
+  loop
+    result := private.reconcile_video_comment_stats(workspace.id);
+    workspaces_checked := workspaces_checked + 1;
+    videos_checked := videos_checked + (result ->> 'videos_checked')::integer;
+    rows_corrected := rows_corrected + (result ->> 'rows_corrected')::integer;
+
+    if (result ->> 'rows_corrected')::integer > 0 then
+      drifted := drifted || jsonb_build_array(result);
+    end if;
+  end loop;
+
+  return jsonb_build_object(
+    'workspaces_checked', workspaces_checked,
+    'videos_checked', videos_checked,
+    'rows_corrected', rows_corrected,
+    'drifted', drifted
+  );
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.reconcile_video_comment_stats(w uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pairs jsonb := '[]'::jsonb;
+  videos_checked integer := 0;
+  rows_corrected integer := 0;
+begin
+  with exact_counts as (
+    select
+      v.id as video_id,
+      v.workspace_id,
+      count(c.id)::integer as total_comments,
+      count(c.id) filter (
+        where exists (
+          select 1
+          from public.sentiment_predictions sp
+          where sp.comment_id = c.id
+            and sp.workspace_id = c.workspace_id
+            and sp.status = 'succeeded'
+        )
+      )::integer as analysed_comments
+    from public.videos v
+    left join public.comments c
+      on c.video_id = v.id
+     and c.workspace_id = v.workspace_id
+    where v.workspace_id = w
+    group by v.id, v.workspace_id
+  ), drift as (
+    select
+      e.video_id,
+      e.workspace_id,
+      e.total_comments,
+      e.analysed_comments,
+      coalesce(s.total, 0) as stored_total_comments,
+      coalesce(s.analysed, 0) as stored_analysed_comments
+    from exact_counts e
+    left join private.video_comment_stats s
+      on s.video_id = e.video_id
+     and s.workspace_id = e.workspace_id
+  )
+  select
+    count(*)::integer,
+    count(*) filter (
+      where stored_total_comments is distinct from total_comments
+         or stored_analysed_comments is distinct from analysed_comments
+    )::integer,
+    coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'video_id', video_id,
+          'workspace_id', workspace_id
+        )
+      ) filter (
+        where stored_total_comments is distinct from total_comments
+           or stored_analysed_comments is distinct from analysed_comments
+      ),
+      '[]'::jsonb
+    )
+  into videos_checked, rows_corrected, pairs
+  from drift;
+
+  if rows_corrected > 0 then
+    perform private.refresh_video_comment_stats(pairs);
+  end if;
+
+  return jsonb_build_object(
+    'workspace_id', w,
+    'videos_checked', videos_checked,
+    'rows_corrected', rows_corrected
+  );
+end;
+$function$
 
 CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats(pairs jsonb)
  RETURNS void
@@ -7229,10 +7361,15 @@ grant EXECUTE on function private.plan_key_for_price(text) to "postgres";
 grant EXECUTE on function private.plan_limit(uuid,text) to "postgres";
 grant EXECUTE on function private.plan_limit(uuid,text) to "service_role";
 grant EXECUTE on function private.platform_owner() to "postgres";
+grant EXECUTE on function private.prevent_comment_move() to "postgres";
 grant EXECUTE on function private.prune_oauth_states(interval) to "postgres";
 grant EXECUTE on function private.prune_oauth_states(interval) to "service_role";
 grant EXECUTE on function private.purge_comment_text(interval) to "postgres";
 grant EXECUTE on function private.purge_comment_text(interval) to "service_role";
+grant EXECUTE on function private.reconcile_all_video_comment_stats() to "postgres";
+grant EXECUTE on function private.reconcile_all_video_comment_stats() to "service_role";
+grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "postgres";
+grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "service_role";
 grant EXECUTE on function private.refresh_video_comment_stats(jsonb) to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_delete() to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_insert() to "postgres";
