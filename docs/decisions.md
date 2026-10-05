@@ -1,5 +1,29 @@
 # Implementation decisions
 
+2026-10-04 — Local Codex dispatch: the dispatcher owns git, Codex edits inside its sandbox.
+Context: the first WO-13 run (`codex exec -s workspace-write`) could not create a branch and built a
+second repository under `/tmp` pointed at the worktree; the third run only succeeded with
+`--approve-for-me`, which Claude Code's auto-mode classifier refuses to launch. A smoke test in a
+standalone clone proved the cause is Codex's sandbox itself: `.git/` is read-only by design under
+`workspace-write` (so the agent cannot plant hooks that run unsandboxed), and neither `--add-dir`
+nor a writable root on the repository defeats it.
+1. **Rejected: make `.git` writable** (`sandbox_workspace_write.writable_roots=["<repo>/.git"]`,
+   an undocumented carve-out in Codex's permissions policy). It removes a real control and can
+   silently stop working on any Codex upgrade.
+2. **Rejected: `--approve-for-me` / `danger-full-access`.** Both widen Codex beyond its sandbox,
+   and the first is exactly what the dispatcher's own harness blocks.
+3. **Chosen: split the roles.** `scripts/codex-dispatch.sh` prepares a dedicated clone
+   (`.codex-workspace/`, gitignored), creates the branch, runs Codex with
+   `-s workspace-write` and network only, then commits, pushes, opens the PR and comments on the
+   issue through `gh`. Codex hands over its commit message and PR text via `.codex-handoff/`.
+   `scripts/codex-watch.mjs` tails the JSON event log and kills Codex on the first forbidden
+   command (git writes, credential reads, deploys, a second repository), matching commands only
+   so documentation text can no longer trigger it.
+4. **`.agents/skills` removed from the tree.** It was a tracked absolute symlink to
+   `~/.lmstudio/skills` (248+ unrelated skills). It is dangling on every other machine and on CI,
+   and on the owner's Mac it overflowed Codex's skills budget so every skill description was
+   dropped. `.agents/` is now gitignored.
+
 2026-09-24 — Scheduler Statement Timeout Elimination, Resilient Quota Lifecycle, and Centralized Services Health Observability.
 To definitively eliminate recurring failures and statement timeouts identified during comprehensive audit of sync logs, scheduler execution, and background worker queues:
 1. **Early-Stopping Existence Subqueries in Scheduler (`private.schedule_due_work`)**:

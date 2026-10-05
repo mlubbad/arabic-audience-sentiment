@@ -29,7 +29,10 @@ cross-cutting code: not `.github/workflows/**`, the five CI gates, SHA/digest pi
 (Claude/DevOps + Codex own those); not OAuth, DB security or RLS (Codex); not large features
 (Gemini); not the Claude-owned docs. Because its coding agent runs in GitHub Actions and consumes
 Actions minutes, it holds build chores while the account is out of minutes and does review-only
-work (which costs no Actions minutes) until the quota resets or the education benefit lands.
+work (which costs no Actions minutes) until the quota resets. The owner's GitHub Education benefit
+is active (Copilot Student plan, 2026-10-04): it is auto-model-selection only and excludes
+third-party agents, and whether its coding agent and code review are enabled for this repository
+is confirmed by the owner in the repository's Copilot settings before the first chore is assigned.
 
 Work arrives as a **GitHub issue (work order)**. You build it on your own branch, open a PR,
 and Claude reviews it. Only the owner merges. The playbook has the details; the short form is:
@@ -38,6 +41,10 @@ and Claude reviews it. Only the owner merges. The playbook has the details; the 
 - Touch only the paths your work order lists as owned. Ask on the issue before touching anything else.
 - **Never push to `main`, never merge, never deploy, never apply migrations remotely.**
 - Paste real command output. For every new test, show that it fails on the old code.
+- Blocked by a sandbox or a permission? Report it verbatim and stop. Never route around it: no
+  `GIT_DIR`, no second repository under `/tmp`, no browser automation in place of a blocked CLI.
+  (When Claude dispatches Codex locally, `scripts/codex-dispatch.sh` owns every git write and
+  the PR; see `docs/engineering/codex-dispatch.md`.)
 - `docs/progress.md`, `docs/verification.md`, `docs/decisions.md`, `docs/adr/`, `AGENTS.md`,
   `CLAUDE.md` and `GEMINI.md` are edited by Claude only, so they never conflict between agents.
 

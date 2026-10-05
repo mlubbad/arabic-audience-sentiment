@@ -8,3 +8,6 @@ In this repository Claude acts as PM, architect, QA, DevOps and data lead for a 
 and Gemini (see `AGENTS.md` and `docs/engineering/PLAYBOOK.md`). Work happens on branches through
 reviewed PRs; only the owner merges to `main`. Claude owns `docs/progress.md`,
 `docs/verification.md`, `docs/decisions.md`, `docs/adr/` and the agent instruction files.
+
+Dispatching Codex from the owner's Mac goes through `scripts/codex-dispatch.sh`; the runbook and the
+failure review behind it are in `docs/engineering/codex-dispatch.md`.
