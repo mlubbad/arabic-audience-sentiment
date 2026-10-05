@@ -21,6 +21,43 @@ All from a clone in `/tmp/aas-src` (the bridge session's own checkout was unread
 | PR #74 merge, read with `git ls-remote` and a depth-5 fetch | `main` = `239979d` "Merge pull request #74", parents `c609150` and `021d21b`. |
 | `git commit` with `core.hooksPath .githooks` on macOS (`/bin/bash` 3.2.57) | Before the fix: `.githooks/pre-commit: line 15: mapfile: command not found`, `line 16: staged: unbound variable`; no commit was created. After replacing `mapfile` with a `read -d ''` loop: the hook ran prettier and eslint over the staged files and the commit landed. |
 
+## 2026-10-05 — Channel search shows its error code
+
+From the cloud checkout of `claude/keen-keller-skwwpm` at `b94a8d4`, Linux. Every lookup failure
+without its own sentence used to read "تعذّر البحث عن القنوات. حاول من جديد."; the owner could not
+tell a lapsed reader token from a refused key or an unreachable function without DevTools. The
+generic sentence now carries the code (the function's `code`, else `http_<status>`, else the client
+error class), isolated with FSI/PDI so it keeps its order in Arabic. Only `[A-Za-z0-9_.:-]{1,64}` is
+echoed.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run apps/web/src/account/channelLookupError.test.ts` | 8 passed. |
+| Mutation: generic branch back to `S.addChannelFailed` | 2 of 8 fail. |
+| Mutation: drop the `http_<status>` fallback | 1 of 8 fails. |
+| `npm run check` | Exit 0: web 141 files / 1100 tests, DB 55 / 469, worker 297, secrets check clean. |
+
+Not verified here: the live failure itself. The owner's next search shows which code it is.
+
+### Follow-up: the three `forbidden` refusals get their own codes
+
+The owner's DevTools showed `403 {"code":"forbidden"}`, and the function log had only boot and
+shutdown lines. Legacy API keys are still enabled (owner's screenshot), so a disabled anon key is
+ruled out. `channel-lookup` now answers `forbidden:session` (`getUser` refused),
+`forbidden:membership_read` (the memberships read failed) or `forbidden:role` (not owner or analyst),
+and logs the code with the error's name, code and message. The decision lives in
+`supabase/functions/_shared/lookup-access.ts`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/lookup_access.test.ts` | 6 passed. |
+| Mutation: membership-read error reported as `role` | 1 of 6 fails. |
+| Mutation: `viewer` allowed to name a channel | 1 of 6 fails. |
+| `npm run check` (includes `deno check` of every function) | Exit 0: web 141 / 1100, DB 56 / 475, worker 297, secrets check clean. |
+
+Not done here: deploying the function. CI does not deploy Edge Functions; the owner runs
+`supabase functions deploy channel-lookup`.
+
 ## 2026-10-05 — Dispatcher follow-up rounds continue the branch
 
 From the cloud checkout of `claude/keen-keller-skwwpm`, Linux, bash 5.

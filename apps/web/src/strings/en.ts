@@ -196,6 +196,8 @@ export const en: Strings = {
     "The channel was added as public data. The next step is listing its videos.",
   addChannelExists: "This channel is already added to this workspace.",
   addChannelFailed: "The channel search failed. Try again.",
+  addChannelFailedCode: (code: string) =>
+    `The channel search failed (error code: \u2068${code}\u2069). Try again; if it keeps failing, send this code to support.`,
   addChannelQueryInvalid:
     "Enter a valid channel link, a handle, or a name to search.",
   addChannelNotConfigured:
