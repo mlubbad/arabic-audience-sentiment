@@ -7,6 +7,7 @@ vi.mock("../supabase", () => ({
 
 import { buildLiveServicesReport, readAdminServicesHealth } from "./adminRead";
 import { getDemoServicesHealth } from "./adminServicesDemo";
+import { failureCode } from "../failure";
 
 beforeEach(() => rpc.mockReset());
 
@@ -79,9 +80,18 @@ describe("readAdminServicesHealth (live)", () => {
 
   it("throws when the RPC returns nothing", async () => {
     rpc.mockResolvedValue({ data: null, error: null });
-    await expect(readAdminServicesHealth()).rejects.toThrow(
-      "services_health_unavailable",
-    );
+    await expect(readAdminServicesHealth()).rejects.toThrow("live_unavailable");
+  });
+
+  it("names the database's code on the page, not `unexpected`", async () => {
+    // Production answered PGRST202 for a function its migration history
+    // recorded but its catalogue did not hold (2026-10-05).
+    rpc.mockResolvedValue({
+      data: null,
+      error: { code: "PGRST202", message: "Could not find the function" },
+    });
+    const error = await readAdminServicesHealth().catch((e: unknown) => e);
+    expect(failureCode("read", error)).toBe("read:live_unavailable:PGRST202");
   });
 
   it("returns the demo report only when asked for it", async () => {
