@@ -635,6 +635,17 @@ export async function submitTopicReview(mode: DataMode, raw: TopicReviewInput) {
 
 export const EXPORT_ROW_CAP = 10_000;
 
+function exportFilename(
+  workspace: string,
+  truncated: boolean,
+  totalRows: number,
+) {
+  const filename = exportObjectPath(workspace, new Date()).split("/").pop()!;
+  return truncated
+    ? filename.replace(/\.csv$/, `-first-${EXPORT_ROW_CAP}-of-${totalRows}.csv`)
+    : filename;
+}
+
 /**
  * Builds the export from the filters currently on screen, through the same
  * shared row selection the dashboard uses. In fixture mode the file is produced
@@ -645,6 +656,46 @@ export const EXPORT_ROW_CAP = 10_000;
  * For browser stability and memory protection, rows are capped at EXPORT_ROW_CAP.
  */
 export async function buildExport(mode: DataMode, filters: Filters) {
+  if (mode === "live") {
+    const aggregates = await loadDashboardAggregates(
+      mode,
+      filters.workspace_id,
+      filters,
+    );
+    const totalRows = aggregates.total;
+    const comments: Comment[] = [];
+    const rpcFilters = filtersToRpc(filters);
+
+    while (comments.length < totalRows && comments.length < EXPORT_ROW_CAP) {
+      const limit = Math.min(100, EXPORT_ROW_CAP - comments.length);
+      const page = await loadDashboardComments(mode, filters.workspace_id, {
+        ...rpcFilters,
+        limit,
+        offset: comments.length,
+      });
+      if (page.comments.length === 0) break;
+      comments.push(...page.comments);
+    }
+
+    const rows = comments
+      .slice(0, EXPORT_ROW_CAP)
+      .map((comment) =>
+        toLabelledComment(
+          comment,
+          aggregates.active_analysis_key ?? "",
+          aggregates.active_topic_key ?? "",
+        ),
+      );
+    const truncated = totalRows > EXPORT_ROW_CAP;
+    return {
+      rows: rows.length,
+      totalRows,
+      truncated,
+      filename: exportFilename(filters.workspace_id, truncated, totalRows),
+      csv: toCsv(rows),
+    };
+  }
+
   const source = await loadSource(mode, filters.workspace_id);
   const rows = exportRows(
     source.comments,
@@ -657,9 +708,11 @@ export async function buildExport(mode: DataMode, filters: Filters) {
     rows: cappedRows.length,
     totalRows: rows.length,
     truncated: rows.length > EXPORT_ROW_CAP,
-    filename: exportObjectPath(filters.workspace_id, new Date())
-      .split("/")
-      .pop()!,
+    filename: exportFilename(
+      filters.workspace_id,
+      rows.length > EXPORT_ROW_CAP,
+      rows.length,
+    ),
     csv: toCsv(cappedRows),
   };
 }
