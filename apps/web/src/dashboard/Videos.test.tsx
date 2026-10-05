@@ -68,4 +68,37 @@ describe("Videos", () => {
         ar.legendMeasured(ar.labels.negative, "1", 50),
     );
   });
+
+  it("does not show an engagement rate when the like count is unknown", () => {
+    const withViews = { ...video, view_count: 200, like_count: null };
+    render(
+      <Videos
+        s={{ ...s, videos: [withViews] } as unknown as Snapshot}
+        S={ar}
+        slice={{ ...slice, items: [withViews] } as typeof slice}
+        video=""
+        onTurn={() => {}}
+        onPick={() => {}}
+      />,
+    );
+    expect(screen.queryByText(new RegExp(ar.kpiEngagement))).toBeNull();
+  });
+
+  it("shows the engagement rate once likes are known", () => {
+    const known = { ...video, view_count: 200, like_count: 6 };
+    render(
+      <Videos
+        s={{ ...s, videos: [known] } as unknown as Snapshot}
+        S={ar}
+        slice={{ ...slice, items: [known] } as typeof slice}
+        video=""
+        onTurn={() => {}}
+        onPick={() => {}}
+      />,
+    );
+    // (6 likes + 4 comments) / 200 views = 5٪
+    expect(screen.getByText(new RegExp(ar.kpiEngagement))).toHaveTextContent(
+      "5٪",
+    );
+  });
 });

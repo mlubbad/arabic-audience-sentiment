@@ -28,7 +28,8 @@ import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import type { PageSlice } from "../videoPaging";
 import { videoLabel } from "../i18n";
-import { n } from "./format";
+import { n, pct } from "./format";
+import { useLocale } from "../locale";
 import { splitAriaLabel, splitSegments } from "./splitBar";
 import "./videos.css";
 
@@ -50,6 +51,7 @@ export function Videos({
   onPick: (id: string) => void;
 }) {
   const labels = S.labels;
+  const lang = useLocale();
   return (
     <section className="db-section" id="rp-videos">
       <header>
@@ -131,14 +133,21 @@ export function Videos({
                     {n(v.like_count)} {S.kpiLikes}
                   </Badge>
                 )}
-                {v.view_count != null && v.view_count > 0 && (
-                  <Badge numeric tone="sentiment-neutral">
-                    {Math.round(
-                      (((v.like_count ?? 0) + v.total) / v.view_count) * 1000,
-                    ) / 10}
-                    ٪ {S.kpiEngagement}
-                  </Badge>
-                )}
+                {/* Engagement needs the like count: an unknown count is not
+                    zero likes, so without it the rate is not shown. */}
+                {v.like_count != null &&
+                  v.view_count != null &&
+                  v.view_count > 0 && (
+                    <Badge numeric tone="sentiment-neutral">
+                      {pct(
+                        Math.round(
+                          ((v.like_count + v.total) / v.view_count) * 1000,
+                        ) / 10,
+                        lang,
+                      )}{" "}
+                      {S.kpiEngagement}
+                    </Badge>
+                  )}
                 <Badge numeric>{S.countComments(n(v.total))}</Badge>
                 <Badge numeric>{S.countReplies(n(v.replies))}</Badge>
                 <Badge numeric>{S.countAnalysed(n(v.analysed))}</Badge>

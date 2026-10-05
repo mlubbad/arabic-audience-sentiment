@@ -18,6 +18,15 @@ import {
 } from "../ui/Dialog";
 import { updatePlanLimits } from "./adminRead";
 
+/** A whole number of at least -1 (-1 means unlimited), or null for a blank
+ *  or malformed field. */
+export function parseLimit(raw: string): number | null {
+  const t = raw.trim();
+  if (!/^-?\d+$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isSafeInteger(n) && n >= -1 ? n : null;
+}
+
 export function EditPlanLimitsDialog({
   plan,
   open,
@@ -32,22 +41,26 @@ export function EditPlanLimitsDialog({
   const S = useStrings();
   const locale = useLocale();
 
-  const [channels, setChannels] = useState<number>(plan?.limits.channels ?? 1);
-  const [analysisUnits, setAnalysisUnits] = useState<number>(
-    plan?.limits.analysis_units ?? 10000,
+  const [channels, setChannels] = useState<string>(
+    String(plan?.limits.channels ?? 1),
   );
-  const [backfillUnits, setBackfillUnits] = useState<number>(
-    plan?.backfill_units ?? 40000,
+  const [analysisUnits, setAnalysisUnits] = useState<string>(
+    String(plan?.limits.analysis_units ?? 10000),
   );
-  const [historicalDays, setHistoricalDays] = useState<number>(
-    plan?.historical_days_limit ?? -1,
+  const [backfillUnits, setBackfillUnits] = useState<string>(
+    String(plan?.backfill_units ?? 40000),
   );
-  const [topicUnits, setTopicUnits] = useState<number>(
-    plan?.limits.topic_units ?? 4000,
+  const [historicalDays, setHistoricalDays] = useState<string>(
+    String(plan?.historical_days_limit ?? -1),
   );
-  const [members, setMembers] = useState<number>(plan?.limits.members ?? 1);
-  const [workspaces, setWorkspaces] = useState<number>(
-    plan?.limits.workspaces ?? 1,
+  const [topicUnits, setTopicUnits] = useState<string>(
+    String(plan?.limits.topic_units ?? 4000),
+  );
+  const [members, setMembers] = useState<string>(
+    String(plan?.limits.members ?? 1),
+  );
+  const [workspaces, setWorkspaces] = useState<string>(
+    String(plan?.limits.workspaces ?? 1),
   );
   const [allowPublic, setAllowPublic] = useState<boolean>(
     plan?.allow_public_channels ?? false,
@@ -64,21 +77,38 @@ export function EditPlanLimitsDialog({
     e.preventDefault();
     if (!plan) return;
 
+    // A blank or malformed field is an error, never 0: a limit of 0 would
+    // silently lock every workspace on this plan out of the feature.
+    const values = {
+      channels: parseLimit(channels),
+      analysisUnits: parseLimit(analysisUnits),
+      backfillUnits: parseLimit(backfillUnits),
+      historicalDays: parseLimit(historicalDays),
+      topicUnits: parseLimit(topicUnits),
+      members: parseLimit(members),
+      workspaces: parseLimit(workspaces),
+    };
+    if (Object.values(values).some((v) => v === null)) {
+      setErrorMsg(S.adminPlanLimitsInvalid);
+      return;
+    }
+    const v = values as { [K in keyof typeof values]: number };
+
     setSaving(true);
     setErrorMsg(null);
 
     try {
       await updatePlanLimits(plan.key, {
-        channels,
-        channels_limit: channels,
-        analysis_units: analysisUnits,
-        backfill_units: backfillUnits,
-        historical_days_limit: historicalDays,
-        topic_units: topicUnits,
-        members,
-        members_limit: members,
-        workspaces,
-        workspaces_limit: workspaces,
+        channels: v.channels,
+        channels_limit: v.channels,
+        analysis_units: v.analysisUnits,
+        backfill_units: v.backfillUnits,
+        historical_days_limit: v.historicalDays,
+        topic_units: v.topicUnits,
+        members: v.members,
+        members_limit: v.members,
+        workspaces: v.workspaces,
+        workspaces_limit: v.workspaces,
         allow_public_channels: allowPublic,
       });
       onSuccess();
@@ -140,8 +170,8 @@ export function EditPlanLimitsDialog({
               >
                 <input
                   type="checkbox"
-                  checked={channels === -1}
-                  onChange={(e) => setChannels(e.target.checked ? -1 : 1)}
+                  checked={channels === "-1"}
+                  onChange={(e) => setChannels(e.target.checked ? "-1" : "1")}
                   data-testid="checkbox-unlimited-channels"
                 />
                 <span>{S.adminPlanUnlimitedCheckbox}</span>
@@ -151,7 +181,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={channels}
-              onChange={(e) => setChannels(parseInt(e.target.value, 10) || 0)}
+              onChange={(e) => setChannels(e.target.value)}
               required
               data-testid="input-plan-channels"
             />
@@ -180,9 +210,9 @@ export function EditPlanLimitsDialog({
               >
                 <input
                   type="checkbox"
-                  checked={analysisUnits === -1}
+                  checked={analysisUnits === "-1"}
                   onChange={(e) =>
-                    setAnalysisUnits(e.target.checked ? -1 : 10000)
+                    setAnalysisUnits(e.target.checked ? "-1" : "10000")
                   }
                   data-testid="checkbox-unlimited-analysis"
                 />
@@ -193,9 +223,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={analysisUnits}
-              onChange={(e) =>
-                setAnalysisUnits(parseInt(e.target.value, 10) || 0)
-              }
+              onChange={(e) => setAnalysisUnits(e.target.value)}
               required
               data-testid="input-plan-analysis-units"
             />
@@ -224,9 +252,9 @@ export function EditPlanLimitsDialog({
               >
                 <input
                   type="checkbox"
-                  checked={backfillUnits === -1}
+                  checked={backfillUnits === "-1"}
                   onChange={(e) =>
-                    setBackfillUnits(e.target.checked ? -1 : 40000)
+                    setBackfillUnits(e.target.checked ? "-1" : "40000")
                   }
                   data-testid="checkbox-unlimited-backfill"
                 />
@@ -237,9 +265,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={backfillUnits}
-              onChange={(e) =>
-                setBackfillUnits(parseInt(e.target.value, 10) || 0)
-              }
+              onChange={(e) => setBackfillUnits(e.target.value)}
               required
               data-testid="input-plan-backfill-units"
             />
@@ -268,9 +294,9 @@ export function EditPlanLimitsDialog({
               >
                 <input
                   type="checkbox"
-                  checked={historicalDays === -1}
+                  checked={historicalDays === "-1"}
                   onChange={(e) =>
-                    setHistoricalDays(e.target.checked ? -1 : 30)
+                    setHistoricalDays(e.target.checked ? "-1" : "30")
                   }
                   data-testid="checkbox-unlimited-historical-days"
                 />
@@ -281,9 +307,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={historicalDays}
-              onChange={(e) =>
-                setHistoricalDays(parseInt(e.target.value, 10) || 0)
-              }
+              onChange={(e) => setHistoricalDays(e.target.value)}
               required
               data-testid="input-plan-historical-days"
             />
@@ -312,8 +336,10 @@ export function EditPlanLimitsDialog({
               >
                 <input
                   type="checkbox"
-                  checked={topicUnits === -1}
-                  onChange={(e) => setTopicUnits(e.target.checked ? -1 : 4000)}
+                  checked={topicUnits === "-1"}
+                  onChange={(e) =>
+                    setTopicUnits(e.target.checked ? "-1" : "4000")
+                  }
                   data-testid="checkbox-unlimited-topic-units"
                 />
                 <span>{S.adminPlanUnlimitedCheckbox}</span>
@@ -323,7 +349,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={topicUnits}
-              onChange={(e) => setTopicUnits(parseInt(e.target.value, 10) || 0)}
+              onChange={(e) => setTopicUnits(e.target.value)}
               required
               data-testid="input-plan-topic-units"
             />
@@ -352,8 +378,8 @@ export function EditPlanLimitsDialog({
               >
                 <input
                   type="checkbox"
-                  checked={members === -1}
-                  onChange={(e) => setMembers(e.target.checked ? -1 : 1)}
+                  checked={members === "-1"}
+                  onChange={(e) => setMembers(e.target.checked ? "-1" : "1")}
                   data-testid="checkbox-unlimited-members"
                 />
                 <span>{S.adminPlanUnlimitedCheckbox}</span>
@@ -363,7 +389,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={members}
-              onChange={(e) => setMembers(parseInt(e.target.value, 10) || 0)}
+              onChange={(e) => setMembers(e.target.value)}
               required
               data-testid="input-plan-members"
             />
@@ -392,8 +418,8 @@ export function EditPlanLimitsDialog({
               >
                 <input
                   type="checkbox"
-                  checked={workspaces === -1}
-                  onChange={(e) => setWorkspaces(e.target.checked ? -1 : 1)}
+                  checked={workspaces === "-1"}
+                  onChange={(e) => setWorkspaces(e.target.checked ? "-1" : "1")}
                   data-testid="checkbox-unlimited-workspaces"
                 />
                 <span>{S.adminPlanUnlimitedCheckbox}</span>
@@ -403,7 +429,7 @@ export function EditPlanLimitsDialog({
               type="number"
               min={-1}
               value={workspaces}
-              onChange={(e) => setWorkspaces(parseInt(e.target.value, 10) || 0)}
+              onChange={(e) => setWorkspaces(e.target.value)}
               required
               data-testid="input-plan-workspaces"
             />

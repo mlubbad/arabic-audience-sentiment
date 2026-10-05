@@ -32,7 +32,7 @@ import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import type { Locale } from "../locale";
 import { commentText, displayDate } from "../i18n";
-import { n } from "./format";
+import { n, pct } from "./format";
 import { EXPORT_ROW_CAP } from "../data";
 import { CommentsTable, confidencePct } from "./CommentsTable";
 import "./comments.css";
@@ -153,10 +153,7 @@ export function Comments({
                   <Badge tone={c.label ? SENTIMENT_TONE[c.label] : "neutral"}>
                     {c.label ? labels[c.label] : S.noLabel}
                     {score !== null && (
-                      <span className="db-chip-score">
-                        {score}
-                        {lang === "ar" ? "٪" : "%"}
-                      </span>
+                      <span className="db-chip-score">{pct(score, lang)}</span>
                     )}
                   </Badge>
                 </div>

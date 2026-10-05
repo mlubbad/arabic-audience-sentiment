@@ -19,7 +19,9 @@ import {
   type AdminChannel,
   type AdminOps,
   type AdminUser,
+  type ServiceHealthItem,
   type ServicesHealthReport,
+  type ServiceStatus,
 } from "@sentiment/contracts";
 import { supabase } from "../supabase";
 import { getDemoServicesHealth } from "./adminServicesDemo";
@@ -80,65 +82,118 @@ export async function updatePlanLimits(
   return data as { ok: boolean; plan: unknown };
 }
 
+/** What `admin_services_health()` returns today: telemetry for the database,
+ *  the worker and the last day's sync runs. Nothing else is measured. */
+type ServicesHealthRpc = {
+  checked_at?: string;
+  database?: { size_mb?: number | null; active_connections?: number | null };
+  worker?: { fresh?: boolean | null; jobs_queued?: number | null };
+};
+
+const STATUS_RANK: Record<ServiceStatus, number> = {
+  down: 3,
+  degraded: 2,
+  healthy: 1,
+  unconfigured: 0,
+  not_monitored: 0,
+};
+
+/**
+ * The live report, built only from what the server measured. The demo module
+ * supplies each service's name, category and endpoint (descriptors, not
+ * telemetry); every reading starts unknown and only the database and the
+ * worker are filled in. A service with no reading is `not_monitored`, never
+ * the demo's "healthy".
+ */
+export function buildLiveServicesReport(
+  data: ServicesHealthRpc,
+  dbLatencyMs: number,
+  now: Date = new Date(),
+): ServicesHealthReport {
+  const checkedAt = data.checked_at ?? now.toISOString();
+  const services: ServiceHealthItem[] = getDemoServicesHealth().services.map(
+    (s) => ({
+      ...s,
+      status: "not_monitored",
+      latency_ms: null,
+      quota_used: null,
+      details: "",
+      last_checked_at: checkedAt,
+      error_code: null,
+      remediation: null,
+    }),
+  );
+
+  const pg = services.find((s) => s.id === "supabase_postgres");
+  if (pg) {
+    // The RPC answered, so the database is reachable; how fast is measured.
+    pg.status = "healthy";
+    pg.latency_ms = dbLatencyMs;
+    pg.quota_used = data.database?.size_mb ?? null;
+    const parts: string[] = [];
+    if (data.database?.active_connections != null)
+      parts.push(`الاتصالات النشطة: ${data.database.active_connections}`);
+    if (data.database?.size_mb != null)
+      parts.push(`مساحة التخزين: ${data.database.size_mb} MB`);
+    pg.details = parts.join(" · ");
+  }
+
+  const worker = services.find((s) => s.id === "python_worker");
+  if (worker && data.worker?.fresh != null) {
+    worker.status = data.worker.fresh ? "healthy" : "degraded";
+    worker.quota_used = data.worker.jobs_queued ?? null;
+  }
+
+  const count = (status: ServiceStatus) =>
+    services.filter((s) => s.status === status).length;
+  const latencies = services
+    .map((s) => s.latency_ms)
+    .filter((v): v is number => v != null);
+  const monitored = services.filter(
+    (s) => s.status !== "not_monitored" && s.status !== "unconfigured",
+  );
+  const overall: ServiceStatus = monitored.length
+    ? monitored.reduce<ServiceStatus>(
+        (worst, s) =>
+          STATUS_RANK[s.status] > STATUS_RANK[worst] ? s.status : worst,
+        "healthy",
+      )
+    : "not_monitored";
+
+  return ServicesHealthReportSchema.parse({
+    overall_status: overall,
+    checked_at: checkedAt,
+    summary: {
+      total: services.length,
+      healthy: count("healthy"),
+      degraded: count("degraded"),
+      down: count("down"),
+      unconfigured: count("unconfigured"),
+      not_monitored: count("not_monitored"),
+      avg_latency_ms: latencies.length
+        ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+        : null,
+    },
+    services,
+  });
+}
+
+/**
+ * Demo data only when the page asked for it (`?demo`). In live mode a failed
+ * read is thrown as it came, so the page shows its error state; it never
+ * falls back to the demo report, which would read "healthy" for services
+ * nobody measured.
+ */
 export async function readAdminServicesHealth(options?: {
   isDemo?: boolean;
 }): Promise<ServicesHealthReport> {
   if (options?.isDemo || !supabase) {
     return getDemoServicesHealth();
   }
-
-  try {
-    const t0 = performance.now();
-    const { data, error } = await supabase.rpc("admin_services_health");
-    const t1 = performance.now();
-    const dbLatencyMs = Math.round(t1 - t0);
-
-    if (error || !data) {
-      // In case the migration hasn't been applied to remote yet or local fallback,
-      // return demo health with measured db latency.
-      const fallback = getDemoServicesHealth();
-      fallback.services[0].latency_ms = dbLatencyMs;
-      return fallback;
-    }
-
-    const baseDemo = getDemoServicesHealth();
-    const db = (
-      data as { database?: { size_mb?: number; active_connections?: number } }
-    ).database;
-    const worker = (
-      data as { worker?: { fresh?: boolean; jobs_queued?: number } }
-    ).worker;
-    const sync24h = (data as { sync_24h?: { youtube_runs?: number } }).sync_24h;
-
-    // Enhance base telemetry with live database telemetry
-    baseDemo.checked_at =
-      (data as { checked_at?: string }).checked_at || new Date().toISOString();
-
-    // Update postgres row
-    const pg = baseDemo.services.find((s) => s.id === "supabase_postgres");
-    if (pg) {
-      pg.latency_ms = dbLatencyMs;
-      if (db?.size_mb != null) pg.quota_used = db.size_mb;
-      if (db?.active_connections != null) {
-        pg.details = `الاتصالات النشطة: ${db.active_connections}/100 · مساحة التخزين: ${db.size_mb || 0} MB · سياسات RLS مفعّلة`;
-      }
-    }
-
-    // Update worker row
-    const w = baseDemo.services.find((s) => s.id === "python_worker");
-    if (w && worker) {
-      w.status = worker.fresh ? "healthy" : "degraded";
-      w.quota_used = worker.jobs_queued ?? 0;
-    }
-
-    // Update youtube row
-    const yt = baseDemo.services.find((s) => s.id === "youtube_api");
-    if (yt && sync24h?.youtube_runs != null) {
-      yt.quota_used = Math.min(10000, sync24h.youtube_runs * 100);
-    }
-
-    return ServicesHealthReportSchema.parse(baseDemo);
-  } catch {
-    return getDemoServicesHealth();
-  }
+  const t0 = performance.now();
+  const { data, error } = await supabase.rpc("admin_services_health");
+  const dbLatencyMs = Math.round(performance.now() - t0);
+  if (error) throw error;
+  if (!data) throw new Error("services_health_unavailable");
+  return buildLiveServicesReport(data as ServicesHealthRpc, dbLatencyMs);
 }

@@ -28,7 +28,7 @@ import type { Snapshot } from "./Dashboard";
 import type { Locale } from "../locale";
 import { commentText, displayDate } from "../i18n";
 import { useMediaQuery } from "../ui/useMediaQuery";
-import { n } from "./format";
+import { n, pct } from "./format";
 import "./comments.css";
 
 /** The sentiment scale's own tone, never `neutral`'s badge default — same
@@ -68,10 +68,7 @@ function SentimentChip({
     >
       {c.label ? labels[c.label] : noLabelText}
       {score !== null && (
-        <span className="db-chip-score">
-          {score}
-          {lang === "ar" ? "٪" : "%"}
-        </span>
+        <span className="db-chip-score">{pct(score, lang)}</span>
       )}
     </Badge>
   );
@@ -191,7 +188,7 @@ export function CommentsTable({
                   {c.is_reply && <small>{S.replyTag}</small>}
                   {c.reply_count != null && c.reply_count > 0 && (
                     <small className="db-comment-replies-badge">
-                      ({n(c.reply_count)} {S.countReplies(n(c.reply_count))})
+                      ({S.countReplies(n(c.reply_count))})
                     </small>
                   )}
                 </div>
@@ -276,7 +273,7 @@ export function CommentsTable({
                     {c.is_reply && <small>{S.replyTag}</small>}
                     {c.reply_count != null && c.reply_count > 0 && (
                       <small className="db-comment-replies-badge">
-                        ({n(c.reply_count)} {S.countReplies(n(c.reply_count))})
+                        ({S.countReplies(n(c.reply_count))})
                       </small>
                     )}
                   </div>

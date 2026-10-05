@@ -930,6 +930,7 @@ describe("ServicesHealthReportSchema and ServiceHealthItemSchema", () => {
         degraded: 1,
         down: 0,
         unconfigured: 0,
+        not_monitored: 0,
         avg_latency_ms: 45.2,
       },
       services: [
