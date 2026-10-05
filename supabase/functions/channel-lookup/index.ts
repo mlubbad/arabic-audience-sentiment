@@ -203,25 +203,19 @@ Deno.serve(async (request) => {
   const db = createClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
     global: { headers: { authorization: auth } },
   });
-  const {
-    data: { user },
-    error: userError,
-  } = await db.auth.getUser();
-  const { data: memberships, error: memberError } =
-    user && !userError
-      ? await db
-          .from("memberships")
-          .select("role")
-          .eq("workspace_id", body.workspace_id)
-          .eq("user_id", user.id)
-      : { data: null, error: null };
-  const refusal = lookupRefusal({ user, userError, memberships, memberError });
+  // The token is verified by PostgREST and the role is the caller's own; no
+  // separate Auth `/user` call (see `_shared/lookup-access.ts`).
+  const { data: role, error: roleError } = await db.rpc("my_role", {
+    w: body.workspace_id,
+  });
+  const refusal = lookupRefusal({
+    role: typeof role === "string" ? role : null,
+    roleError,
+  });
   if (refusal) {
     console.error("channel-lookup refused", {
       code: refusal,
-      ...refusalDetail(
-        refusal === "forbidden:session" ? userError : memberError,
-      ),
+      ...refusalDetail(roleError),
     });
     return json(403, { code: refusal });
   }
