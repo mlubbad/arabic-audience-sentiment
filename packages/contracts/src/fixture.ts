@@ -159,7 +159,7 @@ export const DashboardAggregatesSchema = z.object({
 export type DashboardAggregates = z.infer<typeof DashboardAggregatesSchema>;
 
 export const DashboardCommentsResponseSchema = z.object({
-  total: z.number().int(),
+  total: z.number().int().nullable(),
   comments: z.array(CommentSchema),
   limit: z.number().int(),
   offset: z.number().int(),

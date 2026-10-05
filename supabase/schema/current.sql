@@ -2278,6 +2278,8 @@ DECLARE
   p_limit int := LEAST(COALESCE((f->>'limit')::int, 25), 100);
   p_offset int := GREATEST(COALESCE((f->>'offset')::int, 0), 0);
   p_sort text := COALESCE(f->>'sort', 'published_desc');
+  p_after text := NULLIF(f->>'after', '');
+  p_with_total boolean := COALESCE((f->>'with_total')::boolean, true);
   p_card_tab text := f->>'card_tab';
   v_platform text := f->>'platform';
   v_video text := f->>'video';
@@ -2290,7 +2292,11 @@ DECLARE
   v_from timestamptz := NULLIF(f->>'from', '')::timestamptz;
   v_to timestamptz := NULLIF(f->>'to', '')::timestamptz;
   v_search text := NULLIF(trim(f->>'q'), '');
-  total_matches int := 0;
+  cursor_payload jsonb;
+  cursor_id uuid;
+  cursor_published timestamptz;
+  cursor_likes bigint;
+  total_matches int := NULL;
   comments_list jsonb := '[]'::jsonb;
   next_cur text := NULL;
   has_more_flag boolean := false;
@@ -2312,6 +2318,35 @@ BEGIN
     p_sort := 'published_desc';
   ELSIF p_card_tab = 'liked' THEN
     p_sort := 'likes_desc';
+  END IF;
+
+  IF p_after IS NOT NULL THEN
+    BEGIN
+      cursor_payload := convert_from(decode(p_after, 'hex'), 'UTF8')::jsonb;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE EXCEPTION 'invalid_cursor' USING errcode = '22023';
+    END;
+    IF jsonb_typeof(cursor_payload) <> 'object'
+       OR cursor_payload->>'sort' IS DISTINCT FROM p_sort
+       OR NOT (cursor_payload ? 'id')
+       OR NOT (cursor_payload ? 'published_at')
+       OR (p_sort IN ('likes_desc', 'likes_asc') AND NOT (cursor_payload ? 'likes_value')) THEN
+      RAISE EXCEPTION 'invalid_cursor' USING errcode = '22023';
+    END IF;
+    BEGIN
+      cursor_id := (cursor_payload->>'id')::uuid;
+      cursor_published := NULLIF(cursor_payload->>'published_at', '')::timestamptz;
+      cursor_likes := NULLIF(cursor_payload->>'likes_value', '')::bigint;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE EXCEPTION 'invalid_cursor' USING errcode = '22023';
+    END;
+    -- Check ownership without revealing whether the id exists elsewhere.
+    IF NOT EXISTS (
+      SELECT 1 FROM public.comments cm
+      WHERE cm.id = cursor_id AND cm.workspace_id = w
+    ) THEN
+      RAISE EXCEPTION 'invalid_cursor' USING errcode = '22023';
+    END IF;
   END IF;
 
   WITH ch AS (
@@ -2415,16 +2450,39 @@ BEGIN
   ),
   counted AS (
     SELECT count(*)::int AS cnt FROM filtered
+    HAVING p_with_total
   ),
   sorted_page AS (
     SELECT f.* FROM filtered f
+    WHERE p_after IS NULL OR
+      CASE p_sort
+        WHEN 'published_desc' THEN
+          (cursor_published IS NOT NULL AND (f.published_at < cursor_published OR f.published_at IS NULL))
+          OR (f.published_at IS NOT DISTINCT FROM cursor_published AND f.id < cursor_id)
+        WHEN 'published_asc' THEN
+          (cursor_published IS NOT NULL AND (f.published_at > cursor_published OR f.published_at IS NULL))
+          OR (f.published_at IS NOT DISTINCT FROM cursor_published AND f.id < cursor_id)
+        WHEN 'likes_desc' THEN
+          (cursor_likes IS NOT NULL AND (f.likes_value < cursor_likes OR f.likes_value IS NULL))
+          OR (f.likes_value IS NOT DISTINCT FROM cursor_likes AND (
+            (cursor_published IS NOT NULL AND (f.published_at < cursor_published OR f.published_at IS NULL))
+            OR (f.published_at IS NOT DISTINCT FROM cursor_published AND f.id < cursor_id)
+          ))
+        WHEN 'likes_asc' THEN
+          (cursor_likes IS NOT NULL AND (f.likes_value > cursor_likes OR f.likes_value IS NULL))
+          OR (f.likes_value IS NOT DISTINCT FROM cursor_likes AND (
+            (cursor_published IS NOT NULL AND (f.published_at < cursor_published OR f.published_at IS NULL))
+            OR (f.published_at IS NOT DISTINCT FROM cursor_published AND f.id < cursor_id)
+          ))
+        ELSE false
+      END
     ORDER BY
       CASE WHEN p_sort = 'likes_desc' THEN f.likes_value END DESC NULLS LAST,
       CASE WHEN p_sort = 'likes_asc' THEN f.likes_value END ASC NULLS LAST,
       CASE WHEN p_sort = 'published_asc' THEN f.published_at END ASC NULLS LAST,
       f.published_at DESC NULLS LAST,
       f.id DESC
-    LIMIT p_limit + 1 OFFSET p_offset
+    LIMIT p_limit + 1 OFFSET CASE WHEN p_after IS NULL THEN p_offset ELSE 0 END
   ),
   page_with_extra AS (
     SELECT sp.*, row_number() OVER () AS rnum FROM sorted_page sp
@@ -2536,7 +2594,12 @@ BEGIN
     (SELECT cnt FROM counted),
     coalesce((SELECT items FROM assembled), '[]'::jsonb),
     (SELECT count(*) > p_limit FROM page_with_extra),
-    (SELECT id::text FROM page_exact ORDER BY rnum DESC LIMIT 1)
+    (SELECT encode(convert_to(jsonb_build_object(
+      'sort', p_sort,
+      'published_at', published_at,
+      'likes_value', likes_value,
+      'id', id
+    )::text, 'UTF8'), 'hex') FROM page_exact ORDER BY rnum DESC LIMIT 1)
   INTO total_matches, comments_list, has_more_flag, next_cur;
 
   RETURN jsonb_build_object(

@@ -580,19 +580,23 @@ describe("loadDashboardAggregates null channel handling", () => {
         if (name === "dashboard_comments") {
           const f = args?.f as {
             limit: number;
-            offset: number;
+            offset?: number;
+            after?: string;
+            with_total?: string;
             q: string;
             video: string;
           };
-          const page = comments.slice(f.offset, f.offset + f.limit);
+          const start = f.after ? Number(f.after.slice("cursor-".length)) : 0;
+          const page = comments.slice(start, start + f.limit);
+          const next = start + page.length;
           return {
             data: {
-              total,
+              total: f.with_total === "false" ? null : total,
               comments: page,
               limit: f.limit,
-              offset: f.offset,
-              has_more: f.offset + page.length < total,
-              next_cursor: null,
+              offset: f.offset ?? 0,
+              has_more: next < total,
+              next_cursor: next < total ? `cursor-${next}` : null,
             },
             error: null,
           };
@@ -617,6 +621,17 @@ describe("loadDashboardAggregates null channel handling", () => {
         ([name]) => name === "dashboard_comments",
       );
       expect(pageCalls).toHaveLength(17);
+      const firstFilters = pageCalls[0][1]?.f as Record<string, unknown>;
+      expect(firstFilters).toMatchObject({ offset: 0 });
+      expect(firstFilters).not.toHaveProperty("after");
+      expect(firstFilters).not.toHaveProperty("with_total");
+      for (const [, args] of pageCalls.slice(1)) {
+        expect(args?.f).toMatchObject({
+          after: expect.stringMatching(/^cursor-/),
+          with_total: "false",
+        });
+        expect(args?.f).not.toHaveProperty("offset");
+      }
       expect(
         pageCalls.every(([, args]) => {
           const f = args?.f as { q?: string; video?: string };
@@ -634,21 +649,28 @@ describe("loadDashboardAggregates null channel handling", () => {
           return { data: liveAggregates(total), error: null };
         }
         if (name === "dashboard_comments") {
-          const f = args?.f as { limit: number; offset: number };
-          const count = Math.min(f.limit, total - f.offset);
+          const f = args?.f as {
+            limit: number;
+            offset?: number;
+            after?: string;
+            with_total?: string;
+          };
+          const start = f.after ? Number(f.after.slice("cursor-".length)) : 0;
+          const count = Math.min(f.limit, total - start);
           const comments = Array.from({ length: count }, (_, index) => ({
             ...target,
-            id: `capped_${f.offset + index}`,
-            content_hash: `capped_hash_${f.offset + index}`,
+            id: `capped_${start + index}`,
+            content_hash: `capped_hash_${start + index}`,
           }));
+          const next = start + count;
           return {
             data: {
-              total,
+              total: f.with_total === "false" ? null : total,
               comments,
               limit: f.limit,
-              offset: f.offset,
-              has_more: f.offset + count < total,
-              next_cursor: null,
+              offset: f.offset ?? 0,
+              has_more: next < total,
+              next_cursor: next < total ? `cursor-${next}` : null,
             },
             error: null,
           };
@@ -667,6 +689,14 @@ describe("loadDashboardAggregates null channel handling", () => {
         new RegExp(`-first-${EXPORT_ROW_CAP}-of-${total}\\.csv$`),
       );
       expect(result.csv.split("\n")).toHaveLength(EXPORT_ROW_CAP + 2);
+      const pageCalls = rpc.mock.calls.filter(
+        ([name]) => name === "dashboard_comments",
+      );
+      expect(pageCalls).toHaveLength(EXPORT_ROW_CAP / 100);
+      expect(pageCalls[1][1]?.f).toMatchObject({
+        after: "cursor-100",
+        with_total: "false",
+      });
     });
 
     it("renders unknown reply and author KPIs as an em dash", async () => {
