@@ -54,7 +54,8 @@ async function bruteForce(filters: Record<string, string>): Promise<Kpis> {
     `select
        count(*) filter (where cm.is_reply)::int as replies,
        count(*) filter (where cm.published_at is null)::int as unknown_dates,
-       count(distinct cm.author_channel_id)::int as unique_authors
+       -- The client counts truthy ids only, so '' is not an author.
+       count(distinct nullif(cm.author_channel_id, ''))::int as unique_authors
      from public.comments cm
      join public.videos v on v.id = cm.video_id
      join public.channels ch on ch.id = v.channel_id
@@ -191,6 +192,16 @@ describe("WO-14 dashboard aggregate KPIs", () => {
     await insertComment(
       A,
       videoA2,
+      "a-empty",
+      "",
+      "Empty Id",
+      "ordinary",
+      false,
+      "2026-01-03T00:00:00Z",
+    );
+    await insertComment(
+      A,
+      videoA2,
       "a-owner",
       CHANNEL_OWNER_ID,
       "Owner",
@@ -220,7 +231,7 @@ describe("WO-14 dashboard aggregate KPIs", () => {
     },
   );
 
-  it("ignores another workspace and counts repeated and null author ids honestly", async () => {
+  it("ignores another workspace and counts repeated, null and empty author ids honestly", async () => {
     expect(await aggregate({})).toEqual({
       replies: 2,
       unknown_dates: 2,

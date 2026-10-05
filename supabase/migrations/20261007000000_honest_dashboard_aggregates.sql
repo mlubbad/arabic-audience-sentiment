@@ -190,7 +190,7 @@ BEGIN
       count(*) FILTER (WHERE NOT by_owner AND eff_label = 'negative' AND likes_value IS NULL) AS negative_unranked,
       count(*) FILTER (WHERE NOT by_owner AND is_reply) AS replies,
       count(*) FILTER (WHERE NOT by_owner AND published_at IS NULL) AS unknown_dates,
-      count(DISTINCT author_channel_id) FILTER (WHERE NOT by_owner) AS unique_authors
+      count(DISTINCT NULLIF(author_channel_id, '')) FILTER (WHERE NOT by_owner) AS unique_authors
     FROM filtered
   ),
   platforms_agg AS (
