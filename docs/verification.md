@@ -21,6 +21,34 @@ All from a clone in `/tmp/aas-src` (the bridge session's own checkout was unread
 | PR #74 merge, read with `git ls-remote` and a depth-5 fetch | `main` = `239979d` "Merge pull request #74", parents `c609150` and `021d21b`. |
 | `git commit` with `core.hooksPath .githooks` on macOS (`/bin/bash` 3.2.57) | Before the fix: `.githooks/pre-commit: line 15: mapfile: command not found`, `line 16: staged: unbound variable`; no commit was created. After replacing `mapfile` with a `read -d ''` loop: the hook ran prettier and eslint over the staged files and the commit landed. |
 
+## 2026-10-05 — Channel lookup authorizes through `my_role`, not Auth `/user`
+
+The deployed `channel-lookup` logged `forbidden:session` with `AuthUnknownError: Unexpected token
+'<', "<html>\r\n<h"... is not valid JSON`: the function's `auth.getUser()` call to Auth `/user`
+got an HTML page, while the same ES256 token worked against PostgREST from the browser. Supabase's
+support assistant reported no incident, the gateway accepting the token, and no matching Auth log
+entry. Root cause at Supabase is not established here.
+
+The function no longer calls Auth. `public.my_role(w)` (migration `20261009000000_my_role.sql`)
+returns the caller's own role in one workspace; PostgREST verifies the token and `auth.uid()` is the
+verified subject. A `PGRST3xx` error or `42501` (anon, which may not execute it) reads as
+`forbidden:session`, any other error as `forbidden:membership_read`, no owner/analyst role as
+`forbidden:role`. `paddle-checkout` still calls `getUser()` but only to prefill the buyer email and
+continues without it; left as is.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/my_role.test.ts supabase/tests/lookup_access.test.ts` | 11 passed. |
+| Mutation: drop `m.user_id = auth.uid()` | 4 of 11 fail. |
+| Mutation: grant `my_role` to anon | 1 of 11 fails. |
+| Mutation: `42501` not a session error | 1 of 11 fails. |
+| Mutation: `viewer` may name a channel | 1 of 11 fails. |
+| `npm run check` | Exit 0: web 141 / 1100, DB 57 / 480, worker 297, `deno check` of every function, secrets clean. |
+| `npm run db:snapshot:check` | Exit 0. |
+
+Not done here: the migration reaches the project through the CI deploy; the owner deploys the
+function with `npx supabase functions deploy channel-lookup --project-ref ykqugctewsqvevhyqtbi`.
+
 ## 2026-10-05 — Channel search shows its error code
 
 From the cloud checkout of `claude/keen-keller-skwwpm` at `b94a8d4`, Linux. Every lookup failure
