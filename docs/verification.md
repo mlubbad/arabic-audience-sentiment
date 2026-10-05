@@ -21,6 +21,18 @@ All from a clone in `/tmp/aas-src` (the bridge session's own checkout was unread
 | PR #74 merge, read with `git ls-remote` and a depth-5 fetch | `main` = `239979d` "Merge pull request #74", parents `c609150` and `021d21b`. |
 | `git commit` with `core.hooksPath .githooks` on macOS (`/bin/bash` 3.2.57) | Before the fix: `.githooks/pre-commit: line 15: mapfile: command not found`, `line 16: staged: unbound variable`; no commit was created. After replacing `mapfile` with a `read -d ''` loop: the hook ran prettier and eslint over the staged files and the commit landed. |
 
+## 2026-10-05 — Dispatcher follow-up rounds continue the branch
+
+From the cloud checkout of `claude/keen-keller-skwwpm`, Linux, bash 5.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run scripts` | 5 files, 53 passed (`codex-dispatch.test.ts` 5/5, two new base-selection cases against a bare remote). |
+| Mutation: step 2 back to `switch -C "$branch" origin/main` | "continues an existing branch from its own tip" fails (1 of 5). |
+| `bash -n scripts/codex-dispatch.sh`, `format:check`, `eslint`, `tsc --noEmit`, `check:secrets` | Clean. |
+
+Not verified here: a real follow-up run on the Mac (`gh pr view` / `gh pr edit` against GitHub). The next review round on a Codex PR is that test.
+
 ## 2026-10-05 — Dispatcher runs no repository hook outside the sandbox (PR #75 fix)
 
 From a cloud worktree of `claude/codex-dispatch-hardening`, Linux, bash 5.
