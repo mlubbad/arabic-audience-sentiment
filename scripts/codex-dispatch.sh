@@ -72,7 +72,13 @@ if [ -n "$(git -C "$workspace" status --porcelain)" ]; then
   die "workspace has uncommitted changes from an earlier run: $workspace (inspect, then 'git reset --hard && git clean -fd' there)"
 fi
 git -C "$workspace" switch --quiet -C "$branch" origin/main
-git -C "$workspace" config core.hooksPath .githooks
+# The repository hooks must never run here. Every git command after Codex runs
+# outside its sandbox, and a hook resolves tools from the workspace Codex could
+# write (node_modules/.bin, eslint.config.*, workers/python/pyproject.toml), so a
+# hook would execute Codex-planted code as the owner. Unset it as well, because
+# workspaces from earlier runs of this script still carry it. Lint runs inside
+# the sandbox (codex-constraints.md) and CI is the gate.
+git -C "$workspace" config --unset core.hooksPath || true
 rm -rf "$workspace/.codex-handoff"
 mkdir -p "$workspace/.codex-handoff"
 if [ ! -d "$workspace/node_modules" ] && [ "${CODEX_DRY_RUN:-0}" != "1" ]; then
@@ -123,8 +129,17 @@ echo
 # --- 5. guards before any git write ---------------------------------------
 cd "$workspace"
 [ -n "$(git status --porcelain)" ] || die "Codex made no changes; nothing to commit"
-protected=(.githooks .claude .gitleaksignore .codex-handoff)
-[ "${CODEX_ALLOW_WORKFLOWS:-0}" = "1" ] || protected+=(.github/workflows)
+# The agent tooling and the Claude-owned files never ride a work-order commit.
+protected=(.githooks .claude .gitleaksignore .codex-handoff
+  scripts/codex-dispatch.sh scripts/codex-watch.mjs docs/agents/dispatch
+  AGENTS.md CLAUDE.md GEMINI.md docs/progress.md docs/verification.md
+  docs/decisions.md docs/adr)
+# All of .github/ unless the work order owns workflows; then only workflows open up.
+if [ "${CODEX_ALLOW_WORKFLOWS:-0}" = "1" ]; then
+  protected+=(.github/ISSUE_TEMPLATE .github/dependabot.yml .github/pull_request_template.md)
+else
+  protected+=(.github)
+fi
 for p in "${protected[@]}"; do
   if [ -n "$(git status --porcelain -- "$p")" ]; then
     die "Codex touched protected path '$p'; nothing was committed. Inspect $workspace"
@@ -141,10 +156,11 @@ case "$body" in
 esac
 
 # --- 6. commit, push, PR, issue comment -----------------------------------
+# Hooks off for both writes: they run outside the sandbox (see step 2).
 git add -A
-git commit --quiet -F .codex-handoff/commit.txt
+git -c core.hooksPath=/dev/null commit --no-verify --quiet -F .codex-handoff/commit.txt
 head_sha="$(git rev-parse HEAD)"
-git push -u origin "$branch"
+git -c core.hooksPath=/dev/null push --no-verify -u origin "$branch"
 pr_url="$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')"
 if [ -z "$pr_url" ]; then
   pr_url="$(gh pr create --base main --head "$branch" --title "$title" --body "$body")"

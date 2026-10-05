@@ -21,6 +21,21 @@ All from a clone in `/tmp/aas-src` (the bridge session's own checkout was unread
 | PR #74 merge, read with `git ls-remote` and a depth-5 fetch | `main` = `239979d` "Merge pull request #74", parents `c609150` and `021d21b`. |
 | `git commit` with `core.hooksPath .githooks` on macOS (`/bin/bash` 3.2.57) | Before the fix: `.githooks/pre-commit: line 15: mapfile: command not found`, `line 16: staged: unbound variable`; no commit was created. After replacing `mapfile` with a `read -d ''` loop: the hook ran prettier and eslint over the staged files and the commit landed. |
 
+## 2026-10-05 — Dispatcher runs no repository hook outside the sandbox (PR #75 fix)
+
+From a cloud worktree of `claude/codex-dispatch-hardening`, Linux, bash 5.
+
+| Command / observation | Actual result |
+| --- | --- |
+| Before the fix: throwaway repo with this branch's `.githooks`, `core.hooksPath .githooks`, a planted `node_modules/.bin/prettier`, then step 6's `git commit` verbatim | The planted file ran: `ESCAPED: "ran OUTSIDE the sandbox as root"`. |
+| `npx vitest run scripts` after the fix | 5 files, 51 passed (new `codex-dispatch.test.ts` 3/3). |
+| Mutation: step 6 back to `git commit --quiet` | 2 of 3 fail, including the planted-hook test (the hook ran). |
+| Mutation: `config core.hooksPath .githooks` restored | 1 of 3 fails. |
+| `bash -n scripts/codex-dispatch.sh` | Clean. |
+
+Not verified here: the macOS `workspace-write` read scope with network on (review item 2 on #75).
+That needs the canary check on the Mac.
+
 ## 2026-10-03 — Deploy target, build configuration and live verification
 
 | Command / observation | Actual result |

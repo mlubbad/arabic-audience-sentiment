@@ -14,14 +14,19 @@ scripts/codex-dispatch.sh WO-14 76 codex/wo-14-slug ["extra instructions"]
 | Step | Who | What |
 | --- | --- | --- |
 | 1 | script | Finds `codex` (PATH, else the ChatGPT.app bundle), checks `codex exec` exists, checks `gh` is installed and logged in. |
-| 2 | script | Prepares `.codex-workspace/`, a dedicated clone (gitignored): fetch `origin/main`, refuse to run if it is dirty, `git switch -C <branch> origin/main`, `npm run setup` on first use. |
+| 2 | script | Prepares `.codex-workspace/`, a dedicated clone (gitignored): fetch `origin/main`, refuse to run if it is dirty, `git switch -C <branch> origin/main`, unset `core.hooksPath` (hooks never run there), `npm run setup` on first use. |
 | 3 | script | Builds the prompt: the work order line plus `docs/agents/dispatch/codex-constraints.md`. |
 | 4 | Codex | `codex exec -C .codex-workspace -s workspace-write` with network access. Edits, runs the suites, writes `.codex-handoff/commit.txt` and `.codex-handoff/pr.md`. **No git writes, no PR, no browser.** |
-| 4 | script | `scripts/codex-watch.mjs` tails the JSON log, prints one line per event and kills Codex on the first forbidden command (exit 3). |
-| 5 | script | Guards: Codex changed something; it did not touch `.githooks/`, `.claude/`, `.gitleaksignore` or `.github/workflows/**` (set `CODEX_ALLOW_WORKFLOWS=1` for a work order that owns workflows); both handoff files exist; the PR title starts with `WO-N: `; the body starts with `Closes #N`. |
-| 6 | script | `git commit -F`, `git push -u origin <branch>`, `gh pr create` (or reuse an open PR for the branch), `gh issue comment N "Ready for review: PR #n"`, then the report. |
+| 4 | script | `scripts/codex-watch.mjs` tails the JSON log, prints one line per event and kills Codex on the first forbidden command (exit 3). It is a tripwire, not a boundary: it matches command strings, so `g""it push` or a `python -c` subprocess passes it. |
+| 5 | script | Guards: Codex changed something; it did not touch `.githooks/`, `.claude/`, `.gitleaksignore`, `.github/` (set `CODEX_ALLOW_WORKFLOWS=1` for a work order that owns workflows; the rest of `.github/` stays protected), the dispatcher, the watcher, `docs/agents/dispatch/` or the Claude-owned files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `docs/progress.md`, `docs/verification.md`, `docs/decisions.md`, `docs/adr/`); both handoff files exist; the PR title starts with `WO-N: `; the body starts with `Closes #N`. |
+| 6 | script | `git -c core.hooksPath=/dev/null commit --no-verify -F`, the same for `push -u origin <branch>`, `gh pr create` (or reuse an open PR for the branch), `gh issue comment N "Ready for review: PR #n"`, then the report. |
 
 Nothing is committed or pushed unless Codex exited 0 and the watcher saw nothing forbidden.
+
+**The controls, in order of strength.** (1) The `workspace-write` sandbox. (2) The script runs
+no repository code outside it: only `git` with hooks off and `gh` with fixed arguments
+(`scripts/codex-dispatch.test.ts` pins this). (3) The protected-path guard. The watcher is an
+early warning on top of these, never a reason to relax them.
 `CODEX_DRY_RUN=1` prepares the workspace and prints the command and prompt without running Codex.
 Logs live in `.codex-logs/<WO>-<timestamp>.{jsonl,last.md,stderr}` (gitignored).
 
@@ -72,7 +77,8 @@ Every failure met while dispatching WO-13, its root cause, and the fix now in pl
 | 8 | Codex reloaded the PR checks page about fifteen times waiting for `verify`. | It took "all gates green" as part of its job. | The constraints end Codex's job at the handoff; the PM reviews CI. |
 | 9 | After run 3 every read under `~/Documents` failed with `Operation not permitted`, for the shell and for Claude's Read tool alike; `/tmp` and `~/Desktop` kept working. | macOS TCC revoked Terminal's "Documents Folder" access (the responsible app of the session is `Terminal.app`). | Owner re-enables it (setup step 3). The script keeps working from any folder the session can read; the runbook calls the symptom out so it is not mistaken for a git problem again. |
 | 10 | Run 1's `git read-tree --reset -u` left the dispatcher's worktree with `origin/main` files over an older HEAD. | Consequence of #2. | Cleaned by fast-forwarding to `origin/main`; cannot recur once Codex has no `GIT_DIR` and no second repository. |
-| 11 | Committing this very fix died in `.githooks/pre-commit`: `mapfile: command not found`, then `staged: unbound variable`. | The hook used bash 4's `mapfile`; macOS ships bash 3.2 (`/bin/bash`), so every commit from a Mac with the hook enabled failed. | The hook collects staged files with a `read -d ''` loop. The dispatcher enables the hook in `.codex-workspace/`, so this would have blocked every dispatched commit. |
+| 11 | Committing this very fix died in `.githooks/pre-commit`: `mapfile: command not found`, then `staged: unbound variable`. | The hook used bash 4's `mapfile`; macOS ships bash 3.2 (`/bin/bash`), so every commit from a Mac with the hook enabled failed. | The hook collects staged files with a `read -d ''` loop. The dispatcher enabled the hook in `.codex-workspace/` at the time; see #12. |
+| 12 | PM review of PR #75: the dispatcher set `core.hooksPath .githooks` in the workspace and then ran `git commit` outside the sandbox. The hook runs `npx --no-install prettier/eslint` and `uv run --project workers/python`, which resolve `node_modules/.bin/*`, `eslint.config.*` and `pyproject.toml` from the workspace, all writable by Codex. Reproduced: a planted `node_modules/.bin/prettier` ran as the dispatching user. | Hooks are repository code; running them outside the sandbox hands Codex an unsandboxed exec. | The script unsets `core.hooksPath` (old workspaces still carry it) and commits and pushes with `-c core.hooksPath=/dev/null --no-verify`. Lint runs inside the sandbox per the constraints; CI is the gate. `scripts/codex-dispatch.test.ts` runs the script's own commit line against a workspace with a planted hook and asserts it never runs. |
 
 Related, not a failure: `.claude/settings.local.json` is tracked, so the allow rule the owner
 added for run 3 shows as a local diff there. Keep machine-specific rules in
