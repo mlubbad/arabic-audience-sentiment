@@ -5913,6 +5913,18 @@ begin
   );
 end $function$
 
+CREATE OR REPLACE FUNCTION public.my_role(w uuid)
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select m.role
+  from public.memberships m
+  where m.workspace_id = w
+    and m.user_id = (select auth.uid())
+$function$
+
 CREATE OR REPLACE FUNCTION public.my_workspaces(target_user_id uuid DEFAULT NULL::uuid)
  RETURNS TABLE(id uuid, name text, created_by uuid)
  LANGUAGE plpgsql
@@ -7569,6 +7581,8 @@ grant EXECUTE on function is_platform_admin() to "authenticated";
 grant EXECUTE on function is_platform_admin() to "postgres";
 grant EXECUTE on function list_workspace_accounts(uuid) to "authenticated";
 grant EXECUTE on function list_workspace_accounts(uuid) to "postgres";
+grant EXECUTE on function my_role(uuid) to "authenticated";
+grant EXECUTE on function my_role(uuid) to "postgres";
 grant EXECUTE on function my_workspaces(uuid) to "authenticated";
 grant EXECUTE on function my_workspaces(uuid) to "postgres";
 grant EXECUTE on function oauth_complete(text,text) to "authenticated";

@@ -4,53 +4,42 @@ import {
   refusalDetail,
 } from "../functions/_shared/lookup-access";
 
-const user = { id: "u-1" };
-const ok = { user, userError: null, memberError: null };
-
 describe("channel lookup access", () => {
   it("lets an owner or an analyst name a channel", () => {
     expect(
-      lookupRefusal({ ...ok, memberships: [{ role: "workspace_owner" }] }),
+      lookupRefusal({ role: "workspace_owner", roleError: null }),
     ).toBeNull();
-    expect(
-      lookupRefusal({ ...ok, memberships: [{ role: "analyst" }] }),
-    ).toBeNull();
+    expect(lookupRefusal({ role: "analyst", roleError: null })).toBeNull();
   });
 
-  it("names a refused session apart from the other refusals", () => {
-    expect(
-      lookupRefusal({
-        user: null,
-        userError: { name: "AuthApiError", message: "invalid JWT" },
-        memberships: null,
-        memberError: null,
-      }),
-    ).toBe("forbidden:session");
-    expect(
-      lookupRefusal({
-        user: null,
-        userError: null,
-        memberships: null,
-        memberError: null,
-      }),
-    ).toBe("forbidden:session");
+  it("names a token PostgREST refused, and an anon caller, as the session", () => {
+    expect(lookupRefusal({ role: null, roleError: { code: "PGRST301" } })).toBe(
+      "forbidden:session",
+    );
+    expect(lookupRefusal({ role: null, roleError: { code: "PGRST303" } })).toBe(
+      "forbidden:session",
+    );
+    expect(lookupRefusal({ role: null, roleError: { code: "42501" } })).toBe(
+      "forbidden:session",
+    );
   });
 
-  it("names a failed membership read", () => {
-    expect(
-      lookupRefusal({
-        ...ok,
-        memberships: null,
-        memberError: { code: "42501" },
-      }),
-    ).toBe("forbidden:membership_read");
+  it("names any other failed role read apart from the session", () => {
+    expect(lookupRefusal({ role: null, roleError: { code: "22P02" } })).toBe(
+      "forbidden:membership_read",
+    );
+    expect(lookupRefusal({ role: null, roleError: { code: "" } })).toBe(
+      "forbidden:membership_read",
+    );
   });
 
   it("names a missing role, including a viewer and a non-member", () => {
-    expect(lookupRefusal({ ...ok, memberships: [{ role: "viewer" }] })).toBe(
+    expect(lookupRefusal({ role: "viewer", roleError: null })).toBe(
       "forbidden:role",
     );
-    expect(lookupRefusal({ ...ok, memberships: [] })).toBe("forbidden:role");
+    expect(lookupRefusal({ role: null, roleError: null })).toBe(
+      "forbidden:role",
+    );
   });
 });
 
