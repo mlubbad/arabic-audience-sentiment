@@ -201,13 +201,15 @@ export function Summary({
         </Card>
         <Card className="db-kpi">
           <strong className="db-kpi-value ui-num" data-testid="replies-count">
-            {n(s.replies)}
+            {s.replies != null ? n(s.replies) : "—"}
           </strong>
           <span className="db-kpi-label">{S.metricReplies}</span>
           <small className="db-note">{S.metricRepliesNote}</small>
         </Card>
         <Card className="db-kpi">
-          <strong className="db-kpi-value ui-num">{n(s.unique_authors)}</strong>
+          <strong className="db-kpi-value ui-num">
+            {s.unique_authors != null ? n(s.unique_authors) : "—"}
+          </strong>
           <span className="db-kpi-label">{S.metricAuthors}</span>
           <small className="db-note">{S.metricAuthorsNote}</small>
         </Card>

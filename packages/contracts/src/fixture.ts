@@ -56,6 +56,9 @@ export const DashboardAggregatesSchema = z.object({
   total: z.number().int(),
   analysed: z.number().int(),
   unanalysed: z.number().int(),
+  replies: z.number().int().nullable().optional(),
+  unknown_dates: z.number().int().nullable().optional(),
+  unique_authors: z.number().int().nullable().optional(),
   sentiments: z.object({
     positive: z.number().int(),
     negative: z.number().int(),

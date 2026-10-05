@@ -1,5 +1,11 @@
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ar } from "./strings/ar";
+import { Hero } from "./dashboard/Hero";
+import { Summary } from "./dashboard/Summary";
+import type { Snapshot } from "./dashboard/Dashboard";
 
 // Simulate a fully configured Supabase project. Product Auth being available
 // must not imply that the dashboard's comment data is live.
@@ -14,6 +20,8 @@ const fixtureJson = readFileSync(
   "utf8",
 );
 const fixture = JSON.parse(fixtureJson) as {
+  active_analysis_key: string;
+  active_topic_key: string;
   comments: { id: string; content_hash: string; text_raw: string }[];
 };
 const target = fixture.comments[0];
@@ -493,6 +501,36 @@ describe("loadDashboardAggregates null channel handling", () => {
   });
 
   describe("buildExport cap and deriveSnapshot kpis", () => {
+    const liveAggregates = (total: number) => ({
+      workspace_total: total,
+      channel_own_comments: 0,
+      total,
+      analysed: total,
+      unanalysed: 0,
+      replies: 0,
+      unknown_dates: 0,
+      unique_authors: total,
+      sentiments: { positive: total, negative: 0, neutral: 0, mixed: 0 },
+      measurable: ["positive", "negative", "neutral", "mixed"],
+      negative_ranked: 0,
+      negative_unranked: 0,
+      timeline: {},
+      topic_counts: {},
+      platform_breakdown: {},
+      videos: [],
+      hours: [],
+      weekdays: [],
+      weeks: [],
+      people: [],
+      most_engaged_negative: [],
+      comment_types: [],
+      video_options: [],
+      topics: [],
+      active_analysis_key: fixture.active_analysis_key,
+      active_topic_key: fixture.active_topic_key,
+      revision: "export-test",
+    });
+
     it("buildExport returns rows capped at EXPORT_ROW_CAP and flags truncation", async () => {
       const { buildExport, EXPORT_ROW_CAP } = await loadModule();
       expect(EXPORT_ROW_CAP).toBe(10_000);
@@ -523,6 +561,160 @@ describe("loadDashboardAggregates null channel handling", () => {
       expect(result.rows).toBe(10_000);
       expect(result.truncated).toBe(true);
       expect(result.csv.split("\n").length).toBe(10_002); // Header + 10,000 rows + trailing empty line
+    });
+
+    it("pages through every filtered live row instead of reading dashboard_snapshot", async () => {
+      const { buildExport } = await loadModule();
+      const total = 1_601;
+      const comments = Array.from({ length: total }, (_, index) => ({
+        ...target,
+        id: `live_${index}`,
+        content_hash: `live_hash_${index}`,
+        text_raw: `مطابق ${index}`,
+      }));
+
+      rpc.mockImplementation(async (name, args) => {
+        if (name === "dashboard_aggregates") {
+          return { data: liveAggregates(total), error: null };
+        }
+        if (name === "dashboard_comments") {
+          const f = args?.f as {
+            limit: number;
+            offset: number;
+            q: string;
+            video: string;
+          };
+          const page = comments.slice(f.offset, f.offset + f.limit);
+          return {
+            data: {
+              total,
+              comments: page,
+              limit: f.limit,
+              offset: f.offset,
+              has_more: f.offset + page.length < total,
+              next_cursor: null,
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: null };
+      });
+
+      const result = await buildExport("live", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+        video_ids: ["video-filter"],
+        q: "مطابق",
+      });
+
+      expect(result.totalRows).toBe(total);
+      expect(result.rows).toBe(total);
+      expect(result.truncated).toBe(false);
+      expect(result.csv.split("\n")).toHaveLength(total + 2);
+      expect(
+        rpc.mock.calls.some(([name]) => name === "dashboard_snapshot"),
+      ).toBe(false);
+      const pageCalls = rpc.mock.calls.filter(
+        ([name]) => name === "dashboard_comments",
+      );
+      expect(pageCalls).toHaveLength(17);
+      expect(
+        pageCalls.every(([, args]) => {
+          const f = args?.f as { q?: string; video?: string };
+          return f.q === "مطابق" && f.video === "video-filter";
+        }),
+      ).toBe(true);
+    });
+
+    it("caps a live export and marks the filename with the exported fraction", async () => {
+      const { buildExport, EXPORT_ROW_CAP } = await loadModule();
+      const total = EXPORT_ROW_CAP + 37;
+
+      rpc.mockImplementation(async (name, args) => {
+        if (name === "dashboard_aggregates") {
+          return { data: liveAggregates(total), error: null };
+        }
+        if (name === "dashboard_comments") {
+          const f = args?.f as { limit: number; offset: number };
+          const count = Math.min(f.limit, total - f.offset);
+          const comments = Array.from({ length: count }, (_, index) => ({
+            ...target,
+            id: `capped_${f.offset + index}`,
+            content_hash: `capped_hash_${f.offset + index}`,
+          }));
+          return {
+            data: {
+              total,
+              comments,
+              limit: f.limit,
+              offset: f.offset,
+              has_more: f.offset + count < total,
+              next_cursor: null,
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: null };
+      });
+
+      const result = await buildExport("live", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+
+      expect(result.totalRows).toBe(total);
+      expect(result.rows).toBe(EXPORT_ROW_CAP);
+      expect(result.truncated).toBe(true);
+      expect(result.filename).toMatch(
+        new RegExp(`-first-${EXPORT_ROW_CAP}-of-${total}\\.csv$`),
+      );
+      expect(result.csv.split("\n")).toHaveLength(EXPORT_ROW_CAP + 2);
+    });
+
+    it("renders unknown reply and author KPIs as an em dash", async () => {
+      const dashboardSource = readFileSync(
+        "apps/web/src/dashboard/Dashboard.tsx",
+        "utf8",
+      );
+      expect(dashboardSource).toContain("replies: agg.replies ?? null");
+
+      const { deriveSnapshot, loadSource } = await loadModule();
+      const source = await loadSource(
+        "sanitized_fixture",
+        "00000000-0000-4000-8000-000000000001",
+      );
+      const base = deriveSnapshot(source, "sanitized_fixture", {
+        workspace_id: "00000000-0000-4000-8000-000000000001",
+      });
+      const unknown = {
+        ...base,
+        replies: null,
+        unknown_dates: null,
+        unique_authors: null,
+      } as unknown as Snapshot;
+
+      const summary = renderToStaticMarkup(
+        createElement(Summary, { s: unknown, S: ar }),
+      );
+      const hero = renderToStaticMarkup(
+        createElement(Hero, {
+          s: unknown,
+          S: ar,
+          workspaceName: "مساحة اختبار",
+          range: "كل الوقت",
+          labels: {
+            positive: "إيجابي",
+            negative: "سلبي",
+            neutral: "محايد",
+            mixed: "مختلط",
+          },
+        }),
+      );
+
+      expect(summary).toContain('data-testid="replies-count">—</strong>');
+      expect(summary).toMatch(
+        new RegExp(`>—</strong><span class="db-kpi-label">${ar.metricAuthors}`),
+      );
+      expect(hero).toContain(">—</span>");
+      expect(hero).not.toContain(ar.pillAuthors("0"));
     });
 
     it("deriveSnapshot preserves total_likes from base kpis", async () => {

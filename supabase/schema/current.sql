@@ -2044,7 +2044,10 @@ BEGIN
       count(*) FILTER (WHERE NOT by_owner AND eff_label = 'neutral') AS neutral,
       count(*) FILTER (WHERE NOT by_owner AND eff_label = 'mixed') AS mixed,
       count(*) FILTER (WHERE NOT by_owner AND eff_label = 'negative' AND likes_value IS NOT NULL) AS negative_ranked,
-      count(*) FILTER (WHERE NOT by_owner AND eff_label = 'negative' AND likes_value IS NULL) AS negative_unranked
+      count(*) FILTER (WHERE NOT by_owner AND eff_label = 'negative' AND likes_value IS NULL) AS negative_unranked,
+      count(*) FILTER (WHERE NOT by_owner AND is_reply) AS replies,
+      count(*) FILTER (WHERE NOT by_owner AND published_at IS NULL) AS unknown_dates,
+      count(DISTINCT NULLIF(author_channel_id, '')) FILTER (WHERE NOT by_owner) AS unique_authors
     FROM filtered
   ),
   platforms_agg AS (
@@ -2196,6 +2199,9 @@ BEGIN
     'total', (SELECT total FROM summary_stats),
     'analysed', (SELECT analysed FROM summary_stats),
     'unanalysed', (SELECT total - analysed FROM summary_stats),
+    'replies', (SELECT replies FROM summary_stats),
+    'unknown_dates', (SELECT unknown_dates FROM summary_stats),
+    'unique_authors', (SELECT unique_authors FROM summary_stats),
     'sentiments', jsonb_build_object(
       'positive', (SELECT positive FROM summary_stats),
       'negative', (SELECT negative FROM summary_stats),
