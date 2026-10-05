@@ -11,6 +11,10 @@ whose token can't read issues. If they differ, ask.
 > - After WO-14 merges, merge `origin/main` into your branch (no rebase, no force-push).
 > - Open the PR as `WO-4c: syncHealth truth, admin services, small UI bugs` (`Closes #46`).
 >   Details: the comment on #46 dated 2026-10-04.
+>
+> **Second scope change (owner decision, 2026-10-05):** Claude takes over tasks **3, 4 and 5**
+> and implements them directly; Gemini has no open task in this work order. The draft branch
+> `gemini/wo-4c-honest-numbers` (`99ee202`) is superseded and is not merged.
 
 - **Branch:** `gemini/wo-4c-honest-numbers`, created from the **latest** `origin/main`
   (`a807eab` or newer, not `0423b62`).
