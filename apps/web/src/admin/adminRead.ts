@@ -23,24 +23,43 @@ import {
   type ServicesHealthReport,
   type ServiceStatus,
 } from "@sentiment/contracts";
+import { DashboardRpcError } from "../data";
 import { supabase } from "../supabase";
 import { getDemoServicesHealth } from "./adminServicesDemo";
 
+/** A failed admin RPC as the page can name it: `live_unavailable` with the
+ *  database's own code (`read:live_unavailable:PGRST202`), never the raw error,
+ *  which `failureCode` can only call `unexpected`. The services page showed
+ *  `read:unexpected:Error` for a function missing from production
+ *  (2026-10-05). */
+function rpcFailure(error: {
+  code?: string;
+  details?: unknown;
+  hint?: string;
+}) {
+  return new DashboardRpcError("live_unavailable", {
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+    cause: error,
+  });
+}
+
 export async function readAdminUsers(): Promise<AdminUser[]> {
   const { data, error } = await supabase!.rpc("admin_users");
-  if (error) throw error;
+  if (error) throw rpcFailure(error);
   return AdminUsersSchema.parse(data);
 }
 
 export async function readAdminChannels(): Promise<AdminChannel[]> {
   const { data, error } = await supabase!.rpc("admin_channels");
-  if (error) throw error;
+  if (error) throw rpcFailure(error);
   return AdminChannelsSchema.parse(data);
 }
 
 export async function readAdminOps(): Promise<AdminOps> {
   const { data, error } = await supabase!.rpc("admin_ops");
-  if (error) throw error;
+  if (error) throw rpcFailure(error);
   return AdminOpsSchema.parse(data);
 }
 
@@ -55,7 +74,7 @@ export async function readAdminAudit(
   const { data, error } = await supabase!.rpc("admin_audit", {
     p_limit: limit,
   });
-  if (error) throw error;
+  if (error) throw rpcFailure(error);
   return AdminAuditEventsSchema.parse(data);
 }
 
@@ -67,7 +86,7 @@ export async function updatePlanPublicChannels(
     p_plan_key: planKey,
     p_allowed: allowed,
   });
-  if (error) throw error;
+  if (error) throw rpcFailure(error);
 }
 
 export async function updatePlanLimits(
@@ -78,7 +97,7 @@ export async function updatePlanLimits(
     p_plan_key: planKey,
     p_limits: limits,
   });
-  if (error) throw error;
+  if (error) throw rpcFailure(error);
   return data as { ok: boolean; plan: unknown };
 }
 
@@ -193,7 +212,7 @@ export async function readAdminServicesHealth(options?: {
   const t0 = performance.now();
   const { data, error } = await supabase.rpc("admin_services_health");
   const dbLatencyMs = Math.round(performance.now() - t0);
-  if (error) throw error;
-  if (!data) throw new Error("services_health_unavailable");
+  if (error) throw rpcFailure(error);
+  if (!data) throw new DashboardRpcError("live_unavailable");
   return buildLiveServicesReport(data as ServicesHealthRpc, dbLatencyMs);
 }

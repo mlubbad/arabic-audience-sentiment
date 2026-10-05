@@ -21,6 +21,30 @@ All from a clone in `/tmp/aas-src` (the bridge session's own checkout was unread
 | PR #74 merge, read with `git ls-remote` and a depth-5 fetch | `main` = `239979d` "Merge pull request #74", parents `c609150` and `021d21b`. |
 | `git commit` with `core.hooksPath .githooks` on macOS (`/bin/bash` 3.2.57) | Before the fix: `.githooks/pre-commit: line 15: mapfile: command not found`, `line 16: staged: unbound variable`; no commit was created. After replacing `mapfile` with a `read -d ''` loop: the hook ran prettier and eslint over the staged files and the commit landed. |
 
+## 2026-10-05 — Restore `admin_services_health` in production
+
+The admin services page showed `read:unexpected:Error`. The network response was `404` with
+`proxy-status: PostgREST; error=PGRST202`: no such function. The owner's read-only check in the SQL
+editor returned `migration_recorded = 1, function_exists = 0` for `20260924160000`, and a comparison of
+all 82 public functions in the schema snapshot against `pg_proc` found only this one missing. The
+deploy runner skips recorded versions, so only a new migration brings it back. The page had hidden
+this since at least 2026-09-24 by falling back to demo data, which #82 removed.
+
+Migration `20261009010000_restore_admin_services_health.sql` re-creates the 20260924160000 body
+unchanged (`diff` identical) as `create or replace`. Every admin read now throws
+`DashboardRpcError("live_unavailable", { code })`, so the page shows `read:live_unavailable:<code>`
+instead of `unexpected`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_services_health.test.ts` | 3 passed: restores after a drop, no-op when present, still refuses a non-admin and anon. |
+| `npx vitest run apps/web/src/admin` | 12 files, 93 passed. |
+| Mutation: admin reads back to `throw error` | 1 of 9 in `adminRead.test.ts` fails. |
+| `npm run check` | Exit 0: web 141 / 1101, DB 58 / 483, worker 297, secrets clean. |
+| `npm run db:snapshot` then `db:snapshot:check` | No snapshot change (same function); exit 0. |
+
+Not established: how production came to record the version without the function.
+
 ## 2026-10-05 — Channel lookup authorizes through `my_role`, not Auth `/user`
 
 The deployed `channel-lookup` logged `forbidden:session` with `AuthUnknownError: Unexpected token
