@@ -665,16 +665,22 @@ export async function buildExport(mode: DataMode, filters: Filters) {
     const totalRows = aggregates.total;
     const comments: Comment[] = [];
     const rpcFilters = filtersToRpc(filters);
+    let nextCursor: string | undefined;
 
     while (comments.length < totalRows && comments.length < EXPORT_ROW_CAP) {
       const limit = Math.min(100, EXPORT_ROW_CAP - comments.length);
       const page = await loadDashboardComments(mode, filters.workspace_id, {
         ...rpcFilters,
         limit,
-        offset: comments.length,
+        ...(nextCursor
+          ? { after: nextCursor, with_total: "false" as const }
+          : { offset: 0 }),
       });
       if (page.comments.length === 0) break;
       comments.push(...page.comments);
+      if (!page.has_more) break;
+      if (!page.next_cursor) throw new Error("invalid_cursor");
+      nextCursor = page.next_cursor;
     }
 
     const rows = comments
@@ -1004,6 +1010,8 @@ export async function loadDashboardAggregates(
 export interface CommentsQueryParams {
   limit?: number;
   offset?: number;
+  after?: string;
+  with_total?: "false";
   sort?: "published_desc" | "published_asc" | "likes_desc" | "likes_asc";
   card_tab?: "all" | "critical" | "recent" | "liked";
   q?: string;
