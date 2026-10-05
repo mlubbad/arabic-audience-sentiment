@@ -6,11 +6,14 @@
 #     That sandbox keeps `.git/` read-only by design, so Codex never runs a git
 #     write and never needs `--approve-for-me` or `danger-full-access`.
 #   - This script owns every git write: branch, commit, push, the PR and the
-#     "Ready for review" comment. Codex hands over its commit message and PR
-#     text through `.codex-handoff/` (gitignored) inside the workspace.
+#     "Ready for review" / "Ready for re-review" comment. Codex hands over its
+#     commit message and PR text through `.codex-handoff/` (gitignored).
 #
 # Usage:
 #   scripts/codex-dispatch.sh <WO-N> <issue-number> <codex/wo-N-slug> [extra prompt]
+# Run the same command again after a PM review for a follow-up round: when the
+# branch already exists on origin with an open PR, the script continues from its
+# tip, hands Codex the latest "## PM review" as data, and pushes a fast-forward.
 # Env:
 #   CODEX_WORKSPACE  dedicated clone Codex works in (default: <repo>/.codex-workspace)
 #   CODEX_BIN        path to the codex binary (default: PATH, then the ChatGPT.app bundle)
@@ -71,7 +74,20 @@ git -C "$workspace" fetch --quiet origin main
 if [ -n "$(git -C "$workspace" status --porcelain)" ]; then
   die "workspace has uncommitted changes from an earlier run: $workspace (inspect, then 'git reset --hard && git clean -fd' there)"
 fi
-git -C "$workspace" switch --quiet -C "$branch" origin/main
+# BEGIN base selection (pinned by scripts/codex-dispatch.test.ts)
+# A branch already on origin is a follow-up round: continue from its tip, so the
+# earlier commits and the open PR survive and the push stays a fast-forward.
+# Only a branch that does not exist yet starts from origin/main.
+if git -C "$workspace" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+  git -C "$workspace" fetch --quiet origin "+refs/heads/$branch:refs/remotes/origin/$branch"
+  base_ref="origin/$branch"
+  round="follow-up"
+else
+  base_ref="origin/main"
+  round="first"
+fi
+git -C "$workspace" switch --quiet -C "$branch" "$base_ref"
+# END base selection
 # The repository hooks must never run here. Every git command after Codex runs
 # outside its sandbox, and a hook resolves tools from the workspace Codex could
 # write (node_modules/.bin, eslint.config.*, workers/python/pyproject.toml), so a
@@ -86,14 +102,26 @@ if [ ! -d "$workspace/node_modules" ] && [ "${CODEX_DRY_RUN:-0}" != "1" ]; then
   (cd "$workspace" && npm run setup)
 fi
 base_sha="$(git -C "$workspace" rev-parse HEAD)"
-echo "codex-dispatch: $branch @ $base_sha (origin/main) in $workspace"
+echo "codex-dispatch: $branch @ $base_sha ($base_ref, $round round) in $workspace"
 
 # --- 3. prompt -------------------------------------------------------------
 # Built with printf, not a heredoc: macOS ships bash 3.2, which rejects a
 # command substitution nested inside a heredoc inside "$( )".
 constraints_text="$(cat "$constraints")"
-task="نفّذ $wo من docs/agents/work-orders/$wo.md (issue #$issue). أنت الآن على الفرع $branch المُنشأ من آخر origin/main. اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
-prompt="$(printf '%s\n' "$task" "$extra" "" "$constraints_text")"
+if [ "$round" = "first" ]; then
+  task="نفّذ $wo من docs/agents/work-orders/$wo.md (issue #$issue). أنت الآن على الفرع $branch المُنشأ من آخر origin/main. اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
+  review=""
+else
+  # The PM's latest review on the open PR, fetched here (outside the sandbox,
+  # fixed arguments) because Codex has no GitHub credentials. It is passed as
+  # data inside the prompt, never executed.
+  open_pr="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+  [ -n "$open_pr" ] || die "$branch exists on origin but has no open PR; a closed or merged branch is not continued"
+  review="$(gh pr view "$open_pr" --json reviews --jq '[.reviews[] | select(.body | startswith("## PM review"))] | sort_by(.submittedAt) | last | .body // ""')"
+  [ -n "$review" ] || die "no PM review found on PR #$open_pr; nothing for a follow-up round to address"
+  task="جولة تعديل على $wo (issue #$issue, PR #$open_pr). أنت على الفرع $branch من آخر رأس له على origin، والتزاماتك السابقة موجودة. عالج بنود مراجعة PM أدناه فقط، ثم حدّث .codex-handoff كالعادة (commit.txt لهذا الالتزام فقط، وpr.md بالنص الكامل المحدّث للـPR). اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
+fi
+prompt="$(printf '%s\n' "$task" "$extra" "" "$review" "" "$constraints_text")"
 
 codex_cmd=("$codex_bin" exec -C "$workspace" -s workspace-write
   -c sandbox_workspace_write.network_access=true
@@ -164,13 +192,17 @@ git -c core.hooksPath=/dev/null push --no-verify -u origin "$branch"
 pr_url="$(gh pr list --head "$branch" --state open --json url --jq '.[0].url // empty')"
 if [ -z "$pr_url" ]; then
   pr_url="$(gh pr create --base main --head "$branch" --title "$title" --body "$body")"
+  ready="Ready for review"
+else
+  gh pr edit "$pr_url" --body "$body" >/dev/null
+  ready="Ready for re-review"
 fi
 pr_num="${pr_url##*/}"
-gh issue comment "$issue" --body "Ready for review: PR #$pr_num"
+gh issue comment "$issue" --body "$ready: PR #$pr_num @ ${head_sha:0:7}"
 
 echo "== Report"
 echo "work order: $wo (issue #$issue)"
 echo "branch:     $branch @ $head_sha (base $base_sha)"
 echo "PR:         $pr_url"
-echo "issue:      commented 'Ready for review: PR #$pr_num'"
+echo "issue:      commented '$ready: PR #$pr_num @ ${head_sha:0:7}'"
 echo "log:        $log"

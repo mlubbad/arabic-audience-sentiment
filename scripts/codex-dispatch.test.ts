@@ -83,3 +83,71 @@ describe("codex-dispatch git writes", () => {
     });
   });
 });
+
+// A follow-up round must continue the work-order branch, not recreate it from
+// main: recreating it dropped Codex's earlier commits and made the push a
+// non-fast-forward (PR #78, 2026-10-05).
+describe("codex-dispatch base selection", () => {
+  const block = script.slice(
+    script.indexOf("# BEGIN base selection"),
+    script.indexOf("# END base selection"),
+  );
+  let dir: string | undefined;
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    dir = undefined;
+  });
+
+  const setup = (withBranch: boolean) => {
+    dir = mkdtempSync(join(tmpdir(), "codex-base-"));
+    const run = (cwd: string, ...args: string[]) =>
+      execFileSync("git", args, { cwd, stdio: "pipe" }).toString().trim();
+    const origin = join(dir, "origin.git");
+    const seed = join(dir, "seed");
+    run(dir, "init", "--quiet", "--bare", "-b", "main", origin);
+    run(dir, "clone", "--quiet", origin, seed);
+    run(seed, "config", "user.email", "test@example.invalid");
+    run(seed, "config", "user.name", "test");
+    run(seed, "commit", "--quiet", "--allow-empty", "-m", "main");
+    run(seed, "push", "--quiet", "origin", "HEAD:main");
+    const mainSha = run(seed, "rev-parse", "HEAD");
+    let branchSha = "";
+    if (withBranch) {
+      run(seed, "switch", "--quiet", "-c", "codex/wo-1-x");
+      run(seed, "commit", "--quiet", "--allow-empty", "-m", "codex work");
+      run(seed, "push", "--quiet", "origin", "codex/wo-1-x");
+      branchSha = run(seed, "rev-parse", "HEAD");
+    }
+    const workspace = join(dir, "workspace");
+    run(dir, "clone", "--quiet", origin, workspace);
+    const out = execFileSync(
+      "bash",
+      ["-c", `set -euo pipefail\n${block}\necho "$round $base_ref"`],
+      {
+        cwd: dir,
+        env: { ...process.env, workspace, branch: "codex/wo-1-x" },
+        stdio: "pipe",
+      },
+    )
+      .toString()
+      .trim();
+    return {
+      out,
+      head: run(workspace, "rev-parse", "HEAD"),
+      mainSha,
+      branchSha,
+    };
+  };
+
+  it("continues an existing branch from its own tip", () => {
+    const r = setup(true);
+    expect(r.out).toBe("follow-up origin/codex/wo-1-x");
+    expect(r.head).toBe(r.branchSha);
+  });
+
+  it("starts a new branch from origin/main", () => {
+    const r = setup(false);
+    expect(r.out).toBe("first origin/main");
+    expect(r.head).toBe(r.mainSha);
+  });
+});
