@@ -1608,4 +1608,9 @@ export const en: Strings = {
   adminChannelsLastSuccessfulCollection: "Last successful collection",
   adminChannelsNeverCollected: "Never collected",
   adminChannelsCollectionStale: "Collection stale",
+  adminServicesFilterNotMonitored: "Not monitored",
+  adminServicesStatusNotMonitoredSentence:
+    "No live telemetry reaches these services yet",
+  adminPlanLimitsInvalid:
+    "Every field must be a whole number of -1 or more (-1 means unlimited). Nothing was saved.",
 };

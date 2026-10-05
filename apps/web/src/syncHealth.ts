@@ -63,23 +63,37 @@ export function syncHealth(state: SyncState | null, now: Date): Health {
 
   if (run.status === "failed" || run.status === "blocked") {
     if (run.status === "blocked" && run.error_code === "quota_exceeded") {
-      const endedDate = run.ended_at ? new Date(run.ended_at) : null;
-      const isPastMidnightUtc =
-        endedDate &&
-        (now.getUTCFullYear() > endedDate.getUTCFullYear() ||
-          now.getUTCMonth() > endedDate.getUTCMonth() ||
-          now.getUTCDate() > endedDate.getUTCDate());
-
-      if (isPastMidnightUtc) {
-        return state.worker.connected
-          ? { ...base, severity: "ok", key: "healthy", queued }
-          : { ...base, severity: "warning", key: "stale", queued };
-      }
+      // YouTube resets the daily quota at the next UTC midnight after the
+      // block. Until then the pause is expected. After it, the block stays the
+      // latest run until a later run replaces it, and a pause nobody resumed
+      // is a gap: stale, never healthy. The reset is computed as a timestamp,
+      // so month and year boundaries need no special case.
+      const staleHours = run.ended_at
+        ? (now.getTime() - Date.parse(run.ended_at)) / 3_600_000
+        : null;
+      const ended = run.ended_at ? new Date(run.ended_at) : null;
+      const resetAt = ended
+        ? Date.UTC(
+            ended.getUTCFullYear(),
+            ended.getUTCMonth(),
+            ended.getUTCDate() + 1,
+          )
+        : null;
+      if (resetAt !== null && now.getTime() >= resetAt)
+        return {
+          ...base,
+          severity: "warning",
+          key: "stale",
+          queued,
+          staleHours,
+          errorCode,
+        };
       return {
         ...base,
         severity: "warning",
         key: "quota_paused",
         queued,
+        staleHours,
         errorCode,
       };
     }

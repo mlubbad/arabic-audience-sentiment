@@ -1619,6 +1619,11 @@ export const ar = {
   adminChannelsLastSuccessfulCollection: "آخر جمع ناجح",
   adminChannelsNeverCollected: "لم ينجح الجمع بعد",
   adminChannelsCollectionStale: "الجمع متأخر",
+  adminServicesFilterNotMonitored: "غير مراقَبة",
+  adminServicesStatusNotMonitoredSentence:
+    "لا تصل قياسات حية من هذه الخدمات بعد",
+  adminPlanLimitsInvalid:
+    "كل حقل يجب أن يكون عدداً صحيحاً من ‎-1 فأكثر (‎-1 تعني بلا حد). لم يُحفظ شيء.",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,

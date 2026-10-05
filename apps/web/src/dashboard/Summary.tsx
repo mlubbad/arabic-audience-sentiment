@@ -13,7 +13,8 @@ import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
-import { n } from "./format";
+import { n, pct } from "./format";
+import { useLocale } from "../locale";
 import "./summary.css";
 
 export function Summary({
@@ -30,9 +31,11 @@ export function Summary({
   const analysed = s.analysed;
   const posPct = analysed > 0 ? Math.round((pos / analysed) * 100) : 0;
   const negPct = analysed > 0 ? Math.round((neg / analysed) * 100) : 0;
+  const lang = useLocale();
   const netScore =
     analysed > 0 ? Math.round(((pos - neg) / analysed) * 100) : 0;
-  const netSign = netScore > 0 ? `+${netScore}٪` : `${netScore}٪`;
+  // Nothing analysed is not a net score of 0: it is unknown.
+  const netSign = pct(analysed > 0 ? netScore : null, lang, { signed: true });
 
   let pulseBadge = S.pulseBalanced;
   let pulseTone: "positive" | "negative" | "sentiment-neutral" =
@@ -178,9 +181,7 @@ export function Summary({
         </Card>
         <Card className="db-kpi db-kpi-highlight">
           <strong className="db-kpi-value ui-num" data-testid="kpi-engagement">
-            {s.kpis?.engagement_rate != null
-              ? `${s.kpis.engagement_rate}٪`
-              : "—"}
+            {pct(s.kpis?.engagement_rate, lang)}
           </strong>
           <span className="db-kpi-label">{S.kpiEngagement}</span>
           <small className="db-note">{S.kpiEngagementNote}</small>

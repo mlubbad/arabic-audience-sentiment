@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Plan } from "@sentiment/contracts";
-import { EditPlanLimitsDialog } from "./EditPlanLimitsDialog";
+import { EditPlanLimitsDialog, parseLimit } from "./EditPlanLimitsDialog";
 import * as adminRead from "./adminRead";
 
 vi.mock("./adminRead", () => ({
@@ -177,5 +177,55 @@ describe("EditPlanLimitsDialog", () => {
         screen.getByText("Database error updating plan"),
       ).toBeInTheDocument();
     });
+  });
+
+  it("never saves a cleared field as 0", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditPlanLimitsDialog
+        plan={mockPlan}
+        open={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />,
+    );
+    const input = screen.getByTestId("input-plan-members");
+    await user.clear(input);
+    // The field stays empty instead of snapping to 0.
+    expect(input).toHaveValue(null);
+    await user.click(screen.getByTestId("btn-save-plan-limits"));
+    expect(adminRead.updatePlanLimits).not.toHaveBeenCalled();
+  });
+
+  it("refuses a fractional or below -1 value with a message and no save", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditPlanLimitsDialog
+        plan={mockPlan}
+        open={true}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />,
+    );
+    const input = screen.getByTestId("input-plan-channels");
+    await user.clear(input);
+    await user.type(input, "-2");
+    // The browser's own min/step check blocks this already; submit directly to
+    // prove the dialog's check holds even where that one is bypassed.
+    fireEvent.submit(input.closest("form")!);
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(adminRead.updatePlanLimits).not.toHaveBeenCalled();
+  });
+});
+
+describe("parseLimit", () => {
+  it("accepts whole numbers from -1 up", () => {
+    expect(parseLimit("-1")).toBe(-1);
+    expect(parseLimit("0")).toBe(0);
+    expect(parseLimit(" 25 ")).toBe(25);
+  });
+  it("rejects blank, fractional, below -1 and non-numeric input", () => {
+    for (const raw of ["", "  ", "1.5", "-2", "abc", "1e3"])
+      expect(parseLimit(raw)).toBeNull();
   });
 });

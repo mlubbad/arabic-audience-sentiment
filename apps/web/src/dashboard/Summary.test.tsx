@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ar } from "../strings/ar";
 import { en } from "../strings/en";
 import type { Snapshot } from "./Dashboard";
 import { Summary } from "./Summary";
+import { resetLocale, setLocale } from "../locale";
 
 const baseSnapshot = {
   total: 100,
@@ -95,5 +96,33 @@ describe("Summary Executive Story Briefing", () => {
     expect(briefing).toHaveTextContent("-50٪");
     expect(briefing).toHaveTextContent(ar.pulseCriticalAlert);
     expect(briefing).toHaveTextContent(ar.storyAct3RecCritical);
+  });
+
+  describe("net sentiment when nothing is measured, and per locale", () => {
+    afterEach(() => resetLocale());
+
+    it("shows an em dash, not 0٪, when nothing is analysed", () => {
+      const none = {
+        ...baseSnapshot,
+        analysed: 0,
+        sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+      } as unknown as Snapshot;
+      render(<Summary s={none} S={ar} />);
+      expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent(/^—$/);
+    });
+
+    it("uses % in English and ٪ in Arabic", () => {
+      setLocale("en");
+      const { unmount } = render(<Summary s={baseSnapshot} S={en} />);
+      expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent(
+        /^\+63%$/,
+      );
+      unmount();
+      setLocale("ar");
+      render(<Summary s={baseSnapshot} S={ar} />);
+      expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent(
+        /^\+63٪$/,
+      );
+    });
   });
 });

@@ -12,6 +12,10 @@ export const ServiceStatusSchema = z.enum([
   "degraded",
   "down",
   "unconfigured",
+  // No live telemetry reaches this service yet. Said as such rather than as
+  // "healthy": a dashboard that shows green for what it never measured is the
+  // one that reassures at the wrong moment.
+  "not_monitored",
 ]);
 
 export type ServiceStatus = z.infer<typeof ServiceStatusSchema>;
@@ -53,6 +57,7 @@ export const ServicesSummarySchema = z
     degraded: z.number().int().nonnegative(),
     down: z.number().int().nonnegative(),
     unconfigured: z.number().int().nonnegative(),
+    not_monitored: z.number().int().nonnegative(),
     avg_latency_ms: z.number().nonnegative().nullable(),
   })
   .strict();

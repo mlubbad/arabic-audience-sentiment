@@ -43,7 +43,12 @@ export function AdminServicesPage() {
   // Retrieve stored refresh preference or fallback to recommended 30s
   const [intervalMs, setIntervalMs] = useState<number>(() => {
     if (typeof window === "undefined") return DEFAULT_INTERVAL_MS;
-    const stored = window.localStorage.getItem(REFRESH_STORAGE_KEY);
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(REFRESH_STORAGE_KEY);
+    } catch {
+      // Storage blocked (private mode, disabled site data): use the default.
+    }
     if (stored !== null) {
       const parsed = parseInt(stored, 10);
       if (!isNaN(parsed) && [0, 10000, 30000, 60000, 300000].includes(parsed)) {
@@ -167,6 +172,8 @@ export function AdminServicesPage() {
         return S.adminServicesFilterDown;
       case "unconfigured":
         return S.adminServicesFilterUnconfigured;
+      case "not_monitored":
+        return S.adminServicesFilterNotMonitored;
     }
   };
 
@@ -201,6 +208,9 @@ export function AdminServicesPage() {
     const downCount = report.services.filter((s) => s.status === "down").length;
     const unconfiguredCount = report.services.filter(
       (s) => s.status === "unconfigured",
+    ).length;
+    const notMonitoredCount = report.services.filter(
+      (s) => s.status === "not_monitored",
     ).length;
 
     // Relative seconds ago
@@ -304,7 +314,9 @@ export function AdminServicesPage() {
                 ? S.adminServicesStatusHealthySentence
                 : report.overall_status === "degraded"
                   ? S.adminServicesStatusDegradedSentence
-                  : S.adminServicesStatusDownSentence}
+                  : report.overall_status === "down"
+                    ? S.adminServicesStatusDownSentence
+                    : S.adminServicesStatusNotMonitoredSentence}
             </small>
           </Card>
 
@@ -420,6 +432,16 @@ export function AdminServicesPage() {
                 onClick={() => setSelectedStatus("unconfigured")}
               >
                 {S.adminServicesFilterUnconfigured} ({unconfiguredCount})
+              </button>
+            )}
+            {notMonitoredCount > 0 && (
+              <button
+                type="button"
+                className={`admin-services-pill ${selectedStatus === "not_monitored" ? "is-active" : ""}`}
+                onClick={() => setSelectedStatus("not_monitored")}
+              >
+                <span className="admin-status-dot admin-status-dot--not_monitored" />
+                {S.adminServicesFilterNotMonitored} ({notMonitoredCount})
               </button>
             )}
           </div>

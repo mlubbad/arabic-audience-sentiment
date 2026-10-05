@@ -167,25 +167,67 @@ describe("sync health", () => {
     });
   });
 
-  it("recovers to healthy after midnight UTC if worker is connected", () => {
-    const blockedQuota = state({
+  const quotaBlock = (endedAt: string) =>
+    state({
       queued_jobs: 0,
-      worker: {
-        connected: true,
-        busy: false,
-        last_heartbeat_at: "2026-09-13T01:00:00Z",
-      },
       last_run: {
         ...state().last_run!,
         status: "blocked",
         error_code: "quota_exceeded",
-        ended_at: "2026-09-12T10:00:00Z",
+        ended_at: endedAt,
       },
     });
-    const nextDay = new Date("2026-09-13T01:05:00Z");
-    expect(syncHealth(blockedQuota, nextDay)).toMatchObject({
-      severity: "ok",
-      key: "healthy",
+
+  it("is not healthy for a quota block 10 days ago with no run since", () => {
+    const health = syncHealth(
+      quotaBlock("2026-09-03T10:00:00Z"),
+      new Date("2026-09-13T12:00:00Z"),
+    );
+    expect(health).toMatchObject({ severity: "warning", key: "stale" });
+    expect(health.staleHours).toBeCloseTo(242, 0);
+  });
+
+  it("stays quota_paused until the reset, then turns stale, never healthy", () => {
+    const block = quotaBlock("2026-09-12T10:00:00Z");
+    expect(syncHealth(block, new Date("2026-09-12T23:59:00Z"))).toMatchObject({
+      key: "quota_paused",
     });
+    expect(syncHealth(block, new Date("2026-09-13T00:00:00Z"))).toMatchObject({
+      severity: "warning",
+      key: "stale",
+    });
+  });
+
+  it("crosses a year boundary: Dec 31 block resets at Jan 1 00:00 UTC", () => {
+    const block = quotaBlock("2025-12-31T22:00:00Z");
+    expect(syncHealth(block, new Date("2025-12-31T23:30:00Z"))).toMatchObject({
+      key: "quota_paused",
+    });
+    expect(syncHealth(block, new Date("2026-01-01T00:30:00Z"))).toMatchObject({
+      key: "stale",
+    });
+  });
+
+  it("crosses a month boundary the same way (Sep 30 -> Oct 1)", () => {
+    const block = quotaBlock("2026-09-30T08:00:00Z");
+    expect(syncHealth(block, new Date("2026-09-30T20:00:00Z"))).toMatchObject({
+      key: "quota_paused",
+    });
+    expect(syncHealth(block, new Date("2026-10-01T01:00:00Z"))).toMatchObject({
+      key: "stale",
+    });
+  });
+
+  it("reports queued work behind a quota block as queued, not paused", () => {
+    const block = state({
+      queued_jobs: 2,
+      last_run: {
+        ...state().last_run!,
+        status: "blocked",
+        error_code: "quota_exceeded",
+        ended_at: "2026-09-03T10:00:00Z",
+      },
+    });
+    expect(syncHealth(block, now)).toMatchObject({ key: "queued", queued: 2 });
   });
 });
