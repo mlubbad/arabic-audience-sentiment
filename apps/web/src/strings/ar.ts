@@ -197,6 +197,10 @@ export const ar = {
   addChannelDone: "أُضيفت القناة كبيانات عامة. الخطوة التالية حصر الفيديوهات.",
   addChannelExists: "هذه القناة مضافة في هذه المساحة بالفعل.",
   addChannelFailed: "تعذّر البحث عن القنوات. حاول من جديد.",
+  /** The code is isolated (FSI…PDI) so a Latin code keeps its order inside
+   *  the Arabic sentence. */
+  addChannelFailedCode: (code: string) =>
+    `تعذّر البحث عن القنوات (رمز الخطأ: \u2068${code}\u2069). حاول من جديد، وإن تكرر فأرسل الرمز للدعم.`,
   addChannelQueryInvalid: "أدخل رابط قناة صالحًا أو معرّفًا أو اسمًا للبحث.",
   addChannelNotConfigured: "البحث عن القنوات غير مهيأ على الخادم بعد.",
   addChannelQuota:

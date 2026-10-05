@@ -35,6 +35,7 @@ import { useStrings } from "../strings";
 import { providers, type ProviderId } from "../authProviders";
 import { failureCode } from "../failure";
 import { WorkspaceCard, type ChannelRow, type JobRow } from "./WorkspaceCard";
+import { lookupCode, lookupErrorMessage } from "./channelLookupError";
 import { PlanPanel, DemoPlanPanel } from "./PlanPanel";
 import { AuthEntry } from "./AuthEntry";
 import { Unavailable } from "./Unavailable";
@@ -70,23 +71,6 @@ type Asking = {
   ws: string;
   what: "disconnect" | "rename" | "retire" | "addchannel";
 } | null;
-
-/** The lookup refusal's own code, however the client wrapped it. The function
- *  answers `{code}` in the body; the relay puts its refusal elsewhere, and a
- *  network failure puts it nowhere. */
-async function lookupCode(error: unknown): Promise<string> {
-  const e = error as { context?: Response; code?: unknown; message?: unknown };
-  if (e?.context && typeof e.context.json === "function") {
-    try {
-      const body = (await e.context.json()) as { code?: unknown };
-      if (typeof body?.code === "string") return body.code;
-    } catch {
-      // The body had no code; the fallbacks decide.
-    }
-  }
-  if (typeof e?.code === "string" && e.code) return e.code;
-  return "";
-}
 
 /** The page's notes and its "working…" — one place per message, shared by
  *  the live body and the demo body so both print through the same line. */
@@ -405,19 +389,6 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
       setBusy(null);
     }
   }
-  /** The lookup refusal, in the reader's language. The server's codes are
-   *  the ones the lookup function raises; anything else is a failure to
-   *  reach it, which reads as the same sentence the other doors use. */
-  const lookupErrorMessage = (code: string) =>
-    code === "lookup_not_configured"
-      ? S.addChannelNotConfigured
-      : code === "quota_exceeded"
-        ? S.addChannelQuota
-        : code === "invalid_query"
-          ? S.addChannelQueryInvalid
-          : code === "channel_not_public" || code === "channel_not_found"
-            ? S.channelNotFoundOnPlatform
-            : S.addChannelFailed;
   async function createWorkspace(e: FormEvent) {
     e.preventDefault();
     setBusy("create");
@@ -699,6 +670,7 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                               candidates: null,
                               error: lookupErrorMessage(
                                 await lookupCode(error),
+                                S,
                               ),
                             });
                             return;
@@ -717,7 +689,12 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                             candidates: parsed.success
                               ? parsed.data.candidates
                               : null,
-                            error: parsed.success ? null : S.addChannelFailed,
+                            error: parsed.success
+                              ? null
+                              : lookupErrorMessage(
+                                  "invalid_lookup_response",
+                                  S,
+                                ),
                           });
                         });
                       return;
