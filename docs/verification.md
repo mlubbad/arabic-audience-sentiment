@@ -39,6 +39,25 @@ echoed.
 
 Not verified here: the live failure itself. The owner's next search shows which code it is.
 
+### Follow-up: the three `forbidden` refusals get their own codes
+
+The owner's DevTools showed `403 {"code":"forbidden"}`, and the function log had only boot and
+shutdown lines. Legacy API keys are still enabled (owner's screenshot), so a disabled anon key is
+ruled out. `channel-lookup` now answers `forbidden:session` (`getUser` refused),
+`forbidden:membership_read` (the memberships read failed) or `forbidden:role` (not owner or analyst),
+and logs the code with the error's name, code and message. The decision lives in
+`supabase/functions/_shared/lookup-access.ts`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/lookup_access.test.ts` | 6 passed. |
+| Mutation: membership-read error reported as `role` | 1 of 6 fails. |
+| Mutation: `viewer` allowed to name a channel | 1 of 6 fails. |
+| `npm run check` (includes `deno check` of every function) | Exit 0: web 141 / 1100, DB 56 / 475, worker 297, secrets check clean. |
+
+Not done here: deploying the function. CI does not deploy Edge Functions; the owner runs
+`supabase functions deploy channel-lookup`.
+
 ## 2026-10-05 — Dispatcher follow-up rounds continue the branch
 
 From the cloud checkout of `claude/keen-keller-skwwpm`, Linux, bash 5.

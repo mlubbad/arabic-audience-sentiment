@@ -26,6 +26,7 @@ import {
 } from "../_shared/oauth-callback.ts";
 import { corsHeaders, parseOrigins, preflight } from "../_shared/cors.ts";
 import { parseChannelQuery } from "../_shared/channel-query.ts";
+import { lookupRefusal, refusalDetail } from "../_shared/lookup-access.ts";
 
 const env = (name: string) => Deno.env.get(name) ?? "";
 const allowed = parseOrigins(Deno.env.get("ALLOWED_ORIGINS"));
@@ -206,20 +207,24 @@ Deno.serve(async (request) => {
     data: { user },
     error: userError,
   } = await db.auth.getUser();
-  if (userError || !user) return json(403, { code: "forbidden" });
-  const { data: memberships, error: memberError } = await db
-    .from("memberships")
-    .select("role")
-    .eq("workspace_id", body.workspace_id)
-    .eq("user_id", user.id);
-  if (memberError) return json(403, { code: "forbidden" });
-  if (
-    !memberships?.some(
-      (membership) =>
-        membership.role === "workspace_owner" || membership.role === "analyst",
-    )
-  )
-    return json(403, { code: "forbidden" });
+  const { data: memberships, error: memberError } =
+    user && !userError
+      ? await db
+          .from("memberships")
+          .select("role")
+          .eq("workspace_id", body.workspace_id)
+          .eq("user_id", user.id)
+      : { data: null, error: null };
+  const refusal = lookupRefusal({ user, userError, memberships, memberError });
+  if (refusal) {
+    console.error("channel-lookup refused", {
+      code: refusal,
+      ...refusalDetail(
+        refusal === "forbidden:session" ? userError : memberError,
+      ),
+    });
+    return json(403, { code: refusal });
+  }
 
   if (platform === "telegram") {
     let clean = body.query.trim();
