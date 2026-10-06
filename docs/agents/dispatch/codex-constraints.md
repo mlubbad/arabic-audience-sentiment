@@ -24,5 +24,10 @@ by design, and the dispatcher script outside the sandbox owns every git write. W
    `.gitleaksignore` or `.github/workflows/**` unless the work order names them; the dispatcher
    refuses to commit otherwise. Never read credentials, tokens, keychains, `~/.ssh` or other
    tools' session files. Never deploy or run `npm run db:migrate:remote`.
-5. **Finish with a short final message**: what changed (files), which suites ran with their
+5. **Read the work order from the repository, never from GitHub.** Its full text is the mirror
+   `docs/agents/work-orders/<WO-N>.md`. In a follow-up round the PM review is pasted in this
+   prompt. Do not query GitHub or any external tool for the issue, the PR or the review (no `gh`,
+   no Composio, no connector or MCP call): the sandbox blocks them, and you need nothing they
+   would return.
+6. **Finish with a short final message**: what changed (files), which suites ran with their
    counts, and anything you could not do and why.
