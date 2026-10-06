@@ -10,10 +10,20 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# `npm run check` stays the one local command. CI runs the same steps split
+# across parallel jobs, because one serial job took ~11 minutes (2026-10-06:
+# `npm run check` 6m07s, then `npm run test:e2e` 3m50s). The jobs together run
+# exactly the steps of `npm run check`, plus the snapshot check and the browser
+# suite; scripts/ci-workflow.test.ts fails if a step of `check` is dropped.
+#
+# `verify` is kept as the single gate: the deploy gate (deploy.yml
+# `require_workflow_jobs ci.yml verify`), the playbook and branch protection
+# all name it. It succeeds only when every job it needs succeeded.
 jobs:
-  verify:
+  static:
+    name: Static checks and build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,13 +38,69 @@ jobs:
           python-version: 3.12.10
       - run: npm ci
       - run: uv --directory workers/python sync --frozen
-      - run: npx playwright install --with-deps chromium
-      # Includes the dependency-free ownership guard regression tests.
-      - run: npm run check
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run check:functions
+      - run: npm run build
+      # Scans the source and the built assets, so it runs after the build.
+      - run: npm run check:secrets
       # Fails if a migration changed the schema without regenerating the
       # checked-in snapshot (supabase/schema/current.sql). Regenerate with
       # `npm run db:snapshot`.
       - run: npm run db:snapshot:check
+
+  unit:
+    name: Unit and worker tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: 0.11.11
+          python-version: 3.12.10
+      - run: npm ci
+      - run: uv --directory workers/python sync --frozen
+      # Includes the dependency-free ownership guard regression tests.
+      - run: npm test
+      - run: npm run worker:test
+
+  db:
+    name: Database tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:db
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
@@ -42,3 +108,23 @@ jobs:
           name: browser-failure-evidence
           path: test-results/
           retention-days: 3
+
+  verify:
+    needs: [static, unit, db, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every check job to succeed
+        env:
+          STATIC: ${{ needs.static.result }}
+          UNIT: ${{ needs.unit.result }}
+          DB: ${{ needs.db.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          failed=0
+          for pair in "static=$STATIC" "unit=$UNIT" "db=$DB" "e2e=$E2E"; do
+            echo "$pair"
+            [ "${pair#*=}" = success ] || failed=1
+          done
+          exit "$failed"
