@@ -1,5 +1,28 @@
 # Verification
 
+## 2026-10-06 — WO-16 (PR #90), dispatcher follow-up fix (#91), parallel CI (#92)
+
+**WO-16: service health from records** (Codex; two rounds). The first head `49f696d` mapped a platform with no success in 7 days and only `cancelled` runs to `healthy`; a probe at that head returned `healthy` where `degraded` was expected. Round 2 (`05c6fe8`) fixed it and both optional findings. Merged as `668c4ed`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npm run check` at `49f696d` (Claude's worktree; Codex's sandbox stopped at `check:functions` with npm cache `EPERM`) | exit 0: unit 1117, DB 493, worker 297 passed; build and secret scan passed. |
+| `npm run check` at `05c6fe8` | exit 0: unit 1118, DB 494, worker 297 passed. `npm run db:snapshot:check`: exit 0. |
+| Mutations at `49f696d`: platform from `sync_runs.source`; `running` rows counted; 7-day window dropped; quota match disabled; `problems_7d` ignored | Each fails its suite. `least(10, …)` → `least(1000, …)` survived (no cap test). |
+| Mutations at `05c6fe8`: restore the `last_success_at != null &&` guard; `least(1000, …)` | `1 failed / 22 passed` and `1 failed / 3 passed`. |
+| Deploy Preview run 37537588123 on `668c4ed` | `Applying migration 20261010000000 … ✓ applied successfully`; `app.sky-develop.net serves /static/index-CX27Rv6V.js`. |
+
+**Dispatcher follow-up rounds (#91).** Two WO-16 follow-up rounds stopped before any edit: Codex tried to read issue #88 through a local Composio CLI and the sandbox refused it (`EPERM` on `~/.composio/tool_definitions/GITHUB_GET_AN_ISSUE.json`). The follow-up prompt now names `docs/agents/work-orders/$wo.md` and forbids GitHub reads; `codex-constraints.md` rule 5 says the same. Next round: Codex read only the mirror and pushed `05c6fe8`. `npx vitest run scripts/codex-dispatch.test.ts`: 5 passed.
+
+**Parallel CI (#92).** The single `verify` job took ~11 min (run on `1591491`: `npm run check` 6m07s, then `test:e2e` 3m50s). It now runs as `static`, `unit`, `db` and `e2e` in parallel, with `verify` needing all four.
+
+| Command / observation | Actual result |
+| --- | --- |
+| PR #92 run on `810b07a` | static 1m27s, unit 2m40s, db 3m34s, e2e 4m47s; `verify` passed at 4m53s after start (was ~11 min). |
+| `npx vitest run scripts/ci-workflow.test.ts` | 3 passed. Mutations: drop `check:functions` from the workflow → 1 fails; drop `e2e` from `needs` → 1 fails. |
+| CodeQL on the same runs | JS ~3m20s, Python ~2m30s, in parallel; never on the critical path. |
+| Deploy upload (`scripts/deploy-preview.sh`, run 37537588123) | ~2.4 s per file, one file at a time: ~3.5 min uploading and ~1.5 min removing stale files. The next deploy-speed lever. |
+
 ## 2026-10-04 — Codex dispatch: sandbox facts, watcher, dispatcher dry run
 
 All from a clone in `/tmp/aas-src` (the bridge session's own checkout was unreadable, see
