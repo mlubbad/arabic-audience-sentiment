@@ -101,12 +101,30 @@ export async function updatePlanLimits(
   return data as { ok: boolean; plan: unknown };
 }
 
-/** What `admin_services_health()` returns today: telemetry for the database,
- *  the worker and the last day's sync runs. Nothing else is measured. */
+type PlatformHealthRpc = {
+  last_status?: string | null;
+  last_finished_at?: string | null;
+  last_success_at?: string | null;
+  last_failure_at?: string | null;
+  last_error_code?: string | null;
+  runs_24h?: number | null;
+  failures_24h?: number | null;
+  consecutive_failures?: number | null;
+};
+
 type ServicesHealthRpc = {
   checked_at?: string;
   database?: { size_mb?: number | null; active_connections?: number | null };
   worker?: { fresh?: boolean | null; jobs_queued?: number | null };
+  platforms?: Partial<
+    Record<"youtube" | "telegram" | "x" | "tiktok", PlatformHealthRpc>
+  >;
+  billing_webhooks?: {
+    last_received_at?: string | null;
+    last_outcome?: string | null;
+    received_24h?: number | null;
+    problems_7d?: number | null;
+  };
 };
 
 const STATUS_RANK: Record<ServiceStatus, number> = {
@@ -164,6 +182,86 @@ export function buildLiveServicesReport(
   if (worker && data.worker?.fresh != null) {
     worker.status = data.worker.fresh ? "healthy" : "degraded";
     worker.quota_used = data.worker.jobs_queued ?? null;
+  }
+
+  const isolate = (value: string) =>
+    `${String.fromCodePoint(0x2068)}${value}${String.fromCodePoint(0x2069)}`;
+  const formatTimestamp = (value: string) =>
+    new Date(value).toISOString().replace(".000Z", "Z");
+  const platformServices = {
+    youtube: "youtube_api",
+    telegram: "telegram_api",
+    x: "x_twitter_api",
+    tiktok: "tiktok_api",
+  } as const;
+  const quotaOrRateCode = /quota|rate_limit|rate_limited|insufficient_quota/i;
+
+  for (const [platform, serviceId] of Object.entries(platformServices)) {
+    const health = data.platforms?.[platform as keyof typeof platformServices];
+    const service = services.find((s) => s.id === serviceId);
+    if (!health || !service) continue;
+
+    if (health.last_status == null) {
+      service.details = "لا توجد عملية مكتملة خلال آخر 7 أيام";
+      continue;
+    }
+
+    const latestRunFailed =
+      health.last_failure_at != null &&
+      health.last_finished_at != null &&
+      Date.parse(health.last_failure_at) ===
+        Date.parse(health.last_finished_at);
+    const latestHasQuotaError =
+      latestRunFailed &&
+      health.last_error_code != null &&
+      quotaOrRateCode.test(health.last_error_code);
+    const lastSuccessIsStale =
+      health.last_success_at != null &&
+      Date.parse(health.last_success_at) < now.getTime() - 48 * 60 * 60 * 1000;
+
+    if (latestHasQuotaError || (health.consecutive_failures ?? 0) >= 3) {
+      service.status = "down";
+    } else if (
+      ["failed", "blocked", "partial"].includes(health.last_status) ||
+      lastSuccessIsStale
+    ) {
+      service.status = "degraded";
+    } else {
+      service.status = "healthy";
+    }
+
+    if (service.status === "down" || service.status === "degraded")
+      service.error_code = health.last_error_code ?? null;
+    const lastSuccess = health.last_success_at
+      ? isolate(formatTimestamp(health.last_success_at))
+      : "لا يوجد";
+    service.details =
+      `آخر نجاح: ${lastSuccess}` +
+      ` · التشغيلات خلال 24 ساعة: ${health.runs_24h ?? 0}` +
+      ` · الإخفاقات: ${health.failures_24h ?? 0}`;
+  }
+
+  const paddle = services.find((s) => s.id === "paddle_billing");
+  if (paddle && data.billing_webhooks) {
+    const billing = data.billing_webhooks;
+    if (billing.last_received_at == null) {
+      paddle.details = "لم يُستقبل أي خطاف ويب بعد";
+    } else if ((billing.problems_7d ?? 0) > 0) {
+      paddle.status = "degraded";
+      paddle.details =
+        `المستلم خلال 24 ساعة: ${billing.received_24h ?? 0}` +
+        ` · المشكلات خلال 7 أيام: ${billing.problems_7d}`;
+    } else if (
+      Date.parse(billing.last_received_at) >=
+      now.getTime() - 30 * 24 * 60 * 60 * 1000
+    ) {
+      paddle.status = "healthy";
+      paddle.details = `المستلم خلال 24 ساعة: ${billing.received_24h ?? 0}`;
+    } else {
+      paddle.details =
+        `آخر خطاف ويب مستلم: ` +
+        isolate(formatTimestamp(billing.last_received_at));
+    }
   }
 
   const count = (status: ServiceStatus) =>
