@@ -206,17 +206,13 @@ export function buildLiveServicesReport(
       continue;
     }
 
-    const latestRunFailed =
-      health.last_failure_at != null &&
-      health.last_finished_at != null &&
-      Date.parse(health.last_failure_at) ===
-        Date.parse(health.last_finished_at);
+    const latestRunFailed = ["failed", "blocked"].includes(health.last_status);
     const latestHasQuotaError =
       latestRunFailed &&
       health.last_error_code != null &&
       quotaOrRateCode.test(health.last_error_code);
     const lastSuccessIsStale =
-      health.last_success_at != null &&
+      health.last_success_at == null ||
       Date.parse(health.last_success_at) < now.getTime() - 48 * 60 * 60 * 1000;
 
     if (latestHasQuotaError || (health.consecutive_failures ?? 0) >= 3) {

@@ -148,6 +148,21 @@ describe("buildLiveServicesReport", () => {
     ).toMatchObject({ status: "degraded", error_code: null });
   });
 
+  it("degrades a platform with finished runs but no success", () => {
+    const report = build({
+      platforms: {
+        youtube: platform({
+          last_status: "cancelled",
+          last_success_at: null,
+          runs_24h: 1,
+        }),
+      },
+    });
+    expect(
+      report.services.find((service) => service.id === "youtube_api"),
+    ).toMatchObject({ status: "degraded", error_code: null });
+  });
+
   it.each(["failed", "blocked", "partial"])(
     "degrades a platform whose latest run is %s",
     (lastStatus) => {

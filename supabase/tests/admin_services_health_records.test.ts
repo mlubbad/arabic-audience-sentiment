@@ -299,6 +299,19 @@ describe("admin service health from existing records", () => {
     expect(JSON.stringify(billing)).not.toContain(WORKSPACE_A);
   });
 
+  it("caps consecutive failures at ten", async () => {
+    await db.exec("reset role");
+    await db.query(
+      `insert into sync_runs(workspace_id,channel_id,mode,source,started_at,ended_at,status,error_code)
+       select $1,$2,'collect','unknown',$3::timestamptz + n * interval '1 second',
+         $3::timestamptz + n * interval '1 second' + interval '100 milliseconds','failed','cap_test'
+       from generate_series(1,11) as failures(n)`,
+      [WORKSPACE_A, YOUTUBE_A, ago(1.8)],
+    );
+
+    expect((await report()).platforms.youtube.consecutive_failures).toBe(10);
+  });
+
   it("refuses a non-admin and anon", async () => {
     await as("authenticated", MEMBER);
     await expect(
