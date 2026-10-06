@@ -119,7 +119,7 @@ else
   [ -n "$open_pr" ] || die "$branch exists on origin but has no open PR; a closed or merged branch is not continued"
   review="$(gh pr view "$open_pr" --json reviews --jq '[.reviews[] | select(.body | startswith("## PM review"))] | sort_by(.submittedAt) | last | .body // ""')"
   [ -n "$review" ] || die "no PM review found on PR #$open_pr; nothing for a follow-up round to address"
-  task="جولة تعديل على $wo (issue #$issue, PR #$open_pr). أنت على الفرع $branch من آخر رأس له على origin، والتزاماتك السابقة موجودة. عالج بنود مراجعة PM أدناه فقط، ثم حدّث .codex-handoff كالعادة (commit.txt لهذا الالتزام فقط، وpr.md بالنص الكامل المحدّث للـPR). اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
+  task="جولة تعديل على $wo (issue #$issue, PR #$open_pr). نص أمر العمل في docs/agents/work-orders/$wo.md، ومراجعة PM منسوخة أدناه؛ لا تقرأ GitHub. أنت على الفرع $branch من آخر رأس له على origin، والتزاماتك السابقة موجودة. عالج بنود مراجعة PM أدناه فقط، ثم حدّث .codex-handoff كالعادة (commit.txt لهذا الالتزام فقط، وpr.md بالنص الكامل المحدّث للـPR). اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
 fi
 prompt="$(printf '%s\n' "$task" "$extra" "" "$review" "" "$constraints_text")"
 
