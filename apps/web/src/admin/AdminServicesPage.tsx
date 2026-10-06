@@ -212,6 +212,19 @@ export function AdminServicesPage() {
     const notMonitoredCount = report.services.filter(
       (s) => s.status === "not_monitored",
     ).length;
+    // What the summary may claim is bounded by what is measured: a card that
+    // counts all fifteen services, or calls the platform healthy because the
+    // two measured ones are, says more than the readings do (2026-10-06).
+    const monitoredCount = totalCount - notMonitoredCount - unconfiguredCount;
+    const latencyCount = report.services.filter(
+      (s) => s.latency_ms != null,
+    ).length;
+    const quotaMeasured = report.services.filter(
+      (s) => s.quota_used != null && s.quota_total != null,
+    );
+    const quotaAlerts = quotaMeasured.filter(
+      (s) => s.quota_used! / s.quota_total! > 0.8,
+    ).length;
 
     // Relative seconds ago
     const secondsSinceUpdate = Math.max(
@@ -311,7 +324,12 @@ export function AdminServicesPage() {
             </div>
             <small className="admin-services-kpi-sub">
               {report.overall_status === "healthy"
-                ? S.adminServicesStatusHealthySentence
+                ? notMonitoredCount > 0
+                  ? S.adminServicesHealthyOfMonitored(
+                      monitoredCount,
+                      totalCount,
+                    )
+                  : S.adminServicesStatusHealthySentence
                 : report.overall_status === "degraded"
                   ? S.adminServicesStatusDegradedSentence
                   : report.overall_status === "down"
@@ -325,7 +343,7 @@ export function AdminServicesPage() {
               {S.adminServicesKpiServicesCount}
             </span>
             <div className="admin-services-kpi-val">
-              <b className="ui-num">{totalCount}</b>
+              <b className="ui-num">{monitoredCount}</b>
               <Badge tone="success" numeric>
                 {healthyCount}
               </Badge>
@@ -341,7 +359,9 @@ export function AdminServicesPage() {
               )}
             </div>
             <small className="admin-services-kpi-sub">
-              {S.adminServicesServicesUnit(totalCount)}
+              {notMonitoredCount > 0
+                ? S.adminServicesMonitoredOfTotal(totalCount, notMonitoredCount)
+                : S.adminServicesServicesUnit(totalCount)}
             </small>
           </Card>
 
@@ -358,7 +378,7 @@ export function AdminServicesPage() {
               <small>{S.adminServicesMsUnit}</small>
             </div>
             <small className="admin-services-kpi-sub">
-              {healthyCount} / {totalCount} {S.adminServicesFilterHealthy}
+              {S.adminServicesLatencyBasis(latencyCount)}
             </small>
           </Card>
 
@@ -368,19 +388,16 @@ export function AdminServicesPage() {
             </span>
             <div className="admin-services-kpi-val">
               <b className="ui-num">
-                {
-                  report.services.filter(
-                    (s) =>
-                      s.quota_used != null &&
-                      s.quota_total != null &&
-                      s.quota_used / s.quota_total > 0.8,
-                  ).length
-                }
+                {quotaMeasured.length > 0 ? quotaAlerts : "—"}
               </b>
-              <small>تنبيهات استهلاك</small>
+              {quotaMeasured.length > 0 && (
+                <small>{S.adminServicesQuotaAlertsUnit}</small>
+              )}
             </div>
             <small className="admin-services-kpi-sub">
-              YouTube Data API و Apify Scraper
+              {quotaMeasured.length > 0
+                ? S.adminServicesQuotaSources
+                : S.adminServicesQuotaNotMeasured}
             </small>
           </Card>
         </section>

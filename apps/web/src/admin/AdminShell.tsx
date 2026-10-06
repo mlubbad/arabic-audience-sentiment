@@ -23,6 +23,12 @@ import { failureCode } from "../failure";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 import { Loading, LoadError } from "../pageStates/PageStates";
+// Every admin page renders through this shell, so the admin styles travel with
+// it. They lived only in AdminPage, so a sub-page opened directly (or
+// refreshed) painted unstyled until /admin itself had been visited
+// (2026-10-06, /admin/services).
+import "../pages.css";
+import "./admin.css";
 
 export function useAdminShell(): {
   admin: boolean;

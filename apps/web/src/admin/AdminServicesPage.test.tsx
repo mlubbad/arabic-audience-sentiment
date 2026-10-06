@@ -239,4 +239,43 @@ describe("AdminServicesPage", () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  it("claims only what the live report measured", async () => {
+    // The live shape on 2026-10-06: the database and the worker measured, the
+    // other services not_monitored, no quota limit known for any of them.
+    const actual = await vi.importActual<typeof adminReadModule>("./adminRead");
+    const live = actual.buildLiveServicesReport(
+      {
+        checked_at: "2026-10-06T06:00:00Z",
+        database: { size_mb: 300, active_connections: 7 },
+        worker: { fresh: true, jobs_queued: 0 },
+      },
+      190,
+    );
+    const notMonitored = live.services.length - 2;
+    vi.spyOn(adminReadModule, "readAdminServicesHealth").mockResolvedValue(
+      live,
+    );
+    renderComponent();
+
+    expect(
+      await screen.findByText(
+        ar.adminServicesHealthyOfMonitored(2, live.services.length),
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(ar.adminServicesStatusHealthySentence),
+    ).toBeNull();
+    expect(
+      screen.getByText(
+        ar.adminServicesMonitoredOfTotal(live.services.length, notMonitored),
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(ar.adminServicesLatencyBasis(1)),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(ar.adminServicesQuotaNotMeasured),
+    ).toBeInTheDocument();
+  });
 });
