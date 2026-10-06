@@ -136,6 +136,9 @@ export function buildLiveServicesReport(
       status: "not_monitored",
       latency_ms: null,
       quota_used: null,
+      // No live limit is known for any service; the demo's 1,024 MB and 100
+      // jobs were drawn as real allowances on the live page (2026-10-06).
+      quota_total: null,
       details: "",
       last_checked_at: checkedAt,
       error_code: null,

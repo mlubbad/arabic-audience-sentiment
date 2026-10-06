@@ -21,6 +21,27 @@ All from a clone in `/tmp/aas-src` (the bridge session's own checkout was unread
 | PR #74 merge, read with `git ls-remote` and a depth-5 fetch | `main` = `239979d` "Merge pull request #74", parents `c609150` and `021d21b`. |
 | `git commit` with `core.hooksPath .githooks` on macOS (`/bin/bash` 3.2.57) | Before the fix: `.githooks/pre-commit: line 15: mapfile: command not found`, `line 16: staged: unbound variable`; no commit was created. After replacing `mapfile` with a `read -d ''` loop: the hook ran prettier and eslint over the staged files and the commit landed. |
 
+## 2026-10-06 — Admin services page: styles on direct load; cards claim only what is measured
+
+With the function restored, the owner's screenshot of `/admin/services` showed two problems.
+
+**Unstyled page.** `admin.css` and `pages.css` were imported only by `AdminPage.tsx`. Each admin sub-page is its own lazy chunk, so opening one directly painted without layout. Both stylesheets now import in `AdminShell.tsx`, which every admin page renders through; the build emits `AdminShell-*.css`.
+
+**Cards that said more than the readings.**
+- "All core services operational" was shown with 2 of 15 services measured. When some are unmeasured, the card now reads "healthy in 2 of 15 services that report readings".
+- "Monitored services: 15" was the total. It now shows the monitored count, with the total and the unmonitored count underneath.
+- The latency subtitle "2 / 15 healthy" now says how many services the average comes from.
+- "Critical quotas: 0" was shown with no quota measured. It now shows "—" and "quotas are not measured yet", and its two hard-coded Arabic strings moved to `ar.ts`/`en.ts`.
+- The live report inherited the demo's `quota_total` (1,024 MB database, 100-job queue) and drew it as a real limit. Live services now carry `quota_total: null`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run apps/web/src/admin` | 13 files, 97 passed (new: live-shape card test, `quota_total` null, styles guard). |
+| Mutation: drop `import "./admin.css"` from the shell | 1 fails. |
+| Mutation: live report inherits demo `quota_total` | 2 fail. |
+| Mutation: old "all services operational" sentence | 1 fails. |
+| `npm run check` | Exit 0: web 142 / 1105, DB 59 / 490, worker 297, secrets clean. |
+
 ## 2026-10-05 — Restore `admin_services_health` in production
 
 The admin services page showed `read:unexpected:Error`. The network response was `404` with

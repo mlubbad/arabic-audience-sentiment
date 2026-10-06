@@ -34,6 +34,11 @@ describe("buildLiveServicesReport", () => {
     }
   });
 
+  it("draws no demo allowance as a live limit", () => {
+    // The demo's 1,024 MB database and 100-job queue showed as real limits.
+    for (const s of live.services) expect(s.quota_total).toBeNull();
+  });
+
   it("does not invent a YouTube quota from the run count", () => {
     expect(byId("youtube_api").quota_used).toBeNull();
   });

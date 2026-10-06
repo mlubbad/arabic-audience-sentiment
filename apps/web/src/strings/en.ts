@@ -1610,6 +1610,17 @@ export const en: Strings = {
   adminChannelsLastSuccessfulCollection: "Last successful collection",
   adminChannelsNeverCollected: "Never collected",
   adminChannelsCollectionStale: "Collection stale",
+  adminServicesHealthyOfMonitored: (monitored: number, total: number) =>
+    `Healthy in ${monitored} of ${total} services that report readings; the rest are not monitored`,
+  adminServicesMonitoredOfTotal: (total: number, notMonitored: number) =>
+    `of ${total} services; ${notMonitored} not monitored`,
+  adminServicesLatencyBasis: (measured: number) =>
+    measured === 1
+      ? "From the one service that is measured"
+      : `From the ${measured} services that are measured`,
+  adminServicesQuotaNotMeasured: "Quotas are not measured yet",
+  adminServicesQuotaAlertsUnit: "usage alerts",
+  adminServicesQuotaSources: "Only services with a known quota",
   adminServicesFilterNotMonitored: "Not monitored",
   adminServicesStatusNotMonitoredSentence:
     "No live telemetry reaches these services yet",

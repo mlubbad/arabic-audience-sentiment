@@ -1623,6 +1623,17 @@ export const ar = {
   adminChannelsLastSuccessfulCollection: "آخر جمع ناجح",
   adminChannelsNeverCollected: "لم ينجح الجمع بعد",
   adminChannelsCollectionStale: "الجمع متأخر",
+  adminServicesHealthyOfMonitored: (monitored: number, total: number) =>
+    `سليمة في ${monitored} من ${total} خدمة تصل منها قياسات؛ البقية غير مراقَبة`,
+  adminServicesMonitoredOfTotal: (total: number, notMonitored: number) =>
+    `من أصل ${total} خدمة؛ ${notMonitored} غير مراقَبة`,
+  adminServicesLatencyBasis: (measured: number) =>
+    measured === 1
+      ? "محسوب من خدمة واحدة تُقاس"
+      : `محسوب من ${measured} خدمات تُقاس`,
+  adminServicesQuotaNotMeasured: "لا تُقاس الحصص بعد",
+  adminServicesQuotaAlertsUnit: "تنبيهات استهلاك",
+  adminServicesQuotaSources: "الخدمات التي تُعرف حصتها فقط",
   adminServicesFilterNotMonitored: "غير مراقَبة",
   adminServicesStatusNotMonitoredSentence:
     "لا تصل قياسات حية من هذه الخدمات بعد",
