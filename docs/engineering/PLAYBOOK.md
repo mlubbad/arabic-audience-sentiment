@@ -33,6 +33,10 @@ gets fixed.
    `Ready for review: PR #N` on the issue. If your token can't comment, tell the owner, who relays it.
 5. **Review.** Claude runs the §6 checklist and posts a verdict on the PR: **Approve** or
    **Changes requested** (numbered). Fix on the same branch and reply to each number.
+   **Small fixes by Claude** (owner grant, 2026-10-06): when a review finding needs about 20
+   changed lines or fewer, inside the work order's owned paths, Claude may push the fix to the
+   agent's branch itself, as its own commit (never a rewrite of the agent's history), name the
+   commit in the review, and re-run §6 on the new head. Anything larger goes back to the agent.
 6. **Merge.** Owner only, in dependency order. Claude then updates the docs and the board.
 7. **Learn.** A mistake seen twice becomes a lint rule, a CI check or a line in this playbook.
 
