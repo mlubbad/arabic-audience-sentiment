@@ -1126,7 +1126,8 @@ export const en: Strings = {
   kpiLikes: "Likes",
   kpiLikesNote: "Total likes interaction",
   kpiNetSentiment: "Net Sentiment",
-  kpiNetSentimentNote: "Positive minus negative ratio",
+  kpiNetSentimentNote:
+    "(positive − negative) ÷ (positive + negative); neutral left out",
   kpiEngagement: "Engagement Rate",
   kpiEngagementNote: "(Comments + Likes) / Views",
   actionableStepsTitle: "Actionable Recommendations & Next Steps",

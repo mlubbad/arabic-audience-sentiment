@@ -17,7 +17,7 @@ import { AXIS_TEXT, GRID_LINE, SENTIMENT, VOLUME } from "../chartTheme";
 import { barOptions, doughnutOptions } from "./chartOptions";
 import { ChartFigures } from "./ChartFigures";
 import { ChartEmpty } from "../pageStates/PageStates";
-import { n, pct } from "./format";
+import { n, netSentiment, pct } from "./format";
 import { useLocale } from "../locale";
 import "./voice.css";
 
@@ -39,11 +39,7 @@ export function Voice({
   const pos = s.sentiments.positive ?? 0;
   const neg = s.sentiments.negative ?? 0;
   const lang = useLocale();
-  const netSign = pct(
-    s.analysed > 0 ? Math.round(((pos - neg) / s.analysed) * 100) : null,
-    lang,
-    { signed: true },
-  );
+  const netSign = pct(netSentiment(pos, neg), lang, { signed: true });
 
   const isMeasurable = (k: Label) =>
     s.measurable ? s.measurable.has(k) : true;
