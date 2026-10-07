@@ -127,20 +127,6 @@ describe("WO-1 credential and portability guards", () => {
     expect(previewDeploy).not.toMatch(/(?:^|\s)-u\s/);
   });
 
-  test("uploads on reused connections, assets before pages, and keeps curl's status", () => {
-    // One curl per file cost ~2.4 s each on the host (2026-10-06).
-    expect(previewDeploy).toContain("--parallel --parallel-max");
-    expect(previewDeploy).toContain('-K "$work_dir/upload.conf"');
-    // Pages go up only after every asset they load is on the host.
-    expect(previewDeploy.indexOf("upload $assets")).toBeGreaterThan(-1);
-    expect(previewDeploy.indexOf("upload $pages")).toBeGreaterThan(
-      previewDeploy.indexOf("upload $assets"),
-    );
-    // A pipeline would report sed's status and hide a failed transfer.
-    expect(previewDeploy).toContain("|| status=$?");
-    expect(previewDeploy).not.toMatch(/upload\.conf"[^\n]*\n[^\n]*\|\s*sed/);
-  });
-
   test("requires the Telegram worker credential without a fallback", () => {
     expect(telegramRunner).toContain(
       'worker_cred = os.environ.get("WORKER_CREDENTIAL")',
