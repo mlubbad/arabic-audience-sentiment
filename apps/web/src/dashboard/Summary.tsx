@@ -13,7 +13,7 @@ import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
-import { n, pct } from "./format";
+import { n, netSentiment, pct } from "./format";
 import { useLocale } from "../locale";
 import "./summary.css";
 
@@ -32,10 +32,11 @@ export function Summary({
   const posPct = analysed > 0 ? Math.round((pos / analysed) * 100) : 0;
   const negPct = analysed > 0 ? Math.round((neg / analysed) * 100) : 0;
   const lang = useLocale();
-  const netScore =
-    analysed > 0 ? Math.round(((pos - neg) / analysed) * 100) : 0;
-  // Nothing analysed is not a net score of 0: it is unknown.
-  const netSign = pct(analysed > 0 ? netScore : null, lang, { signed: true });
+  // Unknown (no positive and no negative comment) reads as balanced below
+  // and prints "—", never a net score of 0.
+  const net = netSentiment(pos, neg);
+  const netScore = net ?? 0;
+  const netSign = pct(net, lang, { signed: true });
 
   let pulseBadge = S.pulseBalanced;
   let pulseTone: "positive" | "negative" | "sentiment-neutral" =

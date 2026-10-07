@@ -1122,7 +1122,7 @@ export const ar = {
   kpiLikes: "الإعجابات",
   kpiLikesNote: "إجمالي التفاعل بالإعجاب",
   kpiNetSentiment: "صافي الرضا",
-  kpiNetSentimentNote: "الفارق بين الإيجابي والسلبي",
+  kpiNetSentimentNote: "(الإيجابي − السلبي) ÷ (الإيجابي + السلبي)، دون المحايد",
   kpiEngagement: "معدل التفاعل",
   kpiEngagementNote: "(التعليقات + الإعجابات) / المشاهدات",
   actionableStepsTitle: "خطوات مقترحة ومسارات تحسين",

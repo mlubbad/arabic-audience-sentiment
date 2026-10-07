@@ -5735,6 +5735,7 @@ CREATE OR REPLACE FUNCTION public.dashboard_aggregates(w uuid, f jsonb DEFAULT '
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
   SELECT private.dashboard_aggregates_impl(w, f);
 $function$
@@ -5744,6 +5745,7 @@ CREATE OR REPLACE FUNCTION public.dashboard_comments(w uuid, f jsonb DEFAULT '{}
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
   SELECT private.dashboard_comments_impl(w, f);
 $function$

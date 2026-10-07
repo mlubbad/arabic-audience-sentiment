@@ -50,8 +50,9 @@ describe("Summary Executive Story Briefing", () => {
     const briefing = screen.getByTestId("story-briefing");
     expect(briefing).toBeInTheDocument();
 
-    // Net Sentiment gauge calculation: (60 - 10) / 80 = 50 / 80 = 62.5% -> +63%
-    expect(briefing).toHaveTextContent("+63٪");
+    // Net sentiment: (60 - 10) / (60 + 10) = 50 / 70 = 71.4% -> +71%
+    // (neutral and mixed are left out of the denominator).
+    expect(briefing).toHaveTextContent("+71٪");
     expect(briefing).toHaveTextContent(ar.pulseStrongPositive);
     expect(briefing).toHaveTextContent(ar.netSentimentScoreLabel);
 
@@ -77,7 +78,7 @@ describe("Summary Executive Story Briefing", () => {
       en.secSummaryTitle,
     );
     const briefing = screen.getByTestId("story-briefing");
-    expect(briefing).toHaveTextContent("+63٪");
+    expect(briefing).toHaveTextContent("+71٪");
     expect(briefing).toHaveTextContent(en.pulseStrongPositive);
     expect(briefing).toHaveTextContent(en.storyAct1Title);
     expect(briefing).toHaveTextContent(en.storyAct3Title);
@@ -92,8 +93,8 @@ describe("Summary Executive Story Briefing", () => {
 
     render(<Summary s={criticalSnapshot} S={ar} />);
     const briefing = screen.getByTestId("story-briefing");
-    // (10 - 50) / 80 = -40 / 80 = -50% -> -50%
-    expect(briefing).toHaveTextContent("-50٪");
+    // (10 - 50) / (10 + 50) = -40 / 60 = -66.7% -> -67%
+    expect(briefing).toHaveTextContent("-67٪");
     expect(briefing).toHaveTextContent(ar.pulseCriticalAlert);
     expect(briefing).toHaveTextContent(ar.storyAct3RecCritical);
   });
@@ -111,17 +112,40 @@ describe("Summary Executive Story Briefing", () => {
       expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent(/^—$/);
     });
 
+    it("shows an em dash when everything analysed is neutral", () => {
+      const neutralOnly = {
+        ...baseSnapshot,
+        sentiments: { positive: 0, negative: 0, neutral: 80, mixed: 0 },
+      } as unknown as Snapshot;
+      render(<Summary s={neutralOnly} S={ar} />);
+      expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent(/^—$/);
+    });
+
+    it("leaves neutral comments out of the denominator", () => {
+      // The owner's example: 60 positive, 20 negative, 120 neutral is +50%
+      // (40 / 80), not +20% (40 / 200).
+      const example = {
+        ...baseSnapshot,
+        analysed: 200,
+        sentiments: { positive: 60, negative: 20, neutral: 120, mixed: 0 },
+      } as unknown as Snapshot;
+      render(<Summary s={example} S={ar} />);
+      expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent(
+        /^\+50٪$/,
+      );
+    });
+
     it("uses % in English and ٪ in Arabic", () => {
       setLocale("en");
       const { unmount } = render(<Summary s={baseSnapshot} S={en} />);
       expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent(
-        /^\+63%$/,
+        /^\+71%$/,
       );
       unmount();
       setLocale("ar");
       render(<Summary s={baseSnapshot} S={ar} />);
       expect(screen.getByTestId("kpi-net-sentiment")).toHaveTextContent(
-        /^\+63٪$/,
+        /^\+71٪$/,
       );
     });
   });

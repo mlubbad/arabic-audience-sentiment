@@ -53,6 +53,11 @@ describe("Voice - Conditional Mixed Sentiment Display", () => {
     expect(legend).toBeInTheDocument();
     expect(legend).not.toHaveTextContent(ar.labels.mixed);
     expect(screen.queryByTestId("unmeasurable-mixed")).not.toBeInTheDocument();
+    // Donut centre uses the same net sentiment as the summary card:
+    // (60 - 30) / (60 + 30) = 33.3% -> +33%, not (60 - 30) / 100 = +30%.
+    expect(document.querySelector(".db-donut-center-val")).toHaveTextContent(
+      /^\+33/,
+    );
   });
 
   it("DOES display mixed in Doughnut chart and legend when model supports mixed", () => {
