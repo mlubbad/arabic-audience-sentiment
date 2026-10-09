@@ -400,6 +400,63 @@ export const ar = {
   adminTabOps: "التشغيل",
   adminTabServices: "الخدمات والمؤشرات",
   adminTabAudit: "سجل التدقيق",
+  adminTabImport: "استيراد القنوات",
+  // bulk channel import (platform owner only)
+  adminImportTitle: "استيراد القنوات دفعة واحدة",
+  adminImportLead:
+    "ارفع ملف CSV بقنوات يوتيوب: لكل قناة مساحة باسمها، تُربط بها القناة ويبدأ فهرسة فيديوهاتها فورًا. قناة موجودة في حسابك مسبقًا لا تُستورد مرة ثانية.",
+  adminImportFileLabel: "ملف CSV",
+  adminImportFileHint:
+    "قناة في كل صف تحت عمود name، ومعه عمود url اختياري (رابط القناة أو @المعرّف أو معرّف UC). وتُقرأ أيضًا القوائم المرتبة بعمود «القناة».",
+  adminImportSummary: (n: number, direct: number, search: number) =>
+    `${n} قناة: ${direct} بالرابط و${search} بالبحث بالاسم.`,
+  adminImportUnits: (units: number) =>
+    `البحث يكلّف قرابة ${units} وحدة من حصة YouTube اليومية للمشروع (10,000 وحدة افتراضيًا): البحث بالاسم 100 وحدة والرابط وحدة واحدة.`,
+  adminImportDuplicates: (n: number) => `دُمج ${n} صف مكرر.`,
+  adminImportRejected: (n: number) =>
+    `${n} رابط لا يدل على قناة يوتيوب، فاستُبعد.`,
+  adminImportEmptyFile:
+    "لم يُعثر في الملف على عمود لأسماء القنوات (name أو «القناة»).",
+  adminImportReadFailed: "تعذّرت قراءة الملف.",
+  adminImportFind: "ابحث عن القنوات",
+  adminImportStop: "إيقاف",
+  adminImportContinue: "متابعة البحث",
+  adminImportQuotaHalted:
+    "انتهت حصة YouTube اليومية. توقف البحث عند هذا الصف؛ اضغط «متابعة البحث» غدًا ليكمل من حيث توقف.",
+  adminImportNoHome: "أنشئ مساحة باسمك أولًا: البحث عن القنوات يجري من خلالها.",
+  adminImportColRank: "#",
+  adminImportColName: "في الملف",
+  adminImportColMatch: "القناة على يوتيوب",
+  adminImportColResult: "النتيجة",
+  adminImportWaiting: "لم يُبحث بعد",
+  adminImportSearching: "جارٍ البحث…",
+  adminImportNotFound: "لم تُعثر على قناة",
+  adminImportLookupFailed: (code: string) =>
+    `تعذّر البحث (رمز الخطأ: \u2068${code}\u2069)`,
+  adminImportSkip: "تخطَّ هذه القناة",
+  adminImportPick: "اختر القناة الصحيحة",
+  adminImportOpen: "افتح على يوتيوب",
+  adminImportRun: (n: number) => `أنشئ ${n} مساحة`,
+  adminImportRunning: "جارٍ الإنشاء…",
+  adminImportCreated: "أُنشئت المساحة وبدأت الفهرسة",
+  adminImportExists: (name: string) =>
+    `موجودة في حسابك مسبقًا: \u2068${name}\u2069`,
+  adminImportFailed: (code: string) =>
+    `تعذّر الإنشاء (رمز الخطأ: \u2068${code}\u2069)`,
+  adminImportRetry: "أعد المحاولة",
+  adminImportProgress: (
+    lookedUp: number,
+    total: number,
+    confirmed: number,
+    undecided: number,
+  ) =>
+    `بُحث عن ${lookedUp} من ${total} · ${confirmed} جاهزة للإنشاء · ${undecided} تنتظر اختيارك`,
+  adminImportDone: (created: number, existing: number, failed: number) =>
+    `أُنشئت ${created} مساحة · ${existing} موجودة مسبقًا · ${failed} تعذّرت`,
+  adminImportCollectionNote:
+    "كل مساحة جديدة تتبع خطة مساحتك الأساسية. تُفهرس فيديوهات القناة فورًا ويواصل المجدول جمعها، وتُجمع التعليقات للفيديوهات المختارة في المساحة.",
+  adminImportClear: "امسح القائمة",
+  adminImportDemo: "الاستيراد يعمل على البيانات الحية فقط.",
   // plans & account types
   adminPlansTitle: "أنواع الحسابات والصلاحيات",
   adminPlansLead:

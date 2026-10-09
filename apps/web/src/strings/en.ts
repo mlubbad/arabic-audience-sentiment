@@ -394,6 +394,61 @@ export const en: Strings = {
   adminTabOps: "Operations",
   adminTabServices: "Services & Health",
   adminTabAudit: "Audit trail",
+  adminTabImport: "Import channels",
+  // bulk channel import (platform owner only)
+  adminImportTitle: "Import channels in bulk",
+  adminImportLead:
+    "Upload a CSV of YouTube channels: each gets a workspace named after it, with the channel attached and its videos catalogued at once. A channel your account already holds is not imported again.",
+  adminImportFileLabel: "CSV file",
+  adminImportFileHint:
+    "One channel per row under a name column, with an optional url column (channel link, @handle or UC id). Ranked lists with a channel column headed in Arabic are read too.",
+  adminImportSummary: (n: number, direct: number, search: number) =>
+    `${n} channels: ${direct} by link, ${search} by name search.`,
+  adminImportUnits: (units: number) =>
+    `Looking them up costs about ${units} units of the project's daily YouTube quota (10,000 by default): a name search is 100 units, a link is 1.`,
+  adminImportDuplicates: (n: number) => `${n} repeated rows were merged.`,
+  adminImportRejected: (n: number) =>
+    `${n} links name no YouTube channel and were set aside.`,
+  adminImportEmptyFile:
+    "The file has no column of channel names (name, or its Arabic header).",
+  adminImportReadFailed: "The file could not be read.",
+  adminImportFind: "Find the channels",
+  adminImportStop: "Stop",
+  adminImportContinue: "Continue searching",
+  adminImportQuotaHalted:
+    "YouTube's daily quota is spent. Searching stopped at this row; press “Continue searching” tomorrow and it picks up from here.",
+  adminImportNoHome:
+    "Create a workspace of your own first: the channel search runs through it.",
+  adminImportColRank: "#",
+  adminImportColName: "In the file",
+  adminImportColMatch: "Channel on YouTube",
+  adminImportColResult: "Result",
+  adminImportWaiting: "Not looked up yet",
+  adminImportSearching: "Looking up…",
+  adminImportNotFound: "No channel found",
+  adminImportLookupFailed: (code: string) => `Lookup failed (${code})`,
+  adminImportSkip: "Skip this channel",
+  adminImportPick: "Choose the right channel",
+  adminImportOpen: "Open on YouTube",
+  adminImportRun: (n: number) => `Create ${n} workspaces`,
+  adminImportRunning: "Creating…",
+  adminImportCreated: "Workspace created; cataloguing started",
+  adminImportExists: (name: string) => `Already in your account: ${name}`,
+  adminImportFailed: (code: string) => `Could not create (${code})`,
+  adminImportRetry: "Retry",
+  adminImportProgress: (
+    lookedUp: number,
+    total: number,
+    confirmed: number,
+    undecided: number,
+  ) =>
+    `${lookedUp} of ${total} looked up · ${confirmed} ready to create · ${undecided} waiting for your choice`,
+  adminImportDone: (created: number, existing: number, failed: number) =>
+    `${created} workspaces created · ${existing} already held · ${failed} failed`,
+  adminImportCollectionNote:
+    "Each new workspace bills to your home workspace's plan. The channel's videos are catalogued at once and the scheduler keeps collecting; comments are collected for the videos selected in the workspace.",
+  adminImportClear: "Clear the list",
+  adminImportDemo: "The import works on live data only.",
   // plans & account types
   adminPlansTitle: "Account Types & Permissions",
   adminPlansLead:

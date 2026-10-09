@@ -106,6 +106,11 @@ const AdminServices = lazy(() =>
 const AdminAudit = lazy(() =>
   import("./admin/AdminAuditPage").then((m) => ({ default: m.AdminAuditPage })),
 );
+const AdminImport = lazy(() =>
+  import("./admin/AdminImportPage").then((m) => ({
+    default: m.AdminImportPage,
+  })),
+);
 // The legal documents share one page; the address decides which. The
 // documents themselves load with it, not with the shell.
 const LegalPage = lazy(() =>
@@ -521,6 +526,7 @@ const app = (
                   <Route path="/admin/ops" element={<AdminOps />} />
                   <Route path="/admin/services" element={<AdminServices />} />
                   <Route path="/admin/audit" element={<AdminAudit />} />
+                  <Route path="/admin/import" element={<AdminImport />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
               </Routes>

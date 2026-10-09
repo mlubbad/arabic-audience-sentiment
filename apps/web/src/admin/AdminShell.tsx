@@ -92,6 +92,7 @@ const TABS = [
   { to: "/admin/ops", key: "adminTabOps" },
   { to: "/admin/services", key: "adminTabServices" },
   { to: "/admin/audit", key: "adminTabAudit" },
+  { to: "/admin/import", key: "adminTabImport" },
 ] as const;
 
 export function AdminTabs() {
