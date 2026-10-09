@@ -1,5 +1,18 @@
 # Verification
 
+## 2026-10-09 — Owner console phase 1b: the channels console at `/admin/channels`
+
+Owner request (2026-10-09: "ابدأ لوحة القنوات"). One migration (`20261017000000_admin_channels_console.sql`): `admin_channels_console()` gives every channel its state from `private.admin_channel_states()` (the home's own), the workspace and whose it is (the caller's, or a customer's and their email), catalogued / selected / collected / analysed counts aggregated once per table (comments from `private.video_comment_stats`), and the automatic selection numbers; its own `statement_timeout=30s`. `admin_channels()` is unchanged (the search box and its tests read it). The page: state chips with counts, account filter, folded search, four orders (trouble first by default), all in the address (`?state=&owner=&q=&sort=`), and a side panel with the way into the workspace and next / previous. The home's state counts now link to `/admin/channels?state=…`. Read only; bulk actions and a pause state are phase 2.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_console_overview.test.ts` | 10 passed (3 new): each of the seven channels carries the state the home counts, the failing one its error, the healthy one 1 / 1 / 100 / 90 and 20 / 5; a customer's channel is `mine: false` with the customer's email and no automatic selection; non-admin `forbidden`, anon `permission denied`; `statement_timeout=30s`. |
+| Mutations: `mine` always true; `selected` always 0 | `1 failed` each. |
+| `channelsConsole.test.ts`, `AdminChannelsPage.test.tsx`, `AdminHomePage.test.tsx` | 6, 5, 6 passed: address read with fallbacks and written minimally; trouble-first, most-comments and longest-since-collection orders; state, account and folded search filters; state counts over account and search only; the page lists trouble first with error and counts, opens on the home's state link and rewrites the address on a chip, narrows to customers and to a search, says when nothing matches, and the panel walks next / previous with the way into the workspace. |
+| `npx playwright test` (whole suite, locally, with the container's Chromium 1194 by `launchOptions.executablePath` in an uncommitted config) | 126 passed, 5 skipped. First local e2e run in this container. |
+| Main after #101 merged (run 37907015476) | `Browser tests` failed on `dashboard.spec.ts` › "separates replies from top-level comments" (expected 2, got 4); Deploy Preview skipped. The same tree passed on the PR. Reproduced locally: 6 failed in 40 with six workers. Waiting for the combobox to show the choice before applying did not cure it (6 in 40 again), so it may be a product race, not only test timing; reverted, and filed as its own task. Claude cannot re-run jobs (403). |
+| `npm run check` | exit 0: unit 1208, DB 543, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+
 ## 2026-10-09 — Owner console phase 1a: the home at `/admin`, and Ctrl+K
 
 Owner approval (2026-10-09: "ابدأ المرحلة 1 من واجهة المالك"). Phase 1 is split: 1a (this) is the home and the search box; 1b is the channels console. `/admin` is now the home; the workspaces table moved to `/admin/workspaces` (its tab, and the e2e demo path, follow). One migration (`20261016000000_admin_console_overview.sql`): `private.admin_channel_states()` names each channel's state once (cataloguing, collecting, failing, new, waiting, stale, healthy, first that applies), and `admin_console_overview()` reads the home in one call with its own `statement_timeout=30s`. The funnel sums `private.video_comment_stats`, never `comments`. No quota meters: no table measures YouTube or Apify units yet.

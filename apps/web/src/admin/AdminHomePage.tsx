@@ -14,7 +14,7 @@
 import type { ReactNode } from "react";
 import { Link, Navigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import type { AdminConsoleOverview, ChannelState } from "@sentiment/contracts";
+import type { AdminConsoleOverview } from "@sentiment/contracts";
 import { useStrings } from "../strings";
 import { failureCode } from "../failure";
 import { Badge } from "../ui/Badge";
@@ -22,33 +22,11 @@ import { Card } from "../ui/Card";
 import { LoadError, Loading } from "../pageStates/PageStates";
 import { readAdminConsoleOverview } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
+import { STATE_ORDER, STATE_TONE } from "./channelsConsole";
 
 const n = (value: number) => value.toLocaleString("en-US");
 const when = (iso: string | null) =>
   iso ? iso.slice(0, 16).replace("T", " ") : null;
-
-/** Which states read as trouble, as work in progress, or as fine. */
-const STATE_TONE: Record<
-  ChannelState,
-  "danger" | "warning" | "neutral" | "success"
-> = {
-  failing: "danger",
-  stale: "warning",
-  waiting: "warning",
-  new: "neutral",
-  cataloguing: "neutral",
-  collecting: "neutral",
-  healthy: "success",
-};
-const STATE_ORDER: ChannelState[] = [
-  "failing",
-  "stale",
-  "waiting",
-  "new",
-  "cataloguing",
-  "collecting",
-  "healthy",
-];
 
 export function AdminHomePage() {
   const S = useStrings();
@@ -120,10 +98,12 @@ function Overview({ o }: { o: AdminConsoleOverview }) {
           <ul className="admin-home-states" data-testid="admin-home-states">
             {STATE_ORDER.map((state) => (
               <li key={state}>
-                <Badge tone={STATE_TONE[state]}>
-                  {S.adminChannelStates[state] ?? state}
-                </Badge>
-                <span className="admin-home-num">{n(o.states[state])}</span>
+                <Link to={`/admin/channels?state=${state}`}>
+                  <Badge tone={STATE_TONE[state]}>
+                    {S.adminChannelStates[state] ?? state}
+                  </Badge>
+                  <span className="admin-home-num">{n(o.states[state])}</span>
+                </Link>
               </li>
             ))}
           </ul>

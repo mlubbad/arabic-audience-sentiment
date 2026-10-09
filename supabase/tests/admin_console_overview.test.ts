@@ -10,7 +10,10 @@
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AdminConsoleOverviewSchema } from "@sentiment/contracts";
+import {
+  AdminChannelsConsoleSchema,
+  AdminConsoleOverviewSchema,
+} from "@sentiment/contracts";
 
 const ADMIN = "10000000-0000-4000-8000-000000000001";
 const OTHER = "10000000-0000-4000-8000-000000000002";
@@ -247,5 +250,103 @@ describe("admin_console_overview", () => {
       "select proconfig as config from pg_proc where proname = 'admin_console_overview'",
     );
     expect(rows[0]!.config).toContain("statement_timeout=30s");
+  });
+});
+
+describe("admin_channels_console", () => {
+  type Row = {
+    title: string | null;
+    state: string;
+    mine: boolean;
+    owner_email: string | null;
+    videos: number;
+    selected: number;
+    comments: number;
+    analysed: number;
+    auto_initial: number | null;
+    auto_daily: number | null;
+    last_error: string | null;
+  };
+  async function rows() {
+    const { rows } = await db.query<{ r: unknown }>(
+      "select public.admin_channels_console() as r",
+    );
+    return AdminChannelsConsoleSchema.parse(rows[0]!.r) as Row[];
+  }
+
+  beforeAll(async () => {
+    // A customer's own channel, in their personal workspace.
+    await db.exec("reset role");
+    const { rows: ws } = await db.query<{ id: string; client: string }>(
+      `select w.id, c.id as client from workspaces w join clients c on c.workspace_id = w.id
+        where w.created_by = $1 limit 1`,
+      [OTHER],
+    );
+    await db.query(
+      "insert into channels(workspace_id, client_id, external_channel_id, title) values ($1,$2,'UCBBBBBBBBBBBBBBBBBBBBB1','Customer channel')",
+      [ws[0]!.id, ws[0]!.client],
+    );
+  });
+
+  it("gives every channel the state the home counts, and the home's numbers", async () => {
+    await as("authenticated", ADMIN);
+    const list = await rows();
+    const by = (t: string) => list.find((r) => r.title === t)!;
+    expect(list).toHaveLength(8);
+    expect(
+      [
+        "Cataloguing",
+        "Collecting",
+        "Failing",
+        "New",
+        "Waiting",
+        "Stale",
+        "Healthy",
+      ].map((t) => by(t).state),
+    ).toEqual([
+      "cataloguing",
+      "collecting",
+      "failing",
+      "new",
+      "waiting",
+      "stale",
+      "healthy",
+    ]);
+    expect(by("Failing").last_error).toBe("quota_exceeded");
+    expect(by("Healthy")).toMatchObject({
+      videos: 1,
+      selected: 1,
+      comments: 100,
+      analysed: 90,
+      auto_initial: 20,
+      auto_daily: 5,
+    });
+  });
+
+  it("tells the owner's channels from a customer's, and names the customer", async () => {
+    await as("authenticated", ADMIN);
+    const list = await rows();
+    expect(list.find((r) => r.title === "Healthy")).toMatchObject({
+      mine: true,
+      owner_email: "owner@example.com",
+    });
+    expect(list.find((r) => r.title === "Customer channel")).toMatchObject({
+      mine: false,
+      owner_email: "customer@example.com",
+      state: "new",
+      auto_initial: null,
+    });
+  });
+
+  it("answers no one but a platform admin, within its own 30 s", async () => {
+    await as("authenticated", OTHER);
+    await expect(rows()).rejects.toThrow(/forbidden/);
+    await as("anon", null);
+    await expect(rows()).rejects.toThrow(/permission denied/);
+    await db.exec("reset role");
+    const { rows: cfg } = await db.query<{ config: string[] }>(
+      "select proconfig as config from pg_proc where proname = 'admin_channels_console'",
+    );
+    expect(cfg[0]!.config).toContain("statement_timeout=30s");
   });
 });
