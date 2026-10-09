@@ -28,3 +28,26 @@ export const ChannelLookupResponseSchema = z
   })
   .strict();
 export type ChannelLookupResponse = z.infer<typeof ChannelLookupResponseSchema>;
+
+/** What `admin_import_channel` answers for one channel of a bulk import: a
+ *  new workspace holding it, or the workspace of the owner's account that
+ *  already does. */
+export const AdminImportResultSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("created"),
+      workspace_id: z.string().uuid(),
+      workspace_name: z.string(),
+      channel_id: z.string().uuid(),
+      job_id: z.string().uuid().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("exists"),
+      workspace_id: z.string().uuid(),
+      workspace_name: z.string(),
+    })
+    .strict(),
+]);
+export type AdminImportResult = z.infer<typeof AdminImportResultSchema>;

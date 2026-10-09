@@ -585,3 +585,69 @@
   border-inline-start: 3px solid #f59e0b;
   padding-inline-start: var(--space-2);
 }
+
+/* ---------------- bulk channel import ---------------- */
+.admin-import {
+  display: grid;
+  gap: var(--space-3);
+}
+.admin-import-file {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 600;
+}
+.admin-import-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+.admin-import-error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-small);
+  color: var(--color-danger);
+}
+.admin-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.admin-import-choices {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.admin-import-legend {
+  font-size: var(--fs-micro);
+  color: var(--text-3);
+  padding: 0;
+}
+.admin-import-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-small);
+}
+.admin-import-choice img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+.admin-import-candidate {
+  display: grid;
+  min-width: 0;
+}
+.admin-import-candidate small {
+  color: var(--text-2);
+  font-size: var(--fs-micro);
+}
+.admin-import-open {
+  font-size: var(--fs-micro);
+  margin-inline-start: auto;
+  white-space: nowrap;
+}

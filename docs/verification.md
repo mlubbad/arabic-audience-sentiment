@@ -1,5 +1,20 @@
 # Verification
 
+## 2026-10-09 — Bulk channel import for the platform owner (`/admin/import`)
+
+Owner request (2026-10-09): import a CSV of YouTube channels, one workspace per channel named after it, collection started, and no channel the account already holds imported twice. Follow-up decision the same day: never select a channel's whole catalogue; select its latest 20 videos once the first catalogue run is done, then add videos it publishes later, at most 5 a day. Built by Claude; one migration (`20261012000000_admin_import_channel.sql`), no Edge Function change: lookups reuse the deployed `channel-lookup`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_import_channel.test.ts` | 8 passed: workspace named after the channel, owner membership, `public_unverified` channel, queued `discover` job, billing to the home workspace, audit row; second import → `exists`; channel held in another workspace of the account → `exists`; another user's copy does not block; long title cut to 120; bad id / platform refused; a refused row leaves no workspace; non-admin `forbidden`, anon `permission denied`. |
+| Mutations on the migration: dedupe `if found` → `if false`; admin gate dropped | `2 failed / 6 passed`; `1 failed / 7 passed`. |
+| Parser on the owner's file (`… - Sheet1.csv`, two ranked side-by-side blocks) | 100 channels, rank order 1→100, 0 duplicates, 0 rejected; all 100 are name searches → 10,000 lookup units. |
+| Automatic selection (`supabase/tests/admin_import_channel.test.ts`, 6 more) | nothing while the catalogue run is queued; latest 20 after it (no channel posts, no closed comments), one collect queued; back catalogue never added later; new videos at most 5 per 24 h; a deselected video is not chosen again; channels not imported untouched. |
+| Mutations on the selection: discover-job guard, deselect memory, watermark, initial batch excluded from the cap, scheduler hook | each fails its tests (`3`, `1`, `2`, `1`, `2` failed). The first draft counted the initial 20 against the daily cap, so no new video would ever have been added; the cap test caught it before push. |
+| First run of `npm run test:db` after redefining `schedule_due_work` | 16 failed in `worker_catalogue` / `worker_topics`: `permission denied for function auto_select_videos` (the gateway runs the scheduler as `service_role`). Granted like its sibling helpers; then 509 passed. |
+| `npm run check` | exit 0: unit 1162, DB 509, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| `npm run test:e2e` in Claude's container | not run: the container's Chromium build does not match the pinned Playwright (`chromium_headless_shell-1243` missing). CI's `e2e` job is the evidence. |
+
 ## 2026-10-06 — WO-16 (PR #90), dispatcher follow-up fix (#91), parallel CI (#92)
 
 **WO-16: service health from records** (Codex; two rounds). The first head `49f696d` mapped a platform with no success in 7 days and only `cancelled` runs to `healthy`; a probe at that head returned `healthy` where `degraded` was expected. Round 2 (`05c6fe8`) fixed it and both optional findings. Merged as `668c4ed`.
