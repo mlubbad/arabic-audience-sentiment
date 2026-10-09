@@ -558,6 +558,63 @@ test("separates replies from top-level comments", async ({ page }) => {
   await expect(page.getByTestId("replies-count")).toHaveText("2");
 });
 
+test("an open filter popover never covers the bar's own actions", async ({
+  page,
+}) => {
+  // At 1280px the bar wrapped between «المزيد» and «تطبيق»: the popover,
+  // opening below its trigger, lay over both actions, and a press on
+  // «تطبيق» landed on the popover's «الموضوع» label. A locator click only
+  // got through when its scroll retries outran the popover's repositioning
+  // — the «separates replies» flake on CI (run 37907015476). So this asks
+  // the hit test directly, the way a pointer would, at each desktop width
+  // and in both languages (the English labels are wider).
+  const actions = page.locator("#report-filters .db-filterbar-actions button");
+  const popoverTriggers = page.locator(
+    '#report-filters button[aria-haspopup="dialog"]',
+  );
+  for (const lang of ["ar", "en"]) {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/dashboard");
+    await expect(page.getByTestId("total")).toHaveText("6");
+    if (lang === "en") {
+      await page.getByTestId("language-switch").click();
+      await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    }
+    for (const width of [901, 1024, 1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect(actions).toHaveCount(2);
+      await expect(popoverTriggers).toHaveCount(2);
+      for (const i of [0, 1]) {
+        const trigger = popoverTriggers.nth(i);
+        await trigger.click();
+        await expect(trigger).toHaveAttribute("aria-expanded", "true");
+        await expect(page.getByRole("dialog")).toBeVisible();
+        for (const j of [0, 1]) {
+          // Polled: the popover settles into place a frame after it opens.
+          await expect
+            .poll(
+              () =>
+                actions.nth(j).evaluate((button) => {
+                  const r = button.getBoundingClientRect();
+                  const hit = document.elementFromPoint(
+                    r.left + r.width / 2,
+                    r.top + r.height / 2,
+                  );
+                  return hit !== null && button.contains(hit);
+                }),
+              {
+                message: `${lang} ${width}px, popover ${i}, action ${j}`,
+              },
+            )
+            .toBe(true);
+        }
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toBeHidden();
+      }
+    }
+  }
+});
+
 test("separates known from unknown publication dates", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page.getByTestId("unknown-dates")).toHaveText("1");
