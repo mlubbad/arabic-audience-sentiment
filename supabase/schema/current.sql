@@ -1470,6 +1470,32 @@ declare root uuid; begin
   return 'applied';
 end $function$
 
+CREATE OR REPLACE FUNCTION private.auto_select_after_catalogue()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  picked integer;
+begin
+  -- The selection is a convenience on top of the job's own outcome: a fault
+  -- here must not undo the finished run. The scheduler tries again within
+  -- the hour.
+  begin
+    -- Two statements: `has_due_videos` is stable, so within the statement
+    -- that selects it would not see the new selections.
+    picked := private.auto_select_videos(new.workspace_id, new.channel_id);
+    if picked > 0 and private.has_due_videos(new.workspace_id, new.channel_id) then
+      perform private.enqueue_scheduled(new.workspace_id, new.channel_id, 'collect');
+    end if;
+  exception when others then
+    raise warning 'auto_select_after_catalogue(%, %): %',
+      new.workspace_id, new.channel_id, sqlerrm;
+  end;
+  return null;
+end $function$
+
 CREATE OR REPLACE FUNCTION private.auto_select_videos(w uuid, c uuid)
  RETURNS integer
  LANGUAGE plpgsql
@@ -7682,6 +7708,7 @@ grant EXECUTE on function private.analysis_remaining(uuid) to "postgres";
 grant EXECUTE on function private.analysis_remaining(uuid) to "service_role";
 grant EXECUTE on function private.apply_billing_event(text,text,timestamp with time zone,uuid,text,text,timestamp with time zone,timestamp with time zone,text,boolean,text,text,jsonb) to "postgres";
 grant EXECUTE on function private.apply_pack_event(text,timestamp with time zone,uuid,text,integer,text,jsonb) to "postgres";
+grant EXECUTE on function private.auto_select_after_catalogue() to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "service_role";
 grant EXECUTE on function private.backfill_remaining(uuid) to "postgres";

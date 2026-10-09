@@ -1,5 +1,16 @@
 # Verification
 
+## 2026-10-09 — Automatic selection runs as the catalogue run finishes (admin console phase 0)
+
+Owner observation (2026-10-09): an imported workspace showed 0 selected videos after its catalogue was in. Cause: only the scheduler ran the selection, hourly at :17 or when the worker is idle, and after a bulk import the worker is busy for hours. Fix: one migration (`20261013000000_auto_select_on_catalogue.sql`), a trigger on `jobs` that runs `private.auto_select_videos` when a `discover` job goes from queued/running to `succeeded`/`partial`, and queues the collection of what it selected. No Edge Function change.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_import_channel.test.ts` | 15 passed. New: a failed catalogue run selects nothing; marking the run `succeeded` selects the latest 20 and queues one collect with no scheduler tick. |
+| First draft: one `if auto_select_videos(...) > 0 and has_due_videos(...)` | 20 selected, 0 collect queued: `has_due_videos` is stable and did not see selections made in the same statement. Split into two statements; passed. |
+| Mutations: trigger fires on `partial` only; enqueue skipped | `2 failed`; `1 failed`. |
+| `npm run test:db` / `npm run worker:test` | 510 passed / 297 passed. |
+
 ## 2026-10-09 — Bulk channel import for the platform owner (`/admin/import`)
 
 Owner request (2026-10-09): import a CSV of YouTube channels, one workspace per channel named after it, collection started, and no channel the account already holds imported twice. Follow-up decision the same day: never select a channel's whole catalogue; select its latest 20 videos once the first catalogue run is done, then add videos it publishes later, at most 5 a day. Built by Claude; one migration (`20261012000000_admin_import_channel.sql`), no Edge Function change: lookups reuse the deployed `channel-lookup`.

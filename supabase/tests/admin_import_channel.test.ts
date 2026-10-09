@@ -370,12 +370,24 @@ describe("automatic selection of an imported channel's videos", () => {
     expect(await selected()).toEqual([]);
   });
 
-  it("selects the latest 20 once the catalogue is in, skipping posts and closed comments, and starts a collection", async () => {
+  it("a catalogue run that fails selects nothing", async () => {
     await db.exec("reset role");
     await db.query(
-      "update jobs set status='succeeded' where workspace_id=$1 and type='discover'",
+      "update jobs set status='running' where workspace_id=$1 and type='discover'",
       [ws],
     );
+    await db.query(
+      "update jobs set status='failed' where workspace_id=$1 and type='discover'",
+      [ws],
+    );
+    expect(await selected()).toEqual([]);
+    await db.query(
+      "update jobs set status='queued' where workspace_id=$1 and type='discover'",
+      [ws],
+    );
+  });
+
+  it("selects the latest 20 as the catalogue run finishes, skipping posts and closed comments, and starts a collection", async () => {
     await catalogue([
       ...Array.from({ length: 24 }, (_, i) => ({
         title: `v${String(i).padStart(2, "0")}`,
@@ -384,7 +396,19 @@ describe("automatic selection of an imported channel's videos", () => {
       { title: "post", hoursAgo: 10, kind: "channel_post" },
       { title: "closed", hoursAgo: 11, disabled: true },
     ]);
-    await tick();
+    await db.exec("reset role");
+    await db.query(
+      "update jobs set status='running' where workspace_id=$1 and type='discover'",
+      [ws],
+    );
+    expect(await selected()).toEqual([]);
+
+    // The run is marked done: the selection and its collection follow at
+    // once, with no scheduler tick.
+    await db.query(
+      "update jobs set status='succeeded' where workspace_id=$1 and type='discover'",
+      [ws],
+    );
     const picked = await selected();
     expect(picked).toHaveLength(20);
     expect(picked[0]).toBe("v00");
