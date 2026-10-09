@@ -185,6 +185,44 @@ describe("AdminImportPage", () => {
     );
   });
 
+  it("verifies links on its own once the file is read, and leaves name searches to the owner", async () => {
+    invoke.mockImplementation(
+      async (_fn: string, { body }: { body: { query: string } }) => ({
+        data: {
+          candidates:
+            body.query === "https://www.youtube.com/@alpha"
+              ? [candidate(ID_A, "Alpha")]
+              : [],
+        },
+        error: null,
+      }),
+    );
+    mount();
+    await upload("name,url\nAlpha,https://www.youtube.com/@alpha\nBeta,");
+    // No click: the link is verified and its one answer chosen.
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(invoke).toHaveBeenCalledWith("channel-lookup", {
+      body: {
+        workspace_id: HOME,
+        query: "https://www.youtube.com/@alpha",
+        platform: "youtube",
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-import-run")).toHaveTextContent(
+        ar.adminImportRun(1),
+      ),
+    );
+    // The name search waits for the owner, and says how many it is.
+    expect(screen.getByTestId("admin-import-find")).toHaveTextContent(
+      ar.adminImportFindByName(1),
+    );
+    expect(screen.getByTestId("admin-import-row-2")).toHaveTextContent(
+      ar.adminImportWaiting,
+    );
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
   it("stops looking up when YouTube's daily quota is spent", async () => {
     invoke.mockResolvedValue({
       data: null,

@@ -418,7 +418,9 @@ export const ar = {
   adminImportEmptyFile:
     "لم يُعثر في الملف على عمود لأسماء القنوات (name أو «القناة»).",
   adminImportReadFailed: "تعذّرت قراءة الملف.",
-  adminImportFind: "ابحث عن القنوات",
+  adminImportFindByName: (n: number) => `ابحث بالاسم عن ${n} قناة`,
+  adminImportVerify: (n: number) => `تحقّق من ${n} رابط`,
+  adminImportQueuedLink: "بانتظار التحقق من الرابط",
   adminImportStop: "إيقاف",
   adminImportContinue: "متابعة البحث",
   adminImportQuotaHalted:

@@ -91,6 +91,24 @@ export function AdminImportPage() {
 
   useEffect(() => save(state), [state]);
 
+  // A file of links needs no one to press "search": each link names its
+  // channel, so it is verified as soon as the file is read (once per file;
+  // a Stop is not undone by the next render).
+  const autoVerified = useRef<string | null>(null);
+  useEffect(() => {
+    if (!home.data || running || state.quotaHalted) return;
+    const key = `${state.fileName}:${state.rows.length}:${state.rows[0]?.entry.query ?? ""}`;
+    if (autoVerified.current === key) return;
+    if (
+      !state.rows.some(
+        (r) => r.entry.kind === "direct" && r.lookup.state === "idle",
+      )
+    )
+      return;
+    autoVerified.current = key;
+    void runLookups(home.data, "direct");
+  });
+
   async function readFile(file: File) {
     setFileError(null);
     let text: string;
@@ -108,12 +126,18 @@ export function AdminImportPage() {
     dispatch({ type: "load", fileName: file.name, parsed });
   }
 
-  async function runLookups(homeId: string) {
+  /** Looks the rows up one by one. `direct` runs only the rows that name
+   *  their channel (a link, a handle, an id): one quota unit each and no
+   *  choice to make, so they run on their own once the file is read. The
+   *  owner's button runs everything still waiting, name searches included. */
+  async function runLookups(homeId: string, only?: "direct") {
     stop.current = false;
     setRunning("lookup");
-    dispatch({ type: "resume" });
+    if (!only) dispatch({ type: "resume" });
     const queue = state.rows.filter(
-      (r) => r.lookup.state === "idle" || r.lookup.state === "failed",
+      (r) =>
+        (r.lookup.state === "idle" || (!only && r.lookup.state === "failed")) &&
+        (!only || r.entry.kind === only),
     );
     for (const row of queue) {
       if (stop.current) break;
@@ -211,6 +235,16 @@ export function AdminImportPage() {
     const homeId = home.data;
     const direct = state.rows.filter((r) => r.entry.kind === "direct").length;
     const search = state.rows.length - direct;
+    const waiting = state.rows.filter(
+      (r) => r.lookup.state === "idle" || r.lookup.state === "failed",
+    );
+    const waitingSearch = waiting.filter(
+      (r) => r.entry.kind === "search",
+    ).length;
+    const waitingDirect = waiting.length - waitingSearch;
+    const searchedAny = state.rows.some(
+      (r) => r.entry.kind === "search" && r.lookup.state === "done",
+    );
     const pendingUnits = lookupUnits(
       state.rows.filter((r) => r.lookup.state !== "done").map((r) => r.entry),
     );
@@ -295,14 +329,16 @@ export function AdminImportPage() {
                   </Button>
                 ) : (
                   <>
-                    {counts.lookedUp < counts.total ? (
+                    {waitingSearch + waitingDirect > 0 ? (
                       <Button
                         data-testid="admin-import-find"
                         onClick={() => void runLookups(homeId)}
                       >
-                        {counts.lookedUp || state.quotaHalted
-                          ? S.adminImportContinue
-                          : S.adminImportFind}
+                        {waitingSearch === 0
+                          ? S.adminImportVerify(waitingDirect)
+                          : state.quotaHalted || searchedAny
+                            ? S.adminImportContinue
+                            : S.adminImportFindByName(waitingSearch)}
                       </Button>
                     ) : null}
                     <Button
@@ -391,7 +427,9 @@ function ImportRowView({
   const { entry, lookup, outcome } = row;
   const settled = outcome.state === "done" || outcome.state === "pending";
   let match: ReactNode;
-  if (lookup.state === "idle") match = S.adminImportWaiting;
+  if (lookup.state === "idle")
+    match =
+      entry.kind === "direct" ? S.adminImportQueuedLink : S.adminImportWaiting;
   else if (lookup.state === "pending") match = S.adminImportSearching;
   else if (lookup.state === "failed")
     match = S.adminImportLookupFailed(lookup.code);
