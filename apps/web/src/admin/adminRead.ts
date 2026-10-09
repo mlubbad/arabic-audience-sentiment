@@ -10,6 +10,7 @@
  * from the text, which can carry the request URL.
  */
 import {
+  AdminAccountsSchema,
   AdminAuditEventsSchema,
   AdminChannelsConsoleSchema,
   AdminChannelsSchema,
@@ -18,6 +19,7 @@ import {
   AdminUserDetailSchema,
   AdminUsersSchema,
   ServicesHealthReportSchema,
+  type AdminAccount,
   type AdminAuditEvent,
   type AdminChannel,
   type AdminConsoleChannel,
@@ -252,6 +254,25 @@ export async function setAutoSelection(
   });
   if (error) throw error;
   return data as { changed: number };
+}
+
+/** Every account with what it holds, for the accounts page. */
+export async function readAdminAccounts(): Promise<AdminAccount[]> {
+  const { data, error } = await supabase!.rpc("admin_accounts");
+  if (error) throw rpcFailure(error);
+  return AdminAccountsSchema.parse(data);
+}
+
+/** Mark an account as a test account, or not. Thrown as it came. */
+export async function setUserTest(
+  userId: string,
+  test: boolean,
+): Promise<void> {
+  const { error } = await supabase!.rpc("admin_set_user_test", {
+    p_user: userId,
+    p_test: test,
+  });
+  if (error) throw error;
 }
 
 export async function readAdminChannels(): Promise<AdminChannel[]> {

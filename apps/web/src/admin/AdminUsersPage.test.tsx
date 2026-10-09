@@ -11,7 +11,7 @@ import * as adminReadModule from "./adminRead";
 import * as sessionModule from "../session";
 import * as impersonationModule from "../impersonation";
 import * as adminShellModule from "./AdminShell";
-import type { AdminUser } from "@sentiment/contracts";
+import type { AdminAccount } from "@sentiment/contracts";
 
 vi.mock("./adminRead");
 vi.mock("./AccountFile", () => ({
@@ -32,23 +32,50 @@ vi.mock("./AdminShell", async (importOriginal) => {
   };
 });
 
-const mockUsers: AdminUser[] = [
-  {
+const account = (
+  over: Partial<AdminAccount> & Pick<AdminAccount, "id" | "email">,
+): AdminAccount => ({
+  display_name: null,
+  organization: null,
+  created_at: "2026-02-15T12:00:00Z",
+  last_sign_in_at: "2026-09-21T15:30:00Z",
+  suspended: false,
+  is_admin: false,
+  is_test: false,
+  workspaces: 1,
+  owned: 1,
+  channels: 1,
+  plan_key: "creator",
+  plan_status: "active",
+  period_end: "2026-11-02T00:00:00Z",
+  provider: "paddle",
+  ...over,
+});
+
+const mockUsers: AdminAccount[] = [
+  account({
     id: "admin-id",
     email: "admin@example.com",
-    created_at: "2026-01-01T10:00:00Z",
-    last_sign_in_at: "2026-09-22T10:00:00Z",
-    workspace_count: 2,
-    owner_count: 2,
-  },
-  {
+    is_admin: true,
+    workspaces: 102,
+    owned: 102,
+    channels: 101,
+    plan_key: "owner",
+  }),
+  account({
     id: "user-client-1",
     email: "client1@example.com",
-    created_at: "2026-02-15T12:00:00Z",
-    last_sign_in_at: "2026-09-21T15:30:00Z",
-    workspace_count: 1,
-    owner_count: 1,
-  },
+    display_name: "سارة أحمد",
+    organization: "متجر الأزياء",
+  }),
+  account({
+    id: "probe-1",
+    email: "probe-1@example.com",
+    is_test: true,
+    suspended: true,
+    plan_key: null,
+    period_end: null,
+  }),
 ];
 
 describe("AdminUsersPage", () => {
@@ -56,7 +83,7 @@ describe("AdminUsersPage", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(adminReadModule, "readAdminUsers").mockResolvedValue(mockUsers);
+    vi.spyOn(adminReadModule, "readAdminAccounts").mockResolvedValue(mockUsers);
     vi.spyOn(sessionModule, "useSession").mockReturnValue({
       session: {
         user: { id: "admin-id", email: "admin@example.com" },
@@ -105,7 +132,10 @@ describe("AdminUsersPage", () => {
 
     // Clicking impersonate invokes startImpersonation
     await userEvent.click(impersonateBtn);
-    expect(startImpersonationMock).toHaveBeenCalledWith(mockUsers[1]);
+    expect(startImpersonationMock).toHaveBeenCalledWith({
+      id: "user-client-1",
+      email: "client1@example.com",
+    });
   });
 
   it("opens the account file of the person whose Manage was pressed", async () => {
@@ -126,5 +156,33 @@ describe("AdminUsersPage", () => {
       "client1@example.com",
     );
     window.history.replaceState({}, "", "/");
+  });
+
+  it("keeps customers, test accounts and admins in their own sections, and searches by name", async () => {
+    mount();
+    await screen.findByTestId("admin-users");
+    expect(screen.getByTestId("admin-accounts-customers")).toHaveTextContent(
+      "1",
+    );
+    await userEvent.click(screen.getByTestId("admin-accounts-customers"));
+    expect(
+      screen.getAllByTestId("admin-user-email").map((e) => e.textContent),
+    ).toEqual(["client1@example.com"]);
+    await userEvent.click(screen.getByTestId("admin-accounts-test"));
+    const probe = screen.getByTestId("admin-account-row-probe-1");
+    expect(probe).toHaveTextContent(ar.adminAccountsTagTest);
+    expect(probe).toHaveTextContent(ar.adminAccountSuspended);
+    expect(probe).toHaveTextContent(ar.adminAccountsNoPlan);
+    await userEvent.click(screen.getByTestId("admin-accounts-all"));
+    await userEvent.type(
+      screen.getByRole("searchbox", { name: ar.adminAccountsSearch }),
+      "ساره",
+    );
+    expect(
+      screen.getAllByTestId("admin-user-email").map((e) => e.textContent),
+    ).toEqual(["client1@example.com"]);
+    expect(
+      screen.getByTestId("admin-account-row-user-client-1"),
+    ).toHaveTextContent("سارة أحمد");
   });
 });

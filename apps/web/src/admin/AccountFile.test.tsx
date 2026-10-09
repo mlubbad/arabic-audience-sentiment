@@ -25,6 +25,7 @@ vi.mock("./adminRead", async (importOriginal) => {
     sendPasswordReset: vi.fn(),
     setAdminMemberRole: vi.fn(),
     adminUserAction: vi.fn(),
+    setUserTest: vi.fn(),
   };
 });
 vi.mock("./AdminPage", () => ({
@@ -55,6 +56,7 @@ const DETAIL: AdminUserDetail = {
   last_sign_in_at: USER.last_sign_in_at,
   email_confirmed_at: null,
   banned_until: null,
+  is_test: false,
   profile: {
     display_name: "سارة أحمد",
     organization: null,
@@ -318,5 +320,15 @@ describe("AccountFile", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       ar.adminAccountNotRecorded,
     );
+  });
+
+  it("marks the account as a test account", async () => {
+    vi.mocked(adminRead.setUserTest).mockResolvedValue();
+    mount();
+    const mark = await screen.findByTestId("admin-account-test");
+    await userEvent.click(
+      within(mark).getByRole("checkbox", { name: ar.adminAccountTestLabel }),
+    );
+    expect(adminRead.setUserTest).toHaveBeenCalledWith(USER.id, true);
   });
 });
