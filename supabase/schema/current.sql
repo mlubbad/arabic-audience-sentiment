@@ -238,11 +238,13 @@ create table "private"."user_profiles" (
   "phone" text,
   "admin_note" text,
   "updated_at" timestamp with time zone default now() not null,
-  "updated_by" uuid
+  "updated_by" uuid,
+  "is_test" boolean default false not null
 );
 
 alter table "private"."user_profiles" add constraint "user_profiles_admin_note_check" CHECK (char_length(admin_note) <= 2000);
 alter table "private"."user_profiles" add constraint "user_profiles_display_name_check" CHECK (char_length(display_name) <= 120);
+alter table "private"."user_profiles" add constraint "user_profiles_is_test_not_null" NOT NULL is_test;
 alter table "private"."user_profiles" add constraint "user_profiles_organization_check" CHECK (char_length(organization) <= 120);
 alter table "private"."user_profiles" add constraint "user_profiles_phone_check" CHECK (char_length(phone) <= 40);
 alter table "private"."user_profiles" add constraint "user_profiles_pkey" PRIMARY KEY (user_id);
@@ -5451,6 +5453,65 @@ AS $function$
   from public.addon_prices a
 $function$
 
+CREATE OR REPLACE FUNCTION public.admin_accounts()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '30s'
+AS $function$
+declare
+  result jsonb;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+
+  with seats as (
+    select user_id, count(*) as workspaces
+      from public.memberships group by user_id),
+  owned as (
+    select created_by as user_id, count(*) as owned
+      from public.workspaces group by created_by),
+  chans as (
+    select w.created_by as user_id, count(c.id) as channels
+      from public.workspaces w
+      join public.channels c on c.workspace_id = w.id
+     group by w.created_by),
+  home as (
+    select distinct on (w.created_by) w.created_by as user_id, w.id as workspace_id
+      from public.workspaces w
+     order by w.created_by, w.created_at, w.id)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', u.id,
+           'email', u.email,
+           'display_name', p.display_name,
+           'organization', p.organization,
+           'created_at', u.created_at,
+           'last_sign_in_at', u.last_sign_in_at,
+           'suspended', coalesce(u.banned_until > now(), false),
+           'is_admin', exists (select 1 from private.platform_admins a where a.user_id = u.id),
+           'is_test', coalesce(p.is_test, false),
+           'workspaces', coalesce(seats.workspaces, 0),
+           'owned', coalesce(owned.owned, 0),
+           'channels', coalesce(chans.channels, 0),
+           'plan_key', s.plan_key,
+           'plan_status', s.status,
+           'period_end', s.period_end,
+           'provider', s.provider)
+         order by u.created_at desc, u.id), '[]'::jsonb)
+    into result
+    from auth.users u
+    left join private.user_profiles p on p.user_id = u.id
+    left join seats on seats.user_id = u.id
+    left join owned on owned.user_id = u.id
+    left join chans on chans.user_id = u.id
+    left join home on home.user_id = u.id
+    left join public.subscriptions s
+      on s.workspace_id = coalesce(private.billing_root(home.workspace_id), home.workspace_id);
+  return result;
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_audit(p_limit integer DEFAULT 100)
  RETURNS SETOF jsonb
  LANGUAGE plpgsql
@@ -6101,6 +6162,36 @@ begin
   return jsonb_build_object('changed', changed, 'cancelled_jobs', cancelled);
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_set_user_test(p_user uuid, p_test boolean)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_test is null then
+    raise exception 'invalid_request' using errcode='22023';
+  end if;
+  if not exists (select 1 from auth.users where id = p_user) then
+    raise exception 'user_not_found' using errcode='P0002';
+  end if;
+  insert into private.user_profiles as up (user_id, is_test, updated_at, updated_by)
+  values (p_user, p_test, now(), uid)
+  on conflict (user_id) do update
+     set is_test = excluded.is_test,
+         updated_at = excluded.updated_at,
+         updated_by = excluded.updated_by;
+  insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+  values (null, uid, case when p_test then 'user_marked_test' else 'user_unmarked_test' end,
+          'user', p_user::text);
+  return jsonb_build_object('ok', true);
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_start_impersonation(p_target_user_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6234,6 +6325,7 @@ begin
     'last_sign_in_at', u.last_sign_in_at,
     'email_confirmed_at', u.email_confirmed_at,
     'banned_until', u.banned_until,
+    'is_test', coalesce(p.is_test, false),
     'profile', jsonb_build_object(
       'display_name', p.display_name,
       'organization', p.organization,
@@ -8406,6 +8498,8 @@ grant EXECUTE on function private.workspace_ops_snapshot_impl(uuid) to "service_
 grant EXECUTE on function addon_catalogue() to "anon";
 grant EXECUTE on function addon_catalogue() to "authenticated";
 grant EXECUTE on function addon_catalogue() to "postgres";
+grant EXECUTE on function admin_accounts() to "authenticated";
+grant EXECUTE on function admin_accounts() to "postgres";
 grant EXECUTE on function admin_audit(integer) to "authenticated";
 grant EXECUTE on function admin_audit(integer) to "postgres";
 grant EXECUTE on function admin_channels() to "authenticated";
@@ -8430,6 +8524,8 @@ grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "a
 grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "postgres";
 grant EXECUTE on function admin_set_channels_paused(uuid[],boolean) to "authenticated";
 grant EXECUTE on function admin_set_channels_paused(uuid[],boolean) to "postgres";
+grant EXECUTE on function admin_set_user_test(uuid,boolean) to "authenticated";
+grant EXECUTE on function admin_set_user_test(uuid,boolean) to "postgres";
 grant EXECUTE on function admin_start_impersonation(uuid) to "authenticated";
 grant EXECUTE on function admin_start_impersonation(uuid) to "postgres";
 grant EXECUTE on function admin_stop_impersonation(uuid) to "authenticated";
