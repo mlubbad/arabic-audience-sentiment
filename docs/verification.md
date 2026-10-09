@@ -26,6 +26,45 @@
 | `npm run check` | exit 0: lint, format, typecheck, functions; unit 1199, DB 540, worker 297 passed; build and secret scan passed. |
 | Not fixed here | The bar's «مُصفّى:» chips are built from the draft values, so they name a choice before «تطبيق» is pressed; filed as its own task. On a 4-vCPU runner with 6 workers, the dashboard's first render can miss the default 5 s `expect` (above); the normal CI run uses fewer workers and passed with it, so it is noted, not changed. |
 
+## 2026-10-09 — Owner console phase 2, step 2: bulk actions on the channels console
+
+Owner request (2026-10-09: "ابدأ الإجراءات الجماعية"). One migration (`20261019000000_admin_bulk_channel_actions.sql`): `admin_request_channel_work(uuid[], 'collect'|'discover')` queues work only where it can run (not paused, nothing of that kind queued or running, and for a collection at least one selected video) and answers queued / skipped; `admin_set_auto_selection(uuid[], initial 0–200, daily 0–100)` sets the numbers, creating them in the name of the workspace's creator where there were none. Both admin only, up to 500 channels, audited per channel. The page: a checkbox per row and one for every channel shown; a bar with collect now, refresh catalogue, pause (confirming press), resume, automatic selection numbers, CSV export (byte-order mark, formula-safe), clear. Bulk delete is not here: it waits for the owner's own decision.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_console_overview.test.ts` | 18 passed (4 new): collect queued for the two channels with selections, skipped for one with none and one paused, and skipped when already queued; latest trail row `channel_collect_requested` by the owner; a catalogue run queued; numbers 10 / 3 set on a channel that had none and one that had, the new one in the workspace creator's name; bad kind, 201 initial, non-admin refused. |
+| Mutations: paused not skipped; collect without selections not skipped; numbers in the caller's name | `1 failed` each. |
+| `AdminChannelsPage.test.tsx`, `channelsConsole.test.ts` | 11 and 8 passed (6 new): two rows selected, one collect request for both, the skipped count said; select-all over the shown rows, pause only after the confirming press; numbers out of range keep the button off, in range sent; a refusal named; CSV header and row, quoting, and a leading `=` neutralised. |
+| `npx playwright test` locally (Chromium 1194, uncommitted config) | 126 passed, 5 skipped. |
+| `npm run check` | exit 0: unit 1216, DB 551, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| #103 on main | Deploy Preview 37911502794: migrations applied, frontend deployed, live check passed. |
+
+## 2026-10-09 — Owner console phase 2, step 1: pausing a channel's collection
+
+Owner approval (2026-10-09: "ابدأ بإيقاف الجمع واستئنافه"). One migration (`20261018000000_channel_pause.sql`): `channels.paused_at` / `paused_by` (a mark, not a change of `status`, so resuming needs no memory); `admin_set_channels_paused(uuid[], bool)` (admin only, up to 500 channels, cancels queued jobs on pause, one audit row per channel changed); `schedule_due_work` and `auto_select_videos` rebuilt from 20261012000000 with one guard each; `admin_channel_states()` names `paused` first; `admin_console_overview()` counts it. A member can still sync by hand. The channel panel pauses after a confirming press and resumes in one.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_console_overview.test.ts` | 14 passed (4 new): pause cancels the one queued collect, the home counts 1 paused / 0 collecting, the trail's latest row is `channel_paused` by the owner, a second pause changes nothing; the scheduler queues no collect for a paused stale channel and one after resume; the automatic selection picks 0 while paused and 1 after; non-admin `forbidden`, anon `permission denied`, empty list `invalid_request`. |
+| Mutations: scheduler filter dropped; selection guard dropped; queued-job cancel disabled | `1 failed` each. |
+| `AdminChannelsPage.test.tsx`, admin suites | 7 passed (2 new: pause needs the confirming press; resume is one press and a refusal is named); admin suites 189 passed. |
+| `npx playwright test` locally (Chromium 1194, uncommitted config) | 126 passed, 5 skipped. |
+| `npm run check` | exit 0: unit 1210, DB 547, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| Known limits | A job cancelled by the pause holds the next one of its kind back for up to an hour after resume (`enqueue_scheduled`'s 60-minute rule). Between the migration and the new frontend landing, the old home page refuses the overview's new `paused` key (strict contract); the deploy lands both minutes apart. |
+
+## 2026-10-09 — Owner console phase 1b: the channels console at `/admin/channels`
+
+Owner request (2026-10-09: "ابدأ لوحة القنوات"). One migration (`20261017000000_admin_channels_console.sql`): `admin_channels_console()` gives every channel its state from `private.admin_channel_states()` (the home's own), the workspace and whose it is (the caller's, or a customer's and their email), catalogued / selected / collected / analysed counts aggregated once per table (comments from `private.video_comment_stats`), and the automatic selection numbers; its own `statement_timeout=30s`. `admin_channels()` is unchanged (the search box and its tests read it). The page: state chips with counts, account filter, folded search, four orders (trouble first by default), all in the address (`?state=&owner=&q=&sort=`), and a side panel with the way into the workspace and next / previous. The home's state counts now link to `/admin/channels?state=…`. Read only; bulk actions and a pause state are phase 2.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_console_overview.test.ts` | 10 passed (3 new): each of the seven channels carries the state the home counts, the failing one its error, the healthy one 1 / 1 / 100 / 90 and 20 / 5; a customer's channel is `mine: false` with the customer's email and no automatic selection; non-admin `forbidden`, anon `permission denied`; `statement_timeout=30s`. |
+| Mutations: `mine` always true; `selected` always 0 | `1 failed` each. |
+| `channelsConsole.test.ts`, `AdminChannelsPage.test.tsx`, `AdminHomePage.test.tsx` | 6, 5, 6 passed: address read with fallbacks and written minimally; trouble-first, most-comments and longest-since-collection orders; state, account and folded search filters; state counts over account and search only; the page lists trouble first with error and counts, opens on the home's state link and rewrites the address on a chip, narrows to customers and to a search, says when nothing matches, and the panel walks next / previous with the way into the workspace. |
+| `npx playwright test` (whole suite, locally, with the container's Chromium 1194 by `launchOptions.executablePath` in an uncommitted config) | 126 passed, 5 skipped. First local e2e run in this container. |
+| Main after #101 merged (run 37907015476) | `Browser tests` failed on `dashboard.spec.ts` › "separates replies from top-level comments" (expected 2, got 4); Deploy Preview skipped. The same tree passed on the PR. Reproduced locally: 6 failed in 40 with six workers. Waiting for the combobox to show the choice before applying did not cure it (6 in 40 again), so it may be a product race, not only test timing; reverted, and filed as its own task. Claude cannot re-run jobs (403). |
+| `npm run check` | exit 0: unit 1208, DB 543, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+
 ## 2026-10-09 — Owner console phase 1a: the home at `/admin`, and Ctrl+K
 
 Owner approval (2026-10-09: "ابدأ المرحلة 1 من واجهة المالك"). Phase 1 is split: 1a (this) is the home and the search box; 1b is the channels console. `/admin` is now the home; the workspaces table moved to `/admin/workspaces` (its tab, and the e2e demo path, follow). One migration (`20261016000000_admin_console_overview.sql`): `private.admin_channel_states()` names each channel's state once (cataloguing, collecting, failing, new, waiting, stale, healthy, first that applies), and `admin_console_overview()` reads the home in one call with its own `statement_timeout=30s`. The funnel sums `private.video_comment_stats`, never `comments`. No quota meters: no table measures YouTube or Apify units yet.

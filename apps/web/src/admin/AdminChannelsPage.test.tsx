@@ -2,22 +2,20 @@
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
-import type { AdminChannel } from "@sentiment/contracts";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetLocale, setLocale } from "../locale";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import type { AdminConsoleChannel } from "@sentiment/contracts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ar } from "../strings/ar";
-import { en } from "../strings/en";
-import { loadStrings } from "../strings";
-import * as adminReadModule from "./adminRead";
-import * as adminShellModule from "./AdminShell";
+import * as adminRead from "./adminRead";
 import { AdminChannelsPage } from "./AdminChannelsPage";
 
 vi.mock("./adminRead");
 vi.mock("./AdminShell", async (importOriginal) => {
-  const actual = await importOriginal<typeof adminShellModule>();
+  const actual = await importOriginal<typeof import("./AdminShell")>();
   return {
     ...actual,
+    AdminPageHead: ({ title }: { title: string }) => <h1>{title}</h1>,
     useAdminShell: () => ({
       admin: true,
       shell: (children: React.ReactNode) => <div>{children}</div>,
@@ -25,110 +23,328 @@ vi.mock("./AdminShell", async (importOriginal) => {
   };
 });
 
-const base: AdminChannel = {
-  id: "30000000-0000-4000-8000-000000000001",
-  workspace_id: "20000000-0000-4000-8000-000000000001",
-  workspace_name: "Workspace",
-  external_channel_id: "UC1",
+const WS = "00000000-0000-4000-8000-00000000000";
+const row = (
+  i: number,
+  over: Partial<AdminConsoleChannel>,
+): AdminConsoleChannel => ({
+  id: `10000000-0000-4000-8000-00000000000${i}`,
+  workspace_id: `${WS}${i}`,
+  workspace_name: `ws ${i}`,
+  mine: true,
+  owner_email: "owner@example.com",
+  external_channel_id: `UCAAAAAAAAAAAAAAAAAAAAA${i}`,
+  title: `Channel ${i}`,
   handle: null,
-  title: "49 hours",
-  status: "connected",
-  video_count: 1,
-  comment_count: 2,
-  last_sync_at: null,
-  last_sync_status: null,
-  last_sync_error: null,
-  last_collect_ok_at: "2026-10-04T11:00:00Z",
-};
-
-const channels: AdminChannel[] = [
-  base,
-  {
-    ...base,
-    id: "30000000-0000-4000-8000-000000000002",
-    external_channel_id: "UC2",
-    title: "47 hours",
-    last_collect_ok_at: "2026-10-04T13:00:00Z",
-  },
-  {
-    ...base,
-    id: "30000000-0000-4000-8000-000000000003",
-    external_channel_id: "UC3",
-    title: "No collection",
-    last_collect_ok_at: null,
-  },
-  {
-    ...base,
-    id: "30000000-0000-4000-8000-000000000004",
-    external_channel_id: "UC4",
-    title: "Disconnected",
-    status: "disconnected",
-    last_collect_ok_at: "2026-10-01T12:00:00Z",
-  },
+  state: "healthy",
+  last_ok_at: "2026-10-09T06:00:00+00:00",
+  last_error: null,
+  last_run_at: null,
+  catalogued_at: "2026-10-08T06:00:00+00:00",
+  videos: 100,
+  selected: 20,
+  comments: 1000 * i,
+  analysed: 900,
+  auto_initial: 20,
+  auto_daily: 5,
+  ...over,
+});
+const ROWS = [
+  row(1, { title: "Healthy one" }),
+  row(2, {
+    title: "Failing one",
+    state: "failing",
+    last_error: "quota_exceeded",
+    last_ok_at: null,
+  }),
+  row(3, {
+    title: "Customer shop",
+    mine: false,
+    owner_email: "customer@example.com",
+    auto_initial: null,
+    auto_daily: null,
+  }),
 ];
 
-function mount() {
+function Where() {
+  const l = useLocation();
+  return <p data-testid="where">{`${l.pathname}${l.search}`}</p>;
+}
+
+function mount(path = "/admin/channels") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <AdminChannelsPage />
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <>
+                <AdminChannelsPage />
+                <Where />
+              </>
+            }
+          />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-describe("AdminChannelsPage collection freshness", () => {
+const names = () =>
+  within(screen.getByTestId("admin-channels"))
+    .getAllByRole("button")
+    .map((b) => b.textContent);
+
+describe("AdminChannelsPage (channels console)", () => {
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-10-06T12:00:00Z"));
-    vi.spyOn(adminReadModule, "readAdminChannels").mockResolvedValue(channels);
-    resetLocale();
+    vi.clearAllMocks();
+    vi.mocked(adminRead.readAdminChannelsConsole).mockResolvedValue(ROWS);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-    resetLocale();
-  });
-
-  it("warns connected channels beyond 48 hours or without a successful collection", async () => {
+  it("lists every channel, trouble first, with its state, error and counts", async () => {
     mount();
-    const table = await screen.findByTestId("admin-channels");
-    const rows = within(table).getAllByRole("row");
+    await screen.findByTestId("admin-channels");
+    expect(names()).toEqual(["Failing one", "Customer shop", "Healthy one"]);
+    const failing = screen.getByTestId(`admin-console-row-${ROWS[1]!.id}`);
+    expect(failing).toHaveTextContent(ar.adminChannelStates.failing!);
+    expect(failing).toHaveTextContent("quota_exceeded");
+    expect(failing).toHaveTextContent(ar.adminHomeNever);
+    expect(
+      screen.getByTestId(`admin-console-row-${ROWS[2]!.id}`),
+    ).toHaveTextContent("customer@example.com");
+    expect(screen.getByText(ar.adminConsoleCount(3, 3))).toBeInTheDocument();
+  });
 
-    expect(within(rows[1]).getByText("2 d")).toHaveAttribute(
-      "title",
-      "2026-10-04T11:00:00Z",
+  it("opens on the state the home linked to, and a chip changes the address", async () => {
+    mount("/admin/channels?state=failing");
+    await screen.findByTestId("admin-channels");
+    expect(names()).toEqual(["Failing one"]);
+    expect(screen.getByTestId("admin-console-state-failing")).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
-    expect(
-      within(rows[1]).getByText(ar.adminChannelsCollectionStale),
-    ).toBeInTheDocument();
-    expect(within(rows[2]).getByText("47 h")).toBeInTheDocument();
-    expect(
-      within(rows[2]).queryByText(ar.adminChannelsCollectionStale),
-    ).toBeNull();
-    expect(
-      within(rows[3]).getByText(ar.adminChannelsCollectionStale),
-    ).toBeInTheDocument();
-    expect(
-      within(rows[4]).queryByText(ar.adminChannelsCollectionStale),
-    ).toBeNull();
+    await userEvent.click(screen.getByTestId("admin-console-state-healthy"));
+    expect(names()).toEqual(["Customer shop", "Healthy one"]);
+    expect(screen.getByTestId("where")).toHaveTextContent(
+      "/admin/channels?state=healthy",
+    );
   });
 
-  it("renders the new column label in Arabic and English", async () => {
-    const first = mount();
-    expect(
-      await screen.findByText(ar.adminChannelsLastSuccessfulCollection),
-    ).toBeInTheDocument();
-    first.unmount();
-
-    await loadStrings("en");
-    setLocale("en");
+  it("narrows to the customers' channels and to a search", async () => {
     mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.selectOptions(
+      screen.getByLabelText(ar.adminConsoleOwnerLabel),
+      "customers",
+    );
+    expect(names()).toEqual(["Customer shop"]);
+    await userEvent.selectOptions(
+      screen.getByLabelText(ar.adminConsoleOwnerLabel),
+      "all",
+    );
+    await userEvent.type(
+      screen.getByRole("searchbox", { name: ar.adminConsoleSearch }),
+      "healthy",
+    );
+    expect(names()).toEqual(["Healthy one"]);
+  });
+
+  it("says so when nothing matches", async () => {
+    mount("/admin/channels?q=nothing-like-this");
+    expect(await screen.findByText(ar.adminConsoleEmpty)).toBeInTheDocument();
+  });
+
+  it("opens a channel's details beside the list, and walks to the next one", async () => {
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: ar.adminConsoleOpen("Failing one"),
+      }),
+    );
+    const panel = await screen.findByTestId("admin-console-panel");
+    expect(panel).toHaveTextContent("Failing one");
+    expect(panel).toHaveTextContent(ar.adminConsoleAutoValue(20, 5));
+    expect(panel).toHaveTextContent(ar.adminConsolePosition(1, 3));
     expect(
-      await screen.findByText(en.adminChannelsLastSuccessfulCollection),
-    ).toBeInTheDocument();
+      within(panel).getByRole("link", { name: ar.adminHomeOpenWorkspace }),
+    ).toHaveAttribute("href", `/dashboard?ws=${ROWS[1]!.workspace_id}`);
+    expect(
+      within(panel).getByRole("button", { name: ar.adminConsolePrev }),
+    ).toBeDisabled();
+
+    await userEvent.click(
+      within(panel).getByRole("button", { name: ar.adminConsoleNext }),
+    );
+    expect(panel).toHaveTextContent("Customer shop");
+    expect(panel).toHaveTextContent(ar.adminConsoleAutoNone);
+    expect(panel).toHaveTextContent("customer@example.com");
+  });
+
+  it("pauses a channel only after a confirming press, and says so", async () => {
+    vi.mocked(adminRead.setChannelsPaused).mockResolvedValue({
+      changed: 1,
+      cancelled_jobs: 1,
+    });
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("button", { name: ar.adminConsoleOpen("Healthy one") }),
+    );
+    const panel = await screen.findByTestId("admin-console-pause");
+    await userEvent.click(
+      within(panel).getByRole("button", { name: ar.adminConsolePause }),
+    );
+    expect(adminRead.setChannelsPaused).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(panel).getByRole("button", { name: ar.adminConsolePauseConfirm }),
+    );
+    expect(adminRead.setChannelsPaused).toHaveBeenCalledWith(
+      [ROWS[0]!.id],
+      true,
+    );
+    expect(await within(panel).findByRole("status")).toHaveTextContent(
+      ar.adminConsolePausedDone,
+    );
+  });
+
+  it("resumes a paused channel with one press, and names a refusal", async () => {
+    vi.mocked(adminRead.readAdminChannelsConsole).mockResolvedValue([
+      { ...ROWS[0]!, state: "paused" },
+    ]);
+    vi.mocked(adminRead.setChannelsPaused).mockRejectedValueOnce({
+      message: "forbidden",
+    });
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("button", { name: ar.adminConsoleOpen("Healthy one") }),
+    );
+    const panel = await screen.findByTestId("admin-console-pause");
+    await userEvent.click(
+      within(panel).getByRole("button", { name: ar.adminConsoleResume }),
+    );
+    expect(adminRead.setChannelsPaused).toHaveBeenCalledWith(
+      [ROWS[0]!.id],
+      false,
+    );
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
+      ar.adminConsolePauseFailed,
+    );
+  });
+
+  it("selects channels, collects them in one request, and reports what was left out", async () => {
+    vi.mocked(adminRead.requestChannelWork).mockResolvedValue({
+      queued: 1,
+      skipped: 1,
+    });
+    mount();
+    await screen.findByTestId("admin-channels");
+    expect(screen.queryByTestId("admin-bulk")).toBeNull();
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: ar.adminBulkSelect("Healthy one") }),
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: ar.adminBulkSelect("Failing one") }),
+    );
+    const bar = screen.getByTestId("admin-bulk");
+    expect(bar).toHaveTextContent(ar.adminBulkSelected(2));
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkCollect }),
+    );
+    expect(adminRead.requestChannelWork).toHaveBeenCalledWith(
+      [ROWS[0]!.id, ROWS[1]!.id],
+      "collect",
+    );
+    expect(await within(bar).findByRole("status")).toHaveTextContent(
+      ar.adminBulkQueued(1, 1),
+    );
+  });
+
+  it("selects every channel shown, and pauses them only after a confirming press", async () => {
+    vi.mocked(adminRead.setChannelsPaused).mockResolvedValue({
+      changed: 2,
+      cancelled_jobs: 3,
+    });
+    mount("/admin/channels?owner=mine");
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: ar.adminBulkSelectAll }),
+    );
+    const bar = screen.getByTestId("admin-bulk");
+    expect(bar).toHaveTextContent(ar.adminBulkSelected(2));
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkPause }),
+    );
+    expect(adminRead.setChannelsPaused).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkPauseConfirm(2) }),
+    );
+    expect(adminRead.setChannelsPaused).toHaveBeenCalledWith(
+      expect.arrayContaining([ROWS[0]!.id, ROWS[1]!.id]),
+      true,
+    );
+    expect(await within(bar).findByRole("status")).toHaveTextContent(
+      ar.adminBulkPaused(2, 3),
+    );
+  });
+
+  it("sets the automatic selection numbers, and refuses numbers out of range", async () => {
+    vi.mocked(adminRead.setAutoSelection).mockResolvedValue({ changed: 1 });
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("checkbox", {
+        name: ar.adminBulkSelect("Customer shop"),
+      }),
+    );
+    const bar = screen.getByTestId("admin-bulk");
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkAuto }),
+    );
+    const initial = within(bar).getByLabelText(ar.adminBulkAutoInitial);
+    await userEvent.clear(initial);
+    await userEvent.type(initial, "500");
+    expect(
+      within(bar).getByRole("button", { name: ar.adminBulkAutoApply }),
+    ).toBeDisabled();
+    await userEvent.clear(initial);
+    await userEvent.type(initial, "10");
+    const daily = within(bar).getByLabelText(ar.adminBulkAutoDaily);
+    await userEvent.clear(daily);
+    await userEvent.type(daily, "2");
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkAutoApply }),
+    );
+    expect(adminRead.setAutoSelection).toHaveBeenCalledWith(
+      [ROWS[2]!.id],
+      10,
+      2,
+    );
+    expect(await within(bar).findByRole("status")).toHaveTextContent(
+      ar.adminBulkAutoDone(1),
+    );
+  });
+
+  it("names a refused bulk action", async () => {
+    vi.mocked(adminRead.requestChannelWork).mockRejectedValue({
+      message: "forbidden",
+    });
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: ar.adminBulkSelect("Healthy one") }),
+    );
+    const bar = screen.getByTestId("admin-bulk");
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkCatalogue }),
+    );
+    expect(await within(bar).findByRole("alert")).toHaveTextContent(
+      ar.adminBulkFailed,
+    );
   });
 });

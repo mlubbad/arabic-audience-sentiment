@@ -176,6 +176,7 @@ export type AdminAuditEvent = z.infer<typeof AdminAuditEventSchema>;
 /** A channel's state as `private.admin_channel_states()` names it: the first
  *  of these that applies. */
 export const ChannelStateSchema = z.enum([
+  "paused",
   "cataloguing",
   "collecting",
   "failing",
@@ -194,6 +195,7 @@ export const AdminConsoleOverviewSchema = z
     channels: z.number().int().nonnegative(),
     states: z
       .object({
+        paused: z.number().int().nonnegative(),
         cataloguing: z.number().int().nonnegative(),
         collecting: z.number().int().nonnegative(),
         failing: z.number().int().nonnegative(),
@@ -247,3 +249,31 @@ export const AdminConsoleOverviewSchema = z
   })
   .strict();
 export type AdminConsoleOverview = z.infer<typeof AdminConsoleOverviewSchema>;
+
+/** One row of `admin_channels_console()`: a channel as the owner console's
+ *  channels page shows it. */
+export const AdminConsoleChannelSchema = z
+  .object({
+    id: z.string().uuid(),
+    workspace_id: z.string().uuid(),
+    workspace_name: z.string(),
+    mine: z.boolean(),
+    owner_email: z.string().nullable(),
+    external_channel_id: z.string(),
+    title: z.string().nullable(),
+    handle: z.string().nullable(),
+    state: ChannelStateSchema,
+    last_ok_at: timestamp.nullable(),
+    last_error: z.string().nullable(),
+    last_run_at: timestamp.nullable(),
+    catalogued_at: timestamp.nullable(),
+    videos: z.number().int().nonnegative(),
+    selected: z.number().int().nonnegative(),
+    comments: z.number().int().nonnegative(),
+    analysed: z.number().int().nonnegative(),
+    auto_initial: z.number().int().nonnegative().nullable(),
+    auto_daily: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+export const AdminChannelsConsoleSchema = z.array(AdminConsoleChannelSchema);
+export type AdminConsoleChannel = z.infer<typeof AdminConsoleChannelSchema>;

@@ -11,6 +11,7 @@
  */
 import {
   AdminAuditEventsSchema,
+  AdminChannelsConsoleSchema,
   AdminChannelsSchema,
   AdminConsoleOverviewSchema,
   AdminOpsSchema,
@@ -19,6 +20,7 @@ import {
   ServicesHealthReportSchema,
   type AdminAuditEvent,
   type AdminChannel,
+  type AdminConsoleChannel,
   type AdminConsoleOverview,
   type AdminOps,
   type AdminUser,
@@ -200,6 +202,56 @@ export async function readAdminConsoleOverview(): Promise<AdminConsoleOverview> 
   const { data, error } = await supabase!.rpc("admin_console_overview");
   if (error) throw rpcFailure(error);
   return AdminConsoleOverviewSchema.parse(data);
+}
+
+/** The owner console's channels page: every channel with its state. */
+export async function readAdminChannelsConsole(): Promise<
+  AdminConsoleChannel[]
+> {
+  const { data, error } = await supabase!.rpc("admin_channels_console");
+  if (error) throw rpcFailure(error);
+  return AdminChannelsConsoleSchema.parse(data);
+}
+
+/** Pause or resume the scheduler's work on channels. Thrown as it came. */
+export async function setChannelsPaused(
+  channelIds: string[],
+  paused: boolean,
+): Promise<{ changed: number; cancelled_jobs: number }> {
+  const { data, error } = await supabase!.rpc("admin_set_channels_paused", {
+    p_channels: channelIds,
+    p_paused: paused,
+  });
+  if (error) throw error;
+  return data as { changed: number; cancelled_jobs: number };
+}
+
+/** Ask for a collection or a fresh catalogue now. Thrown as it came. */
+export async function requestChannelWork(
+  channelIds: string[],
+  kind: "collect" | "discover",
+): Promise<{ queued: number; skipped: number }> {
+  const { data, error } = await supabase!.rpc("admin_request_channel_work", {
+    p_channels: channelIds,
+    p_kind: kind,
+  });
+  if (error) throw error;
+  return data as { queued: number; skipped: number };
+}
+
+/** Set the automatic selection numbers. Thrown as it came. */
+export async function setAutoSelection(
+  channelIds: string[],
+  initial: number,
+  daily: number,
+): Promise<{ changed: number }> {
+  const { data, error } = await supabase!.rpc("admin_set_auto_selection", {
+    p_channels: channelIds,
+    p_initial: initial,
+    p_daily: daily,
+  });
+  if (error) throw error;
+  return data as { changed: number };
 }
 
 export async function readAdminChannels(): Promise<AdminChannel[]> {

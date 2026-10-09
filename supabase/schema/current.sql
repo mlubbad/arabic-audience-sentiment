@@ -386,13 +386,16 @@ create table "public"."channels" (
   "subscriber_count" bigint,
   "total_view_count" bigint,
   "video_count" bigint,
-  "avatar_url" text
+  "avatar_url" text,
+  "paused_at" timestamp with time zone,
+  "paused_by" uuid
 );
 alter table "public"."channels" enable row level security;
 
 alter table "public"."channels" add constraint "channels_client_id_not_null" NOT NULL client_id;
 alter table "public"."channels" add constraint "channels_external_channel_id_not_null" NOT NULL external_channel_id;
 alter table "public"."channels" add constraint "channels_id_not_null" NOT NULL id;
+alter table "public"."channels" add constraint "channels_paused_by_fkey" FOREIGN KEY (paused_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 alter table "public"."channels" add constraint "channels_pkey" PRIMARY KEY (id);
 alter table "public"."channels" add constraint "channels_platform_check" CHECK (platform = ANY (ARRAY['youtube'::text, 'telegram'::text, 'x'::text, 'tiktok'::text, 'facebook'::text, 'instagram'::text]));
 alter table "public"."channels" add constraint "channels_platform_not_null" NOT NULL platform;
@@ -1152,6 +1155,7 @@ CREATE OR REPLACE FUNCTION private.admin_channel_states()
 AS $function$
   select c.workspace_id, c.id,
          case
+           when c.paused_at is not null then 'paused'
            when exists (select 1 from public.jobs j
                          where j.workspace_id = c.workspace_id and j.channel_id = c.id
                            and j.type = 'discover' and j.status in ('queued', 'running'))
@@ -1581,7 +1585,8 @@ begin
   if not found then return 0; end if;
 
   if not exists (select 1 from public.channels
-                  where workspace_id = w and id = c and catalogued_at is not null)
+                  where workspace_id = w and id = c and catalogued_at is not null
+                    and paused_at is null)
      or exists (select 1 from public.jobs
                  where workspace_id = w and channel_id = c and type = 'discover'
                    and status in ('queued', 'running')) then
@@ -4259,7 +4264,8 @@ declare ch record; d int := 0; k int := 0; a int := 0; cat int; begin
 
   cat := coalesce(private.plan_limit(w, 'catalogue_interval'), 1440);
   for ch in select id, catalogued_at from public.channels
-             where workspace_id = w and status in ('connected', 'public_unverified') loop
+             where workspace_id = w and status in ('connected', 'public_unverified')
+               and paused_at is null loop
     if ch.catalogued_at is null
        or ch.catalogued_at < now() - make_interval(mins => cat) then
       if private.enqueue_scheduled(w, ch.id, 'discover') is not null then d := d + 1; end if;
@@ -5515,6 +5521,67 @@ begin
     order by w.created_at desc, c.external_channel_id;
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_channels_console()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '30s'
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  result jsonb;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+
+  with st as (select * from private.admin_channel_states()),
+  vids as (
+    select v.workspace_id, v.channel_id, count(*) as videos,
+           coalesce(sum(s.total), 0) as comments,
+           coalesce(sum(s.analysed), 0) as analysed
+      from public.videos v
+      left join private.video_comment_stats s
+        on s.workspace_id = v.workspace_id and s.video_id = v.id
+     group by v.workspace_id, v.channel_id),
+  sel as (
+    select workspace_id, channel_id, count(*) as selected
+      from public.video_selections
+     group by workspace_id, channel_id)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', c.id,
+           'workspace_id', c.workspace_id,
+           'workspace_name', w.name,
+           'mine', w.created_by = uid,
+           'owner_email', u.email,
+           'external_channel_id', c.external_channel_id,
+           'title', c.title,
+           'handle', c.handle,
+           'state', st.state,
+           'last_ok_at', st.last_ok_at,
+           'last_error', st.last_error,
+           'last_run_at', st.last_run_at,
+           'catalogued_at', c.catalogued_at,
+           'videos', coalesce(vids.videos, 0),
+           'selected', coalesce(sel.selected, 0),
+           'comments', coalesce(vids.comments, 0),
+           'analysed', coalesce(vids.analysed, 0),
+           'auto_initial', a.initial_count,
+           'auto_daily', a.daily_cap)
+         order by w.created_at, c.id), '[]'::jsonb)
+    into result
+    from public.channels c
+    join public.workspaces w on w.id = c.workspace_id
+    left join auth.users u on u.id = w.created_by
+    join st on st.channel_id = c.id
+    left join vids on vids.workspace_id = c.workspace_id and vids.channel_id = c.id
+    left join sel on sel.workspace_id = c.workspace_id and sel.channel_id = c.id
+    left join private.channel_auto_selection a
+      on a.workspace_id = c.workspace_id and a.channel_id = c.id;
+  return result;
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_console_overview()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5535,6 +5602,7 @@ begin
     'users', (select count(*) from auth.users),
     'channels', (select count(*) from st),
     'states', jsonb_build_object(
+      'paused', (select count(*) from st where state = 'paused'),
       'cataloguing', (select count(*) from st where state = 'cataloguing'),
       'collecting', (select count(*) from st where state = 'collecting'),
       'failing', (select count(*) from st where state = 'failing'),
@@ -5745,6 +5813,58 @@ begin
   return jsonb_build_object('ok', true);
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_request_channel_work(p_channels uuid[], p_kind text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  queued integer := 0;
+  skipped integer := 0;
+  ch record;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_kind not in ('collect', 'discover') or p_channels is null
+     or cardinality(p_channels) = 0 or cardinality(p_channels) > 500 then
+    raise exception 'invalid_request' using errcode='22023';
+  end if;
+
+  for ch in
+    select c.id, c.workspace_id, c.paused_at from public.channels c
+     where c.id = any(p_channels)
+  loop
+    if ch.paused_at is not null
+       or exists (select 1 from public.jobs j
+                   where j.workspace_id = ch.workspace_id and j.channel_id = ch.id
+                     and j.type = p_kind and j.status in ('queued', 'running'))
+       or (p_kind = 'collect' and not exists (
+             select 1 from public.video_selections s
+              where s.workspace_id = ch.workspace_id and s.channel_id = ch.id)) then
+      skipped := skipped + 1;
+      continue;
+    end if;
+    begin
+      insert into public.jobs(workspace_id, channel_id, type, dedupe_key)
+      values (ch.workspace_id, ch.id, p_kind, p_kind || '-admin-' || gen_random_uuid()::text);
+    exception when unique_violation then
+      skipped := skipped + 1;
+      continue;
+    end;
+    queued := queued + 1;
+    insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+    values (ch.workspace_id, uid,
+            case p_kind when 'collect' then 'channel_collect_requested'
+                        else 'channel_catalogue_requested' end,
+            'channel', ch.id::text);
+  end loop;
+
+  return jsonb_build_object('queued', queued, 'skipped', skipped);
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_services_health()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5890,6 +6010,95 @@ begin
   ) into report;
 
   return report;
+end $function$
+
+CREATE OR REPLACE FUNCTION public.admin_set_auto_selection(p_channels uuid[], p_initial integer, p_daily integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  changed integer := 0;
+  ch record;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_channels is null or cardinality(p_channels) = 0
+     or cardinality(p_channels) > 500
+     or p_initial is null or p_initial not between 0 and 200
+     or p_daily is null or p_daily not between 0 and 100 then
+    raise exception 'invalid_request' using errcode='22023';
+  end if;
+
+  for ch in
+    select c.id, c.workspace_id, w.created_by
+      from public.channels c
+      join public.workspaces w on w.id = c.workspace_id
+     where c.id = any(p_channels)
+  loop
+    insert into private.channel_auto_selection as a
+           (workspace_id, channel_id, initial_count, daily_cap, created_by)
+    values (ch.workspace_id, ch.id, p_initial, p_daily, ch.created_by)
+    on conflict (workspace_id, channel_id) do update
+       set initial_count = excluded.initial_count,
+           daily_cap = excluded.daily_cap;
+    changed := changed + 1;
+    insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+    values (ch.workspace_id, uid, 'auto_selection_set', 'channel', ch.id::text);
+  end loop;
+
+  return jsonb_build_object('changed', changed);
+end $function$
+
+CREATE OR REPLACE FUNCTION public.admin_set_channels_paused(p_channels uuid[], p_paused boolean)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  changed integer := 0;
+  cancelled integer := 0;
+  ch record;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_channels is null or cardinality(p_channels) = 0
+     or cardinality(p_channels) > 500 or p_paused is null then
+    raise exception 'invalid_request' using errcode='22023';
+  end if;
+
+  for ch in
+    select c.id, c.workspace_id from public.channels c
+     where c.id = any(p_channels)
+       and (c.paused_at is null) = p_paused
+     for update
+  loop
+    update public.channels
+       set paused_at = case when p_paused then now() end,
+           paused_by = case when p_paused then uid end
+     where id = ch.id;
+    changed := changed + 1;
+    if p_paused then
+      with gone as (
+        update public.jobs set status = 'cancelled', error_code = 'channel_paused'
+         where workspace_id = ch.workspace_id and channel_id = ch.id
+           and status = 'queued'
+        returning 1)
+      select cancelled + count(*) into cancelled from gone;
+    end if;
+    insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+    values (ch.workspace_id, uid,
+            case when p_paused then 'channel_paused' else 'channel_resumed' end,
+            'channel', ch.id::text);
+  end loop;
+
+  return jsonb_build_object('changed', changed, 'cancelled_jobs', cancelled);
 end $function$
 
 CREATE OR REPLACE FUNCTION public.admin_start_impersonation(p_target_user_id uuid)
@@ -8201,6 +8410,8 @@ grant EXECUTE on function admin_audit(integer) to "authenticated";
 grant EXECUTE on function admin_audit(integer) to "postgres";
 grant EXECUTE on function admin_channels() to "authenticated";
 grant EXECUTE on function admin_channels() to "postgres";
+grant EXECUTE on function admin_channels_console() to "authenticated";
+grant EXECUTE on function admin_channels_console() to "postgres";
 grant EXECUTE on function admin_console_overview() to "authenticated";
 grant EXECUTE on function admin_console_overview() to "postgres";
 grant EXECUTE on function admin_import_channel(text,text,text,text,integer,integer) to "authenticated";
@@ -8211,8 +8422,14 @@ grant EXECUTE on function admin_plan_catalogue() to "authenticated";
 grant EXECUTE on function admin_plan_catalogue() to "postgres";
 grant EXECUTE on function admin_record_user_action(uuid,text) to "authenticated";
 grant EXECUTE on function admin_record_user_action(uuid,text) to "postgres";
+grant EXECUTE on function admin_request_channel_work(uuid[],text) to "authenticated";
+grant EXECUTE on function admin_request_channel_work(uuid[],text) to "postgres";
 grant EXECUTE on function admin_services_health() to "authenticated";
 grant EXECUTE on function admin_services_health() to "postgres";
+grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "authenticated";
+grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "postgres";
+grant EXECUTE on function admin_set_channels_paused(uuid[],boolean) to "authenticated";
+grant EXECUTE on function admin_set_channels_paused(uuid[],boolean) to "postgres";
 grant EXECUTE on function admin_start_impersonation(uuid) to "authenticated";
 grant EXECUTE on function admin_start_impersonation(uuid) to "postgres";
 grant EXECUTE on function admin_stop_impersonation(uuid) to "authenticated";
