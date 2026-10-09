@@ -4,7 +4,7 @@
  * the person's account file (`AccountFile.tsx`): their details, password
  * help, roles, plans and history, each change with its own RPC and guard.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminUser } from "@sentiment/contracts";
 import { useStrings } from "../strings";
@@ -47,6 +47,17 @@ export function AdminUsersPage() {
     queryFn: () => (demo ? Promise.resolve(DEMO_USERS) : readAdminUsers()),
     enabled: admin,
   });
+
+  // `?u=<id>`: the search box's way to one person's file.
+  const wanted =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("u")
+      : null;
+  useEffect(() => {
+    if (!wanted || demo || !list.data) return;
+    const found = list.data.find((u) => u.id === wanted);
+    if (found) setManaging(found);
+  }, [wanted, demo, list.data]);
 
   let body: ReactNode;
   if (!admin)

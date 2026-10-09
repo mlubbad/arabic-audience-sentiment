@@ -118,4 +118,13 @@ describe("AdminUsersPage", () => {
       "client1@example.com",
     );
   });
+
+  it("opens the file the search box asked for with ?u=", async () => {
+    window.history.replaceState({}, "", "/admin/users?u=user-client-1");
+    mount();
+    expect(await screen.findByTestId("account-file")).toHaveTextContent(
+      "client1@example.com",
+    );
+    window.history.replaceState({}, "", "/");
+  });
 });
