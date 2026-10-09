@@ -1144,6 +1144,50 @@ CREATE OR REPLACE FUNCTION auth.uid()
  STABLE
 AS $function$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$function$
 
+CREATE OR REPLACE FUNCTION private.admin_channel_states()
+ RETURNS TABLE(workspace_id uuid, channel_id uuid, state text, last_ok_at timestamp with time zone, last_error text, last_run_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select c.workspace_id, c.id,
+         case
+           when exists (select 1 from public.jobs j
+                         where j.workspace_id = c.workspace_id and j.channel_id = c.id
+                           and j.type = 'discover' and j.status in ('queued', 'running'))
+             then 'cataloguing'
+           when exists (select 1 from public.jobs j
+                         where j.workspace_id = c.workspace_id and j.channel_id = c.id
+                           and j.type = 'collect' and j.status in ('queued', 'running'))
+             then 'collecting'
+           when lr.status = 'failed' then 'failing'
+           when c.catalogued_at is null then 'new'
+           when not exists (select 1 from public.video_selections s
+                             where s.workspace_id = c.workspace_id and s.channel_id = c.id)
+             then 'waiting'
+           when lc.ok_at is null or lc.ok_at < now() - interval '48 hours' then 'stale'
+           else 'healthy'
+         end,
+         lc.ok_at,
+         case when lr.status = 'failed' then lr.error_code end,
+         lr.started_at
+    from public.channels c
+    left join lateral (
+      select sr.status, sr.error_code, sr.started_at
+        from public.sync_runs sr
+       where sr.channel_id = c.id
+       order by sr.started_at desc
+       limit 1) lr on true
+    left join lateral (
+      select coalesce(sr.ended_at, sr.started_at) as ok_at
+        from public.sync_runs sr
+       where sr.channel_id = c.id
+         and sr.mode = 'collect'
+         and sr.status in ('succeeded', 'partial')
+       order by sr.started_at desc
+       limit 1) lc on true
+$function$
+
 CREATE OR REPLACE FUNCTION private.adopt_channel_catalogue(w uuid, c uuid)
  RETURNS integer
  LANGUAGE plpgsql
@@ -5471,6 +5515,75 @@ begin
     order by w.created_at desc, c.external_channel_id;
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_console_overview()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '30s'
+AS $function$
+declare
+  result jsonb;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+
+  with st as (select * from private.admin_channel_states())
+  select jsonb_build_object(
+    'workspaces', (select count(*) from public.workspaces),
+    'users', (select count(*) from auth.users),
+    'channels', (select count(*) from st),
+    'states', jsonb_build_object(
+      'cataloguing', (select count(*) from st where state = 'cataloguing'),
+      'collecting', (select count(*) from st where state = 'collecting'),
+      'failing', (select count(*) from st where state = 'failing'),
+      'new', (select count(*) from st where state = 'new'),
+      'waiting', (select count(*) from st where state = 'waiting'),
+      'stale', (select count(*) from st where state = 'stale'),
+      'healthy', (select count(*) from st where state = 'healthy')),
+    'funnel', jsonb_build_object(
+      'videos', (select count(*) from public.videos),
+      'selected', (select count(*) from public.video_selections),
+      'comments', (select coalesce(sum(total), 0) from private.video_comment_stats),
+      'analysed', (select coalesce(sum(analysed), 0) from private.video_comment_stats)),
+    'worker', jsonb_build_object(
+      'fresh', coalesce((select max(last_seen_at) >= now() - interval '3 minutes'
+                           from public.worker_seen), false),
+      'last_seen', (select max(last_seen_at) from public.worker_seen),
+      'queued', (select count(*) from public.jobs where status = 'queued'),
+      'running', (select count(*) from public.jobs where status = 'running')),
+    'attention', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'channel_id', a.channel_id,
+               'workspace_id', a.workspace_id,
+               'workspace_name', w.name,
+               'title', c.title,
+               'handle', c.handle,
+               'state', a.state,
+               'error_code', a.last_error,
+               'last_ok_at', a.last_ok_at,
+               'last_run_at', a.last_run_at)
+             order by (a.state = 'failing') desc, a.last_run_at desc nulls last)
+        from (select * from st where state in ('failing', 'stale')
+               order by (state = 'failing') desc, last_run_at desc nulls last
+               limit 20) a
+        join public.channels c on c.id = a.channel_id
+        join public.workspaces w on w.id = a.workspace_id), '[]'::jsonb),
+    'activity', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'at', e.created_at,
+               'action', e.action,
+               'actor_email', u.email,
+               'workspace_name', w.name)
+             order by e.created_at desc)
+        from (select * from public.audit_events order by created_at desc limit 10) e
+        left join auth.users u on u.id = e.actor_id
+        left join public.workspaces w on w.id = e.workspace_id), '[]'::jsonb))
+  into result;
+  return result;
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_import_channel(p_external text, p_title text DEFAULT NULL::text, p_handle text DEFAULT NULL::text, p_platform text DEFAULT 'youtube'::text, p_initial_videos integer DEFAULT 20, p_daily_new_videos integer DEFAULT 5)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -7876,6 +7989,7 @@ grant EXECUTE on function auth.uid() to "anon";
 grant EXECUTE on function auth.uid() to "authenticated";
 grant EXECUTE on function auth.uid() to "postgres";
 grant EXECUTE on function auth.uid() to "public";
+grant EXECUTE on function private.admin_channel_states() to "postgres";
 grant EXECUTE on function private.adopt_channel_catalogue(uuid,uuid) to "postgres";
 grant EXECUTE on function private.adopt_channel_catalogue(uuid,uuid) to "service_role";
 grant EXECUTE on function private.adopt_channel_content(uuid,uuid) to "postgres";
@@ -8087,6 +8201,8 @@ grant EXECUTE on function admin_audit(integer) to "authenticated";
 grant EXECUTE on function admin_audit(integer) to "postgres";
 grant EXECUTE on function admin_channels() to "authenticated";
 grant EXECUTE on function admin_channels() to "postgres";
+grant EXECUTE on function admin_console_overview() to "authenticated";
+grant EXECUTE on function admin_console_overview() to "postgres";
 grant EXECUTE on function admin_import_channel(text,text,text,text,integer,integer) to "authenticated";
 grant EXECUTE on function admin_import_channel(text,text,text,text,integer,integer) to "postgres";
 grant EXECUTE on function admin_ops() to "authenticated";

@@ -8,8 +8,8 @@
  * one sentence until `is_platform_admin()` answers. The hiding is a
  * courtesy; the database is the gate, as every RPC checks on its own.
  *
- * `AdminTabs` is the strip under each page head: the operator's five
- * screens, as `NavLink`s so the address bar and the highlight agree. One
+ * `AdminTabs` is the strip under each page head: the operator's
+ * screens, the home first, as `NavLink`s so the address bar and the highlight agree. One
  * rail entry, `/admin`, and its subsections inside — the rail is the
  * product's map, and the admin area is one room in it.
  */
@@ -23,6 +23,7 @@ import { failureCode } from "../failure";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 import { Loading, LoadError } from "../pageStates/PageStates";
+import { AdminCommandPalette } from "./AdminCommandPalette";
 // Every admin page renders through this shell, so the admin styles travel with
 // it. They lived only in AdminPage, so a sub-page opened directly (or
 // refreshed) painted unstyled until /admin itself had been visited
@@ -85,7 +86,8 @@ export function useAdminShell(): {
 }
 
 const TABS = [
-  { to: "/admin", key: "adminTabWorkspaces" },
+  { to: "/admin", key: "adminTabHome" },
+  { to: "/admin/workspaces", key: "adminTabWorkspaces" },
   { to: "/admin/users", key: "adminTabUsers" },
   { to: "/admin/channels", key: "adminTabChannels" },
   { to: "/admin/plans", key: "adminTabPlans" },
@@ -101,22 +103,26 @@ export function AdminTabs() {
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("demo");
   return (
-    <nav className="admin-tabs" aria-label={S.adminTabsLabel}>
-      {TABS.map((t) => (
-        <NavLink
-          key={t.to}
-          to={demo ? `${t.to}?demo=1` : t.to}
-          end
-          className={({ isActive }: { isActive: boolean }) =>
-            `admin-tab${isActive ? " admin-tab-active" : ""}`
-          }
-          // `end` so /admin/users does not light /admin too; /admin itself
-          // has no deeper route, so its tab still matches alone.
-        >
-          {S[t.key]}
-        </NavLink>
-      ))}
-    </nav>
+    <div className="admin-tabs-row">
+      <nav className="admin-tabs" aria-label={S.adminTabsLabel}>
+        {TABS.map((t) => (
+          <NavLink
+            key={t.to}
+            to={demo ? `${t.to}?demo=1` : t.to}
+            end
+            className={({ isActive }: { isActive: boolean }) =>
+              `admin-tab${isActive ? " admin-tab-active" : ""}`
+            }
+            // `end` so /admin/users does not light /admin too; /admin itself
+            // has no deeper route, so its tab still matches alone.
+          >
+            {S[t.key]}
+          </NavLink>
+        ))}
+      </nav>
+      {/* Live data only: the demo has no server for the lists. */}
+      {!demo && <AdminCommandPalette />}
+    </div>
   );
 }
 

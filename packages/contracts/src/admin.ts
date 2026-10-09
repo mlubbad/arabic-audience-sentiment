@@ -172,3 +172,78 @@ export const AdminAuditEventSchema = z
 export const AdminAuditEventsSchema = z.array(AdminAuditEventSchema);
 
 export type AdminAuditEvent = z.infer<typeof AdminAuditEventSchema>;
+
+/** A channel's state as `private.admin_channel_states()` names it: the first
+ *  of these that applies. */
+export const ChannelStateSchema = z.enum([
+  "cataloguing",
+  "collecting",
+  "failing",
+  "new",
+  "waiting",
+  "stale",
+  "healthy",
+]);
+export type ChannelState = z.infer<typeof ChannelStateSchema>;
+
+/** `admin_console_overview()`: the owner console's home in one read. */
+export const AdminConsoleOverviewSchema = z
+  .object({
+    workspaces: z.number().int().nonnegative(),
+    users: z.number().int().nonnegative(),
+    channels: z.number().int().nonnegative(),
+    states: z
+      .object({
+        cataloguing: z.number().int().nonnegative(),
+        collecting: z.number().int().nonnegative(),
+        failing: z.number().int().nonnegative(),
+        new: z.number().int().nonnegative(),
+        waiting: z.number().int().nonnegative(),
+        stale: z.number().int().nonnegative(),
+        healthy: z.number().int().nonnegative(),
+      })
+      .strict(),
+    funnel: z
+      .object({
+        videos: z.number().int().nonnegative(),
+        selected: z.number().int().nonnegative(),
+        comments: z.number().int().nonnegative(),
+        analysed: z.number().int().nonnegative(),
+      })
+      .strict(),
+    worker: z
+      .object({
+        fresh: z.boolean(),
+        last_seen: timestamp.nullable(),
+        queued: z.number().int().nonnegative(),
+        running: z.number().int().nonnegative(),
+      })
+      .strict(),
+    attention: z.array(
+      z
+        .object({
+          channel_id: z.string().uuid(),
+          workspace_id: z.string().uuid(),
+          workspace_name: z.string(),
+          title: z.string().nullable(),
+          handle: z.string().nullable(),
+          state: ChannelStateSchema,
+          error_code: z.string().nullable(),
+          last_ok_at: timestamp.nullable(),
+          last_run_at: timestamp.nullable(),
+        })
+        .strict(),
+    ),
+    activity: z.array(
+      z
+        .object({
+          at: timestamp,
+          action: z.string(),
+          actor_email: z.string().nullable(),
+          workspace_name: z.string().nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type AdminConsoleOverview = z.infer<typeof AdminConsoleOverviewSchema>;

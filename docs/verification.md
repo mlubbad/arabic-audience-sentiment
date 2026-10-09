@@ -1,5 +1,18 @@
 # Verification
 
+## 2026-10-09 — Owner console phase 1a: the home at `/admin`, and Ctrl+K
+
+Owner approval (2026-10-09: "ابدأ المرحلة 1 من واجهة المالك"). Phase 1 is split: 1a (this) is the home and the search box; 1b is the channels console. `/admin` is now the home; the workspaces table moved to `/admin/workspaces` (its tab, and the e2e demo path, follow). One migration (`20261016000000_admin_console_overview.sql`): `private.admin_channel_states()` names each channel's state once (cataloguing, collecting, failing, new, waiting, stale, healthy, first that applies), and `admin_console_overview()` reads the home in one call with its own `statement_timeout=30s`. The funnel sums `private.video_comment_stats`, never `comments`. No quota meters: no table measures YouTube or Apify units yet.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_console_overview.test.ts` | 7 passed: seven imported channels, one per state, each counted once; attention lists failing before stale with error and workspace; funnel 3 / 3 / 140 / 100 from the stats; latest audit row first with its actor; worker queue 2 queued; non-admin `forbidden`, the states helper unreadable by `authenticated`, anon `permission denied`; `proconfig` carries `statement_timeout=30s`. |
+| Mutations: stale window 48 h → 96 h; failing rule dropped; timeout removed | `2 failed`; `2 failed`; `1 failed`. |
+| `AdminHomePage.test.tsx`, `AdminCommandPalette.test.tsx`, `AdminUsersPage.test.tsx` | 6, 5, 3 passed: tiles, states in trouble-first order, attention with `/dashboard?ws=` link, activity in words, empty attention sentence, demo reads nothing; Arabic letter forms folded (أ/ا, ى/ي, diacritics); every word must match; Ctrl+K opens, Enter on a channel goes to its workspace, an account goes to `/admin/users?u=`, which opens its file. |
+| Existing admin suites after the palette joined the tab strip | 166 passed. |
+| `npm run check` | exit 0: unit 1199, DB 540, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| Not checked here | The page in a browser against the live project (no session in the container); CI's e2e runs the moved demo path and the forbidden path at `/admin`. |
+
 ## 2026-10-09 — `admin-users`: the account file's actions that need the auth admin API
 
 Owner approval (2026-10-09, "نفّذ الخطة كما هي"): a reset link the owner hands over, suspension and its lifting, a manual email confirmation, and an email change. #99 (account file and phase 0) merged as `2a6e2c6`; its Deploy Preview run applied the migrations and the live site check passed, before this work was pushed.

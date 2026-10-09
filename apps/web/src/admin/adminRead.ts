@@ -12,12 +12,14 @@
 import {
   AdminAuditEventsSchema,
   AdminChannelsSchema,
+  AdminConsoleOverviewSchema,
   AdminOpsSchema,
   AdminUserDetailSchema,
   AdminUsersSchema,
   ServicesHealthReportSchema,
   type AdminAuditEvent,
   type AdminChannel,
+  type AdminConsoleOverview,
   type AdminOps,
   type AdminUser,
   type AdminUserDetail,
@@ -191,6 +193,13 @@ export async function setAdminMemberRole(
     new_role: role,
   });
   if (error) throw error;
+}
+
+/** The owner console's home: the whole platform in one read. */
+export async function readAdminConsoleOverview(): Promise<AdminConsoleOverview> {
+  const { data, error } = await supabase!.rpc("admin_console_overview");
+  if (error) throw rpcFailure(error);
+  return AdminConsoleOverviewSchema.parse(data);
 }
 
 export async function readAdminChannels(): Promise<AdminChannel[]> {

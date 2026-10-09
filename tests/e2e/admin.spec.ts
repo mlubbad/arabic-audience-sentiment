@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 
 /**
- * The operator's page, driven on its demo (`/admin?demo=1`): six fixture
+ * The operator's page, driven on its demo (`/admin/workspaces?demo=1`): six fixture
  * workspaces in local state, every lever replayed through `reduceAdminDemo`,
  * which refuses exactly what the migrations refuse and in the same shape —
  * so the sentence a row says here is the sentence the live page would say.
@@ -40,7 +40,7 @@ const BILLING_ROOT =
   "مساحات أخرى تُفوتر تحت هذه المساحة؛ لا يمكن حذفها ما دامت جذرًا للفوترة.";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/admin?demo=1");
+  await page.goto("/admin/workspaces?demo=1");
   await expect(rows(page)).toHaveCount(6);
 });
 

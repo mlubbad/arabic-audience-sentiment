@@ -90,6 +90,10 @@ const AdminPage = lazy(() =>
 );
 // The observability pages the roadmap's phase one adds: read-only screens
 // beside the operator's workspace table, one room in the rail's map.
+// The owner console's home: the whole platform in one read (phase 1).
+const AdminHome = lazy(() =>
+  import("./admin/AdminHomePage").then((m) => ({ default: m.AdminHomePage })),
+);
 const AdminUsers = lazy(() =>
   import("./admin/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })),
 );
@@ -527,7 +531,8 @@ const app = (
                   <Route path="/sync" element={<Sync />} />
                   <Route path="/ops" element={<OpsRedirect />} />
                   <Route path="/connected" element={<Connected />} />
-                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/admin" element={<AdminHome />} />
+                  <Route path="/admin/workspaces" element={<AdminPage />} />
                   <Route path="/admin/users" element={<AdminUsers />} />
                   <Route path="/admin/channels" element={<AdminChannels />} />
                   <Route path="/admin/plans" element={<AdminPlans />} />
