@@ -408,6 +408,7 @@ export const ar = {
   adminHomeAnalysed: "تعليقات محللة",
   adminHomeStates: "حالة القنوات",
   adminChannelStates: {
+    paused: "الجمع موقوف",
     cataloguing: "تُفهرس الآن",
     collecting: "تُجمع الآن",
     failing: "فشل آخر تشغيل",
@@ -679,6 +680,15 @@ export const ar = {
   adminConsoleAutoValue: (initial: number, daily: number) =>
     `آخر ${initial} فيديو، ثم حتى ${daily} جديدة يومياً`,
   adminConsoleAutoNone: "غير مفعّل لهذه القناة",
+  adminConsolePause: "إيقاف الجمع",
+  adminConsolePauseConfirm: "تأكيد إيقاف الجمع",
+  adminConsoleResume: "استئناف الجمع",
+  adminConsolePauseNote:
+    "الإيقاف يمنع المجدول من فهرسة القناة وجمع تعليقاتها وتحليلها، ويلغي ما ينتظر في الطابور. ما جُمع يبقى كما هو، ويستطيع عضو المساحة طلب مزامنة يدوية.",
+  adminConsolePausedDone: "أُوقف الجمع لهذه القناة.",
+  adminConsoleResumedDone:
+    "استؤنف الجمع؛ يلتقطها المجدول في دورته القادمة (قد تتأخر حتى ساعة إن أُلغي لها عمل قبل قليل).",
+  adminConsolePauseFailed: "تعذر تغيير حالة الجمع.",
   adminConsolePrev: "القناة السابقة",
   adminConsoleNext: "القناة التالية",
   adminConsolePosition: (i: number, n: number) => `${i} من ${n}`,

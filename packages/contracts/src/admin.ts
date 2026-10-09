@@ -176,6 +176,7 @@ export type AdminAuditEvent = z.infer<typeof AdminAuditEventSchema>;
 /** A channel's state as `private.admin_channel_states()` names it: the first
  *  of these that applies. */
 export const ChannelStateSchema = z.enum([
+  "paused",
   "cataloguing",
   "collecting",
   "failing",
@@ -194,6 +195,7 @@ export const AdminConsoleOverviewSchema = z
     channels: z.number().int().nonnegative(),
     states: z
       .object({
+        paused: z.number().int().nonnegative(),
         cataloguing: z.number().int().nonnegative(),
         collecting: z.number().int().nonnegative(),
         failing: z.number().int().nonnegative(),

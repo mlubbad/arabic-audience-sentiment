@@ -28,6 +28,7 @@ const OVERVIEW: AdminConsoleOverview = {
   users: 12,
   channels: 101,
   states: {
+    paused: 2,
     cataloguing: 4,
     collecting: 2,
     failing: 1,
@@ -103,8 +104,11 @@ describe("AdminHomePage", () => {
     const rows = within(states).getAllByRole("listitem");
     expect(rows[0]).toHaveTextContent(ar.adminChannelStates.failing!);
     expect(rows[0]).toHaveTextContent("1");
-    expect(rows.at(-1)).toHaveTextContent(ar.adminChannelStates.healthy!);
-    expect(rows.at(-1)).toHaveTextContent("90");
+    expect(rows.at(-2)).toHaveTextContent(ar.adminChannelStates.healthy!);
+    expect(rows.at(-2)).toHaveTextContent("90");
+    // Paused last: set aside on purpose, not trouble.
+    expect(rows.at(-1)).toHaveTextContent(ar.adminChannelStates.paused!);
+    expect(rows.at(-1)).toHaveTextContent("2");
   });
 
   it("lists what needs the owner, with the error and the way into its workspace", async () => {

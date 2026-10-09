@@ -1,5 +1,18 @@
 # Verification
 
+## 2026-10-09 — Owner console phase 2, step 1: pausing a channel's collection
+
+Owner approval (2026-10-09: "ابدأ بإيقاف الجمع واستئنافه"). One migration (`20261018000000_channel_pause.sql`): `channels.paused_at` / `paused_by` (a mark, not a change of `status`, so resuming needs no memory); `admin_set_channels_paused(uuid[], bool)` (admin only, up to 500 channels, cancels queued jobs on pause, one audit row per channel changed); `schedule_due_work` and `auto_select_videos` rebuilt from 20261012000000 with one guard each; `admin_channel_states()` names `paused` first; `admin_console_overview()` counts it. A member can still sync by hand. The channel panel pauses after a confirming press and resumes in one.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_console_overview.test.ts` | 14 passed (4 new): pause cancels the one queued collect, the home counts 1 paused / 0 collecting, the trail's latest row is `channel_paused` by the owner, a second pause changes nothing; the scheduler queues no collect for a paused stale channel and one after resume; the automatic selection picks 0 while paused and 1 after; non-admin `forbidden`, anon `permission denied`, empty list `invalid_request`. |
+| Mutations: scheduler filter dropped; selection guard dropped; queued-job cancel disabled | `1 failed` each. |
+| `AdminChannelsPage.test.tsx`, admin suites | 7 passed (2 new: pause needs the confirming press; resume is one press and a refusal is named); admin suites 189 passed. |
+| `npx playwright test` locally (Chromium 1194, uncommitted config) | 126 passed, 5 skipped. |
+| `npm run check` | exit 0: unit 1210, DB 547, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| Known limits | A job cancelled by the pause holds the next one of its kind back for up to an hour after resume (`enqueue_scheduled`'s 60-minute rule). Between the migration and the new frontend landing, the old home page refuses the overview's new `paused` key (strict contract); the deploy lands both minutes apart. |
+
 ## 2026-10-09 — Owner console phase 1b: the channels console at `/admin/channels`
 
 Owner request (2026-10-09: "ابدأ لوحة القنوات"). One migration (`20261017000000_admin_channels_console.sql`): `admin_channels_console()` gives every channel its state from `private.admin_channel_states()` (the home's own), the workspace and whose it is (the caller's, or a customer's and their email), catalogued / selected / collected / analysed counts aggregated once per table (comments from `private.video_comment_stats`), and the automatic selection numbers; its own `statement_timeout=30s`. `admin_channels()` is unchanged (the search box and its tests read it). The page: state chips with counts, account filter, folded search, four orders (trouble first by default), all in the address (`?state=&owner=&q=&sort=`), and a side panel with the way into the workspace and next / previous. The home's state counts now link to `/admin/channels?state=…`. Read only; bulk actions and a pause state are phase 2.
