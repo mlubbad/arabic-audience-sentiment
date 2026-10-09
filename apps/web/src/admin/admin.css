@@ -651,3 +651,116 @@
   margin-inline-start: auto;
   white-space: nowrap;
 }
+
+/* ---- Account file (users page side panel) ---- */
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.ui-dialog-content.admin-account-sheet {
+  width: min(600px, 100vw);
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+.admin-account {
+  display: grid;
+  gap: var(--space-4);
+}
+.admin-account-head {
+  display: grid;
+  gap: var(--space-1);
+}
+.admin-account-head strong {
+  font-size: var(--fs-body);
+  color: var(--text-1);
+}
+.admin-account-head small,
+.admin-account-muted {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.admin-account-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.admin-account-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--fs-small);
+}
+.admin-account-facts dt {
+  color: var(--text-3);
+}
+.admin-account-facts dd {
+  margin: 0;
+  color: var(--text-1);
+}
+.admin-account-section {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.admin-account-section h3 {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-1);
+}
+.admin-account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-2);
+}
+.admin-account-callout {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-2);
+  background: var(--bg-muted);
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+.admin-account-ok,
+.admin-account-error {
+  margin: 0;
+  font-size: var(--fs-small);
+}
+.admin-account-ok {
+  color: var(--color-success);
+}
+.admin-account-error {
+  color: var(--color-danger);
+}
+.admin-account-section > button {
+  justify-self: start;
+}
+.admin-account-list,
+.admin-account-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--fs-small);
+}
+.admin-account-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+.admin-account-history li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+}
+.admin-account-history time {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}

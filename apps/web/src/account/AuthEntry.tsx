@@ -23,6 +23,7 @@ import type { AuthAction } from "../authMessages";
 import type { Provider, ProviderId } from "../authProviders";
 import { useGoogleOneTap } from "../googleOneTap";
 import { setupSteps } from "../setup";
+import { RESET_PATH } from "./recoveryLanding";
 import { useStrings } from "../strings";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -114,6 +115,14 @@ export function AuthEntry({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            {/* A plain link: this form is also rendered outside the router
+                (the sign-in surface's own tests), and the reset page is a
+                rare, whole-page step. */}
+            {!joining && (
+              <a href={RESET_PATH} className="db-forgot">
+                {S.forgotPassword}
+              </a>
+            )}
           </div>
           {feedback}
           <Button

@@ -13,12 +13,14 @@ import {
   AdminAuditEventsSchema,
   AdminChannelsSchema,
   AdminOpsSchema,
+  AdminUserDetailSchema,
   AdminUsersSchema,
   ServicesHealthReportSchema,
   type AdminAuditEvent,
   type AdminChannel,
   type AdminOps,
   type AdminUser,
+  type AdminUserDetail,
   type ServiceHealthItem,
   type ServicesHealthReport,
   type ServiceStatus,
@@ -49,6 +51,75 @@ export async function readAdminUsers(): Promise<AdminUser[]> {
   const { data, error } = await supabase!.rpc("admin_users");
   if (error) throw rpcFailure(error);
   return AdminUsersSchema.parse(data);
+}
+
+/** One person for the account file. */
+export async function readAdminUserDetail(
+  userId: string,
+): Promise<AdminUserDetail> {
+  const { data, error } = await supabase!.rpc("admin_user_detail", {
+    p_user: userId,
+  });
+  if (error) throw rpcFailure(error);
+  return AdminUserDetailSchema.parse(data);
+}
+
+export type AdminProfileInput = {
+  display_name: string;
+  organization: string;
+  phone: string;
+  admin_note: string;
+};
+
+/** The account file's writes are thrown as they came: the page reads the
+ *  database's own refusal (`profile_too_long`) from the message, which for a
+ *  raised exception is the exception's text and nothing else. */
+export async function saveAdminUserProfile(
+  userId: string,
+  p: AdminProfileInput,
+): Promise<void> {
+  const { error } = await supabase!.rpc("admin_update_user_profile", {
+    p_user: userId,
+    p_display_name: p.display_name,
+    p_organization: p.organization,
+    p_phone: p.phone,
+    p_admin_note: p.admin_note,
+  });
+  if (error) throw error;
+}
+
+/** A password reset link to the person's own inbox, through the same
+ *  `/recover` door their "forgot your password?" uses, then a row in the
+ *  trail saying the owner sent it. The link lands on `/reset-password`. */
+export async function sendPasswordReset(
+  userId: string,
+  email: string,
+): Promise<void> {
+  const db = supabase!;
+  const { error } = await db.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  if (error) throw error;
+  const recorded = await db.rpc("admin_record_user_action", {
+    p_user: userId,
+    p_action: "password_reset_sent",
+  });
+  if (recorded.error) throw recorded.error;
+}
+
+/** A member's role in one workspace, through the function the workspace's
+ *  own share dialog uses: analyst or viewer, never the owner's seat. */
+export async function setAdminMemberRole(
+  workspaceId: string,
+  userId: string,
+  role: "analyst" | "viewer",
+): Promise<void> {
+  const { error } = await supabase!.rpc("update_workspace_account_role", {
+    w: workspaceId,
+    target_user_id: userId,
+    new_role: role,
+  });
+  if (error) throw error;
 }
 
 export async function readAdminChannels(): Promise<AdminChannel[]> {

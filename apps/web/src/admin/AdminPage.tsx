@@ -49,7 +49,7 @@ import { WorkspaceRow, type AdminAction } from "./WorkspaceRow";
 import "../pages.css";
 import "./admin.css";
 
-async function readWorkspaces() {
+export async function readWorkspaces() {
   const { data, error } = await supabase!.rpc("admin_workspaces");
   // Thrown as it came: the sentence is chosen where it is shown, from the
   // code alone — never from the text, which can carry the request URL.
@@ -208,12 +208,15 @@ export function AdminPage() {
  *  that show its effect are re-read — this table, and every plan card and
  *  panel, so an admin changing their own workspace's plan sees the rail
  *  change with it. */
-function LiveWorkspaces({
+export function LiveWorkspaces({
   rows,
   catalogue,
+  stacked,
 }: {
   rows: AdminWorkspace[];
   catalogue: { key: string; title_ar: string; title_en: string }[];
+  /** Cards whatever the screen: the account file is a narrow panel. */
+  stacked?: boolean;
 }) {
   const queryClient = useQueryClient();
   const act = async (action: AdminAction) => {
@@ -232,7 +235,9 @@ function LiveWorkspaces({
       queryClient.invalidateQueries({ queryKey: ["plan"] }),
     ]);
   };
-  return <Workspaces rows={rows} catalogue={catalogue} act={act} />;
+  return (
+    <Workspaces rows={rows} catalogue={catalogue} act={act} stacked={stacked} />
+  );
 }
 
 /** The demo table: the fixture's rows in local state, every lever a pure
@@ -268,15 +273,18 @@ function Workspaces({
   catalogue,
   act,
   readFootprint,
+  stacked: forceStacked,
 }: {
   rows: AdminWorkspace[];
   catalogue: { key: string; title_ar: string; title_en: string }[];
   act: (action: AdminAction) => Promise<void>;
   readFootprint?: (w: AdminWorkspace) => Promise<Footprint> | Footprint;
+  stacked?: boolean;
 }) {
   const S = useStrings();
   const locale = useLocale();
-  const stacked = useMediaQuery("(max-width: 760px)");
+  const narrow = useMediaQuery("(max-width: 760px)");
+  const stacked = forceStacked ?? narrow;
   const rows = adminRows(list, S);
   const options = adminPlanOptions(catalogue, locale);
   const keys = options.map((o) => o.key);

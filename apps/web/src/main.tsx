@@ -61,6 +61,7 @@ import { ImpersonationBanner } from "./ImpersonationBanner";
 import { ImpersonationProvider, useImpersonation } from "./impersonation";
 import { TourProvider } from "./tour/TourProvider";
 import { TourEntry } from "./tour/TourEntry";
+import { RESET_PATH, useRecoveryLanding } from "./account/recoveryLanding";
 const Dashboard = lazy(() =>
   import("./dashboard/Dashboard").then((m) => ({ default: m.Dashboard })),
 );
@@ -72,6 +73,11 @@ const Sync = lazy(() =>
 );
 const Account = lazy(() =>
   import("./account/Account").then((m) => ({ default: m.Account })),
+);
+const ResetPassword = lazy(() =>
+  import("./account/ResetPassword").then((m) => ({
+    default: m.ResetPassword,
+  })),
 );
 // `PricingPage`, not `Pricing`: `pricing.ts` (the words) already exists, and
 // on a case-insensitive filesystem `./Pricing` resolves to it.
@@ -291,6 +297,7 @@ function AppLayout() {
       railRef.current?.querySelector<HTMLElement>("a, button")?.focus();
   }, [menuOpen]);
   const { pathname, search } = useLocation();
+  useRecoveryLanding(pathname);
   const carried = carriedSearch(search);
   // The same test `ops/Sync.tsx` and `account/Account.tsx` make: the demo
   // is a signed-in shell for the tour's purposes.
@@ -516,6 +523,7 @@ const app = (
                 <Route element={<AppLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/account" element={<Account />} />
+                  <Route path={RESET_PATH} element={<ResetPassword />} />
                   <Route path="/sync" element={<Sync />} />
                   <Route path="/ops" element={<OpsRedirect />} />
                   <Route path="/connected" element={<Connected />} />

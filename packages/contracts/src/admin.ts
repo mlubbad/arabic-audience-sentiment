@@ -41,6 +41,52 @@ export const AdminUsersSchema = z.array(AdminUserSchema);
 
 export type AdminUser = z.infer<typeof AdminUserSchema>;
 
+/** `admin_user_detail(user)`: one person as the owner's account file shows
+ *  them — sign-in facts, the details the owner keeps, every workspace they
+ *  stand in, and the audit rows that name them, newest first. */
+export const AdminUserDetailSchema = z
+  .object({
+    id: z.string().uuid(),
+    email: z.string().nullable(),
+    created_at: timestamp,
+    last_sign_in_at: timestamp.nullable(),
+    email_confirmed_at: timestamp.nullable(),
+    banned_until: timestamp.nullable(),
+    profile: z
+      .object({
+        display_name: z.string().nullable(),
+        organization: z.string().nullable(),
+        phone: z.string().nullable(),
+        admin_note: z.string().nullable(),
+        updated_at: timestamp.nullable(),
+      })
+      .strict(),
+    memberships: z.array(
+      z
+        .object({
+          workspace_id: z.string().uuid(),
+          workspace_name: z.string(),
+          role: z.string(),
+          created_by_user: z.boolean(),
+        })
+        .strict(),
+    ),
+    history: z.array(
+      z
+        .object({
+          at: timestamp,
+          action: z.string(),
+          actor_email: z.string().nullable(),
+          by_self: z.boolean().nullable(),
+          workspace_name: z.string().nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>;
+
 /** One row of `admin_channels()`: a channel, the workspace it feeds, how much
  *  has been collected through it, and the verdict of its last sync run —
  *  null together when the channel has never run one. */
@@ -110,7 +156,9 @@ export type AdminOps = z.infer<typeof AdminOpsSchema>;
 export const AdminAuditEventSchema = z
   .object({
     id: z.string().uuid(),
-    workspace_id: z.string().uuid(),
+    // Null for an event about a person rather than a workspace: the account
+    // file's edits and password links (`admin_audit` names it "Platform").
+    workspace_id: z.string().uuid().nullable(),
     workspace_name: z.string(),
     actor_id: z.string().uuid().nullable(),
     actor_email: z.string().email().nullable(),
