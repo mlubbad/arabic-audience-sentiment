@@ -23,7 +23,7 @@
 | `npx playwright test` (full e2e, macOS) | 127 passed, 5 skipped of 132 on nine runs (main had 125 passed, 1 failed, 5 skipped; +1 is the new test). One further run printed 126 passed, 5 skipped: one test failed there, and which one is not known, because that output was cut to its last two lines. |
 | Layout at 1280×800 Arabic and 901×800 English, popover open | Search and both selects on row 1; period, «المزيد», «تطبيق», «إعادة ضبط» together on row 2; the popover opens above them; no horizontal overflow (`scrollWidth − innerWidth = 0`, bar `scrollWidth − clientWidth = 0`). Bar is two rows at every width measured, 1100–1920px; the CSS comment that claimed one row from 1280px is corrected. |
 | `npx vitest run apps/web/src/dashboard` | 14 files, 70 tests passed. |
-| `npm run check` | exit 0: lint, format, typecheck, functions; unit 1199, DB 540, worker 297 passed; build and secret scan passed. |
+| `npm run check` | exit 0: lint, format, typecheck, functions; unit 1199, DB 540, worker 297 passed; build and secret scan passed. After merging main (#102, #103, #105): exit 0, unit 1216, DB 551, worker 297; full e2e 127 passed, 5 skipped of 132. |
 | Not fixed here | The bar's «مُصفّى:» chips are built from the draft values, so they name a choice before «تطبيق» is pressed; filed as its own task. On a 4-vCPU runner with 6 workers, the dashboard's first render can miss the default 5 s `expect` (above); the normal CI run uses fewer workers and passed with it, so it is noted, not changed. |
 
 ## 2026-10-09 — Owner console phase 2, step 2: bulk actions on the channels console
