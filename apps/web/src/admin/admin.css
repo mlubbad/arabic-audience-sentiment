@@ -764,3 +764,16 @@
   font-variant-numeric: tabular-nums;
   direction: ltr;
 }
+.admin-account-subform {
+  display: grid;
+  gap: var(--space-2);
+}
+.admin-account-subform > button,
+.admin-account-section .ui-field > button {
+  justify-self: start;
+}
+.admin-account-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

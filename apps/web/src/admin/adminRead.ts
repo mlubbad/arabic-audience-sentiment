@@ -107,6 +107,77 @@ export async function sendPasswordReset(
   if (recorded.error) throw recorded.error;
 }
 
+export type AdminUserActionName =
+  "recovery_link" | "suspend" | "unsuspend" | "confirm_email" | "change_email";
+
+/** What the account file can say about an `admin-users` answer. */
+export type AdminUserActionCode =
+  | "forbidden"
+  | "user_not_found"
+  | "cannot_suspend_admin"
+  | "no_email"
+  | "email_taken"
+  | "invalid_request"
+  | "not_deployed"
+  | "unavailable";
+
+export class AdminUserActionError extends Error {
+  constructor(readonly code: AdminUserActionCode) {
+    super(code);
+  }
+}
+
+const KNOWN: readonly AdminUserActionCode[] = [
+  "forbidden",
+  "user_not_found",
+  "cannot_suspend_admin",
+  "no_email",
+  "email_taken",
+  "invalid_request",
+];
+
+/** One action of the `admin-users` Edge Function, with the caller's own
+ *  token: the function asks the database whether they are an admin. A 404
+ *  that is not the function's own `user_not_found` is the gateway saying the
+ *  function is not deployed yet — the owner deploys it, so the page says so. */
+export async function adminUserAction(
+  action: AdminUserActionName,
+  userId: string,
+  email?: string,
+): Promise<{ recorded: boolean; link?: string }> {
+  const { data } = await supabase!.auth.getSession();
+  const session = data.session;
+  if (!session) throw new AdminUserActionError("forbidden");
+  let response: Response;
+  try {
+    response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action, user_id: userId, email }),
+      },
+    );
+  } catch {
+    throw new AdminUserActionError("unavailable");
+  }
+  const body = (await response.json().catch(() => ({}))) as {
+    code?: string;
+    recorded?: boolean;
+    link?: string;
+  };
+  if (response.ok)
+    return { recorded: body.recorded !== false, link: body.link };
+  const known = KNOWN.find((c) => c === body.code);
+  if (known) throw new AdminUserActionError(known);
+  if (response.status === 404) throw new AdminUserActionError("not_deployed");
+  throw new AdminUserActionError("unavailable");
+}
+
 /** A member's role in one workspace, through the function the workspace's
  *  own share dialog uses: analyst or viewer, never the owner's seat. */
 export async function setAdminMemberRole(
