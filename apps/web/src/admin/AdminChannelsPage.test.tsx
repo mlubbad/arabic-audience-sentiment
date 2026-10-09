@@ -236,4 +236,115 @@ describe("AdminChannelsPage (channels console)", () => {
       ar.adminConsolePauseFailed,
     );
   });
+
+  it("selects channels, collects them in one request, and reports what was left out", async () => {
+    vi.mocked(adminRead.requestChannelWork).mockResolvedValue({
+      queued: 1,
+      skipped: 1,
+    });
+    mount();
+    await screen.findByTestId("admin-channels");
+    expect(screen.queryByTestId("admin-bulk")).toBeNull();
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: ar.adminBulkSelect("Healthy one") }),
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: ar.adminBulkSelect("Failing one") }),
+    );
+    const bar = screen.getByTestId("admin-bulk");
+    expect(bar).toHaveTextContent(ar.adminBulkSelected(2));
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkCollect }),
+    );
+    expect(adminRead.requestChannelWork).toHaveBeenCalledWith(
+      [ROWS[0]!.id, ROWS[1]!.id],
+      "collect",
+    );
+    expect(await within(bar).findByRole("status")).toHaveTextContent(
+      ar.adminBulkQueued(1, 1),
+    );
+  });
+
+  it("selects every channel shown, and pauses them only after a confirming press", async () => {
+    vi.mocked(adminRead.setChannelsPaused).mockResolvedValue({
+      changed: 2,
+      cancelled_jobs: 3,
+    });
+    mount("/admin/channels?owner=mine");
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: ar.adminBulkSelectAll }),
+    );
+    const bar = screen.getByTestId("admin-bulk");
+    expect(bar).toHaveTextContent(ar.adminBulkSelected(2));
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkPause }),
+    );
+    expect(adminRead.setChannelsPaused).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkPauseConfirm(2) }),
+    );
+    expect(adminRead.setChannelsPaused).toHaveBeenCalledWith(
+      expect.arrayContaining([ROWS[0]!.id, ROWS[1]!.id]),
+      true,
+    );
+    expect(await within(bar).findByRole("status")).toHaveTextContent(
+      ar.adminBulkPaused(2, 3),
+    );
+  });
+
+  it("sets the automatic selection numbers, and refuses numbers out of range", async () => {
+    vi.mocked(adminRead.setAutoSelection).mockResolvedValue({ changed: 1 });
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("checkbox", {
+        name: ar.adminBulkSelect("Customer shop"),
+      }),
+    );
+    const bar = screen.getByTestId("admin-bulk");
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkAuto }),
+    );
+    const initial = within(bar).getByLabelText(ar.adminBulkAutoInitial);
+    await userEvent.clear(initial);
+    await userEvent.type(initial, "500");
+    expect(
+      within(bar).getByRole("button", { name: ar.adminBulkAutoApply }),
+    ).toBeDisabled();
+    await userEvent.clear(initial);
+    await userEvent.type(initial, "10");
+    const daily = within(bar).getByLabelText(ar.adminBulkAutoDaily);
+    await userEvent.clear(daily);
+    await userEvent.type(daily, "2");
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkAutoApply }),
+    );
+    expect(adminRead.setAutoSelection).toHaveBeenCalledWith(
+      [ROWS[2]!.id],
+      10,
+      2,
+    );
+    expect(await within(bar).findByRole("status")).toHaveTextContent(
+      ar.adminBulkAutoDone(1),
+    );
+  });
+
+  it("names a refused bulk action", async () => {
+    vi.mocked(adminRead.requestChannelWork).mockRejectedValue({
+      message: "forbidden",
+    });
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: ar.adminBulkSelect("Healthy one") }),
+    );
+    const bar = screen.getByTestId("admin-bulk");
+    await userEvent.click(
+      within(bar).getByRole("button", { name: ar.adminBulkCatalogue }),
+    );
+    expect(await within(bar).findByRole("alert")).toHaveTextContent(
+      ar.adminBulkFailed,
+    );
+  });
 });

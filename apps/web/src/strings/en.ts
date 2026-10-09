@@ -647,6 +647,11 @@ export const en: Strings = {
     user_unsuspended: "Suspension lifted",
     email_confirmed: "Email confirmed by hand",
     email_changed: "Email changed",
+    channel_paused: "Channel collection paused",
+    channel_resumed: "Channel collection resumed",
+    channel_collect_requested: "Channel collection requested",
+    channel_catalogue_requested: "Channel catalogue refresh requested",
+    auto_selection_set: "Automatic selection numbers set",
     channel_imported: "Channel imported",
   } as Record<string, string>,
   // channels
@@ -685,6 +690,32 @@ export const en: Strings = {
   adminConsoleResumedDone:
     "Collection resumed; the scheduler picks it up on its next round (up to an hour if work was cancelled moments ago).",
   adminConsolePauseFailed: "Could not change the collection state.",
+  adminBulkSelectAll: "Select every channel shown",
+  adminBulkSelect: (name: string) => `Select ${name}`,
+  adminBulkSelected: (n: number) => `${n} channels selected`,
+  adminBulkCollect: "Collect now",
+  adminBulkCatalogue: "Refresh catalogue",
+  adminBulkPause: "Pause collection",
+  adminBulkPauseConfirm: (n: number) => `Confirm pausing ${n} channels`,
+  adminBulkResume: "Resume collection",
+  adminBulkAuto: "Automatic selection…",
+  adminBulkAutoInitial: "First batch (latest N videos)",
+  adminBulkAutoDaily: "New per day",
+  adminBulkAutoApply: "Apply the numbers",
+  adminBulkAutoNote:
+    "The first batch only applies to a channel whose first selection has not run yet; the daily number applies from the next round. A channel with no automatic selection gets one.",
+  adminBulkExport: "Export CSV",
+  adminBulkClear: "Clear selection",
+  adminBulkQueued: (queued: number, skipped: number) =>
+    skipped
+      ? `Work requested for ${queued} channels; ${skipped} left out (paused, already working, or nothing selected).`
+      : `Work requested for ${queued} channels.`,
+  adminBulkPaused: (n: number, jobs: number) =>
+    `Collection paused for ${n} channels; ${jobs} queued jobs cancelled.`,
+  adminBulkResumed: (n: number) => `Collection resumed for ${n} channels.`,
+  adminBulkAutoDone: (n: number) =>
+    `Automatic selection numbers updated for ${n} channels.`,
+  adminBulkFailed: "Could not apply this to the selected channels.",
   adminConsolePrev: "Previous channel",
   adminConsoleNext: "Next channel",
   adminConsolePosition: (i: number, n: number) => `${i} of ${n}`,

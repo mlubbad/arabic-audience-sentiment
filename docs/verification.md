@@ -1,5 +1,18 @@
 # Verification
 
+## 2026-10-09 — Owner console phase 2, step 2: bulk actions on the channels console
+
+Owner request (2026-10-09: "ابدأ الإجراءات الجماعية"). One migration (`20261019000000_admin_bulk_channel_actions.sql`): `admin_request_channel_work(uuid[], 'collect'|'discover')` queues work only where it can run (not paused, nothing of that kind queued or running, and for a collection at least one selected video) and answers queued / skipped; `admin_set_auto_selection(uuid[], initial 0–200, daily 0–100)` sets the numbers, creating them in the name of the workspace's creator where there were none. Both admin only, up to 500 channels, audited per channel. The page: a checkbox per row and one for every channel shown; a bar with collect now, refresh catalogue, pause (confirming press), resume, automatic selection numbers, CSV export (byte-order mark, formula-safe), clear. Bulk delete is not here: it waits for the owner's own decision.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_console_overview.test.ts` | 18 passed (4 new): collect queued for the two channels with selections, skipped for one with none and one paused, and skipped when already queued; latest trail row `channel_collect_requested` by the owner; a catalogue run queued; numbers 10 / 3 set on a channel that had none and one that had, the new one in the workspace creator's name; bad kind, 201 initial, non-admin refused. |
+| Mutations: paused not skipped; collect without selections not skipped; numbers in the caller's name | `1 failed` each. |
+| `AdminChannelsPage.test.tsx`, `channelsConsole.test.ts` | 11 and 8 passed (6 new): two rows selected, one collect request for both, the skipped count said; select-all over the shown rows, pause only after the confirming press; numbers out of range keep the button off, in range sent; a refusal named; CSV header and row, quoting, and a leading `=` neutralised. |
+| `npx playwright test` locally (Chromium 1194, uncommitted config) | 126 passed, 5 skipped. |
+| `npm run check` | exit 0: unit 1216, DB 551, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| #103 on main | Deploy Preview 37911502794: migrations applied, frontend deployed, live check passed. |
+
 ## 2026-10-09 — Owner console phase 2, step 1: pausing a channel's collection
 
 Owner approval (2026-10-09: "ابدأ بإيقاف الجمع واستئنافه"). One migration (`20261018000000_channel_pause.sql`): `channels.paused_at` / `paused_by` (a mark, not a change of `status`, so resuming needs no memory); `admin_set_channels_paused(uuid[], bool)` (admin only, up to 500 channels, cancels queued jobs on pause, one audit row per channel changed); `schedule_due_work` and `auto_select_videos` rebuilt from 20261012000000 with one guard each; `admin_channel_states()` names `paused` first; `admin_console_overview()` counts it. A member can still sync by hand. The channel panel pauses after a confirming press and resumes in one.

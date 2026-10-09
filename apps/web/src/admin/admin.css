@@ -1007,3 +1007,24 @@
   align-items: center;
   gap: var(--space-2);
 }
+.admin-console-check {
+  width: 2.5rem;
+}
+.admin-bulk {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-2);
+  background: var(--bg-muted);
+  position: sticky;
+  top: var(--space-2);
+  z-index: 2;
+}
+.admin-bulk-auto {
+  display: grid;
+  gap: var(--space-2);
+}
+.admin-bulk-auto > button {
+  justify-self: start;
+}

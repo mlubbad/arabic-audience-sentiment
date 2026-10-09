@@ -651,6 +651,11 @@ export const ar = {
     user_unsuspended: "أُعيد تفعيل الحساب",
     email_confirmed: "أُكّد البريد يدوياً",
     email_changed: "تغيّر البريد",
+    channel_paused: "أُوقف جمع قناة",
+    channel_resumed: "استؤنف جمع قناة",
+    channel_collect_requested: "طُلب جمع قناة",
+    channel_catalogue_requested: "طُلب تحديث فهرس قناة",
+    auto_selection_set: "عُدّلت أرقام الاختيار التلقائي",
     channel_imported: "استُوردت قناة",
   } as Record<string, string>,
   // channels
@@ -689,6 +694,32 @@ export const ar = {
   adminConsoleResumedDone:
     "استؤنف الجمع؛ يلتقطها المجدول في دورته القادمة (قد تتأخر حتى ساعة إن أُلغي لها عمل قبل قليل).",
   adminConsolePauseFailed: "تعذر تغيير حالة الجمع.",
+  adminBulkSelectAll: "تحديد كل القنوات الظاهرة",
+  adminBulkSelect: (name: string) => `تحديد ${name}`,
+  adminBulkSelected: (n: number) => `${n} قناة محددة`,
+  adminBulkCollect: "اجمع الآن",
+  adminBulkCatalogue: "حدّث الفهرس",
+  adminBulkPause: "أوقف الجمع",
+  adminBulkPauseConfirm: (n: number) => `تأكيد إيقاف ${n} قناة`,
+  adminBulkResume: "استأنف الجمع",
+  adminBulkAuto: "الاختيار التلقائي…",
+  adminBulkAutoInitial: "أول دفعة (آخر N فيديو)",
+  adminBulkAutoDaily: "الجديد يومياً",
+  adminBulkAutoApply: "طبّق الأرقام",
+  adminBulkAutoNote:
+    "الدفعة الأولى تُطبَّق فقط على قناة لم يجرِ لها اختيار بعد؛ الرقم اليومي يسري من الدورة القادمة. القناة التي لم يكن لها اختيار تلقائي يُفعَّل لها.",
+  adminBulkExport: "تصدير CSV",
+  adminBulkClear: "إلغاء التحديد",
+  adminBulkQueued: (queued: number, skipped: number) =>
+    skipped
+      ? `طُلب العمل لـ ${queued} قناة، وتُركت ${skipped} (موقوفة، أو لها عمل قائم، أو بلا فيديو مختار).`
+      : `طُلب العمل لـ ${queued} قناة.`,
+  adminBulkPaused: (n: number, jobs: number) =>
+    `أُوقف الجمع لـ ${n} قناة، وأُلغي ${jobs} عمل من الطابور.`,
+  adminBulkResumed: (n: number) => `استؤنف الجمع لـ ${n} قناة.`,
+  adminBulkAutoDone: (n: number) =>
+    `حُدّثت أرقام الاختيار التلقائي لـ ${n} قناة.`,
+  adminBulkFailed: "تعذر تنفيذ الإجراء على القنوات المحددة.",
   adminConsolePrev: "القناة السابقة",
   adminConsoleNext: "القناة التالية",
   adminConsolePosition: (i: number, n: number) => `${i} من ${n}`,
