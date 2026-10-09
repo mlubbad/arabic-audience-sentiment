@@ -52,6 +52,7 @@ export const AdminUserDetailSchema = z
     last_sign_in_at: timestamp.nullable(),
     email_confirmed_at: timestamp.nullable(),
     banned_until: timestamp.nullable(),
+    is_test: z.boolean(),
     profile: z
       .object({
         display_name: z.string().nullable(),
@@ -277,3 +278,28 @@ export const AdminConsoleChannelSchema = z
   .strict();
 export const AdminChannelsConsoleSchema = z.array(AdminConsoleChannelSchema);
 export type AdminConsoleChannel = z.infer<typeof AdminConsoleChannelSchema>;
+
+/** One row of `admin_accounts()`: an account as the owner console's
+ *  accounts page lists it. */
+export const AdminAccountSchema = z
+  .object({
+    id: z.string().uuid(),
+    email: z.string().nullable(),
+    display_name: z.string().nullable(),
+    organization: z.string().nullable(),
+    created_at: timestamp,
+    last_sign_in_at: timestamp.nullable(),
+    suspended: z.boolean(),
+    is_admin: z.boolean(),
+    is_test: z.boolean(),
+    workspaces: z.number().int().nonnegative(),
+    owned: z.number().int().nonnegative(),
+    channels: z.number().int().nonnegative(),
+    plan_key: z.string().nullable(),
+    plan_status: z.string().nullable(),
+    period_end: timestamp.nullable(),
+    provider: z.string().nullable(),
+  })
+  .strict();
+export const AdminAccountsSchema = z.array(AdminAccountSchema);
+export type AdminAccount = z.infer<typeof AdminAccountSchema>;

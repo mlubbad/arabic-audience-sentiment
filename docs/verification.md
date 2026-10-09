@@ -1,5 +1,17 @@
 # Verification
 
+## 2026-10-09 — Owner console phase 2, step 3: the accounts page
+
+Owner request (2026-10-09: "ابدأ صفحة الحسابات والمساحات"). One migration (`20261020000000_admin_accounts.sql`): `private.user_profiles.is_test` and `admin_set_user_test` (audited); `admin_accounts()` (one row per account: who, when, suspended / admin / test, workspaces stood in and created, channels in those created, and the home workspace's plan through its billing root; own 30 s timeout); `admin_user_detail` now says `is_test`. `/admin/users` becomes "Accounts and workspaces": sections for all / customers / test accounts / admins with counts, a folded search over email, name and organisation, plan and holdings per row, and the account file gains the test-account switch. The tab is now «الحسابات»; the e2e demo test clicks it by exact name («أنواع الحسابات» contains the word).
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_account_file.test.ts` | 17 passed (4 new): the customer with name, one channel, at least three seats and two owned workspaces, the owner as admin; the test mark set and cleared, shown in the file and the history, the kept details untouched; a ban in force shows as suspended; non-admin refused both calls. |
+| Mutations: `is_test` always false; `suspended` always false | `1 failed` each. |
+| `AdminUsersPage.test.tsx`, `AccountFile.test.tsx` | 4 and 13 passed: sections and counts, a test account with its tags and no plan, a folded Arabic name search (ساره → سارة); the file's test switch sends the mark. |
+| First local e2e run | `admin.spec.ts` › users tab: strict-mode violation, «الحسابات» matched two links. Exact match; `admin.spec` + `app-shell.spec` 16 passed. |
+| `npm run check` | exit 0: unit 1218, DB 555, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+
 ## 2026-10-09 — Owner console phase 2, step 2: bulk actions on the channels console
 
 Owner request (2026-10-09: "ابدأ الإجراءات الجماعية"). One migration (`20261019000000_admin_bulk_channel_actions.sql`): `admin_request_channel_work(uuid[], 'collect'|'discover')` queues work only where it can run (not paused, nothing of that kind queued or running, and for a collection at least one selected video) and answers queued / skipped; `admin_set_auto_selection(uuid[], initial 0–200, daily 0–100)` sets the numbers, creating them in the name of the workspace's creator where there were none. Both admin only, up to 500 channels, audited per channel. The page: a checkbox per row and one for every channel shown; a bar with collect now, refresh catalogue, pause (confirming press), resume, automatic selection numbers, CSV export (byte-order mark, formula-safe), clear. Bulk delete is not here: it waits for the owner's own decision.

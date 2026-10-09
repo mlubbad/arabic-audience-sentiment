@@ -10,6 +10,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  AdminAccountsSchema,
   AdminAuditEventsSchema,
   AdminUserDetailSchema,
 } from "@sentiment/contracts";
@@ -25,6 +26,7 @@ type Detail = {
   email: string;
   email_confirmed_at: string | null;
   banned_until: string | null;
+  is_test: boolean;
   profile: {
     display_name: string | null;
     organization: string | null;
@@ -336,5 +338,81 @@ describe("admin_user_target (the admin-users function's gate)", () => {
         "email_changed",
       ]),
     );
+  });
+});
+
+describe("admin_accounts and test accounts", () => {
+  async function accounts() {
+    const { rows } = await db.query<{ r: unknown }>(
+      "select public.admin_accounts() as r",
+    );
+    return AdminAccountsSchema.parse(rows[0]!.r);
+  }
+
+  it("lists every account with what it holds", async () => {
+    await db.exec("reset role");
+    await db.query(
+      "insert into clients(id, workspace_id, name) values ($1, $1, 'Shop')",
+      [SHOP],
+    );
+    await db.query(
+      "insert into channels(workspace_id, client_id, external_channel_id, title) values ($1, $1, 'UCCCCCCCCCCCCCCCCCCCCCC1', 'Shop channel')",
+      [SHOP],
+    );
+    await as("authenticated", ADMIN);
+    const list = await accounts();
+    const customer = list.find((a) => a.id === CUSTOMER)!;
+    const owner = list.find((a) => a.id === ADMIN)!;
+    expect(owner).toMatchObject({ is_admin: true, is_test: false });
+    expect(customer).toMatchObject({
+      email: "customer@example.com",
+      display_name: "سارة أحمد",
+      is_admin: false,
+      suspended: false,
+      channels: 1,
+    });
+    // The personal workspace signup made, Shop, and a seat in Home.
+    expect(customer.workspaces).toBeGreaterThanOrEqual(3);
+    expect(customer.owned).toBeGreaterThanOrEqual(2);
+  });
+
+  it("marks and unmarks a test account, says so in the file, and records it", async () => {
+    await as("authenticated", ADMIN);
+    await db.query("select public.admin_set_user_test($1, true)", [CUSTOMER]);
+    expect((await accounts()).find((a) => a.id === CUSTOMER)!.is_test).toBe(
+      true,
+    );
+    expect((await detail(CUSTOMER)).is_test).toBe(true);
+    expect((await detail(CUSTOMER)).history[0]!.action).toBe(
+      "user_marked_test",
+    );
+    // The details the owner keeps are untouched by the mark.
+    expect((await detail(CUSTOMER)).profile.display_name).toBe("سارة أحمد");
+    await db.query("select public.admin_set_user_test($1, false)", [CUSTOMER]);
+    expect((await detail(CUSTOMER)).is_test).toBe(false);
+  });
+
+  it("shows a suspension in force", async () => {
+    await db.exec("reset role");
+    await db.query(
+      "update auth.users set banned_until = now() + interval '1 day' where id=$1",
+      [CUSTOMER],
+    );
+    await as("authenticated", ADMIN);
+    expect((await accounts()).find((a) => a.id === CUSTOMER)!.suspended).toBe(
+      true,
+    );
+    await db.exec("reset role");
+    await db.query("update auth.users set banned_until = null where id=$1", [
+      CUSTOMER,
+    ]);
+  });
+
+  it("answers no one but a platform admin", async () => {
+    await as("authenticated", CUSTOMER);
+    await expect(accounts()).rejects.toThrow(/forbidden/);
+    await expect(
+      db.query("select public.admin_set_user_test($1, true)", [CUSTOMER]),
+    ).rejects.toThrow(/forbidden/);
   });
 });
