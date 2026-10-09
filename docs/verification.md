@@ -1,5 +1,21 @@
 # Verification
 
+## 2026-10-09 — `admin-users`: the account file's actions that need the auth admin API
+
+Owner approval (2026-10-09, "نفّذ الخطة كما هي"): a reset link the owner hands over, suspension and its lifting, a manual email confirmation, and an email change. #99 (account file and phase 0) merged as `2a6e2c6`; its Deploy Preview run applied the migrations and the live site check passed, before this work was pushed.
+
+New Edge Function `admin-users` (the owner deploys it: `npx supabase functions deploy admin-users`, with the gateway's JWT check on) and one migration (`20261015000000_admin_user_actions.sql`: `admin_user_target`, and `admin_record_user_action` learning five actions). The decision is `supabase/functions/_shared/admin-users.ts`, tested without a project. Who may ask is `admin_user_target`, run with the caller's own token; the service key is used only after it answers, and only for `auth.admin`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_users_handler.test.ts` | 10 passed: suspend `876000h` / lift `none`, each recorded; never the caller or another admin (409, no Auth call); reset link lands on the app's own `/reset-password`, refused for a foreign or missing origin and for a person with no email; manual confirmation; email trimmed, lower-cased, marked confirmed; `email_exists` → `email_taken`, any other Auth or driver text → `unavailable`; malformed body refused before any call; database `forbidden` / `user_not_found` passed on; an action whose trail row failed answers `recorded: false`. |
+| Mutations: admin guard dropped; origin check dropped | `1 failed` each. |
+| `npx vitest run supabase/tests/admin_account_file.test.ts` | 13 passed (3 new: `admin_user_target` names email, admin and self; refuses non-admin and anon; the trail accepts the five actions). |
+| `adminUserAction.test.ts`, `AccountFile.test.tsx` | 6 and 11 passed: caller's token, gateway 404 read as "not deployed", known refusals named, others `unavailable`; suspension needs a confirming press; a ban in force offers the lift; email change only when typed twice the same; handed link shown with its warning; "not recorded" said. |
+| `npm run check:functions` | `admin-users/index.ts` checks under Deno. |
+| `npm run check` | exit 0: unit 1187, DB 533, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| Not verified here | Supabase Auth's behaviour on the live project: the recovery link's lifetime, whether a ban ends an open session at once, and the `email_exists` code. Each is the owner's first live try after deploying. |
+
 ## 2026-10-09 — The account file and password recovery (admin users page)
 
 Owner request (2026-10-09): full management of customer accounts from the owner's side: their details, plan, password help. Owner's choice the same day: build it inside the current users page first, then move it into the new owner console. One migration (`20261014000000_admin_account_file.sql`: `private.user_profiles`, `admin_user_detail`, `admin_update_user_profile`, `admin_record_user_action`), no Edge Function. Suspension, owner-made links and email changes need the auth admin API and wait for an `admin-users` function the owner deploys.

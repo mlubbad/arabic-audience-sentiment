@@ -550,12 +550,57 @@ export const en: Strings = {
   adminAccountHistoryEmpty: "Nothing recorded yet.",
   adminAccountHistoryBy: (who: string) => `by ${who}`,
   adminAccountHistorySelf: "by themselves",
+  adminAccountMakeLink: "Make a link I send myself",
+  adminAccountLinkLabel: "Reset link",
+  adminAccountLinkWarning:
+    "Whoever holds this link can enter the account and change its password. Send it to the account's owner only; it expires as the Supabase project is set.",
+  adminAccountCopy: "Copy the link",
+  adminAccountCopied: "Link copied.",
+  adminAccountEmailSection: "Email",
+  adminAccountConfirmEmail: "Confirm the email by hand",
+  adminAccountEmailConfirmedDone: "Email confirmed.",
+  adminAccountNewEmail: "New email",
+  adminAccountNewEmailAgain: "Type the new email again",
+  adminAccountEmailMismatch: "The two emails do not match.",
+  adminAccountEmailChangeNote:
+    "The email changes at once and counts as confirmed; the person signs in with it from now on. Check it before saving.",
+  adminAccountChangeEmail: "Change the email",
+  adminAccountEmailChanged: (email: string) =>
+    `The account's email is now ${email}.`,
+  adminAccountStatus: "Account status",
+  adminAccountSuspendNote:
+    "Suspension stops sign-in and session renewal and keeps the data as it is; one button lifts it. A session already open may stay valid until it expires.",
+  adminAccountSuspend: "Suspend the account",
+  adminAccountSuspendConfirm: "Confirm suspension",
+  adminAccountCancel: "Cancel",
+  adminAccountUnsuspend: "Lift the suspension",
+  adminAccountSuspendedDone: "Account suspended.",
+  adminAccountUnsuspendedDone: "Suspension lifted.",
+  adminAccountNotRecorded:
+    "Done, but it could not be written to the account's history.",
+  adminAccountActionErrors: {
+    forbidden: "Only the platform admin can do this.",
+    user_not_found: "This account no longer exists.",
+    cannot_suspend_admin:
+      "Neither your account nor another admin's is suspended.",
+    no_email: "This account has no email.",
+    email_taken: "Another account already uses this email.",
+    invalid_request: "The request is not valid; check the email.",
+    not_deployed:
+      "The admin-users function is not deployed yet. Deploy it, then try again.",
+    unavailable: "Could not do this now; try again later.",
+  } as Record<string, string>,
   adminAccountActions: {
     user_profile_updated: "Personal details edited",
     password_reset_sent: "Password reset link sent",
     impersonation_started: "Viewing as them started",
     impersonation_ended: "Viewing as them ended",
     workspace_account_role_updated: "Role in a workspace changed",
+    password_link_created: "Reset link made",
+    user_suspended: "Account suspended",
+    user_unsuspended: "Suspension lifted",
+    email_confirmed: "Email confirmed by hand",
+    email_changed: "Email changed",
     channel_imported: "Channel imported",
   } as Record<string, string>,
   // channels

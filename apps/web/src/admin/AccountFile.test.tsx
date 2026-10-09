@@ -14,7 +14,19 @@ import { AccountFile } from "./AccountFile";
 import * as adminRead from "./adminRead";
 import * as adminPage from "./AdminPage";
 
-vi.mock("./adminRead");
+// The functions are mocks; the error class stays real, so a refusal the test
+// throws reads as the page would read the function's own.
+vi.mock("./adminRead", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./adminRead")>();
+  return {
+    AdminUserActionError: actual.AdminUserActionError,
+    readAdminUserDetail: vi.fn(),
+    saveAdminUserProfile: vi.fn(),
+    sendPasswordReset: vi.fn(),
+    setAdminMemberRole: vi.fn(),
+    adminUserAction: vi.fn(),
+  };
+});
 vi.mock("./AdminPage", () => ({
   readWorkspaces: vi.fn(),
   LiveWorkspaces: ({ rows }: { rows: AdminWorkspace[] }) => (
@@ -202,5 +214,109 @@ describe("AccountFile", () => {
     expect(
       await screen.findByTestId("admin-account-send-reset"),
     ).toBeDisabled();
+  });
+
+  it("suspends only after a second, confirming press", async () => {
+    vi.mocked(adminRead.adminUserAction).mockResolvedValue({ recorded: true });
+    mount();
+    await userEvent.click(await screen.findByTestId("admin-account-suspend"));
+    expect(adminRead.adminUserAction).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId("admin-account-suspend-confirm"));
+    expect(adminRead.adminUserAction).toHaveBeenCalledWith(
+      "suspend",
+      USER.id,
+      undefined,
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      ar.adminAccountSuspendedDone,
+    );
+  });
+
+  it("offers to lift a suspension still in force", async () => {
+    vi.mocked(adminRead.readAdminUserDetail).mockResolvedValue({
+      ...DETAIL,
+      banned_until: "2126-01-01T00:00:00+00:00",
+    });
+    mount();
+    expect(await screen.findByText(ar.adminAccountSuspended)).toBeVisible();
+    expect(screen.getByTestId("admin-account-unsuspend")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-account-suspend")).toBeNull();
+  });
+
+  it("changes the email only when it was typed the same twice", async () => {
+    vi.mocked(adminRead.adminUserAction).mockResolvedValue({ recorded: true });
+    mount();
+    const form = await screen.findByTestId("admin-account-change-email");
+    await userEvent.type(
+      within(form).getByLabelText(ar.adminAccountNewEmail),
+      "New@Example.com",
+    );
+    await userEvent.type(
+      within(form).getByLabelText(ar.adminAccountNewEmailAgain),
+      "new@example.org",
+    );
+    await userEvent.click(
+      within(form).getByRole("button", { name: ar.adminAccountChangeEmail }),
+    );
+    expect(adminRead.adminUserAction).not.toHaveBeenCalled();
+    expect(within(form).getByRole("alert")).toHaveTextContent(
+      ar.adminAccountEmailMismatch,
+    );
+
+    const again = within(form).getByLabelText(ar.adminAccountNewEmailAgain);
+    await userEvent.clear(again);
+    await userEvent.type(again, "new@example.com");
+    await userEvent.click(
+      within(form).getByRole("button", { name: ar.adminAccountChangeEmail }),
+    );
+    expect(adminRead.adminUserAction).toHaveBeenCalledWith(
+      "change_email",
+      USER.id,
+      "new@example.com",
+    );
+    expect(await within(form).findByRole("status")).toHaveTextContent(
+      ar.adminAccountEmailChanged("new@example.com"),
+    );
+  });
+
+  it("shows a handed-over link with its warning", async () => {
+    vi.mocked(adminRead.adminUserAction).mockResolvedValue({
+      recorded: true,
+      link: "https://project.example/verify?t=1",
+    });
+    mount();
+    await userEvent.click(await screen.findByTestId("admin-account-make-link"));
+    expect(adminRead.adminUserAction).toHaveBeenCalledWith(
+      "recovery_link",
+      USER.id,
+      undefined,
+    );
+    expect(await screen.findByLabelText(ar.adminAccountLinkLabel)).toHaveValue(
+      "https://project.example/verify?t=1",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      ar.adminAccountLinkWarning,
+    );
+  });
+
+  it("says plainly when the function is not deployed yet, and when a done action was not recorded", async () => {
+    vi.mocked(adminRead.adminUserAction).mockRejectedValueOnce(
+      new adminRead.AdminUserActionError("not_deployed"),
+    );
+    mount();
+    await userEvent.click(
+      await screen.findByTestId("admin-account-confirm-email"),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      ar.adminAccountActionErrors.not_deployed!,
+    );
+
+    vi.mocked(adminRead.adminUserAction).mockResolvedValueOnce({
+      recorded: false,
+    });
+    await userEvent.click(screen.getByTestId("admin-account-confirm-email"));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      ar.adminAccountNotRecorded,
+    );
   });
 });

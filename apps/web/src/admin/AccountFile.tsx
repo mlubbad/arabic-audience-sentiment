@@ -2,19 +2,18 @@
  * The account file: one person, opened from the admin users page as a side
  * panel (owner request, 2026-10-09).
  *
- * Five parts, each its own server call and each in the audit trail:
+ * Each part is its own server call, and each lands in the audit trail:
  * - the details the owner keeps about them (`admin_update_user_profile`);
- * - password help, a reset link to their own inbox — no one sees or sets a
- *   password here (`sendPasswordReset`);
+ * - password help, a reset link to their own inbox (`sendPasswordReset`) or
+ *   one the owner hands over (`admin-users`); no one sees or sets a password;
+ * - their email, confirmed or changed by hand, and their account suspended
+ *   or restored (`admin-users`: these need the auth admin API, which a
+ *   browser never holds);
  * - their seat in every workspace, analyst or viewer
  *   (`update_workspace_account_role`; the owner's seat is not changed here);
  * - the plan of every workspace they created, the same rows and levers as
  *   the workspaces page (`LiveWorkspaces`);
  * - their history: the trail rows that name them, newest first.
- *
- * Suspension, a link the owner hands over, and email changes need the auth
- * admin API, which a browser never holds; they arrive with the `admin-users`
- * function.
  */
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -37,11 +36,14 @@ import {
 import { LoadError, Loading } from "../pageStates/PageStates";
 import { LiveWorkspaces, readWorkspaces } from "./AdminPage";
 import {
+  AdminUserActionError,
+  adminUserAction,
   readAdminUserDetail,
   saveAdminUserProfile,
   sendPasswordReset,
   setAdminMemberRole,
   type AdminProfileInput,
+  type AdminUserActionName,
 } from "./adminRead";
 
 const day = (iso: string | null | undefined) => iso?.slice(0, 10) ?? "—";
@@ -115,6 +117,8 @@ function AccountBody({ user }: { user: AdminUser }) {
       </header>
       <ProfileForm detail={d} />
       <PasswordHelp detail={d} />
+      <EmailSection detail={d} />
+      <StatusSection detail={d} suspended={suspended} />
       <Memberships detail={d} />
       <Plans userId={d.id} />
       <History detail={d} />
@@ -270,6 +274,284 @@ function PasswordHelp({ detail }: { detail: AdminUserDetail }) {
       >
         {S.adminAccountSendReset}
       </Button>
+      <HandedLink userId={detail.id} />
+    </section>
+  );
+}
+
+type Note = { ok: boolean; text: string } | null;
+
+/** One `admin-users` action at a time for this person: busy while it runs,
+ *  the sentence it ended with, and the file re-read so its badges follow. */
+function useAccountAction(userId: string) {
+  const S = useStrings();
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<Note>(null);
+  async function run(
+    action: AdminUserActionName,
+    done: (result: { link?: string }) => string,
+    email?: string,
+  ): Promise<{ link?: string } | null> {
+    setBusy(true);
+    setNote(null);
+    try {
+      const result = await adminUserAction(action, userId, email);
+      const text = done(result);
+      setNote({
+        ok: true,
+        text: result.recorded ? text : `${text} ${S.adminAccountNotRecorded}`,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "user", userId],
+      });
+      return result;
+    } catch (error) {
+      const code =
+        error instanceof AdminUserActionError ? error.code : "unavailable";
+      setNote({
+        ok: false,
+        text:
+          S.adminAccountActionErrors[code] ??
+          S.adminAccountActionErrors.unavailable!,
+      });
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+  return { busy, note, setNote, run };
+}
+
+function NoteLine({ note }: { note: Note }) {
+  if (!note) return null;
+  return (
+    <p
+      role={note.ok ? "status" : "alert"}
+      className={note.ok ? "admin-account-ok" : "admin-account-error"}
+    >
+      {note.text}
+    </p>
+  );
+}
+
+/** A link the owner hands over: shown once, with a copy button and the
+ *  warning that it opens the account to whoever holds it. */
+function HandedLink({ userId }: { userId: string }) {
+  const S = useStrings();
+  const { busy, note, setNote, run } = useAccountAction(userId);
+  const [link, setLink] = useState<string | null>(null);
+  async function make() {
+    setLink(null);
+    const result = await run("recovery_link", () => S.adminAccountLinkWarning);
+    if (result?.link) setLink(result.link);
+  }
+  async function copy() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setNote({ ok: true, text: S.adminAccountCopied });
+    } catch {
+      /* The field is selectable; copying by hand still works. */
+    }
+  }
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() => void make()}
+        data-testid="admin-account-make-link"
+      >
+        {S.adminAccountMakeLink}
+      </Button>
+      {link && (
+        <div className="ui-field">
+          <label htmlFor="acct-link">{S.adminAccountLinkLabel}</label>
+          <Input
+            id="acct-link"
+            dir="ltr"
+            readOnly
+            value={link}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void copy()}
+          >
+            {S.adminAccountCopy}
+          </Button>
+        </div>
+      )}
+      <NoteLine note={note} />
+    </>
+  );
+}
+
+function EmailSection({ detail }: { detail: AdminUserDetail }) {
+  const S = useStrings();
+  const confirm = useAccountAction(detail.id);
+  const change = useAccountAction(detail.id);
+  const [email, setEmail] = useState("");
+  const [again, setAgain] = useState("");
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (email.trim().toLowerCase() !== again.trim().toLowerCase()) {
+      change.setNote({ ok: false, text: S.adminAccountEmailMismatch });
+      return;
+    }
+    const target = email.trim().toLowerCase();
+    const done = await change.run(
+      "change_email",
+      () => S.adminAccountEmailChanged(target),
+      target,
+    );
+    if (done) {
+      setEmail("");
+      setAgain("");
+    }
+  }
+
+  return (
+    <section className="admin-account-section">
+      <h3>{S.adminAccountEmailSection}</h3>
+      {!detail.email_confirmed_at && (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={confirm.busy}
+            onClick={() =>
+              void confirm.run(
+                "confirm_email",
+                () => S.adminAccountEmailConfirmedDone,
+              )
+            }
+            data-testid="admin-account-confirm-email"
+          >
+            {S.adminAccountConfirmEmail}
+          </Button>
+          <NoteLine note={confirm.note} />
+        </>
+      )}
+      <form
+        className="admin-account-subform"
+        onSubmit={submit}
+        data-testid="admin-account-change-email"
+      >
+        <p className="admin-account-callout">{S.adminAccountEmailChangeNote}</p>
+        <div className="admin-account-grid">
+          <div className="ui-field">
+            <label htmlFor="acct-email">{S.adminAccountNewEmail}</label>
+            <Input
+              id="acct-email"
+              type="email"
+              dir="ltr"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="ui-field">
+            <label htmlFor="acct-email-again">
+              {S.adminAccountNewEmailAgain}
+            </label>
+            <Input
+              id="acct-email-again"
+              type="email"
+              dir="ltr"
+              required
+              value={again}
+              onChange={(e) => setAgain(e.target.value)}
+            />
+          </div>
+        </div>
+        <NoteLine note={change.note} />
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          disabled={change.busy}
+        >
+          {S.adminAccountChangeEmail}
+        </Button>
+      </form>
+    </section>
+  );
+}
+
+function StatusSection({
+  detail,
+  suspended,
+}: {
+  detail: AdminUserDetail;
+  suspended: boolean;
+}) {
+  const S = useStrings();
+  const { busy, note, run } = useAccountAction(detail.id);
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <section className="admin-account-section">
+      <h3>{S.adminAccountStatus}</h3>
+      <p className="admin-account-callout">{S.adminAccountSuspendNote}</p>
+      <NoteLine note={note} />
+      <div className="admin-account-row">
+        {suspended ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() =>
+              void run("unsuspend", () => S.adminAccountUnsuspendedDone)
+            }
+            data-testid="admin-account-unsuspend"
+          >
+            {S.adminAccountUnsuspend}
+          </Button>
+        ) : confirming ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              disabled={busy}
+              onClick={() => {
+                setConfirming(false);
+                void run("suspend", () => S.adminAccountSuspendedDone);
+              }}
+              data-testid="admin-account-suspend-confirm"
+            >
+              {S.adminAccountSuspendConfirm}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirming(false)}
+            >
+              {S.adminAccountCancel}
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setConfirming(true)}
+            data-testid="admin-account-suspend"
+          >
+            {S.adminAccountSuspend}
+          </Button>
+        )}
+      </div>
     </section>
   );
 }

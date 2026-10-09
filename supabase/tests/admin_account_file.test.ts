@@ -279,3 +279,62 @@ describe("admin_record_user_action", () => {
     ).rejects.toThrow(/forbidden/);
   });
 });
+
+describe("admin_user_target (the admin-users function's gate)", () => {
+  async function target(user: string) {
+    const { rows } = await db.query<{
+      r: { email: string | null; is_admin: boolean; is_self: boolean };
+    }>("select public.admin_user_target($1) as r", [user]);
+    return rows[0]!.r;
+  }
+
+  it("names the person, and whether they are an admin or the caller", async () => {
+    await as("authenticated", ADMIN);
+    expect(await target(CUSTOMER)).toEqual({
+      email: "customer@example.com",
+      is_admin: false,
+      is_self: false,
+    });
+    expect(await target(ADMIN)).toEqual({
+      email: "owner@example.com",
+      is_admin: true,
+      is_self: true,
+    });
+    await expect(
+      target("10000000-0000-4000-8000-000000000099"),
+    ).rejects.toThrow(/user_not_found/);
+  });
+
+  it("answers no one but a platform admin", async () => {
+    await as("authenticated", CUSTOMER);
+    await expect(target(ADMIN)).rejects.toThrow(/forbidden/);
+    await as("anon", null);
+    await expect(target(CUSTOMER)).rejects.toThrow(/permission denied/);
+  });
+
+  it("the trail learns the function's actions", async () => {
+    await as("authenticated", ADMIN);
+    for (const action of [
+      "password_link_created",
+      "user_suspended",
+      "user_unsuspended",
+      "email_confirmed",
+      "email_changed",
+    ])
+      await db.query("select public.admin_record_user_action($1,$2)", [
+        CUSTOMER,
+        action,
+      ]);
+    expect(
+      (await detail(CUSTOMER)).history.slice(0, 5).map((h) => h.action),
+    ).toEqual(
+      expect.arrayContaining([
+        "password_link_created",
+        "user_suspended",
+        "user_unsuspended",
+        "email_confirmed",
+        "email_changed",
+      ]),
+    );
+  });
+});

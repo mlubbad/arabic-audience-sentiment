@@ -5619,7 +5619,9 @@ begin
   if uid is null or not public.is_platform_admin() then
     raise exception 'forbidden' using errcode='42501';
   end if;
-  if p_action not in ('password_reset_sent') then
+  if p_action not in ('password_reset_sent', 'password_link_created',
+                      'user_suspended', 'user_unsuspended',
+                      'email_confirmed', 'email_changed') then
     raise exception 'invalid_action' using errcode='22023';
   end if;
   if not exists (select 1 from auth.users where id = p_user) then
@@ -5944,6 +5946,29 @@ begin
               or e.actor_id = p_user
            order by e.created_at desc
            limit 50) h), '[]'::jsonb));
+end $function$
+
+CREATE OR REPLACE FUNCTION public.admin_user_target(p_user uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  u record;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  select id, email into u from auth.users where id = p_user;
+  if not found then
+    raise exception 'user_not_found' using errcode='P0002';
+  end if;
+  return jsonb_build_object(
+    'email', u.email,
+    'is_admin', exists (select 1 from private.platform_admins where user_id = p_user),
+    'is_self', p_user = uid);
 end $function$
 
 CREATE OR REPLACE FUNCTION public.admin_users()
@@ -8080,6 +8105,8 @@ grant EXECUTE on function admin_update_user_profile(uuid,text,text,text,text) to
 grant EXECUTE on function admin_update_user_profile(uuid,text,text,text,text) to "postgres";
 grant EXECUTE on function admin_user_detail(uuid) to "authenticated";
 grant EXECUTE on function admin_user_detail(uuid) to "postgres";
+grant EXECUTE on function admin_user_target(uuid) to "authenticated";
+grant EXECUTE on function admin_user_target(uuid) to "postgres";
 grant EXECUTE on function admin_users() to "authenticated";
 grant EXECUTE on function admin_users() to "postgres";
 grant EXECUTE on function admin_workspace_footprint(uuid) to "authenticated";
