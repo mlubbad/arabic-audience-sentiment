@@ -59,6 +59,10 @@ async function count(sql: string, params: unknown[] = []) {
   return rows[0]!.n;
 }
 
+afterAll(async () => {
+  await db?.close();
+});
+
 describe("admin_import_channel", () => {
   beforeAll(async () => {
     db = new PGlite();
@@ -107,10 +111,6 @@ describe("admin_import_channel", () => {
          ($3,'free','active',now(),now()+interval '30 days')`,
       [HOME, OTHER_HOME, FREE_HOME],
     );
-  });
-
-  afterAll(async () => {
-    await db?.close();
   });
 
   it("makes a workspace named after the channel, files the channel and asks for its catalogue", async () => {
@@ -292,5 +292,181 @@ describe("admin_import_channel", () => {
     expect(await count("select count(*)::int as n from workspaces")).toBe(
       before,
     );
+  });
+});
+
+describe("automatic selection of an imported channel's videos", () => {
+  let ws = "";
+  let ch = "";
+  const AUTO = "UCAAAAAAAAAAAAAAAAAAAAB1";
+
+  async function tick() {
+    await db.exec("reset role");
+    await db.query("select private.schedule_due_work($1)", [ws]);
+  }
+  async function selected() {
+    await db.exec("reset role");
+    const { rows } = await db.query<{ title: string }>(
+      `select v.title from video_selections s join videos v on v.workspace_id=s.workspace_id and v.id=s.video_id
+        where s.workspace_id=$1 order by v.published_at desc`,
+      [ws],
+    );
+    return rows.map((r) => r.title);
+  }
+  /** Videos as a catalogue run files them: published `hoursAgo` hours ago. */
+  async function catalogue(
+    videos: {
+      title: string;
+      hoursAgo: number;
+      kind?: string;
+      disabled?: boolean;
+    }[],
+  ) {
+    await db.exec("reset role");
+    for (const v of videos)
+      await db.query(
+        `insert into videos(workspace_id, channel_id, external_video_id, title, kind, published_at, comments_state)
+         values ($1,$2,$3,$3,$4, now() - make_interval(hours => $5::int), $6)`,
+        [
+          ws,
+          ch,
+          v.title,
+          v.kind ?? "video",
+          v.hoursAgo,
+          v.disabled ? "disabled" : "open",
+        ],
+      );
+    await db.query(
+      "update channels set catalogued_at = now() where workspace_id=$1 and id=$2",
+      [ws, ch],
+    );
+  }
+
+  beforeAll(async () => {
+    await as("authenticated", ADMIN);
+    const r = await importChannel(AUTO, "Auto");
+    ws = r.workspace_id;
+    ch = r.channel_id!;
+  });
+
+  it("records the import's numbers: the latest 20, then 5 new a day", async () => {
+    await db.exec("reset role");
+    const { rows } = await db.query<{
+      initial_count: number;
+      daily_cap: number;
+      created_by: string;
+    }>(
+      "select initial_count, daily_cap, created_by from private.channel_auto_selection where workspace_id=$1 and channel_id=$2",
+      [ws, ch],
+    );
+    expect(rows).toEqual([
+      { initial_count: 20, daily_cap: 5, created_by: ADMIN },
+    ]);
+  });
+
+  it("selects nothing while the first catalogue run is still queued", async () => {
+    await catalogue([{ title: "early", hoursAgo: 1000 }]);
+    await tick();
+    expect(await selected()).toEqual([]);
+  });
+
+  it("selects the latest 20 once the catalogue is in, skipping posts and closed comments, and starts a collection", async () => {
+    await db.exec("reset role");
+    await db.query(
+      "update jobs set status='succeeded' where workspace_id=$1 and type='discover'",
+      [ws],
+    );
+    await catalogue([
+      ...Array.from({ length: 24 }, (_, i) => ({
+        title: `v${String(i).padStart(2, "0")}`,
+        hoursAgo: 100 + i,
+      })),
+      { title: "post", hoursAgo: 10, kind: "channel_post" },
+      { title: "closed", hoursAgo: 11, disabled: true },
+    ]);
+    await tick();
+    const picked = await selected();
+    expect(picked).toHaveLength(20);
+    expect(picked[0]).toBe("v00");
+    expect(picked).not.toContain("post");
+    expect(picked).not.toContain("closed");
+    expect(picked).not.toContain("early");
+    expect(
+      await count(
+        "select count(*)::int as n from jobs where workspace_id=$1 and type='collect' and status='queued'",
+        [ws],
+      ),
+    ).toBe(1);
+
+    // The back catalogue is never chosen later on.
+    await tick();
+    expect(await selected()).toHaveLength(20);
+  });
+
+  it("adds videos published after the first selection, at most 5 a day", async () => {
+    await catalogue(
+      Array.from({ length: 7 }, (_, i) => ({
+        title: `new${i}`,
+        hoursAgo: -1 - i,
+      })),
+    );
+    await tick();
+    expect((await selected()).filter((t) => t.startsWith("new"))).toHaveLength(
+      5,
+    );
+    await tick();
+    expect((await selected()).filter((t) => t.startsWith("new"))).toHaveLength(
+      5,
+    );
+
+    // A day later the cap has room again for the last two.
+    await db.exec("reset role");
+    await db.query(
+      "update private.auto_selected_videos set selected_at = now() - interval '25 hours' where workspace_id=$1",
+      [ws],
+    );
+    await tick();
+    expect((await selected()).filter((t) => t.startsWith("new"))).toHaveLength(
+      7,
+    );
+  });
+
+  it("never re-selects a video a person deselected", async () => {
+    await db.exec("reset role");
+    await db.query(
+      `delete from video_selections s using videos v
+        where s.workspace_id=$1 and v.workspace_id=s.workspace_id and v.id=s.video_id and v.title='new0'`,
+      [ws],
+    );
+    await db.query(
+      "update private.auto_selected_videos set selected_at = now() - interval '25 hours' where workspace_id=$1",
+      [ws],
+    );
+    await tick();
+    expect(await selected()).not.toContain("new0");
+  });
+
+  it("leaves channels that were not imported alone", async () => {
+    // HOME's hand-filed channel has catalogued videos but no automatic selection.
+    await db.exec("reset role");
+    const { rows } = await db.query<{ id: string }>(
+      "select id from channels where workspace_id=$1 and external_channel_id=$2",
+      [HOME, CH3],
+    );
+    await db.query(
+      `insert into videos(workspace_id, channel_id, external_video_id, title, published_at, comments_state)
+       values ($1,$2,'home-v','home-v', now(), 'open')`,
+      [HOME, rows[0]!.id],
+    );
+    await db.query("update channels set catalogued_at = now() where id=$1", [
+      rows[0]!.id,
+    ]);
+    await db.query("select private.schedule_due_work($1)", [HOME]);
+    expect(
+      await count(
+        "select count(*)::int as n from video_selections where workspace_id=$1",
+        [HOME],
+      ),
+    ).toBe(0);
   });
 });

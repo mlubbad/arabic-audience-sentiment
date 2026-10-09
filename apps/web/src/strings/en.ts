@@ -446,7 +446,7 @@ export const en: Strings = {
   adminImportDone: (created: number, existing: number, failed: number) =>
     `${created} workspaces created · ${existing} already held · ${failed} failed`,
   adminImportCollectionNote:
-    "Each new workspace bills to your home workspace's plan. The channel's videos are catalogued at once and the scheduler keeps collecting; comments are collected for the videos selected in the workspace.",
+    "Each new workspace bills to your home workspace's plan. The channel's videos are catalogued at once, its latest 20 are then selected for comment collection, and videos it publishes later are added automatically, at most 5 a day.",
   adminImportClear: "Clear the list",
   adminImportDemo: "The import works on live data only.",
   // plans & account types

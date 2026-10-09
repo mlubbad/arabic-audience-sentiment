@@ -22,6 +22,25 @@ alter table "auth"."users" add constraint "users_pkey" PRIMARY KEY (id);
 
 CREATE UNIQUE INDEX users_pkey ON auth.users USING btree (id);
 
+create table "private"."auto_selected_videos" (
+  "workspace_id" uuid not null,
+  "video_id" uuid not null,
+  "channel_id" uuid not null,
+  "initial" boolean default false not null,
+  "selected_at" timestamp with time zone default now() not null
+);
+
+alter table "private"."auto_selected_videos" add constraint "auto_selected_videos_channel_id_not_null" NOT NULL channel_id;
+alter table "private"."auto_selected_videos" add constraint "auto_selected_videos_initial_not_null" NOT NULL initial;
+alter table "private"."auto_selected_videos" add constraint "auto_selected_videos_pkey" PRIMARY KEY (workspace_id, video_id);
+alter table "private"."auto_selected_videos" add constraint "auto_selected_videos_selected_at_not_null" NOT NULL selected_at;
+alter table "private"."auto_selected_videos" add constraint "auto_selected_videos_video_id_not_null" NOT NULL video_id;
+alter table "private"."auto_selected_videos" add constraint "auto_selected_videos_workspace_id_not_null" NOT NULL workspace_id;
+alter table "private"."auto_selected_videos" add constraint "auto_selected_videos_workspace_id_video_id_fkey" FOREIGN KEY (workspace_id, video_id) REFERENCES videos(workspace_id, id) ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX auto_selected_videos_pkey ON private.auto_selected_videos USING btree (workspace_id, video_id);
+CREATE INDEX auto_selected_videos_recent ON private.auto_selected_videos USING btree (workspace_id, channel_id, selected_at);
+
 create table "private"."billing_events" (
   "event_id" text not null,
   "event_type" text not null,
@@ -44,6 +63,30 @@ alter table "private"."billing_events" add constraint "billing_events_workspace_
 
 CREATE UNIQUE INDEX billing_events_pkey ON private.billing_events USING btree (event_id);
 CREATE INDEX billing_events_workspace ON private.billing_events USING btree (workspace_id, occurred_at DESC);
+
+create table "private"."channel_auto_selection" (
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "initial_count" integer not null,
+  "daily_cap" integer not null,
+  "created_by" uuid,
+  "created_at" timestamp with time zone default now() not null,
+  "initial_done_at" timestamp with time zone,
+  "watermark" timestamp with time zone
+);
+
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_channel_id_not_null" NOT NULL channel_id;
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_created_at_not_null" NOT NULL created_at;
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_daily_cap_check" CHECK (daily_cap >= 0 AND daily_cap <= 100);
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_daily_cap_not_null" NOT NULL daily_cap;
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_initial_count_check" CHECK (initial_count >= 0 AND initial_count <= 200);
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_initial_count_not_null" NOT NULL initial_count;
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_pkey" PRIMARY KEY (workspace_id, channel_id);
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "private"."channel_auto_selection" add constraint "channel_auto_selection_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE UNIQUE INDEX channel_auto_selection_pkey ON private.channel_auto_selection USING btree (workspace_id, channel_id);
 
 create table "private"."job_batches" (
   "job_id" uuid not null,
@@ -1425,6 +1468,83 @@ declare root uuid; begin
   insert into private.billing_events(event_id, event_type, occurred_at, workspace_id, applied_at, outcome, payload)
   values (event_id, 'transaction.completed', occurred_at, root, now(), 'applied', payload);
   return 'applied';
+end $function$
+
+CREATE OR REPLACE FUNCTION private.auto_select_videos(w uuid, c uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  cfg private.channel_auto_selection;
+  remaining bigint;
+  room integer;
+  picked uuid[];
+  v uuid;
+begin
+  select * into cfg from private.channel_auto_selection
+   where workspace_id = w and channel_id = c
+   for update skip locked;
+  if not found then return 0; end if;
+
+  if not exists (select 1 from public.channels
+                  where workspace_id = w and id = c and catalogued_at is not null)
+     or exists (select 1 from public.jobs
+                 where workspace_id = w and channel_id = c and type = 'discover'
+                   and status in ('queued', 'running')) then
+    return 0;
+  end if;
+
+  remaining := private.analysis_remaining(w);
+  if remaining is not null and remaining <= 0 then return 0; end if;
+
+  if cfg.initial_done_at is null then
+    select coalesce(array_agg(x.id), '{}') into picked from (
+      select vd.id from public.videos vd
+       where vd.workspace_id = w and vd.channel_id = c
+         and vd.kind in ('video', 'short', 'stream')
+         and vd.comments_state <> 'disabled'
+         and not exists (select 1 from public.video_selections s
+                          where s.workspace_id = w and s.video_id = vd.id)
+       order by vd.published_at desc nulls last, vd.id
+       limit cfg.initial_count) x;
+    update private.channel_auto_selection
+       set initial_done_at = now(),
+           watermark = coalesce(
+             (select max(vd.published_at) from public.videos vd
+               where vd.workspace_id = w and vd.channel_id = c), now())
+     where workspace_id = w and channel_id = c;
+  else
+    room := cfg.daily_cap - (
+      select count(*) from private.auto_selected_videos a
+       where a.workspace_id = w and a.channel_id = c and not a.initial
+         and a.selected_at > now() - interval '24 hours');
+    if room <= 0 then return 0; end if;
+    select coalesce(array_agg(x.id), '{}') into picked from (
+      select vd.id from public.videos vd
+       where vd.workspace_id = w and vd.channel_id = c
+         and vd.kind in ('video', 'short', 'stream')
+         and vd.comments_state <> 'disabled'
+         and vd.published_at > cfg.watermark
+         and not exists (select 1 from public.video_selections s
+                          where s.workspace_id = w and s.video_id = vd.id)
+         and not exists (select 1 from private.auto_selected_videos a
+                          where a.workspace_id = w and a.video_id = vd.id)
+       order by vd.published_at desc, vd.id
+       limit room) x;
+  end if;
+
+  foreach v in array picked loop
+    insert into public.video_selections(workspace_id, channel_id, video_id, selected_by)
+    values (w, c, v, cfg.created_by)
+    on conflict (workspace_id, video_id) do nothing;
+    insert into private.auto_selected_videos(workspace_id, video_id, channel_id, initial)
+    values (w, v, c, cfg.initial_done_at is null)
+    on conflict (workspace_id, video_id) do nothing;
+    perform private.adopt_video_comments_and_predictions(w, v);
+  end loop;
+  return cardinality(picked);
 end $function$
 
 CREATE OR REPLACE FUNCTION private.backfill_remaining(w uuid)
@@ -4053,6 +4173,8 @@ declare ch record; d int := 0; k int := 0; a int := 0; cat int; begin
       if private.enqueue_scheduled(w, ch.id, 'discover') is not null then d := d + 1; end if;
     end if;
 
+    perform private.auto_select_videos(w, ch.id);
+
     if private.has_due_videos(w, ch.id) then
       if private.enqueue_scheduled(w, ch.id, 'collect') is not null then k := k + 1; end if;
     end if;
@@ -5301,7 +5423,7 @@ begin
     order by w.created_at desc, c.external_channel_id;
 end $function$
 
-CREATE OR REPLACE FUNCTION public.admin_import_channel(p_external text, p_title text DEFAULT NULL::text, p_handle text DEFAULT NULL::text, p_platform text DEFAULT 'youtube'::text)
+CREATE OR REPLACE FUNCTION public.admin_import_channel(p_external text, p_title text DEFAULT NULL::text, p_handle text DEFAULT NULL::text, p_platform text DEFAULT 'youtube'::text, p_initial_videos integer DEFAULT 20, p_daily_new_videos integer DEFAULT 5)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -5359,6 +5481,8 @@ begin
   select id into c from public.clients where workspace_id = w limit 1;
   ch := private.register_public_channel_impl(w, c, v_external, p_handle, p_title, v_platform);
   j := private.request_discovery_impl(w, ch.id);
+  insert into private.channel_auto_selection(workspace_id, channel_id, initial_count, daily_cap, created_by)
+  values (w, ch.id, p_initial_videos, p_daily_new_videos, uid);
 
   insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
   values (w, uid, 'channel_imported', 'channel', ch.id::text);
@@ -7053,6 +7177,13 @@ grant SELECT on table "auth"."users" to "postgres";
 grant TRIGGER on table "auth"."users" to "postgres";
 grant TRUNCATE on table "auth"."users" to "postgres";
 grant UPDATE on table "auth"."users" to "postgres";
+grant DELETE on table "private"."auto_selected_videos" to "postgres";
+grant INSERT on table "private"."auto_selected_videos" to "postgres";
+grant REFERENCES on table "private"."auto_selected_videos" to "postgres";
+grant SELECT on table "private"."auto_selected_videos" to "postgres";
+grant TRIGGER on table "private"."auto_selected_videos" to "postgres";
+grant TRUNCATE on table "private"."auto_selected_videos" to "postgres";
+grant UPDATE on table "private"."auto_selected_videos" to "postgres";
 grant DELETE on table "private"."billing_events" to "postgres";
 grant INSERT on table "private"."billing_events" to "postgres";
 grant REFERENCES on table "private"."billing_events" to "postgres";
@@ -7060,6 +7191,13 @@ grant SELECT on table "private"."billing_events" to "postgres";
 grant TRIGGER on table "private"."billing_events" to "postgres";
 grant TRUNCATE on table "private"."billing_events" to "postgres";
 grant UPDATE on table "private"."billing_events" to "postgres";
+grant DELETE on table "private"."channel_auto_selection" to "postgres";
+grant INSERT on table "private"."channel_auto_selection" to "postgres";
+grant REFERENCES on table "private"."channel_auto_selection" to "postgres";
+grant SELECT on table "private"."channel_auto_selection" to "postgres";
+grant TRIGGER on table "private"."channel_auto_selection" to "postgres";
+grant TRUNCATE on table "private"."channel_auto_selection" to "postgres";
+grant UPDATE on table "private"."channel_auto_selection" to "postgres";
 grant DELETE on table "private"."job_batches" to "postgres";
 grant INSERT on table "private"."job_batches" to "postgres";
 grant REFERENCES on table "private"."job_batches" to "postgres";
@@ -7544,6 +7682,8 @@ grant EXECUTE on function private.analysis_remaining(uuid) to "postgres";
 grant EXECUTE on function private.analysis_remaining(uuid) to "service_role";
 grant EXECUTE on function private.apply_billing_event(text,text,timestamp with time zone,uuid,text,text,timestamp with time zone,timestamp with time zone,text,boolean,text,text,jsonb) to "postgres";
 grant EXECUTE on function private.apply_pack_event(text,timestamp with time zone,uuid,text,integer,text,jsonb) to "postgres";
+grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "postgres";
+grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "service_role";
 grant EXECUTE on function private.backfill_remaining(uuid) to "postgres";
 grant EXECUTE on function private.backfill_remaining(uuid) to "service_role";
 grant EXECUTE on function private.billing_root(uuid) to "postgres";
@@ -7740,8 +7880,8 @@ grant EXECUTE on function admin_audit(integer) to "authenticated";
 grant EXECUTE on function admin_audit(integer) to "postgres";
 grant EXECUTE on function admin_channels() to "authenticated";
 grant EXECUTE on function admin_channels() to "postgres";
-grant EXECUTE on function admin_import_channel(text,text,text,text) to "authenticated";
-grant EXECUTE on function admin_import_channel(text,text,text,text) to "postgres";
+grant EXECUTE on function admin_import_channel(text,text,text,text,integer,integer) to "authenticated";
+grant EXECUTE on function admin_import_channel(text,text,text,text,integer,integer) to "postgres";
 grant EXECUTE on function admin_ops() to "authenticated";
 grant EXECUTE on function admin_ops() to "postgres";
 grant EXECUTE on function admin_plan_catalogue() to "authenticated";
