@@ -55,10 +55,11 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  /* One row from 1280px of viewport up; two rows at 1100 and 1000, where
-     the shell leaves this bar under 800px inside its padding. A one-row bar
-     there was possible only with the search at ~130px and its placeholder
-     clipped, and a readable search box is worth the second row. */
+  /* Two rows on every desktop width the content column allows (measured
+     1100–1920px, 2026-10-09): the search and the two selects, then the
+     period, «المزيد» and the actions together (`.db-filterbar-tail`). A
+     one-row bar was possible only with the search at ~130px and its
+     placeholder clipped, and a readable search box is worth the second row. */
   gap: var(--space-2) var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--glass-2-tint);
@@ -73,6 +74,17 @@
 .db-filterbar-actions {
   display: flex;
   gap: var(--space-2);
+  margin-inline-start: auto;
+}
+/* The period and «المزيد» triggers with the actions, never split across
+   rows: a popover opens above or below its trigger's row, never over it,
+   and with «تطبيق» on the row underneath, the open popover covered it.
+   See FilterBar.tsx. */
+.db-filterbar-tail {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: var(--space-3);
   margin-inline-start: auto;
 }
 .db-filterbar-error {
