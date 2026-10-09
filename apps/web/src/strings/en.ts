@@ -412,7 +412,9 @@ export const en: Strings = {
   adminImportEmptyFile:
     "The file has no column of channel names (name, or its Arabic header).",
   adminImportReadFailed: "The file could not be read.",
-  adminImportFind: "Find the channels",
+  adminImportFindByName: (n: number) => `Search ${n} channels by name`,
+  adminImportVerify: (n: number) => `Verify ${n} links`,
+  adminImportQueuedLink: "Waiting to verify the link",
   adminImportStop: "Stop",
   adminImportContinue: "Continue searching",
   adminImportQuotaHalted:
