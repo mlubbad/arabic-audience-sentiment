@@ -5515,6 +5515,67 @@ begin
     order by w.created_at desc, c.external_channel_id;
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_channels_console()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '30s'
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  result jsonb;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+
+  with st as (select * from private.admin_channel_states()),
+  vids as (
+    select v.workspace_id, v.channel_id, count(*) as videos,
+           coalesce(sum(s.total), 0) as comments,
+           coalesce(sum(s.analysed), 0) as analysed
+      from public.videos v
+      left join private.video_comment_stats s
+        on s.workspace_id = v.workspace_id and s.video_id = v.id
+     group by v.workspace_id, v.channel_id),
+  sel as (
+    select workspace_id, channel_id, count(*) as selected
+      from public.video_selections
+     group by workspace_id, channel_id)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', c.id,
+           'workspace_id', c.workspace_id,
+           'workspace_name', w.name,
+           'mine', w.created_by = uid,
+           'owner_email', u.email,
+           'external_channel_id', c.external_channel_id,
+           'title', c.title,
+           'handle', c.handle,
+           'state', st.state,
+           'last_ok_at', st.last_ok_at,
+           'last_error', st.last_error,
+           'last_run_at', st.last_run_at,
+           'catalogued_at', c.catalogued_at,
+           'videos', coalesce(vids.videos, 0),
+           'selected', coalesce(sel.selected, 0),
+           'comments', coalesce(vids.comments, 0),
+           'analysed', coalesce(vids.analysed, 0),
+           'auto_initial', a.initial_count,
+           'auto_daily', a.daily_cap)
+         order by w.created_at, c.id), '[]'::jsonb)
+    into result
+    from public.channels c
+    join public.workspaces w on w.id = c.workspace_id
+    left join auth.users u on u.id = w.created_by
+    join st on st.channel_id = c.id
+    left join vids on vids.workspace_id = c.workspace_id and vids.channel_id = c.id
+    left join sel on sel.workspace_id = c.workspace_id and sel.channel_id = c.id
+    left join private.channel_auto_selection a
+      on a.workspace_id = c.workspace_id and a.channel_id = c.id;
+  return result;
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_console_overview()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -8201,6 +8262,8 @@ grant EXECUTE on function admin_audit(integer) to "authenticated";
 grant EXECUTE on function admin_audit(integer) to "postgres";
 grant EXECUTE on function admin_channels() to "authenticated";
 grant EXECUTE on function admin_channels() to "postgres";
+grant EXECUTE on function admin_channels_console() to "authenticated";
+grant EXECUTE on function admin_channels_console() to "postgres";
 grant EXECUTE on function admin_console_overview() to "authenticated";
 grant EXECUTE on function admin_console_overview() to "postgres";
 grant EXECUTE on function admin_import_channel(text,text,text,text,integer,integer) to "authenticated";

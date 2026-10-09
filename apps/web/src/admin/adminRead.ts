@@ -11,6 +11,7 @@
  */
 import {
   AdminAuditEventsSchema,
+  AdminChannelsConsoleSchema,
   AdminChannelsSchema,
   AdminConsoleOverviewSchema,
   AdminOpsSchema,
@@ -19,6 +20,7 @@ import {
   ServicesHealthReportSchema,
   type AdminAuditEvent,
   type AdminChannel,
+  type AdminConsoleChannel,
   type AdminConsoleOverview,
   type AdminOps,
   type AdminUser,
@@ -200,6 +202,15 @@ export async function readAdminConsoleOverview(): Promise<AdminConsoleOverview> 
   const { data, error } = await supabase!.rpc("admin_console_overview");
   if (error) throw rpcFailure(error);
   return AdminConsoleOverviewSchema.parse(data);
+}
+
+/** The owner console's channels page: every channel with its state. */
+export async function readAdminChannelsConsole(): Promise<
+  AdminConsoleChannel[]
+> {
+  const { data, error } = await supabase!.rpc("admin_channels_console");
+  if (error) throw rpcFailure(error);
+  return AdminChannelsConsoleSchema.parse(data);
 }
 
 export async function readAdminChannels(): Promise<AdminChannel[]> {
