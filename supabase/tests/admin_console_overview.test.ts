@@ -182,6 +182,7 @@ describe("admin_console_overview", () => {
     const o = await overview();
     expect(o.channels).toBe(7);
     expect(o.states).toEqual({
+      paused: 0,
       cataloguing: 1,
       collecting: 1,
       failing: 1,
@@ -348,5 +349,114 @@ describe("admin_channels_console", () => {
       "select proconfig as config from pg_proc where proname = 'admin_channels_console'",
     );
     expect(cfg[0]!.config).toContain("statement_timeout=30s");
+  });
+});
+
+describe("pausing a channel's collection", () => {
+  async function channel(title: string) {
+    await db.exec("reset role");
+    const { rows } = await db.query<{ ws: string; id: string }>(
+      "select workspace_id as ws, id from channels where title=$1",
+      [title],
+    );
+    return rows[0]!;
+  }
+  async function setPaused(ids: string[], paused: boolean) {
+    const { rows } = await db.query<{
+      r: { changed: number; cancelled_jobs: number };
+    }>("select public.admin_set_channels_paused($1::uuid[], $2) as r", [
+      ids,
+      paused,
+    ]);
+    return rows[0]!.r;
+  }
+  async function queued(ws: string, type: string) {
+    return count(
+      "select count(*)::int as n from jobs where workspace_id=$1 and type=$2 and status='queued'",
+      [ws, type],
+    );
+  }
+  async function count(sql: string, params: unknown[]) {
+    await db.exec("reset role");
+    const { rows } = await db.query<{ n: number }>(sql, params);
+    return rows[0]!.n;
+  }
+
+  it("cancels queued work, counts the channel as paused, and records who did it", async () => {
+    const col = await channel("Collecting");
+    expect(await queued(col.ws, "collect")).toBe(1);
+    await as("authenticated", ADMIN);
+    expect(await setPaused([col.id], true)).toEqual({
+      changed: 1,
+      cancelled_jobs: 1,
+    });
+    expect(await queued(col.ws, "collect")).toBe(0);
+    await as("authenticated", ADMIN);
+    const o = await overview();
+    expect(o.states.paused).toBe(1);
+    expect(o.states.collecting).toBe(0);
+    expect(o.activity[0]).toMatchObject({
+      action: "channel_paused",
+      actor_email: "owner@example.com",
+    });
+    // Pausing it again changes nothing.
+    expect(await setPaused([col.id], true)).toEqual({
+      changed: 0,
+      cancelled_jobs: 0,
+    });
+  });
+
+  it("the scheduler starts nothing for a paused channel, and picks it up again once resumed", async () => {
+    const stale = await channel("Stale");
+    await as("authenticated", ADMIN);
+    await setPaused([stale.id], true);
+    await db.exec("reset role");
+    await db.query("select private.schedule_due_work($1)", [stale.ws]);
+    expect(await queued(stale.ws, "collect")).toBe(0);
+
+    await as("authenticated", ADMIN);
+    expect(await setPaused([stale.id], false)).toEqual({
+      changed: 1,
+      cancelled_jobs: 0,
+    });
+    await db.exec("reset role");
+    await db.query("select private.schedule_due_work($1)", [stale.ws]);
+    expect(await queued(stale.ws, "collect")).toBe(1);
+  });
+
+  it("the automatic selection selects nothing while paused", async () => {
+    // Published after the first selection's watermark: a video the daily
+    // selection would take.
+    const wait = await channel("Waiting");
+    await db.query(
+      `insert into videos(workspace_id, channel_id, external_video_id, title, published_at, comments_state)
+       values ($1,$2,'wait-v','wait-v', now() + interval '1 hour', 'open')`,
+      [wait.ws, wait.id],
+    );
+    await as("authenticated", ADMIN);
+    await setPaused([wait.id], true);
+    await db.exec("reset role");
+    const picked = async () =>
+      (
+        await db.query<{ n: number }>(
+          "select private.auto_select_videos($1,$2) as n",
+          [wait.ws, wait.id],
+        )
+      ).rows[0]!.n;
+    expect(await picked()).toBe(0);
+    await as("authenticated", ADMIN);
+    await setPaused([wait.id], false);
+    await db.exec("reset role");
+    expect(await picked()).toBe(1);
+  });
+
+  it("answers no one but a platform admin, and refuses an empty list", async () => {
+    const ok = await channel("Healthy");
+    await as("authenticated", OTHER);
+    await expect(setPaused([ok.id], true)).rejects.toThrow(/forbidden/);
+    await as("anon", null);
+    await expect(setPaused([ok.id], true)).rejects.toThrow(/permission denied/);
+    await as("authenticated", ADMIN);
+    await expect(setPaused([], true)).rejects.toThrow(/invalid_request/);
   });
 });

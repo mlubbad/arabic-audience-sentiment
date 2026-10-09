@@ -402,6 +402,7 @@ export const en: Strings = {
   adminHomeAnalysed: "Comments analysed",
   adminHomeStates: "Channel states",
   adminChannelStates: {
+    paused: "Collection paused",
     cataloguing: "Cataloguing now",
     collecting: "Collecting now",
     failing: "Last run failed",
@@ -675,6 +676,15 @@ export const en: Strings = {
   adminConsoleAutoValue: (initial: number, daily: number) =>
     `The latest ${initial} videos, then up to ${daily} new a day`,
   adminConsoleAutoNone: "Not on for this channel",
+  adminConsolePause: "Pause collection",
+  adminConsolePauseConfirm: "Confirm the pause",
+  adminConsoleResume: "Resume collection",
+  adminConsolePauseNote:
+    "A pause stops the scheduler from cataloguing, collecting and analysing this channel, and cancels what waits in the queue. What was collected stays; a member can still sync by hand.",
+  adminConsolePausedDone: "Collection paused for this channel.",
+  adminConsoleResumedDone:
+    "Collection resumed; the scheduler picks it up on its next round (up to an hour if work was cancelled moments ago).",
+  adminConsolePauseFailed: "Could not change the collection state.",
   adminConsolePrev: "Previous channel",
   adminConsoleNext: "Next channel",
   adminConsolePosition: (i: number, n: number) => `${i} of ${n}`,

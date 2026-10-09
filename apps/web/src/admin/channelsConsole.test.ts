@@ -135,6 +135,7 @@ describe("channels console filter", () => {
       cataloguing: 0,
       collecting: 0,
       healthy: 1,
+      paused: 0,
     });
   });
 });

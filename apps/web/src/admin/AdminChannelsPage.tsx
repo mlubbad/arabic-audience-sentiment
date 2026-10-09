@@ -10,11 +10,12 @@
  * beside the list, with the way into its workspace and the next and previous
  * channel, so the owner walks the list without leaving it.
  *
- * Read only in this phase; bulk actions and the pause state are phase 2.
+ * The panel pauses and resumes a channel's collection
+ * (`admin_set_channels_paused`); bulk actions over a selection follow.
  */
 import { useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminConsoleChannel } from "@sentiment/contracts";
 import { useStrings } from "../strings";
 import { failureCode } from "../failure";
@@ -31,7 +32,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "../ui/Table";
-import { readAdminChannelsConsole } from "./adminRead";
+import { readAdminChannelsConsole, setChannelsPaused } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
 import {
   STATE_ORDER,
@@ -320,6 +321,7 @@ function ChannelPanel({
             >
               {S.adminHomeOpenWorkspace}
             </Link>
+            <PauseControl key={c.id} channel={c} />
             <div className="admin-console-nav">
               <Button
                 type="button"
@@ -347,5 +349,99 @@ function ChannelPanel({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Pause or resume one channel's collection: a pause asks for a second,
+ *  confirming press; resuming does not, since it only lets work start. */
+function PauseControl({ channel: c }: { channel: AdminConsoleChannel }) {
+  const S = useStrings();
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const paused = c.state === "paused";
+
+  async function change(pause: boolean) {
+    setBusy(true);
+    setNote(null);
+    setConfirming(false);
+    try {
+      await setChannelsPaused([c.id], pause);
+      setNote({
+        ok: true,
+        text: pause ? S.adminConsolePausedDone : S.adminConsoleResumedDone,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "channels", "console"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "overview"] }),
+      ]);
+    } catch {
+      setNote({ ok: false, text: S.adminConsolePauseFailed });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section
+      className="admin-account-section"
+      data-testid="admin-console-pause"
+    >
+      <p className="admin-account-callout">{S.adminConsolePauseNote}</p>
+      {note && (
+        <p
+          role={note.ok ? "status" : "alert"}
+          className={note.ok ? "admin-account-ok" : "admin-account-error"}
+        >
+          {note.text}
+        </p>
+      )}
+      <div className="admin-account-row">
+        {paused ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void change(false)}
+          >
+            {S.adminConsoleResume}
+          </Button>
+        ) : confirming ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              disabled={busy}
+              onClick={() => void change(true)}
+            >
+              {S.adminConsolePauseConfirm}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirming(false)}
+            >
+              {S.adminAccountCancel}
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setConfirming(true)}
+          >
+            {S.adminConsolePause}
+          </Button>
+        )}
+      </div>
+    </section>
   );
 }

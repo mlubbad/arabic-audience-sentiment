@@ -184,4 +184,56 @@ describe("AdminChannelsPage (channels console)", () => {
     expect(panel).toHaveTextContent(ar.adminConsoleAutoNone);
     expect(panel).toHaveTextContent("customer@example.com");
   });
+
+  it("pauses a channel only after a confirming press, and says so", async () => {
+    vi.mocked(adminRead.setChannelsPaused).mockResolvedValue({
+      changed: 1,
+      cancelled_jobs: 1,
+    });
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("button", { name: ar.adminConsoleOpen("Healthy one") }),
+    );
+    const panel = await screen.findByTestId("admin-console-pause");
+    await userEvent.click(
+      within(panel).getByRole("button", { name: ar.adminConsolePause }),
+    );
+    expect(adminRead.setChannelsPaused).not.toHaveBeenCalled();
+    await userEvent.click(
+      within(panel).getByRole("button", { name: ar.adminConsolePauseConfirm }),
+    );
+    expect(adminRead.setChannelsPaused).toHaveBeenCalledWith(
+      [ROWS[0]!.id],
+      true,
+    );
+    expect(await within(panel).findByRole("status")).toHaveTextContent(
+      ar.adminConsolePausedDone,
+    );
+  });
+
+  it("resumes a paused channel with one press, and names a refusal", async () => {
+    vi.mocked(adminRead.readAdminChannelsConsole).mockResolvedValue([
+      { ...ROWS[0]!, state: "paused" },
+    ]);
+    vi.mocked(adminRead.setChannelsPaused).mockRejectedValueOnce({
+      message: "forbidden",
+    });
+    mount();
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("button", { name: ar.adminConsoleOpen("Healthy one") }),
+    );
+    const panel = await screen.findByTestId("admin-console-pause");
+    await userEvent.click(
+      within(panel).getByRole("button", { name: ar.adminConsoleResume }),
+    );
+    expect(adminRead.setChannelsPaused).toHaveBeenCalledWith(
+      [ROWS[0]!.id],
+      false,
+    );
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
+      ar.adminConsolePauseFailed,
+    );
+  });
 });

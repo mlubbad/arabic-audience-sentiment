@@ -19,6 +19,7 @@ export const STATE_ORDER: ChannelState[] = [
   "cataloguing",
   "collecting",
   "healthy",
+  "paused",
 ];
 
 /** How each state reads: trouble, work to look at, work in progress, fine. */
@@ -33,6 +34,7 @@ export const STATE_TONE: Record<
   cataloguing: "neutral",
   collecting: "neutral",
   healthy: "success",
+  paused: "neutral",
 };
 
 export type OwnerFilter = "all" | "mine" | "customers";

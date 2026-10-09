@@ -213,6 +213,19 @@ export async function readAdminChannelsConsole(): Promise<
   return AdminChannelsConsoleSchema.parse(data);
 }
 
+/** Pause or resume the scheduler's work on channels. Thrown as it came. */
+export async function setChannelsPaused(
+  channelIds: string[],
+  paused: boolean,
+): Promise<{ changed: number; cancelled_jobs: number }> {
+  const { data, error } = await supabase!.rpc("admin_set_channels_paused", {
+    p_channels: channelIds,
+    p_paused: paused,
+  });
+  if (error) throw error;
+  return data as { changed: number; cancelled_jobs: number };
+}
+
 export async function readAdminChannels(): Promise<AdminChannel[]> {
   const { data, error } = await supabase!.rpc("admin_channels");
   if (error) throw rpcFailure(error);
