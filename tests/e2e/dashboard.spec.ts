@@ -1441,6 +1441,60 @@ test("the report says what it is narrowed to, wherever you have read to", async 
   await expect(summary).toBeHidden();
 });
 
+test("a chip names an applied filter, never a chosen-but-unapplied one", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const summary = page.getByTestId("active-filters");
+  await expect(page.getByTestId("total")).toHaveText("6");
+
+  // Chosen, not applied: every figure still describes all six comments, so
+  // a chip saying «التعليقات فقط» here would tell the reader the page is
+  // narrowed when it is not.
+  await openMore(page);
+  await pick(page, "نوع المشاركة", "تعليقات أصلية فقط");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(summary).toBeHidden();
+  // The «المزيد» trigger still counts it: it describes the controls behind
+  // it, and one of them is set.
+  await expect(
+    page.getByRole("button", { name: "المزيد من المرشحات (1)" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("4");
+  await expect(summary).toContainText("مُصفّى");
+  await expect(summary).toContainText("التعليقات فقط");
+});
+
+test("removing a chip clears that filter alone, not the drafts beside it", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const summary = page.getByTestId("active-filters");
+  await pick(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("2");
+
+  // A draft beside the applied video filter, not applied.
+  await openMore(page);
+  await pick(page, "نوع المشاركة", "تعليقات أصلية فقط");
+  await page.keyboard.press("Escape");
+
+  // The chip is the applied state: removing it re-reads at once, without
+  // the video, and without slipping the unapplied draft in alongside.
+  await summary
+    .getByRole("button", { name: "إزالة الفلتر: فيديو محدَّد" })
+    .click();
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(summary).toBeHidden();
+  // And the matching control says so, rather than still showing the video.
+  await expect(
+    page.getByRole("combobox", { name: "الفيديو", exact: true }),
+  ).toContainText("كل الفيديوهات");
+});
+
 test("escape leaves the correction overlay", async ({ page }) => {
   await page.goto("/dashboard");
   const row = page.locator('[data-testid="comments-table"] tbody tr').first();
