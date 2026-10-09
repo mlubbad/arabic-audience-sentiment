@@ -1,5 +1,31 @@
 # Verification
 
+## 2026-10-09 — The account file and password recovery (admin users page)
+
+Owner request (2026-10-09): full management of customer accounts from the owner's side: their details, plan, password help. Owner's choice the same day: build it inside the current users page first, then move it into the new owner console. One migration (`20261014000000_admin_account_file.sql`: `private.user_profiles`, `admin_user_detail`, `admin_update_user_profile`, `admin_record_user_action`), no Edge Function. Suspension, owner-made links and email changes need the auth admin API and wait for an `admin-users` function the owner deploys.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_account_file.test.ts` | 10 passed: detail with sign-in facts, empty details, every seat; unknown user `user_not_found`; non-admin `forbidden`, anon `permission denied`; save trims and clears blanks, lands in history; 121-character name `profile_too_long`; `private.user_profiles` unreadable by `authenticated`; reset recorded, unknown action refused; a role change through `update_workspace_account_role` shows in history and the owner's seat is refused. |
+| Mutations: history without `membership` rows; profile edit not audited | `1 failed`; `1 failed`. |
+| `AccountFile.test.tsx`, `ResetPassword.test.tsx`, `AdminUsersPage.test.tsx` | 6, 6, 2 passed. Reset request uses `redirectTo` `/reset-password` and answers the same whether the email has an account; mismatched passwords refused before any call; a recovery landing on `/` is taken to `/reset-password`. |
+| Mutation: recovery landing pattern broken | `1 failed`. |
+| Found on review before push: `AdminAuditEventSchema` required a workspace id, and the account file's events have none | the audit page would have refused every read after the first profile edit. Contract now allows null (the page never read the field); a DB test parses `admin_audit()` through the contract. Mutation (back to required): `1 failed`. |
+| First run of `Account.entry.test.ts` after adding the "forgot" link as a router `Link` | 7 failed: the sign-in surface renders outside a router there. Now a plain `<a>`; 7 passed. |
+| `npm run check` | exit 0: unit 1176, DB 520, worker 297 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| `npm run test:e2e` | not run in Claude's container (Chromium build mismatch); CI's e2e job is the evidence. |
+
+## 2026-10-09 — Automatic selection runs as the catalogue run finishes (admin console phase 0)
+
+Owner observation (2026-10-09): an imported workspace showed 0 selected videos after its catalogue was in. Cause: only the scheduler ran the selection, hourly at :17 or when the worker is idle, and after a bulk import the worker is busy for hours. Fix: one migration (`20261013000000_auto_select_on_catalogue.sql`), a trigger on `jobs` that runs `private.auto_select_videos` when a `discover` job goes from queued/running to `succeeded`/`partial`, and queues the collection of what it selected. No Edge Function change.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/admin_import_channel.test.ts` | 15 passed. New: a failed catalogue run selects nothing; marking the run `succeeded` selects the latest 20 and queues one collect with no scheduler tick. |
+| First draft: one `if auto_select_videos(...) > 0 and has_due_videos(...)` | 20 selected, 0 collect queued: `has_due_videos` is stable and did not see selections made in the same statement. Split into two statements; passed. |
+| Mutations: trigger fires on `partial` only; enqueue skipped | `2 failed`; `1 failed`. |
+| `npm run test:db` / `npm run worker:test` | 510 passed / 297 passed. |
+
 ## 2026-10-09 — Bulk channel import for the platform owner (`/admin/import`)
 
 Owner request (2026-10-09): import a CSV of YouTube channels, one workspace per channel named after it, collection started, and no channel the account already holds imported twice. Follow-up decision the same day: never select a channel's whole catalogue; select its latest 20 videos once the first catalogue run is done, then add videos it publishes later, at most 5 a day. Built by Claude; one migration (`20261012000000_admin_import_channel.sql`), no Edge Function change: lookups reuse the deployed `channel-lookup`.

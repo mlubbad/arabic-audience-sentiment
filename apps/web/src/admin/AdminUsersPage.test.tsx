@@ -14,6 +14,10 @@ import * as adminShellModule from "./AdminShell";
 import type { AdminUser } from "@sentiment/contracts";
 
 vi.mock("./adminRead");
+vi.mock("./AccountFile", () => ({
+  AccountFile: ({ user }: { user: { email: string } | null }) =>
+    user ? <div data-testid="account-file">{user.email}</div> : null,
+}));
 vi.mock("../session");
 vi.mock("../impersonation");
 vi.mock("./AdminShell", async (importOriginal) => {
@@ -102,5 +106,16 @@ describe("AdminUsersPage", () => {
     // Clicking impersonate invokes startImpersonation
     await userEvent.click(impersonateBtn);
     expect(startImpersonationMock).toHaveBeenCalledWith(mockUsers[1]);
+  });
+
+  it("opens the account file of the person whose Manage was pressed", async () => {
+    mount();
+    expect(screen.queryByTestId("account-file")).toBeNull();
+    await userEvent.click(
+      await screen.findByTestId("admin-manage-user-client-1"),
+    );
+    expect(screen.getByTestId("account-file")).toHaveTextContent(
+      "client1@example.com",
+    );
   });
 });

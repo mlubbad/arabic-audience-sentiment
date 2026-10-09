@@ -231,6 +231,28 @@ alter table "private"."platform_reader" add constraint "platform_reader_status_n
 CREATE UNIQUE INDEX one_active_platform_reader ON private.platform_reader USING btree ((1)) WHERE (status = 'active'::text);
 CREATE UNIQUE INDEX platform_reader_pkey ON private.platform_reader USING btree (id);
 
+create table "private"."user_profiles" (
+  "user_id" uuid not null,
+  "display_name" text,
+  "organization" text,
+  "phone" text,
+  "admin_note" text,
+  "updated_at" timestamp with time zone default now() not null,
+  "updated_by" uuid
+);
+
+alter table "private"."user_profiles" add constraint "user_profiles_admin_note_check" CHECK (char_length(admin_note) <= 2000);
+alter table "private"."user_profiles" add constraint "user_profiles_display_name_check" CHECK (char_length(display_name) <= 120);
+alter table "private"."user_profiles" add constraint "user_profiles_organization_check" CHECK (char_length(organization) <= 120);
+alter table "private"."user_profiles" add constraint "user_profiles_phone_check" CHECK (char_length(phone) <= 40);
+alter table "private"."user_profiles" add constraint "user_profiles_pkey" PRIMARY KEY (user_id);
+alter table "private"."user_profiles" add constraint "user_profiles_updated_at_not_null" NOT NULL updated_at;
+alter table "private"."user_profiles" add constraint "user_profiles_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+alter table "private"."user_profiles" add constraint "user_profiles_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+alter table "private"."user_profiles" add constraint "user_profiles_user_id_not_null" NOT NULL user_id;
+
+CREATE UNIQUE INDEX user_profiles_pkey ON private.user_profiles USING btree (user_id);
+
 create table "private"."video_comment_stats" (
   "workspace_id" uuid not null,
   "video_id" uuid not null,
@@ -1468,6 +1490,32 @@ declare root uuid; begin
   insert into private.billing_events(event_id, event_type, occurred_at, workspace_id, applied_at, outcome, payload)
   values (event_id, 'transaction.completed', occurred_at, root, now(), 'applied', payload);
   return 'applied';
+end $function$
+
+CREATE OR REPLACE FUNCTION private.auto_select_after_catalogue()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  picked integer;
+begin
+  -- The selection is a convenience on top of the job's own outcome: a fault
+  -- here must not undo the finished run. The scheduler tries again within
+  -- the hour.
+  begin
+    -- Two statements: `has_due_videos` is stable, so within the statement
+    -- that selects it would not see the new selections.
+    picked := private.auto_select_videos(new.workspace_id, new.channel_id);
+    if picked > 0 and private.has_due_videos(new.workspace_id, new.channel_id) then
+      perform private.enqueue_scheduled(new.workspace_id, new.channel_id, 'collect');
+    end if;
+  exception when others then
+    raise warning 'auto_select_after_catalogue(%, %): %',
+      new.workspace_id, new.channel_id, sqlerrm;
+  end;
+  return null;
 end $function$
 
 CREATE OR REPLACE FUNCTION private.auto_select_videos(w uuid, c uuid)
@@ -5559,6 +5607,29 @@ begin
             from public.plans p);
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_record_user_action(p_user uuid, p_action text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_action not in ('password_reset_sent') then
+    raise exception 'invalid_action' using errcode='22023';
+  end if;
+  if not exists (select 1 from auth.users where id = p_user) then
+    raise exception 'user_not_found' using errcode='P0002';
+  end if;
+  insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+  values (null, uid, p_action, 'user', p_user::text);
+  return jsonb_build_object('ok', true);
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_services_health()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5770,6 +5841,109 @@ begin
   values (v_ws_id, auth.uid(), 'impersonation_ended', 'user', p_target_user_id::text);
 
   return jsonb_build_object('ok', true);
+end $function$
+
+CREATE OR REPLACE FUNCTION public.admin_update_user_profile(p_user uuid, p_display_name text, p_organization text, p_phone text, p_admin_note text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if not exists (select 1 from auth.users where id = p_user) then
+    raise exception 'user_not_found' using errcode='P0002';
+  end if;
+
+  insert into private.user_profiles as up
+         (user_id, display_name, organization, phone, admin_note, updated_at, updated_by)
+  values (p_user,
+          nullif(trim(p_display_name), ''),
+          nullif(trim(p_organization), ''),
+          nullif(trim(p_phone), ''),
+          nullif(trim(p_admin_note), ''),
+          now(), uid)
+  on conflict (user_id) do update
+     set display_name = excluded.display_name,
+         organization = excluded.organization,
+         phone = excluded.phone,
+         admin_note = excluded.admin_note,
+         updated_at = excluded.updated_at,
+         updated_by = excluded.updated_by;
+
+  insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+  values (null, uid, 'user_profile_updated', 'user', p_user::text);
+
+  return jsonb_build_object('ok', true);
+exception when check_violation then
+  raise exception 'profile_too_long' using errcode='22023';
+end $function$
+
+CREATE OR REPLACE FUNCTION public.admin_user_detail(p_user uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  u record;
+  p private.user_profiles;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  select id, email, created_at, last_sign_in_at, email_confirmed_at, banned_until
+    into u from auth.users where id = p_user;
+  if not found then
+    raise exception 'user_not_found' using errcode='P0002';
+  end if;
+  select * into p from private.user_profiles where user_id = p_user;
+
+  return jsonb_build_object(
+    'id', u.id,
+    'email', u.email,
+    'created_at', u.created_at,
+    'last_sign_in_at', u.last_sign_in_at,
+    'email_confirmed_at', u.email_confirmed_at,
+    'banned_until', u.banned_until,
+    'profile', jsonb_build_object(
+      'display_name', p.display_name,
+      'organization', p.organization,
+      'phone', p.phone,
+      'admin_note', p.admin_note,
+      'updated_at', p.updated_at),
+    'memberships', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'workspace_id', ws.id,
+               'workspace_name', ws.name,
+               'role', m.role,
+               'created_by_user', ws.created_by = p_user)
+             order by ws.created_at, ws.id)
+        from public.memberships m
+        join public.workspaces ws on ws.id = m.workspace_id
+       where m.user_id = p_user), '[]'::jsonb),
+    'history', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'at', h.created_at,
+               'action', h.action,
+               'actor_email', h.actor_email,
+               'by_self', h.actor_id = p_user,
+               'workspace_name', h.workspace_name)
+             order by h.created_at desc)
+        from (
+          select e.created_at, e.action, e.actor_id, a.email as actor_email,
+                 ws.name as workspace_name
+            from public.audit_events e
+            left join auth.users a on a.id = e.actor_id
+            left join public.workspaces ws on ws.id = e.workspace_id
+           where (e.target_type in ('user', 'membership') and e.target_id = p_user::text)
+              or e.actor_id = p_user
+           order by e.created_at desc
+           limit 50) h), '[]'::jsonb));
 end $function$
 
 CREATE OR REPLACE FUNCTION public.admin_users()
@@ -7263,6 +7437,13 @@ grant TRUNCATE on table "private"."platform_reader" to "postgres";
 grant UPDATE on table "private"."platform_reader" to "postgres";
 grant SELECT on table "private"."platform_reader" to "service_role";
 grant UPDATE on table "private"."platform_reader" to "service_role";
+grant DELETE on table "private"."user_profiles" to "postgres";
+grant INSERT on table "private"."user_profiles" to "postgres";
+grant REFERENCES on table "private"."user_profiles" to "postgres";
+grant SELECT on table "private"."user_profiles" to "postgres";
+grant TRIGGER on table "private"."user_profiles" to "postgres";
+grant TRUNCATE on table "private"."user_profiles" to "postgres";
+grant UPDATE on table "private"."user_profiles" to "postgres";
 grant DELETE on table "private"."video_comment_stats" to "postgres";
 grant INSERT on table "private"."video_comment_stats" to "postgres";
 grant REFERENCES on table "private"."video_comment_stats" to "postgres";
@@ -7682,6 +7863,7 @@ grant EXECUTE on function private.analysis_remaining(uuid) to "postgres";
 grant EXECUTE on function private.analysis_remaining(uuid) to "service_role";
 grant EXECUTE on function private.apply_billing_event(text,text,timestamp with time zone,uuid,text,text,timestamp with time zone,timestamp with time zone,text,boolean,text,text,jsonb) to "postgres";
 grant EXECUTE on function private.apply_pack_event(text,timestamp with time zone,uuid,text,integer,text,jsonb) to "postgres";
+grant EXECUTE on function private.auto_select_after_catalogue() to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "service_role";
 grant EXECUTE on function private.backfill_remaining(uuid) to "postgres";
@@ -7886,12 +8068,18 @@ grant EXECUTE on function admin_ops() to "authenticated";
 grant EXECUTE on function admin_ops() to "postgres";
 grant EXECUTE on function admin_plan_catalogue() to "authenticated";
 grant EXECUTE on function admin_plan_catalogue() to "postgres";
+grant EXECUTE on function admin_record_user_action(uuid,text) to "authenticated";
+grant EXECUTE on function admin_record_user_action(uuid,text) to "postgres";
 grant EXECUTE on function admin_services_health() to "authenticated";
 grant EXECUTE on function admin_services_health() to "postgres";
 grant EXECUTE on function admin_start_impersonation(uuid) to "authenticated";
 grant EXECUTE on function admin_start_impersonation(uuid) to "postgres";
 grant EXECUTE on function admin_stop_impersonation(uuid) to "authenticated";
 grant EXECUTE on function admin_stop_impersonation(uuid) to "postgres";
+grant EXECUTE on function admin_update_user_profile(uuid,text,text,text,text) to "authenticated";
+grant EXECUTE on function admin_update_user_profile(uuid,text,text,text,text) to "postgres";
+grant EXECUTE on function admin_user_detail(uuid) to "authenticated";
+grant EXECUTE on function admin_user_detail(uuid) to "postgres";
 grant EXECUTE on function admin_users() to "authenticated";
 grant EXECUTE on function admin_users() to "postgres";
 grant EXECUTE on function admin_workspace_footprint(uuid) to "authenticated";

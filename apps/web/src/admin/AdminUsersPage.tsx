@@ -1,10 +1,10 @@
 /**
  * Every signed-up user: the email they came with, when they arrived, when
- * they were last here, and how many workspaces they stand in. One read, no
- * levers — phase one is eyes only; suspension and role changes arrive in
- * phase four, each with its own RPC and its own guard.
+ * they were last here, and how many workspaces they stand in. "Manage" opens
+ * the person's account file (`AccountFile.tsx`): their details, password
+ * help, roles, plans and history, each change with its own RPC and guard.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminUser } from "@sentiment/contracts";
 import { useStrings } from "../strings";
@@ -25,6 +25,7 @@ import { useImpersonation } from "../impersonation";
 import { readAdminUsers } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
 import { DEMO_USERS, DEMO_OWNER_ID } from "./adminDemo";
+import { AccountFile } from "./AccountFile";
 
 const NONE = "—";
 
@@ -40,6 +41,7 @@ export function AdminUsersPage() {
   const currentUserId = demo ? DEMO_OWNER_ID : session?.user.id;
   const { startImpersonation, loading: impersonateLoading } =
     useImpersonation();
+  const [managing, setManaging] = useState<AdminUser | null>(null);
   const list = useQuery({
     queryKey: ["admin", "users", demo ? "demo" : "live"],
     queryFn: () => (demo ? Promise.resolve(DEMO_USERS) : readAdminUsers()),
@@ -89,6 +91,7 @@ export function AdminUsersPage() {
                   user={u}
                   isCurrent={currentUserId === u.id}
                   onImpersonate={startImpersonation}
+                  onManage={demo ? undefined : setManaging}
                   disabled={impersonateLoading}
                 />
               ))}
@@ -98,6 +101,7 @@ export function AdminUsersPage() {
         <Card className="admin-note">
           <p>{S.adminUsersPiiNote}</p>
         </Card>
+        <AccountFile user={managing} onClose={() => setManaging(null)} />
       </section>
     );
 
@@ -113,11 +117,14 @@ function UserRow({
   user,
   isCurrent,
   onImpersonate,
+  onManage,
   disabled,
 }: {
   user: AdminUser;
   isCurrent: boolean;
   onImpersonate: (user: AdminUser) => void;
+  /** Absent on the demo, which has no server to read a file from. */
+  onManage?: (user: AdminUser) => void;
   disabled: boolean;
 }) {
   const S = useStrings();
@@ -130,7 +137,18 @@ function UserRow({
       <TableCell>{day(user.last_sign_in_at)}</TableCell>
       <TableCell>{user.workspace_count}</TableCell>
       <TableCell>{user.owner_count}</TableCell>
-      <TableCell>
+      <TableCell className="admin-user-actions">
+        {onManage && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => onManage(user)}
+            data-testid={`admin-manage-${user.id}`}
+            aria-label={`${S.adminUserManage} ${user.email ?? user.id}`}
+          >
+            {S.adminUserManage}
+          </Button>
+        )}
         {isCurrent ? (
           <span className="admin-user-current" data-testid="admin-user-current">
             {S.adminUserCurrent}
