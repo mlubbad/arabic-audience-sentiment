@@ -460,3 +460,107 @@ describe("pausing a channel's collection", () => {
     await expect(setPaused([], true)).rejects.toThrow(/invalid_request/);
   });
 });
+
+describe("bulk channel actions", () => {
+  async function ids(...titles: string[]) {
+    await db.exec("reset role");
+    const { rows } = await db.query<{ id: string; title: string }>(
+      "select id, title from channels where title = any($1)",
+      [titles],
+    );
+    return titles.map((t) => rows.find((r) => r.title === t)!.id);
+  }
+  async function work(channels: string[], kind: string) {
+    const { rows } = await db.query<{ r: { queued: number; skipped: number } }>(
+      "select public.admin_request_channel_work($1::uuid[], $2) as r",
+      [channels, kind],
+    );
+    return rows[0]!.r;
+  }
+
+  it("queues a collection only where one can run, and says how many it skipped", async () => {
+    const [healthy, waiting, fresh, paused] = await ids(
+      "Healthy",
+      "Waiting",
+      "New",
+      "Collecting",
+    );
+    await as("authenticated", ADMIN);
+    // Healthy and Waiting have selected videos; New has none; Collecting is
+    // paused (the pause tests above).
+    expect(
+      await work([healthy!, waiting!, fresh!, paused!], "collect"),
+    ).toEqual({ queued: 2, skipped: 2 });
+    // Asked again: the queued job is the answer.
+    expect(await work([healthy!], "collect")).toEqual({
+      queued: 0,
+      skipped: 1,
+    });
+    const o = await overview();
+    expect(o.activity[0]).toMatchObject({
+      action: "channel_collect_requested",
+      actor_email: "owner@example.com",
+    });
+  });
+
+  it("queues a fresh catalogue run", async () => {
+    const [failing] = await ids("Failing");
+    await as("authenticated", ADMIN);
+    expect(await work([failing!], "discover")).toEqual({
+      queued: 1,
+      skipped: 0,
+    });
+    await db.exec("reset role");
+    const { rows } = await db.query<{ n: number }>(
+      "select count(*)::int as n from jobs where channel_id=$1 and type='discover' and status='queued'",
+      [failing],
+    );
+    expect(rows[0]!.n).toBe(1);
+  });
+
+  it("sets the automatic selection numbers, creating them where there were none", async () => {
+    const [customer, healthy] = await ids("Customer channel", "Healthy");
+    await as("authenticated", ADMIN);
+    const { rows } = await db.query<{ r: { changed: number } }>(
+      "select public.admin_set_auto_selection($1::uuid[], 10, 3) as r",
+      [[customer, healthy]],
+    );
+    expect(rows[0]!.r).toEqual({ changed: 2 });
+    const { rows: list } = await db.query<{ r: unknown }>(
+      "select public.admin_channels_console() as r",
+    );
+    const parsed = AdminChannelsConsoleSchema.parse(list[0]!.r);
+    for (const t of ["Customer channel", "Healthy"])
+      expect(parsed.find((c) => c.title === t)).toMatchObject({
+        auto_initial: 10,
+        auto_daily: 3,
+      });
+    await db.exec("reset role");
+    const { rows: owner } = await db.query<{ created_by: string }>(
+      "select created_by from private.channel_auto_selection where channel_id=$1",
+      [customer],
+    );
+    // In the name of the workspace's creator, as an import's selection is.
+    expect(owner[0]!.created_by).toBe(OTHER);
+  });
+
+  it("refuses a bad request and anyone but a platform admin", async () => {
+    const [healthy] = await ids("Healthy");
+    await as("authenticated", ADMIN);
+    await expect(work([healthy!], "analyse")).rejects.toThrow(
+      /invalid_request/,
+    );
+    await expect(
+      db.query("select public.admin_set_auto_selection($1::uuid[], 201, 3)", [
+        [healthy],
+      ]),
+    ).rejects.toThrow(/invalid_request/);
+    await as("authenticated", OTHER);
+    await expect(work([healthy!], "collect")).rejects.toThrow(/forbidden/);
+    await expect(
+      db.query("select public.admin_set_auto_selection($1::uuid[], 5, 1)", [
+        [healthy],
+      ]),
+    ).rejects.toThrow(/forbidden/);
+  });
+});

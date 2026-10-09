@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AdminConsoleChannel } from "@sentiment/contracts";
 import {
+  channelsCsv,
   readFilter,
   scoped,
   stateCounts,
@@ -137,5 +138,29 @@ describe("channels console filter", () => {
       healthy: 1,
       paused: 0,
     });
+  });
+});
+
+describe("channelsCsv", () => {
+  it("writes a header and one row per channel, opening as Arabic in a spreadsheet", () => {
+    const csv = channelsCsv([ROWS[0]!]);
+    expect(csv.startsWith("\ufeff")).toBe(true);
+    const lines = csv.slice(1).trimEnd().split("\r\n");
+    expect(lines[0]).toBe(
+      "name,handle,channel_id,workspace,owner,state,videos,selected,comments,analysed,last_good_collection,last_error",
+    );
+    expect(lines[1]).toBe(
+      "أنور المحبوب,,UC,ws,owner@example.com,healthy,0,0,10,0,2026-10-09T06:00:00+00:00,",
+    );
+  });
+
+  it("quotes what would break a row, and never lets a name read as a formula", () => {
+    const csv = channelsCsv([
+      { ...ROWS[0]!, title: 'Say "hi", all' },
+      { ...ROWS[0]!, title: "=HYPERLINK(1)" },
+    ]);
+    const lines = csv.slice(1).trimEnd().split("\r\n");
+    expect(lines[1]!.startsWith('"Say ""hi"", all",')).toBe(true);
+    expect(lines[2]!.startsWith("'=HYPERLINK(1),")).toBe(true);
   });
 });

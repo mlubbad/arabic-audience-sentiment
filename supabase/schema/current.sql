@@ -5813,6 +5813,58 @@ begin
   return jsonb_build_object('ok', true);
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_request_channel_work(p_channels uuid[], p_kind text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  queued integer := 0;
+  skipped integer := 0;
+  ch record;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_kind not in ('collect', 'discover') or p_channels is null
+     or cardinality(p_channels) = 0 or cardinality(p_channels) > 500 then
+    raise exception 'invalid_request' using errcode='22023';
+  end if;
+
+  for ch in
+    select c.id, c.workspace_id, c.paused_at from public.channels c
+     where c.id = any(p_channels)
+  loop
+    if ch.paused_at is not null
+       or exists (select 1 from public.jobs j
+                   where j.workspace_id = ch.workspace_id and j.channel_id = ch.id
+                     and j.type = p_kind and j.status in ('queued', 'running'))
+       or (p_kind = 'collect' and not exists (
+             select 1 from public.video_selections s
+              where s.workspace_id = ch.workspace_id and s.channel_id = ch.id)) then
+      skipped := skipped + 1;
+      continue;
+    end if;
+    begin
+      insert into public.jobs(workspace_id, channel_id, type, dedupe_key)
+      values (ch.workspace_id, ch.id, p_kind, p_kind || '-admin-' || gen_random_uuid()::text);
+    exception when unique_violation then
+      skipped := skipped + 1;
+      continue;
+    end;
+    queued := queued + 1;
+    insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+    values (ch.workspace_id, uid,
+            case p_kind when 'collect' then 'channel_collect_requested'
+                        else 'channel_catalogue_requested' end,
+            'channel', ch.id::text);
+  end loop;
+
+  return jsonb_build_object('queued', queued, 'skipped', skipped);
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_services_health()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5958,6 +6010,47 @@ begin
   ) into report;
 
   return report;
+end $function$
+
+CREATE OR REPLACE FUNCTION public.admin_set_auto_selection(p_channels uuid[], p_initial integer, p_daily integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  changed integer := 0;
+  ch record;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode='42501';
+  end if;
+  if p_channels is null or cardinality(p_channels) = 0
+     or cardinality(p_channels) > 500
+     or p_initial is null or p_initial not between 0 and 200
+     or p_daily is null or p_daily not between 0 and 100 then
+    raise exception 'invalid_request' using errcode='22023';
+  end if;
+
+  for ch in
+    select c.id, c.workspace_id, w.created_by
+      from public.channels c
+      join public.workspaces w on w.id = c.workspace_id
+     where c.id = any(p_channels)
+  loop
+    insert into private.channel_auto_selection as a
+           (workspace_id, channel_id, initial_count, daily_cap, created_by)
+    values (ch.workspace_id, ch.id, p_initial, p_daily, ch.created_by)
+    on conflict (workspace_id, channel_id) do update
+       set initial_count = excluded.initial_count,
+           daily_cap = excluded.daily_cap;
+    changed := changed + 1;
+    insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+    values (ch.workspace_id, uid, 'auto_selection_set', 'channel', ch.id::text);
+  end loop;
+
+  return jsonb_build_object('changed', changed);
 end $function$
 
 CREATE OR REPLACE FUNCTION public.admin_set_channels_paused(p_channels uuid[], p_paused boolean)
@@ -8329,8 +8422,12 @@ grant EXECUTE on function admin_plan_catalogue() to "authenticated";
 grant EXECUTE on function admin_plan_catalogue() to "postgres";
 grant EXECUTE on function admin_record_user_action(uuid,text) to "authenticated";
 grant EXECUTE on function admin_record_user_action(uuid,text) to "postgres";
+grant EXECUTE on function admin_request_channel_work(uuid[],text) to "authenticated";
+grant EXECUTE on function admin_request_channel_work(uuid[],text) to "postgres";
 grant EXECUTE on function admin_services_health() to "authenticated";
 grant EXECUTE on function admin_services_health() to "postgres";
+grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "authenticated";
+grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "postgres";
 grant EXECUTE on function admin_set_channels_paused(uuid[],boolean) to "authenticated";
 grant EXECUTE on function admin_set_channels_paused(uuid[],boolean) to "postgres";
 grant EXECUTE on function admin_start_impersonation(uuid) to "authenticated";

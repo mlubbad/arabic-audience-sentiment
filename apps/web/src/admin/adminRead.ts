@@ -226,6 +226,34 @@ export async function setChannelsPaused(
   return data as { changed: number; cancelled_jobs: number };
 }
 
+/** Ask for a collection or a fresh catalogue now. Thrown as it came. */
+export async function requestChannelWork(
+  channelIds: string[],
+  kind: "collect" | "discover",
+): Promise<{ queued: number; skipped: number }> {
+  const { data, error } = await supabase!.rpc("admin_request_channel_work", {
+    p_channels: channelIds,
+    p_kind: kind,
+  });
+  if (error) throw error;
+  return data as { queued: number; skipped: number };
+}
+
+/** Set the automatic selection numbers. Thrown as it came. */
+export async function setAutoSelection(
+  channelIds: string[],
+  initial: number,
+  daily: number,
+): Promise<{ changed: number }> {
+  const { data, error } = await supabase!.rpc("admin_set_auto_selection", {
+    p_channels: channelIds,
+    p_initial: initial,
+    p_daily: daily,
+  });
+  if (error) throw error;
+  return data as { changed: number };
+}
+
 export async function readAdminChannels(): Promise<AdminChannel[]> {
   const { data, error } = await supabase!.rpc("admin_channels");
   if (error) throw rpcFailure(error);

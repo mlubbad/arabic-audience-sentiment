@@ -137,3 +137,52 @@ export function visibleChannels(
   };
   return [...kept].sort(order[f.sort]);
 }
+
+const CSV_COLUMNS = [
+  "name",
+  "handle",
+  "channel_id",
+  "workspace",
+  "owner",
+  "state",
+  "videos",
+  "selected",
+  "comments",
+  "analysed",
+  "last_good_collection",
+  "last_error",
+] as const;
+
+function csvCell(value: string | number | null): string {
+  const text = value === null ? "" : String(value);
+  // Quote what would break a row; a leading = + - @ is neutralised so a
+  // spreadsheet never reads a channel name as a formula.
+  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
+
+/** The channels as a CSV file's text, with a byte-order mark so a
+ *  spreadsheet opens the Arabic names as Arabic. */
+export function channelsCsv(rows: AdminConsoleChannel[]): string {
+  const lines = [CSV_COLUMNS.join(",")];
+  for (const c of rows)
+    lines.push(
+      [
+        channelName(c),
+        c.handle,
+        c.external_channel_id,
+        c.workspace_name,
+        c.owner_email,
+        c.state,
+        c.videos,
+        c.selected,
+        c.comments,
+        c.analysed,
+        c.last_ok_at,
+        c.last_error,
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+  return "\ufeff" + lines.join("\r\n") + "\r\n";
+}
