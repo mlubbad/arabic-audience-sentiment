@@ -1028,3 +1028,34 @@
 .admin-bulk-auto > button {
   justify-self: start;
 }
+
+/* ---- Comparison (/admin/compare) ---- */
+.admin-compare-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+.admin-compare-card {
+  display: grid;
+  gap: var(--space-1);
+  align-content: start;
+}
+.admin-compare-card h3 {
+  margin: 0;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--text-3);
+}
+.admin-compare-card-value {
+  font-size: var(--fs-h3);
+}
+.admin-compare-net {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.admin-compare-net.is-positive {
+  color: var(--sentiment-positive);
+}
+.admin-compare-net.is-negative {
+  color: var(--sentiment-negative);
+}

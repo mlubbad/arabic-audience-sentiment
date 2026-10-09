@@ -303,3 +303,46 @@ export const AdminAccountSchema = z
   .strict();
 export const AdminAccountsSchema = z.array(AdminAccountSchema);
 export type AdminAccount = z.infer<typeof AdminAccountSchema>;
+
+const count = z.number().int().nonnegative();
+const CompareWindowSchema = z
+  .object({ analysed: count, positive: count, negative: count })
+  .strict();
+
+/** One row of `admin_channels_compare()`: a channel as the owner console's
+ *  comparison page ranks it. One YouTube channel copied into several
+ *  workspaces is one row (`copies` says how many). `refreshed_at` is null
+ *  until the channel's workspace has been counted once. */
+export const AdminCompareChannelSchema = z
+  .object({
+    id: z.string().uuid(),
+    workspace_id: z.string().uuid(),
+    workspace_name: z.string(),
+    mine: z.boolean(),
+    owner_email: z.string().nullable(),
+    platform: z.string(),
+    external_channel_id: z.string(),
+    title: z.string().nullable(),
+    handle: z.string().nullable(),
+    copies: z.number().int().positive(),
+    analysed: count,
+    positive: count,
+    negative: count,
+    neutral: count,
+    mixed: count,
+    week: CompareWindowSchema,
+    previous_week: CompareWindowSchema,
+    top_topic: z
+      .object({
+        key: z.string(),
+        name_ar: z.string(),
+        name_en: z.string(),
+        comments: count,
+      })
+      .strict()
+      .nullable(),
+    refreshed_at: timestamp.nullable(),
+  })
+  .strict();
+export const AdminChannelsCompareSchema = z.array(AdminCompareChannelSchema);
+export type AdminCompareChannel = z.infer<typeof AdminCompareChannelSchema>;

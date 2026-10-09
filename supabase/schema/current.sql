@@ -88,6 +88,63 @@ alter table "private"."channel_auto_selection" add constraint "channel_auto_sele
 
 CREATE UNIQUE INDEX channel_auto_selection_pkey ON private.channel_auto_selection USING btree (workspace_id, channel_id);
 
+create table "private"."channel_compare_cells" (
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "day" date,
+  "topic_key" text,
+  "comments" integer not null,
+  "analysed" integer not null,
+  "positive" integer not null,
+  "negative" integer not null,
+  "neutral" integer not null,
+  "mixed" integer not null
+);
+alter table "private"."channel_compare_cells" enable row level security;
+
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_analysed_check" CHECK (analysed >= 0);
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_analysed_not_null" NOT NULL analysed;
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_channel_id_not_null" NOT NULL channel_id;
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_comments_check" CHECK (comments >= 0);
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_comments_not_null" NOT NULL comments;
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_mixed_check" CHECK (mixed >= 0);
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_mixed_not_null" NOT NULL mixed;
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_negative_check" CHECK (negative >= 0);
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_negative_not_null" NOT NULL negative;
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_neutral_check" CHECK (neutral >= 0);
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_neutral_not_null" NOT NULL neutral;
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_positive_check" CHECK (positive >= 0);
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_positive_not_null" NOT NULL positive;
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "private"."channel_compare_cells" add constraint "channel_compare_cells_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX channel_compare_cells_channel ON private.channel_compare_cells USING btree (workspace_id, channel_id);
+
+create table "private"."channel_compare_dirty" (
+  "workspace_id" uuid not null,
+  "marked_at" timestamp with time zone default now() not null
+);
+alter table "private"."channel_compare_dirty" enable row level security;
+
+alter table "private"."channel_compare_dirty" add constraint "channel_compare_dirty_marked_at_not_null" NOT NULL marked_at;
+alter table "private"."channel_compare_dirty" add constraint "channel_compare_dirty_workspace_id_fkey" FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+alter table "private"."channel_compare_dirty" add constraint "channel_compare_dirty_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX channel_compare_dirty_workspace ON private.channel_compare_dirty USING btree (workspace_id);
+
+create table "private"."channel_compare_refreshed" (
+  "workspace_id" uuid not null,
+  "refreshed_at" timestamp with time zone not null
+);
+alter table "private"."channel_compare_refreshed" enable row level security;
+
+alter table "private"."channel_compare_refreshed" add constraint "channel_compare_refreshed_pkey" PRIMARY KEY (workspace_id);
+alter table "private"."channel_compare_refreshed" add constraint "channel_compare_refreshed_refreshed_at_not_null" NOT NULL refreshed_at;
+alter table "private"."channel_compare_refreshed" add constraint "channel_compare_refreshed_workspace_id_fkey" FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+alter table "private"."channel_compare_refreshed" add constraint "channel_compare_refreshed_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE UNIQUE INDEX channel_compare_refreshed_pkey ON private.channel_compare_refreshed USING btree (workspace_id);
+
 create table "private"."job_batches" (
   "job_id" uuid not null,
   "batch_key" text not null,
@@ -3034,6 +3091,37 @@ BEGIN
     'comments', rows);
 END $function$
 
+CREATE OR REPLACE FUNCTION private.drain_channel_compare(max_workspaces integer DEFAULT 15)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '300s'
+AS $function$
+declare
+  target uuid;
+  done int := 0;
+  started timestamptz := clock_timestamp();
+begin
+  for target in
+    select d.workspace_id
+      from private.channel_compare_dirty d
+     group by d.workspace_id
+     order by min(d.marked_at), d.workspace_id
+     limit greatest(max_workspaces, 0)
+  loop
+    exit when clock_timestamp() - started > interval '2 minutes';
+    begin
+      perform private.refresh_channel_compare(target);
+      done := done + 1;
+    exception when others then
+      raise warning 'channel_compare refresh failed for %: %', target, sqlerrm;
+    end;
+  end loop;
+  return done;
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION private.due_videos(w uuid, c uuid)
  RETURNS jsonb
  LANGUAGE sql
@@ -3245,6 +3333,29 @@ begin
    where id = j and lease_token = t and status = 'running' and lease_expires_at > now();
   if not found then raise exception 'lease_lost' using errcode='40001'; end if;
 end $function$
+
+CREATE OR REPLACE FUNCTION private.mark_all_channel_compare()
+ RETURNS void
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  insert into private.channel_compare_dirty(workspace_id)
+  select distinct c.workspace_id from public.channels c;
+$function$
+
+CREATE OR REPLACE FUNCTION private.mark_channel_compare_dirty()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  insert into private.channel_compare_dirty(workspace_id)
+  select distinct n.workspace_id from new_rows n;
+  return null;
+end;
+$function$
 
 CREATE OR REPLACE FUNCTION private.oauth_attach_channel(state_hash text, external_channel text, tokens bytea, key_version text, scopes text[])
  RETURNS uuid
@@ -3681,6 +3792,91 @@ begin
     'videos_checked', videos_checked,
     'rows_corrected', rows_corrected
   );
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.refresh_channel_compare(w uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  topic_active text;
+  since date := (now() at time zone 'UTC')::date - 35;
+begin
+  -- One recount of a workspace at a time; a second waits and recounts after.
+  perform pg_advisory_xact_lock(hashtextextended('channel_compare:' || w::text, 0));
+
+  -- Marks visible now are answered by this recount. A mark committed after
+  -- it started stays and brings the workspace back.
+  delete from private.channel_compare_dirty where workspace_id = w;
+
+  select ws.active_topic_key into topic_active
+    from public.workspaces ws where ws.id = w;
+
+  delete from private.channel_compare_cells where workspace_id = w;
+
+  insert into private.channel_compare_cells(
+    workspace_id, channel_id, day, topic_key,
+    comments, analysed, positive, negative, neutral, mixed)
+  with ch as (
+    select c.id, c.external_channel_id, c.active_analysis_key
+      from public.channels c
+     where c.workspace_id = w
+  ),
+  audience as (
+    select v.channel_id, cm.id, cm.content_hash, ch.active_analysis_key,
+           case when cm.published_at >= since
+                then (cm.published_at at time zone 'UTC')::date end as day
+      from public.comments cm
+      join public.videos v on v.workspace_id = cm.workspace_id and v.id = cm.video_id
+      join ch on ch.id = v.channel_id
+     where cm.workspace_id = w
+       and not coalesce(cm.author_channel_id = ch.external_channel_id, false)
+  ),
+  rev as (
+    select distinct on (r.comment_id) r.comment_id, r.content_hash, r.label
+      from public.comment_reviews r
+     where r.workspace_id = w and r.origin = 'human'
+     order by r.comment_id, r.created_at desc
+  ),
+  trev as (
+    select distinct on (r.comment_id) r.comment_id, r.content_hash, r.topic_key
+      from public.topic_reviews r
+     where r.workspace_id = w and r.origin = 'human'
+     order by r.comment_id, r.created_at desc
+  ),
+  ev as (
+    select a.channel_id, a.day,
+           case when r.content_hash = a.content_hash then r.label else p.label end as label,
+           case when t.content_hash = a.content_hash then t.topic_key else tp.topic_key end as topic
+      from audience a
+      left join rev r on r.comment_id = a.id
+      left join public.sentiment_predictions p
+        on p.workspace_id = w and p.comment_id = a.id
+       and p.content_hash = a.content_hash
+       and p.analysis_key = a.active_analysis_key
+       and p.status = 'succeeded'
+      left join trev t on t.comment_id = a.id
+      left join public.topic_predictions tp
+        on tp.workspace_id = w and tp.comment_id = a.id
+       and tp.content_hash = a.content_hash
+       and tp.classification_key = topic_active
+       and tp.status = 'succeeded'
+  )
+  select w, ev.channel_id, ev.day, ev.topic,
+         count(*), count(ev.label),
+         count(*) filter (where ev.label = 'positive'),
+         count(*) filter (where ev.label = 'negative'),
+         count(*) filter (where ev.label = 'neutral'),
+         count(*) filter (where ev.label = 'mixed')
+    from ev
+   group by ev.channel_id, ev.day, ev.topic;
+
+  insert into private.channel_compare_refreshed(workspace_id, refreshed_at)
+  values (w, now())
+  on conflict (workspace_id) do update set refreshed_at = excluded.refreshed_at;
 end;
 $function$
 
@@ -5580,6 +5776,108 @@ begin
       order by sr.started_at desc
       limit 1) lc on true
     order by w.created_at desc, c.external_channel_id;
+end $function$
+
+CREATE OR REPLACE FUNCTION public.admin_channels_compare()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '30s'
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  today date := (now() at time zone 'UTC')::date;
+  result jsonb;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  with agg as (
+    select x.workspace_id, x.channel_id,
+           sum(x.analysed) as analysed,
+           sum(x.positive) as positive,
+           sum(x.negative) as negative,
+           sum(x.neutral) as neutral,
+           sum(x.mixed) as mixed,
+           coalesce(sum(x.analysed) filter (where x.day > today - 7), 0) as w_analysed,
+           coalesce(sum(x.positive) filter (where x.day > today - 7), 0) as w_positive,
+           coalesce(sum(x.negative) filter (where x.day > today - 7), 0) as w_negative,
+           coalesce(sum(x.analysed) filter (where x.day > today - 14 and x.day <= today - 7), 0) as p_analysed,
+           coalesce(sum(x.positive) filter (where x.day > today - 14 and x.day <= today - 7), 0) as p_positive,
+           coalesce(sum(x.negative) filter (where x.day > today - 14 and x.day <= today - 7), 0) as p_negative
+      from private.channel_compare_cells x
+     group by x.workspace_id, x.channel_id
+  ),
+  -- The most discussed topic; "other" names nothing, so it is never the one.
+  topics as (
+    select distinct on (x.workspace_id, x.channel_id)
+           x.workspace_id, x.channel_id, x.topic_key, sum(x.comments) as comments
+      from private.channel_compare_cells x
+     where x.topic_key is not null and x.topic_key <> 'other'
+     group by x.workspace_id, x.channel_id, x.topic_key
+     order by x.workspace_id, x.channel_id, sum(x.comments) desc, x.topic_key
+  ),
+  ranked as (
+    select c.id, c.workspace_id, w.name as workspace_name,
+           w.created_by = uid as mine, u.email as owner_email,
+           c.platform, c.external_channel_id, c.title, c.handle,
+           a.analysed, a.positive, a.negative, a.neutral, a.mixed,
+           a.w_analysed, a.w_positive, a.w_negative,
+           a.p_analysed, a.p_positive, a.p_negative,
+           t.topic_key, t.comments as topic_comments,
+           tp.name_ar as topic_name_ar, tp.name_en as topic_name_en,
+           rf.refreshed_at,
+           count(*) over (partition by c.platform, c.external_channel_id) as copies,
+           row_number() over (
+             partition by c.platform, c.external_channel_id
+             order by coalesce(a.analysed, 0) desc, (w.created_by = uid) desc,
+                      w.created_at, c.id) as rn
+      from public.channels c
+      join public.workspaces w on w.id = c.workspace_id
+      left join auth.users u on u.id = w.created_by
+      left join agg a on a.workspace_id = c.workspace_id and a.channel_id = c.id
+      left join topics t on t.workspace_id = c.workspace_id and t.channel_id = c.id
+      left join public.workspace_topics tp
+        on tp.workspace_id = c.workspace_id and tp.key = t.topic_key
+      left join private.channel_compare_refreshed rf on rf.workspace_id = c.workspace_id
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', r.id,
+           'workspace_id', r.workspace_id,
+           'workspace_name', r.workspace_name,
+           'mine', r.mine,
+           'owner_email', r.owner_email,
+           'platform', r.platform,
+           'external_channel_id', r.external_channel_id,
+           'title', r.title,
+           'handle', r.handle,
+           'copies', r.copies,
+           'analysed', coalesce(r.analysed, 0),
+           'positive', coalesce(r.positive, 0),
+           'negative', coalesce(r.negative, 0),
+           'neutral', coalesce(r.neutral, 0),
+           'mixed', coalesce(r.mixed, 0),
+           'week', jsonb_build_object(
+             'analysed', coalesce(r.w_analysed, 0),
+             'positive', coalesce(r.w_positive, 0),
+             'negative', coalesce(r.w_negative, 0)),
+           'previous_week', jsonb_build_object(
+             'analysed', coalesce(r.p_analysed, 0),
+             'positive', coalesce(r.p_positive, 0),
+             'negative', coalesce(r.p_negative, 0)),
+           'top_topic', case when r.topic_key is null then null else jsonb_build_object(
+             'key', r.topic_key,
+             'name_ar', r.topic_name_ar,
+             'name_en', r.topic_name_en,
+             'comments', r.topic_comments) end,
+           'refreshed_at', r.refreshed_at)
+         order by r.workspace_id, r.id), '[]'::jsonb)
+    into result
+    from ranked r
+   where r.rn = 1;
+  return result;
 end $function$
 
 CREATE OR REPLACE FUNCTION public.admin_channels_console()
@@ -7811,6 +8109,27 @@ grant SELECT on table "private"."channel_auto_selection" to "postgres";
 grant TRIGGER on table "private"."channel_auto_selection" to "postgres";
 grant TRUNCATE on table "private"."channel_auto_selection" to "postgres";
 grant UPDATE on table "private"."channel_auto_selection" to "postgres";
+grant DELETE on table "private"."channel_compare_cells" to "postgres";
+grant INSERT on table "private"."channel_compare_cells" to "postgres";
+grant REFERENCES on table "private"."channel_compare_cells" to "postgres";
+grant SELECT on table "private"."channel_compare_cells" to "postgres";
+grant TRIGGER on table "private"."channel_compare_cells" to "postgres";
+grant TRUNCATE on table "private"."channel_compare_cells" to "postgres";
+grant UPDATE on table "private"."channel_compare_cells" to "postgres";
+grant DELETE on table "private"."channel_compare_dirty" to "postgres";
+grant INSERT on table "private"."channel_compare_dirty" to "postgres";
+grant REFERENCES on table "private"."channel_compare_dirty" to "postgres";
+grant SELECT on table "private"."channel_compare_dirty" to "postgres";
+grant TRIGGER on table "private"."channel_compare_dirty" to "postgres";
+grant TRUNCATE on table "private"."channel_compare_dirty" to "postgres";
+grant UPDATE on table "private"."channel_compare_dirty" to "postgres";
+grant DELETE on table "private"."channel_compare_refreshed" to "postgres";
+grant INSERT on table "private"."channel_compare_refreshed" to "postgres";
+grant REFERENCES on table "private"."channel_compare_refreshed" to "postgres";
+grant SELECT on table "private"."channel_compare_refreshed" to "postgres";
+grant TRIGGER on table "private"."channel_compare_refreshed" to "postgres";
+grant TRUNCATE on table "private"."channel_compare_refreshed" to "postgres";
+grant UPDATE on table "private"."channel_compare_refreshed" to "postgres";
 grant DELETE on table "private"."job_batches" to "postgres";
 grant INSERT on table "private"."job_batches" to "postgres";
 grant REFERENCES on table "private"."job_batches" to "postgres";
@@ -8338,6 +8657,7 @@ grant EXECUTE on function private.dashboard_comments_impl(uuid,jsonb) to "servic
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "authenticated";
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "postgres";
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "service_role";
+grant EXECUTE on function private.drain_channel_compare(integer) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "service_role";
 grant EXECUTE on function private.enqueue_scheduled(uuid,uuid,text) to "postgres";
@@ -8355,6 +8675,8 @@ grant EXECUTE on function private.has_role(uuid,text[]) to "authenticated";
 grant EXECUTE on function private.has_role(uuid,text[]) to "postgres";
 grant EXECUTE on function private.heartbeat(uuid,uuid) to "postgres";
 grant EXECUTE on function private.heartbeat(uuid,uuid) to "service_role";
+grant EXECUTE on function private.mark_all_channel_compare() to "postgres";
+grant EXECUTE on function private.mark_channel_compare_dirty() to "postgres";
 grant EXECUTE on function private.oauth_attach_channel(text,text,bytea,text,text[]) to "postgres";
 grant EXECUTE on function private.oauth_attach_channel(text,text,bytea,text,text[]) to "service_role";
 grant EXECUTE on function private.oauth_attach_channel_for(uuid,uuid,uuid,text,bytea,text,text[],text,text) to "postgres";
@@ -8385,6 +8707,7 @@ grant EXECUTE on function private.reconcile_all_video_comment_stats() to "postgr
 grant EXECUTE on function private.reconcile_all_video_comment_stats() to "service_role";
 grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "postgres";
 grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "service_role";
+grant EXECUTE on function private.refresh_channel_compare(uuid) to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats(jsonb) to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_delete() to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_insert() to "postgres";
@@ -8504,6 +8827,8 @@ grant EXECUTE on function admin_audit(integer) to "authenticated";
 grant EXECUTE on function admin_audit(integer) to "postgres";
 grant EXECUTE on function admin_channels() to "authenticated";
 grant EXECUTE on function admin_channels() to "postgres";
+grant EXECUTE on function admin_channels_compare() to "authenticated";
+grant EXECUTE on function admin_channels_compare() to "postgres";
 grant EXECUTE on function admin_channels_console() to "authenticated";
 grant EXECUTE on function admin_channels_console() to "postgres";
 grant EXECUTE on function admin_console_overview() to "authenticated";

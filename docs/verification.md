@@ -1,5 +1,18 @@
 # Verification
 
+## 2026-10-09 — Owner console phase 3: the comparison page
+
+Owner request (2026-10-09: "موافق، ابدأ صفحة المقارنة بعد اكتمال النشر"). One migration (`20261021000000_admin_channels_compare.sql`): `private.channel_compare_cells` keeps each channel's audience comments grouped by day (the last 35 days; older or undated share a null day) and topic, with sentiment counts, counted as the workspace dashboard counts (channel's own comments out, a human review over the model when it judged the same text, the channel's active analysis, the workspace's active topic classification). A statement trigger on new verdicts, topics and reviews marks the workspace in `private.channel_compare_dirty` (no unique key, so a writer never waits); pg_cron `channel-compare-drain` recounts up to 15 marked workspaces every 10 minutes (starting none after two minutes, so a slow batch is never cancelled whole) and `channel-compare-nightly` marks all at 02:47 UTC. The migration only marks every workspace, so the first count comes from the schedule (about 70 minutes for ~105 workspaces), not from the deploy. `public.admin_channels_compare()` (admin only, 30 s) reads the cells, one row per YouTube channel across its workspace copies. `/admin/compare` («المقارنة»): three cards (warmest, coldest, biggest weekly change), a ranking with net sentiment as on the dashboard, change since last week, top topic other than "other", account filter, folded search, order in the address, CSV export. A channel is ranked from 20 positive-or-negative comments; a change needs 20 in both weeks.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `admin_channels_compare.test.ts` | 8 passed: a verdict marks its workspace and a drain clears the mark; counts exclude the channel's own comment and the unjudged one (analysed 15, +7 / −5 / 2 / 1); week 6/2 against 4 (1/3); top topic «praise» over the more frequent «other»; a review counts only for the text it judged; an uncounted channel reads zeros; a new verdict is counted on the next drain; a copied channel shows once (`copies` 2) through the copy with more analysed; the nightly sweep marks all; only a platform admin reads it and the cells and drain are out of reach. |
+| Mutations (each restored) | Counting the channel's own comments, taking a review regardless of its text, letting «other» be the top topic, and ranking from `> MIN_SAMPLE` instead of `>=` each failed one test. |
+| `compareChannels.test.ts`, `AdminComparePage.test.tsx` | 11 and 3 passed: the dashboard's net formula; ranking threshold; weekly change only with both weeks large enough; filter in the address; orders; folded search; highlights; CSV with ranks and BOM; page ranks, cards, small-sample badge, not-counted note, link to the channels page. |
+| `npm run check` | exit 0: unit 1232, DB 563 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| e2e `admin.spec` + `app-shell.spec` (local Chromium) | 16 passed. |
+| Not verified | The page against live data (no demo data for it, as for the channels page), and the drain's run time on the production volume; `cron.job_run_details` after the first runs will say. |
+
 ## 2026-10-09 — The «المزيد» popover covered «تطبيق الفلاتر» (the «separates replies» flake)
 
 `tests/e2e/dashboard.spec.ts` › «separates replies from top-level comments» failed on main after #101 (run 37907015476: `total` expected 2, received 4), and the failed check skipped Deploy Preview. It never failed on the owner's Mac (40 runs on 6 workers, 200 runs on 16, CPU throttled up to 20× through CDP), so it was diagnosed on the Linux runner through a draft PR (#104) whose temporary commits ran an event-logging copy of the test. Those commits are not in the merged history.
