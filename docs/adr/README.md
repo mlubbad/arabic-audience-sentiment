@@ -27,3 +27,4 @@ What gets easier, what gets harder, what we'll watch.
 | # | Title | Status |
 | --- | --- | --- |
 | 0001 | Agent team operating model | proposed |
+| 0002 | Switchable CI runner (hosted by default, self-hosted on demand) | proposed |

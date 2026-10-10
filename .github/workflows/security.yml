@@ -26,7 +26,7 @@ jobs:
     # npm: production deps only (dev deps are audited by dependabot weekly).
     # pip: the Python worker's locked runtime via pip-audit.
     name: Dependency audit
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,38 +41,54 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: 0.11.11
+      # RUNNER_TEMP, not /tmp: a self-hosted machine with two runners shares
+      # /tmp between unrelated jobs.
       - name: Export locked Python requirements
-        run: uv export --directory workers/python --frozen --no-dev --no-emit-project -o /tmp/requirements.txt
+        run: uv export --directory workers/python --frozen --no-dev --no-emit-project -o "$RUNNER_TEMP/requirements.txt"
       - name: pip-audit (locked runtime)
-        run: uv run --no-project --with pip-audit pip-audit -r /tmp/requirements.txt --strict
+        run: uv run --no-project --with pip-audit pip-audit -r "$RUNNER_TEMP/requirements.txt" --strict
 
   secrets:
     # Scans the full history for committed credentials via the gitleaks CLI
     # (pinned binary, no wrapper action needed).
     name: Secret scan
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The archive for the runner's CPU (a self-hosted runner on an Apple
+      # Silicon Mac is linux/arm64), checksum-verified, unpacked into the
+      # job's own temp directory: a self-hosted runner's user cannot write
+      # /usr/local/bin, and the runner empties RUNNER_TEMP after each job.
       - name: Install gitleaks
         run: |
+          case "$RUNNER_ARCH" in
+            X64) arch=x64 ;;
+            ARM64) arch=arm64 ;;
+            *) echo "No gitleaks build for runner arch $RUNNER_ARCH" >&2; exit 1 ;;
+          esac
           BASE=https://github.com/gitleaks/gitleaks/releases/download/v8.30.1
-          curl -sSL --fail -o /tmp/gitleaks.tar.gz "$BASE/gitleaks_8.30.1_linux_x64.tar.gz"
-          curl -sSL --fail -o /tmp/checksums.txt "$BASE/gitleaks_8.30.1_checksums.txt"
-          EXPECTED=$(grep 'linux_x64.tar.gz' /tmp/checksums.txt | awk '{print $1}')
-          echo "$EXPECTED  /tmp/gitleaks.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
-          gitleaks version
+          ARCHIVE="gitleaks_8.30.1_linux_${arch}.tar.gz"
+          DIR="$RUNNER_TEMP/gitleaks"
+          mkdir -p "$DIR"
+          curl -sSL --fail -o "$DIR/$ARCHIVE" "$BASE/$ARCHIVE"
+          curl -sSL --fail -o "$DIR/checksums.txt" "$BASE/gitleaks_8.30.1_checksums.txt"
+          EXPECTED=$(grep " $ARCHIVE\$" "$DIR/checksums.txt" | awk '{print $1}')
+          [ -n "$EXPECTED" ] || { echo "No checksum listed for $ARCHIVE" >&2; exit 1; }
+          echo "$EXPECTED  $DIR/$ARCHIVE" | sha256sum -c -
+          tar -xzf "$DIR/$ARCHIVE" -C "$DIR" gitleaks
+          echo "$DIR" >> "$GITHUB_PATH"
+          "$DIR/gitleaks" version
       - name: Scan full history
         run: gitleaks detect --source . --redact --exit-code 1 --no-banner
 
   semgrep:
     # Same high-confidence security ruleset run locally; blocks on ERROR severity.
     name: Semgrep SAST
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     container:
       # Digest-pinned: a repointed Docker tag is the same supply-chain risk as

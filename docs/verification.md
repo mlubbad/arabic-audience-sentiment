@@ -1,5 +1,21 @@
 # Verification
 
+## 2026-10-10 — CI runner switchable to a self-hosted machine (ADR 0002)
+
+Owner request (2026-10-10), after GitHub refused every hosted job on #108 three times on a billing block. Every job in `ci.yml`, `security.yml` and `codeql.yml` now runs on `${{ vars.CI_RUNNER || 'ubuntu-latest' }}`, and both `deploy.yml` jobs on `${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}`. Unset, CI is unchanged. gitleaks picks its archive from `RUNNER_ARCH` and installs into `RUNNER_TEMP`, and the dependency audit writes to `RUNNER_TEMP` instead of `/tmp`. Runbook: `docs/engineering/self-hosted-runner.md`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run scripts/workflow-runners.test.ts` on the old workflows | 6 failed (every `runs-on`, the deploy split, the gitleaks arch choice and the temp directory). |
+| Same, with the change (7 tests, one added for `/tmp`) | 7 passed; with `ci-workflow` and `deploy-workflow` tests: 20 passed. |
+| Mutation: one `ci.yml` job back to `runs-on: ubuntu-latest` | 1 failed, naming job `static`. |
+| All four workflows parsed with PyYAML | ok; 11 jobs, each with the expected `runs-on`. |
+| The new gitleaks step run locally with `RUNNER_ARCH=X64`, `ARM64`, `RISCV` | X64: checksum OK, unpacked an x86-64 ELF; ARM64: checksum OK, unpacked an aarch64 ELF; both added the folder to `GITHUB_PATH` (executing a Linux binary on macOS then fails, as expected). RISCV: refused with "No gitleaks build for runner arch RISCV". |
+| Semgrep 1.177.0, the CI rule sets | exit 0; 1 finding, the pre-existing placeholder in `docs/superpowers/plans/2026-09-15-selective-video-sync.md:2000`, not in this change. |
+| gitleaks 8.30.1: `detect` (history) and `protect --staged` | no leaks found (both). |
+| `npm run check` | exit 0: unit 1239, DB 563, worker 297 passed; build and secret scan passed. |
+| Not verified | A real job on a self-hosted runner: needs the owner's VM and runner registration (runbook steps 1–3). Hosted CI on this PR can't run while the billing block lasts. |
+
 ## 2026-10-09 — Owner console phase 3: the comparison page
 
 Owner request (2026-10-09: "موافق، ابدأ صفحة المقارنة بعد اكتمال النشر"). One migration (`20261021000000_admin_channels_compare.sql`): `private.channel_compare_cells` keeps each channel's audience comments grouped by day (the last 35 days; older or undated share a null day) and topic, with sentiment counts, counted as the workspace dashboard counts (channel's own comments out, a human review over the model when it judged the same text, the channel's active analysis, the workspace's active topic classification). A statement trigger on new verdicts, topics and reviews marks the workspace in `private.channel_compare_dirty` (no unique key, so a writer never waits); pg_cron `channel-compare-drain` recounts up to 15 marked workspaces every 10 minutes (starting none after two minutes, so a slow batch is never cancelled whole) and `channel-compare-nightly` marks all at 02:47 UTC. The migration only marks every workspace, so the first count comes from the schedule (about 70 minutes for ~105 workspaces), not from the deploy. `public.admin_channels_compare()` (admin only, 30 s) reads the cells, one row per YouTube channel across its workspace copies. `/admin/compare` («المقارنة»): three cards (warmest, coldest, biggest weekly change), a ranking with net sentiment as on the dashboard, change since last week, top topic other than "other", account filter, folded search, order in the address, CSV export. A channel is ranked from 20 positive-or-negative comments; a change needs 20 in both weeks.
