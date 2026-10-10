@@ -17,12 +17,13 @@
  */
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AdminUser, AdminUserDetail } from "@sentiment/contracts";
+import type { AdminUserDetail } from "@sentiment/contracts";
 import { useStrings } from "../strings";
 import { failureCode } from "../failure";
 import { useAdminPlanCatalogue } from "../planCatalogue";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
+import { Checkbox } from "../ui/Checkbox";
 import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Textarea } from "../ui/Textarea";
@@ -42,6 +43,7 @@ import {
   saveAdminUserProfile,
   sendPasswordReset,
   setAdminMemberRole,
+  setUserTest,
   type AdminProfileInput,
   type AdminUserActionName,
 } from "./adminRead";
@@ -53,7 +55,7 @@ export function AccountFile({
   onClose,
 }: {
   /** The row the file was opened from; null when it is closed. */
-  user: AdminUser | null;
+  user: { id: string } | null;
   onClose: () => void;
 }) {
   const S = useStrings();
@@ -74,7 +76,7 @@ export function AccountFile({
   );
 }
 
-function AccountBody({ user }: { user: AdminUser }) {
+function AccountBody({ user }: { user: { id: string } }) {
   const S = useStrings();
   const detail = useQuery({
     queryKey: ["admin", "user", user.id],
@@ -116,6 +118,7 @@ function AccountBody({ user }: { user: AdminUser }) {
         </dl>
       </header>
       <ProfileForm detail={d} />
+      <TestMark detail={d} />
       <PasswordHelp detail={d} />
       <EmailSection detail={d} />
       <StatusSection detail={d} suspended={suspended} />
@@ -225,6 +228,47 @@ function ProfileForm({ detail }: { detail: AdminUserDetail }) {
         {S.adminAccountSave}
       </Button>
     </form>
+  );
+}
+
+/** Set the account apart as a test account: the accounts page lists it
+ *  under its own section, away from the customers. */
+function TestMark({ detail }: { detail: AdminUserDetail }) {
+  const S = useStrings();
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  async function change(on: boolean) {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await setUserTest(detail.id, on);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "user", detail.id],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "accounts"] }),
+      ]);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="admin-account-section" data-testid="admin-account-test">
+      <Checkbox
+        label={S.adminAccountTestLabel}
+        checked={detail.is_test}
+        disabled={busy}
+        onCheckedChange={(on) => void change(on === true)}
+      />
+      {failed && (
+        <p role="alert" className="admin-account-error">
+          {S.adminAccountTestFailed}
+        </p>
+      )}
+    </section>
   );
 }
 

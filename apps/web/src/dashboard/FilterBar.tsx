@@ -428,38 +428,46 @@ export function FilterBar({
           {searchField}
           {videoSelect}
           {sentimentSelect}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                aria-label={S.dateLabel}
-              >
-                {periodLabel}
+          {/* The two popover triggers and the actions wrap as one: a popover
+              opens above or below its trigger's row, never over it, so
+              «تطبيق» must share that row.
+              When the bar wrapped between them (1280px, 2026-10-09) the
+              «المزيد» popover opened over «تطبيق» and «إعادة ضبط», and a press
+              there landed on the popover's «الموضوع» label instead. */}
+          <div className="db-filterbar-tail">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  aria-label={S.dateLabel}
+                >
+                  {periodLabel}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent>
+                <div className="db-popover-stack">{periodControls}</div>
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="secondary" size="sm">
+                  {S.moreFilters(extraCount(values))}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent>
+                <div className="db-popover-stack">{moreControls}</div>
+              </PopoverContent>
+            </Popover>
+            <div className="db-filterbar-actions">
+              <Button type="submit" size="sm">
+                {S.applyFilters}
               </Button>
-            </PopoverTrigger>
-            <PopoverContent>
-              <div className="db-popover-stack">{periodControls}</div>
-            </PopoverContent>
-          </Popover>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="secondary" size="sm">
-                {S.moreFilters(extraCount(values))}
+              <Button variant="ghost" size="sm" type="button" onClick={onReset}>
+                {S.resetFilters}
               </Button>
-            </PopoverTrigger>
-            <PopoverContent>
-              <div className="db-popover-stack">{moreControls}</div>
-            </PopoverContent>
-          </Popover>
-          <div className="db-filterbar-actions">
-            <Button type="submit" size="sm">
-              {S.applyFilters}
-            </Button>
-            <Button variant="ghost" size="sm" type="button" onClick={onReset}>
-              {S.resetFilters}
-            </Button>
+            </div>
           </div>
         </>
       )}

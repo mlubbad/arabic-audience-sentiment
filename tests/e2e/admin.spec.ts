@@ -184,7 +184,8 @@ test("at 390px the six rows are six cards and nothing scrolls sideways", async (
 test("navigates to users tab and tests user impersonation with escape hatch", async ({
   page,
 }, testInfo) => {
-  await page.getByRole("link", { name: "المستخدمون" }).click();
+  // Exact: «أنواع الحسابات» (the plans tab) contains the same word.
+  await page.getByRole("link", { name: "الحسابات", exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/users\?demo=1/);
 
   // Users table is rendered
