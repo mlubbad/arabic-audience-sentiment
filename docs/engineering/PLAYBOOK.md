@@ -29,6 +29,7 @@ gets fixed.
    (`git worktree add ../aas-<agent>-wo-N -b <agent>/wo-N-slug origin/main`). Never work in, or
    leave uncommitted changes in, a checkout another agent uses.
 3. **Draft PR early.** Title `WO-N: …`; the body follows the PR template and starts `Closes #N`.
+   A draft runs no CI (billed minutes, 2026-10-10): `npm run check` locally until ready.
 4. **Ready.** Every acceptance box is ticked with evidence. Handoff: comment
    `Ready for review: PR #N` on the issue. If your token can't comment, tell the owner, who relays it.
 5. **Review.** Claude runs the §6 checklist and posts a verdict on the PR: **Approve** or

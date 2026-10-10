@@ -75,6 +75,10 @@ Every PR runs five gates that must stay green: CodeQL (cross-file,
 npm/pip-audit (dependency CVEs), and `verify`. A red security check is a
 blocker, not noise: fix the cause. Never bypass a gate — no `continue-on-error`,
 no skip-workflow labels, no severity downgrades, no `--force` push to hide one.
+The gates run when a PR is opened as ready or marked ready for review, on every
+push after that, and on `main`; a **draft** runs none (minutes are billed on this
+private repo, 2026-10-10). Run `npm run check` locally while drafting, and mark
+the PR ready only when you want the gates to judge it.
 
 Pin every `uses:` to a full commit SHA with the version in a comment, and pin
 Docker containers by digest, never by tag. Resolve SHAs/digests from the

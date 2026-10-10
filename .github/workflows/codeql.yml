@@ -10,6 +10,9 @@ name: CodeQL
 
 on:
   pull_request:
+    # A draft runs nothing: the checks run once it is marked ready, and again
+    # on main after the merge (minutes are billed on this private repo).
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +27,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:

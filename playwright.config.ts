@@ -56,6 +56,9 @@ export default defineConfig({
     baseURL: origin,
     viewport: { width: 1280, height: 800 },
     storageState: tourSeen(origin),
+    // CI points this at the runner's own Chrome (`PW_CHANNEL=chrome`) instead
+    // of downloading Chromium on every run; unset, Playwright's Chromium.
+    ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}),
   },
   projects: [
     {
