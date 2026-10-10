@@ -17,6 +17,16 @@ Found while fixing #104: the bar's «مُصفّى:» chips, and the phone trigge
 | `npx playwright test` (full e2e, macOS), twice | 130 passed, 5 skipped of 135, both times. |
 | `npm run check` | exit 0: unit 1223, DB 555, worker 297 passed; build and secret scan passed. After merging main (#107): exit 0, unit 1237, DB 563, worker 297; full e2e 130 passed, 5 skipped of 135. Again after #110: exit 0, unit 1250, DB 567, worker 297; full e2e 130 passed, 5 skipped of 135. |
 
+Second fix, from the original session (#108, commit `01c6aea`, brought in here): the effect that drops a sentiment the active model cannot measure (a three-class model has no Mixed) watched the draft `sentiment` and called `applyFilters`, so it re-applied every unapplied draft with it. It now resets the draft control only if the draft holds such a sentiment, and removes one from the applied filters only if it was applied (`withoutUnmeasurable(filters, measurable)`, `null` when nothing changes).
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run apps/web/src/dashboard/filters.test.ts`, new tests before the helper existed | 2 failed (`withoutUnmeasurable is not a function`). |
+| Same, with the helper | 11 passed (2 new: an applied Mixed is dropped under a three-class set while `replies: "comments"` stays; nothing changes when every applied sentiment is measurable or none is applied). |
+| Mutation: the helper keeps every sentiment | 1 failed. |
+| `npm run check` | exit 0: unit 1225, DB 555, worker 297 passed; build and secret scan passed. |
+| `npm run test:e2e` | 129 passed, 5 skipped. The fixture shell measures all four labels, so e2e cannot reach the unmeasurable case; it shows the effect leaves measurable sentiment filters alone. |
+
 ## 2026-10-10 — Fewer CI minutes
 
 Owner request (2026-10-10: "قلّل استهلاك الدقائق في الفحوص"), after GitHub stopped starting jobs ("recent account payments have failed or your spending limit needs to be increased"). Measured on #107's last full PR run: 27 billed minutes per push (each job rounds up), the browser job 7m04s of which `npx playwright install --with-deps chromium` was 3m29s. Two changes, no gate removed:

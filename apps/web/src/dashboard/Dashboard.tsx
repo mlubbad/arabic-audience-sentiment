@@ -83,6 +83,7 @@ import {
   chipsFor,
   EMPTY_FILTERS,
   withoutChip,
+  withoutUnmeasurable,
   type Chip,
   type FilterValues,
 } from "./filters";
@@ -817,12 +818,19 @@ function DashboardBody({
   });
   const s = result.data;
 
+  // A sentiment the active model cannot measure (a three-class model has no
+  // Mixed) is neither offered nor kept. The draft and the applied filters
+  // are checked apart: the control is reset if *it* holds one, and the read
+  // drops one only if it was *applied* — never by re-applying the bar, which
+  // would carry every unapplied draft into the read along with it.
   useEffect(() => {
-    if (sentiment && s?.measurable && !s.measurable.has(sentiment as Label)) {
+    const measurable = s?.measurable;
+    if (!measurable) return;
+    if (sentiment && !measurable.has(sentiment as Label))
       setSentiment(EMPTY_FILTERS.sentiment);
-      applyFilters({ sentiment: EMPTY_FILTERS.sentiment });
-    }
-  }, [sentiment, s?.measurable]);
+    const next = withoutUnmeasurable(filters, measurable);
+    if (next) narrow(next);
+  }, [sentiment, filters, s?.measurable]);
 
   // The pinned bar's height as `db-sticky-bar` measures it (FilterBar + SectionNav).
   // Zero until the first measurement lands.
