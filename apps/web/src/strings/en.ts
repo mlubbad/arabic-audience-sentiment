@@ -437,6 +437,7 @@ export const en: Strings = {
   adminTabUsers: "Accounts",
   adminTabChannels: "Channels",
   adminTabCompare: "Compare",
+  adminTabSystem: "System",
   adminTabPlans: "Account Types",
   adminTabOps: "Operations",
   adminTabServices: "Services & Health",
@@ -751,6 +752,35 @@ export const en: Strings = {
   adminChannelsReconnect: "Reconnect needed",
   adminChannelsDisconnected: "Disconnected",
   adminChannelsNeverSynced: "Never synced",
+  // system room
+  adminSystemTitle: "System",
+  adminSystemLead:
+    "What runs the platform itself and is not needed every day: service health, operations, account types, channel import and the audit trail.",
+  adminSystemOpen: (page: string) => `Open ${page}`,
+  adminSystemBack: "‹ System",
+  adminSystemUnread: "Could not be read now; open the page for details.",
+  adminSystemHealthy: (n: number) => `${n} healthy`,
+  adminSystemDegraded: (n: number) => `${n} degraded`,
+  adminSystemDown: (n: number) => `${n} down`,
+  // morning summary
+  adminDigestTitle: "Morning summary",
+  adminDigestRecorded: (at: string) =>
+    `Snapshot of ${at} (UTC), against the one before it.`,
+  adminDigestFirst: (at: string) =>
+    `First snapshot (${at} UTC). The comparison starts with tomorrow morning's.`,
+  adminDigestNone: "No snapshot yet; one is taken every morning.",
+  adminDigestUnavailable: "The morning summary could not be read.",
+  adminDigestNewlyFailing: "Started failing",
+  adminDigestRecovered: "Recovered",
+  adminDigestFailingNow: "Failing now",
+  adminDigestNoneFailing: "No channel is failing.",
+  adminDigestCollected: "Comments collected",
+  adminDigestAnalysed: "Comments analysed",
+  adminDigestStale: "Stale channels",
+  adminDigestFailedRuns: "Failed runs (24 h)",
+  adminDigestImported: "Channels imported (24 h)",
+  adminDigestMovers: "Biggest sentiment change this week",
+  adminDigestNoMovers: "No change with a large enough sample yet.",
   // compare
   adminCompareTitle: "Compare channels",
   adminCompareLead:

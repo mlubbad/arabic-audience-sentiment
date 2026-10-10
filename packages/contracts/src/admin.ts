@@ -346,3 +346,62 @@ export const AdminCompareChannelSchema = z
   .strict();
 export const AdminChannelsCompareSchema = z.array(AdminCompareChannelSchema);
 export type AdminCompareChannel = z.infer<typeof AdminCompareChannelSchema>;
+
+const DigestBodySchema = z
+  .object({
+    states: z
+      .object({
+        paused: count,
+        cataloguing: count,
+        collecting: count,
+        failing: count,
+        new: count,
+        waiting: count,
+        stale: count,
+        healthy: count,
+      })
+      .strict(),
+    failing: z.array(
+      z
+        .object({
+          channel_id: z.string().uuid(),
+          title: z.string().nullable(),
+          handle: z.string().nullable(),
+          error_code: z.string().nullable(),
+        })
+        .strict(),
+    ),
+    comments: count,
+    analysed: count,
+    failed_runs: count,
+    imported: count,
+    movers: z.array(
+      z
+        .object({
+          channel_id: z.string().uuid(),
+          title: z.string().nullable(),
+          handle: z.string().nullable(),
+          change: z.number(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+const DigestSnapshotSchema = z
+  .object({
+    day: z.string(),
+    recorded_at: timestamp,
+    body: DigestBodySchema,
+  })
+  .strict();
+
+/** `admin_daily_digest()`: the latest morning snapshot of the platform and
+ *  the one before it, for the owner home to compare. */
+export const AdminDailyDigestSchema = z
+  .object({
+    latest: DigestSnapshotSchema.nullable(),
+    previous: DigestSnapshotSchema.nullable(),
+  })
+  .strict();
+export type AdminDailyDigest = z.infer<typeof AdminDailyDigestSchema>;
+export type AdminDigestSnapshot = z.infer<typeof DigestSnapshotSchema>;

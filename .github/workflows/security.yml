@@ -10,6 +10,9 @@ name: Security
 
 on:
   pull_request:
+    # A draft runs nothing: the checks run once it is marked ready, and again
+    # on main after the merge (minutes are billed on this private repo).
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -26,6 +29,7 @@ jobs:
     # npm: production deps only (dev deps are audited by dependabot weekly).
     # pip: the Python worker's locked runtime via pip-audit.
     name: Dependency audit
+    if: github.event.pull_request.draft != true
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -52,6 +56,7 @@ jobs:
     # Scans the full history for committed credentials via the gitleaks CLI
     # (pinned binary, no wrapper action needed).
     name: Secret scan
+    if: github.event.pull_request.draft != true
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
@@ -88,6 +93,7 @@ jobs:
   semgrep:
     # Same high-confidence security ruleset run locally; blocks on ERROR severity.
     name: Semgrep SAST
+    if: github.event.pull_request.draft != true
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     container:

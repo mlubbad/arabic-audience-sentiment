@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+    # A draft runs nothing: the checks run once it is marked ready, and again
+    # on main after the merge (minutes are billed on this private repo).
+    types: [opened, synchronize, reopened, ready_for_review]
 permissions:
   contents: read
 
@@ -22,6 +25,7 @@ concurrency:
 jobs:
   static:
     name: Static checks and build
+    if: github.event.pull_request.draft != true
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -52,6 +56,7 @@ jobs:
 
   unit:
     name: Unit and worker tests
+    if: github.event.pull_request.draft != true
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -74,6 +79,7 @@ jobs:
 
   db:
     name: Database tests
+    if: github.event.pull_request.draft != true
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -89,6 +95,7 @@ jobs:
 
   e2e:
     name: Browser tests
+    if: github.event.pull_request.draft != true
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -100,7 +107,17 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # The runner image ships Google Chrome with its system libraries;
+      # downloading Chromium and its apt dependencies took ~3.5 of the job's
+      # 7 minutes (2026-10-10). Without Chrome on the image, install as before.
+      - name: Use the runner's Chrome, or install Chromium
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            google-chrome --version
+            echo "PW_CHANNEL=chrome" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
       - run: npm run test:e2e
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
@@ -111,7 +128,7 @@ jobs:
 
   verify:
     needs: [static, unit, db, e2e]
-    if: always()
+    if: always() && github.event.pull_request.draft != true
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
