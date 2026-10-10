@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ar } from "../strings/ar";
 import * as adminRead from "./adminRead";
 import { AdminChannelsPage } from "./AdminChannelsPage";
+import { readTrail } from "./adminTrail";
 
 vi.mock("./adminRead");
 vi.mock("./AdminShell", async (importOriginal) => {
@@ -156,6 +157,26 @@ describe("AdminChannelsPage (channels console)", () => {
   it("says so when nothing matches", async () => {
     mount("/admin/channels?q=nothing-like-this");
     expect(await screen.findByText(ar.adminConsoleEmpty)).toBeInTheDocument();
+  });
+
+  it("entering a workspace keeps the list as shown and the way back, for the trail on its pages", async () => {
+    window.sessionStorage.clear();
+    mount("/admin/channels?owner=mine");
+    await screen.findByTestId("admin-channels");
+    await userEvent.click(
+      screen.getByRole("button", { name: ar.adminConsoleOpen("Failing one") }),
+    );
+    const panel = await screen.findByTestId("admin-console-panel");
+    await userEvent.click(
+      within(panel).getByRole("link", { name: ar.adminHomeOpenWorkspace }),
+    );
+    expect(readTrail()).toEqual({
+      back: "/admin/channels?owner=mine",
+      items: [
+        { workspace_id: ROWS[1]!.workspace_id, name: "Failing one" },
+        { workspace_id: ROWS[0]!.workspace_id, name: "Healthy one" },
+      ],
+    });
   });
 
   it("opens a channel's details beside the list, and walks to the next one", async () => {

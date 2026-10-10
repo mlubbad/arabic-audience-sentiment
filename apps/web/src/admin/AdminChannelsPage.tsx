@@ -54,6 +54,7 @@ import {
   type OwnerFilter,
   type SortKey,
 } from "./channelsConsole";
+import { saveTrail } from "./adminTrail";
 
 const n = (value: number) => value.toLocaleString("en-US");
 const when = (iso: string | null) =>
@@ -283,6 +284,15 @@ function Console({ rows }: { rows: AdminConsoleChannel[] }) {
         channel={openIndex >= 0 ? shown[openIndex]! : null}
         position={openIndex}
         count={shown.length}
+        onEnter={() =>
+          saveTrail({
+            back: `/admin/channels${params.size ? `?${params}` : ""}`,
+            items: shown.map((c) => ({
+              workspace_id: c.workspace_id,
+              name: channelName(c),
+            })),
+          })
+        }
         onClose={() => setOpenId(null)}
         onMove={(step) => setOpenId(shown[openIndex + step]?.id ?? openId)}
       />
@@ -296,12 +306,15 @@ function ChannelPanel({
   count,
   onClose,
   onMove,
+  onEnter,
 }: {
   channel: AdminConsoleChannel | null;
   position: number;
   count: number;
   onClose: () => void;
   onMove: (step: 1 | -1) => void;
+  /** Keeps the list as shown, for the way back and on (`adminTrail.ts`). */
+  onEnter: () => void;
 }) {
   const S = useStrings();
   return (
@@ -365,6 +378,7 @@ function ChannelPanel({
             <Link
               to={`/dashboard?ws=${c.workspace_id}`}
               className="ui-btn ui-btn--primary ui-btn--sm admin-console-enter"
+              onClick={onEnter}
             >
               {S.adminHomeOpenWorkspace}
             </Link>

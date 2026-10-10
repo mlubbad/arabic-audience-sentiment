@@ -57,6 +57,7 @@ import { publicPath, resolvePublicPath } from "./publicPaths";
 import { publicRoutes } from "./publicRoutes";
 import { SessionControl } from "./SessionControl";
 import { AdminInspectionBanner } from "./AdminInspectionBanner";
+import { AdminTrail } from "./AdminTrail";
 import { ImpersonationBanner } from "./ImpersonationBanner";
 import { ImpersonationProvider, useImpersonation } from "./impersonation";
 import { TourProvider } from "./tour/TourProvider";
@@ -367,6 +368,7 @@ function AppLayout() {
           <LanguageSwitch />
         </div>
         <AdminInspectionBanner />
+        <AdminTrail />
         <ImpersonationBanner />
         {/* A rail, not a bar.
             Four links across the top said "this is a page with some links on

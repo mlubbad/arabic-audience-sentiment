@@ -756,6 +756,8 @@ export const ar = {
   adminChannelsReconnect: "تحتاج إعادة ربط",
   adminChannelsDisconnected: "منفصلة",
   adminChannelsNeverSynced: "لم تُزامن بعد",
+  adminTrailLabel: "التنقل بين القنوات",
+  adminTrailClose: "إخفاء شريط القنوات",
   // system room
   adminSystemTitle: "النظام",
   adminSystemLead:

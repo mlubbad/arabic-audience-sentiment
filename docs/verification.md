@@ -62,6 +62,19 @@ Second fix, from the original session (#108, commit `01c6aea`, brought in here):
 | `npm run check` | exit 0: unit 1225, DB 555, worker 297 passed; build and secret scan passed. |
 | `npm run test:e2e` | 129 passed, 5 skipped. The fixture shell measures all four labels, so e2e cannot reach the unmeasurable case; it shows the effect leaves measurable sentiment filters alone. |
 
+## 2026-10-10 — Moving between channels inside their workspaces
+
+Owner request (2026-10-10: "ابدأ المرحلة التالية بعد اكتمال النشر"; the remaining non-destructive item of the approved design). Entering a channel's workspace from the channels console («ادخل المساحة» in its panel) keeps, in this tab's sessionStorage, the channels as the console showed them (filtered and ordered) and the console's address (`admin/adminTrail.ts`). On `/dashboard` and `/sync`, a platform admin who is not impersonating then sees «القنوات ‹ name · n من m» with the previous and next channel. The links change only `?ws=` and keep the page and the rest of the address. «القنوات» goes back to the console as it was, and ✕ puts the bar away and forgets the list. A new tab, a workspace outside the list or a stored value that is not a trail (or whose way back leaves `/admin/`) shows nothing. No database change.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `admin/adminTrail.test.ts` | 4 passed: kept and given back; a malformed value, an outside `back` and bad items refused; neighbours and ends; nothing outside the list. |
+| `AdminTrail.test.tsx` | 4 passed: name, position, way back and neighbour links on `/sync` keeping `demo=1`; no step past the end; nothing outside the list, on `/account`, for a non-admin or while impersonating; ✕ hides and forgets. |
+| `AdminChannelsPage.test.tsx` | 12 passed, 1 new: entering from the panel keeps `/admin/channels?owner=mine` and the two shown channels in order. |
+| Mutation (restored) | Not keeping the trail on entry failed that test. |
+| e2e `admin`, `app-shell`, `dashboard` (local Chromium) | 96 passed. |
+| `npm run check` | exit 0: unit 1265, DB 567 passed. |
+
 ## 2026-10-10 — The «النظام» room
 
 Owner request (2026-10-10: "ابدأ المرحلة التالية بعد اكتمال النشر", then «غرفة النظام»). `/admin/system` («النظام») gathers the five pages that run the platform itself: services, operations, account types, channel import and the audit trail. Each is a card with its page's lead and a link. The services card counts healthy, degraded and down services from `readAdminServicesHealth`; the audit card lists the five latest entries from `readAdminAudit`. A read that fails says so on its card only. The tab strip goes from ten tabs to six. The five pages keep their addresses, «النظام» is lit on any of them, and each shows «‹ النظام» back to the room. The Ctrl+K palette still lists every page. No database change.
