@@ -13,6 +13,7 @@ import {
   AdminAccountsSchema,
   AdminAuditEventsSchema,
   AdminChannelsConsoleSchema,
+  AdminChannelsCompareSchema,
   AdminChannelsSchema,
   AdminConsoleOverviewSchema,
   AdminOpsSchema,
@@ -22,6 +23,7 @@ import {
   type AdminAccount,
   type AdminAuditEvent,
   type AdminChannel,
+  type AdminCompareChannel,
   type AdminConsoleChannel,
   type AdminConsoleOverview,
   type AdminOps,
@@ -213,6 +215,15 @@ export async function readAdminChannelsConsole(): Promise<
   const { data, error } = await supabase!.rpc("admin_channels_console");
   if (error) throw rpcFailure(error);
   return AdminChannelsConsoleSchema.parse(data);
+}
+
+/** The comparison page's one read: every channel with its kept counts. */
+export async function readAdminChannelsCompare(): Promise<
+  AdminCompareChannel[]
+> {
+  const { data, error } = await supabase!.rpc("admin_channels_compare");
+  if (error) throw rpcFailure(error);
+  return AdminChannelsCompareSchema.parse(data);
 }
 
 /** Pause or resume the scheduler's work on channels. Thrown as it came. */
