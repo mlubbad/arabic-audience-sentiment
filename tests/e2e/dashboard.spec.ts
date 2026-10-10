@@ -1498,6 +1498,89 @@ test("the report says what it is narrowed to, wherever you have read to", async 
   await expect(summary).toBeHidden();
 });
 
+test("a chip names an applied filter, never a chosen-but-unapplied one", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const summary = page.getByTestId("active-filters");
+  await expect(page.getByTestId("total")).toHaveText("6");
+
+  // Chosen, not applied: every figure still describes all six comments, so
+  // a chip saying «التعليقات فقط» here would tell the reader the page is
+  // narrowed when it is not.
+  await openMore(page);
+  await pick(page, "نوع المشاركة", "تعليقات أصلية فقط");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(summary).toBeHidden();
+  // The «المزيد» trigger still counts it: it describes the controls behind
+  // it, and one of them is set.
+  await expect(
+    page.getByRole("button", { name: "المزيد من المرشحات (1)" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("4");
+  await expect(summary).toContainText("مُصفّى");
+  await expect(summary).toContainText("التعليقات فقط");
+});
+
+test("removing a chip clears that filter alone, not the drafts beside it", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const summary = page.getByTestId("active-filters");
+  await pick(page, "الفيديو", "أفضل 5 تطبيقات مجانية لتنظيم وقتك");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(page.getByTestId("total")).toHaveText("2");
+
+  // A draft beside the applied video filter, not applied.
+  await openMore(page);
+  await pick(page, "نوع المشاركة", "تعليقات أصلية فقط");
+  await page.keyboard.press("Escape");
+
+  // The chip is the applied state: removing it re-reads at once, without
+  // the video, and without slipping the unapplied draft in alongside.
+  await summary
+    .getByRole("button", { name: "إزالة الفلتر: فيديو محدَّد" })
+    .click();
+  await expect(page.getByTestId("total")).toHaveText("6");
+  await expect(summary).toBeHidden();
+  // And the matching control says so, rather than still showing the video.
+  await expect(
+    page.getByRole("combobox", { name: "الفيديو", exact: true }),
+  ).toContainText("كل الفيديوهات");
+});
+
+test("removing the period chip takes the date-order error with it", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  const summary = page.getByTestId("active-filters");
+  const error = page.locator("#report-filters [role=alert]");
+  await openPeriod(page);
+  await page.getByLabel("من تاريخ").fill("2026-09-01");
+  await page.getByLabel("إلى تاريخ (غير شامل)").fill("2026-09-10");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(summary).toContainText("فترة محدَّدة");
+  // An out-of-order range is refused with a sentence, and the applied
+  // period stays.
+  await openPeriod(page);
+  await page.getByLabel("من تاريخ").fill("2026-09-20");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(error).toHaveText("يجب أن يسبق تاريخ البداية تاريخ النهاية");
+  // Removing the period empties both dates, so nothing is out of order any
+  // more; the sentence must not outlive the range it was about.
+  await summary
+    .getByRole("button", { name: "إزالة الفلتر: فترة محدَّدة" })
+    .click();
+  await expect(summary).toBeHidden();
+  await expect(error).toBeHidden();
+});
+
 test("escape leaves the correction overlay", async ({ page }) => {
   await page.goto("/dashboard");
   const row = page.locator('[data-testid="comments-table"] tbody tr').first();

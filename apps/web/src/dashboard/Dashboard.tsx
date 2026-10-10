@@ -79,8 +79,11 @@ import {
   Updating,
 } from "../pageStates/PageStates";
 import {
+  appliedValues,
   chipsFor,
   EMPTY_FILTERS,
+  withoutChip,
+  withoutUnmeasurable,
   type Chip,
   type FilterValues,
 } from "./filters";
@@ -717,10 +720,16 @@ function DashboardBody({
       return;
     }
     setFormError("");
+    narrow(filtersFrom(over));
+  }
+  /** Set what the read is keyed on, dropping the paging that belonged to the
+   *  previous set: a cursor or a video page is only valid for the list it
+   *  was turned in. */
+  function narrow(next: Filters) {
     setCursorNotice(false);
     setCursors([]);
     setVideoPage(0);
-    setFilters(filtersFrom(over));
+    setFilters(next);
   }
   function reset() {
     setQuery("");
@@ -781,70 +790,47 @@ function DashboardBody({
   }
   /**
    * A chip is the applied state itself, not a draft of it — so clearing one
-   * applies immediately, unlike the bar's own apply button. The cleared
-   * value is passed to `applyFilters` as an override rather than relied on
-   * from the state just set above: the same reason the video cards pass
-   * `{ video: next }` (see `filtersFrom`'s comment) — the `setX` call has
-   * not landed yet when `applyFilters` runs here.
+   * takes effect at once, unlike the bar's own apply button. It edits the
+   * applied filters (`withoutChip`) rather than re-applying the bar: a
+   * control chosen but not applied yet stays a draft, instead of slipping
+   * into the read with the chip's removal. The matching control is reset
+   * too, so the bar does not go on showing a condition no longer applied.
    */
   function onClear(key: Chip["key"]) {
-    switch (key) {
-      case "query":
-        setQuery(EMPTY_FILTERS.query);
-        applyFilters({ query: EMPTY_FILTERS.query });
-        break;
-      case "video":
-        setVideo(EMPTY_FILTERS.video);
-        applyFilters({ video: EMPTY_FILTERS.video });
-        break;
-      case "sentiment":
-        setSentiment(EMPTY_FILTERS.sentiment);
-        applyFilters({ sentiment: EMPTY_FILTERS.sentiment });
-        break;
-      case "topic":
-        setTopic(EMPTY_FILTERS.topic);
-        applyFilters({ topic: EMPTY_FILTERS.topic });
-        break;
-      case "videoKind":
-        setVideoKind(EMPTY_FILTERS.videoKind);
-        applyFilters({ videoKind: EMPTY_FILTERS.videoKind });
-        break;
-      case "platform":
-        setPlatform(EMPTY_FILTERS.platform);
-        applyFilters({ platform: EMPTY_FILTERS.platform });
-        break;
-      case "commentType":
-        setCommentType(EMPTY_FILTERS.commentType);
-        applyFilters({ commentType: EMPTY_FILTERS.commentType });
-        break;
-      case "replies":
-        setReplies(EMPTY_FILTERS.replies);
-        applyFilters({ replies: EMPTY_FILTERS.replies });
-        break;
-      case "reviewStatus":
-        setReviewStatus(EMPTY_FILTERS.reviewStatus);
-        applyFilters({ reviewStatus: EMPTY_FILTERS.reviewStatus });
-        break;
-      case "dateMode":
-        setDateMode(EMPTY_FILTERS.dateMode);
-        applyFilters({ dateMode: EMPTY_FILTERS.dateMode });
-        break;
-      case "period":
-        setFrom(EMPTY_FILTERS.from);
-        setTo(EMPTY_FILTERS.to);
-        applyFilters({ from: EMPTY_FILTERS.from, to: EMPTY_FILTERS.to });
-        break;
-    }
+    onChange(
+      key === "period"
+        ? { from: EMPTY_FILTERS.from, to: EMPTY_FILTERS.to }
+        : { [key]: EMPTY_FILTERS[key] },
+    );
+    // The date-order sentence is about the draft range; removing the period
+    // empties it, so the sentence goes too. Any other chip leaves the draft
+    // dates as they were, and the sentence still describes them.
+    if (key === "period" || key === "from" || key === "to") setFormError("");
+    narrow(withoutChip(filters, key));
   }
-  const chips = chipsFor(values, { S, labels, topicName });
+  // From the applied filters, never the draft: a chip appearing the moment
+  // a control is picked says the page is narrowed while every figure on it
+  // still describes the whole set.
+  const chips = chipsFor(appliedValues(filters, limit), {
+    S,
+    labels,
+    topicName,
+  });
   const s = result.data;
 
+  // A sentiment the active model cannot measure (a three-class model has no
+  // Mixed) is neither offered nor kept. The draft and the applied filters
+  // are checked apart: the control is reset if *it* holds one, and the read
+  // drops one only if it was *applied* — never by re-applying the bar, which
+  // would carry every unapplied draft into the read along with it.
   useEffect(() => {
-    if (sentiment && s?.measurable && !s.measurable.has(sentiment as Label)) {
+    const measurable = s?.measurable;
+    if (!measurable) return;
+    if (sentiment && !measurable.has(sentiment as Label))
       setSentiment(EMPTY_FILTERS.sentiment);
-      applyFilters({ sentiment: EMPTY_FILTERS.sentiment });
-    }
-  }, [sentiment, s?.measurable]);
+    const next = withoutUnmeasurable(filters, measurable);
+    if (next) narrow(next);
+  }, [sentiment, filters, s?.measurable]);
 
   // The pinned bar's height as `db-sticky-bar` measures it (FilterBar + SectionNav).
   // Zero until the first measurement lands.
