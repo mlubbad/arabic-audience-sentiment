@@ -22,7 +22,7 @@ Owner request (2026-10-10), after GitHub refused every hosted job on #108 three 
 | --- | --- |
 | `npx vitest run scripts/ci-workflow.test.ts scripts/workflow-runners.test.ts` on the merge | 16 passed: #110's draft guard and `ready_for_review` trigger, and this PR's runner variables, together. |
 | PyYAML over the four workflows | All parse; the nine CI jobs run on `CI_RUNNER` with the draft guard, the two deploy jobs on `DEPLOY_RUNNER` without it. |
-| MERGE_CHECK_ROW |
+| `npm run check` on the merge (main at #112) | exit 0: unit 1256, DB 567, worker 297 passed; build and secret scan passed. The e2e suite was not re-run here: this PR changes no app code, and main's app code came with its own green checks. |
 
 ## 2026-10-10 — The «النظام» room
 
