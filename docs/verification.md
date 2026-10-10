@@ -27,6 +27,17 @@ Second fix, from the original session (#108, commit `01c6aea`, brought in here):
 | `npm run check` | exit 0: unit 1225, DB 555, worker 297 passed; build and secret scan passed. |
 | `npm run test:e2e` | 129 passed, 5 skipped. The fixture shell measures all four labels, so e2e cannot reach the unmeasurable case; it shows the effect leaves measurable sentiment filters alone. |
 
+## 2026-10-10 — The «النظام» room
+
+Owner request (2026-10-10: "ابدأ المرحلة التالية بعد اكتمال النشر", then «غرفة النظام»). `/admin/system` («النظام») gathers the five pages that run the platform itself: services, operations, account types, channel import and the audit trail. Each is a card with its page's lead and a link. The services card counts healthy, degraded and down services from `readAdminServicesHealth`; the audit card lists the five latest entries from `readAdminAudit`. A read that fails says so on its card only. The tab strip goes from ten tabs to six. The five pages keep their addresses, «النظام» is lit on any of them, and each shows «‹ النظام» back to the room. The Ctrl+K palette still lists every page. No database change.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `AdminSystemPage.test.tsx` | 4 passed: five links to the right addresses; health counts 10 / 1 / 1; five audit entries out of six; a failed services read leaves the audit card; «النظام» lit and the back link on `/admin/services`, neither on `/admin/channels`. |
+| Mutation (restored) | Not lighting «النظام» on its pages failed one test. |
+| e2e `admin.spec` + `app-shell.spec` (local Chromium) | 16 passed. |
+| `npm run check` | exit 0: unit 1249, DB 567 passed. |
+
 ## 2026-10-10 — Fewer CI minutes
 
 Owner request (2026-10-10: "قلّل استهلاك الدقائق في الفحوص"), after GitHub stopped starting jobs ("recent account payments have failed or your spending limit needs to be increased"). Measured on #107's last full PR run: 27 billed minutes per push (each job rounds up), the browser job 7m04s of which `npx playwright install --with-deps chromium` was 3m29s. Two changes, no gate removed:
@@ -41,7 +52,7 @@ Owner request (2026-10-10: "قلّل استهلاك الدقائق في الفح
 | YAML | All three files parse; every job's `if:` read back as expected. |
 | `PW_CHANNEL=chrome npx playwright test --list` | 132 tests in 11 files, as without it. |
 | `npm run check` | exit 0: unit 1245, DB 567 passed. |
-| Not verified | A browser run on the runner's Chrome: no CI job can start until billing is fixed, and this machine has no Google Chrome. The first ready run will show `google-chrome --version` in its log; if the e2e suite fails only there, revert the step. Expected saving: about 3 billed minutes per browser run, and every run on a draft push. |
+| Browser run on the runner's Chrome (#110 at 1f6b9ab, after billing was fixed) | All 10 checks passed. «Use the runner's Chrome» took 3 s (the Chromium install took 209 s before); the browser job went from 424 s to 235 s, so 8 billed minutes became 4. |
 
 ## 2026-10-10 — Owner console phase 4: the morning summary
 

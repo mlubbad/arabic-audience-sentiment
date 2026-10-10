@@ -443,6 +443,7 @@ export const ar = {
   adminTabUsers: "الحسابات",
   adminTabChannels: "القنوات",
   adminTabCompare: "المقارنة",
+  adminTabSystem: "النظام",
   adminTabPlans: "أنواع الحسابات",
   adminTabOps: "التشغيل",
   adminTabServices: "الخدمات والمؤشرات",
@@ -755,6 +756,16 @@ export const ar = {
   adminChannelsReconnect: "تحتاج إعادة ربط",
   adminChannelsDisconnected: "منفصلة",
   adminChannelsNeverSynced: "لم تُزامن بعد",
+  // system room
+  adminSystemTitle: "النظام",
+  adminSystemLead:
+    "ما يخص تشغيل المنصة نفسها ولا تحتاجه كل يوم: صحة الخدمات، والتشغيل، وأنواع الحسابات، واستيراد القنوات، وسجل التدقيق.",
+  adminSystemOpen: (page: string) => `افتح ${page}`,
+  adminSystemBack: "‹ النظام",
+  adminSystemUnread: "تعذّرت القراءة الآن؛ افتح الصفحة للتفاصيل.",
+  adminSystemHealthy: (n: number) => `${n} سليمة`,
+  adminSystemDegraded: (n: number) => `${n} متدهورة`,
+  adminSystemDown: (n: number) => `${n} متوقفة`,
   // morning summary
   adminDigestTitle: "ملخص الصباح",
   adminDigestRecorded: (at: string) =>
