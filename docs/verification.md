@@ -1,5 +1,21 @@
 # Verification
 
+## 2026-10-10 — Fewer CI minutes
+
+Owner request (2026-10-10: "قلّل استهلاك الدقائق في الفحوص"), after GitHub stopped starting jobs ("recent account payments have failed or your spending limit needs to be increased"). Measured on #107's last full PR run: 27 billed minutes per push (each job rounds up), the browser job 7m04s of which `npx playwright install --with-deps chromium` was 3m29s. Two changes, no gate removed:
+
+- A draft PR runs no job in `ci.yml`, `security.yml` or `codeql.yml` (`if: github.event.pull_request.draft != true` on every job; `ready_for_review` added to the PR triggers). The gates run when a PR is marked ready, on every push after, and on `main`. AGENTS.md and the playbook say so.
+- The browser job uses the runner image's Google Chrome (`PW_CHANNEL=chrome`, read by `playwright.config.ts`) and installs Chromium as before only when the image has none.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `scripts/ci-workflow.test.ts` | 9 passed, 5 of them new: each of the three workflows lists `ready_for_review` and every job carries the draft guard. |
+| Mutations (each restored) | Dropping the guard from Semgrep, and `ready_for_review` from CodeQL, each failed one test. |
+| YAML | All three files parse; every job's `if:` read back as expected. |
+| `PW_CHANNEL=chrome npx playwright test --list` | 132 tests in 11 files, as without it. |
+| `npm run check` | exit 0: unit 1245, DB 567 passed. |
+| Not verified | A browser run on the runner's Chrome: no CI job can start until billing is fixed, and this machine has no Google Chrome. The first ready run will show `google-chrome --version` in its log; if the e2e suite fails only there, revert the step. Expected saving: about 3 billed minutes per browser run, and every run on a draft push. |
+
 ## 2026-10-10 — Owner console phase 4: the morning summary
 
 Owner request (2026-10-10: "ابدأ المرحلة التالية بعد اكتمال النشر"; delivery chosen: inside the owner console, nothing sent anywhere). One migration (`20261022000000_admin_daily_digest.sql`): `private.admin_digests` keeps one snapshot a day (30 days) of the channel states, the failing channels with their errors, the comment and analysis totals, failed runs and imports in the last 24 hours, and the three biggest weekly net-sentiment changes from the comparison counts (20 positive-or-negative comments in each week). pg_cron `admin-daily-digest` records it at 03:53 UTC; the migration records the first. `public.admin_daily_digest()` (admin only) gives the latest snapshot and the one before. The `/admin` home shows «ملخص الصباح» above the rest, read on its own: started failing, recovered, comments collected and analysed between the two snapshots, stale channels, failed runs, imports, movers; on the first snapshot it lists what fails now and says the comparison starts the next morning.

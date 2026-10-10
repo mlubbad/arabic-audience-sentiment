@@ -40,8 +40,35 @@ describe("CI workflow covers npm run check", () => {
         .map((s) => s.trim())
         .sort(),
     ).toEqual(others.sort());
-    expect(workflow).toMatch(/^ {4}if: always\(\)$/m);
+    expect(workflow).toMatch(/^ {4}if: always\(\) && /m);
     for (const job of others)
       expect(workflow).toContain(`\${{ needs.${job}.result }}`);
   });
+});
+
+// Minutes are billed on this private repo (the billing block of 2026-10-10):
+// a draft PR runs no job, the checks run once it is marked ready and again on
+// main. Every job of the three PR workflows carries the guard, and each
+// workflow listens for `ready_for_review`, or a PR made ready would never be
+// checked.
+describe("a draft pull request spends no CI minutes", () => {
+  for (const file of ["ci.yml", "security.yml", "codeql.yml"]) {
+    const text = readFileSync(`.github/workflows/${file}`, "utf8");
+    const body = text.slice(text.indexOf("\njobs:\n"));
+    const jobs = body.split(/^ {2}(?=[a-z0-9_-]+:$)/m).slice(1);
+
+    test(`${file} runs again when a draft is marked ready`, () => {
+      expect(text).toMatch(
+        /^ {2}pull_request:\n(?: {4}#.*\n)* {4}types: \[opened, synchronize, reopened, ready_for_review\]$/m,
+      );
+    });
+
+    test(`every job in ${file} skips a draft`, () => {
+      expect(jobs.length).toBeGreaterThan(0);
+      for (const job of jobs)
+        expect(job).toMatch(
+          /^ {4}if: (?:always\(\) && )?github\.event\.pull_request\.draft != true$/m,
+        );
+    });
+  }
 });
