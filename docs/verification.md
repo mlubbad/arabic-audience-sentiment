@@ -15,7 +15,7 @@ Found while fixing #104: the bar's «مُصفّى:» chips, and the phone trigge
 | The three chip tests with the fix, ×15 on 6 workers | 45 passed. |
 | `npx vitest run apps/web/src/dashboard/filters.test.ts` (in `npm test`) | `appliedValues`: no chip for an unfiltered read; every applied condition reads back as its chip, the picked days intact; no period chip when no bound was sent. `withoutChip`: one condition removed, the rest kept; both bounds of the period removed together. |
 | `npx playwright test` (full e2e, macOS), twice | 130 passed, 5 skipped of 135, both times. |
-| `npm run check` | exit 0: unit 1223, DB 555, worker 297 passed; build and secret scan passed. After merging main (#107): exit 0, unit 1237, DB 563, worker 297; full e2e 130 passed, 5 skipped of 135. |
+| `npm run check` | exit 0: unit 1223, DB 555, worker 297 passed; build and secret scan passed. After merging main (#107): exit 0, unit 1237, DB 563, worker 297; full e2e 130 passed, 5 skipped of 135. Again after #110: exit 0, unit 1250, DB 567, worker 297; full e2e 130 passed, 5 skipped of 135. |
 
 ## 2026-10-10 — Fewer CI minutes
 
