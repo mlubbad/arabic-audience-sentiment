@@ -35,6 +35,33 @@ Owner request (2026-10-10), after GitHub refused every hosted job on #108 three 
 | apt install `git curl jq unzip build-essential docker.io gh`, user added to `docker`, VM restarted | git 2.43.0, jq 1.7, gh 2.45.0, Docker 29.1.3; after the restart `docker info` runs as the user: `linux/aarch64, storage overlayfs`. |
 | Runner registration | **Not done.** The repository is public for now (`visibility=PUBLIC`), and the runbook allows a self-hosted runner only on a private repository. 0 runners registered; `CI_RUNNER` deleted; #111's checks re-run on hosted `ubuntu-latest`. |
 
+## 2026-10-10 — Filter chips name the applied filters, not the draft
+
+Found while fixing #104: the bar's «مُصفّى:» chips, and the phone trigger's «الفلاتر (n)», were built from the draft controls, so choosing «تعليقات أصلية فقط» put «مُصفّى: التعليقات فقط» on screen before «تطبيق الفلاتر» was pressed, while every figure still described all six comments. Removing a chip also re-applied the whole bar, so an unapplied draft beside it slipped into the read. The work was started in a separate session (commit `0ebfa2f`, never pushed); it was reviewed, finished and opened here at the owner's request ("أكمله أنت وافتح الـ PR").
+
+**Change.** `filters.ts`: `appliedValues(filters, limit)` reads the applied `Filters` back as bar values (a picked day restored from its `+03:00` bound), and `withoutChip(filters, key)` removes one condition from what is applied. `Dashboard.tsx` builds the chips and `appliedCount` from `appliedValues`, and `onClear` edits the applied filters with `withoutChip` and resets the matching control instead of re-applying the bar. The «المزيد (n)» count stays a draft count: it describes the controls behind it. Review finding, fixed here: the old `onClear` went through `applyFilters`, which cleared the date-order sentence; the new one did not, so removing the period chip emptied both dates but left «يجب أن يسبق تاريخ البداية تاريخ النهاية» on screen. `onClear` now clears it when the period (or one of its bounds) is removed; other chips leave the draft dates, and the sentence, as they were.
+
+| Command / observation | Actual result |
+| --- | --- |
+| New e2e «a chip names an applied filter, never a chosen-but-unapplied one» and «removing a chip clears that filter alone, not the drafts beside it», on main's `Dashboard.tsx`, `filters.ts`, `FilterBar.tsx` | Both failed: the chip row visible before apply (`toBeHidden` received visible); total 4 instead of 6 after removing the video chip. |
+| Same two tests with the change, ×20 on 6 workers | 40 passed. |
+| Review probe: an applied period, then an out-of-order draft refused, then the period chip removed | Chips commit: the sentence still visible. main: hidden. |
+| New e2e «removing the period chip takes the date-order error with it», before the `onClear` fix | Failed at `expect(error).toBeHidden()`. |
+| The three chip tests with the fix, ×15 on 6 workers | 45 passed. |
+| `npx vitest run apps/web/src/dashboard/filters.test.ts` (in `npm test`) | `appliedValues`: no chip for an unfiltered read; every applied condition reads back as its chip, the picked days intact; no period chip when no bound was sent. `withoutChip`: one condition removed, the rest kept; both bounds of the period removed together. |
+| `npx playwright test` (full e2e, macOS), twice | 130 passed, 5 skipped of 135, both times. |
+| `npm run check` | exit 0: unit 1223, DB 555, worker 297 passed; build and secret scan passed. After merging main (#107): exit 0, unit 1237, DB 563, worker 297; full e2e 130 passed, 5 skipped of 135. Again after #110: exit 0, unit 1250, DB 567, worker 297; full e2e 130 passed, 5 skipped of 135. With the second fix below as well: exit 0, unit 1252, DB 567, worker 297; full e2e 130 passed, 5 skipped of 135; the chip tests ×10 on 6 workers, 40 passed. |
+
+Second fix, from the original session (#108, commit `01c6aea`, brought in here): the effect that drops a sentiment the active model cannot measure (a three-class model has no Mixed) watched the draft `sentiment` and called `applyFilters`, so it re-applied every unapplied draft with it. It now resets the draft control only if the draft holds such a sentiment, and removes one from the applied filters only if it was applied (`withoutUnmeasurable(filters, measurable)`, `null` when nothing changes).
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run apps/web/src/dashboard/filters.test.ts`, new tests before the helper existed | 2 failed (`withoutUnmeasurable is not a function`). |
+| Same, with the helper | 11 passed (2 new: an applied Mixed is dropped under a three-class set while `replies: "comments"` stays; nothing changes when every applied sentiment is measurable or none is applied). |
+| Mutation: the helper keeps every sentiment | 1 failed. |
+| `npm run check` | exit 0: unit 1225, DB 555, worker 297 passed; build and secret scan passed. |
+| `npm run test:e2e` | 129 passed, 5 skipped. The fixture shell measures all four labels, so e2e cannot reach the unmeasurable case; it shows the effect leaves measurable sentiment filters alone. |
+
 ## 2026-10-10 — The «النظام» room
 
 Owner request (2026-10-10: "ابدأ المرحلة التالية بعد اكتمال النشر", then «غرفة النظام»). `/admin/system` («النظام») gathers the five pages that run the platform itself: services, operations, account types, channel import and the audit trail. Each is a card with its page's lead and a link. The services card counts healthy, degraded and down services from `readAdminServicesHealth`; the audit card lists the five latest entries from `readAdminAudit`. A read that fails says so on its card only. The tab strip goes from ten tabs to six. The five pages keep their addresses, «النظام» is lit on any of them, and each shows «‹ النظام» back to the room. The Ctrl+K palette still lists every page. No database change.

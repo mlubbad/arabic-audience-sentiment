@@ -47,10 +47,13 @@ export type FilterBarProps = {
   labels: Record<Label, string>;
   /** How many chips `ActiveFilters` would render right now — shown on the
    *  compact trigger so a phone reader sees the count without opening the
-   *  sheet. Computed by the caller (`chipsFor(values, …).length`) rather
-   *  than here, so this component stays a pure view over `values`. */
+   *  sheet. Computed by the caller from the *applied* filters
+   *  (`chipsFor(appliedValues(filters, …), …).length`), not from `values`,
+   *  which is the draft: a count that moved on every pick would claim a
+   *  narrowing the figures do not have yet. */
   appliedCount: number;
-  /** The applied-filter chips (`ActiveFilters`), rendered as the last row
+  /** The applied-filter chips (`ActiveFilters`) — built from the applied
+   *  filters, never from `values` — rendered as the last row
    *  inside the pinned pane. A narrowed report read as a whole one is a
    *  wrong one, and a reader who has scrolled learns what the page is
    *  narrowed to only if that row travels with the bar. */
