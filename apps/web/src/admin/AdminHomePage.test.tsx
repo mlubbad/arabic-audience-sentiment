@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
-import type { AdminConsoleOverview } from "@sentiment/contracts";
+import type {
+  AdminConsoleOverview,
+  AdminDailyDigest,
+} from "@sentiment/contracts";
 import { ar } from "../strings/ar";
 import { AdminHomePage } from "./AdminHomePage";
 import * as adminRead from "./adminRead";
@@ -67,6 +70,57 @@ const OVERVIEW: AdminConsoleOverview = {
   ],
 };
 
+const A = "10000000-0000-4000-8000-00000000000a";
+const B = "10000000-0000-4000-8000-00000000000b";
+const states = {
+  paused: 0,
+  cataloguing: 0,
+  collecting: 0,
+  failing: 1,
+  new: 0,
+  waiting: 0,
+  stale: 2,
+  healthy: 90,
+};
+const snapshot = (
+  day: string,
+  failing: { id: string; title: string; error: string }[],
+  comments: number,
+  analysed: number,
+) => ({
+  day,
+  recorded_at: `${day}T03:53:00+00:00`,
+  body: {
+    states,
+    failing: failing.map((f) => ({
+      channel_id: f.id,
+      title: f.title,
+      handle: null,
+      error_code: f.error,
+    })),
+    comments,
+    analysed,
+    failed_runs: 3,
+    imported: 0,
+    movers: [{ channel_id: A, title: "Mover", handle: null, change: -12.5 }],
+  },
+});
+// Yesterday Old Fail failed; this morning New Fail does instead.
+const DIGEST: AdminDailyDigest = {
+  latest: snapshot(
+    "2026-10-10",
+    [{ id: B, title: "New Fail", error: "quota_exceeded" }],
+    141000,
+    70500,
+  ),
+  previous: snapshot(
+    "2026-10-09",
+    [{ id: A, title: "Old Fail", error: "rate_limit_exceeded" }],
+    140000,
+    70000,
+  ),
+};
+
 function mount(path = "/admin") {
   window.history.replaceState({}, "", path);
   const client = new QueryClient({
@@ -85,6 +139,52 @@ describe("AdminHomePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(adminRead.readAdminConsoleOverview).mockResolvedValue(OVERVIEW);
+    vi.mocked(adminRead.readAdminDailyDigest).mockResolvedValue(DIGEST);
+  });
+
+  it("sums up the morning against the day before: new failures, recoveries, what was collected", async () => {
+    mount();
+    const card = await screen.findByTestId("admin-digest");
+    expect(card).toHaveTextContent(ar.adminDigestRecorded("2026-10-10 03:53"));
+    expect(within(card).getByTestId("admin-digest-new")).toHaveTextContent(
+      "New Fail",
+    );
+    expect(within(card).getByTestId("admin-digest-new")).toHaveTextContent(
+      "quota_exceeded",
+    );
+    expect(
+      within(card).getByTestId("admin-digest-recovered"),
+    ).toHaveTextContent("Old Fail");
+    expect(card).toHaveTextContent("1,000");
+    expect(card).toHaveTextContent("500");
+    expect(within(card).getByTestId("admin-digest-movers")).toHaveTextContent(
+      ar.adminComparePoints(-12.5),
+    );
+  });
+
+  it("on the first snapshot lists what fails now and says when the comparison starts", async () => {
+    vi.mocked(adminRead.readAdminDailyDigest).mockResolvedValue({
+      latest: DIGEST.latest,
+      previous: null,
+    });
+    mount();
+    const card = await screen.findByTestId("admin-digest");
+    expect(card).toHaveTextContent(ar.adminDigestFirst("2026-10-10 03:53"));
+    expect(within(card).getByTestId("admin-digest-failing")).toHaveTextContent(
+      "New Fail",
+    );
+    expect(within(card).queryByText(ar.adminDigestCollected)).toBeNull();
+  });
+
+  it("a summary that cannot be read never hides the rest of the page", async () => {
+    vi.mocked(adminRead.readAdminDailyDigest).mockRejectedValue(
+      new Error("down"),
+    );
+    mount();
+    expect(await screen.findByTestId("admin-home")).toBeInTheDocument();
+    expect(
+      await screen.findByText(ar.adminDigestUnavailable),
+    ).toBeInTheDocument();
   });
 
   it("shows the size of the platform and the worker's queue", async () => {
@@ -145,6 +245,7 @@ describe("AdminHomePage", () => {
   it("asks nothing of the server on the demo", () => {
     mount("/admin?demo=1");
     expect(adminRead.readAdminConsoleOverview).not.toHaveBeenCalled();
+    expect(adminRead.readAdminDailyDigest).not.toHaveBeenCalled();
     expect(screen.queryByTestId("admin-home")).toBeNull();
   });
 });

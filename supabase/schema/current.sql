@@ -22,6 +22,20 @@ alter table "auth"."users" add constraint "users_pkey" PRIMARY KEY (id);
 
 CREATE UNIQUE INDEX users_pkey ON auth.users USING btree (id);
 
+create table "private"."admin_digests" (
+  "day" date not null,
+  "recorded_at" timestamp with time zone not null,
+  "body" jsonb not null
+);
+alter table "private"."admin_digests" enable row level security;
+
+alter table "private"."admin_digests" add constraint "admin_digests_body_not_null" NOT NULL body;
+alter table "private"."admin_digests" add constraint "admin_digests_day_not_null" NOT NULL day;
+alter table "private"."admin_digests" add constraint "admin_digests_pkey" PRIMARY KEY (day);
+alter table "private"."admin_digests" add constraint "admin_digests_recorded_at_not_null" NOT NULL recorded_at;
+
+CREATE UNIQUE INDEX admin_digests_pkey ON private.admin_digests USING btree (day);
+
 create table "private"."auto_selected_videos" (
   "workspace_id" uuid not null,
   "video_id" uuid not null,
@@ -1783,6 +1797,79 @@ AS $function$
     'used', used,
     'remaining', case when allowance is null or allowance < 0 or allowance = 2147483647 then -1 else greatest((allowance + granted) - used, 0::bigint) end
   );
+$function$
+
+CREATE OR REPLACE FUNCTION private.build_admin_digest()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  result jsonb;
+  today date := (now() at time zone 'UTC')::date;
+begin
+  with st as (select * from private.admin_channel_states()),
+  -- One row per YouTube channel, through the copy with the most judged
+  -- comments, as the comparison page shows it.
+  weeks as (
+    select x.workspace_id, x.channel_id,
+           coalesce(sum(x.positive) filter (where x.day > today - 7), 0) as wp,
+           coalesce(sum(x.negative) filter (where x.day > today - 7), 0) as wn,
+           coalesce(sum(x.positive) filter (where x.day > today - 14 and x.day <= today - 7), 0) as pp,
+           coalesce(sum(x.negative) filter (where x.day > today - 14 and x.day <= today - 7), 0) as pn,
+           sum(x.positive + x.negative) as polar
+      from private.channel_compare_cells x
+     group by x.workspace_id, x.channel_id
+  ),
+  movers as (
+    select distinct on (c.platform, c.external_channel_id)
+           c.id, c.workspace_id, c.title, c.handle,
+           round(((w.wp - w.wn)::numeric / (w.wp + w.wn)
+                - (w.pp - w.pn)::numeric / (w.pp + w.pn)) * 100, 1) as change
+      from weeks w
+      join public.channels c on c.workspace_id = w.workspace_id and c.id = w.channel_id
+     where w.wp + w.wn >= 20 and w.pp + w.pn >= 20
+     order by c.platform, c.external_channel_id, w.polar desc, c.id
+  )
+  select jsonb_build_object(
+    'states', jsonb_build_object(
+      'paused', (select count(*) from st where state = 'paused'),
+      'cataloguing', (select count(*) from st where state = 'cataloguing'),
+      'collecting', (select count(*) from st where state = 'collecting'),
+      'failing', (select count(*) from st where state = 'failing'),
+      'new', (select count(*) from st where state = 'new'),
+      'waiting', (select count(*) from st where state = 'waiting'),
+      'stale', (select count(*) from st where state = 'stale'),
+      'healthy', (select count(*) from st where state = 'healthy')),
+    'failing', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'channel_id', s.channel_id,
+               'title', c.title,
+               'handle', c.handle,
+               'error_code', s.last_error)
+             order by c.title nulls last, s.channel_id)
+        from st s
+        join public.channels c on c.id = s.channel_id
+       where s.state = 'failing'), '[]'::jsonb),
+    'comments', (select coalesce(sum(total), 0) from private.video_comment_stats),
+    'analysed', (select coalesce(sum(analysed), 0) from private.video_comment_stats),
+    'failed_runs', (select count(*) from public.sync_runs
+                     where status = 'failed' and started_at >= now() - interval '24 hours'),
+    'imported', (select count(*) from public.audit_events
+                  where action = 'channel_imported' and created_at >= now() - interval '24 hours'),
+    'movers', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'channel_id', m.id,
+               'title', m.title,
+               'handle', m.handle,
+               'change', m.change)
+             order by abs(m.change) desc, m.id)
+        from (select * from movers where change <> 0
+               order by abs(change) desc, id limit 3) m), '[]'::jsonb))
+  into result;
+  return result;
+end;
 $function$
 
 CREATE OR REPLACE FUNCTION private.cancel_job_impl(w uuid, j uuid)
@@ -3792,6 +3879,23 @@ begin
     'videos_checked', videos_checked,
     'rows_corrected', rows_corrected
   );
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.record_admin_digest()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '120s'
+AS $function$
+begin
+  insert into private.admin_digests(day, recorded_at, body)
+  values ((now() at time zone 'UTC')::date, now(), private.build_admin_digest())
+  on conflict (day) do update
+    set recorded_at = excluded.recorded_at, body = excluded.body;
+  delete from private.admin_digests
+   where day < (now() at time zone 'UTC')::date - 30;
 end;
 $function$
 
@@ -6011,6 +6115,29 @@ begin
   return result;
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_daily_digest()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '30s'
+AS $function$
+declare
+  result jsonb;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  select jsonb_build_object(
+    'latest', (select jsonb_build_object('day', d.day, 'recorded_at', d.recorded_at, 'body', d.body)
+                 from private.admin_digests d order by d.day desc limit 1),
+    'previous', (select jsonb_build_object('day', d.day, 'recorded_at', d.recorded_at, 'body', d.body)
+                   from private.admin_digests d order by d.day desc offset 1 limit 1))
+    into result;
+  return result;
+end $function$
+
 CREATE OR REPLACE FUNCTION public.admin_import_channel(p_external text, p_title text DEFAULT NULL::text, p_handle text DEFAULT NULL::text, p_platform text DEFAULT 'youtube'::text, p_initial_videos integer DEFAULT 20, p_daily_new_videos integer DEFAULT 5)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -8088,6 +8215,13 @@ grant SELECT on table "auth"."users" to "postgres";
 grant TRIGGER on table "auth"."users" to "postgres";
 grant TRUNCATE on table "auth"."users" to "postgres";
 grant UPDATE on table "auth"."users" to "postgres";
+grant DELETE on table "private"."admin_digests" to "postgres";
+grant INSERT on table "private"."admin_digests" to "postgres";
+grant REFERENCES on table "private"."admin_digests" to "postgres";
+grant SELECT on table "private"."admin_digests" to "postgres";
+grant TRIGGER on table "private"."admin_digests" to "postgres";
+grant TRUNCATE on table "private"."admin_digests" to "postgres";
+grant UPDATE on table "private"."admin_digests" to "postgres";
 grant DELETE on table "private"."auto_selected_videos" to "postgres";
 grant INSERT on table "private"."auto_selected_videos" to "postgres";
 grant REFERENCES on table "private"."auto_selected_videos" to "postgres";
@@ -8633,6 +8767,7 @@ grant EXECUTE on function private.billing_sweep() to "postgres";
 grant EXECUTE on function private.bootstrap_personal_workspace() to "postgres";
 grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "postgres";
 grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "service_role";
+grant EXECUTE on function private.build_admin_digest() to "postgres";
 grant EXECUTE on function private.cancel_job_impl(uuid,uuid) to "authenticated";
 grant EXECUTE on function private.cancel_job_impl(uuid,uuid) to "postgres";
 grant EXECUTE on function private.claim_job(uuid) to "postgres";
@@ -8707,6 +8842,7 @@ grant EXECUTE on function private.reconcile_all_video_comment_stats() to "postgr
 grant EXECUTE on function private.reconcile_all_video_comment_stats() to "service_role";
 grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "postgres";
 grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "service_role";
+grant EXECUTE on function private.record_admin_digest() to "postgres";
 grant EXECUTE on function private.refresh_channel_compare(uuid) to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats(jsonb) to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_delete() to "postgres";
@@ -8833,6 +8969,8 @@ grant EXECUTE on function admin_channels_console() to "authenticated";
 grant EXECUTE on function admin_channels_console() to "postgres";
 grant EXECUTE on function admin_console_overview() to "authenticated";
 grant EXECUTE on function admin_console_overview() to "postgres";
+grant EXECUTE on function admin_daily_digest() to "authenticated";
+grant EXECUTE on function admin_daily_digest() to "postgres";
 grant EXECUTE on function admin_import_channel(text,text,text,text,integer,integer) to "authenticated";
 grant EXECUTE on function admin_import_channel(text,text,text,text,integer,integer) to "postgres";
 grant EXECUTE on function admin_ops() to "authenticated";

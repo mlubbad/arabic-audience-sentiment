@@ -8,6 +8,10 @@
  * No quota meters: nothing in the database measures YouTube or Apify units
  * yet, and a meter would be a claim the page cannot back.
  *
+ * Above them, the morning summary (phase 4): what changed between the last
+ * two daily snapshots (`admin_daily_digest()`), read on its own so a
+ * failure there never hides the rest of the page.
+ *
  * The demo (`?demo=1`) has no server to read, so it goes on to the
  * workspaces demo, the admin area's only demo.
  */
@@ -20,9 +24,10 @@ import { failureCode } from "../failure";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 import { LoadError, Loading } from "../pageStates/PageStates";
-import { readAdminConsoleOverview } from "./adminRead";
+import { readAdminConsoleOverview, readAdminDailyDigest } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
 import { STATE_ORDER, STATE_TONE } from "./channelsConsole";
+import { digestView, failingName } from "./dailyDigest";
 
 const n = (value: number) => value.toLocaleString("en-US");
 const when = (iso: string | null) =>
@@ -59,6 +64,7 @@ export function AdminHomePage() {
   return shell(
     <>
       <AdminPageHead title={S.adminHomeTitle} lead={S.adminHomeLead} />
+      {admin && <MorningSummary />}
       {body}
     </>,
   );
@@ -208,5 +214,132 @@ function Tile({
       <strong className="admin-home-tile-value">{value}</strong>
       {note && <span className="admin-home-tile-note">{note}</span>}
     </Card>
+  );
+}
+
+function MorningSummary() {
+  const S = useStrings();
+  const digest = useQuery({
+    queryKey: ["admin", "digest"],
+    queryFn: readAdminDailyDigest,
+  });
+  if (digest.isPending) return null;
+  if (digest.isError)
+    return (
+      <p className="admin-account-muted" role="status">
+        {S.adminDigestUnavailable}
+      </p>
+    );
+  const v = digestView(digest.data);
+  return (
+    <Card className="admin-home-card" data-testid="admin-digest">
+      <h2>{S.adminDigestTitle}</h2>
+      {!v ? (
+        <p className="admin-account-muted">{S.adminDigestNone}</p>
+      ) : (
+        <>
+          <p className="admin-account-muted">
+            {v.compared
+              ? S.adminDigestRecorded(when(v.recordedAt)!)
+              : S.adminDigestFirst(when(v.recordedAt)!)}
+          </p>
+          <dl className="admin-home-funnel">
+            {v.collected !== null && (
+              <>
+                <dt>{S.adminDigestCollected}</dt>
+                <dd>{n(v.collected)}</dd>
+              </>
+            )}
+            {v.analysed !== null && (
+              <>
+                <dt>{S.adminDigestAnalysed}</dt>
+                <dd>{n(v.analysed)}</dd>
+              </>
+            )}
+            <dt>{S.adminDigestStale}</dt>
+            <dd>{n(v.stale)}</dd>
+            <dt>{S.adminDigestFailedRuns}</dt>
+            <dd>{n(v.failedRuns)}</dd>
+            <dt>{S.adminDigestImported}</dt>
+            <dd>{n(v.imported)}</dd>
+          </dl>
+          {v.compared ? (
+            <>
+              <DigestList
+                title={S.adminDigestNewlyFailing}
+                items={v.newlyFailing}
+                testId="admin-digest-new"
+              />
+              <DigestList
+                title={S.adminDigestRecovered}
+                items={v.recovered}
+                testId="admin-digest-recovered"
+              />
+            </>
+          ) : (
+            <DigestList
+              title={S.adminDigestFailingNow}
+              items={v.failing}
+              testId="admin-digest-failing"
+            />
+          )}
+          {v.failing.length === 0 && (
+            <p className="admin-account-muted">{S.adminDigestNoneFailing}</p>
+          )}
+          <h3>{S.adminDigestMovers}</h3>
+          {v.movers.length === 0 ? (
+            <p className="admin-account-muted">{S.adminDigestNoMovers}</p>
+          ) : (
+            <ul
+              className="admin-home-attention"
+              data-testid="admin-digest-movers"
+            >
+              {v.movers.map((m) => (
+                <li key={m.channel_id}>
+                  <span dir="auto">{failingName(m)}</span>{" "}
+                  <span
+                    className={`admin-compare-net ${m.change >= 0 ? "is-positive" : "is-negative"}`}
+                  >
+                    {S.adminComparePoints(m.change)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
+function DigestList({
+  title,
+  items,
+  testId,
+}: {
+  title: string;
+  items: {
+    channel_id: string;
+    title: string | null;
+    handle: string | null;
+    error_code: string | null;
+  }[];
+  testId: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <>
+      <h3>{title}</h3>
+      <ul className="admin-home-attention" data-testid={testId}>
+        {items.map((f) => (
+          <li key={f.channel_id}>
+            <span dir="auto">{failingName(f)}</span>
+            {f.error_code && (
+              <code className="admin-home-error">{f.error_code}</code>
+            )}
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
