@@ -1,5 +1,33 @@
 # Verification
 
+## 2026-10-10 — Fewer CI minutes
+
+Owner request (2026-10-10: "قلّل استهلاك الدقائق في الفحوص"), after GitHub stopped starting jobs ("recent account payments have failed or your spending limit needs to be increased"). Measured on #107's last full PR run: 27 billed minutes per push (each job rounds up), the browser job 7m04s of which `npx playwright install --with-deps chromium` was 3m29s. Two changes, no gate removed:
+
+- A draft PR runs no job in `ci.yml`, `security.yml` or `codeql.yml` (`if: github.event.pull_request.draft != true` on every job; `ready_for_review` added to the PR triggers). The gates run when a PR is marked ready, on every push after, and on `main`. AGENTS.md and the playbook say so.
+- The browser job uses the runner image's Google Chrome (`PW_CHANNEL=chrome`, read by `playwright.config.ts`) and installs Chromium as before only when the image has none.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `scripts/ci-workflow.test.ts` | 9 passed, 5 of them new: each of the three workflows lists `ready_for_review` and every job carries the draft guard. |
+| Mutations (each restored) | Dropping the guard from Semgrep, and `ready_for_review` from CodeQL, each failed one test. |
+| YAML | All three files parse; every job's `if:` read back as expected. |
+| `PW_CHANNEL=chrome npx playwright test --list` | 132 tests in 11 files, as without it. |
+| `npm run check` | exit 0: unit 1245, DB 567 passed. |
+| Not verified | A browser run on the runner's Chrome: no CI job can start until billing is fixed, and this machine has no Google Chrome. The first ready run will show `google-chrome --version` in its log; if the e2e suite fails only there, revert the step. Expected saving: about 3 billed minutes per browser run, and every run on a draft push. |
+
+## 2026-10-10 — Owner console phase 4: the morning summary
+
+Owner request (2026-10-10: "ابدأ المرحلة التالية بعد اكتمال النشر"; delivery chosen: inside the owner console, nothing sent anywhere). One migration (`20261022000000_admin_daily_digest.sql`): `private.admin_digests` keeps one snapshot a day (30 days) of the channel states, the failing channels with their errors, the comment and analysis totals, failed runs and imports in the last 24 hours, and the three biggest weekly net-sentiment changes from the comparison counts (20 positive-or-negative comments in each week). pg_cron `admin-daily-digest` records it at 03:53 UTC; the migration records the first. `public.admin_daily_digest()` (admin only) gives the latest snapshot and the one before. The `/admin` home shows «ملخص الصباح» above the rest, read on its own: started failing, recovered, comments collected and analysed between the two snapshots, stale channels, failed runs, imports, movers; on the first snapshot it lists what fails now and says the comparison starts the next morning.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `admin_daily_digest.test.ts` | 4 passed: the migration's first snapshot with no previous; a failing channel named with `quota_exceeded`, one failed run, three imports; the mover at +50 points and the 5-comment channel left out; one snapshot a day, the previous given, a 40-day-old one forgotten; only a platform admin reads it and the snapshots and recorder are out of reach. |
+| `dailyDigest.test.ts`, `AdminHomePage.test.tsx` | 4 and 9 passed: new and recovered failures, deltas never negative, first-snapshot view; the card's lists, deltas and movers; a failed digest read leaves the page; the demo asks nothing. |
+| Mutations (each restored) | Listing recovered channels as those still failing, and lowering the movers' sample to 5, each failed one test. |
+| `npm run check` | exit 0: unit 1239, DB 567 passed; build and secret scan passed. `npm run db:snapshot:check`: exit 0. |
+| Not verified | The card against live data. #107's deploy was skipped: the `verify` job did not start ("recent account payments have failed or your spending limit needs to be increased"), so this migration follows #107's into production once billing is fixed. |
+
 ## 2026-10-09 — Owner console phase 3: the comparison page
 
 Owner request (2026-10-09: "موافق، ابدأ صفحة المقارنة بعد اكتمال النشر"). One migration (`20261021000000_admin_channels_compare.sql`): `private.channel_compare_cells` keeps each channel's audience comments grouped by day (the last 35 days; older or undated share a null day) and topic, with sentiment counts, counted as the workspace dashboard counts (channel's own comments out, a human review over the model when it judged the same text, the channel's active analysis, the workspace's active topic classification). A statement trigger on new verdicts, topics and reviews marks the workspace in `private.channel_compare_dirty` (no unique key, so a writer never waits); pg_cron `channel-compare-drain` recounts up to 15 marked workspaces every 10 minutes (starting none after two minutes, so a slow batch is never cancelled whole) and `channel-compare-nightly` marks all at 02:47 UTC. The migration only marks every workspace, so the first count comes from the schedule (about 70 minutes for ~105 workspaces), not from the deploy. `public.admin_channels_compare()` (admin only, 30 s) reads the cells, one row per YouTube channel across its workspace copies. `/admin/compare` («المقارنة»): three cards (warmest, coldest, biggest weekly change), a ranking with net sentiment as on the dashboard, change since last week, top topic other than "other", account filter, folded search, order in the address, CSV export. A channel is ranked from 20 positive-or-negative comments; a change needs 20 in both weeks.

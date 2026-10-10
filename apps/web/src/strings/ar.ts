@@ -755,6 +755,25 @@ export const ar = {
   adminChannelsReconnect: "تحتاج إعادة ربط",
   adminChannelsDisconnected: "منفصلة",
   adminChannelsNeverSynced: "لم تُزامن بعد",
+  // morning summary
+  adminDigestTitle: "ملخص الصباح",
+  adminDigestRecorded: (at: string) =>
+    `لقطة ${at} (UTC)، مقارنة باللقطة التي قبلها.`,
+  adminDigestFirst: (at: string) =>
+    `أول لقطة (${at} UTC). المقارنة تبدأ مع لقطة صباح الغد.`,
+  adminDigestNone: "لم تُسجَّل لقطة بعد؛ تُسجَّل كل صباح.",
+  adminDigestUnavailable: "تعذّرت قراءة ملخص الصباح.",
+  adminDigestNewlyFailing: "بدأت تفشل",
+  adminDigestRecovered: "تعافت",
+  adminDigestFailingNow: "تفشل الآن",
+  adminDigestNoneFailing: "لا قناة تفشل.",
+  adminDigestCollected: "تعليقات جُمعت",
+  adminDigestAnalysed: "تعليقات حُللت",
+  adminDigestStale: "قنوات متأخرة",
+  adminDigestFailedRuns: "تشغيلات فشلت (24 ساعة)",
+  adminDigestImported: "قنوات استُوردت (24 ساعة)",
+  adminDigestMovers: "أكبر تغيّر في المشاعر هذا الأسبوع",
+  adminDigestNoMovers: "لا تغيّر بعينة كافية بعد.",
   // compare
   adminCompareTitle: "مقارنة القنوات",
   adminCompareLead:

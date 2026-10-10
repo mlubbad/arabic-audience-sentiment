@@ -14,6 +14,7 @@ import {
   AdminAuditEventsSchema,
   AdminChannelsConsoleSchema,
   AdminChannelsCompareSchema,
+  AdminDailyDigestSchema,
   AdminChannelsSchema,
   AdminConsoleOverviewSchema,
   AdminOpsSchema,
@@ -24,6 +25,7 @@ import {
   type AdminAuditEvent,
   type AdminChannel,
   type AdminCompareChannel,
+  type AdminDailyDigest,
   type AdminConsoleChannel,
   type AdminConsoleOverview,
   type AdminOps,
@@ -224,6 +226,13 @@ export async function readAdminChannelsCompare(): Promise<
   const { data, error } = await supabase!.rpc("admin_channels_compare");
   if (error) throw rpcFailure(error);
   return AdminChannelsCompareSchema.parse(data);
+}
+
+/** The owner's morning summary: the latest snapshot and the one before. */
+export async function readAdminDailyDigest(): Promise<AdminDailyDigest> {
+  const { data, error } = await supabase!.rpc("admin_daily_digest");
+  if (error) throw rpcFailure(error);
+  return AdminDailyDigestSchema.parse(data);
 }
 
 /** Pause or resume the scheduler's work on channels. Thrown as it came. */
