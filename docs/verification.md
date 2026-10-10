@@ -14,6 +14,7 @@ Owner request (2026-10-09). The chips (`ActiveFilters`) and the phone trigger's 
 | `npm run test:e2e` | 128 passed, 5 skipped. |
 | Browser, 1280×800, fixture dev server | picked «تعليقات أصلية فقط», not applied: no chip, total 43, «المزيد من المرشحات (1)»; after «تطبيق الفلاتر»: «مُصفّى: التعليقات فقط», total 40. |
 | Browser, 375×812 | same draft in the sheet, closed without applying: trigger «الفلاتر» (no count), no chip, total 43. |
+| After merging main (#104, popover row layout) | `npm run check` exit 0: unit 1223, DB 555, worker 297 passed; `npm run test:e2e` 129 passed, 5 skipped. |
 
 Not changed: the effect that clears a sentiment no longer measurable still calls `applyFilters`, so it can apply other drafts with it; noted on the PR as a follow-up.
 ## 2026-10-09 — The «المزيد» popover covered «تطبيق الفلاتر» (the «separates replies» flake)
