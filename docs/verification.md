@@ -24,6 +24,17 @@ Owner request (2026-10-10), after GitHub refused every hosted job on #108 three 
 | PyYAML over the four workflows | All parse; the nine CI jobs run on `CI_RUNNER` with the draft guard, the two deploy jobs on `DEPLOY_RUNNER` without it. |
 | `npm run check` on the merge (main at #112) | exit 0: unit 1256, DB 567, worker 297 passed; build and secret scan passed. The e2e suite was not re-run here: this PR changes no app code, and main's app code came with its own green checks. |
 
+**The runner VM: Lima, not Multipass** (owner-approved installs, 2026-10-10, Apple M5 Max, macOS 26.5). The runbook's step 1 now describes what was actually run.
+
+| Command / observation | Actual result |
+| --- | --- |
+| Multipass 1.16.4 (signed by Canonical, notarized), `multipass launch 24.04 --name aas-runner --cpus 4 --memory 8G --disk 40G`, 4 attempts | Each attempt: `timed out waiting for response`, state `Unknown`, no IPv4. `/var/db/dhcpd_leases` never created, no ARP entry for the VM's MAC on `bridge100`, firewall off, no route conflict. The bundled QEMU is 8.2.1. VM deleted (`multipass delete --purge`). |
+| Lima 2.2.0 (`SHA256SUMS` OK), `limactl create --name=aas-runner --vm-type=vz --cpus=4 --memory=8 --disk=40 --plain --tty=false template://ubuntu-24.04`, then `limactl start` | `READY`; `vz`, aarch64, 4 CPUs, 8 GiB, 40 GiB; the host agent says "Running in plain mode. Mounts, dynamic port forwarding, containerd, etc. will be ignored." |
+| `limactl edit --tty=false aas-runner --set '.mounts = []'` on a config with `- location: "~"` | "configuration edited"; `mounts: []`; `limactl validate`: OK. |
+| Inside the VM | Ubuntu 24.04.4 LTS aarch64; no virtiofs/9p/sshfs mounts; `/Users` does not exist; passwordless `sudo`; `https://github.com` HTTP 200. |
+| apt install `git curl jq unzip build-essential docker.io gh`, user added to `docker`, VM restarted | git 2.43.0, jq 1.7, gh 2.45.0, Docker 29.1.3; after the restart `docker info` runs as the user: `linux/aarch64, storage overlayfs`. |
+| Runner registration | **Not done.** The repository is public for now (`visibility=PUBLIC`), and the runbook allows a self-hosted runner only on a private repository. 0 runners registered; `CI_RUNNER` deleted; #111's checks re-run on hosted `ubuntu-latest`. |
+
 ## 2026-10-10 — The «النظام» room
 
 Owner request (2026-10-10: "ابدأ المرحلة التالية بعد اكتمال النشر", then «غرفة النظام»). `/admin/system` («النظام») gathers the five pages that run the platform itself: services, operations, account types, channel import and the audit trail. Each is a card with its page's lead and a link. The services card counts healthy, degraded and down services from `readAdminServicesHealth`; the audit card lists the five latest entries from `readAdminAudit`. A read that fails says so on its card only. The tab strip goes from ten tabs to six. The five pages keep their addresses, «النظام» is lit on any of them, and each shows «‹ النظام» back to the room. The Ctrl+K palette still lists every page. No database change.

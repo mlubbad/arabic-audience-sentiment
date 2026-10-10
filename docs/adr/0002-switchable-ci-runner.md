@@ -32,7 +32,7 @@ Date: 2026-10-10
 - **Guarded by a test.** `scripts/workflow-runners.test.ts` fails if any job hard-codes its
   runner, if a deploy job uses `CI_RUNNER`, or if the security workflow goes back to
   `/usr/local/bin` or `/tmp`.
-- **Owner-operated.** The runner lives in an Ubuntu 24.04 VM the owner runs. Setup, switching and
+- **Owner-operated.** The runner lives in an Ubuntu 24.04 VM the owner runs (Lima, `vz` driver; Multipass/QEMU 8.2.1 could not boot a guest on the owner's M5 Max). Setup, switching and
   safety rules are in `docs/engineering/self-hosted-runner.md`.
 
 ## Consequences
