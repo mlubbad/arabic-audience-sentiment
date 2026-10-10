@@ -1552,6 +1552,35 @@ test("removing a chip clears that filter alone, not the drafts beside it", async
   ).toContainText("كل الفيديوهات");
 });
 
+test("removing the period chip takes the date-order error with it", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("total")).toHaveText("6");
+  const summary = page.getByTestId("active-filters");
+  const error = page.locator("#report-filters [role=alert]");
+  await openPeriod(page);
+  await page.getByLabel("من تاريخ").fill("2026-09-01");
+  await page.getByLabel("إلى تاريخ (غير شامل)").fill("2026-09-10");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(summary).toContainText("فترة محدَّدة");
+  // An out-of-order range is refused with a sentence, and the applied
+  // period stays.
+  await openPeriod(page);
+  await page.getByLabel("من تاريخ").fill("2026-09-20");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "تطبيق الفلاتر" }).click();
+  await expect(error).toHaveText("يجب أن يسبق تاريخ البداية تاريخ النهاية");
+  // Removing the period empties both dates, so nothing is out of order any
+  // more; the sentence must not outlive the range it was about.
+  await summary
+    .getByRole("button", { name: "إزالة الفلتر: فترة محدَّدة" })
+    .click();
+  await expect(summary).toBeHidden();
+  await expect(error).toBeHidden();
+});
+
 test("escape leaves the correction overlay", async ({ page }) => {
   await page.goto("/dashboard");
   const row = page.locator('[data-testid="comments-table"] tbody tr').first();

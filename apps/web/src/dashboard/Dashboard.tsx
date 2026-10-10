@@ -801,6 +801,10 @@ function DashboardBody({
         ? { from: EMPTY_FILTERS.from, to: EMPTY_FILTERS.to }
         : { [key]: EMPTY_FILTERS[key] },
     );
+    // The date-order sentence is about the draft range; removing the period
+    // empties it, so the sentence goes too. Any other chip leaves the draft
+    // dates as they were, and the sentence still describes them.
+    if (key === "period" || key === "from" || key === "to") setFormError("");
     narrow(withoutChip(filters, key));
   }
   // From the applied filters, never the draft: a chip appearing the moment

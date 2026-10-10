@@ -1,5 +1,22 @@
 # Verification
 
+## 2026-10-10 — Filter chips name the applied filters, not the draft
+
+Found while fixing #104: the bar's «مُصفّى:» chips, and the phone trigger's «الفلاتر (n)», were built from the draft controls, so choosing «تعليقات أصلية فقط» put «مُصفّى: التعليقات فقط» on screen before «تطبيق الفلاتر» was pressed, while every figure still described all six comments. Removing a chip also re-applied the whole bar, so an unapplied draft beside it slipped into the read. The work was started in a separate session (commit `0ebfa2f`, never pushed); it was reviewed, finished and opened here at the owner's request ("أكمله أنت وافتح الـ PR").
+
+**Change.** `filters.ts`: `appliedValues(filters, limit)` reads the applied `Filters` back as bar values (a picked day restored from its `+03:00` bound), and `withoutChip(filters, key)` removes one condition from what is applied. `Dashboard.tsx` builds the chips and `appliedCount` from `appliedValues`, and `onClear` edits the applied filters with `withoutChip` and resets the matching control instead of re-applying the bar. The «المزيد (n)» count stays a draft count: it describes the controls behind it. Review finding, fixed here: the old `onClear` went through `applyFilters`, which cleared the date-order sentence; the new one did not, so removing the period chip emptied both dates but left «يجب أن يسبق تاريخ البداية تاريخ النهاية» on screen. `onClear` now clears it when the period (or one of its bounds) is removed; other chips leave the draft dates, and the sentence, as they were.
+
+| Command / observation | Actual result |
+| --- | --- |
+| New e2e «a chip names an applied filter, never a chosen-but-unapplied one» and «removing a chip clears that filter alone, not the drafts beside it», on main's `Dashboard.tsx`, `filters.ts`, `FilterBar.tsx` | Both failed: the chip row visible before apply (`toBeHidden` received visible); total 4 instead of 6 after removing the video chip. |
+| Same two tests with the change, ×20 on 6 workers | 40 passed. |
+| Review probe: an applied period, then an out-of-order draft refused, then the period chip removed | Chips commit: the sentence still visible. main: hidden. |
+| New e2e «removing the period chip takes the date-order error with it», before the `onClear` fix | Failed at `expect(error).toBeHidden()`. |
+| The three chip tests with the fix, ×15 on 6 workers | 45 passed. |
+| `npx vitest run apps/web/src/dashboard/filters.test.ts` (in `npm test`) | `appliedValues`: no chip for an unfiltered read; every applied condition reads back as its chip, the picked days intact; no period chip when no bound was sent. `withoutChip`: one condition removed, the rest kept; both bounds of the period removed together. |
+| `npx playwright test` (full e2e, macOS), twice | 130 passed, 5 skipped of 135, both times. |
+| `npm run check` | exit 0: unit 1223, DB 555, worker 297 passed; build and secret scan passed. |
+
 ## 2026-10-09 — The «المزيد» popover covered «تطبيق الفلاتر» (the «separates replies» flake)
 
 `tests/e2e/dashboard.spec.ts` › «separates replies from top-level comments» failed on main after #101 (run 37907015476: `total` expected 2, received 4), and the failed check skipped Deploy Preview. It never failed on the owner's Mac (40 runs on 6 workers, 200 runs on 16, CPU throttled up to 20× through CDP), so it was diagnosed on the Linux runner through a draft PR (#104) whose temporary commits ran an event-logging copy of the test. Those commits are not in the merged history.
