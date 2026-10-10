@@ -16,7 +16,15 @@ Owner request (2026-10-09). The chips (`ActiveFilters`) and the phone trigger's 
 | Browser, 375×812 | same draft in the sheet, closed without applying: trigger «الفلاتر» (no count), no chip, total 43. |
 | After merging main (#104, popover row layout) | `npm run check` exit 0: unit 1223, DB 555, worker 297 passed; `npm run test:e2e` 129 passed, 5 skipped. |
 
-Not changed: the effect that clears a sentiment no longer measurable still calls `applyFilters`, so it can apply other drafts with it; noted on the PR as a follow-up.
+Follow-up in the same PR: the effect that drops a sentiment the active model cannot measure (a three-class model has no Mixed) watched the draft `sentiment` and called `applyFilters`, so it re-applied every unapplied draft with it. It now resets the draft control only if the draft holds such a sentiment, and removes one from the applied filters only if it was applied (`withoutUnmeasurable(filters, measurable)`, `null` when nothing changes).
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run apps/web/src/dashboard/filters.test.ts`, new tests before the helper existed | 2 failed (`withoutUnmeasurable is not a function`). |
+| Same, with the helper | 11 passed (2 new: an applied Mixed is dropped under a three-class set while `replies: "comments"` stays; nothing changes when every applied sentiment is measurable or none is applied). |
+| Mutation: the helper keeps every sentiment | 1 failed. |
+| `npm run check` | exit 0: unit 1225, DB 555, worker 297 passed; build and secret scan passed. |
+| `npm run test:e2e` | 129 passed, 5 skipped. The fixture shell measures all four labels, so e2e cannot reach the unmeasurable case; it shows the effect leaves measurable sentiment filters alone. |
 ## 2026-10-09 — The «المزيد» popover covered «تطبيق الفلاتر» (the «separates replies» flake)
 
 `tests/e2e/dashboard.spec.ts` › «separates replies from top-level comments» failed on main after #101 (run 37907015476: `total` expected 2, received 4), and the failed check skipped Deploy Preview. It never failed on the owner's Mac (40 runs on 6 workers, 200 runs on 16, CPU throttled up to 20× through CDP), so it was diagnosed on the Linux runner through a draft PR (#104) whose temporary commits ran an event-logging copy of the test. Those commits are not in the merged history.

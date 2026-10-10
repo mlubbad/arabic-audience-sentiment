@@ -211,3 +211,19 @@ export function withoutChip(f: Filters, key: Chip["key"]): Filters {
       return { ...f, to: undefined };
   }
 }
+
+/**
+ * The applied filters with every sentiment the active model cannot measure
+ * removed (a three-class model has no Mixed), or `null` when there is none
+ * to remove — so the caller narrows only when something actually changed.
+ * Like `withoutChip`, it edits what is applied and nothing else: the bar's
+ * draft is not re-applied with it.
+ */
+export function withoutUnmeasurable(
+  f: Filters,
+  measurable: ReadonlySet<string>,
+): Filters | null {
+  const sentiments = f.sentiments ?? [];
+  const kept = sentiments.filter((l) => measurable.has(l));
+  return kept.length === sentiments.length ? null : { ...f, sentiments: kept };
+}

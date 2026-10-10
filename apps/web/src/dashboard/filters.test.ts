@@ -7,6 +7,7 @@ import {
   chipsFor,
   extraCount,
   withoutChip,
+  withoutUnmeasurable,
 } from "./filters";
 
 const topicName = (key: string) => key;
@@ -150,5 +151,34 @@ describe("withoutChip", () => {
       "video",
       "replies",
     ]);
+  });
+});
+
+describe("withoutUnmeasurable", () => {
+  // A three-class model (CAMeLBERT-DA) cannot say Mixed at all.
+  const threeClass = new Set(["positive", "negative", "neutral"]);
+
+  it("drops an applied sentiment the active model cannot measure", () => {
+    const applied: Filters = {
+      workspace_id,
+      sentiments: ["mixed"],
+      replies: "comments",
+    };
+    // Only the sentiment goes: the other applied condition stays, and
+    // nothing from the bar's draft is involved.
+    expect(withoutUnmeasurable(applied, threeClass)).toEqual({
+      ...applied,
+      sentiments: [],
+    });
+  });
+
+  it("changes nothing when every applied sentiment is measurable", () => {
+    expect(
+      withoutUnmeasurable(
+        { workspace_id, sentiments: ["negative"] },
+        threeClass,
+      ),
+    ).toBeNull();
+    expect(withoutUnmeasurable({ workspace_id }, threeClass)).toBeNull();
   });
 });
