@@ -1,5 +1,22 @@
 # Verification
 
+## 2026-10-09 — Dashboard: filter chips follow the applied filters, not the draft
+
+Owner request (2026-10-09). The chips (`ActiveFilters`) and the phone trigger's count were built from the bar's draft `useState`s, so picking «تعليقات أصلية فقط» showed «مُصفّى: التعليقات فقط» before «تطبيق الفلاتر» while every figure still described all comments. Removing a chip also re-applied the whole bar, so an unapplied draft entered the read with it. Now `appliedValues(filters, limit)` (`apps/web/src/dashboard/filters.ts`) reads the applied `Filters` back for `chipsFor`, and `withoutChip(filters, key)` removes one condition from the applied filters while `onClear` resets the matching control. «المزيد من المرشحات (N)» stays a draft count on purpose: it describes the controls behind the popover, one of which may be set but not applied; the chips say what is applied.
+
+| Command / observation | Actual result |
+| --- | --- |
+| New e2e tests on the old code (`-g "chip"`) | 2 failed: active-filters visible before apply (`toBeHidden` got "visible"); after removing the video chip with an unapplied «تعليقات أصلية فقط» draft, total `4` (expected `6`). |
+| Same tests with the fix (`-g "chip\|narrowed to"`) | 4 passed. |
+| `npx vitest run apps/web/src/dashboard/filters.test.ts` | 9 passed (5 new: `appliedValues` for the unfiltered read, every condition read back including the picked day, no period chip under `date_mode: "unknown"`; `withoutChip` leaves the other conditions, clears both period bounds). |
+| Mutation: `appliedValues` ignores `replies` | 2 failed. |
+| `npm run check` | exit 0: unit 1221, DB 551, worker 297 passed; build and secret scan passed. |
+| `npm run test:e2e` | 128 passed, 5 skipped. |
+| Browser, 1280×800, fixture dev server | picked «تعليقات أصلية فقط», not applied: no chip, total 43, «المزيد من المرشحات (1)»; after «تطبيق الفلاتر»: «مُصفّى: التعليقات فقط», total 40. |
+| Browser, 375×812 | same draft in the sheet, closed without applying: trigger «الفلاتر» (no count), no chip, total 43. |
+
+Not changed: the effect that clears a sentiment no longer measurable still calls `applyFilters`, so it can apply other drafts with it; noted on the PR as a follow-up.
+
 ## 2026-10-09 — Owner console phase 2, step 2: bulk actions on the channels console
 
 Owner request (2026-10-09: "ابدأ الإجراءات الجماعية"). One migration (`20261019000000_admin_bulk_channel_actions.sql`): `admin_request_channel_work(uuid[], 'collect'|'discover')` queues work only where it can run (not paused, nothing of that kind queued or running, and for a collection at least one selected video) and answers queued / skipped; `admin_set_auto_selection(uuid[], initial 0–200, daily 0–100)` sets the numbers, creating them in the name of the workspace's creator where there were none. Both admin only, up to 500 channels, audited per channel. The page: a checkbox per row and one for every channel shown; a bar with collect now, refresh catalogue, pause (confirming press), resume, automatic selection numbers, CSV export (byte-order mark, formula-safe), clear. Bulk delete is not here: it waits for the owner's own decision.
