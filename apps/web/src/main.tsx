@@ -107,6 +107,11 @@ const AdminCompare = lazy(() =>
     default: m.AdminComparePage,
   })),
 );
+const AdminSystem = lazy(() =>
+  import("./admin/AdminSystemPage").then((m) => ({
+    default: m.AdminSystemPage,
+  })),
+);
 const AdminPlans = lazy(() =>
   import("./admin/AdminPlansPage").then((m) => ({ default: m.AdminPlansPage })),
 );
@@ -541,6 +546,7 @@ const app = (
                   <Route path="/admin/users" element={<AdminUsers />} />
                   <Route path="/admin/channels" element={<AdminChannels />} />
                   <Route path="/admin/compare" element={<AdminCompare />} />
+                  <Route path="/admin/system" element={<AdminSystem />} />
                   <Route path="/admin/plans" element={<AdminPlans />} />
                   <Route path="/admin/ops" element={<AdminOps />} />
                   <Route path="/admin/services" element={<AdminServices />} />

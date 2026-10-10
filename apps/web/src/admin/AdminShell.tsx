@@ -14,7 +14,7 @@
  * product's map, and the admin area is one room in it.
  */
 import type { ReactNode } from "react";
-import { NavLink } from "react-router";
+import { Link, NavLink, useLocation } from "react-router";
 import { useSession } from "../session";
 import { useIsPlatformAdmin } from "../adminAccess";
 import { useImpersonation } from "../impersonation";
@@ -91,15 +91,25 @@ const TABS = [
   { to: "/admin/users", key: "adminTabUsers" },
   { to: "/admin/channels", key: "adminTabChannels" },
   { to: "/admin/compare", key: "adminTabCompare" },
-  { to: "/admin/plans", key: "adminTabPlans" },
-  { to: "/admin/ops", key: "adminTabOps" },
-  { to: "/admin/services", key: "adminTabServices" },
-  { to: "/admin/audit", key: "adminTabAudit" },
-  { to: "/admin/import", key: "adminTabImport" },
+  { to: "/admin/system", key: "adminTabSystem" },
 ] as const;
+
+/** The pages behind «النظام» (`AdminSystemPage.tsx`): each keeps its own
+ *  address, and the strip lights «النظام» on any of them. */
+export const SYSTEM_PATHS = [
+  "/admin/services",
+  "/admin/ops",
+  "/admin/plans",
+  "/admin/import",
+  "/admin/audit",
+] as const;
+const inSystem = (path: string) =>
+  path === "/admin/system" ||
+  (SYSTEM_PATHS as readonly string[]).includes(path);
 
 export function AdminTabs() {
   const S = useStrings();
+  const { pathname } = useLocation();
   const demo =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("demo");
@@ -112,7 +122,11 @@ export function AdminTabs() {
             to={demo ? `${t.to}?demo=1` : t.to}
             end
             className={({ isActive }: { isActive: boolean }) =>
-              `admin-tab${isActive ? " admin-tab-active" : ""}`
+              `admin-tab${
+                isActive || (t.to === "/admin/system" && inSystem(pathname))
+                  ? " admin-tab-active"
+                  : ""
+              }`
             }
             // `end` so /admin/users does not light /admin too; /admin itself
             // has no deeper route, so its tab still matches alone.
@@ -136,6 +150,7 @@ export function AdminPageHead({
   lead: string;
 }) {
   const S = useStrings();
+  const { pathname } = useLocation();
   const demo =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("demo");
@@ -144,6 +159,14 @@ export function AdminPageHead({
       <Badge tone="neutral">
         {demo ? `${S.adminEyebrow} · ${S.dashDemoTag}` : S.adminEyebrow}
       </Badge>
+      {(SYSTEM_PATHS as readonly string[]).includes(pathname) && (
+        <Link
+          className="admin-system-back"
+          to={demo ? "/admin/system?demo=1" : "/admin/system"}
+        >
+          {S.adminSystemBack}
+        </Link>
+      )}
       <h1>{title}</h1>
       <p>{lead}</p>
       <AdminTabs />
