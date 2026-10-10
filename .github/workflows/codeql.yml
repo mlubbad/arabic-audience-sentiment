@@ -28,7 +28,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     if: github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false

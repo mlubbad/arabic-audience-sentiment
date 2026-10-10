@@ -1,5 +1,40 @@
 # Verification
 
+## 2026-10-10 — CI runner switchable to a self-hosted machine (ADR 0002)
+
+Owner request (2026-10-10), after GitHub refused every hosted job on #108 three times on a billing block. Every job in `ci.yml`, `security.yml` and `codeql.yml` now runs on `${{ vars.CI_RUNNER || 'ubuntu-latest' }}`, and both `deploy.yml` jobs on `${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}`. Unset, CI is unchanged. gitleaks picks its archive from `RUNNER_ARCH` and installs into `RUNNER_TEMP`, and the dependency audit writes to `RUNNER_TEMP` instead of `/tmp`. Runbook: `docs/engineering/self-hosted-runner.md`.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run scripts/workflow-runners.test.ts` on the old workflows | 6 failed (every `runs-on`, the deploy split, the gitleaks arch choice and the temp directory). |
+| Same, with the change (7 tests, one added for `/tmp`) | 7 passed; with `ci-workflow` and `deploy-workflow` tests: 20 passed. |
+| Mutation: one `ci.yml` job back to `runs-on: ubuntu-latest` | 1 failed, naming job `static`. |
+| All four workflows parsed with PyYAML | ok; 11 jobs, each with the expected `runs-on`. |
+| The new gitleaks step run locally with `RUNNER_ARCH=X64`, `ARM64`, `RISCV` | X64: checksum OK, unpacked an x86-64 ELF; ARM64: checksum OK, unpacked an aarch64 ELF; both added the folder to `GITHUB_PATH` (executing a Linux binary on macOS then fails, as expected). RISCV: refused with "No gitleaks build for runner arch RISCV". |
+| Semgrep 1.177.0, the CI rule sets | exit 0; 1 finding, the pre-existing placeholder in `docs/superpowers/plans/2026-09-15-selective-video-sync.md:2000`, not in this change. |
+| gitleaks 8.30.1: `detect` (history) and `protect --staged` | no leaks found (both). |
+| `npm run check` | exit 0: unit 1239, DB 563, worker 297 passed; build and secret scan passed. |
+| Not verified | A real job on a self-hosted runner: needs the owner's VM and runner registration (runbook steps 1–3). Hosted CI on this PR can't run while the billing block lasts. |
+
+**Merged with main after #110** (the owner asked the session that fixed the «separates replies» flake to resolve the conflicts). #110 added `if: github.event.pull_request.draft != true` to the same nine CI jobs whose `runs-on` this PR changed. Every conflict was one of two shapes, and each kept both: #110's guard (`verify` keeps `always() && … draft != true`) and this PR's `${{ vars.CI_RUNNER || 'ubuntu-latest' }}`. #110's browser step uses the image's Google Chrome when present and otherwise runs `npx playwright install --with-deps chromium`; Google ships no Chrome for Linux arm64, so on the runbook's VM it takes the install path, which needs the passwordless `sudo` the runbook already sets up.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run scripts/ci-workflow.test.ts scripts/workflow-runners.test.ts` on the merge | 16 passed: #110's draft guard and `ready_for_review` trigger, and this PR's runner variables, together. |
+| PyYAML over the four workflows | All parse; the nine CI jobs run on `CI_RUNNER` with the draft guard, the two deploy jobs on `DEPLOY_RUNNER` without it. |
+| `npm run check` on the merge (main at #112) | exit 0: unit 1256, DB 567, worker 297 passed; build and secret scan passed. The e2e suite was not re-run here: this PR changes no app code, and main's app code came with its own green checks. |
+
+**The runner VM: Lima, not Multipass** (owner-approved installs, 2026-10-10, Apple M5 Max, macOS 26.5). The runbook's step 1 now describes what was actually run.
+
+| Command / observation | Actual result |
+| --- | --- |
+| Multipass 1.16.4 (signed by Canonical, notarized), `multipass launch 24.04 --name aas-runner --cpus 4 --memory 8G --disk 40G`, 4 attempts | Each attempt: `timed out waiting for response`, state `Unknown`, no IPv4. `/var/db/dhcpd_leases` never created, no ARP entry for the VM's MAC on `bridge100`, firewall off, no route conflict. The bundled QEMU is 8.2.1. VM deleted (`multipass delete --purge`). |
+| Lima 2.2.0 (`SHA256SUMS` OK), `limactl create --name=aas-runner --vm-type=vz --cpus=4 --memory=8 --disk=40 --plain --tty=false template://ubuntu-24.04`, then `limactl start` | `READY`; `vz`, aarch64, 4 CPUs, 8 GiB, 40 GiB; the host agent says "Running in plain mode. Mounts, dynamic port forwarding, containerd, etc. will be ignored." |
+| `limactl edit --tty=false aas-runner --set '.mounts = []'` on a config with `- location: "~"` | "configuration edited"; `mounts: []`; `limactl validate`: OK. |
+| Inside the VM | Ubuntu 24.04.4 LTS aarch64; no virtiofs/9p/sshfs mounts; `/Users` does not exist; passwordless `sudo`; `https://github.com` HTTP 200. |
+| apt install `git curl jq unzip build-essential docker.io gh`, user added to `docker`, VM restarted | git 2.43.0, jq 1.7, gh 2.45.0, Docker 29.1.3; after the restart `docker info` runs as the user: `linux/aarch64, storage overlayfs`. |
+| Runner registration | **Not done.** The repository is public for now (`visibility=PUBLIC`), and the runbook allows a self-hosted runner only on a private repository. 0 runners registered; `CI_RUNNER` deleted; #111's checks re-run on hosted `ubuntu-latest`. |
+
 ## 2026-10-10 — Filter chips name the applied filters, not the draft
 
 Found while fixing #104: the bar's «مُصفّى:» chips, and the phone trigger's «الفلاتر (n)», were built from the draft controls, so choosing «تعليقات أصلية فقط» put «مُصفّى: التعليقات فقط» on screen before «تطبيق الفلاتر» was pressed, while every figure still described all six comments. Removing a chip also re-applied the whole bar, so an unapplied draft beside it slipped into the read. The work was started in a separate session (commit `0ebfa2f`, never pushed); it was reviewed, finished and opened here at the owner's request ("أكمله أنت وافتح الـ PR").
