@@ -437,6 +437,7 @@ export const en: Strings = {
   adminTabUsers: "Accounts",
   adminTabChannels: "Channels",
   adminTabCompare: "Compare",
+  adminTabSystem: "System",
   adminTabPlans: "Account Types",
   adminTabOps: "Operations",
   adminTabServices: "Services & Health",
@@ -751,6 +752,16 @@ export const en: Strings = {
   adminChannelsReconnect: "Reconnect needed",
   adminChannelsDisconnected: "Disconnected",
   adminChannelsNeverSynced: "Never synced",
+  // system room
+  adminSystemTitle: "System",
+  adminSystemLead:
+    "What runs the platform itself and is not needed every day: service health, operations, account types, channel import and the audit trail.",
+  adminSystemOpen: (page: string) => `Open ${page}`,
+  adminSystemBack: "‹ System",
+  adminSystemUnread: "Could not be read now; open the page for details.",
+  adminSystemHealthy: (n: number) => `${n} healthy`,
+  adminSystemDegraded: (n: number) => `${n} degraded`,
+  adminSystemDown: (n: number) => `${n} down`,
   // morning summary
   adminDigestTitle: "Morning summary",
   adminDigestRecorded: (at: string) =>
