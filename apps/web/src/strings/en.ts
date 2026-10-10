@@ -752,6 +752,8 @@ export const en: Strings = {
   adminChannelsReconnect: "Reconnect needed",
   adminChannelsDisconnected: "Disconnected",
   adminChannelsNeverSynced: "Never synced",
+  adminTrailLabel: "Move between channels",
+  adminTrailClose: "Hide the channels bar",
   // system room
   adminSystemTitle: "System",
   adminSystemLead:
