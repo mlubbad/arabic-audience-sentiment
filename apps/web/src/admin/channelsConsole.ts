@@ -153,7 +153,7 @@ const CSV_COLUMNS = [
   "last_error",
 ] as const;
 
-function csvCell(value: string | number | null): string {
+export function csvCell(value: string | number | null): string {
   const text = value === null ? "" : String(value);
   // Quote what would break a row; a leading = + - @ is neutralised so a
   // spreadsheet never reads a channel name as a formula.
