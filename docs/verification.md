@@ -1,5 +1,35 @@
 # Verification
 
+## 2026-10-11 — Clear a CI run wedged on the removed `aas-ci` runner label
+
+After #113 merged (`4079a7b`), the `main` push runs for `ci.yml` (Credential-free
+checks) and `security.yml` (Security) sat `queued` from 09:07 UTC and never
+started. Root cause: both were queued while repository variable `CI_RUNNER` was
+set to `aas-ci` (from the self-hosted runner trial, ADR 0002); the label is
+baked into a run's jobs at queue time, and no `aas-ci` runner is registered, so
+the jobs had no runner to pick them up. This was not the earlier billing block —
+Dependabot's own update jobs ran normally on GitHub's infrastructure.
+
+Deleting `CI_RUNNER` only affects runs queued afterwards. Security was cleared by
+Force cancel + Re-run (attempt 2 ran on `ubuntu-latest`, 31s, passed).
+Credential-free checks could not be cleared the same way: its `verify` gate job
+(`if: always()`) stayed `queued` on `aas-ci` after the four test jobs were
+cancelled, so the run never reached a terminal state and GitHub would not create
+a re-run attempt. A run with a job wedged on a missing runner is only released by
+GitHub's ~24h queue timeout.
+
+To unblock without waiting, this entry is the no-op change whose merge produces a
+fresh `main` push run of `ci.yml` on `ubuntu-latest`; the `concurrency` group
+`ci-refs/heads/main` (cancel-in-progress) supersedes the wedged run, `verify`
+passes, and Deploy Preview then ships `4079a7b` (owner console: move between
+channels inside their workspaces, #113) plus this note.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `gh api .../actions/runs/38040298663/jobs` (wedged Credential-free run) | `verify` `queued` with label `aas-ci`; four test jobs `cancelled`; run `status=queued` for 24h+. |
+| `gh api .../actions/runs/38040298684/jobs` (Security, attempt 2) | 3 jobs on `ubuntu-latest`, all `success`. |
+| `grep runs-on .github/workflows/*.yml` | every CI/security/CodeQL job on `${{ vars.CI_RUNNER || 'ubuntu-latest' }}`; `CI_RUNNER` now deleted, so new runs use `ubuntu-latest`. |
+
 ## 2026-10-10 — CI runner switchable to a self-hosted machine (ADR 0002)
 
 Owner request (2026-10-10), after GitHub refused every hosted job on #108 three times on a billing block. Every job in `ci.yml`, `security.yml` and `codeql.yml` now runs on `${{ vars.CI_RUNNER || 'ubuntu-latest' }}`, and both `deploy.yml` jobs on `${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}`. Unset, CI is unchanged. gitleaks picks its archive from `RUNNER_ARCH` and installs into `RUNNER_TEMP`, and the dependency audit writes to `RUNNER_TEMP` instead of `/tmp`. Runbook: `docs/engineering/self-hosted-runner.md`.
