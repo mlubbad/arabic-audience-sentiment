@@ -1,5 +1,44 @@
 # Verification
 
+## 2026-10-12 — Root fix for CI runs that wedge on a missing runner label
+
+Owner request (2026-10-12): find the root of the wedge, not its symptom. Three
+layers stacked. **Trigger:** `CI_RUNNER=aas-ci` was set while no `aas-ci`
+runner was registered; the runbook orders the steps correctly (register, see it
+online, then set the variable) but nothing enforces it. **Amplifier, the real
+defect:** `verify` in `ci.yml` had `if: always()`. Cancelling a wedged run
+cancelled the four test jobs, but `always()` made `verify` run anyway and it
+re-queued on the missing label; GitHub delivers a cancellation only to a
+runner, so the run could never end. Our own test
+(`scripts/ci-workflow.test.ts`) mandated that pattern. **Spreader:** `ci.yml`'s
+`concurrency` with `cancel-in-progress: true` made every later run on the ref
+wait behind the un-cancellable one, which is why `recreate` on #114–#116
+produced runs that sat `pending` behind their own PR's old run.
+
+The decisive evidence: `security.yml` and `codeql.yml` carry the identical
+concurrency setting and never wedged; the only difference is that they have no
+`always()` gate job.
+
+Changes: `verify` now uses `${{ !cancelled() && … }}` (it still runs, and
+fails, when a job fails; it does not run when the run is cancelled, so a
+cancelled run reaches a terminal state and frees its concurrency group); the
+test now requires `!cancelled()` on the `if:` line and rejects `always()`
+there; and a new `queue-watchdog.yml` (every 30 min, hosted `ubuntu-latest`
+by name, `actions: write`, no checkout, no third-party action) force-cancels
+any run that has sat `queued` longer than 30 minutes, turning a silent
+multi-day outage into a loud half-hour recovery. The watchdog targets
+`status=queued` only, never `pending` (a run waiting on concurrency or
+approval), and never itself.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run scripts/ci-workflow.test.ts scripts/workflow-runners.test.ts scripts/queue-watchdog.test.ts` | 3 files, 20 passed. |
+| Mutation: `verify` back to `if: always() && …` | 2 failed: "verify needs every other job and fails unless all succeeded" and "every job in ci.yml skips a draft". File restored; `git diff --stat` showed only the intended files. |
+| First run of the new guards | My own comments tripped them (prose named `always()` and `CI_RUNNER`); the guards were narrowed to the defect: the `if:` line, and the `vars.CI_RUNNER` expression. |
+| `npx prettier --check` on the two test files; `npx eslint` on them | Both clean. |
+| PyYAML `safe_load` of `ci.yml` and `queue-watchdog.yml` | Both parse; `verify.if` = `${{ !cancelled() && github.event.pull_request.draft != true }}` (a bare `!` would be a YAML tag, hence the `${{ }}`). |
+| Watchdog force-cancel on a never-dispatched job | **Not verified live yet.** GitHub documents force-cancel as the cancel that bypasses `always()`; its first scheduled run after merge is expected to free the three wedged Dependabot runs (38053761041, 38053766568, 38053791377). The `!cancelled()` change is the cure; the watchdog is the safety net. |
+
 ## 2026-10-11 — Clear a CI run wedged on the removed `aas-ci` runner label
 
 After #113 merged (`4079a7b`), the `main` push runs for `ci.yml` (Credential-free

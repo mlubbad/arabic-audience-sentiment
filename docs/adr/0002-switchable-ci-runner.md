@@ -50,3 +50,12 @@ Date: 2026-10-10
     runner first.
   - **Cost:** if GitHub reintroduces the self-hosted platform charge, those minutes count against
     the same quota. This decision is then revisited.
+  - **A wrong label is a wedge, not an error (learned 2026-10-10/11).** A job queued for a
+    label no registered runner carries never starts and can't be cancelled (GitHub delivers a
+    cancellation only to a runner). With `verify` on `if: always()`, a cancelled run re-queued
+    that job and never ended, and `ci.yml`'s `concurrency` then held every later run on the ref
+    behind it: `main` for 24 hours, three Dependabot PRs for 40+. Two guards now stand:
+    `verify` uses `!cancelled()` so a cancelled run ends, and `queue-watchdog.yml` force-cancels
+    any run queued longer than 30 minutes (on hosted `ubuntu-latest` by name, so it can't wedge
+    itself). The runbook's order still stands: register the runner, see it online, **then** set
+    `CI_RUNNER`. Setting the variable first costs at most half an hour now, not days.
