@@ -324,6 +324,19 @@
   margin: calc(-1 * var(--space-2)) 0 0;
   font-size: var(--fs-small);
 }
+/* The password rules under the new-password field: each line turns from a
+   hollow mark to a check as the typed password meets it. */
+.db-entry-form > .db-rules {
+  list-style: none;
+  margin: calc(-1 * var(--space-2)) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--fs-small);
+}
+.db-entry-form > .db-rules > li[data-ok="false"] {
+  opacity: 0.7;
+}
 /* The one action on its own screen — the thing the reader came to do — at
    the form's full width. */
 .db-entry-submit {

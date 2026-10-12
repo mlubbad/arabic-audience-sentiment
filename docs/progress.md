@@ -55,6 +55,12 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
 - **Dependencies.** #114 (setup-node 7.1.0), #115 (upload-artifact 7.0.2) and #118 (19 dev
   updates, replacing #116 which Dependabot closed itself) merged on 2026-10-12 once their runs were
   freed; Deploy Preview on `bc26c5d` succeeded with the updated packages.
+- **Reset page hardened (2026-10-12, owner's live test).** The page now names the server's
+  reason (`same_password`, weak-password reasons, expired link, rate limit), asks an already
+  signed-in session for the current password before changing it (and handles the project's
+  "secure password change" code), and enforces the password policy on the form: eight
+  characters with a lowercase, an uppercase, a digit and a symbol, mirrored in
+  `supabase/config.toml`. The owner sets the same policy on the hosted project.
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes

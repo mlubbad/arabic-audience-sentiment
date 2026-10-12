@@ -6,16 +6,20 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { supabase } from "../supabase";
+import { markRecovery } from "./recoveryState";
 
 export const RESET_PATH = "/reset-password";
 
 /** Was this page load a recovery link? Read from the address when the module
  *  loads, before the client consumes it: the implicit flow puts
  *  `type=recovery` in the hash. Cleared once acted on, so a reader who set
- *  their password and moved on is not sent back. */
+ *  their password and moved on is not sent back. The fact itself is kept in
+ *  `recoveryState`, which the reset page reads to skip the current-password
+ *  check for a person who arrived by the link. */
 let pending =
   typeof window !== "undefined" &&
   /(?:^|[#&])type=recovery(?:&|$)/.test(window.location.hash);
+if (pending) markRecovery();
 
 /** In the shell: a reader a recovery link signed in anywhere but the reset
  *  page is taken there, to choose their new password. Supabase lands the
@@ -31,10 +35,9 @@ export function useRecoveryLanding(pathname: string) {
   useEffect(() => {
     if (!supabase) return;
     const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (
-        event === "PASSWORD_RECOVERY" &&
-        window.location.pathname !== RESET_PATH
-      )
+      if (event !== "PASSWORD_RECOVERY") return;
+      markRecovery();
+      if (window.location.pathname !== RESET_PATH)
         navigate(RESET_PATH, { replace: true });
     });
     return () => data.subscription.unsubscribe();

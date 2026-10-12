@@ -945,12 +945,41 @@ export const en: Strings = {
   resetRequestFailed:
     "Could not send the link now. The hourly email limit may be spent; try again later.",
   resetSetTitle: "Set a new password",
-  resetSetLead: "At least eight characters. You stay signed in after saving.",
+  resetSetLead:
+    "At least eight characters, with a lowercase letter, an uppercase letter, a digit and a symbol. You stay signed in after saving.",
+  resetCurrentLead:
+    "You were already signed in, so prove the current password first.",
+  resetCurrentLabel: "Current password",
+  resetCurrentWrong: "The current password is wrong.",
+  resetNoEmail:
+    "Your account has no email, so the current password cannot be checked. Ask for a recovery link instead.",
   resetNewLabel: "New password",
   resetConfirmLabel: "Type it again",
+  resetRulesLabel: "Password rules",
+  resetRuleLength: "At least eight characters",
+  resetRuleLower: "A lowercase letter (a-z)",
+  resetRuleUpper: "An uppercase letter (A-Z)",
+  resetRuleDigit: "A digit (0-9)",
+  resetRuleSymbol: "A symbol such as ! @ or #",
+  resetPolicyFailed: "The password does not meet the rules listed above.",
   resetMismatch: "The two passwords do not match.",
   resetSave: "Save the password",
   resetDone: "Your password changed. You are signed in.",
+  resetSamePassword:
+    "The new password is the current one. Choose a different password.",
+  resetWeak: (reasons: string[]) =>
+    `The server refused the password as weak${reasons.length ? ": " + reasons.join(", ") : "."}`,
+  resetWeakCharacters: "it lacks one of the required character classes",
+  resetWeakPwned: "it appeared in a known data breach",
+  resetCodeSent:
+    "We sent a verification code to your email. Enter it, then save again.",
+  resetCodeLabel: "Verification code from your email",
+  resetCodeWrong: "The verification code is wrong or has expired.",
+  resetLinkExpired: "The link or the session has expired. Ask for a new link.",
+  resetRateLimited:
+    "Too many attempts in a short time. Wait a little, then try.",
+  resetFailedCode: (code: string) =>
+    `Could not change the password. Error code: ${code}`,
   resetFailed:
     "Could not change the password. Ask for a new link and try again.",
   resetToDashboard: "To your dashboard",
