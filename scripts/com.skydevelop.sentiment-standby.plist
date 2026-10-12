@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd agent: the Mac's standby for the Oracle worker.
+
+  Every five minutes it runs scripts/worker-standby.sh from the service's
+  detached checkout, which probes the Oracle container and starts or stops
+  this Mac's worker service (com.skydevelop.sentiment-worker) accordingly.
+  Install, update and remove with scripts/worker-standby-install.sh.
+  Log: ~/Library/Application Support/sentiment-worker/standby.log
+
+  Like every LaunchAgent it runs only while this user is logged in and the
+  Mac is awake: a closed laptop is no standby.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.skydevelop.sentiment-standby</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>/Users/mlubbad/Library/Application Support/sentiment-worker/checkout/scripts/worker-standby.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/mlubbad/Library/Application Support/sentiment-worker</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/mlubbad/Library/Application Support/sentiment-worker/standby.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/mlubbad/Library/Application Support/sentiment-worker/standby.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/mlubbad</string>
+  </dict>
+</dict>
+</plist>

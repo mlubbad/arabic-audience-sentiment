@@ -42,6 +42,15 @@ while launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; do
   i=$((i + 1)); [ "$i" -gt 620 ] && { echo "the old run did not exit" >&2; exit 1; }
   sleep 1
 done
+# On standby (scripts/worker-standby-install.sh), the standby agent decides
+# when this Mac's worker runs: an update moves the checkout and leaves the
+# service stopped unless the standby has already failed over to it.
+standby_mode=""
+[ -f "$SVC/standby.state" ] && read -r standby_mode _ < "$SVC/standby.state"
+if [ "${WORKER_SERVICE_NO_START:-0}" = 1 ] || [ "$standby_mode" = standby ]; then
+  echo "service at $(git -C "$CO" rev-parse --short HEAD), not started (standby decides); log: $SVC/service.log"
+  exit 0
+fi
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "service at $(git -C "$CO" rev-parse --short HEAD); log: $SVC/service.log"
 launchctl print "gui/$(id -u)/$LABEL" | grep -E "state =|pid =" || true

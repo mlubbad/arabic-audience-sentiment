@@ -79,8 +79,55 @@ docker compose logs -f           # اخرج بـ Ctrl+C، العامل يبقى 
 cd ~/arabic-audience-sentiment && git pull && docker compose up -d --build
 ```
 
-### و. بعد التأكد
-أوقف العامل على جهازك، كي لا يعمل عاملان بالبيانات نفسها.
+### و. بعد التأكد: جهازك احتياط جاهز (standby)
+لا تُزل عامل جهازك. يبقى مثبتًا ومعطّلًا، ويعمل وحده إن تعطّل Oracle. ثبّت الاحتياط فقط بعد أن يُظهر سجل Oracle سطر `loaded CAMeL-Lab/...`.
+
+**كيف يعمل:**
+- وكيل launchd اسمه `com.skydevelop.sentiment-standby` يفحص كل 5 دقائق أن حاوية Oracle تعمل.
+- فحصان فاشلان متتاليان (نحو 10 دقائق) يشغّلان عامل جهازك مع إشعار macOS.
+- فحصان ناجحان متتاليان يوقفانه بعد أن يُنهي المهمة التي في يده، ثم يعطّلانه كي لا يعمل عند تسجيل الدخول.
+- التداخل لحظة التبديل آمن: المهمة تُحجز حصريًا (`for update skip locked` مع مهلة 5 دقائق)، فلا يأخذ عاملان المهمة نفسها.
+
+**1. مفتاح فحص لا يستطيع إلا الفحص.** على جهازك:
+```bash
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/oracle_standby -C standby-probe
+cat ~/.ssh/oracle_standby.pub
+```
+ثم على الخادم افتح `nano ~/.ssh/authorized_keys` وأضف سطرًا جديدًا بهذا الشكل، بعد أن تستبدل `ssh-ed25519 AAAA...` بما طبعه الأمر السابق:
+```
+command="docker inspect -f '{{.State.Running}} {{.State.Restarting}}' sentiment-worker",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... standby-probe
+```
+هذا المفتاح بلا كلمة مرور لأن الوكيل يعمل دون تدخل، لكن الخادم يقيّده بأمر واحد يقرأ حالة الحاوية فقط. لو تسرّب لا يفتح أي وصول آخر. للتجربة:
+```bash
+ssh -i ~/.ssh/oracle_standby ubuntu@<IP>     # يجب أن يطبع: true false
+```
+
+**2. الإعداد والتثبيت** (من مجلد المشروع على جهازك):
+```bash
+mkdir -p ~/Library/Application\ Support/sentiment-worker
+printf 'ORACLE_HOST=%s\nORACLE_KEY=%s\n' '<IP>' "$HOME/.ssh/oracle_standby" \
+  > ~/Library/Application\ Support/sentiment-worker/standby.env
+git pull && sh scripts/worker-standby-install.sh
+```
+
+**3. المتابعة:**
+```bash
+cat ~/Library/Application\ Support/sentiment-worker/standby.state   # standby 0 N، والرقم الأخير يزيد كل 5 دقائق
+cat ~/Library/Application\ Support/sentiment-worker/standby.log     # سطر لكل تبديل فقط
+```
+
+**4. تمرين مرة واحدة للتأكد:**
+- على الخادم نفّذ `docker compose stop`. خلال 10 دقائق تقريبًا يصلك إشعار ويعمل عامل جهازك.
+- ثم نفّذ `docker compose start`. خلال 10 دقائق أخرى يعود جهازك احتياطًا.
+
+**الإزالة**، فيعود جهازك هو العامل الأساسي:
+```bash
+sh scripts/worker-standby-install.sh --remove
+```
+
+**حدود معروفة:**
+- الاحتياط يعمل ما دام جهازك مستيقظًا ومسجَّل الدخول. الحاسوب المغلق ليس احتياطًا.
+- إن انقطع إنترنت جهازك وحده، سيظن أن Oracle توقف فيشغّل عامله. الضرر الوحيد استهلاك موارد زائد، لا تكرار في المعالجة.
 
 ---
 

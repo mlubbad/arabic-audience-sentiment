@@ -83,7 +83,10 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
   `inference` group, `SENTIMENT_MODEL=none`, Python 3.14 against a 3.12 project) and that the
   compose file blanked credentials without a `.env`; both fixed, an arm64 CI job now builds the
   image and classifies with the pinned checkpoint, and `docs/cloud-worker-deployment.md` has
-  the runbook. The owner runs the runbook; the session cannot reach Oracle.
+  the runbook. The owner runs the runbook; the session cannot reach Oracle. The owner's Mac
+  becomes the standby (owner's request): its worker service stays installed and disabled, and a
+  launchd agent starts it after two failed probes of the Oracle container and stops it after
+  two good ones (`scripts/worker-standby.sh`, 10 tests).
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes
