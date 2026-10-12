@@ -51,9 +51,10 @@ describe("CI workflow covers npm run check", () => {
   });
 });
 
-// Minutes are billed on this private repo (the billing block of 2026-10-10):
-// a draft PR runs no job, the checks run once it is marked ready and again on
-// main. Every job of the three PR workflows carries the guard, and each
+// A draft PR runs no job; the checks run once it is marked ready and again on
+// main. The rule came from the billing block of 2026-10-10 and stays although
+// the repository is public now (hosted minutes free): it keeps the queue and
+// the noise down. Every job of the three PR workflows carries the guard, and each
 // workflow listens for `ready_for_review`, or a PR made ready would never be
 // checked.
 describe("a draft pull request spends no CI minutes", () => {

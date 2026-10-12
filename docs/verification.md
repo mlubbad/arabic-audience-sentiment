@@ -32,6 +32,34 @@ accepted. Three changes, one PR:
 | `npm test` | 162 files, 1293 passed. |
 | `npm run typecheck`; `npx eslint apps/web/src/account apps/web/src/strings`; `npx prettier --check` on the changed files | All clean. |
 | Live, after deploy | Pending: the owner repeats the three steps on the live site once the dashboard policy is set. |
+## 2026-10-12 — Deploy upload: one connection per file in parallel, temp name, size audit
+
+Owner's decision (2026-10-12): the safer retry of #94. `scripts/deploy-preview.sh` now uploads
+one connection per file, four at a time (`xargs -P`), each file as `NAME.part` renamed into
+place after the transfer (`-Q "-*RNFR" -Q "-RNTO"`; the `*` because RNFR answers 350, which
+curl otherwise counts as a failure; the rename names the file alone because curl has changed
+into its directory), skips hashed assets already on the host at the same size, uploads pages
+last, and audits sizes from one listing per directory after each batch, re-sending a mismatch
+once and failing on a second. `scripts/deploy-workflow.test.ts` guards the shape.
+
+Local FTPS server: pyftpdlib 2.2.0 `TLS_FTPHandler`, TLS required on control and data, a 0.5 s
+delay per login, a self-signed certificate trusted through `CURL_CA_BUNDLE` (never `-k`), the
+real `apps/web/dist` (91 files, 6 of them over 114688 bytes). Same server, same build, in this
+order:
+
+| Command / observation | Actual result |
+| --- | --- |
+| Old script (`origin/main`), empty host | exit 0; remote tree equals `dist`. |
+| New script, `DEPLOY_PARALLEL=1`, empty host | exit 0; remote tree equals `dist`. |
+| New script, `PARALLEL=4`, empty host | exit 0, 58 s, 109 logins; remote tree equals `dist`; 0 `.part` leftovers. |
+| Three more deploys onto an empty host (stress) | all exit 0 and equal `dist`; the third needed the audit: `re-sending landing/arabic-bold.ttf: the host holds a different size`, then whole. (An earlier run of the same server, before the audit existed, had left three files at exactly 114688 bytes with the server logging `completed=1` and curl reporting the full size: the audit exists because of it.) |
+| Nothing changed | exit 0, 30 s, 56 logins: `30 asset(s); 52 unchanged hashed asset(s) skipped`, 9 pages re-sent; tree equals `dist`. |
+| 2 stale remote assets, 1 asset truncated to 100 bytes, a leftover `index.html.part` | exit 0: the truncated asset re-sent whole, both stale files and the `.part` removed; tree equals `dist`. |
+| `STOR` refused (a directory sits at `index.html.part`) | exit 123 (xargs: an invocation failed); the live `index.html` untouched. |
+| `RNTO` refused (a directory sits at `robots.txt`) | exit 123; `robots.txt FAILED`; `robots.txt.part` left for the sweep, the directory intact. |
+| `npx vitest run scripts/deploy-workflow.test.ts` | 11 passed (1 new). |
+| `npx prettier --check`, `npx eslint` on the test; `sh -n` on the script | Clean. |
+| Live | Pending: the first Deploy Preview after merge; its `verify-deploy` step still checks the live host. |
 
 ## 2026-10-12 — Root fix for CI runs that wedge on a missing runner label
 
