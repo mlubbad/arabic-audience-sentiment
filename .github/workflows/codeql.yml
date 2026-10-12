@@ -4,14 +4,16 @@
 # repos, so the analysis runs with `upload: never` — the same official engine
 # and security-extended queries, with results reported as PR annotations,
 # check-run output, and a downloadable SARIF artifact instead of the Security tab.
-# To get the hosted Security tab later: enable GitHub Code Security (or make the
-# repo public) and change `upload: never` back to the default.
+# The repository has been public since 2026-10-10, so the upload is free now;
+# turning it on (remove `upload: never`) is a separate, owner-approved change,
+# because the Security tab then becomes the record and this comment goes.
 name: CodeQL
 
 on:
   pull_request:
     # A draft runs nothing: the checks run once it is marked ready, and again
-    # on main after the merge (minutes are billed on this private repo).
+    # on main after the merge. The repository has been public since 2026-10-10
+    # (hosted minutes are free); the rule stays for the queue and the noise.
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 

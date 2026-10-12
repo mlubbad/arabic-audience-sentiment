@@ -45,9 +45,12 @@ Date: 2026-10-10
   - **Parity:** the VM is linux/arm64, while hosted is linux/x64. Browser tests have shown
     Linux-only flakes before. A failure seen only on the self-hosted runner is compared against a
     hosted run before anyone fixes it.
-  - **Exposure:** the VM runs agent-written code. It holds no credentials, the repository stays
-    private, and fork workflows stay off. Making the repository public requires removing the
-    runner first.
+  - **Exposure:** the VM runs agent-written code. It holds no credentials, and fork workflows
+    stay off. A self-hosted runner is allowed only while the repository is private. **State
+    (2026-10-12):** the repository has been public since 2026-10-10 by the owner's decision
+    (confirmed 2026-10-12), no runner is registered and `CI_RUNNER` is unset; the switch stays
+    unused until the repository is private again. CI runs on hosted runners, whose minutes
+    are free on a public repository, which also removes the billing block this ADR answered.
   - **Cost:** if GitHub reintroduces the self-hosted platform charge, those minutes count against
     the same quota. This decision is then revisited.
   - **A wrong label is a wedge, not an error (learned 2026-10-10/11).** A job queued for a

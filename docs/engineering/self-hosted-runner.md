@@ -143,9 +143,14 @@ gh variable set DEPLOY_RUNNER --body aas-deploy --repo mlubbad/arabic-audience-s
 ## Rules that keep this safe
 - **Private repository only.** If the repository ever becomes public, first run
   `gh variable delete CI_RUNNER` and remove the runner. On a public repository, anyone's pull
-  request would run on this VM.
-- **Keep fork workflows off.** In **Settings → Actions → General → Fork pull request workflows
-  in private repositories**, leave "Run workflows from fork pull requests" unchecked.
+  request would run on this VM. **State (2026-10-12):** the repository is public by the
+  owner's decision; no runner is registered and `CI_RUNNER` is unset. This runbook applies
+  again only if the repository is made private.
+- **Keep fork workflows off.** On a private repository: **Settings → Actions → General → Fork
+  pull request workflows in private repositories**, leave "Run workflows from fork pull
+  requests" unchecked. On a public repository the setting is **Fork pull request workflows
+  from outside collaborators**: keep "Require approval for all external contributors" (the
+  strictest choice), so no stranger's PR runs a workflow before the owner looks at it.
 - **Labels, not `self-hosted`.** Jobs ask for `aas-ci` by name, so another runner registered
   later can't pick them up by accident.
 - **Cost.** GitHub's docs say self-hosted runner usage is free. A per-minute charge for
