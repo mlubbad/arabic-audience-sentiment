@@ -127,6 +127,34 @@ describe("WO-1 credential and portability guards", () => {
     expect(previewDeploy).not.toMatch(/(?:^|\s)-u\s/);
   });
 
+  test("uploads one connection per file in parallel, through a temporary name, assets before pages, and audits sizes", () => {
+    // Reusing a connection made the host answer 425 and left files truncated
+    // (#94, 2026-10-07); a reused connection is never asked for again.
+    expect(previewDeploy).not.toContain("--parallel");
+    expect(previewDeploy).toContain('xargs -P "$PARALLEL"');
+    // The file lands as NAME.part and is renamed into place after the
+    // transfer, so a transfer that stops never replaces the live file. The
+    // rename names the file alone: curl has changed into its directory.
+    expect(previewDeploy).toContain('"ftp://$PREVIEW_FTP_HOST/$f.part"');
+    expect(previewDeploy).toContain('-Q "-*RNFR $b.part" -Q "-RNTO $b"');
+    expect(previewDeploy).toContain("b=${f##*/}");
+    // Pages go up only after every asset they load is on the host.
+    const assets = previewDeploy.indexOf("upload_audited $assets");
+    const pages = previewDeploy.indexOf("upload_audited $pages");
+    expect(assets).toBeGreaterThan(-1);
+    expect(pages).toBeGreaterThan(assets);
+    // A 226 is not proof of a whole file: sizes are read back from a listing
+    // and a mismatch is re-sent once, then fails the deploy.
+    expect(previewDeploy).toContain("bad=$(audit");
+    expect(previewDeploy).toContain(
+      "still wrong on the host after a second send",
+    );
+    // The rename and the audit both run under set -e, and a failed xargs
+    // invocation is a failed deploy.
+    expect(previewDeploy).toMatch(/^set -eu$/m);
+    expect(previewDeploy).not.toContain("|| true\nupload");
+  });
+
   test("requires the Telegram worker credential without a fallback", () => {
     expect(telegramRunner).toContain(
       'worker_cred = os.environ.get("WORKER_CREDENTIAL")',

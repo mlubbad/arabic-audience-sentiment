@@ -59,6 +59,11 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
   decision (confirmed 2026-10-12); `docs/decisions.md` records the consequences, and the
   workflow comments, `AGENTS.md`, ADR 0002 and the runner runbook no longer describe it as
   private. No self-hosted runner is registered and `CI_RUNNER` is unset.
+- **Deploy upload retried the safe way (2026-10-12, owner's decision on #94).** One connection
+  per file, four at a time; each file lands under a temporary name and is renamed into place;
+  sizes are audited from directory listings after each batch and a mismatch is re-sent once.
+  Exercised against a local FTPS server with the real build, including a stress run where the
+  audit caught and repaired one cut-short transfer. Record in `docs/verification.md`.
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes
