@@ -78,6 +78,12 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
   owner made the repository public again at 21:47 UTC. Lesson: on this account, a private
   repository has no CI at all until the billing is fixed, so visibility is part of the
   delivery path, not only of who can read the code.
+- **Worker hosting: Oracle Cloud Always Free, Frankfurt (owner's decision, 2026-10-12).** The
+  owner created the account. Preparing the image found it never loaded the model (no
+  `inference` group, `SENTIMENT_MODEL=none`, Python 3.14 against a 3.12 project) and that the
+  compose file blanked credentials without a `.env`; both fixed, an arm64 CI job now builds the
+  image and classifies with the pinned checkpoint, and `docs/cloud-worker-deployment.md` has
+  the runbook. The owner runs the runbook; the session cannot reach Oracle.
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes

@@ -22,7 +22,69 @@
 
 ---
 
-## 2. خيار النشر الأول (الأسهل والموصى به): منصة Render
+## 1.5 الخيار المعتمد (2026-10-12): Oracle Cloud Always Free، منطقة Frankfurt
+
+قرار المالك: يعمل العامل على جهاز Oracle المجاني (معالج ARM من نوع Ampere A1). الصورة تُبنى وتُختبر على المعمارية نفسها في كل تغيير على العامل، عبر `.github/workflows/worker-image.yml`، الذي يحمّل النموذج ويصنّف به داخل الصورة.
+
+> **تحقق قبل الاعتماد:** حدود الخطة المجانية وسياساتها تتغير. ما يلي يصف ما أعرفه حتى منتصف 2026، فراجع صفحة Oracle Always Free الحالية.
+> - الحد المعروف لأجهزة A1 المجانية هو 4 أنوية و24 غيغابايت ذاكرة في المجموع.
+> - تذكر Oracle أنها قد تستعيد جهازًا مجانيًا يبقى خاملًا 7 أيام (استهلاك منخفض للمعالج والشبكة والذاكرة). عاملنا يمضي معظم وقته منتظرًا، فراقب ذلك. الترقية إلى Pay As You Go تُسقط هذه الاستعادة وتبقي الموارد المجانية مجانية، لكنها تفتح باب الدفع إن تجاوزت الحدود.
+
+### أ. إنشاء الجهاز (مرة واحدة، من لوحة Oracle)
+1. على جهازك (Mac) أنشئ مفتاح SSH خاصًا بهذا الخادم:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/oracle_worker -C oracle-worker
+   ```
+2. في لوحة Oracle: **Compute ← Instances ← Create instance**.
+   - **Image:** Canonical Ubuntu 24.04 (نسخة aarch64).
+   - **Shape:** Ampere ← `VM.Standard.A1.Flex` بنواتين و12 غيغابايت (يكفي ويترك نصف الحصة احتياطًا).
+   - **Networking:** الشبكة الافتراضية مع عنوان IP عام.
+   - **Add SSH keys:** الصق محتوى `~/.ssh/oracle_worker.pub`، المفتاح العام فقط.
+   - **Boot volume:** 50 غيغابايت.
+3. إن ظهرت رسالة `Out of host capacity` فهي نفاد مؤقت في المنطقة. أعد المحاولة لاحقًا، أو جرّب نواة واحدة و6 غيغابايت. لا تفتح حسابًا ثانيًا، فذلك مخالف لشروط Oracle.
+4. **المنافذ:** العامل يتصل بالخارج فقط ولا يستقبل شيئًا، فلا تفتح أي منفذ غير SSH (22). وإن أمكن، قيّد SSH بعنوانك في Security List.
+
+### ب. تجهيز الخادم (مرة واحدة)
+```bash
+ssh -i ~/.ssh/oracle_worker ubuntu@<IP>
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+sudo usermod -aG docker ubuntu && exit   # اخرج ثم ادخل مجددًا ليسري الإذن
+ssh -i ~/.ssh/oracle_worker ubuntu@<IP>
+git clone https://github.com/mlubbad/arabic-audience-sentiment.git
+```
+
+### ج. الأسرار (من جهازك، لا تلصقها في أي محادثة)
+انسخ ملف الأسرار باسم `.env` تحديدًا. هذا الاسم يقرؤه Compose في الحالتين، وكان غيابه يفرّغ بيانات الاعتماد قبل إصلاح 2026-10-12:
+```bash
+scp -i ~/.ssh/oracle_worker .env.local ubuntu@<IP>:~/arabic-audience-sentiment/.env
+ssh -i ~/.ssh/oracle_worker ubuntu@<IP> chmod 600 ~/arabic-audience-sentiment/.env
+```
+يحتاج العامل على الأقل `WORKER_API_BASE_URL` و`WORKER_CREDENTIAL`، والباقي حسب المنصات المفعّلة (جدول القسم 1).
+
+### د. التشغيل
+```bash
+cd ~/arabic-audience-sentiment
+docker compose up -d --build     # البناء الأول بضع دقائق (torch)
+docker compose logs -f           # اخرج بـ Ctrl+C، العامل يبقى يعمل
+```
+السجل الصحيح يظهر بهذا الترتيب:
+- `loading the classifier (camelbert-da)`
+- `loaded CAMeL-Lab/bert-base-arabic-camelbert-da-sentiment@b0df630d23e5`
+- ثم سطر `worker up …`
+
+التنزيل الأول للنموذج (نحو 500 ميغابايت) يُحفظ في وحدة التخزين `hf-cache`، فلا يتكرر بعدها.
+
+### هـ. التحديث بعد كل دمج يغيّر العامل
+```bash
+cd ~/arabic-audience-sentiment && git pull && docker compose up -d --build
+```
+
+### و. بعد التأكد
+أوقف العامل على جهازك، كي لا يعمل عاملان بالبيانات نفسها.
+
+---
+
+## 2. بديل: منصة Render (مدفوعة للعمال الخلفيين)
 
 منصة **[Render](https://render.com)** توفر خياراً متخصصاً لتشغيل العمال الخلفيين (**Background Worker**) بشكل سحابي كامل ومستقل.
 
@@ -36,7 +98,7 @@
    - **Environment**: اختر **Docker**.
    - **Dockerfile Path**: `./workers/python/Dockerfile`
    - **Docker Context**: `./workers/python`
-   - **Instance Type**: اختر **Starter** (أو المناسب لميزانيتك، الحاوية تستهلك ~500MB RAM فقط).
+   - **Instance Type**: الحاوية تحمّل النموذج منذ 2026-10-12 وتحتاج نحو 1.5 غيغابايت ذاكرة على الأقل؛ خطة Starter (512 ميغابايت) لم تعد تكفي.
 5. في قسم **Environment Variables** (المتغيرات البيئية):
    - اضغط **Add Environment Variable** وأضف المتغيرات المذكورة في الجدول أعلاه مع قيمها من `.env.local`.
 6. اضغط على زر **Create Background Worker**.

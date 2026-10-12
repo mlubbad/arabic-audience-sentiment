@@ -1,0 +1,68 @@
+name: Worker image
+# Builds the analysis worker's container exactly as a server builds it, on an
+# arm64 runner (the architecture of Oracle Cloud's Ampere A1, where it runs),
+# then loads the pinned CAMeLBERT checkpoint inside the image and classifies
+# three sentences. Catches what unit tests cannot: a Dockerfile that installs no
+# model (it did, until 2026-10-12), a lock that does not resolve on arm64, a
+# checkpoint whose labels moved. Arm64 runners are free on public repositories.
+on:
+  pull_request:
+    # A draft runs nothing, like the other PR workflows.
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "workers/python/**"
+      - "docker-compose.yml"
+      - ".github/workflows/worker-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "workers/python/**"
+      - "docker-compose.yml"
+      - ".github/workflows/worker-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-classify:
+    name: Build the worker image and classify with the pinned model
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image (linux/arm64)
+        run: docker build --tag sentiment-worker:ci workers/python
+      - name: Load the pinned checkpoint and classify inside the image
+        # No secret is passed: the checkpoint is public and the worker's own
+        # credentials are not needed to classify. Nothing a viewer of this
+        # public log should not see is printed: three fixed sentences and
+        # their labels.
+        run: |
+          docker run --rm -i --env SENTIMENT_TORCH_THREADS=2 sentiment-worker:ci \
+            python - <<'PY'
+          from sentiment.transformer import load_pinned
+          a = load_pinned("camelbert-da")
+          texts = ["هذا البرنامج رائع جدا وأحببته", "أسوأ حلقة شاهدتها، مضيعة للوقت", ""]
+          preds = a.predict(texts)
+          for t, p in zip(texts, preds):
+              print(repr(t), p.status, p.label)
+          assert [p.status for p in preds] == ["succeeded", "succeeded", "skipped"], preds
+          # load_pinned already refuses a checkpoint whose revision or label
+          # order is not the pinned one. Here: the model ran, its scores are a
+          # distribution, and the clearly positive sentence scores higher on
+          # "positive" than the clearly negative one. No exact label is
+          # asserted: these sentences are not from the golden set (its texts
+          # are not committed) and the model is right about 76% of the time.
+          for p in preds[:2]:
+              assert abs(sum(p.scores.values()) - 1.0) < 1e-4, p.scores
+          assert preds[0].scores["positive"] > preds[1].scores["positive"], preds
+          print("model", a.model_id, "at", a.revision[:12], "loaded and classified")
+          PY

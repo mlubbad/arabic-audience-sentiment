@@ -1,5 +1,15 @@
 # Implementation decisions
 
+2026-10-12 — The worker runs on Oracle Cloud Always Free (Ampere A1, Frankfurt).
+Context: the worker ran on the owner's Mac; the shared host cannot keep a process alive nor
+hold torch. Rejected: Render and Railway (no free background worker as of this decision);
+Hugging Face Spaces (sleeps when idle); a scheduled GitHub Actions job (production work on
+CI is a grey area in GitHub's terms, and its logs are public). Chosen: one Oracle A1 VM,
+2 OCPU / 12 GB, Docker Compose, in Frankfurt for proximity to the Supabase project. Risks
+recorded in the runbook: Oracle may reclaim an idle Always Free VM, and A1 capacity can be
+exhausted at creation. The image is built and model-tested on arm64 in CI on every worker
+change (`worker-image.yml`).
+
 2026-10-12 — The repository is public (owner's decision of 2026-10-10, confirmed 2026-10-12).
 Context: GitHub refused every hosted job on 2026-10-10 over a billing block on the then-private
 repository; hosted minutes are free on a public one. The owner made the repository public and

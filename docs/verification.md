@@ -1,5 +1,34 @@
 # Verification
 
+## 2026-10-12 — Worker image ready for Oracle Cloud (arm64), with the model it never had
+
+Owner's decision (2026-10-12): host the worker on Oracle Cloud Always Free (Ampere A1,
+Frankfurt). Preparing it found the image could not classify: `SENTIMENT_MODEL=none` and
+`uv sync --no-dev` without the `inference` group, on `python:3.14` while the project requires
+`==3.12.*`, with uv 0.5.21. And `docker-compose.yml` repeated each credential as `KEY=${KEY}`,
+which Compose fills from `.env` or the shell only: with just `.env.local` on a server each
+became an empty string overriding the real value.
+
+Changes: the Dockerfile builds on `python:3.12.10-slim` and `uv:0.11.11` (CI's versions), each
+pinned by its multi-arch index digest read from the registry (the Python index digest
+recomputed locally from the fetched index: `sha256:fd95fa22…`, equal to the registry's
+header); installs `--group inference`; defaults to `camelbert-da`; keeps the Hugging Face
+cache at `HF_HOME` on a compose volume; `UV_PYTHON_DOWNLOADS=never`. The compose file drops
+the empty-able credential lines (the env files supply them), raises the memory limit from
+1536M to 4G and sets two torch threads. New `.github/workflows/worker-image.yml` builds the
+image on `ubuntu-24.04-arm` and runs the pinned checkpoint inside it. `docs/cloud-worker-deployment.md`
+gains the Oracle runbook.
+
+| Command / observation | Actual result |
+| --- | --- |
+| No Docker daemon and no Hugging Face access in the cloud session | The image could not be built or run here; the arm64 CI job is the build and model test. Its first result is recorded on the PR. |
+| `uv.lock` | Carries `torch-2.9.0-cp312-cp312-manylinux_2_28_aarch64.whl`: the inference group resolves on arm64. |
+| `npx vitest run scripts/worker-image.test.ts` | 5 passed. |
+| Mutations: drop `--group inference`; set `SENTIMENT_MODEL=none`; base `python:3.14-slim` | Each fails 1 test. Restored. |
+| PyYAML on the workflow and the compose file | Both parse; compose `environment` holds only defaulted settings. |
+| `npx vitest run scripts/workflow-runners.test.ts scripts/ci-workflow.test.ts` | 20 passed (the new workflow names its runner on purpose; it is not one of the three switchable workflows). |
+| The smoke step's assertions | No exact label on invented sentences (the golden set's texts are not committed, and the model is right ~76% of the time): statuses, score distributions, and the positive sentence scoring higher on "positive" than the negative one. `load_pinned` itself refuses a wrong revision or label order. |
+
 ## 2026-10-12 — Reset page: the real cause, the current password, and a password policy
 
 Owner's test on the live site (2026-10-12, signed in, `/reset-password` opened directly): a
