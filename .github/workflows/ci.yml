@@ -128,7 +128,13 @@ jobs:
 
   verify:
     needs: [static, unit, db, e2e]
-    if: always() && github.event.pull_request.draft != true
+    # `!cancelled()`, not `always()`: the gate still runs when a job fails, so
+    # it can fail, but not when the run is cancelled. With `always()` a
+    # cancelled run re-queued this job, and a job queued for a runner label no
+    # runner carries can never be cancelled (GitHub delivers a cancellation
+    # only to a runner), so the run never ended and, through `concurrency`
+    # above, every later run on the ref waited behind it (2026-10-10/11).
+    if: ${{ !cancelled() && github.event.pull_request.draft != true }}
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:

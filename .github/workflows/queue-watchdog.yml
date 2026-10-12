@@ -1,0 +1,45 @@
+# Frees a workflow run stuck in the queue.
+#
+# A job queued for a runner label that no registered runner carries never
+# starts, and never leaves the queue on its own: GitHub delivers a
+# cancellation only to a runner, so a plain cancel does nothing to it. Such a
+# run also holds its `concurrency` group, so every later run on that ref waits
+# behind it (2026-10-10/11: `CI_RUNNER=aas-ci` with no `aas-ci` runner wedged
+# `main` for 24 hours and three Dependabot PRs for more than 40). Every half
+# hour this cancels, by force, any run that has sat `queued` for longer than
+# STALE_MINUTES. The force endpoint is the one cancel that bypasses a job's
+# `always()` condition.
+#
+# It runs on the hosted runner by name on purpose: it must never depend on
+# `CI_RUNNER`, or the thing it guards against could wedge it too. It checks
+# out nothing and uses no third-party action.
+name: Queue watchdog
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+permissions:
+  actions: write
+jobs:
+  cancel-stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STALE_MINUTES: "30"
+    steps:
+      - name: Force-cancel runs queued longer than STALE_MINUTES
+        shell: bash
+        run: |
+          set -euo pipefail
+          limit=$(( $(date -u +%s) - STALE_MINUTES * 60 ))
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/runs?status=queued&per_page=100" \
+            --jq '.workflow_runs[] | [.id, .created_at, .name] | @tsv' |
+          while IFS=$'\t' read -r id created name; do
+            [ "$id" = "$GITHUB_RUN_ID" ] && continue
+            [ "$(date -u -d "$created" +%s)" -lt "$limit" ] || continue
+            echo "force-cancelling $id ($name), queued since $created"
+            gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/force-cancel" ||
+              echo "::warning::could not cancel $id"
+          done

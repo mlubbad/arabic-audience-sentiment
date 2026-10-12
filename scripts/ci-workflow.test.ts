@@ -40,7 +40,12 @@ describe("CI workflow covers npm run check", () => {
         .map((s) => s.trim())
         .sort(),
     ).toEqual(others.sort());
-    expect(workflow).toMatch(/^ {4}if: always\(\) && /m);
+    // `!cancelled()`, never `always()`: with `always()` a cancelled run
+    // re-queued `verify`, a job queued for a missing runner label can't be
+    // cancelled, and the run then held its `concurrency` group forever
+    // (main for 24h and three Dependabot PRs for 40h+, 2026-10-10/11).
+    expect(workflow).toMatch(/^ {4}if: \$\{\{ !cancelled\(\) && /m);
+    expect(workflow).not.toMatch(/^ {4}if: .*always\(\)/m);
     for (const job of others)
       expect(workflow).toContain(`\${{ needs.${job}.result }}`);
   });
@@ -67,7 +72,7 @@ describe("a draft pull request spends no CI minutes", () => {
       expect(jobs.length).toBeGreaterThan(0);
       for (const job of jobs)
         expect(job).toMatch(
-          /^ {4}if: (?:always\(\) && )?github\.event\.pull_request\.draft != true$/m,
+          /^ {4}if: (?:github\.event\.pull_request\.draft != true|\$\{\{ !cancelled\(\) && github\.event\.pull_request\.draft != true \}\})$/m,
         );
     });
   }
