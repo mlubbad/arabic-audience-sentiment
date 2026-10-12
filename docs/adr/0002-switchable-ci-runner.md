@@ -58,4 +58,7 @@ Date: 2026-10-10
     `verify` uses `!cancelled()` so a cancelled run ends, and `queue-watchdog.yml` force-cancels
     any run queued longer than 30 minutes (on hosted `ubuntu-latest` by name, so it can't wedge
     itself). The runbook's order still stands: register the runner, see it online, **then** set
-    `CI_RUNNER`. Setting the variable first costs at most half an hour now, not days.
+    `CI_RUNNER`. Setting the variable first costs at most half an hour now, not days. GitHub
+    itself ended the wedged runs 48 hours after they were queued (observed 2026-10-12; the
+    watchdog's own schedule had not fired yet), so without the watchdog the worst case is two
+    days per run, not forever.
