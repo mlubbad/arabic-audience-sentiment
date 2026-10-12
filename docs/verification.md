@@ -1,5 +1,37 @@
 # Verification
 
+## 2026-10-12 — Reset page: the real cause, the current password, and a password policy
+
+Owner's test on the live site (2026-10-12, signed in, `/reset-password` opened directly): a
+`422 same_password` from `PUT /auth/v1/user` was shown as the generic "ask for a new link"
+sentence; no current password was asked of an already signed-in session; and `12345678` was
+accepted. Three changes, one PR:
+
+- `resetErrors.ts`: every documented `updateUser` code gets its sentence (`same_password`,
+  `weak_password` with the server's reasons, `reauthentication_not_valid`, `session_expired`
+  and kin, the rate limits); an unknown code is shown as is.
+- `recoveryState.ts` + `recoveryLanding.ts`: a session that came from a recovery link
+  (`type=recovery` in the hash, or the `PASSWORD_RECOVERY` event) is remembered, in memory and
+  in `sessionStorage`. The reset page asks such a reader for nothing but the new password (the
+  link was the proof). Any other signed-in session must give the **current password**, checked
+  with `signInWithPassword` before `updateUser`. When the project's "secure password change"
+  answers `reauthentication_needed`, the page calls `reauthenticate()` and asks for the emailed
+  code, then saves with `nonce`.
+- `passwordPolicy.ts`: eight characters, a lowercase, an uppercase, a digit and a symbol
+  (GoTrue's ASCII classes and symbol set, so an Arabic letter counts for neither case, as on
+  the server). The form shows the five rules as a live list and refuses a password before the
+  round trip. `supabase/config.toml` carries the same policy (`minimum_password_length = 8`,
+  `password_requirements = "lower_upper_letters_digits_symbols"`, `secure_password_change =
+  true`) for local parity; the hosted project is set by the owner in the dashboard.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run apps/web/src/account/ResetPassword.test.tsx apps/web/src/account/passwordPolicy.test.ts apps/web/src/account/recoveryState.test.ts apps/web/src/locale.test.ts` | 4 files, 32 passed: the link flow unchanged; recovery session asks no current password, refuses a mismatch and `12345678` before any call (list shows ✓ length, ✓ digit, ○ lower, ○ upper, ○ symbol), saves a strong one, names `same_password`, shows `weak_password` reasons, says the link expired, shows an unknown code; a plain session asks the current password, refuses a wrong one (`updateUser` never called), saves after a right one, handles `reauthentication_needed` (code sent, saved with `nonce`, one sign-in only), and with no email points to the link. |
+| Mutation: `passwordProblems` returns `[]` | 4 failed (three policy tests and the form's refusal). Restored. |
+| Mutation: the current-password branch disabled (`if (false)`) | 4 failed (every "signed in some other way" test). Restored. |
+| `npm test` | 162 files, 1293 passed. |
+| `npm run typecheck`; `npx eslint apps/web/src/account apps/web/src/strings`; `npx prettier --check` on the changed files | All clean. |
+| Live, after deploy | Pending: the owner repeats the three steps on the live site once the dashboard policy is set. |
 ## 2026-10-12 — Deploy upload: one connection per file in parallel, temp name, size audit
 
 Owner's decision (2026-10-12): the safer retry of #94. `scripts/deploy-preview.sh` now uploads

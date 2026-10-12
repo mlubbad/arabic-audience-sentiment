@@ -55,6 +55,12 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
 - **Dependencies.** #114 (setup-node 7.1.0), #115 (upload-artifact 7.0.2) and #118 (19 dev
   updates, replacing #116 which Dependabot closed itself) merged on 2026-10-12 once their runs were
   freed; Deploy Preview on `bc26c5d` succeeded with the updated packages.
+- **Reset page hardened (2026-10-12, owner's live test).** The page now names the server's
+  reason (`same_password`, weak-password reasons, expired link, rate limit), asks an already
+  signed-in session for the current password before changing it (and handles the project's
+  "secure password change" code), and enforces the password policy on the form: eight
+  characters with a lowercase, an uppercase, a digit and a symbol, mirrored in
+  `supabase/config.toml`. The owner sets the same policy on the hosted project.
 - **Repository visibility.** The repository has been public since 2026-10-10 by the owner's
   decision (confirmed 2026-10-12); `docs/decisions.md` records the consequences, and the
   workflow comments, `AGENTS.md`, ADR 0002 and the runner runbook no longer describe it as
