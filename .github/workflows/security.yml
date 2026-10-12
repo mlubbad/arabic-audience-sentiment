@@ -5,13 +5,16 @@
 # Licensing note: dependency-review-action and gitleaks-action wrappers require
 # GitHub Advanced Security or a commercial license on private repositories.
 # This workflow uses the free equivalents instead: npm/pip-audit for dependency
-# review and the gitleaks CLI directly for secret scanning.
+# review and the gitleaks CLI directly for secret scanning. The repository has
+# been public since 2026-10-10, which would allow the wrappers; the equivalents
+# stay because they are pinned, tested and independent of the visibility.
 name: Security
 
 on:
   pull_request:
     # A draft runs nothing: the checks run once it is marked ready, and again
-    # on main after the merge (minutes are billed on this private repo).
+    # on main after the merge. The repository has been public since 2026-10-10
+    # (hosted minutes are free); the rule stays for the queue and the noise.
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]

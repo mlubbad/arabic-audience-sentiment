@@ -4,7 +4,8 @@ on:
     branches: [main]
   pull_request:
     # A draft runs nothing: the checks run once it is marked ready, and again
-    # on main after the merge (minutes are billed on this private repo).
+    # on main after the merge. The repository has been public since 2026-10-10
+    # (hosted minutes are free); the rule stays for the queue and the noise.
     types: [opened, synchronize, reopened, ready_for_review]
 permissions:
   contents: read

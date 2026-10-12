@@ -1,5 +1,23 @@
 # Implementation decisions
 
+2026-10-12 — The repository is public (owner's decision of 2026-10-10, confirmed 2026-10-12).
+Context: GitHub refused every hosted job on 2026-10-10 over a billing block on the then-private
+repository; hosted minutes are free on a public one. The owner made the repository public and
+kept it so.
+1. **Consequences accepted.** Code, issues, PRs and workflow logs are readable by anyone. The
+   security rules in `AGENTS.md` already forbade secrets in tracked files; they now also forbid
+   printing a secret or customer data in a workflow log, and the self-hosted runner of ADR 0002
+   may not be registered while the repository is public (no runner is registered; `CI_RUNNER`
+   is unset).
+2. **Kept as is, on purpose.** Draft PRs still run no CI (queue and noise, not cost). CodeQL
+   keeps `upload: never` and the security workflow keeps the free CLI equivalents until the
+   owner asks for the hosted Security tab; both are one-line changes, recorded in the workflow
+   comments.
+3. **Now available.** Branch protection on `main` costs nothing on a public repository; the
+   owner decides whether to require PRs and the status checks (`verify`, Security, CodeQL).
+   The owner's setting for fork pull-request workflows must stay at "require approval for all
+   external contributors" (`docs/engineering/self-hosted-runner.md`).
+
 2026-10-04 — Local Codex dispatch: the dispatcher owns git, Codex edits inside its sandbox.
 Context: the first WO-13 run (`codex exec -s workspace-write`) could not create a branch and built a
 second repository under `/tmp` pointed at the worktree; the third run only succeeded with

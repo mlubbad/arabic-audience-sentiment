@@ -76,8 +76,9 @@ npm/pip-audit (dependency CVEs), and `verify`. A red security check is a
 blocker, not noise: fix the cause. Never bypass a gate — no `continue-on-error`,
 no skip-workflow labels, no severity downgrades, no `--force` push to hide one.
 The gates run when a PR is opened as ready or marked ready for review, on every
-push after that, and on `main`; a **draft** runs none (minutes are billed on this
-private repo, 2026-10-10). Run `npm run check` locally while drafting, and mark
+push after that, and on `main`; a **draft** runs none (a rule from the billing
+block of 2026-10-10, kept for the queue and the noise now that the repository is
+public). Run `npm run check` locally while drafting, and mark
 the PR ready only when you want the gates to judge it.
 
 Pin every `uses:` to a full commit SHA with the version in a comment, and pin
@@ -87,6 +88,10 @@ registry API, not from memory. New workflow files need: a least-privilege
 `persist-credentials: false` on checkout. Do not introduce `pull_request_target`
 with checkout of untrusted code.
 
+The repository is **public** (owner's decision, 2026-10-10, confirmed 2026-10-12):
+every commit, issue, PR and workflow log is readable by anyone. So no self-hosted
+runner may be registered on it (ADR 0002), workflow logs must never print a
+secret or a customer's data, and the next rule is doubly binding.
 Secrets never enter tracked files — not in code, fixtures, docs, or plans.
 `.env*` is gitignored (only `.env.example` is tracked). If gitleaks flags
 test data, verify it is synthetic, then allowlist by exact fingerprint
@@ -102,8 +107,10 @@ sensitive data lives in the `private` schema, and SECURITY DEFINER functions
 set `search_path=''`. New tables follow the same pattern — RLS is not a
 follow-up task.
 
-CodeQL runs with `upload: never` because the repo is private without a Code
-Security license; keep it that way unless the license exists. CodeQL/Semgrep
+CodeQL runs with `upload: never`, a setting from when the repository was private
+without a Code Security license. The repository has been public since
+2026-10-10, so the upload would be free; changing it is the owner's call, not a
+side effect of another PR. CodeQL/Semgrep
 findings are fixed or explicitly dismissed with a written reason — never
 silenced by ignore comments without one.
 

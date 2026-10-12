@@ -138,6 +138,36 @@ The CI uploads that landed outside `public_html` (`/home/u101542/en`, `static`, 
 `fonts`, `fixtures`, `privacy-policy`, `pricing`, `terms` and the top-level files of
 `dist/`) are not served and can be deleted from the panel.
 
+## How the upload is shaped (2026-10-12)
+
+`scripts/deploy-preview.sh` learned from #94 (2026-10-07), which reused FTPS connections and
+was reverted the same day: the host answers `425` to a second data transfer on a reused
+control connection, and five files were left truncated at 64 KB. The shape now:
+
+- **One connection per file, four at a time** (`xargs -P 4`). No connection is ever asked
+  for a second transfer. The time comes back from the parallelism: one curl per file cost
+  about 2.4 s on the host, so ~90 files took about 3.5 minutes in sequence.
+- **A temporary name, then a rename.** Each file lands as `NAME.part` and is renamed into
+  place on the same connection (`RNFR`/`RNTO` after the transfer). A transfer that stops
+  leaves a `.part` beside the live file and never replaces it; the sweep removes `.part`
+  leftovers on the next deploy.
+- **A size audit after each batch.** An FTPS server can answer `226` for a transfer it cut
+  short (seen on the local test server at exactly 114688 bytes under parallel load), and curl
+  then reports the full size it sent, so the transfer's status is not proof. After the
+  assets and again after the pages, one listing per directory is compared with the local
+  sizes; a mismatch is re-sent once, one file at a time, and a second mismatch fails the
+  deploy. In the local stress run, one of four deploys needed this re-send and ended whole.
+- **Unchanged hashed assets are skipped.** A file in `static/` with the same name and size on
+  the host is the same file (the name carries the content hash); a size mismatch, a truncated
+  earlier upload, sends it again.
+- **Assets first, pages last**, so a page is replaced only once everything it loads is on
+  the host.
+
+The script was exercised against a local FTPS server (pyftpdlib, TLS required on both
+channels, a 0.5 s login delay) with the real build: empty host, unchanged host, stale and
+truncated remote files with a leftover `.part`, a refused `STOR` and a refused `RNTO`. The
+record is in `docs/verification.md` under 2026-10-12.
+
 ## Superseded assets, and two traps in removing them
 
 The bundle is content-hashed, so every deploy writes a new filename and the previous one is
