@@ -5,7 +5,9 @@ Context: the worker ran on the owner's Mac; the shared host cannot keep a proces
 hold torch. Rejected: Render and Railway (no free background worker as of this decision);
 Hugging Face Spaces (sleeps when idle); a scheduled GitHub Actions job (production work on
 CI is a grey area in GitHub's terms, and its logs are public). Chosen: one Oracle A1 VM,
-2 OCPU / 12 GB, Docker Compose, in Frankfurt for proximity to the Supabase project. Risks
+1 OCPU / 6 GB (the owner's choice at creation, 2026-10-13: the worker's ~2 GB resident keeps
+memory above the 20% idle-reclamation threshold, which 12 GB would not), Docker Compose, in
+Frankfurt for proximity to the Supabase project. Risks
 recorded in the runbook: Oracle may reclaim an idle Always Free VM, and A1 capacity can be
 exhausted at creation. The image is built and model-tested on arm64 in CI on every worker
 change (`worker-image.yml`).

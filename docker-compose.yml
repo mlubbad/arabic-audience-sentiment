@@ -21,9 +21,10 @@ services:
       - TOPIC_MODEL=${TOPIC_MODEL:-gemini}
       - WORKER_IDLE_SECONDS=${WORKER_IDLE_SECONDS:-30}
       - WORKER_MAX_IDLE=${WORKER_MAX_IDLE:-30}
-      # torch threads for inference. The Oracle Always Free A1 shape gives up
-      # to 4 OCPUs; 2 leaves room for collection and the host.
-      - SENTIMENT_TORCH_THREADS=${SENTIMENT_TORCH_THREADS:-2}
+      # torch threads for inference: one per core. The Oracle VM is 1 OCPU /
+      # 6 GB (owner's choice, 2026-10-13: at ~2 GB resident the memory stays
+      # above the idle-reclamation threshold); raise this with the shape.
+      - SENTIMENT_TORCH_THREADS=${SENTIMENT_TORCH_THREADS:-1}
     # The Hugging Face cache (HF_HOME in the image): the pinned checkpoint is
     # downloaded once and survives restarts and image rebuilds.
     volumes:
