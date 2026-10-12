@@ -59,7 +59,7 @@ order:
 | `RNTO` refused (a directory sits at `robots.txt`) | exit 123; `robots.txt FAILED`; `robots.txt.part` left for the sweep, the directory intact. |
 | `npx vitest run scripts/deploy-workflow.test.ts` | 11 passed (1 new). |
 | `npx prettier --check`, `npx eslint` on the test; `sh -n` on the script | Clean. |
-| Live | Pending: the first Deploy Preview after merge; its `verify-deploy` step still checks the live host. |
+| Live, first run (#123 merged as `290f621`, Deploy Preview 38312167577) | Success. Upload step 21:42:01 → 21:43:06 UTC, **65 s**, against **3 min 39 s** for the previous deploy (`f337b66`, the old script, 20:36:52 → 20:40:31); `Verify the live site serves this build` passed. The host accepted `RNFR`/`RNTO` as the local server did. |
 
 ## 2026-10-12 — Root fix for CI runs that wedge on a missing runner label
 

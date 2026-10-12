@@ -70,6 +70,14 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
   sizes are audited from directory listings after each batch and a mismatch is re-sent once.
   Exercised against a local FTPS server with the real build, including a stress run where the
   audit caught and repaired one cut-short transfer. Record in `docs/verification.md`.
+- **Visibility flipped once, and what it cost (2026-10-12).** The owner made the repository
+  private at 21:45 UTC, two minutes after #124 merged; the `verify` job of that push's CI run
+  (38312354312) was refused at 21:46 with the account's billing message ("recent account
+  payments have failed"), although the four test jobs it needs had passed. The deploy gate
+  needs `verify` on the exact commit, so Deploy Preview skipped and #124 did not go live. The
+  owner made the repository public again at 21:47 UTC. Lesson: on this account, a private
+  repository has no CI at all until the billing is fixed, so visibility is part of the
+  delivery path, not only of who can read the code.
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes
