@@ -22,7 +22,116 @@
 
 ---
 
-## 2. خيار النشر الأول (الأسهل والموصى به): منصة Render
+## 1.5 الخيار المعتمد (2026-10-12): Oracle Cloud Always Free، منطقة Frankfurt
+
+قرار المالك: يعمل العامل على جهاز Oracle المجاني (معالج ARM من نوع Ampere A1). الصورة تُبنى وتُختبر على المعمارية نفسها في كل تغيير على العامل، عبر `.github/workflows/worker-image.yml`، الذي يحمّل النموذج ويصنّف به داخل الصورة.
+
+> **تحقق قبل الاعتماد:** حدود الخطة المجانية وسياساتها تتغير. ما يلي يصف ما أعرفه حتى منتصف 2026، فراجع صفحة Oracle Always Free الحالية.
+> - الحد المعروف لأجهزة A1 المجانية هو 4 أنوية و24 غيغابايت ذاكرة في المجموع.
+> - تذكر Oracle أنها قد تستعيد جهازًا مجانيًا يبقى خاملًا 7 أيام (استهلاك منخفض للمعالج والشبكة والذاكرة). عاملنا يمضي معظم وقته منتظرًا، فراقب ذلك. الترقية إلى Pay As You Go تُسقط هذه الاستعادة وتبقي الموارد المجانية مجانية، لكنها تفتح باب الدفع إن تجاوزت الحدود.
+
+### أ. إنشاء الجهاز (مرة واحدة، من لوحة Oracle)
+1. على جهازك (Mac) أنشئ مفتاح SSH خاصًا بهذا الخادم:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/oracle_worker -C oracle-worker
+   ```
+2. في لوحة Oracle: **Compute ← Instances ← Create instance**.
+   - **Image:** Canonical Ubuntu 24.04 (نسخة aarch64).
+   - **Shape:** Ampere ← `VM.Standard.A1.Flex` بنواتين و12 غيغابايت (يكفي ويترك نصف الحصة احتياطًا).
+   - **Networking:** الشبكة الافتراضية مع عنوان IP عام.
+   - **Add SSH keys:** الصق محتوى `~/.ssh/oracle_worker.pub`، المفتاح العام فقط.
+   - **Boot volume:** 50 غيغابايت.
+3. إن ظهرت رسالة `Out of host capacity` فهي نفاد مؤقت في المنطقة. أعد المحاولة لاحقًا، أو جرّب نواة واحدة و6 غيغابايت. لا تفتح حسابًا ثانيًا، فذلك مخالف لشروط Oracle.
+4. **المنافذ:** العامل يتصل بالخارج فقط ولا يستقبل شيئًا، فلا تفتح أي منفذ غير SSH (22). وإن أمكن، قيّد SSH بعنوانك في Security List.
+
+### ب. تجهيز الخادم (مرة واحدة)
+```bash
+ssh -i ~/.ssh/oracle_worker ubuntu@<IP>
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+sudo usermod -aG docker ubuntu && exit   # اخرج ثم ادخل مجددًا ليسري الإذن
+ssh -i ~/.ssh/oracle_worker ubuntu@<IP>
+git clone https://github.com/mlubbad/arabic-audience-sentiment.git
+```
+
+### ج. الأسرار (من جهازك، لا تلصقها في أي محادثة)
+انسخ ملف الأسرار باسم `.env` تحديدًا. هذا الاسم يقرؤه Compose في الحالتين، وكان غيابه يفرّغ بيانات الاعتماد قبل إصلاح 2026-10-12:
+```bash
+scp -i ~/.ssh/oracle_worker .env.local ubuntu@<IP>:~/arabic-audience-sentiment/.env
+ssh -i ~/.ssh/oracle_worker ubuntu@<IP> chmod 600 ~/arabic-audience-sentiment/.env
+```
+يحتاج العامل على الأقل `WORKER_API_BASE_URL` و`WORKER_CREDENTIAL`، والباقي حسب المنصات المفعّلة (جدول القسم 1).
+
+### د. التشغيل
+```bash
+cd ~/arabic-audience-sentiment
+docker compose up -d --build     # البناء الأول بضع دقائق (torch)
+docker compose logs -f           # اخرج بـ Ctrl+C، العامل يبقى يعمل
+```
+السجل الصحيح يظهر بهذا الترتيب:
+- `loading the classifier (camelbert-da)`
+- `loaded CAMeL-Lab/bert-base-arabic-camelbert-da-sentiment@b0df630d23e5`
+- ثم سطر `worker up …`
+
+التنزيل الأول للنموذج (نحو 500 ميغابايت) يُحفظ في وحدة التخزين `hf-cache`، فلا يتكرر بعدها.
+
+### هـ. التحديث بعد كل دمج يغيّر العامل
+```bash
+cd ~/arabic-audience-sentiment && git pull && docker compose up -d --build
+```
+
+### و. بعد التأكد: جهازك احتياط جاهز (standby)
+لا تُزل عامل جهازك. يبقى مثبتًا ومعطّلًا، ويعمل وحده إن تعطّل Oracle. ثبّت الاحتياط فقط بعد أن يُظهر سجل Oracle سطر `loaded CAMeL-Lab/...`.
+
+**كيف يعمل:**
+- وكيل launchd اسمه `com.skydevelop.sentiment-standby` يفحص كل 5 دقائق أن حاوية Oracle تعمل.
+- فحصان فاشلان متتاليان (نحو 10 دقائق) يشغّلان عامل جهازك مع إشعار macOS.
+- فحصان ناجحان متتاليان يوقفانه بعد أن يُنهي المهمة التي في يده، ثم يعطّلانه كي لا يعمل عند تسجيل الدخول.
+- التداخل لحظة التبديل آمن: المهمة تُحجز حصريًا (`for update skip locked` مع مهلة 5 دقائق)، فلا يأخذ عاملان المهمة نفسها.
+
+**1. مفتاح فحص لا يستطيع إلا الفحص.** على جهازك:
+```bash
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/oracle_standby -C standby-probe
+cat ~/.ssh/oracle_standby.pub
+```
+ثم على الخادم افتح `nano ~/.ssh/authorized_keys` وأضف سطرًا جديدًا بهذا الشكل، بعد أن تستبدل `ssh-ed25519 AAAA...` بما طبعه الأمر السابق:
+```
+command="docker inspect -f '{{.State.Running}} {{.State.Restarting}}' sentiment-worker",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... standby-probe
+```
+هذا المفتاح بلا كلمة مرور لأن الوكيل يعمل دون تدخل، لكن الخادم يقيّده بأمر واحد يقرأ حالة الحاوية فقط. لو تسرّب لا يفتح أي وصول آخر. للتجربة:
+```bash
+ssh -i ~/.ssh/oracle_standby ubuntu@<IP>     # يجب أن يطبع: true false
+```
+
+**2. الإعداد والتثبيت** (من مجلد المشروع على جهازك):
+```bash
+mkdir -p ~/Library/Application\ Support/sentiment-worker
+printf 'ORACLE_HOST=%s\nORACLE_KEY=%s\n' '<IP>' "$HOME/.ssh/oracle_standby" \
+  > ~/Library/Application\ Support/sentiment-worker/standby.env
+git pull && sh scripts/worker-standby-install.sh
+```
+
+**3. المتابعة:**
+```bash
+cat ~/Library/Application\ Support/sentiment-worker/standby.state   # standby 0 N، والرقم الأخير يزيد كل 5 دقائق
+cat ~/Library/Application\ Support/sentiment-worker/standby.log     # سطر لكل تبديل فقط
+```
+
+**4. تمرين مرة واحدة للتأكد:**
+- على الخادم نفّذ `docker compose stop`. خلال 10 دقائق تقريبًا يصلك إشعار ويعمل عامل جهازك.
+- ثم نفّذ `docker compose start`. خلال 10 دقائق أخرى يعود جهازك احتياطًا.
+
+**الإزالة**، فيعود جهازك هو العامل الأساسي:
+```bash
+sh scripts/worker-standby-install.sh --remove
+```
+
+**حدود معروفة:**
+- الاحتياط يعمل ما دام جهازك مستيقظًا ومسجَّل الدخول. الحاسوب المغلق ليس احتياطًا.
+- إن انقطع إنترنت جهازك وحده، سيظن أن Oracle توقف فيشغّل عامله. الضرر الوحيد استهلاك موارد زائد، لا تكرار في المعالجة.
+
+---
+
+## 2. بديل: منصة Render (مدفوعة للعمال الخلفيين)
 
 منصة **[Render](https://render.com)** توفر خياراً متخصصاً لتشغيل العمال الخلفيين (**Background Worker**) بشكل سحابي كامل ومستقل.
 
@@ -36,7 +145,7 @@
    - **Environment**: اختر **Docker**.
    - **Dockerfile Path**: `./workers/python/Dockerfile`
    - **Docker Context**: `./workers/python`
-   - **Instance Type**: اختر **Starter** (أو المناسب لميزانيتك، الحاوية تستهلك ~500MB RAM فقط).
+   - **Instance Type**: الحاوية تحمّل النموذج منذ 2026-10-12 وتحتاج نحو 1.5 غيغابايت ذاكرة على الأقل؛ خطة Starter (512 ميغابايت) لم تعد تكفي.
 5. في قسم **Environment Variables** (المتغيرات البيئية):
    - اضغط **Add Environment Variable** وأضف المتغيرات المذكورة في الجدول أعلاه مع قيمها من `.env.local`.
 6. اضغط على زر **Create Background Worker**.

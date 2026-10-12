@@ -1,5 +1,54 @@
 # Verification
 
+## 2026-10-12 — The Mac as standby for the Oracle worker
+
+Owner's request (2026-10-12): keep the local device as a failback, standby and ready. The Mac's
+existing worker service stays installed and disabled; `scripts/worker-standby.sh`, run every
+five minutes by a new launchd agent, probes the Oracle container over SSH with a key the
+server restricts to one `docker inspect` command, starts the local service after two failed
+probes in a row and stops (and disables) it after two good ones. Overlap is safe because a job
+is claimed `for update skip locked` under a five-minute lease (schema: `jobs.lease_expires_at`,
+the claim's `for update skip locked`). `scripts/worker-service-update.sh` no longer starts the
+service while the standby holds it; `scripts/worker-standby-install.sh` installs and removes
+the standby. Runbook: `docs/cloud-worker-deployment.md`, section و.
+
+| Command / observation | Actual result |
+| --- | --- |
+| `npx vitest run scripts/worker-standby.test.ts` (a fake probe and a fake `launchctl` that keeps a loaded flag) | 10 passed: stays on standby while up (no bootstrap in three ticks); one failure does not fail over and a success resets the count; two failures enable and start; a restart loop counts as down; after failover two good checks boot out and then disable; while active a stopped local worker is started again; on standby a stray local worker is stopped; nothing happens without `standby.env`; an update does not start the worker on standby; the agent runs every 300 s and the probe uses `BatchMode` and a 10 s timeout. |
+| Mutations | Threshold 1: 2 failed. A restart loop read as up: 4 failed. No failback: 1 failed. No `disable` on standby: 1 failed. Restored each time. |
+| `sh -n` on the three scripts | Clean. |
+| Live | Pending: the owner installs it after the Oracle worker is verified, then runs the stop/start drill in the runbook. |
+
+## 2026-10-12 — Worker image ready for Oracle Cloud (arm64), with the model it never had
+
+Owner's decision (2026-10-12): host the worker on Oracle Cloud Always Free (Ampere A1,
+Frankfurt). Preparing it found the image could not classify: `SENTIMENT_MODEL=none` and
+`uv sync --no-dev` without the `inference` group, on `python:3.14` while the project requires
+`==3.12.*`, with uv 0.5.21. And `docker-compose.yml` repeated each credential as `KEY=${KEY}`,
+which Compose fills from `.env` or the shell only: with just `.env.local` on a server each
+became an empty string overriding the real value.
+
+Changes: the Dockerfile builds on `python:3.12.10-slim` and `uv:0.11.11` (CI's versions), each
+pinned by its multi-arch index digest read from the registry (the Python index digest
+recomputed locally from the fetched index: `sha256:fd95fa22…`, equal to the registry's
+header); installs `--group inference`; defaults to `camelbert-da`; keeps the Hugging Face
+cache at `HF_HOME` on a compose volume; `UV_PYTHON_DOWNLOADS=never`. The compose file drops
+the empty-able credential lines (the env files supply them), raises the memory limit from
+1536M to 4G and sets two torch threads. New `.github/workflows/worker-image.yml` builds the
+image on `ubuntu-24.04-arm` and runs the pinned checkpoint inside it. `docs/cloud-worker-deployment.md`
+gains the Oracle runbook.
+
+| Command / observation | Actual result |
+| --- | --- |
+| No Docker daemon and no Hugging Face access in the cloud session | The image could not be built or run here; the arm64 CI job is the build and model test. Its first result is recorded on the PR. |
+| `uv.lock` | Carries `torch-2.9.0-cp312-cp312-manylinux_2_28_aarch64.whl`: the inference group resolves on arm64. |
+| `npx vitest run scripts/worker-image.test.ts` | 5 passed. |
+| Mutations: drop `--group inference`; set `SENTIMENT_MODEL=none`; base `python:3.14-slim` | Each fails 1 test. Restored. |
+| PyYAML on the workflow and the compose file | Both parse; compose `environment` holds only defaulted settings. |
+| `npx vitest run scripts/workflow-runners.test.ts scripts/ci-workflow.test.ts` | 20 passed (the new workflow names its runner on purpose; it is not one of the three switchable workflows). |
+| `Worker image` job on PR #126 (`8c78360`, ubuntu-24.04-arm) | Success. Build 22:34:42 → 22:35:09 UTC (27 s); load and classify 22:35:09 → 22:35:19 (10 s). Output: `'هذا البرنامج رائع جدا وأحببته' succeeded positive`, `'أسوأ حلقة شاهدتها، مضيعة للوقت' succeeded negative`, `'' skipped None`, `model CAMeL-Lab/bert-base-arabic-camelbert-da-sentiment at b0df630d23e5 loaded and classified`. First time this image classified anything. |
+| The smoke step's assertions | No exact label on invented sentences (the golden set's texts are not committed, and the model is right ~76% of the time): statuses, score distributions, and the positive sentence scoring higher on "positive" than the negative one. `load_pinned` itself refuses a wrong revision or label order. |
+
 ## 2026-10-12 — Reset page: the real cause, the current password, and a password policy
 
 Owner's test on the live site (2026-10-12, signed in, `/reset-password` opened directly): a

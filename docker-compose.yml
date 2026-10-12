@@ -11,21 +11,31 @@ services:
         required: false
       - path: .env
         required: false
+    # Credentials come from the env files above, and only from there. They used
+    # to be repeated here as `KEY=${KEY}`, but Compose fills `${KEY}` from the
+    # shell or a file named `.env` only: with just `.env.local` on a server,
+    # each became an empty string that overrode the real value, and the worker
+    # stopped at "need WORKER_API_BASE_URL and WORKER_CREDENTIAL".
     environment:
-      - WORKER_API_BASE_URL=${WORKER_API_BASE_URL}
-      - WORKER_CREDENTIAL=${WORKER_CREDENTIAL}
       - SENTIMENT_MODEL=${SENTIMENT_MODEL:-camelbert-da}
       - TOPIC_MODEL=${TOPIC_MODEL:-gemini}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
-      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
-      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
-      - TELEGRAM_SESSION_STRING=${TELEGRAM_SESSION_STRING}
       - WORKER_IDLE_SECONDS=${WORKER_IDLE_SECONDS:-30}
       - WORKER_MAX_IDLE=${WORKER_MAX_IDLE:-30}
+      # torch threads for inference. The Oracle Always Free A1 shape gives up
+      # to 4 OCPUs; 2 leaves room for collection and the host.
+      - SENTIMENT_TORCH_THREADS=${SENTIMENT_TORCH_THREADS:-2}
+    # The Hugging Face cache (HF_HOME in the image): the pinned checkpoint is
+    # downloaded once and survives restarts and image rebuilds.
+    volumes:
+      - hf-cache:/app/.cache/huggingface
+    # torch plus the CAMeLBERT checkpoint need about 1.5 GB resident; the old
+    # 1536M limit was set for a worker that loaded no model.
     deploy:
       resources:
         limits:
-          memory: 1536M
+          memory: 4G
         reservations:
-          memory: 512M
+          memory: 1G
+
+volumes:
+  hf-cache:
