@@ -1,5 +1,61 @@
 # Progress
 
+## 2026-10-12 — Program status: every work order shipped; the owner console; the CI wedge fixed at its root
+
+This entry closes the gap since 2026-10-04. Each item below has its own evidence entry in
+`docs/verification.md` under the date given; the status board in #7 carries the same facts.
+
+- **Work orders (all merged and live).**
+  - **WO-14 (#76)** honest dashboard KPIs and a full live export: PR #78 merged as `3ecabd5`
+    (2026-10-05). The counts shown are the counts the database holds; the export no longer stops
+    at the page.
+  - **WO-15 (#80)** keyset paging for dashboard comments: PR #85 merged as `9ce044a`
+    (2026-10-06); migration `20261008000000` live.
+  - **WO-16 (#88)** service health from records (sync runs by platform, Paddle webhooks), phase 1
+    with no external calls: PR #90 merged as `668c4ed` (2026-10-07) after a second round
+    (`05c6fe8`). Phase 2 (active probes) waits on an owner decision about quota.
+  - **WO-4c tasks 3–5** (sync-health truth, admin services, small UI bugs) moved from Gemini to
+    Claude and shipped as #82 (`b94a8d4`, 2026-10-05).
+- **Production fixes along the way.** `admin_services_health` was missing in production although
+  its migration was recorded; restored by #86 (2026-10-06). `channel-lookup` now authorizes through
+  `my_role` instead of Auth `/user` (#84), and channel search shows its error code (#83). The live
+  dashboard reads carry a 30 s timeout and net sentiment uses one definition, the owner's choice A
+  (#96, `8b27c58`, 2026-10-07); the owner confirmed repeated loads during syncs with no `57014`.
+- **Deploy upload, tried and reverted.** #94 (`fff9c27`) reused FTPS connections; the host answers
+  `425` to a second transfer on a reused connection and five files were left truncated. Reverted
+  the same day (#95, `ee5440c`); the next deploy re-sent all 87 files whole. A safer retry (one
+  file per connection, in parallel, temp name then rename) needs the owner's go-ahead.
+- **Owner console (Claude, 2026-10-09/10, one PR per step, each verified in the browser suite).**
+  Bulk YouTube channel import at `/admin/import`, one workspace per channel (#97, #98); automatic
+  selection as the catalogue run finishes (#99); the account file with password recovery, and the
+  `admin-users` Edge Function for the actions that need the auth admin API (#99, #100); the home at
+  `/admin` with Ctrl+K (#101); the channels console (#102); pause and resume collection (#103);
+  bulk actions (#105); the accounts page (#106); the comparison page with counts kept ready
+  (#107); the morning summary on the owner home (#110); the «النظام» room gathering the five system
+  pages (#112); moving between channels inside their workspaces (#113, `4079a7b`). Still open on
+  the owner's side: deploy `admin-users` after `git pull`, add `/reset-password` to the Supabase
+  redirect URLs, check the SMTP limits.
+- **Dashboard.** The «المزيد» popover covered «تطبيق الفلاتر» on a wrapped filter bar, the real
+  cause of the «separates replies» flake (#104, `207e9ba`); filter chips now name the applied
+  filters, not the draft (#109, `7ae6e80`; #108 closed as its duplicate).
+- **CI.** Parallel jobs behind one `verify` gate (#92, 2026-10-07). Draft PRs spend no minutes and
+  the browser job uses the image's Chrome (#110). The runner became switchable by repository
+  variable after a billing block (ADR 0002, #111, 2026-10-10). That variable then wedged `main`:
+  `CI_RUNNER=aas-ci` with no such runner, `verify` on `if: always()` re-queued after a cancel, and
+  `concurrency` held every later run behind it (24 h on `main`, 40 h+ on three Dependabot PRs).
+  #117 recorded the unblock; **#119 (`3ce70f6`, 2026-10-12) fixed it at the root**: `verify` runs
+  on `!cancelled()`, `queue-watchdog.yml` force-cancels anything queued over 30 minutes, and tests
+  guard both. The cure was then verified live three times (#114/#115 and #118/#120 merged seconds
+  apart; each superseded run ended cancelled instead of wedging). The watchdog's own schedule has
+  not fired yet; GitHub ended the wedged runs itself after 48 hours (#120, `bc26c5d`).
+- **Dependencies.** #114 (setup-node 7.1.0), #115 (upload-artifact 7.0.2) and #118 (19 dev
+  updates, replacing #116 which Dependabot closed itself) merged on 2026-10-12 once their runs were
+  freed; Deploy Preview on `bc26c5d` succeeded with the updated packages.
+- **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
+  conditions in #7, the record (this entry) was the last. The feature freeze can end once the
+  owner clears the pending list in #7 (the security rotations above all) and picks what comes
+  next: WO-16 phase 2, the deploy-upload retry, bulk delete, or the next admin phase.
+
 ## 2026-10-04 — WO-13 merged; local Codex dispatch rebuilt after its first three runs
 
 - **Owner directive:** *"راجع جميع الاخفاقات وجد حلا جذريا لكل منها ومن ثم نفذه"* — review every
