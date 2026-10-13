@@ -177,3 +177,142 @@ def test_apify_error_handling():
         c_usage.scrape_x_profile("channel")
     assert exc_usage.value.code == "apify_quota_depleted"
     assert exc_usage.value.retryable is False
+
+
+def test_apify_scrape_facebook_posts_and_comments():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        body = json.loads(request.content.decode("utf-8"))
+        seen.append((url, body))
+        if "facebook-posts-scraper" in url:
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "postId": "1122334455",
+                        "url": "https://www.facebook.com/aljazeera/posts/1122334455",
+                        "text": "تغطية مباشرة للأحداث",
+                        "time": "2026-09-21T08:00:00.000Z",
+                        "comments": 42,
+                        "media": [{"__typename": "Video", "thumbnail": "https://cdn.example.com/fb.jpg"}],
+                    },
+                    {
+                        "url": "https://www.facebook.com/aljazeera/posts/pfbid0AbCdEfGhIjKlMnOpQrStUvWxYz",
+                        "text": "منشور نصي بلا عدّاد",
+                        "media": [],
+                    },
+                ],
+            )
+        assert "facebook-comments-scraper" in url
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "commentId": "c_1",
+                    "text": "تحليل موفق",
+                    "date": "2026-09-21T09:00:00.000Z",
+                    "likesCount": "7",
+                    "profileName": "سارة",
+                    "profileId": "u_1",
+                },
+                {
+                    "id": "c_2",
+                    "text": "رد على التحليل",
+                    "replyToCommentId": "c_1",
+                    "profileName": "علي",
+                },
+            ],
+        )
+
+    apify = ApifyClient(token="t", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    posts = apify.scrape_facebook_posts("aljazeera", max_items=10)
+    assert seen[0][0].startswith("https://api.apify.com/v2/acts/apify~facebook-posts-scraper/")
+    assert seen[0][1] == {"startUrls": [{"url": "https://www.facebook.com/aljazeera/"}], "resultsLimit": 10}
+    assert [p["external_video_id"] for p in posts] == ["1122334455", "pfbid0AbCdEfGhIjKlMnOpQrStUvWxYz"]
+    assert posts[0]["kind"] == "video" and posts[1]["kind"] == "channel_post"
+    assert posts[0]["published_at"] == "2026-09-21T08:00:00+00:00"
+    assert posts[0]["reported_comment_count"] == 42
+    assert posts[0]["thumbnail_url"] == "https://cdn.example.com/fb.jpg"
+    assert posts[0]["field_provenance"]["url"] == "https://www.facebook.com/aljazeera/posts/1122334455"
+    # Unknown stays unknown: no count, no date, no face.
+    assert posts[1]["published_at"] is None
+    assert posts[1]["reported_comment_count"] is None
+    assert posts[1]["thumbnail_url"] is None
+
+    comments = apify.scrape_facebook_comments("1122334455", handle="aljazeera", max_items=20)
+    assert seen[1][1] == {
+        "startUrls": [{"url": "https://www.facebook.com/aljazeera/posts/1122334455"}],
+        "resultsLimit": 20,
+        "includeNestedComments": True,
+    }
+    assert comments[0] == {
+        "id": "c_1",
+        "video_id": "1122334455",
+        "text": "تحليل موفق",
+        "parent_id": None,
+        "is_reply": False,
+        "published_at": "2026-09-21T09:00:00+00:00",
+        "author_name": "سارة",
+        "author_channel_id": "u_1",
+        "likes_value": 7,
+    }
+    assert comments[1]["parent_id"] == "c_1" and comments[1]["is_reply"] is True
+    assert comments[1]["likes_value"] is None and comments[1]["published_at"] is None
+
+
+def test_apify_scrape_instagram_posts_and_comments():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        body = json.loads(request.content.decode("utf-8"))
+        seen.append((url, body))
+        if "instagram-post-scraper" in url:
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": "3300011122",
+                        "shortCode": "DLNsnpUTdVS",
+                        "type": "Video",
+                        "productType": "clips",
+                        "caption": "ريل قصير عن الذكاء الاصطناعي",
+                        "timestamp": "2026-09-22T10:00:00.000Z",
+                        "commentsCount": 5,
+                        "displayUrl": "https://cdn.example.com/ig.jpg",
+                    },
+                    {"id": "3300011123", "shortCode": "DLNsAAAAAAA", "type": "Sidecar", "caption": "ألبوم"},
+                ],
+            )
+        assert "instagram-comment-scraper" in url
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "id": "17900001",
+                    "text": "مفيد جدًا",
+                    "timestamp": "2026-09-22T11:00:00.000Z",
+                    "likesCount": 3,
+                    "ownerUsername": "noura",
+                    "owner": {"id": "4411"},
+                }
+            ],
+        )
+
+    apify = ApifyClient(token="t", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    posts = apify.scrape_instagram_posts("natgeo", max_items=7)
+    assert seen[0][1] == {"username": ["natgeo"], "resultsLimit": 7, "dataDetailLevel": "basicData"}
+    assert posts[0]["external_video_id"] == "DLNsnpUTdVS"
+    assert posts[0]["kind"] == "short" and posts[1]["kind"] == "channel_post"
+    assert posts[0]["reported_comment_count"] == 5 and posts[1]["reported_comment_count"] is None
+    assert posts[0]["field_provenance"]["media_id"] == "3300011122"
+    assert posts[1]["published_at"] is None
+
+    comments = apify.scrape_instagram_comments("DLNsnpUTdVS", max_items=9)
+    assert seen[1][1] == {"directUrls": ["https://www.instagram.com/p/DLNsnpUTdVS/"], "resultsLimit": 9}
+    assert comments[0]["id"] == "17900001"
+    assert comments[0]["author_name"] == "noura" and comments[0]["author_channel_id"] == "4411"
+    assert comments[0]["likes_value"] == 3 and comments[0]["parent_id"] is None
+    assert comments[0]["video_id"] == "DLNsnpUTdVS"
