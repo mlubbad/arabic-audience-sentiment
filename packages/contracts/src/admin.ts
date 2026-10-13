@@ -342,6 +342,11 @@ export const AdminCompareChannelSchema = z
       .strict()
       .nullable(),
     refreshed_at: timestamp.nullable(),
+    // The channel's own count (20261025000000): never counted, waiting for
+    // a recount, failing (with the error and the next attempt), or current.
+    count_state: z.enum(["never", "waiting", "failing", "current"]),
+    count_error: z.string().nullable(),
+    next_attempt_at: timestamp.nullable(),
   })
   .strict();
 export const AdminChannelsCompareSchema = z.array(AdminCompareChannelSchema);
@@ -405,3 +410,48 @@ export const AdminDailyDigestSchema = z
   .strict();
 export type AdminDailyDigest = z.infer<typeof AdminDailyDigestSchema>;
 export type AdminDigestSnapshot = z.infer<typeof DigestSnapshotSchema>;
+
+/** `admin_background_jobs()` (20261025000000): each cron job's last finished
+ *  run and its failures over 24 hours, and the state of the comparison
+ *  recount and the stats reconcile, for the System page. */
+const BackgroundJobSchema = z
+  .object({
+    name: z.string(),
+    schedule: z.string(),
+    active: z.boolean(),
+    last_status: z.enum(["succeeded", "failed"]).nullable(),
+    last_started_at: timestamp.nullable(),
+    last_finished_at: timestamp.nullable(),
+    last_error: z.string().nullable(),
+    runs_24h: count,
+    failures_24h: count,
+  })
+  .strict();
+export const AdminBackgroundJobsSchema = z
+  .object({
+    checked_at: timestamp,
+    cron_available: z.boolean(),
+    jobs: z.array(BackgroundJobSchema),
+    compare: z
+      .object({
+        channels: count,
+        counted: count,
+        never_counted: count,
+        waiting: count,
+        failing: count,
+        oldest_counted_at: timestamp.nullable(),
+        last_error: z.string().nullable(),
+      })
+      .strict(),
+    stats: z
+      .object({
+        workspaces: count,
+        reconciled_24h: count,
+        failing: count,
+        last_error: z.string().nullable(),
+      })
+      .strict(),
+  })
+  .strict();
+export type AdminBackgroundJobs = z.infer<typeof AdminBackgroundJobsSchema>;
+export type AdminBackgroundJob = z.infer<typeof BackgroundJobSchema>;

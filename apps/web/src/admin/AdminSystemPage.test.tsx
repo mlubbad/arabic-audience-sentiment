@@ -5,6 +5,7 @@ import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import type {
   AdminAuditEvent,
+  AdminBackgroundJobs,
   ServicesHealthReport,
 } from "@sentiment/contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,6 +53,57 @@ const event = (i: number): AdminAuditEvent => ({
   created_at: `2026-10-10T0${i}:00:00+00:00`,
 });
 
+// Production on 2026-10-13: the comparison step failing, the reconcile fine.
+const JOBS: AdminBackgroundJobs = {
+  checked_at: "2026-10-13T02:00:00+00:00",
+  cron_available: true,
+  jobs: [
+    {
+      name: "channel-compare-step",
+      schedule: "* * * * *",
+      active: true,
+      last_status: "failed",
+      last_started_at: "2026-10-13T01:59:00+00:00",
+      last_finished_at: "2026-10-13T02:00:00+00:00",
+      last_error: "ERROR:  canceling statement due to statement timeout",
+      runs_24h: 60,
+      failures_24h: 3,
+    },
+    {
+      name: "reconcile-video-comment-stats-step",
+      schedule: "* 2-4 * * *",
+      active: true,
+      last_status: "succeeded",
+      last_started_at: "2026-10-13T02:30:00+00:00",
+      last_finished_at: "2026-10-13T02:30:01+00:00",
+      last_error: null,
+      runs_24h: 30,
+      failures_24h: 0,
+    },
+    {
+      name: "some-new-job",
+      schedule: "0 * * * *",
+      active: true,
+      last_status: null,
+      last_started_at: null,
+      last_finished_at: null,
+      last_error: null,
+      runs_24h: 0,
+      failures_24h: 0,
+    },
+  ],
+  compare: {
+    channels: 130,
+    counted: 40,
+    never_counted: 89,
+    waiting: 95,
+    failing: 1,
+    oldest_counted_at: "2026-10-13T01:00:00+00:00",
+    last_error: "ERROR:  canceling statement due to statement timeout",
+  },
+  stats: { workspaces: 115, reconciled_24h: 30, failing: 0, last_error: null },
+};
+
 function mount(path: string, page: React.ReactNode) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -70,6 +122,47 @@ describe("AdminSystemPage", () => {
     vi.mocked(adminRead.readAdminAudit).mockResolvedValue(
       [1, 2, 3, 4, 5, 6].map(event),
     );
+    vi.mocked(adminRead.readAdminBackgroundJobs).mockResolvedValue(JOBS);
+  });
+
+  it("shows each scheduled job's last run, a failure with its error, and both recounts", async () => {
+    mount("/admin/system", <AdminSystemPage />);
+    const failed = await screen.findByTestId("admin-job-channel-compare-step");
+    expect(failed).toHaveTextContent(
+      ar.adminJobsNames["channel-compare-step"]!,
+    );
+    expect(failed).toHaveTextContent(ar.adminJobsFailed);
+    expect(failed).toHaveTextContent(ar.adminJobsRuns(3, 60));
+    expect(failed).toHaveTextContent(
+      /canceling statement due to statement timeout/,
+    );
+    expect(
+      screen.getByTestId("admin-job-reconcile-video-comment-stats-step"),
+    ).toHaveTextContent(ar.adminJobsOk);
+    // A job the console has no name for shows its own.
+    expect(screen.getByTestId("admin-job-some-new-job")).toHaveTextContent(
+      "some-new-job",
+    );
+    expect(screen.getByTestId("admin-job-some-new-job")).toHaveTextContent(
+      ar.adminJobsNever,
+    );
+    const compare = screen.getByTestId("admin-jobs-compare");
+    expect(compare).toHaveTextContent(ar.adminJobsCompare(40, 130));
+    expect(compare).toHaveTextContent(ar.adminJobsNeverCounted(89));
+    expect(compare).toHaveTextContent(ar.adminJobsFailing(1));
+    expect(screen.getByTestId("admin-jobs-stats")).toHaveTextContent(
+      ar.adminJobsStats(30, 115),
+    );
+  });
+
+  it("says so where scheduled jobs are not available", async () => {
+    vi.mocked(adminRead.readAdminBackgroundJobs).mockResolvedValue({
+      ...JOBS,
+      cron_available: false,
+      jobs: [],
+    });
+    mount("/admin/system", <AdminSystemPage />);
+    expect(await screen.findByText(ar.adminJobsUnavailable)).toBeVisible();
   });
 
   it("leads to each system page, with the services' health and the latest audit entries", async () => {

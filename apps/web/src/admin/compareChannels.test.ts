@@ -34,6 +34,9 @@ const row = (
   previous_week: zero,
   top_topic: null,
   refreshed_at: "2026-10-09T12:00:00+00:00",
+  count_state: "current",
+  count_error: null,
+  next_attempt_at: null,
   ...over,
 });
 
@@ -95,6 +98,14 @@ describe("a compared channel", () => {
     // This week −80, the week before 0.
     expect(compared(ROWS[1]!).change).toBe(-80);
     expect(compared(ROWS[0]!).change).toBeNull();
+  });
+
+  it("is neither ranked nor compared before its first count, whatever its cells hold", () => {
+    const never = compared({ ...ROWS[1]!, count_state: "never" });
+    expect(never.ranked).toBe(false);
+    expect(never.change).toBeNull();
+    // A failing count keeps the numbers it last had.
+    expect(compared({ ...ROWS[1]!, count_state: "failing" }).ranked).toBe(true);
   });
 });
 
@@ -174,9 +185,11 @@ describe("compareCsv", () => {
       "previous_week_net",
       "change_points",
       "top_topic",
+      "count_state",
+      "counted_at",
     ]);
     expect(lines[1]).toBe(
-      "1,أنور المحبوب,,UCwarm,ws,owner@example.com,1,120,80,20,20,0,60,,,,",
+      "1,أنور المحبوب,,UCwarm,ws,owner@example.com,1,120,80,20,20,0,60,,,,,current,2026-10-09T12:00:00+00:00",
     );
     // The small sample comes last, with no rank.
     expect(lines[4]!.startsWith(",Small,")).toBe(true);

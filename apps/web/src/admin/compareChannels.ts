@@ -72,8 +72,11 @@ const enough = (w: { positive: number; negative: number }) =>
   w.positive + w.negative >= MIN_SAMPLE;
 
 export function compared(c: AdminCompareChannel): ComparedChannel {
+  // A channel never counted has no numbers of its own to rank or compare,
+  // whatever its cells say (20261025000000).
+  const counted = c.count_state !== "never";
   const change =
-    enough(c.week) && enough(c.previous_week)
+    counted && enough(c.week) && enough(c.previous_week)
       ? Math.round(
           (netSentiment(c.week.positive, c.week.negative)! -
             netSentiment(c.previous_week.positive, c.previous_week.negative)!) *
@@ -84,7 +87,7 @@ export function compared(c: AdminCompareChannel): ComparedChannel {
     ...c,
     name: c.title ?? c.handle ?? c.external_channel_id,
     net: netSentiment(c.positive, c.negative),
-    ranked: enough(c),
+    ranked: counted && enough(c),
     change,
   };
 }
@@ -183,6 +186,8 @@ const CSV_COLUMNS = [
   "previous_week_net",
   "change_points",
   "top_topic",
+  "count_state",
+  "counted_at",
 ] as const;
 
 /** The rows as shown, as a CSV file's text with a byte-order mark so a
@@ -211,6 +216,8 @@ export function compareCsv(rows: ComparedChannel[]): string {
         netSentiment(c.previous_week.positive, c.previous_week.negative),
         c.change,
         c.top_topic?.key ?? null,
+        c.count_state,
+        c.refreshed_at,
       ]
         .map(csvCell)
         .join(","),

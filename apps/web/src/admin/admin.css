@@ -1067,6 +1067,21 @@
   gap: var(--space-2);
   margin: 0;
 }
+/* Scheduled jobs span the room: the one card that says whether the
+   database's own work is running (20261025000000). */
+.admin-jobs-card {
+  grid-column: 1 / -1;
+}
+.admin-jobs-card .admin-system-chips {
+  align-items: center;
+  margin-block-end: var(--space-2);
+}
+.admin-jobs-card li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
 .admin-system-back {
   justify-self: start;
   font-size: var(--fs-small);

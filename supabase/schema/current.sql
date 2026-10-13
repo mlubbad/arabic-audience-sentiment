@@ -55,6 +55,18 @@ alter table "private"."auto_selected_videos" add constraint "auto_selected_video
 CREATE UNIQUE INDEX auto_selected_videos_pkey ON private.auto_selected_videos USING btree (workspace_id, video_id);
 CREATE INDEX auto_selected_videos_recent ON private.auto_selected_videos USING btree (workspace_id, channel_id, selected_at);
 
+create table "private"."background_job_failures_seen" (
+  "jobname" text not null,
+  "last_runid" bigint not null
+);
+alter table "private"."background_job_failures_seen" enable row level security;
+
+alter table "private"."background_job_failures_seen" add constraint "background_job_failures_seen_jobname_not_null" NOT NULL jobname;
+alter table "private"."background_job_failures_seen" add constraint "background_job_failures_seen_last_runid_not_null" NOT NULL last_runid;
+alter table "private"."background_job_failures_seen" add constraint "background_job_failures_seen_pkey" PRIMARY KEY (jobname);
+
+CREATE UNIQUE INDEX background_job_failures_seen_pkey ON private.background_job_failures_seen USING btree (jobname);
+
 create table "private"."billing_events" (
   "event_id" text not null,
   "event_type" text not null,
@@ -158,6 +170,28 @@ alter table "private"."channel_compare_refreshed" add constraint "channel_compar
 alter table "private"."channel_compare_refreshed" add constraint "channel_compare_refreshed_workspace_id_not_null" NOT NULL workspace_id;
 
 CREATE UNIQUE INDEX channel_compare_refreshed_pkey ON private.channel_compare_refreshed USING btree (workspace_id);
+
+create table "private"."channel_compare_units" (
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "dirty_since" timestamp with time zone,
+  "refreshed_at" timestamp with time zone,
+  "attempts" integer default 0 not null,
+  "next_attempt_at" timestamp with time zone,
+  "last_error" text,
+  "last_error_at" timestamp with time zone
+);
+alter table "private"."channel_compare_units" enable row level security;
+
+alter table "private"."channel_compare_units" add constraint "channel_compare_units_attempts_check" CHECK (attempts >= 0);
+alter table "private"."channel_compare_units" add constraint "channel_compare_units_attempts_not_null" NOT NULL attempts;
+alter table "private"."channel_compare_units" add constraint "channel_compare_units_channel_id_not_null" NOT NULL channel_id;
+alter table "private"."channel_compare_units" add constraint "channel_compare_units_pkey" PRIMARY KEY (workspace_id, channel_id);
+alter table "private"."channel_compare_units" add constraint "channel_compare_units_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "private"."channel_compare_units" add constraint "channel_compare_units_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX channel_compare_units_due ON private.channel_compare_units USING btree (attempts, dirty_since) WHERE (dirty_since IS NOT NULL);
+CREATE UNIQUE INDEX channel_compare_units_pkey ON private.channel_compare_units USING btree (workspace_id, channel_id);
 
 create table "private"."job_batches" (
   "job_id" uuid not null,
@@ -344,6 +378,24 @@ alter table "private"."video_comment_stats" add constraint "video_comment_stats_
 alter table "private"."video_comment_stats" add constraint "video_comment_stats_workspace_id_video_id_fkey" FOREIGN KEY (workspace_id, video_id) REFERENCES videos(workspace_id, id) ON DELETE CASCADE;
 
 CREATE UNIQUE INDEX video_comment_stats_pkey ON private.video_comment_stats USING btree (workspace_id, video_id);
+
+create table "private"."video_stats_reconcile_units" (
+  "workspace_id" uuid not null,
+  "reconciled_at" timestamp with time zone,
+  "attempts" integer default 0 not null,
+  "next_attempt_at" timestamp with time zone,
+  "last_error" text,
+  "last_error_at" timestamp with time zone
+);
+alter table "private"."video_stats_reconcile_units" enable row level security;
+
+alter table "private"."video_stats_reconcile_units" add constraint "video_stats_reconcile_units_attempts_check" CHECK (attempts >= 0);
+alter table "private"."video_stats_reconcile_units" add constraint "video_stats_reconcile_units_attempts_not_null" NOT NULL attempts;
+alter table "private"."video_stats_reconcile_units" add constraint "video_stats_reconcile_units_pkey" PRIMARY KEY (workspace_id);
+alter table "private"."video_stats_reconcile_units" add constraint "video_stats_reconcile_units_workspace_id_fkey" FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+alter table "private"."video_stats_reconcile_units" add constraint "video_stats_reconcile_units_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE UNIQUE INDEX video_stats_reconcile_units_pkey ON private.video_stats_reconcile_units USING btree (workspace_id);
 
 create table "private"."worker_credentials" (
   "id" uuid default gen_random_uuid() not null,
@@ -1734,6 +1786,15 @@ declare sub record; begin
                      - private.used_units(w, 'historical_backfill', sub.period_start));
 end $function$
 
+CREATE OR REPLACE FUNCTION private.backoff_after(attempts integer)
+ RETURNS timestamp with time zone
+ LANGUAGE sql
+ STABLE
+ SET search_path TO ''
+AS $function$
+  select now() + least(interval '10 minutes' * power(2, least(attempts, 8)), interval '24 hours');
+$function$
+
 CREATE OR REPLACE FUNCTION private.billing_root(w uuid)
  RETURNS uuid
  LANGUAGE sql
@@ -1891,6 +1952,81 @@ declare current text; begin
   update public.jobs set status='cancelled', error_code='cancelled_by_operator'
    where workspace_id=w and id=j;
 end $function$
+
+CREATE OR REPLACE FUNCTION private.channel_compare_step()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  u record;
+  have_unit boolean;
+  failure text;
+begin
+  -- The triggers' marks become dirty channels; new channels join dirty.
+  with marks as (
+    delete from private.channel_compare_dirty d
+    returning d.workspace_id, d.marked_at
+  ),
+  per_ws as (
+    select m.workspace_id, min(m.marked_at) as since from marks m group by m.workspace_id
+  )
+  insert into private.channel_compare_units as un(workspace_id, channel_id, dirty_since)
+  select c.workspace_id, c.id, p.since
+    from per_ws p
+    join public.channels c on c.workspace_id = p.workspace_id
+  on conflict (workspace_id, channel_id) do update
+    set dirty_since = least(coalesce(un.dirty_since, excluded.dirty_since), excluded.dirty_since);
+
+  insert into private.channel_compare_units(workspace_id, channel_id, dirty_since)
+  select c.workspace_id, c.id, now()
+    from public.channels c
+   where not exists (select 1 from private.channel_compare_units x
+                      where x.workspace_id = c.workspace_id and x.channel_id = c.id);
+
+  -- Never counted first, then the longest waiting. A unit whose mark is
+  -- fresh waits five minutes so a burst of verdicts is counted once.
+  select x.workspace_id, x.channel_id, x.attempts into u
+    from private.channel_compare_units x
+   where x.dirty_since is not null
+     and (x.next_attempt_at is null or x.next_attempt_at <= now())
+     and (x.refreshed_at is null or x.dirty_since <= now() - interval '5 minutes')
+   order by x.attempts, (x.refreshed_at is not null), x.dirty_since, x.workspace_id, x.channel_id
+   limit 1;
+  have_unit := found;
+
+  failure := private.unseen_job_failure('channel-compare-step');
+  if failure is not null then
+    if have_unit then
+      update private.channel_compare_units
+         set attempts = attempts + 1,
+             next_attempt_at = private.backoff_after(attempts),
+             last_error = failure,
+             last_error_at = now()
+       where workspace_id = u.workspace_id and channel_id = u.channel_id;
+    end if;
+    return 'failure recorded';
+  end if;
+
+  if not have_unit then
+    return 'idle';
+  end if;
+
+  begin
+    perform private.refresh_channel_compare_channel(u.workspace_id, u.channel_id);
+  exception when others then
+    update private.channel_compare_units
+       set attempts = attempts + 1,
+           next_attempt_at = private.backoff_after(attempts),
+           last_error = left(sqlerrm, 300),
+           last_error_at = now()
+     where workspace_id = u.workspace_id and channel_id = u.channel_id;
+    return 'error recorded';
+  end;
+  return 'counted';
+end;
+$function$
 
 CREATE OR REPLACE FUNCTION private.claim_job(w uuid)
  RETURNS SETOF jobs
@@ -3907,20 +4043,37 @@ CREATE OR REPLACE FUNCTION private.refresh_channel_compare(w uuid)
  SET search_path TO ''
 AS $function$
 declare
+  ch record;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('channel_compare:' || w::text, 0));
+  delete from private.channel_compare_dirty where workspace_id = w;
+  for ch in select c.id from public.channels c where c.workspace_id = w order by c.id loop
+    perform private.refresh_channel_compare_channel(w, ch.id);
+  end loop;
+  insert into private.channel_compare_refreshed(workspace_id, refreshed_at)
+  values (w, now())
+  on conflict (workspace_id) do update set refreshed_at = excluded.refreshed_at;
+end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.refresh_channel_compare_channel(w uuid, p_channel uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
   topic_active text;
   since date := (now() at time zone 'UTC')::date - 35;
 begin
-  -- One recount of a workspace at a time; a second waits and recounts after.
-  perform pg_advisory_xact_lock(hashtextextended('channel_compare:' || w::text, 0));
-
-  -- Marks visible now are answered by this recount. A mark committed after
-  -- it started stays and brings the workspace back.
-  delete from private.channel_compare_dirty where workspace_id = w;
+  perform pg_advisory_xact_lock(
+    hashtextextended('channel_compare:' || w::text || ':' || p_channel::text, 0));
 
   select ws.active_topic_key into topic_active
     from public.workspaces ws where ws.id = w;
 
-  delete from private.channel_compare_cells where workspace_id = w;
+  delete from private.channel_compare_cells
+   where workspace_id = w and channel_id = p_channel;
 
   insert into private.channel_compare_cells(
     workspace_id, channel_id, day, topic_key,
@@ -3928,16 +4081,16 @@ begin
   with ch as (
     select c.id, c.external_channel_id, c.active_analysis_key
       from public.channels c
-     where c.workspace_id = w
+     where c.workspace_id = w and c.id = p_channel
   ),
   audience as (
     select v.channel_id, cm.id, cm.content_hash, ch.active_analysis_key,
            case when cm.published_at >= since
                 then (cm.published_at at time zone 'UTC')::date end as day
-      from public.comments cm
-      join public.videos v on v.workspace_id = cm.workspace_id and v.id = cm.video_id
+      from public.videos v
       join ch on ch.id = v.channel_id
-     where cm.workspace_id = w
+      join public.comments cm on cm.workspace_id = v.workspace_id and cm.video_id = v.id
+     where v.workspace_id = w and v.channel_id = p_channel
        and not coalesce(cm.author_channel_id = ch.external_channel_id, false)
   ),
   rev as (
@@ -3979,9 +4132,11 @@ begin
     from ev
    group by ev.channel_id, ev.day, ev.topic;
 
-  insert into private.channel_compare_refreshed(workspace_id, refreshed_at)
-  values (w, now())
-  on conflict (workspace_id) do update set refreshed_at = excluded.refreshed_at;
+  insert into private.channel_compare_units as u(workspace_id, channel_id, refreshed_at)
+  values (w, p_channel, now())
+  on conflict (workspace_id, channel_id) do update
+    set refreshed_at = now(), dirty_since = null, attempts = 0,
+        next_attempt_at = null, last_error = null, last_error_at = null;
 end;
 $function$
 
@@ -4947,6 +5102,38 @@ declare count int := 0; begin
   return count;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.unseen_job_failure(p_job text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  r record;
+begin
+  if to_regclass('cron.job_run_details') is null then
+    return null;
+  end if;
+  select d.runid, d.status, coalesce(d.return_message, '') as msg into r
+    from cron.job_run_details d
+    join cron.job j on j.jobid = d.jobid
+   where j.jobname = p_job and d.status in ('succeeded', 'failed')
+   order by d.runid desc
+   limit 1;
+  if not found or r.status <> 'failed' then
+    return null;
+  end if;
+  if exists (select 1 from private.background_job_failures_seen s
+              where s.jobname = p_job and s.last_runid >= r.runid) then
+    return null;
+  end if;
+  insert into private.background_job_failures_seen(jobname, last_runid)
+  values (p_job, r.runid)
+  on conflict (jobname) do update set last_runid = excluded.last_runid;
+  return left(split_part(r.msg, E'\n', 1), 300);
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION private.usage_summary_impl(w uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -4989,6 +5176,66 @@ AS $function$
    where u.event_type = used_units.kind and u.period_start = since
      and u.workspace_id in (select s.workspace_id from public.subscriptions s
                             where coalesce(s.billing_workspace_id, s.workspace_id) = private.billing_root(w));
+$function$
+
+CREATE OR REPLACE FUNCTION private.video_stats_reconcile_step()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  u record;
+  have_unit boolean;
+  failure text;
+begin
+  insert into private.video_stats_reconcile_units(workspace_id)
+  select w.id from public.workspaces w
+   where not exists (select 1 from private.video_stats_reconcile_units x where x.workspace_id = w.id);
+
+  -- Each workspace once a day, the longest unreconciled first.
+  select x.workspace_id, x.attempts into u
+    from private.video_stats_reconcile_units x
+   where (x.reconciled_at is null or x.reconciled_at < now() - interval '20 hours')
+     and (x.next_attempt_at is null or x.next_attempt_at <= now())
+   order by x.attempts, x.reconciled_at nulls first, x.workspace_id
+   limit 1;
+  have_unit := found;
+
+  failure := private.unseen_job_failure('reconcile-video-comment-stats-step');
+  if failure is not null then
+    if have_unit then
+      update private.video_stats_reconcile_units
+         set attempts = attempts + 1,
+             next_attempt_at = private.backoff_after(attempts),
+             last_error = failure,
+             last_error_at = now()
+       where workspace_id = u.workspace_id;
+    end if;
+    return 'failure recorded';
+  end if;
+
+  if not have_unit then
+    return 'idle';
+  end if;
+
+  begin
+    perform private.reconcile_video_comment_stats(u.workspace_id);
+    update private.video_stats_reconcile_units
+       set reconciled_at = now(), attempts = 0, next_attempt_at = null,
+           last_error = null, last_error_at = null
+     where workspace_id = u.workspace_id;
+  exception when others then
+    update private.video_stats_reconcile_units
+       set attempts = attempts + 1,
+           next_attempt_at = private.backoff_after(attempts),
+           last_error = left(sqlerrm, 300),
+           last_error_at = now()
+     where workspace_id = u.workspace_id;
+    return 'error recorded';
+  end;
+  return 'reconciled';
+end;
 $function$
 
 CREATE OR REPLACE FUNCTION private.worker_channel_grant(token_hash text, j uuid)
@@ -5850,6 +6097,80 @@ begin
     limit p_limit;
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_background_jobs()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '30s'
+AS $function$
+declare
+  uid uuid := (select auth.uid());
+  jobs jsonb := '[]'::jsonb;
+  recent bigint;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  if to_regclass('cron.job_run_details') is not null then
+    -- The newest runs only, through the primary key: the history table keeps
+    -- every run of every job and is never read whole here.
+    select coalesce(max(d.runid), 0) - 20000 into recent from cron.job_run_details d;
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'name', j.jobname,
+             'schedule', j.schedule,
+             'active', j.active,
+             'last_status', l.status,
+             'last_started_at', l.start_time,
+             'last_finished_at', l.end_time,
+             'last_error', case when l.status = 'failed'
+                                then left(split_part(coalesce(l.return_message, ''), E'\n', 1), 300) end,
+             'runs_24h', coalesce(f.runs, 0),
+             'failures_24h', coalesce(f.failures, 0))
+           order by j.jobname), '[]'::jsonb)
+      into jobs
+      from cron.job j
+      left join lateral (
+        select d.status, d.start_time, d.end_time, d.return_message
+          from cron.job_run_details d
+         where d.runid > recent and d.jobid = j.jobid
+           and d.status in ('succeeded', 'failed')
+         order by d.runid desc
+         limit 1) l on true
+      left join lateral (
+        select count(*) as runs, count(*) filter (where d.status = 'failed') as failures
+          from cron.job_run_details d
+         where d.runid > recent and d.jobid = j.jobid
+           and d.start_time > now() - interval '24 hours') f on true;
+  end if;
+
+  return jsonb_build_object(
+    'checked_at', now(),
+    'cron_available', to_regclass('cron.job_run_details') is not null,
+    'jobs', jobs,
+    'compare', (
+      select jsonb_build_object(
+               'channels', count(*),
+               'counted', count(*) filter (where x.refreshed_at is not null),
+               'never_counted', count(*) filter (where x.refreshed_at is null),
+               'waiting', count(*) filter (where x.dirty_since is not null),
+               'failing', count(*) filter (where x.attempts > 0),
+               'oldest_counted_at', min(x.refreshed_at),
+               'last_error', (select y.last_error from private.channel_compare_units y
+                               where y.attempts > 0 order by y.last_error_at desc nulls last limit 1))
+        from private.channel_compare_units x),
+    'stats', (
+      select jsonb_build_object(
+               'workspaces', count(*),
+               'reconciled_24h', count(*) filter (where x.reconciled_at > now() - interval '24 hours'),
+               'failing', count(*) filter (where x.attempts > 0),
+               'last_error', (select y.last_error from private.video_stats_reconcile_units y
+                               where y.attempts > 0 order by y.last_error_at desc nulls last limit 1))
+        from private.video_stats_reconcile_units x));
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION public.admin_channels()
  RETURNS SETOF jsonb
  LANGUAGE plpgsql
@@ -5930,7 +6251,6 @@ begin
       from private.channel_compare_cells x
      group by x.workspace_id, x.channel_id
   ),
-  -- The most discussed topic; "other" names nothing, so it is never the one.
   topics as (
     select distinct on (x.workspace_id, x.channel_id)
            x.workspace_id, x.channel_id, x.topic_key, sum(x.comments) as comments
@@ -5948,7 +6268,7 @@ begin
            a.p_analysed, a.p_positive, a.p_negative,
            t.topic_key, t.comments as topic_comments,
            tp.name_ar as topic_name_ar, tp.name_en as topic_name_en,
-           rf.refreshed_at,
+           cu.refreshed_at, cu.dirty_since, cu.attempts, cu.last_error, cu.next_attempt_at,
            count(*) over (partition by c.platform, c.external_channel_id) as copies,
            row_number() over (
              partition by c.platform, c.external_channel_id
@@ -5961,7 +6281,8 @@ begin
       left join topics t on t.workspace_id = c.workspace_id and t.channel_id = c.id
       left join public.workspace_topics tp
         on tp.workspace_id = c.workspace_id and tp.key = t.topic_key
-      left join private.channel_compare_refreshed rf on rf.workspace_id = c.workspace_id
+      left join private.channel_compare_units cu
+        on cu.workspace_id = c.workspace_id and cu.channel_id = c.id
   )
   select coalesce(jsonb_agg(jsonb_build_object(
            'id', r.id,
@@ -5992,7 +6313,14 @@ begin
              'name_ar', r.topic_name_ar,
              'name_en', r.topic_name_en,
              'comments', r.topic_comments) end,
-           'refreshed_at', r.refreshed_at)
+           'refreshed_at', r.refreshed_at,
+           'count_state', case
+             when coalesce(r.attempts, 0) > 0 then 'failing'
+             when r.refreshed_at is null then 'never'
+             when r.dirty_since is not null then 'waiting'
+             else 'current' end,
+           'count_error', case when coalesce(r.attempts, 0) > 0 then r.last_error end,
+           'next_attempt_at', case when coalesce(r.attempts, 0) > 0 then r.next_attempt_at end)
          order by r.workspace_id, r.id), '[]'::jsonb)
     into result
     from ranked r
@@ -8247,6 +8575,13 @@ grant SELECT on table "private"."auto_selected_videos" to "postgres";
 grant TRIGGER on table "private"."auto_selected_videos" to "postgres";
 grant TRUNCATE on table "private"."auto_selected_videos" to "postgres";
 grant UPDATE on table "private"."auto_selected_videos" to "postgres";
+grant DELETE on table "private"."background_job_failures_seen" to "postgres";
+grant INSERT on table "private"."background_job_failures_seen" to "postgres";
+grant REFERENCES on table "private"."background_job_failures_seen" to "postgres";
+grant SELECT on table "private"."background_job_failures_seen" to "postgres";
+grant TRIGGER on table "private"."background_job_failures_seen" to "postgres";
+grant TRUNCATE on table "private"."background_job_failures_seen" to "postgres";
+grant UPDATE on table "private"."background_job_failures_seen" to "postgres";
 grant DELETE on table "private"."billing_events" to "postgres";
 grant INSERT on table "private"."billing_events" to "postgres";
 grant REFERENCES on table "private"."billing_events" to "postgres";
@@ -8282,6 +8617,13 @@ grant SELECT on table "private"."channel_compare_refreshed" to "postgres";
 grant TRIGGER on table "private"."channel_compare_refreshed" to "postgres";
 grant TRUNCATE on table "private"."channel_compare_refreshed" to "postgres";
 grant UPDATE on table "private"."channel_compare_refreshed" to "postgres";
+grant DELETE on table "private"."channel_compare_units" to "postgres";
+grant INSERT on table "private"."channel_compare_units" to "postgres";
+grant REFERENCES on table "private"."channel_compare_units" to "postgres";
+grant SELECT on table "private"."channel_compare_units" to "postgres";
+grant TRIGGER on table "private"."channel_compare_units" to "postgres";
+grant TRUNCATE on table "private"."channel_compare_units" to "postgres";
+grant UPDATE on table "private"."channel_compare_units" to "postgres";
 grant DELETE on table "private"."job_batches" to "postgres";
 grant INSERT on table "private"."job_batches" to "postgres";
 grant REFERENCES on table "private"."job_batches" to "postgres";
@@ -8361,6 +8703,13 @@ grant SELECT on table "private"."video_comment_stats" to "postgres";
 grant TRIGGER on table "private"."video_comment_stats" to "postgres";
 grant TRUNCATE on table "private"."video_comment_stats" to "postgres";
 grant UPDATE on table "private"."video_comment_stats" to "postgres";
+grant DELETE on table "private"."video_stats_reconcile_units" to "postgres";
+grant INSERT on table "private"."video_stats_reconcile_units" to "postgres";
+grant REFERENCES on table "private"."video_stats_reconcile_units" to "postgres";
+grant SELECT on table "private"."video_stats_reconcile_units" to "postgres";
+grant TRIGGER on table "private"."video_stats_reconcile_units" to "postgres";
+grant TRUNCATE on table "private"."video_stats_reconcile_units" to "postgres";
+grant UPDATE on table "private"."video_stats_reconcile_units" to "postgres";
 grant DELETE on table "private"."worker_credentials" to "postgres";
 grant INSERT on table "private"."worker_credentials" to "postgres";
 grant REFERENCES on table "private"."worker_credentials" to "postgres";
@@ -8779,6 +9128,7 @@ grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "service_role";
 grant EXECUTE on function private.backfill_remaining(uuid) to "postgres";
 grant EXECUTE on function private.backfill_remaining(uuid) to "service_role";
+grant EXECUTE on function private.backoff_after(integer) to "postgres";
 grant EXECUTE on function private.billing_root(uuid) to "postgres";
 grant EXECUTE on function private.billing_root(uuid) to "service_role";
 grant EXECUTE on function private.billing_sweep() to "postgres";
@@ -8788,6 +9138,7 @@ grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "se
 grant EXECUTE on function private.build_admin_digest() to "postgres";
 grant EXECUTE on function private.cancel_job_impl(uuid,uuid) to "authenticated";
 grant EXECUTE on function private.cancel_job_impl(uuid,uuid) to "postgres";
+grant EXECUTE on function private.channel_compare_step() to "postgres";
 grant EXECUTE on function private.claim_job(uuid) to "postgres";
 grant EXECUTE on function private.claim_job(uuid) to "service_role";
 grant EXECUTE on function private.claim_job(uuid,text[]) to "postgres";
@@ -8862,6 +9213,7 @@ grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "postgr
 grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "service_role";
 grant EXECUTE on function private.record_admin_digest() to "postgres";
 grant EXECUTE on function private.refresh_channel_compare(uuid) to "postgres";
+grant EXECUTE on function private.refresh_channel_compare_channel(uuid,uuid) to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats(jsonb) to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_delete() to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_insert() to "postgres";
@@ -8924,11 +9276,13 @@ grant EXECUTE on function private.touch_worker_seen(text) to "postgres";
 grant EXECUTE on function private.touch_worker_seen(text) to "public";
 grant EXECUTE on function private.unblock_due_jobs() to "postgres";
 grant EXECUTE on function private.unblock_due_jobs() to "service_role";
+grant EXECUTE on function private.unseen_job_failure(text) to "postgres";
 grant EXECUTE on function private.usage_summary_impl(uuid) to "authenticated";
 grant EXECUTE on function private.usage_summary_impl(uuid) to "postgres";
 grant EXECUTE on function private.usage_summary_unchecked(uuid) to "postgres";
 grant EXECUTE on function private.used_units(uuid,text,timestamp with time zone) to "postgres";
 grant EXECUTE on function private.used_units(uuid,text,timestamp with time zone) to "service_role";
+grant EXECUTE on function private.video_stats_reconcile_step() to "postgres";
 grant EXECUTE on function private.worker_channel_grant(text,uuid) to "postgres";
 grant EXECUTE on function private.worker_channel_grant(text,uuid) to "service_role";
 grant EXECUTE on function private.worker_claim(text) to "postgres";
@@ -8979,6 +9333,8 @@ grant EXECUTE on function admin_accounts() to "authenticated";
 grant EXECUTE on function admin_accounts() to "postgres";
 grant EXECUTE on function admin_audit(integer) to "authenticated";
 grant EXECUTE on function admin_audit(integer) to "postgres";
+grant EXECUTE on function admin_background_jobs() to "authenticated";
+grant EXECUTE on function admin_background_jobs() to "postgres";
 grant EXECUTE on function admin_channels() to "authenticated";
 grant EXECUTE on function admin_channels() to "postgres";
 grant EXECUTE on function admin_channels_compare() to "authenticated";

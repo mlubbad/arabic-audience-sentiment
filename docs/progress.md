@@ -103,6 +103,15 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
   On a production-sized local Postgres it goes from 5.2 s to 0.13 s, with identical output
   across the quota cases. Live after #130 fixed a deploy refusal (a comment tripped the
   migration check): 802 comments classified in the first ten minutes, no `57014` on Oracle.
+- **Owner console review and its first fixes (2026-10-13).** The owner asked for a root review
+  of all six console sections; `docs/reviews/2026-10-13-owner-console-review.md` ranks 21
+  findings with evidence and six fix batches. The owner's queries confirmed the worst: the
+  comparison recount (`channel-compare-drain`) was cancelled at 2:00 on every run and had never
+  counted a workspace, and the nightly comment-count reconcile failed on 3 of 5 nights; nothing in
+  the console showed either. Batch A (`20261025000000`) counts one channel (or reconciles one
+  workspace) per cron run, charges a cancelled run to its unit with a back-off on the next run,
+  and shows both jobs and every channel's count state on the System and Comparison pages. A
+  suspected lock wait on `worker_seen` was not confirmed (0 waits), so batch B is dropped.
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes

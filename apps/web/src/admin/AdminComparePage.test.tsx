@@ -48,6 +48,9 @@ const row = (
   previous_week: zero,
   top_topic: null,
   refreshed_at: "2026-10-09T12:00:00+00:00",
+  count_state: "current",
+  count_error: null,
+  next_attempt_at: null,
   ...over,
 });
 const ROWS = [
@@ -70,7 +73,27 @@ const ROWS = [
     week: { analysed: 40, positive: 5, negative: 30 },
     previous_week: { analysed: 40, positive: 20, negative: 20 },
   }),
-  row(3, { title: "Tiny", positive: 2, negative: 1, refreshed_at: null }),
+  row(3, {
+    title: "Tiny",
+    positive: 2,
+    negative: 1,
+    refreshed_at: "2026-10-08T06:30:00+00:00",
+  }),
+  // Never counted, and one whose count keeps failing (20261025000000).
+  row(4, {
+    title: "Fresh",
+    analysed: 0,
+    refreshed_at: null,
+    count_state: "never",
+  }),
+  row(5, {
+    title: "Stuck",
+    analysed: 0,
+    refreshed_at: null,
+    count_state: "failing",
+    count_error: "ERROR:  canceling statement due to statement timeout",
+    next_attempt_at: "2026-10-13T03:10:00+00:00",
+  }),
 ];
 
 function Where() {
@@ -115,7 +138,7 @@ describe("AdminComparePage", () => {
   it("ranks the warmest first, with its net, topic and the cards above", async () => {
     mount();
     await screen.findByTestId("admin-compare");
-    expect(names()).toEqual(["Warm", "Cold", "Tiny"]);
+    expect(names()).toEqual(["Warm", "Cold", "Tiny", "Fresh", "Stuck"]);
     const warm = screen.getByTestId(`admin-compare-row-${ROWS[0]!.id}`);
     expect(warm).toHaveTextContent("1");
     expect(warm).toHaveTextContent(ar.adminComparePercent(80));
@@ -145,6 +168,9 @@ describe("AdminComparePage", () => {
       screen.getByText(new RegExp(ar.adminCompareNotCounted(1))),
     ).toBeVisible();
     expect(
+      screen.getByText(new RegExp(ar.adminCompareFailingCount(1))),
+    ).toBeVisible();
+    expect(
       screen.getByTestId(`admin-compare-row-${ROWS[1]!.id}`),
     ).toHaveTextContent(ar.adminCompareCopies(2));
   });
@@ -160,7 +186,7 @@ describe("AdminComparePage", () => {
     expect(screen.getByTestId("where")).toHaveTextContent(
       "/admin/compare?sort=worst",
     );
-    expect(names()).toEqual(["Cold", "Warm", "Tiny"]);
+    expect(names()).toEqual(["Cold", "Warm", "Tiny", "Fresh", "Stuck"]);
     expect(
       within(screen.getByTestId("admin-compare")).getByRole("link", {
         name: ar.adminCompareOpen("Cold"),
@@ -169,5 +195,27 @@ describe("AdminComparePage", () => {
       "href",
       `/admin/channels?q=${ROWS[1]!.external_channel_id}`,
     );
+  });
+
+  it("shows a never-counted channel and a failing count as such, not as a small sample", async () => {
+    mount();
+    const fresh = await screen.findByTestId(`admin-compare-row-${ROWS[3]!.id}`);
+    expect(fresh).toHaveTextContent(ar.adminCompareStateNever);
+    expect(fresh).not.toHaveTextContent(ar.adminCompareSmall);
+    const stuck = screen.getByTestId(`admin-compare-failing-${ROWS[4]!.id}`);
+    expect(stuck).toHaveTextContent(ar.adminCompareStateFailing);
+    expect(stuck).toHaveAttribute(
+      "title",
+      ar.adminCompareFailingTitle(
+        "ERROR:  canceling statement due to statement timeout",
+        "2026-10-13 03:10",
+      ),
+    );
+    // The freshness line names the oldest count, not the newest.
+    expect(
+      screen.getByText(ar.adminCompareRefreshed("2026-10-08 06:30"), {
+        exact: false,
+      }),
+    ).toBeVisible();
   });
 });
