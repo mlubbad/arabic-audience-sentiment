@@ -287,6 +287,39 @@ describe("WorkspaceCard", () => {
       expect(onConnect).toHaveBeenCalledTimes(1);
     });
 
+    it("the YouTube door still answers google on connect-<ws>", async () => {
+      const onConnect = vi.fn();
+      mount({ channel: null, onConnect });
+      await userEvent.click(screen.getByTestId(`connect-${W}`));
+      expect(onConnect).toHaveBeenCalledWith("google");
+    });
+
+    it("the Facebook and Instagram doors ask for their provider", async () => {
+      const onConnect = vi.fn();
+      mount({ channel: null, onConnect });
+      await userEvent.click(screen.getByTestId(`connect-facebook-${W}`));
+      expect(onConnect).toHaveBeenLastCalledWith("facebook");
+      await userEvent.click(screen.getByTestId(`connect-instagram-${W}`));
+      expect(onConnect).toHaveBeenLastCalledWith("instagram");
+      expect(
+        screen.getByRole("button", { name: ar.connectFacebookPage }),
+      ).toBeInTheDocument();
+    });
+
+    it("a lapsed Instagram grant reconnects through Instagram, not Google", async () => {
+      const onConnect = vi.fn();
+      mount({
+        channel: {
+          ...connected,
+          status: "reconnect_required",
+          platform: "instagram",
+        },
+        onConnect,
+      });
+      await userEvent.click(screen.getByTestId(`connect-${W}`));
+      expect(onConnect).toHaveBeenCalledWith("instagram");
+    });
+
     it("relinks directly to Google when the relink door is clicked", async () => {
       const onConnect = vi.fn();
       mount({
@@ -654,6 +687,103 @@ describe("WorkspaceCard", () => {
         },
       });
       expect(screen.getByText(ar.platformTikTok)).toBeInTheDocument();
+    });
+
+    it("switches to Facebook and adds a page by link", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformFacebook }),
+      );
+      const form = screen.getByTestId(`addfacebook-form-${W}`);
+      const field = within(form).getByLabelText(ar.addFacebookChannel);
+      await userEvent.type(field, "https://www.facebook.com/aljazeera/");
+      await userEvent.click(screen.getByTestId(`addfacebook-submit-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "aljazeera",
+        handle: "aljazeera",
+        title: "aljazeera",
+        thumbnail_url: null,
+        platform: "facebook",
+      });
+    });
+
+    it("validates a Facebook page link and searches with the clean handle", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformFacebook }),
+      );
+      const form = screen.getByTestId(`addfacebook-form-${W}`);
+      const field = within(form).getByLabelText(ar.addFacebookChannel);
+      await userEvent.type(field, "https://www.facebook.com/groups/abc");
+      await userEvent.click(screen.getByTestId(`addfacebook-submit-${W}`));
+      expect(screen.getByText(ar.addFacebookInvalidHandle)).toBeInTheDocument();
+      expect(onAddChannel).not.toHaveBeenCalledWith(
+        "add",
+        expect.anything(),
+        expect.anything(),
+      );
+      await userEvent.clear(field);
+      await userEvent.type(field, "facebook.com/profile.php?id=123456");
+      await userEvent.click(screen.getByTestId(`addfacebook-search-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith(
+        "search",
+        "123456",
+        undefined,
+        "facebook",
+      );
+    });
+
+    it("switches to Instagram and adds an account by handle", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformInstagram }),
+      );
+      const form = screen.getByTestId(`addinstagram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addInstagramChannel);
+      await userEvent.type(field, "@natgeo");
+      await userEvent.click(screen.getByTestId(`addinstagram-submit-${W}`));
+      expect(onAddChannel).toHaveBeenCalledWith("add", undefined, {
+        external_channel_id: "natgeo",
+        handle: "@natgeo",
+        title: "@natgeo",
+        thumbnail_url: null,
+        platform: "instagram",
+      });
+    });
+
+    it("refuses an Instagram post link as an account", async () => {
+      const onAddChannel = vi.fn();
+      mount({ onAddChannel, addingChannel: true });
+      await userEvent.click(
+        screen.getByRole("button", { name: ar.platformInstagram }),
+      );
+      const form = screen.getByTestId(`addinstagram-form-${W}`);
+      const field = within(form).getByLabelText(ar.addInstagramChannel);
+      await userEvent.type(field, "https://www.instagram.com/p/DLNsnpUTdVS/");
+      await userEvent.click(screen.getByTestId(`addinstagram-submit-${W}`));
+      expect(
+        screen.getByText(ar.addInstagramInvalidHandle),
+      ).toBeInTheDocument();
+      expect(onAddChannel).not.toHaveBeenCalledWith(
+        "add",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("displays Facebook and Instagram badges on connected channels", () => {
+      const { rerender } = mount({
+        channel: { ...connected, platform: "facebook", title: "الجزيرة" },
+      });
+      expect(screen.getByText(ar.platformFacebook)).toBeInTheDocument();
+      mount(
+        { channel: { ...connected, platform: "instagram", title: "@natgeo" } },
+        rerender,
+      );
+      expect(screen.getByText(ar.platformInstagram)).toBeInTheDocument();
     });
 
     it("switches to Telegram, searches channel, sees candidate, and adds it", async () => {

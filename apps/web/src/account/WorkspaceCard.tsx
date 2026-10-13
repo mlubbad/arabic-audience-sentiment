@@ -17,13 +17,21 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { ChannelCandidate, SourcePlatform } from "@sentiment/contracts";
+import type { ConnectProvider } from "../connect";
 import { setupProgress } from "../setup";
 import { SetupPath } from "../SetupPath";
 import { useStrings } from "../strings";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { Input } from "../ui/Input";
+import { platformLabel } from "../platformLabel";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { PublicHandleForm } from "./PublicHandleForm";
+import {
+  PUBLIC_PLATFORM_ORDER,
+  PUBLIC_PLATFORMS,
+  type PublicPlatform,
+} from "./publicPlatforms";
 import { ShareWorkspaceDialog } from "./ShareWorkspaceDialog";
 import "./account.css";
 
@@ -35,6 +43,16 @@ export type ChannelRow = {
   handle: string | null;
   title: string | null;
   platform?: string;
+};
+
+/** A face for a candidate without a picture: the platform's glyph. */
+const CANDIDATE_ICON: Record<string, string> = {
+  youtube: "▶️",
+  telegram: "✈️",
+  x: "𝕏",
+  tiktok: "🎵",
+  facebook: "📘",
+  instagram: "📷",
 };
 
 export type JobRow = {
@@ -74,8 +92,9 @@ export function WorkspaceCard({
   pending: boolean;
   /** What this card has to say for itself — its own note, or that it is working. */
   feedback: ReactNode;
-  /** Starts the OAuth connect or relink redirect to Google. */
-  onConnect: () => void;
+  /** Starts the OAuth connect or relink redirect: Google for YouTube, Meta
+   *  for a Facebook page or an Instagram account. */
+  onConnect: (provider: ConnectProvider) => void;
   /** The public-data door: `open` shows the form, `cancel` closes it,
    *  `search` looks a query up on the server, `add` files the candidate.
    *  The page owns the lookup and the registration; this card only shows
@@ -120,141 +139,34 @@ export function WorkspaceCard({
   const steps = setupProgress({ channel, latestJob, allowPublicChannels }, S);
   const nameId = `rename-name-${workspace.id}`;
   const addChannelQueryId = `addchannel-query-${workspace.id}`;
-  const addTelegramInputId = `addtelegram-handle-${workspace.id}`;
-  const addXInputId = `addx-handle-${workspace.id}`;
-  const addTikTokInputId = `addtiktok-handle-${workspace.id}`;
   const [query, setQuery] = useState("");
-  const [addPlatform, setAddPlatform] = useState<
-    "youtube" | "telegram" | "x" | "tiktok"
-  >("youtube");
-  const [telegramHandle, setTelegramHandle] = useState("");
-  const [telegramError, setTelegramError] = useState<string | null>(null);
-  const [xHandle, setXHandle] = useState("");
-  const [xError, setXError] = useState<string | null>(null);
-  const [tikTokHandle, setTikTokHandle] = useState("");
-  const [tikTokError, setTikTokError] = useState<string | null>(null);
+  const [addPlatform, setAddPlatform] = useState<"youtube" | PublicPlatform>(
+    "youtube",
+  );
+  const [publicHandle, setPublicHandle] = useState("");
+  const [publicError, setPublicError] = useState<string | null>(null);
+  const publicSpec =
+    addPlatform === "youtube" ? null : PUBLIC_PLATFORMS[addPlatform];
 
-  function cleanTelegramHandle(raw: string): string | null {
-    let s = raw.trim();
-    s = s.replace(/^https?:\/\/(www\.)?t\.me\//i, "");
-    s = s.replace(/^t\.me\//i, "");
-    s = s.replace(/^\//, "");
-    s = s.replace(/\/.*$/, "");
-    if (!s) return null;
-    if (!s.startsWith("@")) s = "@" + s;
-    if (!/^@[A-Za-z0-9_]{4,64}$/.test(s)) return null;
-    return s;
+  function switchPlatform(next: "youtube" | PublicPlatform) {
+    setAddPlatform(next);
+    setPublicHandle("");
+    setPublicError(null);
+    onAddChannel?.("clear-error");
   }
 
-  function cleanXHandle(raw: string): string | null {
-    let s = raw.trim();
-    s = s.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i, "");
-    s = s.replace(/^(twitter|x)\.com\//i, "");
-    s = s.replace(/^\/?@?/, "");
-    s = s.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
-    if (!s || !/^[A-Za-z0-9_]{1,15}$/.test(s)) return null;
-    return s;
-  }
-
-  function cleanTikTokHandle(raw: string): string | null {
-    let s = raw.trim();
-    s = s.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, "");
-    s = s.replace(/^tiktok\.com\/@?/i, "");
-    s = s.replace(/^\/?@?/, "");
-    s = s.replace(/\/.*$/, "").replace(/\?.*$/, "").trim();
-    if (!s || !/^[A-Za-z0-9_.-]{2,30}$/.test(s)) return null;
-    return s;
-  }
-
-  function handleTelegramSearch(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const s = cleanTelegramHandle(telegramHandle);
-    if (!s) {
-      setTelegramError(S.addTelegramInvalidHandle);
-      return;
-    }
-    setTelegramError(null);
-    onAddChannel?.("search", s, undefined, "telegram");
-  }
-
-  function handleTelegramSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const s = cleanTelegramHandle(telegramHandle);
-    if (!s) {
-      setTelegramError(S.addTelegramInvalidHandle);
-      return;
-    }
-    setTelegramError(null);
-    onAddChannel?.("add", undefined, {
-      external_channel_id: s,
-      handle: s,
-      title: s,
-      thumbnail_url: null,
-      platform: "telegram",
-    });
-  }
-
-  function handleXSearch(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const s = cleanXHandle(xHandle);
-    if (!s) {
-      setXError(S.addXInvalidHandle);
-      return;
-    }
-    setXError(null);
-    onAddChannel?.("search", s, undefined, "x");
-  }
-
-  function handleXSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const s = cleanXHandle(xHandle);
-    if (!s) {
-      setXError(S.addXInvalidHandle);
-      return;
-    }
-    setXError(null);
-    onAddChannel?.("add", undefined, {
-      external_channel_id: s,
-      handle: "@" + s,
-      title: "@" + s,
-      thumbnail_url: null,
-      platform: "x",
-    });
-  }
-
-  function handleTikTokSearch(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const s = cleanTikTokHandle(tikTokHandle);
-    if (!s) {
-      setTikTokError(S.addTikTokInvalidHandle);
-      return;
-    }
-    setTikTokError(null);
-    onAddChannel?.("search", s, undefined, "tiktok");
-  }
-
-  function handleTikTokSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const s = cleanTikTokHandle(tikTokHandle);
-    if (!s) {
-      setTikTokError(S.addTikTokInvalidHandle);
-      return;
-    }
-    setTikTokError(null);
-    onAddChannel?.("add", undefined, {
-      external_channel_id: s,
-      handle: "@" + s,
-      title: "@" + s,
-      thumbnail_url: null,
-      platform: "tiktok",
-    });
+  /** The clean handle of the open public platform, or the validation message shown. */
+  function cleanPublicHandle(): string | null {
+    if (!publicSpec) return null;
+    const clean = publicSpec.clean(publicHandle);
+    setPublicError(clean ? null : S[publicSpec.invalid]);
+    return clean;
   }
 
   function handleDirectAddForCurrentPlatform() {
-    const fakeEv = { preventDefault: () => {} } as React.FormEvent;
-    if (addPlatform === "telegram") handleTelegramSubmit(fakeEv);
-    else if (addPlatform === "x") handleXSubmit(fakeEv);
-    else if (addPlatform === "tiktok") handleTikTokSubmit(fakeEv);
+    const clean = cleanPublicHandle();
+    if (clean && publicSpec)
+      onAddChannel?.("add", undefined, publicSpec.candidate(clean));
   }
   const connected = channel?.status === "connected";
   const hasPublicChannel = channel?.status === "public_unverified";
@@ -266,6 +178,42 @@ export function WorkspaceCard({
   // fill, and named for what it does rather than as a generic "reconnect"
   // a reader would take for a fault.
   const unnamed = connected && !channel.title && !channel.handle;
+  // A lapsed or unnamed channel reconnects through the door it came in by.
+  const channelProvider: ConnectProvider =
+    channel?.platform === "facebook"
+      ? "facebook"
+      : channel?.platform === "instagram"
+        ? "instagram"
+        : "google";
+  // The owner door, one button per consent screen. `connect-<ws>` stays on
+  // YouTube: it is the id the page tests and the browser suite press.
+  const ownerDoors = hasClient && (
+    <>
+      <Button
+        disabled={pending}
+        data-testid={`connect-${workspace.id}`}
+        onClick={() => onConnect("google")}
+      >
+        {S.connectChannel}
+      </Button>
+      <Button
+        variant="secondary"
+        disabled={pending}
+        data-testid={`connect-facebook-${workspace.id}`}
+        onClick={() => onConnect("facebook")}
+      >
+        {S.connectFacebookPage}
+      </Button>
+      <Button
+        variant="secondary"
+        disabled={pending}
+        data-testid={`connect-instagram-${workspace.id}`}
+        onClick={() => onConnect("instagram")}
+      >
+        {S.connectInstagramAccount}
+      </Button>
+    </>
+  );
 
   return (
     <Card asChild className="db-ws">
@@ -350,13 +298,7 @@ export function WorkspaceCard({
                 className="ui-badge ui-badge--neutral"
                 style={{ marginInlineEnd: "0.5rem" }}
               >
-                {channel.platform === "telegram"
-                  ? S.platformTelegram
-                  : channel.platform === "x"
-                    ? S.platformX
-                    : channel.platform === "tiktok"
-                      ? S.platformTikTok
-                      : channel.platform}
+                {platformLabel(channel.platform, S)}
               </span>
             )}
             {channel.status === "connected"
@@ -418,17 +360,7 @@ export function WorkspaceCard({
                   <p className="db-channel-choice-desc">
                     {S.channelOptionOwnerDesc}
                   </p>
-                  <div className="db-actions">
-                    {hasClient && (
-                      <Button
-                        disabled={pending}
-                        data-testid={`connect-${workspace.id}`}
-                        onClick={onConnect}
-                      >
-                        {S.connectChannel}
-                      </Button>
-                    )}
-                  </div>
+                  <div className="db-actions">{ownerDoors}</div>
                 </div>
 
                 <div className="db-channel-choice db-channel-choice--public">
@@ -472,17 +404,10 @@ export function WorkspaceCard({
         {/* When public channels are not permitted for this account type: render direct connect button */}
         {(!channel || channel.status === "disconnected") &&
           !allowPublicChannels && (
-            <div className="db-actions">
-              {hasClient && (
-                <Button
-                  disabled={pending}
-                  data-testid={`connect-${workspace.id}`}
-                  onClick={onConnect}
-                >
-                  {S.connectChannel}
-                </Button>
-              )}
-            </div>
+            <>
+              <p className="db-muted">{S.connectProviderLead}</p>
+              <div className="db-actions">{ownerDoors}</div>
+            </>
           )}
 
         {/* Action doors for existing channels or workspace-level actions */}
@@ -507,7 +432,7 @@ export function WorkspaceCard({
               <Button
                 disabled={pending}
                 data-testid={`connect-${workspace.id}`}
-                onClick={onConnect}
+                onClick={() => onConnect(channelProvider)}
               >
                 {S.connectChannel}
               </Button>
@@ -517,7 +442,7 @@ export function WorkspaceCard({
                 variant="secondary"
                 disabled={pending}
                 data-testid={`relink-${workspace.id}`}
-                onClick={onConnect}
+                onClick={() => onConnect(channelProvider)}
               >
                 {S.relinkForName}
               </Button>
@@ -584,58 +509,21 @@ export function WorkspaceCard({
                 type="button"
                 size="sm"
                 variant={addPlatform === "youtube" ? "primary" : "secondary"}
-                onClick={() => {
-                  setAddPlatform("youtube");
-                  setTelegramError(null);
-                  setXError(null);
-                  setTikTokError(null);
-                  onAddChannel?.("clear-error");
-                }}
+                onClick={() => switchPlatform("youtube")}
               >
                 {S.platformYouTube}
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={addPlatform === "telegram" ? "primary" : "secondary"}
-                onClick={() => {
-                  setAddPlatform("telegram");
-                  setTelegramError(null);
-                  setXError(null);
-                  setTikTokError(null);
-                  onAddChannel?.("clear-error");
-                }}
-              >
-                {S.platformTelegram}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={addPlatform === "x" ? "primary" : "secondary"}
-                onClick={() => {
-                  setAddPlatform("x");
-                  setTelegramError(null);
-                  setXError(null);
-                  setTikTokError(null);
-                  onAddChannel?.("clear-error");
-                }}
-              >
-                {S.platformX}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={addPlatform === "tiktok" ? "primary" : "secondary"}
-                onClick={() => {
-                  setAddPlatform("tiktok");
-                  setTelegramError(null);
-                  setXError(null);
-                  setTikTokError(null);
-                  onAddChannel?.("clear-error");
-                }}
-              >
-                {S.platformTikTok}
-              </Button>
+              {PUBLIC_PLATFORM_ORDER.map((p) => (
+                <Button
+                  key={p}
+                  type="button"
+                  size="sm"
+                  variant={addPlatform === p ? "primary" : "secondary"}
+                  onClick={() => switchPlatform(p)}
+                >
+                  {S[PUBLIC_PLATFORMS[p].label]}
+                </Button>
+              ))}
             </div>
 
             {addPlatform === "youtube" ? (
@@ -686,211 +574,25 @@ export function WorkspaceCard({
                   </div>
                 </form>
               </>
-            ) : addPlatform === "telegram" ? (
-              <>
-                <p>{S.addTelegramLead}</p>
-                <form
-                  className="db-ws-rename"
-                  data-testid={`addtelegram-form-${workspace.id}`}
-                  onSubmit={handleTelegramSearch}
-                >
-                  <label htmlFor={addTelegramInputId}>
-                    {S.addTelegramChannel}
-                  </label>
-                  <Input
-                    id={addTelegramInputId}
-                    name="handle"
-                    required
-                    maxLength={100}
-                    placeholder={S.addTelegramPlaceholder}
-                    value={telegramHandle}
-                    onChange={(e) => {
-                      setTelegramHandle(e.target.value);
-                      if (telegramError) setTelegramError(null);
-                      if (channelLookupError) onAddChannel?.("clear-error");
-                    }}
-                    autoFocus
-                  />
-                  <small
-                    className="db-muted"
-                    style={{ display: "block", marginTop: "0.25rem" }}
-                  >
-                    {S.addDirectAvailableDesc}
-                  </small>
-                  <div className="db-actions">
-                    <Button
-                      type="submit"
-                      disabled={pending || !telegramHandle.trim()}
-                      data-testid={`addtelegram-search-${workspace.id}`}
-                    >
-                      {S.addChannelSearch}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={pending || !telegramHandle.trim()}
-                      data-testid={`addtelegram-submit-${workspace.id}`}
-                      onClick={handleTelegramSubmit}
-                    >
-                      {S.addDirectAvailable}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={pending}
-                      data-testid={`addtelegram-close-${workspace.id}`}
-                      onClick={() => {
-                        setTelegramHandle("");
-                        setTelegramError(null);
-                        onAddChannel?.("cancel");
-                      }}
-                    >
-                      {S.addChannelCancel}
-                    </Button>
-                  </div>
-                </form>
-              </>
-            ) : addPlatform === "x" ? (
-              <>
-                <p>{S.addXLead}</p>
-                <form
-                  className="db-ws-rename"
-                  data-testid={`addx-form-${workspace.id}`}
-                  onSubmit={handleXSearch}
-                >
-                  <label htmlFor={addXInputId}>{S.addXChannel}</label>
-                  <Input
-                    id={addXInputId}
-                    name="handle"
-                    required
-                    maxLength={100}
-                    placeholder={S.addXPlaceholder}
-                    value={xHandle}
-                    onChange={(e) => {
-                      setXHandle(e.target.value);
-                      if (xError) setXError(null);
-                      if (channelLookupError) onAddChannel?.("clear-error");
-                    }}
-                    autoFocus
-                  />
-                  <small
-                    className="db-muted"
-                    style={{ display: "block", marginTop: "0.25rem" }}
-                  >
-                    {S.addDirectAvailableDesc}
-                  </small>
-                  <div className="db-actions">
-                    <Button
-                      type="submit"
-                      disabled={pending || !xHandle.trim()}
-                      data-testid={`addx-search-${workspace.id}`}
-                    >
-                      {S.addChannelSearch}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={pending || !xHandle.trim()}
-                      data-testid={`addx-submit-${workspace.id}`}
-                      onClick={handleXSubmit}
-                    >
-                      {S.addDirectAvailable}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={pending}
-                      data-testid={`addx-close-${workspace.id}`}
-                      onClick={() => {
-                        setXHandle("");
-                        setXError(null);
-                        onAddChannel?.("cancel");
-                      }}
-                    >
-                      {S.addChannelCancel}
-                    </Button>
-                  </div>
-                </form>
-              </>
             ) : (
-              <>
-                <p>{S.addTikTokLead}</p>
-                <form
-                  className="db-ws-rename"
-                  data-testid={`addtiktok-form-${workspace.id}`}
-                  onSubmit={handleTikTokSearch}
-                >
-                  <label htmlFor={addTikTokInputId}>{S.addTikTokChannel}</label>
-                  <Input
-                    id={addTikTokInputId}
-                    name="handle"
-                    required
-                    maxLength={100}
-                    placeholder={S.addTikTokPlaceholder}
-                    value={tikTokHandle}
-                    onChange={(e) => {
-                      setTikTokHandle(e.target.value);
-                      if (tikTokError) setTikTokError(null);
-                      if (channelLookupError) onAddChannel?.("clear-error");
-                    }}
-                    autoFocus
-                  />
-                  <small
-                    className="db-muted"
-                    style={{ display: "block", marginTop: "0.25rem" }}
-                  >
-                    {S.addDirectAvailableDesc}
-                  </small>
-                  <div className="db-actions">
-                    <Button
-                      type="submit"
-                      disabled={pending || !tikTokHandle.trim()}
-                      data-testid={`addtiktok-search-${workspace.id}`}
-                    >
-                      {S.addChannelSearch}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={pending || !tikTokHandle.trim()}
-                      data-testid={`addtiktok-submit-${workspace.id}`}
-                      onClick={handleTikTokSubmit}
-                    >
-                      {S.addDirectAvailable}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={pending}
-                      data-testid={`addtiktok-close-${workspace.id}`}
-                      onClick={() => {
-                        setTikTokHandle("");
-                        setTikTokError(null);
-                        onAddChannel?.("cancel");
-                      }}
-                    >
-                      {S.addChannelCancel}
-                    </Button>
-                  </div>
-                </form>
-              </>
-            )}
-
-            {/* Validation errors for non-youtube platforms */}
-            {addPlatform === "telegram" && telegramError && (
-              <p className="db-feedback db-feedback--note" role="status">
-                {telegramError}
-              </p>
-            )}
-            {addPlatform === "x" && xError && (
-              <p className="db-feedback db-feedback--note" role="status">
-                {xError}
-              </p>
-            )}
-            {addPlatform === "tiktok" && tikTokError && (
-              <p className="db-feedback db-feedback--note" role="status">
-                {tikTokError}
-              </p>
+              <PublicHandleForm
+                platform={addPlatform}
+                workspaceId={workspace.id}
+                pending={pending}
+                handle={publicHandle}
+                error={publicError}
+                lookupErrorPresent={Boolean(channelLookupError)}
+                onHandleChange={setPublicHandle}
+                onErrorChange={setPublicError}
+                onSearch={(clean) =>
+                  onAddChannel?.("search", clean, undefined, addPlatform)
+                }
+                onAdd={(candidate) =>
+                  onAddChannel?.("add", undefined, candidate)
+                }
+                onCancel={() => onAddChannel?.("cancel")}
+                onClearError={() => onAddChannel?.("clear-error")}
+              />
             )}
 
             {/* Backend lookup error */}
@@ -970,13 +672,7 @@ export function WorkspaceCard({
                           flexShrink: 0,
                         }}
                       >
-                        {c.platform === "telegram"
-                          ? "✈️"
-                          : c.platform === "x"
-                            ? "𝕏"
-                            : c.platform === "tiktok"
-                              ? "🎵"
-                              : "▶️"}
+                        {CANDIDATE_ICON[c.platform ?? "youtube"] ?? "▶️"}
                       </div>
                     )}
                     <span className="db-candidate-name">
@@ -992,13 +688,7 @@ export function WorkspaceCard({
                         className="ui-badge ui-badge--neutral"
                         style={{ marginInlineEnd: "0.5rem" }}
                       >
-                        {c.platform === "telegram"
-                          ? S.platformTelegram
-                          : c.platform === "x"
-                            ? S.platformX
-                            : c.platform === "tiktok"
-                              ? S.platformTikTok
-                              : c.platform}
+                        {platformLabel(c.platform, S)}
                       </span>
                     )}
                     <Button

@@ -219,6 +219,32 @@ export function videoLinks(
       embed: null,
     };
   }
+  if (platform === "facebook") {
+    // A public row names the page; a connected row holds Meta's numeric id,
+    // which Facebook resolves on its own. No embed: Meta's plugin needs a
+    // Facebook SDK on the page, which this product does not load.
+    const clean = (handle ?? "").replace(/^@/, "");
+    const id = encodeURIComponent(external_video_id);
+    return {
+      watch: clean
+        ? `https://www.facebook.com/${clean}/posts/${id}`
+        : `https://www.facebook.com/${id}`,
+      embed: null,
+    };
+  }
+  if (platform === "instagram") {
+    // A public row's id is the post's shortcode (its own URL); a connected
+    // row's is a Graph media id, which has no public URL, so the link is the
+    // account's page.
+    const clean = (handle ?? "").replace(/^@/, "");
+    const isMediaId = /^[0-9]+$/.test(external_video_id);
+    return {
+      watch: isMediaId
+        ? `https://www.instagram.com/${clean ? `${clean}/` : ""}`
+        : `https://www.instagram.com/p/${encodeURIComponent(external_video_id)}/`,
+      embed: null,
+    };
+  }
   const id = encodeURIComponent(external_video_id);
   return {
     watch:

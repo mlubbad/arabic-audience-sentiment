@@ -40,6 +40,7 @@ import { supabase } from "../supabase";
 import { displayDate, formatElapsed } from "../i18n";
 import { useLocale } from "../locale";
 import { useStrings, type Strings } from "../strings";
+import { catalogueRunningDetail, openOnLabel } from "../platformLabel";
 import { describeJob, explainCode, type JobRow } from "../jobFeed";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -560,13 +561,7 @@ export function Catalogue({
               const curPlatform = read.data?.platform;
               const detail =
                 e.detail === S.jobCatalogueRunningDetail
-                  ? curPlatform === "telegram"
-                    ? S.jobCatalogueRunningDetailTelegram
-                    : curPlatform === "x"
-                      ? S.jobCatalogueRunningDetailX
-                      : curPlatform === "tiktok"
-                        ? S.jobCatalogueRunningDetailTikTok
-                        : e.detail
+                  ? catalogueRunningDetail(curPlatform, S)
                   : e.detail;
               return (
                 <div
@@ -685,15 +680,10 @@ export function Catalogue({
                         }
                         target="_blank"
                         rel="noopener noreferrer"
-                        aria-label={`${
-                          (r.platform ?? read.data?.platform) === "telegram"
-                            ? S.catOpenTelegram
-                            : (r.platform ?? read.data?.platform) === "x"
-                              ? S.catOpenX
-                              : (r.platform ?? read.data?.platform) === "tiktok"
-                                ? S.catOpenTikTok
-                                : S.catOpenYouTube
-                        }: ${r.title}`}
+                        aria-label={`${openOnLabel(
+                          r.platform ?? read.data?.platform,
+                          S,
+                        )}: ${r.title}`}
                       >
                         ↗
                       </a>

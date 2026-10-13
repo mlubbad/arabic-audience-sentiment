@@ -54,6 +54,14 @@ Deno.serve(async (request) => {
         token_uri: "https://oauth2.googleapis.com/token",
         key_version: env("TOKEN_ENCRYPTION_KEY_VERSION") || "k1",
       },
+      meta: {
+        app_id: env("META_APP_ID"),
+        app_secret: env("META_APP_SECRET"),
+        ig_app_id: env("INSTAGRAM_APP_ID"),
+        ig_app_secret: env("INSTAGRAM_APP_SECRET"),
+        redirect_uri: env("META_REDIRECT_URI"),
+        key_version: env("TOKEN_ENCRYPTION_KEY_VERSION") || "k1",
+      },
       db: {
         consumeState: async (hash) => {
           const { data, error } = await db.rpc("svc_oauth_consume_state", {
@@ -77,6 +85,7 @@ Deno.serve(async (request) => {
                 .join(""),
             key_version: input.keyVersion,
             scopes: input.scopes,
+            pending_platform: input.platform,
           });
           if (error) throw new Error(error.code ?? "pending_failed");
         },

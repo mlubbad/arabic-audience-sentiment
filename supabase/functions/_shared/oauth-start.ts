@@ -13,7 +13,16 @@
  * Pure, with injected config, randomness and data layer, so it is testable
  * without a deployed project — the same shape as worker-gateway.ts.
  */
+export type Provider = "google" | "facebook" | "instagram";
+export const PROVIDERS: readonly Provider[] = [
+  "google",
+  "facebook",
+  "instagram",
+];
+
 export interface OauthConfig {
+  /** Which consent screen this is bound for. Google when absent. */
+  provider?: Provider;
   /** Public client identifier. Not a secret, but still not shipped in VITE_*. */
   client_id: string;
   /** Must match a URI registered with Google exactly, including its path. */
@@ -29,6 +38,7 @@ export interface StartDb {
     stateHash: string,
     verifier: string,
     browserNonceHash: string,
+    provider: Provider,
   ): Promise<void>;
 }
 
@@ -36,6 +46,15 @@ export interface StartDb {
 export type RandomBytes = (length: number) => Uint8Array;
 
 const AUTHORIZE = "https://accounts.google.com/o/oauth2/v2/auth";
+const AUTHORIZE_FACEBOOK = "https://www.facebook.com/v25.0/dialog/oauth";
+const AUTHORIZE_INSTAGRAM = "https://www.instagram.com/oauth/authorize";
+// Meta's consent screens take the scopes as a comma-separated list and do not
+// document PKCE; the state, hashed and bound to the browser nonce, is the
+// CSRF protection on these doors.
+const FACEBOOK_SCOPE =
+  "pages_show_list,pages_read_engagement,pages_read_user_content";
+const INSTAGRAM_SCOPE =
+  "instagram_business_basic,instagram_business_manage_comments";
 
 /** base64url, unpadded: exactly the unreserved set RFC 7636 asks for. */
 export function base64url(bytes: Uint8Array): string {
@@ -85,7 +104,10 @@ export async function beginAuthorization(
   db: StartDb,
   random: RandomBytes,
 ): Promise<{ url: string; state: string; nonce: string }> {
-  if (!config.client_id || !config.redirect_uri || config.scopes.length === 0)
+  const provider: Provider = config.provider ?? "google";
+  if (!config.client_id || !config.redirect_uri)
+    throw new Error("oauth_not_configured");
+  if (provider === "google" && config.scopes.length === 0)
     throw new Error("oauth_not_configured");
   // Refused rather than coerced: a redirect URI that is not exactly the one
   // registered is a misconfiguration, and http would put the code on the wire.
@@ -111,7 +133,26 @@ export async function beginAuthorization(
     await sha256Hex(state),
     verifier,
     await sha256Hex(nonce),
+    provider,
   );
+
+  if (provider !== "google") {
+    const params = new URLSearchParams({
+      client_id: config.client_id,
+      redirect_uri: config.redirect_uri,
+      response_type: "code",
+      scope: provider === "facebook" ? FACEBOOK_SCOPE : INSTAGRAM_SCOPE,
+      state,
+    });
+    // Instagram Login is its own door; without this Meta routes the person
+    // through Facebook Login, which is the other door.
+    if (provider === "instagram") params.set("enable_fb_login", "0");
+    return {
+      url: `${provider === "facebook" ? AUTHORIZE_FACEBOOK : AUTHORIZE_INSTAGRAM}?${params}`,
+      state,
+      nonce,
+    };
+  }
 
   const params = new URLSearchParams({
     client_id: config.client_id,

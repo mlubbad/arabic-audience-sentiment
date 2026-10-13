@@ -1,5 +1,45 @@
 # Progress
 
+## 2026-10-13 — Facebook and Instagram channels: two doors, one worker
+
+The owner asked for Facebook pages and Instagram accounts beside YouTube, X, TikTok and
+Telegram, by owner consent and without it. Design: `docs/superpowers/specs/2026-10-13-facebook-instagram-channels-design.md`;
+plan: `docs/superpowers/plans/2026-10-13-facebook-instagram-channels.md`; branch
+`claude/meta-channels`, thirteen commits, one per task, each with its test shown red first.
+
+- **Worker.** `collectors/meta_graph.py` (one Graph client: bearer, cursor paging, Meta's
+  numeric error codes mapped to `invalid_credentials`/`rate_limit_exceeded`/`permission_missing`/
+  `channel_not_found`, the message never kept), `facebook_collector.py`, `instagram_collector.py`
+  (the X/TikTok shape; a token reads Graph, a handle reads the scrapers; a missing date is
+  `None` with precision `unknown`, a missing like count is `None`, a refused read raises).
+  Apify and Bright Data clients gained the four Meta methods; the router and the loop builder
+  route both platforms; `.env.example` names the six new worker variables. Worker suite: 336 tests green.
+- **Database.** `20261026000000_meta_oauth_providers.sql`: `oauth_states.provider`,
+  `oauth_pending.platform`, `oauth_start(..., p_provider default 'google')`, the consume
+  state returns the provider, the pending row checks the id per platform (UC id for YouTube,
+  numeric for Meta), the attach keys the channel on `(platform, external_channel_id)`.
+  PGlite: 68 files / 577 tests green.
+- **Edge functions.** `_shared/oauth-meta.ts` (Facebook Login → long-lived user token →
+  the one page's token, stored with no refresh token and a ten-year expiry; Instagram Login →
+  sixty-day token that refreshes from itself; refusals `meta_no_page`, `ambiguous_channel`,
+  `meta_scope_missing`, `instagram_not_professional`, `meta_token_exchange_failed`);
+  `oauth-start` takes `provider`; `oauth-callback` branches on the state's provider and seals
+  `{…, provider}`; the worker gateway renews per provider (Instagram through
+  `refresh_access_token`, a 190 marks the channel for reconnection); `channel-lookup` names a
+  page or an account from its link (`_shared/meta-handles.ts`), falling back to the bare handle.
+- **Web.** `account/publicPlatforms.ts` + `PublicHandleForm.tsx` replace the three copied
+  forms (`WorkspaceCard.tsx` 1,052 → 742 lines, every test id kept); the owner door is three
+  buttons (YouTube, Facebook page, Instagram account) and a lapsed Meta grant reconnects
+  through its own door; `videoLinks` opens Facebook posts and Instagram shortcodes; the
+  dashboard platform filter lists all six platforms; one `platformLabel.ts` names a platform,
+  its "open on" link and its cataloguing note. Web suite 165 files / 1,320+ tests green.
+
+**Not live-tested.** Nothing here has touched Meta or a scraper live: the Meta app, its five
+secrets (`META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`, `INSTAGRAM_APP_ID`,
+`INSTAGRAM_APP_SECRET`), App Review for accounts the owner does not administer, and the Apify
+token on the worker are the owner's to set. Every path is fixture-tested with
+`httpx.MockTransport` / `vi.fn` transports against the documented response shapes of 2026-10-13.
+
 ## 2026-10-12 — Program status: every work order shipped; the owner console; the CI wedge fixed at its root
 
 This entry closes the gap since 2026-10-04. Each item below has its own evidence entry in

@@ -338,3 +338,105 @@ describe("renewing an access token", () => {
     ).rejects.toThrow("token_refresh_failed");
   });
 });
+
+describe("completing a Meta connection", () => {
+  it("a facebook state goes to the Meta adapter and files platform facebook", async () => {
+    const calls: string[] = [];
+    const http = vi.fn(async (url: string) => {
+      calls.push(url);
+      if (
+        url.includes("graph.facebook.com") &&
+        url.includes("/oauth/access_token")
+      )
+        return new Response(
+          JSON.stringify({ access_token: "EAAX", expires_in: 5000 }),
+          { status: 200 },
+        );
+      if (url.includes("/me/accounts"))
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "100200300",
+                name: "صفحة",
+                username: "page",
+                access_token: "EAAPAGE",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      return new Response("{}", { status: 500 });
+    });
+    const pending: Parameters<CallbackDb["createPending"]>[0][] = [];
+    const db: CallbackDb = {
+      consumeState: async () => ({ ...binding, provider: "facebook" }),
+      createPending: async (input) => {
+        pending.push(input);
+      },
+    };
+    const key = await importSealingKey(KEY_B64);
+    const result = await handleCallback({
+      code: "fb-code",
+      state: "state-value",
+      error: null,
+      config,
+      meta: {
+        app_id: "1234567890",
+        app_secret: "s",
+        ig_app_id: "9876543210",
+        ig_app_secret: "t",
+        redirect_uri: "https://proj.supabase.co/functions/v1/oauth-callback",
+        key_version: "k1",
+      },
+      db,
+      http,
+      key,
+      random: (n) => new Uint8Array(n).fill(9),
+    });
+    expect(result.ticket).toHaveLength(43);
+    expect(pending[0]).toMatchObject({
+      platform: "facebook",
+      externalChannel: "100200300",
+      handle: "page",
+      title: "صفحة",
+    });
+    expect(calls.some((u) => u.includes("googleapis"))).toBe(false);
+    const opened = (await openTokens(key, pending[0].sealedTokens)) as {
+      provider: string;
+      access_token: string;
+    };
+    expect(opened).toMatchObject({
+      provider: "facebook",
+      access_token: "EAAPAGE",
+    });
+  });
+
+  it("a google state still files platform youtube with provider google in the seal", async () => {
+    const { pending, key } = await run();
+    expect(pending[0].platform).toBe("youtube");
+    const opened = (await openTokens(key, pending[0].sealedTokens)) as {
+      provider?: string;
+    };
+    expect(opened.provider).toBe("google");
+  });
+
+  it("a facebook state without Meta configuration is refused as not configured", async () => {
+    const db: CallbackDb = {
+      consumeState: async () => ({ ...binding, provider: "facebook" }),
+      createPending: async () => {},
+    };
+    await expect(
+      handleCallback({
+        code: "c",
+        state: "s",
+        error: null,
+        config,
+        db,
+        http: vi.fn(),
+        key: await importSealingKey(KEY_B64),
+        random: (n) => new Uint8Array(n).fill(9),
+      }),
+    ).rejects.toMatchObject({ code: "oauth_not_configured" });
+  });
+});

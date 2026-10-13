@@ -1,5 +1,26 @@
 # Implementation decisions
 
+2026-10-13 — Facebook and Instagram: owner consent through Meta's own APIs, public reads
+through managed scrapers, never a home-grown scraper. The research of 2026-10-13 found the
+free libraries (instaloader, facebook-scraper) throttled to a request or two per half minute
+and blocked by TLS fingerprinting from datacenter IPs, with comments behind a login whose
+account is banned within days — not "stable and reliable". The project already pays per
+result on Apify and Bright Data for X and TikTok, so the public door is the same chain
+(official actors ≈ $1.7–5 per 1,000 posts, $2.5–2.6 per 1,000 comments at the free tier; the
+free plan's $5 monthly credit covers a pilot), with the actor and dataset ids in the
+environment so the operator can switch without a deploy. The owner door is free: Facebook
+Login with `pages_show_list`, `pages_read_engagement`, `pages_read_user_content` and
+Instagram Login with `instagram_business_basic`, `instagram_business_manage_comments`
+(the `business_*` names were deprecated 2025-01-27). Meta documents no PKCE on either
+screen; the state hash bound to the browser nonce is the CSRF protection, as before.
+Three narrower calls, recorded so they can be overturned: (1) no new `videos.kind` —
+posts/photos/carousels are `channel_post`, videos `video`, reels `short`, so no redefinition of
+`commit_catalogue`; (2) exactly one Facebook page per connection, more is `ambiguous_channel`
+as YouTube already handles several channels, a page chooser is a follow-up; (3) a public row
+keys on the vanity handle and a connected row on Meta's numeric id, so the same page through
+both doors is two rows rather than an upgrade — documented, not hidden. The admin services
+health RPC still reports four platforms; widening it is a separate migration.
+
 2026-10-12 — The worker runs on Oracle Cloud Always Free (Ampere A1, Frankfurt).
 Context: the worker ran on the owner's Mac; the shared host cannot keep a process alive nor
 hold torch. Rejected: Render and Railway (no free background worker as of this decision);

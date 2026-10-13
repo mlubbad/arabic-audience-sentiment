@@ -233,6 +233,31 @@ describe("pageOf", () => {
 });
 
 describe("videoLinks", () => {
+  it("opens a Facebook post on its page, or by id when the page is unnamed", () => {
+    expect(
+      videoLinks("1122334455", "channel_post", "facebook", "aljazeera"),
+    ).toEqual({
+      watch: "https://www.facebook.com/aljazeera/posts/1122334455",
+      embed: null,
+    });
+    expect(videoLinks("1122334455", "video", "facebook", null).watch).toBe(
+      "https://www.facebook.com/1122334455",
+    );
+  });
+
+  it("opens an Instagram post by shortcode, and the profile when only a media id is known", () => {
+    expect(videoLinks("DLNsnpUTdVS", "short", "instagram", "@natgeo")).toEqual({
+      watch: "https://www.instagram.com/p/DLNsnpUTdVS/",
+      embed: null,
+    });
+    expect(
+      videoLinks("17900000001", "channel_post", "instagram", "@natgeo").watch,
+    ).toBe("https://www.instagram.com/natgeo/");
+    expect(
+      videoLinks("17900000001", "channel_post", "instagram", null).watch,
+    ).toBe("https://www.instagram.com/");
+  });
+
   it("sends a short to its own path and everything else to watch", () => {
     expect(videoLinks("abcDEF12345", "short").watch).toBe(
       "https://www.youtube.com/shorts/abcDEF12345",

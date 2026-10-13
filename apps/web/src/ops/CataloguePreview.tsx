@@ -19,6 +19,7 @@ import type { CatalogueVideo } from "@sentiment/contracts";
 import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { videoLinks } from "../catalogue";
 import type { Strings } from "../strings";
+import { openOnLabel } from "../platformLabel";
 
 export function CataloguePreview({
   video,
@@ -101,15 +102,7 @@ export function CataloguePreview({
                 />
               ) : (
                 <div className="db-preview-placeholder">
-                  <span>
-                    {video.platform === "telegram"
-                      ? S.catOpenTelegram
-                      : video.platform === "x"
-                        ? S.catOpenX
-                        : video.platform === "tiktok"
-                          ? S.catOpenTikTok
-                          : S.catOpenYouTube}
-                  </span>
+                  <span>{openOnLabel(video.platform, S)}</span>
                 </div>
               )}
             </div>
@@ -132,14 +125,7 @@ export function CataloguePreview({
               )}
             </span>
             <a href={links?.watch} target="_blank" rel="noopener noreferrer">
-              {video.platform === "telegram"
-                ? S.catOpenTelegram
-                : video.platform === "x"
-                  ? S.catOpenX
-                  : video.platform === "tiktok"
-                    ? S.catOpenTikTok
-                    : S.catOpenYouTube}{" "}
-              ↗
+              {openOnLabel(video.platform, S)} ↗
             </a>
             <small className="db-note">{S.catPreviewHint}</small>
           </footer>

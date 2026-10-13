@@ -77,6 +77,9 @@ Secrets, set with `supabase secrets set` and never written in this repository:
 | `PADDLE_WEBHOOK_SECRET` | `paddle-webhook` | The notification destination's secret key, from Paddle's dashboard |
 | `PADDLE_API_KEY` | `billing-portal` (checkout is client-side Paddle.js and reads no server secret) | A Paddle API key, server side only |
 | `PADDLE_ENV` | `billing-portal` | `sandbox` or `production`, choosing the Paddle base URL |
+| `META_APP_ID`, `META_APP_SECRET` | `oauth-start`, `oauth-callback` | The Meta app (Facebook Login) for connecting a Facebook page |
+| `META_REDIRECT_URI` | `oauth-start`, `oauth-callback` | The one `oauth-callback` URL, registered on the Meta app for both doors |
+| `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` | `oauth-start`, `oauth-callback` | The Instagram app id Meta issues under the same app (Instagram Login) |
 
 Paddle sends no Supabase JWT, so the function is deployed without the gateway's JWT check —
 `supabase config.toml` carries `[functions.paddle-webhook] verify_jwt = false` for the local
