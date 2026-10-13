@@ -93,10 +93,13 @@ function Compare({ rows }: { rows: AdminCompareChannel[] }) {
     setParams(writeCompareFilter({ ...filter, ...patch }), { replace: true });
   const shown = visibleCompare(rows, filter);
   const top = highlights(shown);
-  const pending = rows.filter((r) => r.refreshed_at === null).length;
-  const latest = rows.reduce<string | null>(
+  // Each channel is counted on its own, so the line names the oldest count
+  // and how many were never counted or keep failing (20261025000000).
+  const never = rows.filter((r) => r.count_state === "never").length;
+  const failing = rows.filter((r) => r.count_state === "failing").length;
+  const oldest = rows.reduce<string | null>(
     (at, r) =>
-      r.refreshed_at && (!at || r.refreshed_at > at) ? r.refreshed_at : at,
+      r.refreshed_at && (!at || r.refreshed_at < at) ? r.refreshed_at : at,
     null,
   );
   let rank = 0;
@@ -179,7 +182,8 @@ function Compare({ rows }: { rows: AdminCompareChannel[] }) {
       </div>
       <p className="admin-account-muted" aria-live="polite">
         {S.adminConsoleCount(shown.length, rows.length)}
-        {pending > 0 && ` · ${S.adminCompareNotCounted(pending)}`}
+        {never > 0 && ` · ${S.adminCompareNotCounted(never)}`}
+        {failing > 0 && ` · ${S.adminCompareFailingCount(failing)}`}
       </p>
 
       {shown.length === 0 ? (
@@ -218,10 +222,17 @@ function Compare({ rows }: { rows: AdminCompareChannel[] }) {
                     {n(c.analysed)}
                   </TableCell>
                   <TableCell>
-                    {c.ranked ? (
+                    {c.count_state === "never" ? (
+                      <Badge tone="neutral">{S.adminCompareStateNever}</Badge>
+                    ) : c.refreshed_at === null ? (
+                      <CountFailed channel={c} />
+                    ) : c.ranked ? (
                       <Net value={c.net} />
                     ) : (
                       <Badge tone="neutral">{S.adminCompareSmall}</Badge>
+                    )}
+                    {c.count_state === "failing" && c.refreshed_at !== null && (
+                      <CountFailed channel={c} />
                     )}
                   </TableCell>
                   <TableCell>
@@ -239,10 +250,27 @@ function Compare({ rows }: { rows: AdminCompareChannel[] }) {
 
       <p className="admin-account-muted">
         {S.adminCompareHow(MIN_SAMPLE)}
-        {latest &&
-          ` ${S.adminCompareRefreshed(latest.slice(0, 16).replace("T", " "))}`}
+        {oldest &&
+          ` ${S.adminCompareRefreshed(oldest.slice(0, 16).replace("T", " "))}`}
       </p>
     </section>
+  );
+}
+
+/** A channel whose count keeps failing: the error and the next attempt. */
+function CountFailed({ channel }: { channel: ComparedChannel }) {
+  const S = useStrings();
+  const next = channel.next_attempt_at
+    ? channel.next_attempt_at.slice(0, 16).replace("T", " ")
+    : null;
+  return (
+    <Badge
+      tone="danger"
+      title={S.adminCompareFailingTitle(channel.count_error ?? "", next)}
+      data-testid={`admin-compare-failing-${channel.id}`}
+    >
+      {S.adminCompareStateFailing}
+    </Badge>
   );
 }
 

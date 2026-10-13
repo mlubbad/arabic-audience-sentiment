@@ -1,5 +1,35 @@
 # Verification
 
+## 2026-10-13 — Background jobs finish one unit at a time and say when they fail (review batch A)
+
+Review findings 1–3 (`docs/reviews/2026-10-13-owner-console-review.md`). The owner's read-only
+queries:
+
+| Query (owner, 2026-10-13) | Result |
+| --- | --- |
+| `cron.job_run_details` for `channel-compare-drain` | Every run `failed`, `canceling statement due to statement timeout` inside `refresh_channel_compare`'s INSERT, each ending exactly 2:00 after it started (00:20:00 → 00:22:00 … 01:50:00 → 01:52:00). |
+| `channel_compare_refreshed` / `channel_compare_dirty` | 0 workspaces refreshed, 115 waiting. |
+| `cron.job_run_details` for `reconcile_all` | Failed on 10-09, 10-10 and 10-12 (statement timeout inside `reconcile_video_comment_stats`), succeeded on 10-08 and 10-11. |
+| `pg_stat_activity` lock waits for `authenticator`, both workers running | 0 waiting, twice. Review finding 4 is not confirmed and batch B is dropped. |
+
+Migration `20261025000000`:
+- **Units:** one per channel for the comparison count, one per workspace for the stats reconcile.
+- **One unit per cron run.** `channel-compare-step` runs every minute. `reconcile-video-comment-stats-step` runs every minute from 02:00 to 04:59 UTC and reconciles each workspace once a day.
+- **Failures are recorded even when uncatchable.** A run cancelled by the timeout cannot write its own error. The next run reads `cron.job_run_details` and charges that failed run, once, to the unit the same order puts first. The unit gets the error, one more attempt, and a back-off of 10 minutes doubling up to a day.
+- **`admin_background_jobs()`** feeds a new card on the System page.
+- **`admin_channels_compare()`** gives each channel its own `count_state` (`never` / `waiting` / `failing` / `current`), the error, and the next attempt. The page shows "never counted" and "count failed" instead of "small sample", and the freshness line names the oldest count. The two old cron jobs are unscheduled.
+
+| Command / observation | Actual result |
+| --- | --- |
+| Local PostgreSQL 16.13 with every migration, the 155,822-comment channel plus 12 smaller ones | The migration applies. Each step counts one channel: 4,510 ms for the largest with the OS cache dropped, 411 ms warm, 17–23 ms for the small ones. Units created and unchanged since then wait their five minutes (`idle`). |
+| `npx vitest run supabase/tests/background_jobs.test.ts` | 13 passed. Covered: every existing channel starts dirty and never counted, and shows as `never`. One channel per step, then idle, with the right counts. A verdict's mark dirties its workspace's channels, which are counted after five quiet minutes. A failed cron run is charged to the first unit, once, with the error and a back-off, and the next unit is counted meanwhile. The page shows `failing` with the error and the next attempt. A later success clears it. A manual `drain_channel_compare` still recounts a workspace. The reconcile does each workspace once, then waits, and a failed run is charged the same way. `admin_background_jobs()` is refused to a non-admin and to anon, reports each job's last status, error and 24-hour runs and failures plus both unit tables, and carries `statement_timeout=30s`. |
+| Mutations | Failure never charged: 2 failed. Whole workspace per step: 2 failed. No back-off: 4 failed. `never` reported as `current`: 1 failed. Restored each time. |
+| Existing suites `admin_channels_compare`, `video_comment_stats_reconcile`, `admin_daily_digest`, `admin_console_overview` | 38 passed. |
+| `AdminComparePage.test.tsx`, `compareChannels.test.ts` | 16 passed. New tests: a never-counted and a failing channel are shown as such, the failing one with its error and next attempt in the title; the freshness line names the oldest count; a never-counted channel is neither ranked nor compared; the CSV carries `count_state` and `counted_at`. |
+| `AdminSystemPage.test.tsx` | 6 passed. New tests: each job's last run, a failure with its error, runs and failures in 24 hours, a job the console has no name for under its own name, both recounts' progress, and the no-pg_cron case. |
+| Screenshots (the review harness: real app, mocked Supabase answering with this database's output, a stand-in `cron` schema shaped like production's) | System: the "المهام الخلفية" card spans the room. It shows the comparison step's failed last run with `ERROR: canceling statement due to statement timeout` and "3 إخفاق من 60 تشغيل في 24 ساعة", and the counts "المقارنة: 4 من 13 قناة معدودة · 9 لم تُعدّ بعد · 1 متعثرة". Compare: "لم تُعدّ بعد" and "تعذّر العدّ" badges in place of numbers, and "8 قناة لم تُحسب أرقامها بعد · 1 قناة تعذّر عدّها" in the count line. |
+| Live | Pending: the deploy applies `20261025000000`. Then `admin_background_jobs()` on the System page shows `channel-compare-step` running every minute, and the comparison fills channel by channel. Production's time for the largest channel is still unknown; if it cannot finish under 2 minutes it is now shown as failing with its error instead of blocking the rest. |
+
 ## 2026-10-13 — The topics batch reads the 200 comments it returns, not the channel
 
 After #128 was live (deploy 00:17 UTC, `svc_worker_tick` showing `statement_timeout=25s`), the

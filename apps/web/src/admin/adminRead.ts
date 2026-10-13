@@ -12,6 +12,7 @@
 import {
   AdminAccountsSchema,
   AdminAuditEventsSchema,
+  AdminBackgroundJobsSchema,
   AdminChannelsConsoleSchema,
   AdminChannelsCompareSchema,
   AdminDailyDigestSchema,
@@ -23,6 +24,7 @@ import {
   ServicesHealthReportSchema,
   type AdminAccount,
   type AdminAuditEvent,
+  type AdminBackgroundJobs,
   type AdminChannel,
   type AdminCompareChannel,
   type AdminDailyDigest,
@@ -226,6 +228,13 @@ export async function readAdminChannelsCompare(): Promise<
   const { data, error } = await supabase!.rpc("admin_channels_compare");
   if (error) throw rpcFailure(error);
   return AdminChannelsCompareSchema.parse(data);
+}
+
+/** Scheduled jobs and the two recounts they drive (20261025000000). */
+export async function readAdminBackgroundJobs(): Promise<AdminBackgroundJobs> {
+  const { data, error } = await supabase!.rpc("admin_background_jobs");
+  if (error) throw rpcFailure(error);
+  return AdminBackgroundJobsSchema.parse(data);
 }
 
 /** The owner's morning summary: the latest snapshot and the one before. */

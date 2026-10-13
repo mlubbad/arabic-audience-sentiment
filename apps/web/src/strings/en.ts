@@ -779,6 +779,34 @@ export const en: Strings = {
   adminSystemUnread: "Could not be read now; open the page for details.",
   adminSystemHealthy: (n: number) => `${n} healthy`,
   adminSystemDegraded: (n: number) => `${n} degraded`,
+  // background jobs (20261025000000)
+  adminJobsTitle: "Background jobs",
+  adminJobsLead:
+    "What runs in the database on a schedule: each job's last run and its failures over the last 24 hours.",
+  adminJobsUnavailable: "Scheduled jobs are not available in this environment.",
+  adminJobsNames: {
+    "channel-compare-step": "Comparison count, one channel a minute",
+    "channel-compare-nightly": "Nightly comparison recount",
+    "reconcile-video-comment-stats-step": "Nightly comment-count correction",
+    "admin-daily-digest": "Morning summary",
+    "sentiment-tick": "Hourly work scheduling",
+    "billing-sweep": "Subscription sweep",
+    "prune-oauth-states": "Connection-session cleanup",
+    "purge-comment-text": "Expired comment-text purge",
+  } as Record<string, string>,
+  adminJobsOk: "Last run succeeded",
+  adminJobsFailed: "Last run failed",
+  adminJobsNever: "Not run yet",
+  adminJobsInactive: "Paused",
+  adminJobsRuns: (failures: number, runs: number) =>
+    `${failures} ${failures === 1 ? "failure" : "failures"} in ${runs} ${runs === 1 ? "run" : "runs"} over 24 hours`,
+  adminJobsLast: (at: string) => `last run ${at} (UTC)`,
+  adminJobsCompare: (counted: number, total: number) =>
+    `Comparison: ${counted} of ${total} channels counted`,
+  adminJobsNeverCounted: (n: number) => `${n} not counted yet`,
+  adminJobsFailing: (n: number) => `${n} failing`,
+  adminJobsStats: (done: number, total: number) =>
+    `Comment counts: ${done} of ${total} workspaces corrected in the last 24 hours`,
   adminSystemDown: (n: number) => `${n} down`,
   // morning summary
   adminDigestTitle: "Morning summary",
@@ -802,7 +830,7 @@ export const en: Strings = {
   // compare
   adminCompareTitle: "Compare channels",
   adminCompareLead:
-    "How each channel's audience speaks next to the others: net sentiment, its change since last week, and the most discussed topic. The numbers are kept ready and updated within minutes of each new analysis.",
+    "How each channel's audience speaks next to the others: net sentiment, its change since last week, and the most discussed topic. The numbers are kept ready and each channel is recounted after new analysis; the table shows each count's state.",
   adminCompareLoading: "Reading the comparison…",
   adminCompareHeading: "Channel ranking",
   adminCompareBest: "Warmest audience",
@@ -822,13 +850,20 @@ export const en: Strings = {
   adminCompareSmall: "Small sample",
   adminCompareCopies: (n: number) => `in ${n} workspaces`,
   adminCompareNotCounted: (n: number) =>
-    `${n} ${n === 1 ? "channel" : "channels"} not counted yet; counted within minutes`,
+    `${n} ${n === 1 ? "channel" : "channels"} not counted yet`,
+  adminCompareFailingCount: (n: number) =>
+    `${n} ${n === 1 ? "channel" : "channels"} could not be counted`,
+  adminCompareStateNever: "Not counted yet",
+  adminCompareStateFailing: "Count failed",
+  adminCompareFailingTitle: (error: string, next: string | null) =>
+    next ? `${error} — next attempt ${next} (UTC)` : error,
   adminComparePercent: (v: number) => `${v > 0 ? "+" : ""}${v}%`,
   adminComparePoints: (v: number) => `${v > 0 ? "+" : ""}${v} pts`,
   adminCompareOpen: (name: string) => `${name} on the channels page`,
   adminCompareHow: (min: number) =>
     `Net sentiment = (positive − negative) ÷ (positive + negative), as on each workspace's dashboard, without the channel's own comments. A channel is ranked from ${min} positive or negative comments, and the change is shown when both weeks reach that many.`,
-  adminCompareRefreshed: (at: string) => `Numbers last updated ${at} (UTC).`,
+  adminCompareRefreshed: (at: string) =>
+    `Oldest count among counted channels: ${at} (UTC).`,
   // ops
   adminOpsTitle: "Operations",
   adminOpsLead:

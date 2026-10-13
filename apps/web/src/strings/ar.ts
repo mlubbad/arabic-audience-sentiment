@@ -784,6 +784,34 @@ export const ar = {
   adminSystemHealthy: (n: number) => `${n} سليمة`,
   adminSystemDegraded: (n: number) => `${n} متدهورة`,
   adminSystemDown: (n: number) => `${n} متوقفة`,
+  // background jobs (20261025000000)
+  adminJobsTitle: "المهام الخلفية",
+  adminJobsLead:
+    "ما يعمل في قاعدة البيانات بجدول زمني: آخر تشغيل لكل مهمة، وإخفاقاتها في آخر 24 ساعة.",
+  adminJobsUnavailable: "المهام المجدولة غير متاحة في هذه البيئة.",
+  adminJobsNames: {
+    "channel-compare-step": "عدّ المقارنة، قناة كل دقيقة",
+    "channel-compare-nightly": "إعادة عدّ المقارنة ليلاً",
+    "reconcile-video-comment-stats-step": "تصحيح أعداد التعليقات ليلاً",
+    "admin-daily-digest": "ملخص الصباح",
+    "sentiment-tick": "جدولة العمل كل ساعة",
+    "billing-sweep": "مراجعة الاشتراكات",
+    "prune-oauth-states": "تنظيف جلسات الربط",
+    "purge-comment-text": "حذف نصوص التعليقات المنتهية",
+  } as Record<string, string>,
+  adminJobsOk: "نجح آخر تشغيل",
+  adminJobsFailed: "فشل آخر تشغيل",
+  adminJobsNever: "لم يعمل بعد",
+  adminJobsInactive: "موقوفة",
+  adminJobsRuns: (failures: number, runs: number) =>
+    `${failures} إخفاق من ${runs} تشغيل في 24 ساعة`,
+  adminJobsLast: (at: string) => `آخر تشغيل ${at} (UTC)`,
+  adminJobsCompare: (counted: number, total: number) =>
+    `المقارنة: ${counted} من ${total} قناة معدودة`,
+  adminJobsNeverCounted: (n: number) => `${n} لم تُعدّ بعد`,
+  adminJobsFailing: (n: number) => `${n} متعثرة`,
+  adminJobsStats: (done: number, total: number) =>
+    `أعداد التعليقات: صُحّحت ${done} من ${total} مساحة في آخر 24 ساعة`,
   // morning summary
   adminDigestTitle: "ملخص الصباح",
   adminDigestRecorded: (at: string) =>
@@ -806,7 +834,7 @@ export const ar = {
   // compare
   adminCompareTitle: "مقارنة القنوات",
   adminCompareLead:
-    "كيف يتحدث جمهور كل قناة مقارنة بغيرها: صافي المشاعر، وتغيّره عن الأسبوع الماضي، وأبرز موضوع. الأرقام محفوظة وتُحدَّث خلال دقائق من كل تحليل جديد.",
+    "كيف يتحدث جمهور كل قناة مقارنة بغيرها: صافي المشاعر، وتغيّره عن الأسبوع الماضي، وأبرز موضوع. الأرقام محفوظة، وتُعاد كل قناة على حدة بعد كل تحليل جديد، وحالة عدّها ظاهرة في الجدول.",
   adminCompareLoading: "جارٍ قراءة المقارنة…",
   adminCompareHeading: "ترتيب القنوات",
   adminCompareBest: "أكثر جمهور إيجابية",
@@ -825,14 +853,19 @@ export const ar = {
   adminCompareTopic: "أبرز موضوع",
   adminCompareSmall: "عينة صغيرة",
   adminCompareCopies: (n: number) => `في ${n} مساحات`,
-  adminCompareNotCounted: (n: number) =>
-    `${n} قناة لم تُحسب أرقامها بعد، وتُحسب خلال دقائق`,
+  adminCompareNotCounted: (n: number) => `${n} قناة لم تُحسب أرقامها بعد`,
+  adminCompareFailingCount: (n: number) => `${n} قناة تعذّر عدّها`,
+  adminCompareStateNever: "لم تُعدّ بعد",
+  adminCompareStateFailing: "تعذّر العدّ",
+  adminCompareFailingTitle: (error: string, next: string | null) =>
+    next ? `${error} — المحاولة التالية ${next} (UTC)` : error,
   adminComparePercent: (v: number) => `${v > 0 ? "+" : ""}${v}٪`,
   adminComparePoints: (v: number) => `${v > 0 ? "+" : ""}${v} نقطة`,
   adminCompareOpen: (name: string) => `${name} في صفحة القنوات`,
   adminCompareHow: (min: number) =>
     `صافي المشاعر = (الإيجابي − السلبي) ÷ (الإيجابي + السلبي)، كما في لوحة كل مساحة، دون تعليقات القناة نفسها. تُرتَّب القناة بعد ${min} تعليقاً إيجابياً أو سلبياً على الأقل، ويُحسب التغيّر حين يبلغ كل أسبوع من الأسبوعين هذا العدد.`,
-  adminCompareRefreshed: (at: string) => `آخر تحديث للأرقام: ${at} (UTC).`,
+  adminCompareRefreshed: (at: string) =>
+    `أقدم عدّ بين القنوات المعدودة: ${at} (UTC).`,
   // ops
   adminOpsTitle: "التشغيل",
   adminOpsLead:

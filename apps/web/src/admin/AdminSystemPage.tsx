@@ -17,6 +17,7 @@ import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 import { readAdminAudit, readAdminServicesHealth } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
+import { BackgroundJobsCard } from "./BackgroundJobsCard";
 
 const when = (iso: string) => iso.slice(0, 16).replace("T", " ");
 
@@ -73,6 +74,7 @@ export function AdminSystemPage() {
       <AdminPageHead title={S.adminSystemTitle} lead={S.adminSystemLead} />
       {admin && (
         <div className="admin-home-grid" data-testid="admin-system">
+          <BackgroundJobsCard enabled={admin} />
           <Room
             to="/admin/services"
             title={S.adminTabServices}
