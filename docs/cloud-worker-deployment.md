@@ -31,33 +31,36 @@
 > - تذكر Oracle أنها قد تستعيد جهازًا مجانيًا يبقى خاملًا 7 أيام (استهلاك منخفض للمعالج والشبكة والذاكرة). عاملنا يمضي معظم وقته منتظرًا، فراقب ذلك. الترقية إلى Pay As You Go تُسقط هذه الاستعادة وتبقي الموارد المجانية مجانية، لكنها تفتح باب الدفع إن تجاوزت الحدود.
 
 ### أ. إنشاء الجهاز (مرة واحدة، من لوحة Oracle)
-1. على جهازك (Mac) أنشئ مفتاح SSH خاصًا بهذا الخادم:
+1. مفتاح SSH لهذا الخادم، اسمه على جهازك `~/.ssh/oracle_vm`. المالك اختار في Oracle خيار **Generate a key pair** ونزّل المفتاح الخاص (2026-10-13)، ثم على جهازك:
    ```bash
-   ssh-keygen -t ed25519 -f ~/.ssh/oracle_worker -C oracle-worker
+   mv "$(ls -t ~/Downloads/ssh-key-*.key | head -1)" ~/.ssh/oracle_vm && chmod 600 ~/.ssh/oracle_vm
+   ssh-keygen -y -f ~/.ssh/oracle_vm > ~/.ssh/oracle_vm.pub   # المفتاح العام، لإعادة استخدامه في جهاز جديد
    ```
+   لا تكتب فوق مفتاح موجود بالاسم نفسه. إن وُجد `~/.ssh/oracle_vm` فاختر اسمًا آخر واستعمله في كل الأوامر أدناه.
 2. في لوحة Oracle: **Compute ← Instances ← Create instance**.
    - **Image:** Canonical Ubuntu 24.04 (نسخة aarch64).
    - **Shape:** Ampere ← `VM.Standard.A1.Flex` بنواة واحدة و6 غيغابايت (اختيار المالك، 2026-10-13). العامل يستهلك نحو 1.5 إلى 2 غيغابايت. على 6 غيغابايت يبقى استهلاك الذاكرة فوق 20%، فلا يُعدّ الجهاز خاملًا بمعيار الذاكرة في قاعدة الاستعادة. على 12 غيغابايت ينزل تحتها. (تحقق من نص القاعدة الحالي.)
-   - **Networking:** الشبكة الافتراضية مع عنوان IP عام.
-   - **Add SSH keys:** الصق محتوى `~/.ssh/oracle_worker.pub`، المفتاح العام فقط.
+   - **Networking:** الشبكة الافتراضية. إن كان خيار IPv4 العام معطّلًا عند الإنشاء فأضفه بعده: صفحة الجهاز ← **Networking** ← الـ VNIC ← **IPv4 addresses** ← **Edit** ← **Ephemeral public IP**.
+   - **Add SSH keys:** **Generate a key pair** ونزّل المفتاح الخاص (الخطوة 1)، أو **Upload public key** وارفع `~/.ssh/oracle_vm.pub`.
    - **Boot volume:** 50 غيغابايت.
 3. إن ظهرت رسالة `Out of host capacity` فهي نفاد مؤقت في المنطقة. أعد المحاولة لاحقًا، أو جرّب نواة واحدة و6 غيغابايت. لا تفتح حسابًا ثانيًا، فذلك مخالف لشروط Oracle.
-4. **المنافذ:** العامل يتصل بالخارج فقط ولا يستقبل شيئًا، فلا تفتح أي منفذ غير SSH (22). وإن أمكن، قيّد SSH بعنوانك في Security List.
+4. **تحقق من النظام بعد أول دخول:** `cat /etc/os-release | head -3` يجب أن يطبع `24.04`. في 2026-10-13 أُنشئ جهاز أول على 20.04 رغم أن صفحة المراجعة عرضت 24.04، فأعيد إنشاؤه.
+5. **المنافذ:** العامل يتصل بالخارج فقط ولا يستقبل شيئًا، فلا تفتح أي منفذ غير SSH (22). وإن أمكن، قيّد SSH بعنوانك في Security List.
 
 ### ب. تجهيز الخادم (مرة واحدة)
 ```bash
-ssh -i ~/.ssh/oracle_worker ubuntu@<IP>
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
+ssh -i ~/.ssh/oracle_vm ubuntu@<IP>
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 docker-buildx git
 sudo usermod -aG docker ubuntu && exit   # اخرج ثم ادخل مجددًا ليسري الإذن
-ssh -i ~/.ssh/oracle_worker ubuntu@<IP>
+ssh -i ~/.ssh/oracle_vm ubuntu@<IP>
 git clone https://github.com/mlubbad/arabic-audience-sentiment.git
 ```
 
 ### ج. الأسرار (من جهازك، لا تلصقها في أي محادثة)
-انسخ ملف الأسرار باسم `.env` تحديدًا. هذا الاسم يقرؤه Compose في الحالتين، وكان غيابه يفرّغ بيانات الاعتماد قبل إصلاح 2026-10-12:
+هذان الأمران يُنفَّذان **على جهازك** من مجلد المشروع، لا داخل الخادم. انسخ ملف الأسرار باسم `.env` تحديدًا. هذا الاسم يقرؤه Compose في الحالتين، وكان غيابه يفرّغ بيانات الاعتماد قبل إصلاح 2026-10-12:
 ```bash
-scp -i ~/.ssh/oracle_worker .env.local ubuntu@<IP>:~/arabic-audience-sentiment/.env
-ssh -i ~/.ssh/oracle_worker ubuntu@<IP> chmod 600 ~/arabic-audience-sentiment/.env
+scp -i ~/.ssh/oracle_vm .env.local ubuntu@<IP>:~/arabic-audience-sentiment/.env
+ssh -i ~/.ssh/oracle_vm ubuntu@<IP> 'chmod 600 ~/arabic-audience-sentiment/.env'   # علامتا الاقتباس تمنعان جهازك من تحويل ~
 ```
 يحتاج العامل على الأقل `WORKER_API_BASE_URL` و`WORKER_CREDENTIAL`، والباقي حسب المنصات المفعّلة (جدول القسم 1).
 
