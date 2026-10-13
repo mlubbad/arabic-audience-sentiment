@@ -28,7 +28,7 @@ plan: `docs/superpowers/plans/2026-10-13-facebook-instagram-channels.md`; branch
   `refresh_access_token`, a 190 marks the channel for reconnection); `channel-lookup` names a
   page or an account from its link (`_shared/meta-handles.ts`), falling back to the bare handle.
 - **Web.** `account/publicPlatforms.ts` + `PublicHandleForm.tsx` replace the three copied
-  forms (`WorkspaceCard.tsx` 1,052 → 721 lines, every test id kept); the owner door is three
+  forms (`WorkspaceCard.tsx` 1,052 → 742 lines, every test id kept); the owner door is three
   buttons (YouTube, Facebook page, Instagram account) and a lapsed Meta grant reconnects
   through its own door; `videoLinks` opens Facebook posts and Instagram shortcodes; the
   dashboard platform filter lists all six platforms; one `platformLabel.ts` names a platform,

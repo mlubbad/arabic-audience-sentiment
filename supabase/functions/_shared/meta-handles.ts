@@ -126,18 +126,20 @@ export async function instagramProfileCandidate(
   if (response.status === 404)
     throw new MetaLookupError("channel_not_found", 404);
   if (!response.ok) return bare(handle, "instagram", `@${handle}`);
-  let user: { full_name?: unknown; profile_pic_url?: unknown } | null = null;
+  // A 200 that is not the profile JSON (an HTML login wall, a "useragent
+  // mismatch" body) is a refusal to name, not a missing account: the add
+  // stays possible on the bare handle. Only a parsed body whose user is
+  // explicitly null is Instagram's "this does not exist".
+  let body: { data?: { user?: unknown } } | null = null;
   try {
-    const body = (await response.json()) as {
-      data?: {
-        user?: { full_name?: unknown; profile_pic_url?: unknown } | null;
-      };
-    };
-    user = body?.data?.user ?? null;
+    body = (await response.json()) as { data?: { user?: unknown } };
   } catch {
-    user = null;
+    body = null;
   }
-  // No user in a 200 is Instagram's "this does not exist" for a logged-out reader.
+  if (!body || typeof body !== "object" || !("data" in body))
+    return bare(handle, "instagram", `@${handle}`);
+  const user = body.data?.user as
+    { full_name?: unknown; profile_pic_url?: unknown } | null | undefined;
   if (!user) throw new MetaLookupError("channel_not_found", 404);
   const title =
     typeof user.full_name === "string" && user.full_name.trim()

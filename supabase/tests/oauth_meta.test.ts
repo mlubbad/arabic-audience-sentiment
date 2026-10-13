@@ -11,6 +11,7 @@ import {
   connectFacebookPage,
   connectInstagramAccount,
   refreshInstagramToken,
+  renewalDue,
   type MetaConfig,
 } from "../functions/_shared/oauth-meta";
 
@@ -240,5 +241,24 @@ describe("connecting an Instagram account", () => {
     await expect(
       refreshInstagramToken("IGOLD", flaky.http),
     ).rejects.toMatchObject({ code: "token_refresh_failed" });
+  });
+});
+
+describe("when a stored grant is renewed", () => {
+  const now = Date.parse("2026-10-13T12:00:00Z");
+  const at = (ms: number) => new Date(now + ms).toISOString();
+  const DAY = 24 * 3600_000;
+
+  it("renews an Instagram token a week before its sixty days end, not in its last minutes", () => {
+    // Google's 15-minute margin fits a one-hour token; on a 60-day token the
+    // hourly claim would almost never land inside it and the token would lapse.
+    expect(renewalDue("instagram", at(3 * DAY), now)).toBe(true);
+    expect(renewalDue("instagram", at(30 * DAY), now)).toBe(false);
+    expect(renewalDue("google", at(3 * DAY), now)).toBe(false);
+    expect(renewalDue("google", at(10 * 60_000), now)).toBe(true);
+    // A page token does not expire and has nothing to renew with.
+    expect(renewalDue("facebook", at(10 * 60_000), now)).toBe(false);
+    // A seal from before the Meta doors is Google's.
+    expect(renewalDue(undefined, at(10 * 60_000), now)).toBe(true);
   });
 });

@@ -126,6 +126,23 @@ describe("instagramProfileCandidate", () => {
     );
     expect(thrown.fallback_available).toBe(true);
   });
+  it("a login wall answered with 200 falls back; a parsed null user is not found", async () => {
+    // From a datacenter IP Instagram often answers 200 with HTML: that is a
+    // refusal to name, not a missing account, and the add must stay possible.
+    const wall = await instagramProfileCandidate(
+      "natgeo",
+      http(200, "<html>login</html>"),
+    );
+    expect(wall.fallback_available).toBe(true);
+    expect(wall.candidates[0]).toMatchObject({
+      external_channel_id: "natgeo",
+      platform: "instagram",
+    });
+    await expect(
+      instagramProfileCandidate("nobody", http(200, { data: { user: null } })),
+    ).rejects.toMatchObject({ code: "channel_not_found" });
+  });
+
   it("a 404 is an account that does not exist", async () => {
     await expect(
       instagramProfileCandidate("nobody", http(404, "{}")),

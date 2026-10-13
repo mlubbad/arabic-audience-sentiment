@@ -42,6 +42,34 @@ export const INSTAGRAM_SCOPES = [
 /** Page tokens from a long-lived user token do not expire; this is "far enough". */
 const PAGE_TOKEN_LIFETIME_MS = 3650 * 24 * 3600_000;
 
+/**
+ * How soon before expiry a stored grant is renewed, per provider.
+ *
+ * Google's one-hour token is renewed in its last quarter hour, so the renewal
+ * lands at claim time for the ordinary job. An Instagram token lives sixty
+ * days: a fifteen-minute margin would almost never meet an hourly claim and
+ * the token would lapse, so it is renewed a week early (Meta refuses a refresh
+ * before the token is a day old; a week leaves fifty-two). A Facebook page
+ * token does not expire and has nothing to renew with.
+ */
+const RENEW_MARGIN_MS = {
+  google: 15 * 60_000,
+  instagram: 7 * 24 * 3600_000,
+} as const;
+
+export function renewalDue(
+  provider: string | undefined,
+  expiresAt: string,
+  now: number = Date.now(),
+): boolean {
+  if (provider === "facebook") return false;
+  const margin =
+    provider === "instagram"
+      ? RENEW_MARGIN_MS.instagram
+      : RENEW_MARGIN_MS.google;
+  return Date.parse(expiresAt) - now <= margin;
+}
+
 export type MetaTokens = {
   access_token: string;
   refresh_token: string;

@@ -13,7 +13,7 @@ import {
   refreshAccessToken,
   RevokedError,
 } from "../_shared/oauth-callback.ts";
-import { refreshInstagramToken } from "../_shared/oauth-meta.ts";
+import { refreshInstagramToken, renewalDue } from "../_shared/oauth-meta.ts";
 
 const env = (name: string) => Deno.env.get(name) ?? "";
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
@@ -29,15 +29,12 @@ const failed = (error: unknown): never => {
 };
 
 /**
- * How soon before expiry a token is considered stale.
- *
- * A collection run can last longer than the hour its token starts with, and
- * a token that lapses mid-run costs the whole run. Renewing whenever less
- * than a quarter of an hour remains keeps the renewal at claim time for the
- * ordinary job, and leaves the mid-run renewal as a backstop for the long
- * ones rather than the normal way a run survives.
+ * How soon before expiry a token is considered stale is the provider's
+ * business (`renewalDue` in oauth-meta.ts): a quarter hour on Google's
+ * one-hour token keeps the renewal at claim time for the ordinary job and
+ * leaves the mid-run renewal as a backstop; a week on Instagram's sixty-day
+ * token; never on a Facebook page token.
  */
-const RENEW_MARGIN_MS = 15 * 60_000;
 
 /**
  * Opens the channel grant and returns a usable access token, renewing and
@@ -74,10 +71,7 @@ async function issueToken(
 
   // A Facebook page token does not expire and has nothing to renew with; it
   // is handed out as stored until Meta refuses it on a read.
-  if (
-    provider === "facebook" ||
-    Date.parse(tokens.expires_at) - Date.now() > RENEW_MARGIN_MS
-  )
+  if (!renewalDue(provider, tokens.expires_at))
     return {
       access_token: tokens.access_token,
       access_token_expires_at: tokens.expires_at,
