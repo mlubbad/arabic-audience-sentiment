@@ -183,6 +183,10 @@ export const en: Strings = {
   shareWorkspaceFailed: (err: string) => `Could not share workspace: ${err}`,
   shareWorkspaceClose: "Close",
   connectChannel: "Connect a YouTube channel",
+  connectFacebookPage: "Connect a Facebook page",
+  connectInstagramAccount: "Connect an Instagram account",
+  connectProviderLead:
+    "Sign in as the owner on the platform of your choice. Nothing is posted on your behalf; we only read.",
   relinkForName: "Reconnect to store the channel's name",
   addChannel: "Add a channel by link or search",
   addChannelLead:
@@ -223,6 +227,18 @@ export const en: Strings = {
   addTikTokPlaceholder: "@username or tiktok.com/@username",
   addTikTokInvalidHandle:
     "Please enter a valid TikTok handle or profile link (e.g. @username or tiktok.com/@username).",
+  addFacebookChannel: "Add a public Facebook page",
+  addFacebookLead:
+    "Enter the Facebook page link or name (facebook.com/page). Posts and comments are collected automatically. Only public pages; personal profiles and groups cannot be added.",
+  addFacebookPlaceholder: "facebook.com/page or page name",
+  addFacebookInvalidHandle:
+    "Please enter a valid Facebook page link or name (e.g. facebook.com/page).",
+  addInstagramChannel: "Add a public Instagram account",
+  addInstagramLead:
+    "Enter the Instagram handle (@username) or profile link. Posts, reels and comments are collected automatically. Only public accounts.",
+  addInstagramPlaceholder: "@username or instagram.com/username",
+  addInstagramInvalidHandle:
+    "Please enter a valid Instagram handle or profile link (e.g. @username or instagram.com/username).",
   addDirectAvailable: "Direct add (based on availability)",
   addDirectAvailableAction: "Add channel directly based on availability",
   addDirectAvailableDesc:
@@ -1112,6 +1128,9 @@ export const en: Strings = {
   jobCatalogueRunningDetail: "Channel cataloguing is running now.",
   jobCatalogueRunningDetailTelegram: "Channel post cataloguing is running now.",
   jobCatalogueRunningDetailX: "Account tweet cataloguing is running now.",
+  jobCatalogueRunningDetailFacebook: "Page post cataloguing is running now.",
+  jobCatalogueRunningDetailInstagram:
+    "Account post cataloguing is running now.",
   jobCatalogueRunningDetailTikTok: "Account video cataloguing is running now.",
   jobCatalogueSucceededDetail:
     "Channel videos catalogued and list updated successfully.",
@@ -1181,6 +1200,14 @@ export const en: Strings = {
     "The link you returned with is incomplete. Start the connection again.",
   crAlreadyConnected:
     "This channel is connected to another workspace. Disconnect it there first.",
+  crMetaNoPage:
+    "This account manages no Facebook page. Create or join a page, then try again.",
+  crMetaScopeMissing:
+    "The read permissions were not granted. Try again and allow reading posts and comments.",
+  crInstagramNotProfessional:
+    "This Instagram account is not a professional (business or creator) account. Switch it in Instagram settings, then try again.",
+  crMetaTokenExchangeFailed:
+    "Meta did not accept the sign-in. Try again in a moment.",
   crConnectedHeading: "Channel connected",
   crConnectedDetail:
     "The channel is connected now. Collection starts with the first sync.",
@@ -1383,6 +1410,8 @@ export const en: Strings = {
   catOpenTelegram: "Open on Telegram",
   catOpenX: "Open on X",
   catOpenTikTok: "Open on TikTok",
+  catOpenFacebook: "Open on Facebook",
+  catOpenInstagram: "Open on Instagram",
   catPreview: (title: string) => `Preview: ${title}`,
   catPreviewHint:
     "Watched here through YouTube's player; it sets no cookies until you press play.",
