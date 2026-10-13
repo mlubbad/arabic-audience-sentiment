@@ -32,7 +32,8 @@ Fix, migration `20261024000000`:
 | `npx vitest run supabase/tests/worker_topics_due_bounded.test.ts` | 3 passed: the index with its included columns; the walk ordered `published_at nulls last, id`, stopping at the cap, text read via `unnest(picked)`, no window over the channel; `svc_worker_topics_due` at `statement_timeout=25s` with `search_path=""`. |
 | Mutations | Migration emptied: 3 failed. The `exit when` removed: 1 failed. Restored each time. |
 | `worker_topics`, `worker_credential_touch`, `unlimited_plan_and_retry_correctness` (behaviour and quota cases) | 3 files, 31 passed against the new function. |
-| Live | Pending: deploy applies `20261024000000`; then the Oracle log should show classification instead of `57014`. |
+| Live, first deploy (run 38329785572, 00:58 UTC) | Refused in under a second: `validateMigrationSql` rejects the word CONCURRENTLY anywhere in a migration, and the comment explaining why the index is not built concurrently contained it. The check runs before any connection, so nothing reached the database. The comment is reworded (no SQL change), and `scripts/deploy-workflow.test.ts` now runs the check over every migration in the repository (12 passed; with the old file restored it fails with the deploy's own message). |
+| Live | Pending: the redeploy applies `20261024000000`; then the Oracle log should show classification instead of `57014`. |
 
 ## 2026-10-13 — Worker requests no longer queue behind a tick on their credential (57014)
 
