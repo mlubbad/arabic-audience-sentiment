@@ -73,7 +73,9 @@ describe("connecting a Facebook page", () => {
       ]),
     );
     const before = Date.now();
-    const out = await connectFacebookPage("auth-code", config, http);
+    const pages = await connectFacebookPage("auth-code", config, http);
+    expect(pages).toHaveLength(1);
+    const out = pages[0];
     expect(out.external_channel).toBe("100200300");
     expect(out.handle).toBe("aljazeera");
     expect(out.title).toBe("الجزيرة");
@@ -99,23 +101,38 @@ describe("connecting a Facebook page", () => {
     expect(calls[0].url).toContain("client_secret=not-a-real-app-secret");
     expect(calls[1].url).toContain("fb_exchange_token=EAASHORT");
     expect(calls[2].url).toContain(
-      "/me/accounts?fields=id,name,username,access_token",
+      "/me/accounts?fields=id,name,username,access_token&limit=100",
     );
     expect(calls[2].init.headers).toMatchObject({
       authorization: "Bearer EAALONG",
     });
   });
 
-  it("two pages is ambiguous, none is meta_no_page", async () => {
+  it("several pages all come back, each with its own page token; none is meta_no_page", async () => {
     const two = transport(
       fbRoutes([
-        { id: "1", name: "a", access_token: "x" },
-        { id: "2", name: "b", access_token: "y" },
+        {
+          id: "111",
+          name: "صفحة أ",
+          username: "page.a",
+          access_token: "EAA-A",
+        },
+        { id: "222", name: "صفحة ب", access_token: "EAA-B" },
+        { id: "bad", name: "no token" },
       ]),
     );
-    await expect(
-      connectFacebookPage("c", config, two.http),
-    ).rejects.toMatchObject({ code: "ambiguous_channel" });
+    const pages = await connectFacebookPage("c", config, two.http);
+    expect(
+      pages.map((p) => [
+        p.external_channel,
+        p.title,
+        p.handle,
+        p.tokens.access_token,
+      ]),
+    ).toEqual([
+      ["111", "صفحة أ", "page.a", "EAA-A"],
+      ["222", "صفحة ب", null, "EAA-B"],
+    ]);
     const none = transport(fbRoutes([]));
     await expect(
       connectFacebookPage("c", config, none.http),

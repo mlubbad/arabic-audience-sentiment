@@ -121,12 +121,12 @@ export const en: Strings = {
   channelOptionOwnerBadge: "Official owner",
   channelOptionOwnerTitle: "I own the channel",
   channelOptionOwnerDesc:
-    "Connect via official Google account to verify ownership and grant full read & analysis access.",
+    "Sign in as the owner with Google (YouTube) or Meta (Facebook and Instagram) to verify ownership and grant full read & analysis access.",
   channelOptionOwnerAction: "Connect YouTube via Google",
   channelOptionPublicBadge: "Public monitoring",
   channelOptionPublicTitle: "I don't own the channel",
   channelOptionPublicDesc:
-    "Search and select any public channel (YouTube, Telegram, X, TikTok) to monitor without owner login.",
+    "Search and select any public channel or page (YouTube, Telegram, X, TikTok, Facebook, Instagram) to monitor without owner login.",
   channelOptionPublicAction: "Search & select channel",
   searchPublicChannelHeading:
     "Search for a public channel to monitor (no login or ownership needed)",
@@ -1252,7 +1252,13 @@ export const en: Strings = {
   crFailedHeading: "The connection could not be completed",
   crUnknownDetail: (code: string) =>
     `The request could not be completed. Error code: ${code}`,
-  connectedEyebrow: "Connecting a YouTube channel",
+  connectedEyebrow: "Connecting a channel",
+  crChoosePageHeading: "Choose the page to follow",
+  crChoosePageDetail:
+    "Your account manages more than one Facebook page. Choose one for this workspace; you can connect another page in another workspace.",
+  crChoosePageLoading: "Loading your pages…",
+  crChoosePageInvalid:
+    "That page is no longer among the choices. Choose from the list again.",
   enableApiLink: "Open the YouTube Data API activation page",
   backToAccount: "Back to the account",
 

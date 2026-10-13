@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // (production, 2026-10-13). Reproduced locally: cancelled at 150 s, 1.03 s
 // with nested loops off. The two background counts therefore plan without
 // nested loops, and the tables the worker writes most refresh their
-// statistics after 1 % of their rows change (20261027000000).
+// statistics after 1 % of their rows change (20261028000000).
 let db: PGlite;
 
 describe("background counts plan without stale estimates", () => {

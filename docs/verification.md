@@ -14,7 +14,7 @@ kept failing at the 2-minute cron limit. The owner's read-only queries:
 Cause: a workspace whose rows arrived after the tables' last ANALYZE is not in their statistics,
 and the planner can estimate it at one row. Autoanalyze waits for 10 % of a table to change.
 
-Migration `20261027000000`:
+Migration `20261028000000`:
 - `refresh_channel_compare_channel` and `reconcile_video_comment_stats` run with `enable_nestloop = off`.
 - `comments`, `sentiment_predictions`, `topic_predictions` and `videos` refresh their statistics after 1 % of their rows change.
 

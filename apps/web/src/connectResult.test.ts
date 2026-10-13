@@ -2,10 +2,15 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ar } from "./strings/ar";
-import { completePendingConnection, connectResult } from "./connectResult";
+import {
+  completePendingConnection,
+  connectResult,
+  listPageChoices,
+} from "./connectResult";
 
 const getSession = vi.hoisted(() => vi.fn());
-vi.mock("./supabase", () => ({ supabase: { auth: { getSession } } }));
+const rpc = vi.hoisted(() => vi.fn());
+vi.mock("./supabase", () => ({ supabase: { auth: { getSession }, rpc } }));
 
 const at = (q: string) => connectResult(new URLSearchParams(q), ar);
 
@@ -135,6 +140,82 @@ describe("coming back from Google", () => {
     expect(at("status=error&code=meta_token_exchange_failed").detail).toBe(
       ar.crMetaTokenExchangeFailed,
     );
+  });
+
+  it("a ticket with several pages asks for a choice and keeps the nonce for it", async () => {
+    sessionStorage.setItem("oauth_browser_nonce", "browser-nonce");
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ code: "choose_page" }), { status: 409 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await completePendingConnection("ticket")).toEqual({
+      kind: "choose",
+    });
+    expect(sessionStorage.getItem("oauth_browser_nonce")).toBe("browser-nonce");
+
+    rpc.mockResolvedValueOnce({
+      data: [
+        { id: "c-1", external_channel: "111", title: "صفحة أ", handle: "a" },
+      ],
+      error: null,
+    });
+    expect(await listPageChoices("ticket")).toEqual({
+      kind: "choices",
+      choices: [
+        { id: "c-1", external_channel: "111", title: "صفحة أ", handle: "a" },
+      ],
+    });
+    expect(rpc).toHaveBeenCalledWith("oauth_pending_choices", {
+      ticket: "ticket",
+      nonce: "browser-nonce",
+    });
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ channel_id: "channel-id" }), {
+        status: 200,
+      }),
+    );
+    expect(await completePendingConnection("ticket", "c-1")).toEqual({
+      kind: "success",
+      channelId: "channel-id",
+    });
+    const [, init] = fetchMock.mock.calls[1] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(String(init.body))).toEqual({
+      ticket: "ticket",
+      nonce: "browser-nonce",
+      choice: "c-1",
+    });
+    // Spent once it connected.
+    expect(sessionStorage.getItem("oauth_browser_nonce")).toBeNull();
+  });
+
+  it("an empty or refused list is an error the page can name", async () => {
+    sessionStorage.setItem("oauth_browser_nonce", "n");
+    rpc.mockResolvedValueOnce({ data: [], error: null });
+    expect(await listPageChoices("ticket")).toEqual({
+      kind: "error",
+      code: "oauth_binding_mismatch",
+    });
+    sessionStorage.clear();
+    expect(await listPageChoices("ticket")).toEqual({
+      kind: "error",
+      code: "oauth_binding_mismatch",
+    });
+  });
+
+  it("confirms a pending connection without printing the internal id", () => {
+    const done = connectResult(
+      new URLSearchParams("connect=pending&ticket=t"),
+      ar,
+      { kind: "success", channelId: "dd514869-cee2-4068-b12a-9afeab6dc7c9" },
+    );
+    expect(done.tone).toBe("success");
+    expect(done.detail).not.toContain("dd514869");
+    expect(done.detail).toBe(ar.crConnectedDetail);
   });
 
   it("shows an unknown code as a code, never as server text", () => {
