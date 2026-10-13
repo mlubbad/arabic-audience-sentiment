@@ -1,5 +1,5 @@
 /**
- * Starting a YouTube connection from the browser.
+ * Starting a channel connection from the browser.
  *
  * The browser's whole part is: ask our function for a URL, and go there. It
  * never sees the verifier, never chooses the redirect, and never learns the
@@ -18,6 +18,9 @@ import type { StringKey, Strings } from "./strings";
  *  URL can carry a key — never reaches the screen. */
 export type ConnectOutcome =
   { kind: "redirect"; url: string } | { kind: "error"; code: string };
+
+/** Which consent screen to start: Google for YouTube, Meta for the other two. */
+export type ConnectProvider = "google" | "facebook" | "instagram";
 
 export const OAUTH_BROWSER_NONCE_KEY = "oauth_browser_nonce";
 
@@ -39,6 +42,7 @@ export function connectErrorMessage(code: string, S: Strings): string {
 export async function beginConnect(
   workspaceId: string,
   clientId: string,
+  provider: ConnectProvider = "google",
 ): Promise<ConnectOutcome> {
   if (!supabase) return { kind: "error", code: "oauth_not_configured" };
   const { data: sessionData } = await supabase.auth.getSession();
@@ -58,6 +62,7 @@ export async function beginConnect(
         body: JSON.stringify({
           workspace_id: workspaceId,
           client_id: clientId,
+          provider,
         }),
       },
     );

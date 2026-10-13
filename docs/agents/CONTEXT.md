@@ -4,8 +4,9 @@ Kept under 200 lines on purpose. If something here is wrong, say so on your work
 Claude fixes this file.
 
 ## 1. What the product is
-Arabic-first, multi-tenant SaaS. A creator or organisation connects channels (YouTube via
-OAuth, or public YouTube/X/TikTok/Telegram channels). A worker collects comments, classifies
+Arabic-first, multi-tenant SaaS. A creator or organisation connects channels (YouTube,
+Facebook pages and Instagram accounts via OAuth, or public YouTube/X/TikTok/Telegram/
+Facebook/Instagram channels). A worker collects comments, classifies
 sentiment (Positive, Negative, Neutral, Mixed) and topics, and a dashboard shows them with
 filters, human corrections and CSV export. Plans and billing run through Paddle. The UI is RTL
 Arabic first, with English.
@@ -13,7 +14,7 @@ Arabic first, with English.
 ## 2. How a comment flows
 ```
 Python worker      workers/python/src/server/loop.py → runner.py
-  collectors/*       fetch comments (official API, or Apify / Bright Data scrapers, Telethon)
+  collectors/*       fetch comments (official APIs incl. Meta Graph, or Apify / Bright Data scrapers, Telethon)
   sentiment/*        CAMeLBERT-DA (3-class), pinned revision, preprocessing strip-html-arabic-norm-v2
   topics/*           Gemini (prompt p1) or TypeSafe
       │  HTTPS, bearer = platform worker credential (never a workspace id)

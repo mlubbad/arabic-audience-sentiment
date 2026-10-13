@@ -1,10 +1,11 @@
-"""Apify scraping client for social media platforms (X/Twitter and TikTok).
+"""Apify scraping client for social media platforms (X/Twitter, TikTok, Facebook, Instagram).
 
 Invokes Apify actors via the Apify REST API (run-sync-get-dataset-items).
 """
 
 from datetime import datetime, timezone
 import httpx
+from ..meta_graph import parse_graph_time
 from ..protocol import CollectionError
 
 
@@ -16,6 +17,10 @@ class ApifyClient:
         x_actor: str = "apidojo/tweet-scraper",
         tiktok_actor: str = "clockworks/tiktok-scraper",
         timeout: float = 90.0,
+        facebook_posts_actor: str = "apify/facebook-posts-scraper",
+        facebook_comments_actor: str = "apify/facebook-comments-scraper",
+        instagram_posts_actor: str = "apify/instagram-post-scraper",
+        instagram_comments_actor: str = "apify/instagram-comment-scraper",
     ):
         if not token:
             raise ValueError("missing_apify_token")
@@ -24,6 +29,10 @@ class ApifyClient:
         self.x_actor = x_actor
         self.tiktok_actor = tiktok_actor
         self.timeout = timeout
+        self.facebook_posts_actor = facebook_posts_actor
+        self.facebook_comments_actor = facebook_comments_actor
+        self.instagram_posts_actor = instagram_posts_actor
+        self.instagram_comments_actor = instagram_comments_actor
 
     @staticmethod
     def _normalize_actor_id(actor: str) -> str:
@@ -245,3 +254,171 @@ class ApifyClient:
                 }
             )
         return comments
+
+    # ----- Facebook and Instagram -------------------------------------------
+    # These four keep every unknown unknown: a missing count is None, a
+    # missing date is None, a missing like count is None. Nothing is now().
+
+    def scrape_facebook_posts(self, handle: str, max_items: int = 25) -> list[dict]:
+        """Posts of a public Facebook page, newest first as the actor lists them."""
+        clean_handle = handle.strip().strip("/")
+        run_input = {
+            "startUrls": [{"url": f"https://www.facebook.com/{clean_handle}/"}],
+            "resultsLimit": max_items,
+        }
+        videos = []
+        for item in self._run_actor(self.facebook_posts_actor, run_input):
+            url = item.get("url") if isinstance(item.get("url"), str) else ""
+            post_id = str(item.get("postId") or "") or _last_path_segment(url)
+            if not post_id:
+                continue
+            text = item.get("text") if isinstance(item.get("text"), str) else ""
+            media = item.get("media") if isinstance(item.get("media"), list) else []
+            is_video = any(isinstance(m, dict) and m.get("__typename") == "Video" for m in media)
+            published_at, _ = parse_graph_time(item.get("time") or item.get("timestamp"))
+            videos.append(
+                {
+                    "external_video_id": post_id,
+                    "title": text[:100] or f"Post {post_id}",
+                    "kind": "video" if is_video else "channel_post",
+                    "published_at": published_at,
+                    "reported_comment_count": _int_or_none(item.get("comments")),
+                    "thumbnail_url": _first_media_image(media),
+                    "field_provenance": {
+                        "source": "apify",
+                        "actor": self.facebook_posts_actor,
+                        "handle": clean_handle,
+                        "url": url or None,
+                    },
+                }
+            )
+        return videos
+
+    def scrape_facebook_comments(
+        self, post_id: str, handle: str | None = None, max_items: int = 50
+    ) -> list[dict]:
+        """Comments and replies of one Facebook post."""
+        post_url = f"https://www.facebook.com/{(handle or 'facebook').strip('/')}/posts/{post_id}"
+        run_input = {
+            "startUrls": [{"url": post_url}],
+            "resultsLimit": max_items,
+            "includeNestedComments": True,
+        }
+        comments = []
+        for item in self._run_actor(self.facebook_comments_actor, run_input):
+            cid = str(item.get("commentId") or item.get("id") or "")
+            if not cid:
+                continue
+            parent = item.get("parentComment") if isinstance(item.get("parentComment"), dict) else {}
+            parent_id = str(item.get("replyToCommentId") or parent.get("id") or "") or None
+            published_at, _ = parse_graph_time(item.get("date"))
+            comments.append(
+                {
+                    "id": cid,
+                    "video_id": post_id,
+                    "text": item.get("text") if isinstance(item.get("text"), str) else "",
+                    "parent_id": parent_id,
+                    "is_reply": parent_id is not None,
+                    "published_at": published_at,
+                    "author_name": item.get("profileName") if isinstance(item.get("profileName"), str) else "",
+                    "author_channel_id": str(item.get("profileId")) if item.get("profileId") else None,
+                    "likes_value": _int_or_none(item.get("likesCount")),
+                }
+            )
+        return comments
+
+    def scrape_instagram_posts(self, handle: str, max_items: int = 25) -> list[dict]:
+        """Posts and reels of a public Instagram account; the shortcode is the id."""
+        clean_handle = handle.lstrip("@").strip().strip("/")
+        run_input = {"username": [clean_handle], "resultsLimit": max_items, "dataDetailLevel": "basicData"}
+        videos = []
+        for item in self._run_actor(self.instagram_posts_actor, run_input):
+            shortcode = str(item.get("shortCode") or item.get("id") or "")
+            if not shortcode:
+                continue
+            caption = item.get("caption") if isinstance(item.get("caption"), str) else ""
+            published_at, _ = parse_graph_time(item.get("timestamp"))
+            videos.append(
+                {
+                    "external_video_id": shortcode,
+                    "title": caption[:100] or f"Post {shortcode}",
+                    "kind": _instagram_kind(item.get("type"), item.get("productType")),
+                    "published_at": published_at,
+                    "reported_comment_count": _int_or_none(item.get("commentsCount")),
+                    "thumbnail_url": item.get("displayUrl") if isinstance(item.get("displayUrl"), str) else None,
+                    "field_provenance": {
+                        "source": "apify",
+                        "actor": self.instagram_posts_actor,
+                        "handle": clean_handle,
+                        "media_id": str(item.get("id")) if item.get("id") else None,
+                        "url": item.get("url") if isinstance(item.get("url"), str) else None,
+                    },
+                }
+            )
+        return videos
+
+    def scrape_instagram_comments(self, shortcode: str, max_items: int = 50) -> list[dict]:
+        """Comments of one Instagram post or reel, by its shortcode."""
+        run_input = {
+            "directUrls": [f"https://www.instagram.com/p/{shortcode}/"],
+            "resultsLimit": max_items,
+        }
+        comments = []
+        for item in self._run_actor(self.instagram_comments_actor, run_input):
+            cid = str(item.get("id") or "")
+            if not cid:
+                continue
+            owner = item.get("owner") if isinstance(item.get("owner"), dict) else {}
+            parent_id = str(item.get("parentCommentId") or "") or None
+            published_at, _ = parse_graph_time(item.get("timestamp"))
+            comments.append(
+                {
+                    "id": cid,
+                    "video_id": shortcode,
+                    "text": item.get("text") if isinstance(item.get("text"), str) else "",
+                    "parent_id": parent_id,
+                    "is_reply": parent_id is not None,
+                    "published_at": published_at,
+                    "author_name": item.get("ownerUsername") if isinstance(item.get("ownerUsername"), str) else "",
+                    "author_channel_id": str(owner.get("id")) if owner.get("id") else None,
+                    "likes_value": _int_or_none(item.get("likesCount")),
+                }
+            )
+        return comments
+
+
+def _int_or_none(value: object) -> int | None:
+    """An integer the source stated, or None. Never 0 for an absent value."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _last_path_segment(url: str) -> str:
+    return url.split("?")[0].rstrip("/").rsplit("/", 1)[-1] if url else ""
+
+
+def _first_media_image(media: list) -> str | None:
+    for m in media:
+        if not isinstance(m, dict):
+            continue
+        for key in ("thumbnail", "url"):
+            if isinstance(m.get(key), str) and m[key]:
+                return m[key]
+        for nested in ("photo_image", "image"):
+            inner = m.get(nested)
+            if isinstance(inner, dict) and isinstance(inner.get("uri"), str) and inner["uri"]:
+                return inner["uri"]
+    return None
+
+
+def _instagram_kind(media_type: object, product_type: object) -> str:
+    if media_type == "Video":
+        return "short" if product_type == "clips" else "video"
+    return "channel_post"

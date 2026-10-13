@@ -276,3 +276,102 @@ def test_check_brightdata_diagnostics(monkeypatch):
     )
     assert res_not_ready["status"] == "CONFIGURED"
     assert "Scraping Browser: HTTP 200" in res_not_ready["details"]
+
+
+def test_brightdata_scrape_facebook_posts_and_comments():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        req = json.loads(request.content.decode("utf-8"))
+        seen.append((request.url.params.get("dataset_id"), req))
+        if request.url.params.get("dataset_id") == "gd_lkay758p1eanlolqw8":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "comment_id": "fbc_1",
+                        "comment_text": "نقاش جيد",
+                        "date_created": "2026-09-21T09:30:00.000Z",
+                        "user_name": "ريم",
+                        "user_id": "9001",
+                        "num_likes": 4,
+                    }
+                ],
+            )
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "post_id": "5566778899",
+                    "content": "منشور من الصفحة",
+                    "date_posted": "2026-09-21T07:00:00.000Z",
+                    "num_comments": 12,
+                    "url": "https://www.facebook.com/aljazeera/posts/5566778899",
+                    "attachments": [{"type": "Photo", "url": "https://cdn.example.com/bd_fb.jpg"}],
+                }
+            ],
+        )
+
+    bd = BrightDataClient(api_key="k", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    posts = bd.scrape_facebook_posts("aljazeera")
+    assert seen[0] == ("gd_lkaxegm826bjpoo9m5", [{"url": "https://www.facebook.com/aljazeera/"}])
+    assert posts[0]["external_video_id"] == "5566778899"
+    assert posts[0]["kind"] == "channel_post"
+    assert posts[0]["reported_comment_count"] == 12
+    assert posts[0]["thumbnail_url"] == "https://cdn.example.com/bd_fb.jpg"
+    assert posts[0]["field_provenance"]["source"] == "brightdata"
+
+    comments = bd.scrape_facebook_comments("5566778899", handle="aljazeera")
+    assert seen[1] == ("gd_lkay758p1eanlolqw8", [{"url": "https://www.facebook.com/aljazeera/posts/5566778899"}])
+    assert comments[0]["id"] == "fbc_1" and comments[0]["text"] == "نقاش جيد"
+    assert comments[0]["author_name"] == "ريم" and comments[0]["author_channel_id"] == "9001"
+    assert comments[0]["likes_value"] == 4 and comments[0]["published_at"] == "2026-09-21T09:30:00+00:00"
+
+
+def test_brightdata_scrape_instagram_posts_and_comments():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        req = json.loads(request.content.decode("utf-8"))
+        seen.append((request.url.params.get("dataset_id"), req))
+        if request.url.params.get("dataset_id") == "gd_ltppn085pokosxh13":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "comment_id": "igc_1",
+                        "comment": "رائع",
+                        "comment_date": "2026-09-22T12:00:00.000Z",
+                        "comment_user": "hind",
+                        "likes_number": None,
+                    }
+                ],
+            )
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "shortcode": "DLNsnpUTdVS",
+                    "post_id": "3300011122",
+                    "description": "صورة اليوم",
+                    "date_posted": "2026-09-22T10:00:00.000Z",
+                    "num_comments": 0,
+                    "content_type": "Reel",
+                    "thumbnail": "https://cdn.example.com/bd_ig.jpg",
+                }
+            ],
+        )
+
+    bd = BrightDataClient(api_key="k", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    posts = bd.scrape_instagram_posts("natgeo")
+    assert seen[0][0] == "gd_lk5ns7kz21pck8jpis"
+    assert seen[0][1][0]["url"] == "https://www.instagram.com/natgeo/"
+    assert posts[0]["external_video_id"] == "DLNsnpUTdVS"
+    assert posts[0]["kind"] == "short"
+    assert posts[0]["reported_comment_count"] == 0  # a real zero from the source stays zero
+    assert posts[0]["field_provenance"]["media_id"] == "3300011122"
+
+    comments = bd.scrape_instagram_comments("DLNsnpUTdVS")
+    assert seen[1] == ("gd_ltppn085pokosxh13", [{"url": "https://www.instagram.com/p/DLNsnpUTdVS/"}])
+    assert comments[0]["id"] == "igc_1" and comments[0]["author_name"] == "hind"
+    assert comments[0]["likes_value"] is None

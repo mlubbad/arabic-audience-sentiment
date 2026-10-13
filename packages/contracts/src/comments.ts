@@ -51,6 +51,12 @@ export const KNOWN_COMMENT_SOURCES = [
   "tiktok_display_api",
   "tiktok_apify",
   "tiktok_brightdata",
+  "facebook_graph_api",
+  "facebook_apify",
+  "facebook_brightdata",
+  "instagram_graph_api",
+  "instagram_apify",
+  "instagram_brightdata",
   "youtube_apify_scrape",
   "youtube_brightdata_scrape",
 ] as const;

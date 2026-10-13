@@ -87,3 +87,16 @@ The actual token exchange, channel identification, sealing, and revocation logic
 this is a UX change to the two buttons that start the redirect, adding one question before
 either of them fires. `docs/youtube-quota-extension.md` and `docs/decisions.md` are the
 record of the scopes and retention decisions themselves.
+
+## 9. Facebook pages and Instagram accounts (2026-10-13)
+
+The same machinery, two more consent screens. The owner door on the account card is now
+three buttons; the state row records which provider it was bound for, the callback hands the
+code to that provider's adapter (`supabase/functions/_shared/oauth-meta.ts`), and the sealed
+grant carries `provider` so the worker gateway renews it the right way: Google through its
+refresh token, Instagram through `refresh_access_token` (sixty days, from itself), a Facebook
+page token not at all (it does not expire). Meta documents no PKCE; the hashed state bound to
+the browser nonce stays the CSRF protection. One page per Facebook connection; several is
+`ambiguous_channel`. The refusals the `/connected` page translates are `meta_no_page`,
+`meta_scope_missing`, `instagram_not_professional` and `meta_token_exchange_failed`.
+

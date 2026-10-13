@@ -6,6 +6,8 @@ to the corresponding collector implementation.
 
 from typing import Any, Callable
 from .protocol import Collector, CollectionError
+from .facebook_collector import FacebookCollector
+from .instagram_collector import InstagramCollector
 from .telegram_collector import TelegramCollector
 from .tiktok_collector import TikTokCollector
 from .x_collector import XCollector
@@ -22,11 +24,15 @@ class CollectorRouter:
         telegram_builder: Callable[..., Any] | None = None,
         x_builder: Callable[..., Any] | None = None,
         tiktok_builder: Callable[..., Any] | None = None,
+        facebook_builder: Callable[..., Any] | None = None,
+        instagram_builder: Callable[..., Any] | None = None,
     ):
         self.youtube_builder = youtube_builder
         self.telegram_builder = telegram_builder
         self.x_builder = x_builder
         self.tiktok_builder = tiktok_builder
+        self.facebook_builder = facebook_builder
+        self.instagram_builder = instagram_builder
 
     def get_collector(
         self,
@@ -75,5 +81,15 @@ class CollectorRouter:
                 )
             return TikTokCollector(channel_id=channel_id, access_token=token)
 
-        # Omnichannel scaffolding: platform known, but collector adapter not yet active
+        if target_platform == "facebook":
+            if self.facebook_builder:
+                return self.facebook_builder(channel_id=channel_id, token=token)
+            return FacebookCollector(channel_id=channel_id, access_token=token)
+
+        if target_platform == "instagram":
+            if self.instagram_builder:
+                return self.instagram_builder(channel_id=channel_id, token=token)
+            return InstagramCollector(channel_id=channel_id, access_token=token)
+
+        # A platform the constraint names but no adapter serves yet.
         raise CollectionError(f"platform_{target_platform}_collector_not_configured", "blocked")

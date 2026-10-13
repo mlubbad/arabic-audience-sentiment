@@ -26,6 +26,13 @@ import {
 } from "../_shared/oauth-callback.ts";
 import { corsHeaders, parseOrigins, preflight } from "../_shared/cors.ts";
 import { parseChannelQuery } from "../_shared/channel-query.ts";
+import {
+  facebookPageCandidate,
+  instagramProfileCandidate,
+  MetaLookupError,
+  parseFacebookHandle,
+  parseInstagramHandle,
+} from "../_shared/meta-handles.ts";
 import { lookupRefusal, refusalDetail } from "../_shared/lookup-access.ts";
 
 const env = (name: string) => Deno.env.get(name) ?? "";
@@ -37,7 +44,7 @@ interface Candidate {
   handle: string | null;
   title: string | null;
   thumbnail_url: string | null;
-  platform?: "youtube" | "telegram" | "x" | "tiktok";
+  platform?: "youtube" | "telegram" | "x" | "tiktok" | "facebook" | "instagram";
 }
 
 class LookupError extends Error {
@@ -334,6 +341,28 @@ Deno.serve(async (request) => {
       ],
       fallback_available: true,
     });
+  }
+
+  if (platform === "instagram" || platform === "facebook") {
+    // Named from a public profile read; refused reads fall back to the bare
+    // handle, which the person can still add (the worker reads through the
+    // scrapers either way). A 404 is the one answer that stops the add.
+    const handle =
+      platform === "instagram"
+        ? parseInstagramHandle(body.query)
+        : parseFacebookHandle(body.query);
+    if (!handle) return json(400, { code: "invalid_query" });
+    try {
+      const named =
+        platform === "instagram"
+          ? await instagramProfileCandidate(handle, (u, init) => fetch(u, init))
+          : await facebookPageCandidate(handle, (u, init) => fetch(u, init));
+      return json(200, named);
+    } catch (error) {
+      if (error instanceof MetaLookupError)
+        return json(error.status, { code: error.code });
+      return json(500, { code: "control_plane_error" });
+    }
   }
 
   // The reading credential: the project API key when one is set, otherwise

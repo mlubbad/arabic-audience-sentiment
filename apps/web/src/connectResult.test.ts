@@ -120,6 +120,23 @@ describe("coming back from Google", () => {
     );
   });
 
+  it("names the four Meta refusals in the reader's language", () => {
+    expect(at("status=error&code=meta_no_page")).toMatchObject({
+      tone: "error",
+      detail: ar.crMetaNoPage,
+      action: "retry",
+    });
+    expect(at("status=error&code=meta_scope_missing").detail).toBe(
+      ar.crMetaScopeMissing,
+    );
+    expect(at("status=error&code=instagram_not_professional").detail).toBe(
+      ar.crInstagramNotProfessional,
+    );
+    expect(at("status=error&code=meta_token_exchange_failed").detail).toBe(
+      ar.crMetaTokenExchangeFailed,
+    );
+  });
+
   it("shows an unknown code as a code, never as server text", () => {
     const r = at("status=error&code=some_new_failure");
     expect(r.detail).toContain("some_new_failure");

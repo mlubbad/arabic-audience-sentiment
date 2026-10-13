@@ -599,19 +599,21 @@ function LiveAccount({ client }: { client: NonNullable<typeof supabase> }) {
                         }
                       : undefined
                   }
-                  onConnect={() => {
+                  onConnect={(provider) => {
                     if (!workspaceClient) return;
                     setBusy(scope);
                     setNote(null);
                     setAsking(null);
-                    void beginConnect(w.id, workspaceClient.id).then((out) => {
-                      setBusy(null);
-                      if (out.kind === "error")
-                        say(scope, connectErrorMessage(out.code, S));
-                      // Google's consent screen is a full navigation, not a
-                      // popup: a popup here is blocked as often as not.
-                      else window.location.assign(out.url);
-                    });
+                    void beginConnect(w.id, workspaceClient.id, provider).then(
+                      (out) => {
+                        setBusy(null);
+                        if (out.kind === "error")
+                          say(scope, connectErrorMessage(out.code, S));
+                        // Google's consent screen is a full navigation, not a
+                        // popup: a popup here is blocked as often as not.
+                        else window.location.assign(out.url);
+                      },
+                    );
                   }}
                   addingChannel={
                     asking?.ws === w.id && asking.what === "addchannel"

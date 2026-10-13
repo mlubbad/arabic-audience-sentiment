@@ -816,4 +816,204 @@ describe("youtube connection", () => {
       db.query("select * from private.oauth_pending"),
     ).rejects.toThrow();
   });
+
+  // ----- Meta providers (Facebook pages, Instagram accounts) -----------------
+
+  const PAGE = "123456789012345";
+  const createMetaPending = async (
+    who: string,
+    workspace: string,
+    provider: "facebook" | "instagram",
+    state: string,
+    ticket: string,
+    nonce: string,
+    external: string,
+  ) => {
+    await user(who);
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4,$5)", [
+      workspace,
+      h(state),
+      VERIFIER,
+      sha(nonce),
+      provider,
+    ]);
+    await admin();
+    const consumed = await db.query<{ state_id: string; provider: string }>(
+      "select state_id, provider from private.oauth_consume_state($1)",
+      [h(state)],
+    );
+    expect(consumed.rows[0].provider).toBe(provider);
+    await db.query(
+      "select private.oauth_create_pending($1,$2,$3,$4,'k1',$5,null,null,$6)",
+      [
+        consumed.rows[0].state_id,
+        sha(ticket),
+        external,
+        CIPHERTEXT,
+        ["pages_read_engagement"],
+        provider,
+      ],
+    );
+  };
+
+  it("stores the provider on the state and hands it back to the service", async () => {
+    await user(ownerA);
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4,$5)", [
+      A,
+      h("h-provider"),
+      VERIFIER,
+      NONCE_HASH,
+      "facebook",
+    ]);
+    // The five-argument call still works and means Google, as every existing caller expects.
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
+      A,
+      h("h-google"),
+      VERIFIER,
+      NONCE_HASH,
+    ]);
+    await admin();
+    await db.exec("set role service_role");
+    const fb = await db.query<{ provider: string }>(
+      "select provider from public.svc_oauth_consume_state($1)",
+      [h("h-provider")],
+    );
+    const google = await db.query<{ provider: string }>(
+      "select provider from public.svc_oauth_consume_state($1)",
+      [h("h-google")],
+    );
+    await admin();
+    expect(fb.rows[0].provider).toBe("facebook");
+    expect(google.rows[0].provider).toBe("google");
+  });
+
+  it("refuses an unknown provider", async () => {
+    await user(ownerA);
+    await expect(
+      db.query("select public.oauth_start($1,$1,$2,$3,$4,$5)", [
+        A,
+        h("h-bad"),
+        VERIFIER,
+        NONCE_HASH,
+        "myspace",
+      ]),
+    ).rejects.toThrow(/invalid_provider/);
+    await admin();
+  });
+
+  it("a Meta pending row refuses a UC id and accepts a numeric page id", async () => {
+    await expect(
+      createMetaPending(ownerA, A, "facebook", "m-uc", "t-uc", "n-uc", CHANNEL),
+    ).rejects.toThrow(/invalid_channel_id/);
+    await admin();
+    await createMetaPending(
+      ownerA,
+      A,
+      "facebook",
+      "m-num",
+      "t-num",
+      "n-num",
+      PAGE,
+    );
+    // And a YouTube pending row still refuses a numeric id.
+    await user(ownerA);
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4)", [
+      A,
+      h("m-yt"),
+      VERIFIER,
+      NONCE_HASH,
+    ]);
+    await admin();
+    const consumed = await db.query<{ state_id: string }>(
+      "select state_id from private.oauth_consume_state($1)",
+      [h("m-yt")],
+    );
+    await expect(
+      db.query(
+        "select private.oauth_create_pending($1,$2,$3,$4,'k1',$5,null,null)",
+        [consumed.rows[0].state_id, sha("t-yt-num"), PAGE, CIPHERTEXT, ["x"]],
+      ),
+    ).rejects.toThrow(/invalid_channel_id/);
+  });
+
+  it("attaches a Facebook page under its own platform and keeps platforms apart", async () => {
+    await createMetaPending(
+      ownerA,
+      A,
+      "facebook",
+      "m-fb",
+      "t-fb",
+      "n-fb",
+      PAGE,
+    );
+    await user(ownerA);
+    const done = await db.query<{
+      channel_id: string | null;
+      code: string | null;
+    }>("select * from public.oauth_complete($1,$2)", ["t-fb", "n-fb"]);
+    expect(done.rows[0].code).toBeNull();
+    await admin();
+    const row = await db.query<{
+      platform: string;
+      status: string;
+      external_channel_id: string;
+    }>(
+      "select platform, status, external_channel_id from channels where id=$1",
+      [done.rows[0].channel_id],
+    );
+    expect(row.rows[0]).toEqual({
+      platform: "facebook",
+      status: "connected",
+      external_channel_id: PAGE,
+    });
+
+    // The same numeric id on Instagram is a different channel, not an upgrade of the page.
+    await createMetaPending(
+      ownerA,
+      A,
+      "instagram",
+      "m-ig",
+      "t-ig",
+      "n-ig",
+      PAGE,
+    );
+    await user(ownerA);
+    const ig = await db.query<{
+      channel_id: string | null;
+      code: string | null;
+    }>("select * from public.oauth_complete($1,$2)", ["t-ig", "n-ig"]);
+    expect(ig.rows[0].code).toBeNull();
+    expect(ig.rows[0].channel_id).not.toBe(done.rows[0].channel_id);
+    await admin();
+    const n = await db.query<{ n: number }>(
+      "select count(*)::int as n from channels where workspace_id=$1 and external_channel_id=$2 and status='connected'",
+      [A, PAGE],
+    );
+    expect(n.rows[0].n).toBe(2);
+    const grants = await db.query<{ n: number }>(
+      "select count(*)::int as n from private.oauth_connections c join channels ch on ch.id=c.channel_id where ch.external_channel_id=$1 and c.status='connected'",
+      [PAGE],
+    );
+    expect(grants.rows[0].n).toBe(2);
+  });
+
+  it("will not let a second workspace seize a connected page", async () => {
+    await createMetaPending(
+      ownerB,
+      B,
+      "facebook",
+      "m-seize",
+      "t-seize",
+      "n-seize",
+      PAGE,
+    );
+    await user(ownerB);
+    await expect(
+      db.query("select * from public.oauth_complete($1,$2)", [
+        "t-seize",
+        "n-seize",
+      ]),
+    ).rejects.toThrow(/channel_already_connected/);
+    await admin();
+  });
 });

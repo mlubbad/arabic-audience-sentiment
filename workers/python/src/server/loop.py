@@ -30,6 +30,8 @@ import time
 import httpx
 
 from collectors.youtube_api import YouTubeAPI
+from collectors.facebook_collector import FacebookCollector
+from collectors.instagram_collector import InstagramCollector
 from collectors.telegram_collector import TelegramCollector
 from collectors.tiktok_collector import TikTokCollector
 from collectors.x_collector import XCollector
@@ -74,6 +76,14 @@ def build_collector(
     brightdata_webdriver_url: str | None = None,
     x_scraper_provider: str | None = None,
     tiktok_scraper_provider: str | None = None,
+    facebook_fixture: dict | None = None,
+    instagram_fixture: dict | None = None,
+    apify_facebook_posts_actor: str | None = None,
+    apify_facebook_comments_actor: str | None = None,
+    apify_instagram_posts_actor: str | None = None,
+    apify_instagram_comments_actor: str | None = None,
+    facebook_scraper_provider: str | None = None,
+    instagram_scraper_provider: str | None = None,
 ):
     """The collector builder the runner is handed.
 
@@ -88,6 +98,10 @@ def build_collector(
     For platform == 'telegram', returns a TelegramCollector adapter.
     For platform == 'x', returns an XCollector adapter.
     For platform == 'tiktok', returns a TikTokCollector adapter.
+    For platform == 'facebook' / 'instagram', returns the Meta collectors: a
+    lease token is the page's or account's own grant (Graph API), a lease
+    with only a handle is read through the scrapers. There is no worker-wide
+    Meta token to fall back to: Meta grants are per channel.
     """
     apify_client = None
     if apify_token:
@@ -96,6 +110,14 @@ def build_collector(
             apify_kwargs["x_actor"] = apify_x_actor
         if apify_tiktok_actor:
             apify_kwargs["tiktok_actor"] = apify_tiktok_actor
+        for key, value in (
+            ("facebook_posts_actor", apify_facebook_posts_actor),
+            ("facebook_comments_actor", apify_facebook_comments_actor),
+            ("instagram_posts_actor", apify_instagram_posts_actor),
+            ("instagram_comments_actor", apify_instagram_comments_actor),
+        ):
+            if value:
+                apify_kwargs[key] = value
         apify_client = ApifyClient(**apify_kwargs)
 
     brightdata_client = None
@@ -145,6 +167,26 @@ def build_collector(
                 brightdata_client=brightdata_client,
                 fixture_data=tiktok_fixture,
                 preferred_scraper=tiktok_scraper_provider,
+            )
+        if p == "facebook":
+            return FacebookCollector(
+                channel_id=channel_id,
+                client=client,
+                access_token=token,
+                apify_client=apify_client,
+                brightdata_client=brightdata_client,
+                fixture_data=facebook_fixture,
+                preferred_scraper=facebook_scraper_provider,
+            )
+        if p == "instagram":
+            return InstagramCollector(
+                channel_id=channel_id,
+                client=client,
+                access_token=token,
+                apify_client=apify_client,
+                brightdata_client=brightdata_client,
+                fixture_data=instagram_fixture,
+                preferred_scraper=instagram_scraper_provider,
             )
         if token:
             return YouTubeAPI(
@@ -356,6 +398,12 @@ def main() -> None:
     brightdata_webdriver_url = os.environ.get("BRIGHTDATA_WEBDRIVER_URL") or None
     x_scraper_provider = os.environ.get("X_SCRAPER_PROVIDER") or None
     tiktok_scraper_provider = os.environ.get("TIKTOK_SCRAPER_PROVIDER") or None
+    facebook_scraper_provider = os.environ.get("FACEBOOK_SCRAPER_PROVIDER") or None
+    instagram_scraper_provider = os.environ.get("INSTAGRAM_SCRAPER_PROVIDER") or None
+    apify_facebook_posts_actor = os.environ.get("APIFY_FACEBOOK_POSTS_ACTOR") or None
+    apify_facebook_comments_actor = os.environ.get("APIFY_FACEBOOK_COMMENTS_ACTOR") or None
+    apify_instagram_posts_actor = os.environ.get("APIFY_INSTAGRAM_POSTS_ACTOR") or None
+    apify_instagram_comments_actor = os.environ.get("APIFY_INSTAGRAM_COMMENTS_ACTOR") or None
 
     build = build_collector(
         client,
@@ -375,6 +423,12 @@ def main() -> None:
         brightdata_webdriver_url=brightdata_webdriver_url,
         x_scraper_provider=x_scraper_provider,
         tiktok_scraper_provider=tiktok_scraper_provider,
+        apify_facebook_posts_actor=apify_facebook_posts_actor,
+        apify_facebook_comments_actor=apify_facebook_comments_actor,
+        apify_instagram_posts_actor=apify_instagram_posts_actor,
+        apify_instagram_comments_actor=apify_instagram_comments_actor,
+        facebook_scraper_provider=facebook_scraper_provider,
+        instagram_scraper_provider=instagram_scraper_provider,
     )
     has_scrapers = bool(
         apify_token

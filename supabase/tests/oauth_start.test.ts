@@ -197,3 +197,58 @@ describe("the authorization redirect", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("meta providers", () => {
+  it("facebook builds Meta's dialog with the page scopes and no PKCE", async () => {
+    const { db, calls } = recorder();
+    const { url } = await beginAuthorization(
+      W,
+      C,
+      { ...config, provider: "facebook", client_id: "1234567890", scopes: [] },
+      db,
+      sequential(1),
+    );
+    const u = new URL(url);
+    expect(u.origin + u.pathname).toBe(
+      "https://www.facebook.com/v25.0/dialog/oauth",
+    );
+    expect(u.searchParams.get("client_id")).toBe("1234567890");
+    expect(u.searchParams.get("redirect_uri")).toBe(config.redirect_uri);
+    expect(u.searchParams.get("response_type")).toBe("code");
+    expect(u.searchParams.get("scope")).toBe(
+      "pages_show_list,pages_read_engagement,pages_read_user_content",
+    );
+    expect(u.searchParams.get("state")).toHaveLength(43);
+    expect(u.searchParams.has("code_challenge")).toBe(false);
+    expect(u.searchParams.has("access_type")).toBe(false);
+    // The provider is stored with the state, as the sixth argument.
+    expect(calls[0][5]).toBe("facebook");
+  });
+
+  it("instagram asks the Instagram window with the business scopes", async () => {
+    const { db, calls } = recorder();
+    const { url } = await beginAuthorization(
+      W,
+      C,
+      { ...config, provider: "instagram", client_id: "9876543210", scopes: [] },
+      db,
+      sequential(2),
+    );
+    const u = new URL(url);
+    expect(u.origin + u.pathname).toBe(
+      "https://www.instagram.com/oauth/authorize",
+    );
+    expect(u.searchParams.get("scope")).toBe(
+      "instagram_business_basic,instagram_business_manage_comments",
+    );
+    expect(u.searchParams.get("enable_fb_login")).toBe("0");
+    expect(u.searchParams.has("code_challenge")).toBe(false);
+    expect(calls[0][5]).toBe("instagram");
+  });
+
+  it("google stays the default and is stored as such", async () => {
+    const { db, calls } = recorder();
+    await beginAuthorization(W, C, config, db, sequential(3));
+    expect(calls[0][5]).toBe("google");
+  });
+});

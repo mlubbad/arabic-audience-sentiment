@@ -960,3 +960,18 @@ describe("ServicesHealthReportSchema and ServiceHealthItemSchema", () => {
     expect(parsed.summary.avg_latency_ms).toBe(45.2);
   });
 });
+
+describe("comment sources name both Meta doors", () => {
+  it("KNOWN_COMMENT_SOURCES lists the Facebook and Instagram sources", async () => {
+    const { KNOWN_COMMENT_SOURCES } = await import("./comments");
+    for (const source of [
+      "facebook_graph_api",
+      "facebook_apify",
+      "facebook_brightdata",
+      "instagram_graph_api",
+      "instagram_apify",
+      "instagram_brightdata",
+    ])
+      expect(KNOWN_COMMENT_SOURCES).toContain(source);
+  });
+});

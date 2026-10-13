@@ -184,6 +184,10 @@ export const ar = {
   shareWorkspaceFailed: (err: string) => `تعذّرت مشاركة المساحة: ${err}`,
   shareWorkspaceClose: "إغلاق",
   connectChannel: "ربط قناة يوتيوب",
+  connectFacebookPage: "ربط صفحة فيسبوك",
+  connectInstagramAccount: "ربط حساب انستغرام",
+  connectProviderLead:
+    "سجّل الدخول بصفتك المالك على المنصة التي تختارها. لا ننشر شيئًا باسمك؛ نقرأ فقط.",
   relinkForName: "إعادة الربط لحفظ اسم القناة",
   addChannel: "إضافة قناة بالرابط أو بالبحث",
   addChannelLead:
@@ -224,6 +228,18 @@ export const ar = {
   addTikTokPlaceholder: "@username أو tiktok.com/@username",
   addTikTokInvalidHandle:
     "أدخل اسم مستخدم صالحًا على تيك توك (مثال: @username أو رابط tiktok.com/@username).",
+  addFacebookChannel: "إضافة صفحة فيسبوك عامة",
+  addFacebookLead:
+    "أدخل رابط صفحة فيسبوك أو اسمها (facebook.com/page). يتم جمع المنشورات والتعليقات تلقائيًا. الصفحات العامة فقط؛ لا يمكن إضافة الحسابات الشخصية أو المجموعات.",
+  addFacebookPlaceholder: "facebook.com/page أو اسم الصفحة",
+  addFacebookInvalidHandle:
+    "أدخل رابط صفحة فيسبوك صالحًا أو اسمها (مثال: facebook.com/page).",
+  addInstagramChannel: "إضافة حساب انستغرام عام",
+  addInstagramLead:
+    "أدخل اسم المستخدم (@المعرّف) أو رابط الحساب على انستغرام. يتم جمع المنشورات والريلز والتعليقات تلقائيًا. الحسابات العامة فقط.",
+  addInstagramPlaceholder: "@username أو instagram.com/username",
+  addInstagramInvalidHandle:
+    "أدخل اسم مستخدم صالحًا على انستغرام (مثال: @username أو رابط instagram.com/username).",
   addDirectAvailable: "إضافة مباشرة (بناءً على الإتاحة)",
   addDirectAvailableAction: "إضافة القناة مباشرة بناءً على الإتاحة",
   addDirectAvailableDesc:
@@ -1110,6 +1126,8 @@ export const ar = {
   jobCatalogueRunningDetail: "فهرسة فيديوهات القناة قيد التنفيذ الآن.",
   jobCatalogueRunningDetailTelegram: "فهرسة منشورات القناة قيد التنفيذ الآن.",
   jobCatalogueRunningDetailX: "فهرسة تغريدات الحساب قيد التنفيذ الآن.",
+  jobCatalogueRunningDetailFacebook: "فهرسة منشورات الصفحة قيد التنفيذ الآن.",
+  jobCatalogueRunningDetailInstagram: "فهرسة منشورات الحساب قيد التنفيذ الآن.",
   jobCatalogueRunningDetailTikTok: "فهرسة مقاطع الحساب قيد التنفيذ الآن.",
   jobCatalogueSucceededDetail:
     "تم استكشاف فيديوهات القناة وتحديث القائمة بنجاح.",
@@ -1177,6 +1195,14 @@ export const ar = {
     "انتهت صلاحية طلب الربط أو استُخدم من قبل. ابدأ من جديد؛ هذا القيد هو ما يمنع إعادة استخدام رابط قديم.",
   crInvalidCallback: "الرابط الذي عدت به غير مكتمل. ابدأ الربط من جديد.",
   crAlreadyConnected: "هذه القناة مرتبطة بمساحة عمل أخرى. افصلها هناك أولًا.",
+  crMetaNoPage:
+    "هذا الحساب لا يدير أي صفحة فيسبوك. أنشئ صفحة أو انضم إلى إحداها ثم أعد المحاولة.",
+  crMetaScopeMissing:
+    "لم تُمنح أذونات القراءة. أعد المحاولة واسمح بقراءة المنشورات والتعليقات.",
+  crInstagramNotProfessional:
+    "حساب انستغرام هذا ليس حسابًا مهنيًا (أعمال أو منشئ محتوى). حوّله من إعدادات انستغرام ثم أعد المحاولة.",
+  crMetaTokenExchangeFailed:
+    "لم تقبل Meta تسجيل الدخول. أعد المحاولة بعد قليل.",
   crConnectedHeading: "تم ربط القناة",
   crConnectedDetail: "القناة متصلة الآن. سيبدأ الجمع في أول مزامنة.",
   crConnectedDetailWith: (channel: string) =>
@@ -1374,6 +1400,8 @@ export const ar = {
   catOpenTelegram: "فتح في تليجرام",
   catOpenX: "فتح في X",
   catOpenTikTok: "فتح في تيك توك",
+  catOpenFacebook: "فتح في فيسبوك",
+  catOpenInstagram: "فتح في انستغرام",
   catPreview: (title: string) => `معاينة: ${title}`,
   catPreviewHint:
     "المشاهدة داخل المنصة عبر مشغّل يوتيوب؛ لا يحفظ ملفات تعريف قبل الضغط على تشغيل.",

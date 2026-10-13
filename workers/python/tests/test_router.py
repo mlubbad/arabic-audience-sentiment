@@ -1,7 +1,6 @@
 """Unit tests for CollectorRouter and multi-platform runner resolution."""
 
 import pytest
-from collectors.protocol import CollectionError
 from collectors.router import CollectorRouter, SUPPORTED_PLATFORMS
 from server.runner import _collector_for
 
@@ -48,10 +47,22 @@ def test_collector_router_routing():
     assert col_tt == "fake_tiktok"
     assert len(tt_called) == 1
 
-    # Route downstream platforms raises not yet configured error
-    with pytest.raises(CollectionError) as exc:
-        router.get_collector("facebook")
-    assert exc.value.code == "platform_facebook_collector_not_configured"
+    # Facebook and Instagram route like the others, with their own builders
+    fb_called, ig_called = [], []
+    router = CollectorRouter(
+        facebook_builder=lambda **kwargs: fb_called.append(kwargs) or "fake_facebook",
+        instagram_builder=lambda **kwargs: ig_called.append(kwargs) or "fake_instagram",
+    )
+    assert router.get_collector("facebook", channel_id="aljazeera") == "fake_facebook"
+    assert fb_called == [{"channel_id": "aljazeera", "token": None}]
+    assert router.get_collector("instagram", channel_id="natgeo", token="ig") == "fake_instagram"
+    assert ig_called == [{"channel_id": "natgeo", "token": "ig"}]
+    # Without a builder, the default collectors are built rather than refused
+    from collectors.facebook_collector import FacebookCollector
+    from collectors.instagram_collector import InstagramCollector
+
+    assert isinstance(CollectorRouter().get_collector("facebook", channel_id="aljazeera"), FacebookCollector)
+    assert isinstance(CollectorRouter().get_collector("instagram", channel_id="natgeo"), InstagramCollector)
 
     # Route unknown platform raises ValueError
     with pytest.raises(ValueError, match="unsupported_platform"):

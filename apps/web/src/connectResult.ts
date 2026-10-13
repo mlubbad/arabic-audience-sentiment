@@ -78,6 +78,16 @@ const FAILURES: Record<
   invalid_callback: { detail: "crInvalidCallback", action: "retry" },
   channel_already_connected: { detail: "crAlreadyConnected", action: null },
   oauth_binding_mismatch: { detail: "crBindingMismatch", action: "retry" },
+  meta_no_page: { detail: "crMetaNoPage", action: "retry" },
+  meta_scope_missing: { detail: "crMetaScopeMissing", action: "retry" },
+  instagram_not_professional: {
+    detail: "crInstagramNotProfessional",
+    action: "retry",
+  },
+  meta_token_exchange_failed: {
+    detail: "crMetaTokenExchangeFailed",
+    action: "retry",
+  },
   unauthenticated: { detail: "crUnauthenticated", action: "retry" },
   unreachable: { detail: "crUnreachable", action: "retry" },
 };

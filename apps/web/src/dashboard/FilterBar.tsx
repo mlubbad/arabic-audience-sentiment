@@ -226,22 +226,10 @@ export function FilterBar({
       <SelectItem value={ALL}>{S.allPlatforms}</SelectItem>
       <SelectItem value="youtube">{S.platformYouTube}</SelectItem>
       <SelectItem value="telegram">{S.platformTelegram}</SelectItem>
-      <SelectItem
-        value="x"
-        disabled
-      >{`${S.platformX} (${S.platformSoon})`}</SelectItem>
-      <SelectItem
-        value="tiktok"
-        disabled
-      >{`${S.platformTikTok} (${S.platformSoon})`}</SelectItem>
-      <SelectItem
-        value="facebook"
-        disabled
-      >{`${S.platformFacebook} (${S.platformSoon})`}</SelectItem>
-      <SelectItem
-        value="instagram"
-        disabled
-      >{`${S.platformInstagram} (${S.platformSoon})`}</SelectItem>
+      <SelectItem value="x">{S.platformX}</SelectItem>
+      <SelectItem value="tiktok">{S.platformTikTok}</SelectItem>
+      <SelectItem value="facebook">{S.platformFacebook}</SelectItem>
+      <SelectItem value="instagram">{S.platformInstagram}</SelectItem>
     </Labelled>
   );
 
