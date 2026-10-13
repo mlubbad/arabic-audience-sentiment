@@ -115,11 +115,18 @@ async function readToken(
   };
 }
 
+/**
+ * Every page the person allowed, each with its own page token.
+ *
+ * One page connects straight away; several are filed as choices and the
+ * person picks one inside the product (20261027000000), because Meta's own
+ * "Edit settings" screen is not something an ordinary user understands.
+ */
 export async function connectFacebookPage(
   code: string,
   config: MetaConfig,
   http: Http,
-): Promise<MetaConnection> {
+): Promise<MetaConnection[]> {
   const exchange = new URL(`${GRAPH_FACEBOOK}/oauth/access_token`);
   exchange.search = new URLSearchParams({
     client_id: config.app_id,
@@ -145,7 +152,7 @@ export async function connectFacebookPage(
   );
 
   const pagesResponse = await http(
-    `${GRAPH_FACEBOOK}/me/accounts?fields=id,name,username,access_token`,
+    `${GRAPH_FACEBOOK}/me/accounts?fields=id,name,username,access_token&limit=100`,
     {
       method: "GET",
       headers: { authorization: `Bearer ${long.access_token}` },
@@ -171,21 +178,19 @@ export async function connectFacebookPage(
   );
   // No page is a real answer: the account authorised fine and manages nothing.
   if (pages.length === 0) throw new ConnectError("meta_no_page");
-  // More than one cannot be chosen server-side without guessing.
-  if (pages.length > 1) throw new ConnectError("ambiguous_channel");
-  const page = pages[0];
-  return {
+  const expiresAt = new Date(Date.now() + PAGE_TOKEN_LIFETIME_MS).toISOString();
+  return pages.map((page) => ({
     external_channel: page.id as string,
     handle: text(page.username, 100),
     title: text(page.name, 200),
     tokens: {
       access_token: page.access_token as string,
       refresh_token: "",
-      expires_at: new Date(Date.now() + PAGE_TOKEN_LIFETIME_MS).toISOString(),
-      provider: "facebook",
+      expires_at: expiresAt,
+      provider: "facebook" as const,
     },
     scopes: [...FACEBOOK_SCOPES],
-  };
+  }));
 }
 
 export async function connectInstagramAccount(

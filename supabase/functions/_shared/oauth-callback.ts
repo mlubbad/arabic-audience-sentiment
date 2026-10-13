@@ -60,6 +60,21 @@ export interface CallbackDb {
     /** The platform the channel is filed under: the provider's own. */
     platform: ConnectedPlatform;
   }): Promise<void>;
+  /** Several pages under one ticket, each sealed on its own; the person
+   *  chooses one inside the product. */
+  createPendingChoices?(input: {
+    stateId: string;
+    ticketHash: string;
+    keyVersion: string;
+    scopes: string[];
+    platform: "facebook";
+    choices: {
+      externalChannel: string;
+      handle: string | null;
+      title: string | null;
+      sealedTokens: Uint8Array;
+    }[];
+  }): Promise<void>;
 }
 
 /** Injected so tests need no network, and so nothing here can reach the internet by accident. */
@@ -286,10 +301,31 @@ export async function handleCallback(input: {
     // The Meta doors: the state said which one, and the code goes only there.
     if (!meta?.app_id || !meta.app_secret || !meta.redirect_uri)
       throw new ConnectError("oauth_not_configured");
-    const connection =
+    const connections =
       provider === "facebook"
         ? await connectFacebookPage(code, meta, http)
-        : await connectInstagramAccount(code, meta, http);
+        : [await connectInstagramAccount(code, meta, http)];
+    if (connections.length > 1 && provider === "facebook") {
+      // Several pages: file them all and let the person choose one.
+      if (!db.createPendingChoices) throw new ConnectError("ambiguous_channel");
+      await db.createPendingChoices({
+        stateId: binding.state_id,
+        ticketHash: await sha256Hex(ticket),
+        keyVersion: meta.key_version,
+        scopes: connections[0].scopes,
+        platform: "facebook",
+        choices: await Promise.all(
+          connections.map(async (c) => ({
+            externalChannel: c.external_channel,
+            handle: c.handle,
+            title: c.title,
+            sealedTokens: await sealTokens(key, c.tokens),
+          })),
+        ),
+      });
+      return { ticket, workspaceId: binding.workspace_id };
+    }
+    const connection = connections[0];
     await db.createPending({
       stateId: binding.state_id,
       ticketHash: await sha256Hex(ticket),

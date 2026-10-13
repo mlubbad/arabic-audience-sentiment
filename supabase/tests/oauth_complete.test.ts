@@ -68,6 +68,41 @@ describe("oauth-complete edge handler", () => {
     },
   );
 
+  it("passes the chosen page, and only a well-formed one", async () => {
+    const complete = vi.fn(async () => ({
+      channel_id: "channel-id",
+      code: null,
+    }));
+    const choice = "3f1c0a9e-1b2c-4d5e-8f90-0a1b2c3d4e5f";
+    await handleOauthComplete(
+      request({ ticket: "t", nonce: "n", choice }),
+      { complete },
+      [],
+    );
+    expect(complete).toHaveBeenLastCalledWith("t", "n", choice);
+    const bad = await handleOauthComplete(
+      request({ ticket: "t", nonce: "n", choice: "1; drop" }),
+      { complete },
+      [],
+    );
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toEqual({ code: "invalid_choice" });
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["choose_page", "invalid_choice"])(
+    "answers %s with 409 and the code, so the page can ask for a choice",
+    async (code) => {
+      const response = await handleOauthComplete(
+        request({ ticket: "t", nonce: "n" }),
+        { complete: async () => ({ channel_id: null, code }) },
+        [],
+      );
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ code });
+    },
+  );
+
   it("refuses missing authentication and missing binding inputs", async () => {
     const complete = vi.fn();
     expect(
