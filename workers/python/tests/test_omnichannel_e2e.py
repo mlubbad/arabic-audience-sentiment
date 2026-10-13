@@ -548,3 +548,84 @@ def test_e2e_cross_workspace_single_database_model():
     # Both workspaces have access to the exact same sentiment data
     assert ("ws_alpha", cid_a) in workspace_channels
     assert ("ws_beta", cid_a) in workspace_channels
+
+
+# ============================================================================
+# 5. FACEBOOK AND INSTAGRAM E2E PIPELINE TESTS
+# ============================================================================
+
+def test_e2e_facebook_pipeline_success():
+    from collectors.facebook_collector import FacebookCollector
+
+    fixture = {
+        "posts": [{"id": "1122334455", "message": "منشور الصفحة", "created_time": "2026-09-21T08:00:00+0000", "comment_count": 2}],
+        "comments": {
+            "1122334455": [
+                {"id": "c_fb_1", "message": "﹢ عمل رائع ومميز", "created_time": "2026-09-21T09:00:00+0000", "like_count": 3},
+                {"id": "c_fb_2", "message": "﹣ تجربة سيئة للغاية", "parent_id": "c_fb_1"},
+            ]
+        },
+    }
+    discover_lease = {"job_id": "j_fb_d", "lease_token": "t1", "external_channel_id": "aljazeera", "platform": "facebook", "mode": "discover"}
+    rec = MockControlPlaneRecorder(discover_lease)
+    builder_fn = make_builder(FacebookCollector, fixture_data=fixture)
+    assert _discover(rec.plane(), discover_lease, builder_fn) is True
+    post = rec.committed_catalogues[0][0]
+    assert post["external_video_id"] == "1122334455" and post["kind"] == "channel_post"
+    assert post["published_at"] == "2026-09-21T08:00:00+00:00" and post["reported_comment_count"] == 2
+    assert rec.finished_outcome == "succeeded"
+
+    backfill_lease = {
+        "job_id": "j_fb_b", "lease_token": "t2", "external_channel_id": "aljazeera", "platform": "facebook", "mode": "backfill",
+        "videos": [{"video_id": "v_fb", "external_video_id": "1122334455", "title": "منشور الصفحة"}],
+    }
+    rec = MockControlPlaneRecorder(backfill_lease)
+    assert _backfill(rec.plane(), backfill_lease, builder_fn, analyzer=DeterministicTestAnalyzer()) is True
+    committed = rec.committed_batches[0]
+    assert [c["external_comment_id"] for c in committed["comments"]] == ["c_fb_1", "c_fb_2"]
+    assert committed["comments"][0]["source"] == "sanitized_fixture"
+    assert committed["comments"][0]["timestamp_precision"] == "second"
+    assert committed["comments"][1]["timestamp_precision"] == "unknown"
+    assert committed["comments"][1]["likes_value"] is None
+    assert [p["label"] for p in committed["predictions"]] == ["positive", "negative"]
+    assert rec.finished_outcome == "succeeded"
+
+
+def test_e2e_instagram_pipeline_success():
+    from collectors.instagram_collector import InstagramCollector
+
+    fixture = {
+        "media": [{"id": "17900000001", "caption": "ريل اليوم", "media_type": "VIDEO", "media_product_type": "REELS", "timestamp": "2026-09-22T10:00:00+0000", "comments_count": 1}],
+        "comments": {"17900000001": [{"id": "ig_c1", "text": "﹢ إبداع حقيقي", "timestamp": "2026-09-22T11:00:00+0000", "username": "noura", "like_count": 5}]},
+    }
+    builder_fn = make_builder(InstagramCollector, fixture_data=fixture)
+    discover_lease = {"job_id": "j_ig_d", "lease_token": "t1", "external_channel_id": "natgeo", "platform": "instagram", "mode": "discover"}
+    rec = MockControlPlaneRecorder(discover_lease)
+    assert _discover(rec.plane(), discover_lease, builder_fn) is True
+    assert rec.committed_catalogues[0][0]["kind"] == "short"
+    backfill_lease = {
+        "job_id": "j_ig_b", "lease_token": "t2", "external_channel_id": "natgeo", "platform": "instagram", "mode": "backfill",
+        "videos": [{"video_id": "v_ig", "external_video_id": "17900000001", "title": "ريل اليوم"}],
+    }
+    rec = MockControlPlaneRecorder(backfill_lease)
+    assert _backfill(rec.plane(), backfill_lease, builder_fn, analyzer=DeterministicTestAnalyzer()) is True
+    committed = rec.committed_batches[0]
+    assert committed["comments"][0]["published_at"] == "2026-09-22T11:00:00+00:00"
+    assert committed["predictions"][0]["label"] == "positive"
+    assert rec.finished_outcome == "succeeded"
+
+
+def test_e2e_instagram_graph_190_blocked():
+    """A connected account whose token Meta no longer honours ends blocked, never empty-succeeded."""
+    from collectors.instagram_collector import InstagramCollector
+
+    handler = lambda r: httpx.Response(400, json={"error": {"code": 190, "message": "expired"}})  # noqa: E731
+
+    def builder_fn(tok=None, exp=None, ren=None, channel_id=None, platform=None, **kwargs):
+        return InstagramCollector(client=httpx.Client(transport=httpx.MockTransport(handler)), access_token=tok)
+
+    discover_lease = {"job_id": "j_ig_190", "lease_token": "t", "access_token": "dead", "platform": "instagram", "mode": "discover"}
+    rec = MockControlPlaneRecorder(discover_lease)
+    _discover(rec.plane(), discover_lease, builder_fn)
+    assert rec.finished_outcome == "blocked" and rec.finished_reason == "invalid_credentials"
+    assert rec.committed_catalogues == []
