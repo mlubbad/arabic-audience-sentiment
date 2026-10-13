@@ -1,5 +1,19 @@
 # Implementation decisions
 
+2026-10-13 — A Facebook account that manages several pages chooses one inside the product.
+The first live connect (the owner's own account) ended at `ambiguous_channel`; the way
+through, Meta's "Edit settings" screen with one page ticked, worked but is not something an
+ordinary user understands (owner, 2026-10-13: "he will think there is a problem"). The owner
+chose the in-product list over steering people through Meta's screen. The callback now files
+every allowed page under the one pending ticket, each with its own sealed page token
+(`20261027000000_meta_page_choice.sql`: `private.oauth_pending_choices`); completion without
+a choice answers `choose_page` and keeps the ticket; `oauth_pending_choices(ticket, nonce)`
+lists names only, to the user who started, with the browser nonce and the owner role, within
+the ticket's ten minutes; completion with the chosen row id attaches that page and spends the
+ticket with all its choices. One page per workspace is unchanged: a second page goes in
+another workspace. YouTube's `ambiguous_channel` (one Google account, several channels) is
+untouched: Google's consent screen already asks which channel.
+
 2026-10-13 — Facebook and Instagram: owner consent through Meta's own APIs, public reads
 through managed scrapers, never a home-grown scraper. The research of 2026-10-13 found the
 free libraries (instaloader, facebook-scraper) throttled to a request or two per half minute
