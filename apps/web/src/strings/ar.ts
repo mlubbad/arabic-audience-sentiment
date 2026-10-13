@@ -125,12 +125,12 @@ export const ar = {
   channelOptionOwnerBadge: "مالك رسمي",
   channelOptionOwnerTitle: "أملك القناة",
   channelOptionOwnerDesc:
-    "ربط القناة بحساب Google الرسمي لتأكيد الملكية وصلاحيات القراءة المباشرة والتحليل الشامل.",
+    "سجّل الدخول بصفتك المالك عبر Google (يوتيوب) أو Meta (فيسبوك وانستغرام) لتأكيد الملكية وصلاحيات القراءة المباشرة والتحليل الشامل.",
   channelOptionOwnerAction: "ربط قناة يوتيوب عبر Google",
   channelOptionPublicBadge: "متابعة عامة",
   channelOptionPublicTitle: "لا أملك القناة",
   channelOptionPublicDesc:
-    "البحث عن أي قناة عامة بالرابط أو المعرّف (YouTube, Telegram, X, TikTok) لمتابعتها دون الحاجة لحساب المالك.",
+    "البحث عن أي قناة أو صفحة عامة بالرابط أو المعرّف (YouTube, Telegram, X, TikTok, Facebook, Instagram) لمتابعتها دون الحاجة لحساب المالك.",
   channelOptionPublicAction: "البحث عن قناة واختيارها",
   searchPublicChannelHeading:
     "البحث عن قناة عامة للمتابعة (لا تتطلب ملكية أو تسجيل دخول)",
@@ -1243,7 +1243,13 @@ export const ar = {
   crIncompleteHeading: "لم يكتمل الربط",
   crFailedHeading: "تعذر إتمام الربط",
   crUnknownDetail: (code: string) => `تعذر إتمام الطلب. رمز الخطأ: ${code}`,
-  connectedEyebrow: "ربط قناة يوتيوب",
+  connectedEyebrow: "ربط قناة",
+  crChoosePageHeading: "اختر الصفحة التي تريد متابعتها",
+  crChoosePageDetail:
+    "حسابك يدير أكثر من صفحة على فيسبوك. اختر صفحة واحدة لهذه المساحة؛ يمكنك ربط صفحة أخرى في مساحة عمل أخرى.",
+  crChoosePageLoading: "نجلب قائمة صفحاتك…",
+  crChoosePageInvalid:
+    "لم تعد هذه الصفحة ضمن الخيارات. اختر من القائمة مرة أخرى.",
   enableApiLink: "افتح صفحة تفعيل YouTube Data API",
   backToAccount: "العودة إلى الحساب",
 
