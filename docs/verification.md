@@ -33,7 +33,8 @@ Fix, migration `20261024000000`:
 | Mutations | Migration emptied: 3 failed. The `exit when` removed: 1 failed. Restored each time. |
 | `worker_topics`, `worker_credential_touch`, `unlimited_plan_and_retry_correctness` (behaviour and quota cases) | 3 files, 31 passed against the new function. |
 | Live, first deploy (run 38329785572, 00:58 UTC) | Refused in under a second: `validateMigrationSql` rejects the word CONCURRENTLY anywhere in a migration, and the comment explaining why the index is not built concurrently contained it. The check runs before any connection, so nothing reached the database. The comment is reworded (no SQL change), and `scripts/deploy-workflow.test.ts` now runs the check over every migration in the repository (12 passed; with the old file restored it fails with the deploy's own message). |
-| Live | Pending: the redeploy applies `20261024000000`; then the Oracle log should show classification instead of `57014`. |
+| Live, redeploy after #130 (run 38330658880) | "Apply remote database migrations" succeeded in 32 s (01:08:36 → 01:09:08 UTC; the index built on all of `comments`). The site was uploaded and the live check passed at 01:10. Owner's SQL editor: `svc_worker_topics_due` `proconfig` = `search_path=""`, `statement_timeout=25s`. |
+| Live, workers (owner, 2026-10-13) | Oracle restarted with classification on at 01:11 UTC (`worker up, model=camelbert-da, tenants=1, topics=gemini`). `topic_predictions` written in the last 10 minutes: **802**, latest 01:35:55 UTC; `docker compose logs --since 10m \| grep -c 57014` on Oracle: **0**. Before the fix no batch completed. |
 
 ## 2026-10-13 — Worker requests no longer queue behind a tick on their credential (57014)
 

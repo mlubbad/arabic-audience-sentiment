@@ -101,7 +101,8 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
   155,308 comments of the largest channel (14 of 15.8 s from disk) to return 200. Migration
   `20261024000000` walks the due comments over a covering index and stops at the batch size.
   On a production-sized local Postgres it goes from 5.2 s to 0.13 s, with identical output
-  across the quota cases.
+  across the quota cases. Live after #130 fixed a deploy refusal (a comment tripped the
+  migration check): 802 comments classified in the first ten minutes, no `57014` on Oracle.
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes
