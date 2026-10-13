@@ -93,9 +93,15 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
   with `57014` about once a minute: every worker request updated its credential's row, the tick
   held that lock for 5.6 s on average, and the rest queued behind it until the 8 s limit. Fixed
   by migration `20261023000000` (read the credential, touch `last_seen_at` once a minute with
-  `skip locked`; the tick gets 25 s), reproduced before and after on a local Postgres 16. The
-  owner applies it. The standby agent waits until the logs are clean; the runbook now names the
+  `skip locked`; the tick gets 25 s), reproduced before and after on a local Postgres 16; the
+  deploy applied it (00:17 UTC). The standby agent waits until the logs are clean; the runbook now names the
   key the owner actually uses (`~/.ssh/oracle_vm`).
+  #128 went live and the `57014` stayed: the lock wait was real but secondary. The owner's
+  `pg_stat_activity` and `explain (analyze, buffers)` showed `svc_worker_topics_due` reading all
+  155,308 comments of the largest channel (14 of 15.8 s from disk) to return 200. Migration
+  `20261024000000` walks the due comments over a covering index and stops at the batch size.
+  On a production-sized local Postgres it goes from 5.2 s to 0.13 s, with identical output
+  across the quota cases.
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes
