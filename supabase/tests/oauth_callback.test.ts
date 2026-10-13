@@ -440,3 +440,89 @@ describe("completing a Meta connection", () => {
     ).rejects.toMatchObject({ code: "oauth_not_configured" });
   });
 });
+
+describe("several Facebook pages", () => {
+  it("files the pages as choices, each sealed on its own, and no single pending row", async () => {
+    const http = vi.fn(async (url: string) => {
+      if (url.includes("/oauth/access_token"))
+        return new Response(
+          JSON.stringify({ access_token: "EAAX", expires_in: 5000 }),
+          { status: 200 },
+        );
+      if (url.includes("/me/accounts"))
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "111",
+                name: "صفحة أ",
+                username: "a",
+                access_token: "EAA-A",
+              },
+              { id: "222", name: "صفحة ب", access_token: "EAA-B" },
+            ],
+          }),
+          { status: 200 },
+        );
+      return new Response("{}", { status: 500 });
+    });
+    const pending: unknown[] = [];
+    const choices: Parameters<
+      NonNullable<CallbackDb["createPendingChoices"]>
+    >[0][] = [];
+    const db: CallbackDb = {
+      consumeState: async () => ({ ...binding, provider: "facebook" }),
+      createPending: async (input) => {
+        pending.push(input);
+      },
+      createPendingChoices: async (input) => {
+        choices.push(input);
+      },
+    };
+    const key = await importSealingKey(KEY_B64);
+    const result = await handleCallback({
+      code: "fb-code",
+      state: "state-value",
+      error: null,
+      config,
+      meta: {
+        app_id: "1234567890",
+        app_secret: "s",
+        ig_app_id: "9876543210",
+        ig_app_secret: "t",
+        redirect_uri: "https://proj.supabase.co/functions/v1/oauth-callback",
+        key_version: "k1",
+      },
+      db,
+      http,
+      key,
+      random: (n) => new Uint8Array(n).fill(9),
+    });
+    expect(result.ticket).toHaveLength(43);
+    expect(pending).toEqual([]);
+    expect(choices).toHaveLength(1);
+    expect(choices[0]).toMatchObject({
+      platform: "facebook",
+      keyVersion: "k1",
+    });
+    expect(
+      choices[0].choices.map((c) => [c.externalChannel, c.title, c.handle]),
+    ).toEqual([
+      ["111", "صفحة أ", "a"],
+      ["222", "صفحة ب", null],
+    ]);
+    const opened = await Promise.all(
+      choices[0].choices.map(
+        (c) =>
+          openTokens(key, c.sealedTokens) as Promise<{
+            access_token: string;
+            provider: string;
+          }>,
+      ),
+    );
+    expect(opened.map((t) => [t.access_token, t.provider])).toEqual([
+      ["EAA-A", "facebook"],
+      ["EAA-B", "facebook"],
+    ]);
+  });
+});

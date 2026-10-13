@@ -89,6 +89,27 @@ Deno.serve(async (request) => {
           });
           if (error) throw new Error(error.code ?? "pending_failed");
         },
+        createPendingChoices: async (input) => {
+          const { error } = await db.rpc("svc_oauth_create_pending_choices", {
+            state_id: input.stateId,
+            ticket_hash: input.ticketHash,
+            key_version: input.keyVersion,
+            scopes: input.scopes,
+            pending_platform: input.platform,
+            // bytea inside jsonb travels as the same hex literal.
+            choices: input.choices.map((c) => ({
+              external_channel: c.externalChannel,
+              handle: c.handle,
+              title: c.title,
+              tokens:
+                "\\x" +
+                [...c.sealedTokens]
+                  .map((b) => b.toString(16).padStart(2, "0"))
+                  .join(""),
+            })),
+          });
+          if (error) throw new Error(error.code ?? "pending_failed");
+        },
       },
       http: (u, init) => fetch(u, init),
       key: await importSealingKey(env("TOKEN_ENCRYPTION_KEY")),

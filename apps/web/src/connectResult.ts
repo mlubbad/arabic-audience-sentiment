@@ -11,15 +11,34 @@ import { OAUTH_BROWSER_NONCE_KEY } from "./connect";
 import { supabase } from "./supabase";
 
 export type PendingCompletion =
-  { kind: "success"; channelId: string } | { kind: "error"; code: string };
+  | { kind: "success"; channelId: string }
+  | { kind: "error"; code: string }
+  /** The account manages several Facebook pages; the ticket waits for one. */
+  | { kind: "choose"; invalid?: boolean };
 
+export type PageChoice = {
+  id: string;
+  external_channel: string;
+  title: string | null;
+  handle: string | null;
+};
+
+/**
+ * Completes the connection the ticket names. With several pages under the
+ * ticket the first call answers `choose`, and the browser nonce is kept for
+ * the list and for the call that carries the chosen page; any final answer,
+ * success or refusal, spends it.
+ */
 export async function completePendingConnection(
   ticket: string,
+  choice?: string,
 ): Promise<PendingCompletion> {
   const nonce = sessionStorage.getItem(OAUTH_BROWSER_NONCE_KEY);
-  sessionStorage.removeItem(OAUTH_BROWSER_NONCE_KEY);
-  if (!nonce || !ticket)
+  const spend = () => sessionStorage.removeItem(OAUTH_BROWSER_NONCE_KEY);
+  if (!nonce || !ticket) {
+    spend();
     return { kind: "error", code: "oauth_binding_mismatch" };
+  }
   if (!supabase) return { kind: "error", code: "oauth_not_configured" };
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -34,13 +53,19 @@ export async function completePendingConnection(
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ ticket, nonce }),
+        body: JSON.stringify(
+          choice ? { ticket, nonce, choice } : { ticket, nonce },
+        ),
       },
     );
     const body = (await response.json().catch(() => ({}))) as {
       channel_id?: string;
       code?: string;
     };
+    if (body.code === "choose_page") return { kind: "choose" };
+    if (body.code === "invalid_choice")
+      return { kind: "choose", invalid: true };
+    spend();
     if (!response.ok || !body.channel_id)
       return {
         kind: "error",
@@ -53,6 +78,26 @@ export async function completePendingConnection(
   } catch {
     return { kind: "error", code: "unreachable" };
   }
+}
+
+/** The pages under the ticket, names only, for the person who started. */
+export async function listPageChoices(
+  ticket: string,
+): Promise<
+  { kind: "choices"; choices: PageChoice[] } | { kind: "error"; code: string }
+> {
+  const nonce = sessionStorage.getItem(OAUTH_BROWSER_NONCE_KEY);
+  if (!nonce || !ticket || !supabase)
+    return { kind: "error", code: "oauth_binding_mismatch" };
+  const { data, error } = await supabase.rpc("oauth_pending_choices", {
+    ticket,
+    nonce,
+  });
+  // An empty list is what the database answers to anyone the ticket is not
+  // bound to, or once it has expired: the same refusal either way.
+  if (error || !Array.isArray(data) || data.length === 0)
+    return { kind: "error", code: "oauth_binding_mismatch" };
+  return { kind: "choices", choices: data as PageChoice[] };
 }
 
 export type ConnectResult = {
@@ -105,11 +150,22 @@ export function connectResult(
         detail: S.crFinishingDetail,
         action: null,
       };
+    if (completion.kind === "choose")
+      return {
+        tone: "notice",
+        heading: S.crChoosePageHeading,
+        detail: completion.invalid
+          ? S.crChoosePageInvalid
+          : S.crChoosePageDetail,
+        action: null,
+      };
+    // The id the completion returns is a database key, not a name a person
+    // recognises; the account page shows the channel by its name.
     if (completion.kind === "success")
       return {
         tone: "success",
         heading: S.crConnectedHeading,
-        detail: S.crConnectedDetailWith(completion.channelId),
+        detail: S.crConnectedDetail,
         action: null,
       };
     params = new URLSearchParams({ status: "error", code: completion.code });

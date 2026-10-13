@@ -15,11 +15,11 @@ Deno.serve(async (request) => {
   return handleOauthComplete(
     request,
     {
-      complete: async (ticket, nonce) => {
-        const { data, error } = await db.rpc("oauth_complete", {
-          ticket,
-          nonce,
-        });
+      complete: async (ticket, nonce, choice) => {
+        const { data, error } = await db.rpc(
+          "oauth_complete",
+          choice ? { ticket, nonce, choice } : { ticket, nonce },
+        );
         if (error) throw new Error(error.code ?? "oauth_complete_failed");
         return (
           data?.[0] ?? {

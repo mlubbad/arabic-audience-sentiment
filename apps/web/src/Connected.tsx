@@ -5,9 +5,10 @@ import {
   connectResult,
   type PendingCompletion,
 } from "./connectResult";
+import { PageChooser } from "./PageChooser";
 import { useStrings } from "./strings";
 
-/** Where Google's callback hands the person back, inside the product. */
+/** Where the OAuth callback (Google or Meta) hands the person back, inside the product. */
 export function Connected() {
   const [params, setSearchParams] = useSearchParams();
   const S = useStrings();
@@ -15,6 +16,10 @@ export function Connected() {
   const started = useRef(false);
   const ticket =
     params.get("connect") === "pending" ? params.get("ticket") : null;
+  // The ticket leaves the URL at once (it is single use and should not sit in
+  // history), but a ticket holding several pages is needed again to list
+  // them and to complete with the chosen one: kept from the first render.
+  const [heldTicket] = useState(ticket);
   useEffect(() => {
     if (params.get("connect") !== "pending" || started.current) return;
     started.current = true;
@@ -40,6 +45,9 @@ export function Connected() {
       >
         <p>{result.detail}</p>
       </div>
+      {completion?.kind === "choose" && heldTicket && (
+        <PageChooser ticket={heldTicket} onDone={setCompletion} />
+      )}
       <p>
         {result.action === "console" && (
           <a

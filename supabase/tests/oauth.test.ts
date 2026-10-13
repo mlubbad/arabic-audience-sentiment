@@ -1016,4 +1016,242 @@ describe("youtube connection", () => {
     ).rejects.toThrow(/channel_already_connected/);
     await admin();
   });
+
+  // ----- Several Facebook pages: the person chooses inside the product -------
+
+  const PAGE_A = "111222333444555";
+  const PAGE_B = "666777888999000";
+  const createChoices = async (
+    who: string,
+    workspace: string,
+    state: string,
+    ticket: string,
+    nonce: string,
+    pages: string[] = [PAGE_A, PAGE_B],
+  ) => {
+    await user(who);
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4,$5)", [
+      workspace,
+      h(state),
+      VERIFIER,
+      sha(nonce),
+      "facebook",
+    ]);
+    await admin();
+    const consumed = await db.query<{ state_id: string }>(
+      "select state_id from private.oauth_consume_state($1)",
+      [h(state)],
+    );
+    const choices = pages.map((id, i) => ({
+      external_channel: id,
+      handle: `page${i}`,
+      title: `صفحة ${i}`,
+      tokens: "\\x" + Buffer.from(`sealed-${id}`).toString("hex"),
+    }));
+    await db.query(
+      "select private.oauth_create_pending_choices($1,$2,'k1',$3,'facebook',$4::jsonb)",
+      [
+        consumed.rows[0].state_id,
+        sha(ticket),
+        ["pages_read_engagement"],
+        JSON.stringify(choices),
+      ],
+    );
+  };
+
+  it("offers the pages to choose from and keeps the ticket until one is chosen", async () => {
+    await createChoices(ownerA, A, "c-list", "t-list", "n-list");
+    await user(ownerA);
+    const first = await db.query<{
+      channel_id: string | null;
+      code: string | null;
+    }>("select * from public.oauth_complete($1,$2)", ["t-list", "n-list"]);
+    expect(first.rows[0]).toEqual({ channel_id: null, code: "choose_page" });
+    const listed = await db.query<Record<string, unknown>>(
+      "select * from public.oauth_pending_choices($1,$2)",
+      ["t-list", "n-list"],
+    );
+    expect(listed.rows.map((r) => r.external_channel)).toEqual([
+      PAGE_A,
+      PAGE_B,
+    ]);
+    expect(listed.rows[0]).toMatchObject({ title: "صفحة 0", handle: "page0" });
+    // The list names pages; it never carries a token.
+    for (const row of listed.rows)
+      expect(Object.keys(row).sort()).toEqual([
+        "external_channel",
+        "handle",
+        "id",
+        "title",
+      ]);
+
+    const chosen = listed.rows[1].id as string;
+    const done = await db.query<{
+      channel_id: string | null;
+      code: string | null;
+    }>("select * from public.oauth_complete($1,$2,$3)", [
+      "t-list",
+      "n-list",
+      chosen,
+    ]);
+    expect(done.rows[0].code).toBeNull();
+    await admin();
+    const row = await db.query<{
+      platform: string;
+      status: string;
+      external_channel_id: string;
+      title: string;
+    }>(
+      "select platform,status,external_channel_id,title from channels where id=$1",
+      [done.rows[0].channel_id],
+    );
+    expect(row.rows[0]).toEqual({
+      platform: "facebook",
+      status: "connected",
+      external_channel_id: PAGE_B,
+      title: "صفحة 1",
+    });
+    // Only the chosen page is connected, with its own sealed token.
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select count(*)::int as n from channels where workspace_id=$1 and external_channel_id=$2",
+          [A, PAGE_A],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    const grant = await db.query<{ t: string }>(
+      "select convert_from(c.encrypted_tokens,'utf8') as t from private.oauth_connections c where c.channel_id=$1 and c.status='connected'",
+      [done.rows[0].channel_id],
+    );
+    expect(grant.rows[0].t).toBe(`sealed-${PAGE_B}`);
+    // The ticket and its choices are spent.
+    expect(
+      (
+        await db.query<{ n: number }>(
+          "select count(*)::int as n from private.oauth_pending_choices",
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    await user(ownerA);
+    const replay = await db.query<{ code: string | null }>(
+      "select code from public.oauth_complete($1,$2,$3)",
+      ["t-list", "n-list", chosen],
+    );
+    expect(replay.rows[0].code).toBe("oauth_binding_mismatch");
+    await admin();
+  });
+
+  it("shows the choices only to the person who started, with the right nonce", async () => {
+    await createChoices(ownerA, A, "c-who", "t-who", "n-who");
+    await user(ownerB);
+    expect(
+      (
+        await db.query("select * from public.oauth_pending_choices($1,$2)", [
+          "t-who",
+          "n-who",
+        ])
+      ).rows,
+    ).toEqual([]);
+    await user(ownerA);
+    expect(
+      (
+        await db.query("select * from public.oauth_pending_choices($1,$2)", [
+          "t-who",
+          "wrong",
+        ])
+      ).rows,
+    ).toEqual([]);
+    expect(
+      (
+        await db.query("select * from public.oauth_pending_choices($1,$2)", [
+          "t-who",
+          "n-who",
+        ])
+      ).rows,
+    ).toHaveLength(2);
+    // Another user cannot complete it with a valid choice either.
+    const id = (
+      await db.query<{ id: string }>(
+        "select id from public.oauth_pending_choices($1,$2)",
+        ["t-who", "n-who"],
+      )
+    ).rows[0].id;
+    await user(ownerB);
+    const refused = await db.query<{ code: string | null }>(
+      "select code from public.oauth_complete($1,$2,$3)",
+      ["t-who", "n-who", id],
+    );
+    expect(refused.rows[0].code).toBe("oauth_binding_mismatch");
+    await admin();
+  });
+
+  it("a choice from another ticket is refused and the ticket stays usable", async () => {
+    await createChoices(ownerA, A, "c-x1", "t-x1", "n-x1", ["123123123"]);
+    await createChoices(ownerA, A, "c-x2", "t-x2", "n-x2", [
+      "456456456",
+      "789789789",
+    ]);
+    await user(ownerA);
+    const foreign = (
+      await db.query<{ id: string }>(
+        "select id from public.oauth_pending_choices($1,$2)",
+        ["t-x1", "n-x1"],
+      )
+    ).rows[0].id;
+    const wrong = await db.query<{ code: string | null }>(
+      "select code from public.oauth_complete($1,$2,$3)",
+      ["t-x2", "n-x2", foreign],
+    );
+    expect(wrong.rows[0].code).toBe("invalid_choice");
+    expect(
+      (
+        await db.query("select * from public.oauth_pending_choices($1,$2)", [
+          "t-x2",
+          "n-x2",
+        ])
+      ).rows,
+    ).toHaveLength(2);
+    await admin();
+  });
+
+  it("refuses a malformed list of pages", async () => {
+    await user(ownerA);
+    await db.query("select public.oauth_start($1,$1,$2,$3,$4,$5)", [
+      A,
+      h("c-bad"),
+      VERIFIER,
+      NONCE_HASH,
+      "facebook",
+    ]);
+    await admin();
+    const st = (
+      await db.query<{ state_id: string }>(
+        "select state_id from private.oauth_consume_state($1)",
+        [h("c-bad")],
+      )
+    ).rows[0].state_id;
+    const call = (choices: unknown) =>
+      db.query(
+        "select private.oauth_create_pending_choices($1,$2,'k1',$3,'facebook',$4::jsonb)",
+        [st, sha("t-bad-" + Math.random()), ["x"], JSON.stringify(choices)],
+      );
+    await expect(
+      call([{ external_channel: CHANNEL, tokens: "\\x00" }]),
+    ).rejects.toThrow(/invalid_channel_id/);
+    await expect(call([])).rejects.toThrow(/invalid_choices/);
+    await expect(call([{ external_channel: "1" }])).rejects.toThrow(
+      /invalid_choices/,
+    );
+  });
+
+  it("the choice entry points are tenant-callable only where they must be", async () => {
+    await user(ownerA);
+    await expect(
+      db.query(
+        "select private.oauth_create_pending_choices(gen_random_uuid(),'x','k1','{}','facebook','[]'::jsonb)",
+      ),
+    ).rejects.toThrow(/permission denied/);
+    await admin();
+  });
 });
