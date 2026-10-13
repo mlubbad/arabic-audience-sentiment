@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
 import {
@@ -115,6 +115,20 @@ describe("remote migration safety", () => {
     expect(() =>
       validateMigrationSql("create table demo(id bigint);", "safe.sql"),
     ).not.toThrow();
+  });
+
+  test("passes every migration in the repository, comments included", () => {
+    // The check reads the whole file, comments too: 20261024000000 named the
+    // word in a comment and the deploy refused it (2026-10-13, run 38329785572).
+    for (const file of readdirSync("supabase/migrations").filter((f) =>
+      f.endsWith(".sql"),
+    ))
+      expect(() =>
+        validateMigrationSql(
+          readFileSync(`supabase/migrations/${file}`, "utf8"),
+          file,
+        ),
+      ).not.toThrow();
   });
 });
 

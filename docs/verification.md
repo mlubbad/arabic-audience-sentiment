@@ -1,5 +1,41 @@
 # Verification
 
+## 2026-10-13 — The topics batch reads the 200 comments it returns, not the channel
+
+After #128 was live (deploy 00:17 UTC, `svc_worker_tick` showing `statement_timeout=25s`), the
+Oracle log still showed `control plane refused: control_plane_error:57014` every 45 s or so. The
+owner's SQL editor answered where the time went:
+
+| Query (owner, 2026-10-13) | Result |
+| --- | --- |
+| `pg_stat_activity` for `authenticator`, not idle | Two `svc_worker_topics_due`, 7.0 s each, `IO / DataFileRead`: reading, not waiting on a lock. |
+| Jobs queued or running | Nine `analyse` jobs leased; the largest channel has 4,583 due videos. |
+| `explain (analyze, buffers)` of the selection for the oldest analyse job | 15,780 ms. `comments_video_date` 4,583 loops, 155,308 rows, 14.0 s, 20,907 pages read from disk; 125,600 rows still due (29,708 classified); a top-N sort keeps 200. The real function also checks `usage_events` for every due row and computes a running total over all of them, which this explain left out. |
+
+So #128 removed a real lock wait, but it was not why the workers failed. The batch was
+`O(channel)`: it read every comment row of the channel to return 200, and on this channel that
+always passed 8 s.
+
+Fix, migration `20261024000000`:
+- **`comments_topic_scan`:** a new index on `(workspace_id, video_id, published_at, id)` that also
+  carries `content_hash`, `author_channel_id`, `external_comment_id` and `content_purged_at`.
+- **`worker_topics_due`:** walks the due comments in the same order, stops at the batch size, and
+  reads text and parents for the picked rows only.
+- **`svc_worker_topics_due`:** gets a 25 s statement timeout.
+
+| Command / observation | Actual result |
+| --- | --- |
+| Local PostgreSQL 16.13, every migration applied; one workspace with 4,583 videos and 155,822 comments (Arabic text ~350 chars, `comments` 243 MB), the oldest 29,708 classified and charged, an analyse job leased | Old function: 5,231 ms with the OS cache dropped, then 1,659 / 1,847 ms warm. New function: 134 ms with the OS cache dropped and Postgres restarted, then 117 / 111 ms. |
+| Same output, old against new, on that data plus own-channel comments (4,444), purged comments (3,333), replies with parents (3,333) and 300 comments charged earlier but unclassified | Byte-identical `worker_topics_due` result for topic quotas of 1,000,000 / 150 / 50 / 1 / 0 with `max_rows` 200 and 37, and with the subscription closed (`blocked: quota_exceeded`, no rows). At quota 1 and 0 the walk continues past the costing rows to the free ones, as the window did: 200 rows. |
+| Quota-limited timings (quota 1 / 0) | Old 1,547 / 1,478 ms; new 141 / 136 ms. |
+| `reindex index comments_topic_scan` on 155,822 rows | 344 ms, 22 MB. Production's build runs inside the deployment transaction and holds a share lock on `comments` for about that long per 155k rows. |
+| `npx vitest run supabase/tests/worker_topics_due_bounded.test.ts` | 3 passed: the index with its included columns; the walk ordered `published_at nulls last, id`, stopping at the cap, text read via `unnest(picked)`, no window over the channel; `svc_worker_topics_due` at `statement_timeout=25s` with `search_path=""`. |
+| Mutations | Migration emptied: 3 failed. The `exit when` removed: 1 failed. Restored each time. |
+| `worker_topics`, `worker_credential_touch`, `unlimited_plan_and_retry_correctness` (behaviour and quota cases) | 3 files, 31 passed against the new function. |
+| Live, first deploy (run 38329785572, 00:58 UTC) | Refused in under a second: `validateMigrationSql` rejects the word CONCURRENTLY anywhere in a migration, and the comment explaining why the index is not built concurrently contained it. The check runs before any connection, so nothing reached the database. The comment is reworded (no SQL change), and `scripts/deploy-workflow.test.ts` now runs the check over every migration in the repository (12 passed; with the old file restored it fails with the deploy's own message). |
+| Live, redeploy after #130 (run 38330658880) | "Apply remote database migrations" succeeded in 32 s (01:08:36 → 01:09:08 UTC; the index built on all of `comments`). The site was uploaded and the live check passed at 01:10. Owner's SQL editor: `svc_worker_topics_due` `proconfig` = `search_path=""`, `statement_timeout=25s`. |
+| Live, workers (owner, 2026-10-13) | Oracle restarted with classification on at 01:11 UTC (`worker up, model=camelbert-da, tenants=1, topics=gemini`). `topic_predictions` written in the last 10 minutes: **802**, latest 01:35:55 UTC; `docker compose logs --since 10m \| grep -c 57014` on Oracle: **0**. Before the fix no batch completed. |
+
 ## 2026-10-13 — Worker requests no longer queue behind a tick on their credential (57014)
 
 The Oracle worker came up on the first run (owner's terminal, 2026-10-12 23:50 UTC, Ubuntu 24.04
