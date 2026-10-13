@@ -48,8 +48,28 @@ describe("starting a connection from the browser", () => {
     expect(JSON.parse(String(init.body))).toEqual({
       workspace_id: "ws-1",
       client_id: "client-1",
+      provider: "google",
     });
     expect(String(init.body)).not.toContain("verifier");
+  });
+
+  it("sends the provider the card chose, and google explicitly when none was", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ url: "https://x", nonce: "n" }), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { beginConnect } = await load();
+    await beginConnect("ws-1", "client-1", "instagram");
+    await beginConnect("ws-1", "client-1");
+    const bodies = fetchMock.mock.calls.map(
+      (c) =>
+        JSON.parse(String((c as unknown as [string, RequestInit])[1].body))
+          .provider,
+    );
+    expect(bodies).toEqual(["instagram", "google"]);
   });
 
   it("sends the session, so the server checks membership rather than trusting us", async () => {

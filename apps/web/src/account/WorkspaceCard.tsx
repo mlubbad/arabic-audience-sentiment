@@ -17,6 +17,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { ChannelCandidate, SourcePlatform } from "@sentiment/contracts";
+import type { ConnectProvider } from "../connect";
 import { setupProgress } from "../setup";
 import { SetupPath } from "../SetupPath";
 import { useStrings } from "../strings";
@@ -91,8 +92,9 @@ export function WorkspaceCard({
   pending: boolean;
   /** What this card has to say for itself — its own note, or that it is working. */
   feedback: ReactNode;
-  /** Starts the OAuth connect or relink redirect to Google. */
-  onConnect: () => void;
+  /** Starts the OAuth connect or relink redirect: Google for YouTube, Meta
+   *  for a Facebook page or an Instagram account. */
+  onConnect: (provider: ConnectProvider) => void;
   /** The public-data door: `open` shows the form, `cancel` closes it,
    *  `search` looks a query up on the server, `add` files the candidate.
    *  The page owns the lookup and the registration; this card only shows
@@ -176,6 +178,42 @@ export function WorkspaceCard({
   // fill, and named for what it does rather than as a generic "reconnect"
   // a reader would take for a fault.
   const unnamed = connected && !channel.title && !channel.handle;
+  // A lapsed or unnamed channel reconnects through the door it came in by.
+  const channelProvider: ConnectProvider =
+    channel?.platform === "facebook"
+      ? "facebook"
+      : channel?.platform === "instagram"
+        ? "instagram"
+        : "google";
+  // The owner door, one button per consent screen. `connect-<ws>` stays on
+  // YouTube: it is the id the page tests and the browser suite press.
+  const ownerDoors = hasClient && (
+    <>
+      <Button
+        disabled={pending}
+        data-testid={`connect-${workspace.id}`}
+        onClick={() => onConnect("google")}
+      >
+        {S.connectChannel}
+      </Button>
+      <Button
+        variant="secondary"
+        disabled={pending}
+        data-testid={`connect-facebook-${workspace.id}`}
+        onClick={() => onConnect("facebook")}
+      >
+        {S.connectFacebookPage}
+      </Button>
+      <Button
+        variant="secondary"
+        disabled={pending}
+        data-testid={`connect-instagram-${workspace.id}`}
+        onClick={() => onConnect("instagram")}
+      >
+        {S.connectInstagramAccount}
+      </Button>
+    </>
+  );
 
   return (
     <Card asChild className="db-ws">
@@ -322,17 +360,7 @@ export function WorkspaceCard({
                   <p className="db-channel-choice-desc">
                     {S.channelOptionOwnerDesc}
                   </p>
-                  <div className="db-actions">
-                    {hasClient && (
-                      <Button
-                        disabled={pending}
-                        data-testid={`connect-${workspace.id}`}
-                        onClick={onConnect}
-                      >
-                        {S.connectChannel}
-                      </Button>
-                    )}
-                  </div>
+                  <div className="db-actions">{ownerDoors}</div>
                 </div>
 
                 <div className="db-channel-choice db-channel-choice--public">
@@ -376,17 +404,10 @@ export function WorkspaceCard({
         {/* When public channels are not permitted for this account type: render direct connect button */}
         {(!channel || channel.status === "disconnected") &&
           !allowPublicChannels && (
-            <div className="db-actions">
-              {hasClient && (
-                <Button
-                  disabled={pending}
-                  data-testid={`connect-${workspace.id}`}
-                  onClick={onConnect}
-                >
-                  {S.connectChannel}
-                </Button>
-              )}
-            </div>
+            <>
+              <p className="db-muted">{S.connectProviderLead}</p>
+              <div className="db-actions">{ownerDoors}</div>
+            </>
           )}
 
         {/* Action doors for existing channels or workspace-level actions */}
@@ -411,7 +432,7 @@ export function WorkspaceCard({
               <Button
                 disabled={pending}
                 data-testid={`connect-${workspace.id}`}
-                onClick={onConnect}
+                onClick={() => onConnect(channelProvider)}
               >
                 {S.connectChannel}
               </Button>
@@ -421,7 +442,7 @@ export function WorkspaceCard({
                 variant="secondary"
                 disabled={pending}
                 data-testid={`relink-${workspace.id}`}
-                onClick={onConnect}
+                onClick={() => onConnect(channelProvider)}
               >
                 {S.relinkForName}
               </Button>

@@ -287,6 +287,39 @@ describe("WorkspaceCard", () => {
       expect(onConnect).toHaveBeenCalledTimes(1);
     });
 
+    it("the YouTube door still answers google on connect-<ws>", async () => {
+      const onConnect = vi.fn();
+      mount({ channel: null, onConnect });
+      await userEvent.click(screen.getByTestId(`connect-${W}`));
+      expect(onConnect).toHaveBeenCalledWith("google");
+    });
+
+    it("the Facebook and Instagram doors ask for their provider", async () => {
+      const onConnect = vi.fn();
+      mount({ channel: null, onConnect });
+      await userEvent.click(screen.getByTestId(`connect-facebook-${W}`));
+      expect(onConnect).toHaveBeenLastCalledWith("facebook");
+      await userEvent.click(screen.getByTestId(`connect-instagram-${W}`));
+      expect(onConnect).toHaveBeenLastCalledWith("instagram");
+      expect(
+        screen.getByRole("button", { name: ar.connectFacebookPage }),
+      ).toBeInTheDocument();
+    });
+
+    it("a lapsed Instagram grant reconnects through Instagram, not Google", async () => {
+      const onConnect = vi.fn();
+      mount({
+        channel: {
+          ...connected,
+          status: "reconnect_required",
+          platform: "instagram",
+        },
+        onConnect,
+      });
+      await userEvent.click(screen.getByTestId(`connect-${W}`));
+      expect(onConnect).toHaveBeenCalledWith("instagram");
+    });
+
     it("relinks directly to Google when the relink door is clicked", async () => {
       const onConnect = vi.fn();
       mount({
