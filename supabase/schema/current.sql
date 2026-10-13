@@ -242,10 +242,10 @@ create table "private"."oauth_pending" (
   "id" uuid default gen_random_uuid() not null,
   "state_id" uuid not null,
   "ticket_hash" text not null,
-  "external_channel" text not null,
+  "external_channel" text,
   "channel_handle" text,
   "channel_title" text,
-  "encrypted_tokens" bytea not null,
+  "encrypted_tokens" bytea,
   "key_version" text not null,
   "granted_scopes" text[] not null,
   "expires_at" timestamp with time zone not null,
@@ -255,15 +255,14 @@ create table "private"."oauth_pending" (
 alter table "private"."oauth_pending" enable row level security;
 
 alter table "private"."oauth_pending" add constraint "oauth_pending_created_at_not_null" NOT NULL created_at;
-alter table "private"."oauth_pending" add constraint "oauth_pending_encrypted_tokens_not_null" NOT NULL encrypted_tokens;
 alter table "private"."oauth_pending" add constraint "oauth_pending_expires_at_not_null" NOT NULL expires_at;
-alter table "private"."oauth_pending" add constraint "oauth_pending_external_channel_not_null" NOT NULL external_channel;
 alter table "private"."oauth_pending" add constraint "oauth_pending_granted_scopes_not_null" NOT NULL granted_scopes;
 alter table "private"."oauth_pending" add constraint "oauth_pending_id_not_null" NOT NULL id;
 alter table "private"."oauth_pending" add constraint "oauth_pending_key_version_not_null" NOT NULL key_version;
 alter table "private"."oauth_pending" add constraint "oauth_pending_pkey" PRIMARY KEY (id);
 alter table "private"."oauth_pending" add constraint "oauth_pending_platform_check" CHECK (platform = ANY (ARRAY['youtube'::text, 'facebook'::text, 'instagram'::text]));
 alter table "private"."oauth_pending" add constraint "oauth_pending_platform_not_null" NOT NULL platform;
+alter table "private"."oauth_pending" add constraint "oauth_pending_single_or_choice" CHECK ((external_channel IS NULL) = (encrypted_tokens IS NULL));
 alter table "private"."oauth_pending" add constraint "oauth_pending_state_id_fkey" FOREIGN KEY (state_id) REFERENCES private.oauth_states(id) ON DELETE CASCADE;
 alter table "private"."oauth_pending" add constraint "oauth_pending_state_id_key" UNIQUE (state_id);
 alter table "private"."oauth_pending" add constraint "oauth_pending_state_id_not_null" NOT NULL state_id;
@@ -273,6 +272,32 @@ alter table "private"."oauth_pending" add constraint "oauth_pending_ticket_hash_
 CREATE UNIQUE INDEX oauth_pending_pkey ON private.oauth_pending USING btree (id);
 CREATE UNIQUE INDEX oauth_pending_state_id_key ON private.oauth_pending USING btree (state_id);
 CREATE UNIQUE INDEX oauth_pending_ticket_hash_key ON private.oauth_pending USING btree (ticket_hash);
+
+create table "private"."oauth_pending_choices" (
+  "id" uuid default gen_random_uuid() not null,
+  "pending_id" uuid not null,
+  "position" integer not null,
+  "external_channel" text not null,
+  "channel_handle" text,
+  "channel_title" text,
+  "encrypted_tokens" bytea not null
+);
+alter table "private"."oauth_pending_choices" enable row level security;
+
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_channel_handle_check" CHECK (channel_handle IS NULL OR length(channel_handle) <= 100);
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_channel_title_check" CHECK (channel_title IS NULL OR length(channel_title) <= 200);
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_encrypted_tokens_not_null" NOT NULL encrypted_tokens;
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_external_channel_check" CHECK (external_channel ~ '^[0-9]{1,64}$'::text);
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_external_channel_not_null" NOT NULL external_channel;
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_id_not_null" NOT NULL id;
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_pending_id_external_channel_key" UNIQUE (pending_id, external_channel);
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_pending_id_fkey" FOREIGN KEY (pending_id) REFERENCES private.oauth_pending(id) ON DELETE CASCADE;
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_pending_id_not_null" NOT NULL pending_id;
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_pkey" PRIMARY KEY (id);
+alter table "private"."oauth_pending_choices" add constraint "oauth_pending_choices_position_not_null" NOT NULL "position";
+
+CREATE UNIQUE INDEX oauth_pending_choices_pending_id_external_channel_key ON private.oauth_pending_choices USING btree (pending_id, external_channel);
+CREATE UNIQUE INDEX oauth_pending_choices_pkey ON private.oauth_pending_choices USING btree (id);
 
 create table "private"."oauth_states" (
   "state_hash" text not null,
@@ -3644,7 +3669,7 @@ declare ch uuid; begin
   return ch;
 end $function$
 
-CREATE OR REPLACE FUNCTION private.oauth_complete_impl(ticket text, browser_nonce text)
+CREATE OR REPLACE FUNCTION private.oauth_complete_impl(ticket text, browser_nonce text, choice uuid DEFAULT NULL::uuid)
  RETURNS TABLE(channel_id uuid, code text)
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -3652,6 +3677,7 @@ CREATE OR REPLACE FUNCTION private.oauth_complete_impl(ticket text, browser_nonc
 AS $function$
 declare
   pending record;
+  picked record;
   attached uuid;
 begin
   select p.*,s.user_id,s.workspace_id,s.client_id,s.browser_nonce_hash
@@ -3666,19 +3692,42 @@ begin
     return;
   end if;
 
-  -- Consume before checking. Returning a coded refusal commits this deletion;
-  -- raising would roll the transaction back and leave a replayable ticket.
-  delete from private.oauth_pending p where p.id=pending.id;
-
   if pending.expires_at<=now()
      or browser_nonce is null
      or encode(extensions.digest(browser_nonce,'sha256'),'hex') is distinct from pending.browser_nonce_hash
      or (select auth.uid()) is distinct from pending.user_id
      or not private.has_role(pending.workspace_id,array['workspace_owner']) then
+    -- A refused completion spends the ticket: a coded answer commits the
+    -- deletion, where raising would roll it back and leave it replayable.
+    delete from private.oauth_pending p where p.id=pending.id;
     return query select null::uuid,'oauth_binding_mismatch'::text;
     return;
   end if;
 
+  if pending.external_channel is null then
+    -- Several pages: nothing is attached until the person picks one, and
+    -- asking again does not spend the ticket.
+    if choice is null then
+      return query select null::uuid,'choose_page'::text;
+      return;
+    end if;
+    select c.* into picked from private.oauth_pending_choices c
+     where c.id=choice and c.pending_id=pending.id;
+    if not found then
+      return query select null::uuid,'invalid_choice'::text;
+      return;
+    end if;
+    delete from private.oauth_pending p where p.id=pending.id;
+    attached := private.oauth_attach_channel_for(
+      pending.user_id,pending.workspace_id,pending.client_id,
+      picked.external_channel,picked.encrypted_tokens,pending.key_version,
+      pending.granted_scopes,picked.channel_handle,picked.channel_title,
+      pending.platform);
+    return query select attached,null::text;
+    return;
+  end if;
+
+  delete from private.oauth_pending p where p.id=pending.id;
   attached := private.oauth_attach_channel_for(
     pending.user_id,pending.workspace_id,pending.client_id,
     pending.external_channel,pending.encrypted_tokens,pending.key_version,
@@ -3732,6 +3781,57 @@ begin
     pending_key_version,pending_scopes,now()+interval '10 minutes',pending_platform);
 end $function$
 
+CREATE OR REPLACE FUNCTION private.oauth_create_pending_choices(pending_state_id uuid, pending_ticket_hash text, pending_key_version text, pending_scopes text[], pending_platform text, choices jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  pending_id uuid;
+  choice jsonb;
+  n integer := 0;
+  external text;
+  tokens text;
+begin
+  if pending_ticket_hash is null or length(pending_ticket_hash) <> 64 then
+    raise exception 'invalid_ticket' using errcode='22023'; end if;
+  if pending_platform is distinct from 'facebook' then
+    raise exception 'invalid_platform' using errcode='22023'; end if;
+  if jsonb_typeof(choices) is distinct from 'array'
+     or jsonb_array_length(choices) < 1 or jsonb_array_length(choices) > 100 then
+    raise exception 'invalid_choices' using errcode='22023'; end if;
+  if not exists(
+    select 1 from private.oauth_states s
+    where s.id=pending_state_id and s.consumed_at is not null) then
+    raise exception 'invalid_state' using errcode='42501'; end if;
+
+  insert into private.oauth_pending(
+    state_id,ticket_hash,external_channel,channel_handle,channel_title,
+    encrypted_tokens,key_version,granted_scopes,expires_at,platform)
+  values (
+    pending_state_id,pending_ticket_hash,null,null,null,null,
+    pending_key_version,pending_scopes,now()+interval '10 minutes',pending_platform)
+  returning id into pending_id;
+
+  for choice in select value from jsonb_array_elements(choices) loop
+    external := choice->>'external_channel';
+    tokens := choice->>'tokens';
+    if tokens is null or tokens !~ '^\\x[0-9a-fA-F]{2,}$' then
+      raise exception 'invalid_choices' using errcode='22023'; end if;
+    if external is null or external !~ '^[0-9]{1,64}$' then
+      raise exception 'invalid_channel_id' using errcode='22023'; end if;
+    insert into private.oauth_pending_choices(
+      pending_id,position,external_channel,channel_handle,channel_title,encrypted_tokens)
+    values (
+      pending_id, n, external,
+      nullif(left(trim(coalesce(choice->>'handle','')),100),''),
+      nullif(left(trim(coalesce(choice->>'title','')),200),''),
+      decode(substr(tokens,3),'hex'));
+    n := n + 1;
+  end loop;
+end $function$
+
 CREATE OR REPLACE FUNCTION private.oauth_disconnect_impl(w uuid, channel uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -3759,6 +3859,26 @@ begin
   update private.oauth_connections set status='reconnect_required' where channel_id=channel;
   update public.jobs set status='cancelled', error_code='connection_revoked'
   where channel_id=channel and status in ('queued','running');
+end $function$
+
+CREATE OR REPLACE FUNCTION private.oauth_pending_for(ticket text, browser_nonce text)
+ RETURNS private.oauth_pending
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare p private.oauth_pending; ok boolean;
+begin
+  select pe.* into p
+  from private.oauth_pending pe
+  join private.oauth_states s on s.id=pe.state_id
+  where pe.ticket_hash=encode(extensions.digest(ticket,'sha256'),'hex')
+    and pe.expires_at>now()
+    and browser_nonce is not null
+    and encode(extensions.digest(browser_nonce,'sha256'),'hex') = s.browser_nonce_hash
+    and (select auth.uid()) = s.user_id
+    and private.has_role(s.workspace_id,array['workspace_owner']);
+  return p;
 end $function$
 
 CREATE OR REPLACE FUNCTION private.oauth_start_impl(w uuid, c uuid, state_hash text, verifier text, browser_nonce_hash text, p_provider text DEFAULT 'google'::text)
@@ -7699,13 +7819,13 @@ begin
   order by w.name asc;
 end $function$
 
-CREATE OR REPLACE FUNCTION public.oauth_complete(ticket text, nonce text)
+CREATE OR REPLACE FUNCTION public.oauth_complete(ticket text, nonce text, choice uuid DEFAULT NULL::uuid)
  RETURNS TABLE(channel_id uuid, code text)
  LANGUAGE sql
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-  select * from private.oauth_complete_impl(ticket,nonce)
+  select * from private.oauth_complete_impl(ticket,nonce,choice)
 $function$
 
 CREATE OR REPLACE FUNCTION public.oauth_disconnect(w uuid, channel uuid)
@@ -7713,6 +7833,23 @@ CREATE OR REPLACE FUNCTION public.oauth_disconnect(w uuid, channel uuid)
  LANGUAGE sql
  SET search_path TO ''
 AS $function$select private.oauth_disconnect_impl(w,channel)$function$
+
+CREATE OR REPLACE FUNCTION public.oauth_pending_choices(ticket text, nonce text)
+ RETURNS TABLE(id uuid, external_channel text, title text, handle text)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare p private.oauth_pending;
+begin
+  p := private.oauth_pending_for(ticket, nonce);
+  if p.id is null then return; end if;
+  return query
+    select c.id, c.external_channel, c.channel_title, c.channel_handle
+    from private.oauth_pending_choices c
+    where c.pending_id=p.id
+    order by c.position;
+end $function$
 
 CREATE OR REPLACE FUNCTION public.oauth_start(w uuid, c uuid, state_hash text, verifier text, browser_nonce_hash text, p_provider text DEFAULT 'google'::text)
  RETURNS text
@@ -8149,6 +8286,15 @@ AS $function$
   select private.oauth_create_pending(
     state_id,ticket_hash,external_channel,tokens,key_version,scopes,
     channel_handle,channel_title,pending_platform)
+$function$
+
+CREATE OR REPLACE FUNCTION public.svc_oauth_create_pending_choices(state_id uuid, ticket_hash text, key_version text, scopes text[], pending_platform text, choices jsonb)
+ RETURNS void
+ LANGUAGE sql
+ SET search_path TO ''
+AS $function$
+  select private.oauth_create_pending_choices(
+    state_id,ticket_hash,key_version,scopes,pending_platform,choices)
 $function$
 
 CREATE OR REPLACE FUNCTION public.svc_register_platform_worker_credential(secret text, label text)
@@ -8681,6 +8827,13 @@ grant SELECT on table "private"."oauth_pending" to "postgres";
 grant TRIGGER on table "private"."oauth_pending" to "postgres";
 grant TRUNCATE on table "private"."oauth_pending" to "postgres";
 grant UPDATE on table "private"."oauth_pending" to "postgres";
+grant DELETE on table "private"."oauth_pending_choices" to "postgres";
+grant INSERT on table "private"."oauth_pending_choices" to "postgres";
+grant REFERENCES on table "private"."oauth_pending_choices" to "postgres";
+grant SELECT on table "private"."oauth_pending_choices" to "postgres";
+grant TRIGGER on table "private"."oauth_pending_choices" to "postgres";
+grant TRUNCATE on table "private"."oauth_pending_choices" to "postgres";
+grant UPDATE on table "private"."oauth_pending_choices" to "postgres";
 grant DELETE on table "private"."oauth_states" to "postgres";
 grant INSERT on table "private"."oauth_states" to "postgres";
 grant REFERENCES on table "private"."oauth_states" to "postgres";
@@ -9207,15 +9360,18 @@ grant EXECUTE on function private.oauth_attach_channel(text,text,bytea,text,text
 grant EXECUTE on function private.oauth_attach_channel(text,text,bytea,text,text[]) to "service_role";
 grant EXECUTE on function private.oauth_attach_channel_for(uuid,uuid,uuid,text,bytea,text,text[],text,text,text) to "postgres";
 grant EXECUTE on function private.oauth_attach_channel_for(uuid,uuid,uuid,text,bytea,text,text[],text,text,text) to "service_role";
-grant EXECUTE on function private.oauth_complete_impl(text,text) to "postgres";
+grant EXECUTE on function private.oauth_complete_impl(text,text,uuid) to "postgres";
 grant EXECUTE on function private.oauth_consume_state(text) to "postgres";
 grant EXECUTE on function private.oauth_consume_state(text) to "service_role";
 grant EXECUTE on function private.oauth_create_pending(uuid,text,text,bytea,text,text[],text,text,text) to "postgres";
 grant EXECUTE on function private.oauth_create_pending(uuid,text,text,bytea,text,text[],text,text,text) to "service_role";
+grant EXECUTE on function private.oauth_create_pending_choices(uuid,text,text,text[],text,jsonb) to "postgres";
+grant EXECUTE on function private.oauth_create_pending_choices(uuid,text,text,text[],text,jsonb) to "service_role";
 grant EXECUTE on function private.oauth_disconnect_impl(uuid,uuid) to "authenticated";
 grant EXECUTE on function private.oauth_disconnect_impl(uuid,uuid) to "postgres";
 grant EXECUTE on function private.oauth_mark_revoked(uuid) to "postgres";
 grant EXECUTE on function private.oauth_mark_revoked(uuid) to "service_role";
+grant EXECUTE on function private.oauth_pending_for(text,text) to "postgres";
 grant EXECUTE on function private.oauth_start_impl(uuid,uuid,text,text,text,text) to "authenticated";
 grant EXECUTE on function private.oauth_start_impl(uuid,uuid,text,text,text,text) to "postgres";
 grant EXECUTE on function private.owner_plan_workspace(uuid) to "postgres";
@@ -9446,10 +9602,12 @@ grant EXECUTE on function my_role(uuid) to "authenticated";
 grant EXECUTE on function my_role(uuid) to "postgres";
 grant EXECUTE on function my_workspaces(uuid) to "authenticated";
 grant EXECUTE on function my_workspaces(uuid) to "postgres";
-grant EXECUTE on function oauth_complete(text,text) to "authenticated";
-grant EXECUTE on function oauth_complete(text,text) to "postgres";
+grant EXECUTE on function oauth_complete(text,text,uuid) to "authenticated";
+grant EXECUTE on function oauth_complete(text,text,uuid) to "postgres";
 grant EXECUTE on function oauth_disconnect(uuid,uuid) to "authenticated";
 grant EXECUTE on function oauth_disconnect(uuid,uuid) to "postgres";
+grant EXECUTE on function oauth_pending_choices(text,text) to "authenticated";
+grant EXECUTE on function oauth_pending_choices(text,text) to "postgres";
 grant EXECUTE on function oauth_start(uuid,uuid,text,text,text,text) to "authenticated";
 grant EXECUTE on function oauth_start(uuid,uuid,text,text,text,text) to "postgres";
 grant EXECUTE on function plan_catalogue() to "anon";
@@ -9496,6 +9654,8 @@ grant EXECUTE on function svc_oauth_consume_state(text) to "postgres";
 grant EXECUTE on function svc_oauth_consume_state(text) to "service_role";
 grant EXECUTE on function svc_oauth_create_pending(uuid,text,text,bytea,text,text[],text,text,text) to "postgres";
 grant EXECUTE on function svc_oauth_create_pending(uuid,text,text,bytea,text,text[],text,text,text) to "service_role";
+grant EXECUTE on function svc_oauth_create_pending_choices(uuid,text,text,text[],text,jsonb) to "postgres";
+grant EXECUTE on function svc_oauth_create_pending_choices(uuid,text,text,text[],text,jsonb) to "service_role";
 grant EXECUTE on function svc_register_platform_worker_credential(text,text) to "postgres";
 grant EXECUTE on function svc_register_platform_worker_credential(text,text) to "service_role";
 grant EXECUTE on function svc_register_worker_credential(text,text,uuid) to "postgres";
