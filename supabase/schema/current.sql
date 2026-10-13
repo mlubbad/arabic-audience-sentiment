@@ -625,6 +625,7 @@ CREATE UNIQUE INDEX comments_pkey ON public.comments USING btree (id);
 CREATE INDEX comments_platform_ext_id_idx ON public.comments USING btree (platform, external_comment_id);
 CREATE INDEX comments_platform_workspace_idx ON public.comments USING btree (workspace_id, platform, published_at DESC);
 CREATE INDEX comments_retention ON public.comments USING btree (last_seen_at) WHERE (content_purged_at IS NULL);
+CREATE INDEX comments_topic_scan ON public.comments USING btree (workspace_id, video_id, published_at, id) INCLUDE (content_hash, author_channel_id, external_comment_id, content_purged_at);
 CREATE INDEX comments_video_date ON public.comments USING btree (workspace_id, video_id, published_at, id);
 CREATE UNIQUE INDEX comments_workspace_id_id_key ON public.comments USING btree (workspace_id, id);
 CREATE UNIQUE INDEX comments_workspace_id_platform_external_comment_id_key ON public.comments USING btree (workspace_id, platform, external_comment_id);
@@ -5471,13 +5472,14 @@ CREATE OR REPLACE FUNCTION private.worker_topics_due(token_hash text, j uuid, t 
  SET search_path TO ''
 AS $function$
 declare
-  w uuid; c uuid; p text; kind text; k text; active text; rows jsonb; taxonomy jsonb;
-  remaining bigint; sub_open boolean;
+  w uuid; c uuid; p text; ext text; kind text; k text; active text; rows jsonb; taxonomy jsonb;
+  remaining bigint; sub_open boolean; cap int; spent bigint := 0; costs boolean;
+  picked uuid[] := '{}'; cand record;
 begin
   w := private.worker_job(token_hash, j, t);
   select channel_id, type into c, kind from public.jobs where id = j;
   if kind <> 'analyse' then raise exception 'invalid_job_type' using errcode='22023'; end if;
-  select platform into p from public.channels where id = c and workspace_id = w;
+  select platform, external_channel_id into p, ext from public.channels where id = c and workspace_id = w;
   p := coalesce(p, 'youtube');
   if model_id !~ '^[A-Za-z0-9._-]{1,80}$' or prompt_version !~ '^[A-Za-z0-9._-]{1,20}$' then
     raise exception 'invalid_batch' using errcode='22023'; end if;
@@ -5504,42 +5506,50 @@ begin
     remaining := 0::bigint;
   end if;
 
+  cap := least(greatest(coalesce(max_rows, 200), 1), 200);
+
+  -- The channel row must exist for any comment to be due (it was a join).
+  if sub_open and exists (select 1 from public.channels where id = c and workspace_id = w) then
+    for cand in
+      select cm.id, cm.external_comment_id, cm.content_purged_at
+        from public.videos v
+        join public.comments cm on cm.workspace_id = w and cm.video_id = v.id
+       where v.workspace_id = w and v.channel_id = c
+         and (cm.author_channel_id is null or cm.author_channel_id <> ext)
+         and not exists (
+           select 1 from public.topic_predictions tp
+            where tp.workspace_id = w and tp.comment_id = cm.id
+              and tp.content_hash = cm.content_hash and tp.classification_key = k
+              and tp.status in ('succeeded','skipped','unsupported'))
+       order by cm.published_at nulls last, cm.id
+    loop
+      if remaining is null or remaining >= cap then
+        picked := picked || cand.id;
+      else
+        costs := cand.content_purged_at is null and not exists (
+          select 1 from public.usage_events u
+           where u.workspace_id = w
+             and u.event_type = 'topic_classification'
+             and (u.event_key = 'topics:' || p || ':' || cand.external_comment_id
+                  or (p = 'youtube' and u.event_key = 'topics:youtube:' || cand.external_comment_id)));
+        if costs then spent := spent + 1; end if;
+        if not costs or spent <= remaining then picked := picked || cand.id; end if;
+      end if;
+      exit when cardinality(picked) >= cap;
+    end loop;
+  end if;
+
   select coalesce(jsonb_agg(jsonb_build_object(
-           'external_comment_id', e.external_comment_id, 'content_hash', e.content_hash,
-           'text', e.text, 'parent_text', e.parent_text, 'is_reply', e.is_reply)
-           order by e.published_at nulls last, e.id), '[]'::jsonb)
+           'external_comment_id', cm.external_comment_id, 'content_hash', cm.content_hash,
+           'text', case when cm.content_purged_at is null then cm.text_raw end,
+           'parent_text', case when parent.content_purged_at is null then parent.text_raw end,
+           'is_reply', cm.is_reply)
+           order by cm.published_at nulls last, cm.id), '[]'::jsonb)
     into rows
-    from (
-    select d.* from (
-      select r.*,
-             count(*) filter (where r.costs)
-               over (order by r.published_at nulls last, r.id
-                     rows between unbounded preceding and current row) as spent
-        from (
-          select cm.id, cm.published_at, cm.external_comment_id, cm.content_hash,
-                 case when cm.content_purged_at is null then cm.text_raw end as text,
-                 case when parent.content_purged_at is null then parent.text_raw end as parent_text,
-                 cm.is_reply,
-                 cm.content_purged_at is null and not exists (
-                   select 1 from public.usage_events u
-                    where u.workspace_id = w
-                      and u.event_type = 'topic_classification'
-                      and (u.event_key = 'topics:' || p || ':' || cm.external_comment_id
-                           or (p = 'youtube' and u.event_key = 'topics:youtube:' || cm.external_comment_id))) as costs
-            from public.comments cm
-            join public.videos v on v.workspace_id = w and v.id = cm.video_id
-            join public.channels ch on ch.workspace_id = w and ch.id = v.channel_id
-            left join public.comments parent on parent.workspace_id = w
-              and parent.platform = cm.platform and parent.external_comment_id = cm.external_parent_id
-           where cm.workspace_id = w and v.channel_id = c
-             and (cm.author_channel_id is null or cm.author_channel_id <> ch.external_channel_id)
-             and private.topic_row_due(w, cm, k)
-        ) r
-    ) d
-    where (sub_open and (remaining is null or not d.costs or d.spent <= remaining))
-    order by d.published_at nulls last, d.id
-    limit least(greatest(coalesce(max_rows, 200), 1), 200)
-    ) e;
+    from unnest(picked) as x(id)
+    join public.comments cm on cm.workspace_id = w and cm.id = x.id
+    left join public.comments parent on parent.workspace_id = w
+      and parent.platform = cm.platform and parent.external_comment_id = cm.external_parent_id;
 
   if jsonb_array_length(rows) = 0 and (not sub_open or (remaining is not null and remaining = 0))
      and private.topics_pending(w, c) then
@@ -7949,6 +7959,7 @@ CREATE OR REPLACE FUNCTION public.svc_worker_topics_due(credential_hash text, j 
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '25s'
 AS $function$
   select private.worker_topics_due(credential_hash, j, t, model_id, prompt_version, max_rows) $function$
 
