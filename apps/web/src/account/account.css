@@ -605,3 +605,9 @@
   font-size: var(--fs-small);
   color: var(--accent);
 }
+
+/* The note under a public-handle field: its own line, a breath below the input. */
+.db-form-note {
+  display: block;
+  margin-top: 0.25rem;
+}
