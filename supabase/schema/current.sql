@@ -4089,6 +4089,7 @@ CREATE OR REPLACE FUNCTION private.reconcile_video_comment_stats(w uuid)
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
+ SET enable_nestloop TO 'off'
 AS $function$
 declare
   pairs jsonb := '[]'::jsonb;
@@ -4203,6 +4204,7 @@ CREATE OR REPLACE FUNCTION private.refresh_channel_compare_channel(w uuid, p_cha
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
+ SET enable_nestloop TO 'off'
 AS $function$
 declare
   topic_active text;

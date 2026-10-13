@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-10-13 — Owner console review batch A live; the two channels it could not count
+
+Batch A (#132) is live: the comparison counts one channel a minute and the System page shows
+the background jobs. Two small channels kept failing at the 2-minute limit. The owner's EXPLAIN
+showed why: their workspaces arrived after the tables' last ANALYZE, the planner estimated
+them at one row and chose nested loops, and every comment scanned the workspace's predictions.
+`20261028000000` makes the channel recount and the stats reconcile plan without nested loops
+and refreshes statistics after 1 % change on the four busiest tables. Reproduced and measured
+locally; evidence in `docs/verification.md`.
+
 ## 2026-10-13 — Facebook and Instagram are live; several pages are chosen inside the product
 
 PR #133 merged (`cc0e331`); the deploy applied `20261026000000_meta_oauth_providers.sql`; the
@@ -14,6 +24,7 @@ refusal is what this branch (`claude/meta-page-chooser`) removes: the person pic
 from a list on `/connected`. The same branch makes the result page platform-neutral, stops
 printing the channel's database id on success, and names Meta, Facebook and Instagram on the
 two channel-choice cards.
+
 
 ## 2026-10-13 — Facebook and Instagram channels: two doors, one worker
 
