@@ -16,7 +16,7 @@
 | الصلاحيات (فيسبوك) | `pages_show_list`, `pages_read_engagement`, `pages_read_user_content` |
 | الصلاحيات (انستغرام) | `instagram_business_basic`, `instagram_business_manage_comments` |
 
-الترتيب مهم: **ادمج PR #133 أولًا** حتى يطبّق CI الهجرة `20261024000000_meta_oauth_providers.sql`
+الترتيب مهم: **ادمج PR #133 أولًا** حتى يطبّق CI الهجرة `20261026000000_meta_oauth_providers.sql`
 على قاعدة البيانات، ثم انشر الدوال، ثم اضبط الأسرار، ثم جرّب. نشر `oauth-start` الجديدة قبل الهجرة
 يكسر زر ربط يوتيوب نفسه (الدالة تمرّر `p_provider` إلى RPC لا يعرفه بعد).
 

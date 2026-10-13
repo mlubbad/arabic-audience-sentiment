@@ -108,7 +108,7 @@ bare handle, exactly as X and TikTok do today.
 
 - `AGENTS.md` and `docs/agents/CONTEXT.md` §5 invariants; the five CI gates.
 - Secrets only in Supabase function secrets and the worker's environment.
-- Migrations are new files; `20261024000000_meta_oauth_providers.sql`.
+- Migrations are new files; `20261026000000_meta_oauth_providers.sql`.
 - New strings in both `strings/ar.ts` and `strings/en.ts`.
 - `WorkspaceCard.tsx` (1,052 lines) may only shrink; new files ≤ 400 lines.
 

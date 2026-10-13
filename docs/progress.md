@@ -14,7 +14,7 @@ plan: `docs/superpowers/plans/2026-10-13-facebook-instagram-channels.md`; branch
   `None` with precision `unknown`, a missing like count is `None`, a refused read raises).
   Apify and Bright Data clients gained the four Meta methods; the router and the loop builder
   route both platforms; `.env.example` names the six new worker variables. Worker suite: 336 tests green.
-- **Database.** `20261024000000_meta_oauth_providers.sql`: `oauth_states.provider`,
+- **Database.** `20261026000000_meta_oauth_providers.sql`: `oauth_states.provider`,
   `oauth_pending.platform`, `oauth_start(..., p_provider default 'google')`, the consume
   state returns the provider, the pending row checks the id per platform (UC id for YouTube,
   numeric for Meta), the attach keys the channel on `(platform, external_channel_id)`.

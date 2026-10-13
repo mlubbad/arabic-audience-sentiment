@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Invariants of `docs/agents/CONTEXT.md` §5: unknown is `None`/`null` never 0 or `now()`; a short or refused read is `partial`/`failed`/`blocked`, never an empty exhausted batch; tenant from credential.
-- Migration file: `supabase/migrations/20261024000000_meta_oauth_providers.sql`; immutable afterwards.
+- Migration file: `supabase/migrations/20261026000000_meta_oauth_providers.sql`; immutable afterwards.
 - Every user-facing string exists in both `apps/web/src/strings/ar.ts` and `en.ts`.
 - `apps/web/src/account/WorkspaceCard.tsx` must end shorter than 1,052 lines; every new file ≤ 400 lines.
 - No network in tests; Apify/Bright Data/Graph are mocked with `httpx.MockTransport` or `vi.fn`.
@@ -140,7 +140,7 @@
 ### Task 7: Migration: providers on the OAuth state, platform on the pending row
 
 **Files:**
-- Create: `supabase/migrations/20261024000000_meta_oauth_providers.sql`
+- Create: `supabase/migrations/20261026000000_meta_oauth_providers.sql`
 - Test: `supabase/tests/oauth.test.ts`
 
 **Interfaces (SQL):**

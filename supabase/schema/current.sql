@@ -215,7 +215,8 @@ create table "private"."oauth_pending" (
   "key_version" text not null,
   "granted_scopes" text[] not null,
   "expires_at" timestamp with time zone not null,
-  "created_at" timestamp with time zone default now() not null
+  "created_at" timestamp with time zone default now() not null,
+  "platform" text default 'youtube'::text not null
 );
 alter table "private"."oauth_pending" enable row level security;
 
@@ -227,6 +228,8 @@ alter table "private"."oauth_pending" add constraint "oauth_pending_granted_scop
 alter table "private"."oauth_pending" add constraint "oauth_pending_id_not_null" NOT NULL id;
 alter table "private"."oauth_pending" add constraint "oauth_pending_key_version_not_null" NOT NULL key_version;
 alter table "private"."oauth_pending" add constraint "oauth_pending_pkey" PRIMARY KEY (id);
+alter table "private"."oauth_pending" add constraint "oauth_pending_platform_check" CHECK (platform = ANY (ARRAY['youtube'::text, 'facebook'::text, 'instagram'::text]));
+alter table "private"."oauth_pending" add constraint "oauth_pending_platform_not_null" NOT NULL platform;
 alter table "private"."oauth_pending" add constraint "oauth_pending_state_id_fkey" FOREIGN KEY (state_id) REFERENCES private.oauth_states(id) ON DELETE CASCADE;
 alter table "private"."oauth_pending" add constraint "oauth_pending_state_id_key" UNIQUE (state_id);
 alter table "private"."oauth_pending" add constraint "oauth_pending_state_id_not_null" NOT NULL state_id;
@@ -246,7 +249,8 @@ create table "private"."oauth_states" (
   "consumed_at" timestamp with time zone,
   "code_verifier" text,
   "id" uuid default gen_random_uuid() not null,
-  "browser_nonce_hash" text
+  "browser_nonce_hash" text,
+  "provider" text default 'google'::text not null
 );
 alter table "private"."oauth_states" enable row level security;
 
@@ -255,6 +259,8 @@ alter table "private"."oauth_states" add constraint "oauth_states_expires_at_not
 alter table "private"."oauth_states" add constraint "oauth_states_id_key" UNIQUE (id);
 alter table "private"."oauth_states" add constraint "oauth_states_id_not_null" NOT NULL id;
 alter table "private"."oauth_states" add constraint "oauth_states_pkey" PRIMARY KEY (state_hash);
+alter table "private"."oauth_states" add constraint "oauth_states_provider_check" CHECK (provider = ANY (ARRAY['google'::text, 'facebook'::text, 'instagram'::text]));
+alter table "private"."oauth_states" add constraint "oauth_states_provider_not_null" NOT NULL provider;
 alter table "private"."oauth_states" add constraint "oauth_states_state_hash_not_null" NOT NULL state_hash;
 alter table "private"."oauth_states" add constraint "oauth_states_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id);
 alter table "private"."oauth_states" add constraint "oauth_states_user_id_not_null" NOT NULL user_id;
@@ -3456,30 +3462,36 @@ declare st record; begin
     st.user_id, st.workspace_id, st.client_id, external_channel, tokens, key_version, scopes);
 end $function$
 
-CREATE OR REPLACE FUNCTION private.oauth_attach_channel_for(u uuid, w uuid, c uuid, external_channel text, tokens bytea, key_version text, scopes text[], channel_handle text DEFAULT NULL::text, channel_title text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION private.oauth_attach_channel_for(u uuid, w uuid, c uuid, external_channel text, tokens bytea, key_version text, scopes text[], channel_handle text DEFAULT NULL::text, channel_title text DEFAULT NULL::text, p_platform text DEFAULT 'youtube'::text)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
 declare ch uuid; begin
-  if external_channel !~ '^UC[A-Za-z0-9_-]{22}$' then
-    raise exception 'invalid_channel_id' using errcode='22023'; end if;
+  if p_platform is null or p_platform not in ('youtube', 'facebook', 'instagram') then
+    raise exception 'invalid_platform' using errcode='22023'; end if;
+  if p_platform = 'youtube' then
+    if external_channel !~ '^UC[A-Za-z0-9_-]{22}$' then
+      raise exception 'invalid_channel_id' using errcode='22023'; end if;
+  elsif external_channel !~ '^[0-9]{1,64}$' then
+    raise exception 'invalid_channel_id' using errcode='22023';
+  end if;
   if exists(select 1 from public.channels
-            where platform='youtube' and external_channel_id=external_channel
+            where platform=p_platform and external_channel_id=external_channel
               and status='connected' and workspace_id <> w) then
     raise exception 'channel_already_connected' using errcode='23505'; end if;
 
-  -- A name Google did not send this time does not erase one it sent before:
-  -- a reconnect after a lapsed grant should not cost the reader the label.
+  -- A name the provider did not send this time does not erase one it sent
+  -- before: a reconnect after a lapsed grant should not cost the reader the label.
   update public.channels set status='connected', client_id=c,
     handle=coalesce(channel_handle, handle),
     title=coalesce(channel_title, title)
-  where workspace_id=w and platform='youtube'
+  where workspace_id=w and platform=p_platform
     and external_channel_id=external_channel
   returning id into ch;
   if ch is null then
-    insert into public.channels(workspace_id,client_id,external_channel_id,status,handle,title)
-    values (w, c, external_channel, 'connected', channel_handle, channel_title)
+    insert into public.channels(workspace_id,client_id,external_channel_id,status,handle,title,platform)
+    values (w, c, external_channel, 'connected', channel_handle, channel_title, p_platform)
     returning id into ch;
   end if;
 
@@ -3534,12 +3546,13 @@ begin
   attached := private.oauth_attach_channel_for(
     pending.user_id,pending.workspace_id,pending.client_id,
     pending.external_channel,pending.encrypted_tokens,pending.key_version,
-    pending.granted_scopes,pending.channel_handle,pending.channel_title);
+    pending.granted_scopes,pending.channel_handle,pending.channel_title,
+    pending.platform);
   return query select attached,null::text;
 end $function$
 
 CREATE OR REPLACE FUNCTION private.oauth_consume_state(state_hash text)
- RETURNS TABLE(state_id uuid, user_id uuid, workspace_id uuid, client_id uuid, code_verifier text, browser_nonce_hash text)
+ RETURNS TABLE(state_id uuid, user_id uuid, workspace_id uuid, client_id uuid, code_verifier text, browser_nonce_hash text, provider text)
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
@@ -3548,11 +3561,11 @@ begin
   update private.oauth_states s set consumed_at=now()
   where s.state_hash=oauth_consume_state.state_hash
     and s.consumed_at is null and s.expires_at>now()
-  returning s.id,s.user_id,s.workspace_id,s.client_id,s.code_verifier,s.browser_nonce_hash;
+  returning s.id,s.user_id,s.workspace_id,s.client_id,s.code_verifier,s.browser_nonce_hash,s.provider;
   if not found then raise exception 'invalid_state' using errcode='42501'; end if;
 end $function$
 
-CREATE OR REPLACE FUNCTION private.oauth_create_pending(pending_state_id uuid, pending_ticket_hash text, pending_external_channel text, pending_tokens bytea, pending_key_version text, pending_scopes text[], pending_channel_handle text DEFAULT NULL::text, pending_channel_title text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION private.oauth_create_pending(pending_state_id uuid, pending_ticket_hash text, pending_external_channel text, pending_tokens bytea, pending_key_version text, pending_scopes text[], pending_channel_handle text DEFAULT NULL::text, pending_channel_title text DEFAULT NULL::text, pending_platform text DEFAULT 'youtube'::text)
  RETURNS void
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -3561,19 +3574,26 @@ AS $function$
 begin
   if pending_ticket_hash is null or length(pending_ticket_hash) <> 64 then
     raise exception 'invalid_ticket' using errcode='22023'; end if;
-  if pending_external_channel !~ '^UC[A-Za-z0-9_-]{22}$' then
-    raise exception 'invalid_channel_id' using errcode='22023'; end if;
+  if pending_platform is null or pending_platform not in ('youtube', 'facebook', 'instagram') then
+    raise exception 'invalid_platform' using errcode='22023'; end if;
+  -- A YouTube channel id is a UC id; a Meta page or account id is numeric.
+  if pending_platform = 'youtube' then
+    if pending_external_channel !~ '^UC[A-Za-z0-9_-]{22}$' then
+      raise exception 'invalid_channel_id' using errcode='22023'; end if;
+  elsif pending_external_channel !~ '^[0-9]{1,64}$' then
+    raise exception 'invalid_channel_id' using errcode='22023';
+  end if;
   if not exists(
     select 1 from private.oauth_states s
     where s.id=pending_state_id and s.consumed_at is not null) then
     raise exception 'invalid_state' using errcode='42501'; end if;
   insert into private.oauth_pending(
     state_id,ticket_hash,external_channel,channel_handle,channel_title,
-    encrypted_tokens,key_version,granted_scopes,expires_at)
+    encrypted_tokens,key_version,granted_scopes,expires_at,platform)
   values (
     pending_state_id,pending_ticket_hash,pending_external_channel,
     pending_channel_handle,pending_channel_title,pending_tokens,
-    pending_key_version,pending_scopes,now()+interval '10 minutes');
+    pending_key_version,pending_scopes,now()+interval '10 minutes',pending_platform);
 end $function$
 
 CREATE OR REPLACE FUNCTION private.oauth_disconnect_impl(w uuid, channel uuid)
@@ -3605,7 +3625,7 @@ begin
   where channel_id=channel and status in ('queued','running');
 end $function$
 
-CREATE OR REPLACE FUNCTION private.oauth_start_impl(w uuid, c uuid, state_hash text, verifier text, browser_nonce_hash text)
+CREATE OR REPLACE FUNCTION private.oauth_start_impl(w uuid, c uuid, state_hash text, verifier text, browser_nonce_hash text, p_provider text DEFAULT 'google'::text)
  RETURNS text
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -3624,10 +3644,12 @@ begin
   if browser_nonce_hash is null or length(browser_nonce_hash) <> 64
      or browser_nonce_hash !~ '^[0-9a-f]{64}$' then
     raise exception 'invalid_browser_nonce' using errcode='22023'; end if;
+  if p_provider is null or p_provider not in ('google', 'facebook', 'instagram') then
+    raise exception 'invalid_provider' using errcode='22023'; end if;
   insert into private.oauth_states(
-    state_hash,user_id,workspace_id,client_id,expires_at,code_verifier,browser_nonce_hash)
+    state_hash,user_id,workspace_id,client_id,expires_at,code_verifier,browser_nonce_hash,provider)
   values (
-    state_hash,(select auth.uid()),w,c,now()+interval '10 minutes',verifier,browser_nonce_hash);
+    state_hash,(select auth.uid()),w,c,now()+interval '10 minutes',verifier,browser_nonce_hash,p_provider);
   return state_hash;
 end $function$
 
@@ -7364,12 +7386,12 @@ CREATE OR REPLACE FUNCTION public.oauth_disconnect(w uuid, channel uuid)
  SET search_path TO ''
 AS $function$select private.oauth_disconnect_impl(w,channel)$function$
 
-CREATE OR REPLACE FUNCTION public.oauth_start(w uuid, c uuid, state_hash text, verifier text, browser_nonce_hash text)
+CREATE OR REPLACE FUNCTION public.oauth_start(w uuid, c uuid, state_hash text, verifier text, browser_nonce_hash text, p_provider text DEFAULT 'google'::text)
  RETURNS text
  LANGUAGE sql
  SET search_path TO ''
 AS $function$
-  select private.oauth_start_impl(w,c,state_hash,verifier,browser_nonce_hash)
+  select private.oauth_start_impl(w,c,state_hash,verifier,browser_nonce_hash,p_provider)
 $function$
 
 CREATE OR REPLACE FUNCTION public.plan_catalogue()
@@ -7784,21 +7806,21 @@ AS $function$
 $function$
 
 CREATE OR REPLACE FUNCTION public.svc_oauth_consume_state(state_hash text)
- RETURNS TABLE(state_id uuid, user_id uuid, workspace_id uuid, client_id uuid, code_verifier text, browser_nonce_hash text)
+ RETURNS TABLE(state_id uuid, user_id uuid, workspace_id uuid, client_id uuid, code_verifier text, browser_nonce_hash text, provider text)
  LANGUAGE sql
  SET search_path TO ''
 AS $function$
   select * from private.oauth_consume_state(state_hash)
 $function$
 
-CREATE OR REPLACE FUNCTION public.svc_oauth_create_pending(state_id uuid, ticket_hash text, external_channel text, tokens bytea, key_version text, scopes text[], channel_handle text DEFAULT NULL::text, channel_title text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION public.svc_oauth_create_pending(state_id uuid, ticket_hash text, external_channel text, tokens bytea, key_version text, scopes text[], channel_handle text DEFAULT NULL::text, channel_title text DEFAULT NULL::text, pending_platform text DEFAULT 'youtube'::text)
  RETURNS void
  LANGUAGE sql
  SET search_path TO ''
 AS $function$
   select private.oauth_create_pending(
     state_id,ticket_hash,external_channel,tokens,key_version,scopes,
-    channel_handle,channel_title)
+    channel_handle,channel_title,pending_platform)
 $function$
 
 CREATE OR REPLACE FUNCTION public.svc_register_platform_worker_credential(secret text, label text)
@@ -8832,19 +8854,19 @@ grant EXECUTE on function private.mark_all_channel_compare() to "postgres";
 grant EXECUTE on function private.mark_channel_compare_dirty() to "postgres";
 grant EXECUTE on function private.oauth_attach_channel(text,text,bytea,text,text[]) to "postgres";
 grant EXECUTE on function private.oauth_attach_channel(text,text,bytea,text,text[]) to "service_role";
-grant EXECUTE on function private.oauth_attach_channel_for(uuid,uuid,uuid,text,bytea,text,text[],text,text) to "postgres";
-grant EXECUTE on function private.oauth_attach_channel_for(uuid,uuid,uuid,text,bytea,text,text[],text,text) to "service_role";
+grant EXECUTE on function private.oauth_attach_channel_for(uuid,uuid,uuid,text,bytea,text,text[],text,text,text) to "postgres";
+grant EXECUTE on function private.oauth_attach_channel_for(uuid,uuid,uuid,text,bytea,text,text[],text,text,text) to "service_role";
 grant EXECUTE on function private.oauth_complete_impl(text,text) to "postgres";
 grant EXECUTE on function private.oauth_consume_state(text) to "postgres";
 grant EXECUTE on function private.oauth_consume_state(text) to "service_role";
-grant EXECUTE on function private.oauth_create_pending(uuid,text,text,bytea,text,text[],text,text) to "postgres";
-grant EXECUTE on function private.oauth_create_pending(uuid,text,text,bytea,text,text[],text,text) to "service_role";
+grant EXECUTE on function private.oauth_create_pending(uuid,text,text,bytea,text,text[],text,text,text) to "postgres";
+grant EXECUTE on function private.oauth_create_pending(uuid,text,text,bytea,text,text[],text,text,text) to "service_role";
 grant EXECUTE on function private.oauth_disconnect_impl(uuid,uuid) to "authenticated";
 grant EXECUTE on function private.oauth_disconnect_impl(uuid,uuid) to "postgres";
 grant EXECUTE on function private.oauth_mark_revoked(uuid) to "postgres";
 grant EXECUTE on function private.oauth_mark_revoked(uuid) to "service_role";
-grant EXECUTE on function private.oauth_start_impl(uuid,uuid,text,text,text) to "authenticated";
-grant EXECUTE on function private.oauth_start_impl(uuid,uuid,text,text,text) to "postgres";
+grant EXECUTE on function private.oauth_start_impl(uuid,uuid,text,text,text,text) to "authenticated";
+grant EXECUTE on function private.oauth_start_impl(uuid,uuid,text,text,text,text) to "postgres";
 grant EXECUTE on function private.owner_plan_workspace(uuid) to "postgres";
 grant EXECUTE on function private.plan_json(plans) to "postgres";
 grant EXECUTE on function private.plan_key_for_price(text) to "postgres";
@@ -9072,8 +9094,8 @@ grant EXECUTE on function oauth_complete(text,text) to "authenticated";
 grant EXECUTE on function oauth_complete(text,text) to "postgres";
 grant EXECUTE on function oauth_disconnect(uuid,uuid) to "authenticated";
 grant EXECUTE on function oauth_disconnect(uuid,uuid) to "postgres";
-grant EXECUTE on function oauth_start(uuid,uuid,text,text,text) to "authenticated";
-grant EXECUTE on function oauth_start(uuid,uuid,text,text,text) to "postgres";
+grant EXECUTE on function oauth_start(uuid,uuid,text,text,text,text) to "authenticated";
+grant EXECUTE on function oauth_start(uuid,uuid,text,text,text,text) to "postgres";
 grant EXECUTE on function plan_catalogue() to "anon";
 grant EXECUTE on function plan_catalogue() to "authenticated";
 grant EXECUTE on function plan_catalogue() to "postgres";
@@ -9116,8 +9138,8 @@ grant EXECUTE on function svc_oauth_attach_channel(uuid,uuid,uuid,text,bytea,tex
 grant EXECUTE on function svc_oauth_attach_channel(uuid,uuid,uuid,text,bytea,text,text[],text,text) to "service_role";
 grant EXECUTE on function svc_oauth_consume_state(text) to "postgres";
 grant EXECUTE on function svc_oauth_consume_state(text) to "service_role";
-grant EXECUTE on function svc_oauth_create_pending(uuid,text,text,bytea,text,text[],text,text) to "postgres";
-grant EXECUTE on function svc_oauth_create_pending(uuid,text,text,bytea,text,text[],text,text) to "service_role";
+grant EXECUTE on function svc_oauth_create_pending(uuid,text,text,bytea,text,text[],text,text,text) to "postgres";
+grant EXECUTE on function svc_oauth_create_pending(uuid,text,text,bytea,text,text[],text,text,text) to "service_role";
 grant EXECUTE on function svc_register_platform_worker_credential(text,text) to "postgres";
 grant EXECUTE on function svc_register_platform_worker_credential(text,text) to "service_role";
 grant EXECUTE on function svc_register_worker_credential(text,text,uuid) to "postgres";
