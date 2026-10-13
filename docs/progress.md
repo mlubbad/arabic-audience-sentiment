@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-10-13 — Owner console review batch A live; the two channels it could not count
+
+Batch A (#132) is live: the comparison counts one channel a minute and the System page shows
+the background jobs. Two small channels kept failing at the 2-minute limit. The owner's EXPLAIN
+showed why: their workspaces arrived after the tables' last ANALYZE, the planner estimated
+them at one row and chose nested loops, and every comment scanned the workspace's predictions.
+`20261027000000` makes the channel recount and the stats reconcile plan without nested loops
+and refreshes statistics after 1 % change on the four busiest tables. Reproduced and measured
+locally; evidence in `docs/verification.md`.
+
 ## 2026-10-13 — Facebook and Instagram channels: two doors, one worker
 
 The owner asked for Facebook pages and Instagram accounts beside YouTube, X, TikTok and

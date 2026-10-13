@@ -1,5 +1,32 @@
 # Verification
 
+## 2026-10-13 — Background counts plan without stale estimates
+
+After `20261025000000` went live, the comparison step counted channel after channel. Two channels
+kept failing at the 2-minute cron limit. The owner's read-only queries:
+
+| Query (owner, 2026-10-13) | Result |
+| --- | --- |
+| `private.channel_compare_units` | 115 channels, 9 counted, then 2 failing with `canceling statement due to statement timeout`: "shfa" (1,415 videos, 25,849 comments) and a channel of 297 videos and 58,933 comments. |
+| `pg_class` for `comments`, `sentiment_predictions`, `topic_predictions` | 96 %, 99.7 % and 68 % of pages all-visible; about 1.51 M comments and 1.52 M predictions. Heap fetches are not the cause. |
+| `explain` of the recount query for "shfa" | `rows=1` for `comments where workspace_id = …`, `rows=1` for its predictions, and its reviews treated as an empty table. Nested loops, with the predictions index scanned on `workspace_id` alone and `comment_id` checked as a join filter, so every comment reads all of the workspace's predictions. |
+
+Cause: a workspace whose rows arrived after the tables' last ANALYZE is not in their statistics,
+and the planner can estimate it at one row. Autoanalyze waits for 10 % of a table to change.
+
+Migration `20261027000000`:
+- `refresh_channel_compare_channel` and `reconcile_video_comment_stats` run with `enable_nestloop = off`.
+- `comments`, `sentiment_predictions`, `topic_predictions` and `videos` refresh their statistics after 1 % of their rows change.
+
+| Command / observation | Actual result |
+| --- | --- |
+| Local PostgreSQL 16.13: autovacuum off, ANALYZE, then a 25,849-comment workspace (1,415 videos, a prediction per comment) copied in | `explain` estimates 1 row for its comments, as in production. The channel recount is cancelled at 150 s. With `enable_nestloop = off` it takes 1.03 s. After ANALYZE it takes 0.16 s and the estimate is 25,978. |
+| Same setup, a second copy, `reconcile_video_comment_stats` | 23.9 s; 0.13 s with nested loops off; 0.21 s after ANALYZE. Plausibly the same cause as the reconcile's failed nights. |
+| Largest channel (155,822 comments), fresh statistics, three runs each | Nested loops on: 0.90 / 0.60 / 0.55 s. Off: 1.55 / 1.65 / 1.58 s. A bounded time is kept over the best case. |
+| `npx vitest run supabase/tests/background_counts_plan.test.ts` | 2 passed: both functions carry `enable_nestloop=off`, keep `search_path=""` and stay `SECURITY DEFINER`; the four tables carry `autovacuum_analyze_scale_factor=0.01`. |
+| Mutation: migration removed | Both tests failed. Restored. |
+| Live | Pending the deploy. The two failing channels retry on their own back-off. Until then, an `ANALYZE` of the four tables (owner) corrects the estimates at once. |
+
 ## 2026-10-13 — Background jobs finish one unit at a time and say when they fail (review batch A)
 
 Review findings 1–3 (`docs/reviews/2026-10-13-owner-console-review.md`). The owner's read-only
