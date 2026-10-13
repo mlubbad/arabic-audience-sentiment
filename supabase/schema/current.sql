@@ -5648,11 +5648,17 @@ CREATE OR REPLACE FUNCTION private.worker_workspace(token_hash text)
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare w uuid; matched boolean; begin
+declare w uuid; cred uuid; begin
+  select c.id, c.workspace_id into cred, w
+    from private.worker_credentials c
+   where c.token_hash = worker_workspace.token_hash and c.status = 'active';
+  if cred is null then raise exception 'invalid_worker_credential' using errcode='42501'; end if;
   update private.worker_credentials c set last_seen_at = now()
-  where c.token_hash = worker_workspace.token_hash and c.status = 'active'
-  returning c.workspace_id, true into w, matched;
-  if matched is not true then raise exception 'invalid_worker_credential' using errcode='42501'; end if;
+   where c.id = (select x.id from private.worker_credentials x
+                  where x.id = cred
+                    and (x.last_seen_at is null
+                         or x.last_seen_at < now() - interval '1 minute')
+                  for update skip locked);
   return w;
 end $function$
 
@@ -7935,6 +7941,7 @@ CREATE OR REPLACE FUNCTION public.svc_worker_tick(credential_hash text)
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '25s'
 AS $function$
   select private.worker_tick(credential_hash) $function$
 

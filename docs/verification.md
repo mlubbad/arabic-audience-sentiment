@@ -1,5 +1,37 @@
 # Verification
 
+## 2026-10-13 — Worker requests no longer queue behind a tick on their credential (57014)
+
+The Oracle worker came up on the first run (owner's terminal, 2026-10-12 23:50 UTC, Ubuntu 24.04
+aarch64, Compose 2.40.3): `loaded CAMeL-Lab/bert-base-arabic-camelbert-da-sentiment@b0df630d23e5`,
+`worker up, model=camelbert-da, tenants=1, topics=gemini`. It and the Mac worker then logged
+`control plane refused: control_plane_error:57014` about once a minute; the Mac had it at
+23:46 UTC, before Oracle started. The owner ran two read-only queries in the SQL editor:
+
+| Query (owner, 2026-10-13) | Result |
+| --- | --- |
+| `pg_stat_statements` for `svc_worker_*` | Every worker RPC has a maximum of 7.70–8.00 s (heartbeat 7996 ms, commit_batch 7995, claim 7953, finish 7966, …); `svc_worker_tick` averages **5586 ms** over 979 calls. |
+| `pg_roles.rolconfig` | `authenticator` and `authenticated`: `statement_timeout=8s`; `service_role`: none, so the RPCs run under 8 s. |
+
+Cause: `private.worker_workspace`, which every worker RPC calls first, authenticated by
+`UPDATE private.worker_credentials … returning`. The row lock lasts to the end of the
+transaction, and the tick holds it for all of `schedule_due_work`; any other request using the
+same credential waited behind it until 8 s. The Supabase logs page showed nothing for any source
+during a Supabase incident banner, so the cancelled statement was reproduced instead.
+
+| Command / observation | Actual result |
+| --- | --- |
+| Local PostgreSQL 16.13, `private.worker_credentials` as in the schema, a tick stand-in that authenticates and then sleeps 5 s; a second session authenticates 0.5 s later under `statement_timeout = '2s'` | Old function (`20260918130000_a:80-88`): `ERROR: canceling statement due to statement timeout`, `CONTEXT: while updating tuple (0,1) in relation "worker_credentials"`, after 2.04 s. New function: returns the workspace in 0.04 s. |
+| `npx vitest run supabase/tests/worker_credential_touch.test.ts` | 5 passed: the workspace for a tenant credential and null for the platform one; revoked and unknown refused with `42501 invalid_worker_credential` and not touched; `last_seen_at` written when null, left alone within the minute, refreshed after two minutes; the only write is behind `for update skip locked`; `svc_worker_tick` carries `statement_timeout=25s` and keeps `search_path=""`. |
+| Mutations | Migration emptied: 3 failed. Throttle removed (`0 seconds`): 1 failed. Restored each time. |
+| The worker suites (`worker_gateway`, `worker_gateway_handler`, `platform_worker`, `platform_reader`, `worker_catalogue`, `worker_topics`, `worker_video_counts`, `end_to_end`, `unlimited_plan_and_retry_correctness`, `interaction_metrics_and_storytelling`) | 10 files, 104 passed. |
+| `npm run db:snapshot` | `supabase/schema/current.sql` carries the new function and the tick's setting. |
+| Live | Pending: the owner applies `20261023000000` (`npm run db:migrate:remote`); then both worker logs should stop showing `57014`. |
+
+Not fixed here: the tick itself still averages 5.6 s. With the lock gone it delays nothing else,
+and its 25 s timeout stays inside the worker's 30 s HTTP timeout; why `schedule_due_work` is slow
+is a separate investigation.
+
 ## 2026-10-12 — The Mac as standby for the Oracle worker
 
 Owner's request (2026-10-12): keep the local device as a failback, standby and ready. The Mac's

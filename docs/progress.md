@@ -87,6 +87,15 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
   becomes the standby (owner's request): its worker service stays installed and disabled, and a
   launchd agent starts it after two failed probes of the Oracle container and stops it after
   two good ones (`scripts/worker-standby.sh`, 10 tests).
+- **Oracle worker live, and the 57014 behind it (2026-10-13).** The owner created the VM
+  (A1.Flex, 1 OCPU / 6 GB, Ubuntu 24.04 after a first VM came up on 20.04 and was replaced) and
+  the worker loaded the pinned model on the first run. Both it and the Mac worker were refused
+  with `57014` about once a minute: every worker request updated its credential's row, the tick
+  held that lock for 5.6 s on average, and the rest queued behind it until the 8 s limit. Fixed
+  by migration `20261023000000` (read the credential, touch `last_seen_at` once a minute with
+  `skip locked`; the tick gets 25 s), reproduced before and after on a local Postgres 16. The
+  owner applies it. The standby agent waits until the logs are clean; the runbook now names the
+  key the owner actually uses (`~/.ssh/oracle_vm`).
 - **Where the program stands.** No open PRs and no agent in flight. Of the four "done when"
   conditions in #7, the record (this entry) was the last. The feature freeze can end once the
   owner clears the pending list in #7 (the security rotations above all) and picks what comes
