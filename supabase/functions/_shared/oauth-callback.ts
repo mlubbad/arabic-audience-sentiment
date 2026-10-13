@@ -17,7 +17,14 @@
  * Pure, with injected transport and data layer, so the whole flow is testable
  * without Google and without a deployed project.
  */
-import { base64url } from "./oauth-start.ts";
+import { base64url, type Provider } from "./oauth-start.ts";
+import {
+  connectFacebookPage,
+  connectInstagramAccount,
+  type MetaConfig,
+} from "./oauth-meta.ts";
+
+export type ConnectedPlatform = "youtube" | "facebook" | "instagram";
 
 export interface CallbackConfig {
   client_id: string;
@@ -36,6 +43,8 @@ export interface CallbackDb {
     workspace_id: string;
     client_id: string;
     code_verifier: string;
+    /** Which consent screen the state was bound for. Google when absent. */
+    provider?: Provider | string | null;
   }>;
   createPending(input: {
     stateId: string;
@@ -48,6 +57,8 @@ export interface CallbackDb {
     sealedTokens: Uint8Array;
     keyVersion: string;
     scopes: string[];
+    /** The platform the channel is filed under: the provider's own. */
+    platform: ConnectedPlatform;
   }): Promise<void>;
 }
 
@@ -247,12 +258,14 @@ export async function handleCallback(input: {
   state: string | null;
   error: string | null;
   config: CallbackConfig;
+  /** Meta's credentials; absent means the Meta doors are not configured. */
+  meta?: MetaConfig;
   db: CallbackDb;
   http: Http;
   key: CryptoKey;
   random: (length: number) => Uint8Array;
 }): Promise<{ ticket: string; workspaceId: string }> {
-  const { code, state, error, config, db, http, key, random } = input;
+  const { code, state, error, config, meta, db, http, key, random } = input;
   // The user declining is an outcome, not a failure to hide behind a generic code.
   if (error)
     throw new ConnectError(
@@ -263,10 +276,36 @@ export async function handleCallback(input: {
   // Burns the state. A failed exchange after this point means starting again,
   // which is the correct trade: a state surviving a failure is a replayable code.
   const binding = await db.consumeState(await sha256Hex(state));
+  const provider =
+    binding.provider === "facebook" || binding.provider === "instagram"
+      ? binding.provider
+      : "google";
+  const ticket = base64url(random(32));
+
+  if (provider !== "google") {
+    // The Meta doors: the state said which one, and the code goes only there.
+    if (!meta?.app_id || !meta.app_secret || !meta.redirect_uri)
+      throw new ConnectError("oauth_not_configured");
+    const connection =
+      provider === "facebook"
+        ? await connectFacebookPage(code, meta, http)
+        : await connectInstagramAccount(code, meta, http);
+    await db.createPending({
+      stateId: binding.state_id,
+      ticketHash: await sha256Hex(ticket),
+      externalChannel: connection.external_channel,
+      handle: connection.handle,
+      title: connection.title,
+      sealedTokens: await sealTokens(key, connection.tokens),
+      keyVersion: meta.key_version,
+      scopes: connection.scopes,
+      platform: provider,
+    });
+    return { ticket, workspaceId: binding.workspace_id };
+  }
 
   const tokens = await exchangeCode(code, binding.code_verifier, config, http);
   const channel = await fetchOwnChannel(tokens.access_token, http);
-  const ticket = base64url(random(32));
 
   await db.createPending({
     stateId: binding.state_id,
@@ -280,9 +319,11 @@ export async function handleCallback(input: {
       // Absolute, not a duration: a stored "3600" tells a later reader nothing
       // about whether the token is still valid.
       expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      provider: "google",
     }),
     keyVersion: config.key_version,
     scopes: tokens.scope ? tokens.scope.split(" ") : [],
+    platform: "youtube",
   });
   return { ticket, workspaceId: binding.workspace_id };
 }
