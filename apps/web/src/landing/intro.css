@@ -3,17 +3,11 @@
    token; the sentiment marks are the dashboard's own four. All movement is
    inside `prefers-reduced-motion: no-preference` — without it the stage
    shows each scene complete and still, and the reader picks the scene. */
-.lp-intro {
+.ix-player {
   --ix-scene: 5s;
   --ix-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  padding-top: clamp(24px, 4vw, 48px);
-}
-.lp-intro .lp-lead {
-  text-align: center;
-}
-.ix-player {
   position: relative;
-  max-width: 980px;
+  max-width: 1040px;
   margin-inline: auto;
 }
 
@@ -476,7 +470,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-3);
-  max-width: 980px;
+  max-width: 1040px;
   margin: var(--space-5) auto 0;
   padding: 0;
   list-style: none;
@@ -558,15 +552,6 @@
   font-size: var(--lp-t-sm);
   color: var(--text-2);
 }
-.ix-after {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-  text-align: center;
-}
-
 /* ---- motion ---- */
 @media (prefers-reduced-motion: no-preference) {
   .ix-glow--a {
@@ -584,35 +569,35 @@
   }
   /* Every scene, while playing: its tag, then its title word by word.
      The entrances are scoped to a playing player; see the paused rule. */
-  .ix-player[data-playing="true"] .ix-tag {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-tag {
     animation: ix-rise 500ms var(--ix-ease) 100ms both;
   }
-  .ix-player[data-playing="true"] .ix-w {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w {
     animation: ix-word 600ms var(--ix-ease) both;
     animation-delay: 250ms;
   }
-  .ix-player[data-playing="true"] .ix-w:nth-child(2) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w:nth-child(2) {
     animation-delay: 330ms;
   }
-  .ix-player[data-playing="true"] .ix-w:nth-child(3) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w:nth-child(3) {
     animation-delay: 410ms;
   }
-  .ix-player[data-playing="true"] .ix-w:nth-child(4) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w:nth-child(4) {
     animation-delay: 490ms;
   }
-  .ix-player[data-playing="true"] .ix-w:nth-child(5) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w:nth-child(5) {
     animation-delay: 570ms;
   }
-  .ix-player[data-playing="true"] .ix-w:nth-child(6) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w:nth-child(6) {
     animation-delay: 650ms;
   }
-  .ix-player[data-playing="true"] .ix-w:nth-child(7) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w:nth-child(7) {
     animation-delay: 730ms;
   }
-  .ix-player[data-playing="true"] .ix-w:nth-child(8) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w:nth-child(8) {
     animation-delay: 810ms;
   }
-  .ix-player[data-playing="true"] .ix-w:nth-child(n + 9) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-w:nth-child(n + 9) {
     animation-delay: 890ms;
   }
   /* The whole scene leaves in its last half-second, so the cut to the
@@ -622,126 +607,162 @@
   }
 
   /* 1 — the channels light up, then the comments drop into one stream. */
-  .ix-player[data-playing="true"] .ix-chip {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-chip {
     animation: ix-chip 700ms var(--ix-ease) both;
     animation-delay: 300ms;
   }
-  .ix-player[data-playing="true"] .ix-chip:nth-child(2) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-chip:nth-child(2) {
     animation-delay: 420ms;
   }
-  .ix-player[data-playing="true"] .ix-chip:nth-child(3) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-chip:nth-child(3) {
     animation-delay: 540ms;
   }
-  .ix-player[data-playing="true"] .ix-chip:nth-child(4) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-chip:nth-child(4) {
     animation-delay: 660ms;
   }
-  .ix-player[data-playing="true"] .ix-chip:nth-child(5) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-chip:nth-child(5) {
     animation-delay: 780ms;
   }
-  .ix-player[data-playing="true"] .ix-chip:nth-child(6) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-chip:nth-child(6) {
     animation-delay: 900ms;
   }
-  .ix-player[data-playing="true"] .ix-bubble {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-bubble {
     animation: ix-drop 600ms var(--ix-ease) both;
     animation-delay: 1200ms;
   }
-  .ix-player[data-playing="true"] .ix-bubble:nth-child(2) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-bubble:nth-child(2) {
     animation-delay: 1700ms;
   }
-  .ix-player[data-playing="true"] .ix-bubble:nth-child(3) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-bubble:nth-child(3) {
     animation-delay: 2200ms;
   }
-  .ix-player[data-playing="true"] .ix-bubble:nth-child(4) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-bubble:nth-child(4) {
     animation-delay: 2700ms;
   }
 
   /* 2 — a beam reads the comment; the two feelings light; the label lands. */
-  .ix-player[data-playing="true"] .ix-focus {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-focus {
     animation: ix-rise 500ms var(--ix-ease) 200ms both;
   }
-  .ix-player[data-playing="true"] .ix-scan {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-scan {
     animation: ix-scan 1300ms ease-in-out 600ms both;
   }
-  .ix-player[data-playing="true"] .ix-mark {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-mark {
     animation: ix-mark 500ms ease-out both;
     animation-delay: 1200ms;
   }
-  .ix-player[data-playing="true"] .ix-mark.negative {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-mark.negative {
     animation-delay: 1600ms;
   }
-  .ix-player[data-playing="true"] .ix-focus .ix-label {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-focus .ix-label {
     animation: ix-pop 500ms var(--ix-ease) 2100ms both;
   }
-  .ix-player[data-playing="true"] .ix-dialects li {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-dialects li {
     animation: ix-rise 450ms var(--ix-ease) both;
     animation-delay: 2600ms;
   }
-  .ix-player[data-playing="true"] .ix-dialects li:nth-child(2) {
+  .ix-player[data-playing="true"]:not([data-fresh])
+    .ix-dialects
+    li:nth-child(2) {
     animation-delay: 2800ms;
   }
-  .ix-player[data-playing="true"] .ix-dialects li:nth-child(3) {
+  .ix-player[data-playing="true"]:not([data-fresh])
+    .ix-dialects
+    li:nth-child(3) {
     animation-delay: 3000ms;
   }
-  .ix-player[data-playing="true"] .ix-dialects li:nth-child(4) {
+  .ix-player[data-playing="true"]:not([data-fresh])
+    .ix-dialects
+    li:nth-child(4) {
     animation-delay: 3200ms;
   }
 
   /* 3 — the three bars grow in turn, then their figures and the key. */
-  .ix-player[data-playing="true"] .ix-compare {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-compare {
     animation: ix-rise 500ms var(--ix-ease) 200ms both;
   }
-  .ix-player[data-playing="true"] .ix-bar {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-bar {
     animation: ix-grow 1100ms var(--ix-ease) both;
     animation-delay: 600ms;
   }
-  .ix-player[data-playing="true"] .ix-row-pct {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-row-pct {
     animation: ix-pop 400ms var(--ix-ease) both;
     animation-delay: 1500ms;
   }
-  .ix-player[data-playing="true"] .ix-row:nth-child(2) .ix-bar {
+  .ix-player[data-playing="true"]:not([data-fresh])
+    .ix-row:nth-child(2)
+    .ix-bar {
     animation-delay: 1000ms;
   }
-  .ix-player[data-playing="true"] .ix-row:nth-child(2) .ix-row-pct {
+  .ix-player[data-playing="true"]:not([data-fresh])
+    .ix-row:nth-child(2)
+    .ix-row-pct {
     animation-delay: 1900ms;
   }
-  .ix-player[data-playing="true"] .ix-row:nth-child(3) .ix-bar {
+  .ix-player[data-playing="true"]:not([data-fresh])
+    .ix-row:nth-child(3)
+    .ix-bar {
     animation-delay: 1400ms;
   }
-  .ix-player[data-playing="true"] .ix-row:nth-child(3) .ix-row-pct {
+  .ix-player[data-playing="true"]:not([data-fresh])
+    .ix-row:nth-child(3)
+    .ix-row-pct {
     animation-delay: 2300ms;
   }
-  .ix-player[data-playing="true"] .ix-legend {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-legend {
     animation: ix-rise 500ms var(--ix-ease) 2600ms both;
   }
 
   /* 4 — the mark lands and pulses; what you keep; the closing line. */
-  .ix-player[data-playing="true"] .ix-badge {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-badge {
     animation: ix-pop 600ms var(--ix-ease) 200ms both;
   }
-  .ix-player[data-playing="true"] .ix-badge::after {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-badge::after {
     animation: ix-ring 1800ms ease-out 900ms infinite;
   }
-  .ix-player[data-playing="true"] .ix-checks li {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-checks li {
     animation: ix-slide 500ms var(--ix-ease) both;
     animation-delay: 800ms;
   }
-  .ix-player[data-playing="true"] .ix-checks li:nth-child(2) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-checks li:nth-child(2) {
     animation-delay: 1150ms;
   }
-  .ix-player[data-playing="true"] .ix-checks li:nth-child(3) {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-checks li:nth-child(3) {
     animation-delay: 1500ms;
   }
-  .ix-player[data-playing="true"] .ix-final {
+  .ix-player[data-playing="true"]:not([data-fresh]) .ix-final {
     animation: ix-word 700ms var(--ix-ease) 2100ms both;
+  }
+
+  /* The first pass of scene 1 keeps the prerendered picture; a light runs
+     along the channels instead of an entrance. */
+  .ix-player[data-playing="true"][data-fresh] .ix-chip {
+    animation: ix-glint 900ms ease-in-out both;
+    animation-delay: 300ms;
+  }
+  .ix-player[data-playing="true"][data-fresh] .ix-chip:nth-child(2) {
+    animation-delay: 450ms;
+  }
+  .ix-player[data-playing="true"][data-fresh] .ix-chip:nth-child(3) {
+    animation-delay: 600ms;
+  }
+  .ix-player[data-playing="true"][data-fresh] .ix-chip:nth-child(4) {
+    animation-delay: 750ms;
+  }
+  .ix-player[data-playing="true"][data-fresh] .ix-chip:nth-child(5) {
+    animation-delay: 900ms;
+  }
+  .ix-player[data-playing="true"][data-fresh] .ix-chip:nth-child(6) {
+    animation-delay: 1050ms;
   }
 
   /* Paused: the clock and the ambient light hold. The scenes' entrances
      run only while playing (above), so a paused stage, or a scene chosen
      while paused, shows the scene complete rather than its empty first
      frame. */
-  .lp-intro .ix-player[data-playing="false"] .ix-progress i,
-  .lp-intro .ix-player[data-playing="false"] .ix-glow,
-  .lp-intro .ix-player[data-playing="false"] .ix-live i {
+  .ix-player[data-playing="false"] .ix-progress i,
+  .ix-player[data-playing="false"] .ix-glow,
+  .ix-player[data-playing="false"] .ix-live i {
     animation-play-state: paused;
   }
 }
@@ -783,6 +804,13 @@
   }
   100% {
     scale: 1;
+  }
+}
+@keyframes ix-glint {
+  50% {
+    color: var(--ink-on-dark);
+    background: var(--ml-indigo-500);
+    border-color: var(--ml-indigo-300);
   }
 }
 @keyframes ix-drop {

@@ -1,65 +1,62 @@
+/* The hero: the words centred on top — eyebrow, H1, lead, the two doors —
+   and the product in twenty seconds full width under them, as its picture.
+   The player's own rules are in intro.css. */
 .lp-hero {
   position: relative;
-  padding-block: clamp(40px, 6vw, 88px) clamp(48px, 7vw, 96px);
-}
-.lp-hero-grid {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: clamp(32px, 5vw, 72px);
-  align-items: center;
+  padding-block: clamp(28px, 4vw, 56px) clamp(48px, 7vw, 96px);
 }
 .lp-hero-copy {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-4);
+  text-align: center;
 }
-.lp-hero-copy h1 {
+/* Smaller than the landing's display size (landing.css): centred over the
+   picture, three lines at 68px pushed the stage below the first screen. */
+.lp-page .lp-hero-copy h1 {
+  margin: 0;
+  font-size: clamp(34px, 4.4vw, 58px);
+}
+.lp-hero-copy .lp-lead {
   margin: 0;
 }
 .lp-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-3);
   align-items: center;
+}
+.lp-hero-stage {
+  margin-top: clamp(28px, 4vw, 44px);
+}
+.lp-hero-stage > .lp-caption {
+  margin: var(--space-4) 0 0;
+  text-align: center;
 }
 .lp-hero-figure {
   position: relative;
   margin: 0;
-  aspect-ratio: 4 / 3;
-  display: flex;
-  align-items: center;
-}
-.lp-hero-figure .pw {
-  width: 100%;
 }
 .lp-hero-halo {
   position: absolute;
-  inset: -12% -8%;
+  inset: -10% -6%;
   background: radial-gradient(
     closest-side,
-    color-mix(in srgb, var(--ml-indigo) 12%, transparent),
+    color-mix(in srgb, var(--ml-indigo) 14%, transparent),
     transparent
   );
   pointer-events: none;
   z-index: 0;
 }
-.lp-hero-figure .pw {
-  position: relative;
+.lp-hero-figure .ix-player {
   z-index: 1;
 }
 .lp-value-strip {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-2);
   margin-top: clamp(32px, 5vw, 56px);
-}
-@media (max-width: 1023px) {
-  .lp-hero-grid {
-    grid-template-columns: 1fr;
-  }
-  .lp-hero-figure {
-    max-width: 560px;
-    aspect-ratio: auto;
-  }
 }
