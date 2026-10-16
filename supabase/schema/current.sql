@@ -8319,6 +8319,39 @@ CREATE OR REPLACE FUNCTION public.submit_topic_review(w uuid, c uuid, seen_hash 
 AS $function$
   select private.submit_topic_review_impl(w, c, seen_hash, topic, why) $function$
 
+CREATE OR REPLACE FUNCTION public.svc_monitor_channel_freshness()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+ SET statement_timeout TO '30s'
+AS $function$
+  with collected as (
+    select s.last_ok_at,
+           (select min(v.selected_at) from public.video_selections v
+             where v.workspace_id = s.workspace_id and v.channel_id = s.channel_id)
+             as first_selected_at
+      from private.admin_channel_states() s
+      join public.channels c on c.workspace_id = s.workspace_id and c.id = s.channel_id
+     where s.state <> 'paused'
+       and c.catalogued_at is not null
+       and exists (select 1 from public.video_selections v
+                    where v.workspace_id = s.workspace_id and v.channel_id = s.channel_id)
+  ),
+  judged as (
+    select last_ok_at,
+           case
+             when last_ok_at is not null then last_ok_at < now() - interval '48 hours'
+             else first_selected_at < now() - interval '48 hours'
+           end as stale
+      from collected
+  )
+  select jsonb_build_object(
+    'collected', (select count(*) from judged),
+    'stale', (select count(*) from judged where stale),
+    'never', (select count(*) from judged where stale and last_ok_at is null))
+$function$
+
 CREATE OR REPLACE FUNCTION public.svc_oauth_attach_channel(u uuid, w uuid, c uuid, external_channel text, tokens bytea, key_version text, scopes text[], channel_handle text DEFAULT NULL::text, channel_title text DEFAULT NULL::text)
  RETURNS uuid
  LANGUAGE sql
@@ -9707,6 +9740,8 @@ grant EXECUTE on function submit_comment_review(uuid,uuid,text,text,text) to "au
 grant EXECUTE on function submit_comment_review(uuid,uuid,text,text,text) to "postgres";
 grant EXECUTE on function submit_topic_review(uuid,uuid,text,text,text) to "authenticated";
 grant EXECUTE on function submit_topic_review(uuid,uuid,text,text,text) to "postgres";
+grant EXECUTE on function svc_monitor_channel_freshness() to "postgres";
+grant EXECUTE on function svc_monitor_channel_freshness() to "service_role";
 grant EXECUTE on function svc_oauth_attach_channel(uuid,uuid,uuid,text,bytea,text,text[],text,text) to "postgres";
 grant EXECUTE on function svc_oauth_attach_channel(uuid,uuid,uuid,text,bytea,text,text[],text,text) to "service_role";
 grant EXECUTE on function svc_oauth_consume_state(text) to "postgres";
