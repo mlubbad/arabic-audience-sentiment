@@ -4046,6 +4046,54 @@ begin
   return removed;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.purge_foreign_catalogue(p_channel uuid, source_external text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE ch public.channels; foreign_ids uuid[]; n_videos int; n_comments int; BEGIN
+  SELECT * INTO ch FROM public.channels WHERE id = p_channel;
+  IF ch.id IS NULL THEN
+    RAISE EXCEPTION 'invalid_channel' USING errcode='23503'; END IF;
+  IF source_external IS NULL OR source_external !~ '^UC[A-Za-z0-9_-]{22}$' THEN
+    RAISE EXCEPTION 'invalid_channel_id' USING errcode='22023'; END IF;
+  -- The source channel's own rows are its own, wherever they sit.
+  IF coalesce(ch.platform, 'youtube') <> 'youtube' OR ch.external_channel_id = source_external THEN
+    RETURN jsonb_build_object('videos', 0, 'comments', 0);
+  END IF;
+
+  SELECT coalesce(array_agg(v.id), '{}') INTO foreign_ids
+    FROM public.videos v
+   WHERE v.workspace_id = ch.workspace_id AND v.channel_id = ch.id
+     AND EXISTS (
+       SELECT 1 FROM public.videos s
+         JOIN public.channels sc ON sc.workspace_id = s.workspace_id AND sc.id = s.channel_id
+        WHERE sc.platform = 'youtube' AND sc.external_channel_id = source_external
+          AND s.platform = 'youtube' AND s.external_video_id = v.external_video_id);
+  IF cardinality(foreign_ids) = 0 THEN
+    RETURN jsonb_build_object('videos', 0, 'comments', 0);
+  END IF;
+
+  PERFORM set_config('app.deleting_workspace', ch.workspace_id::text, true);
+  DELETE FROM public.sentiment_predictions WHERE workspace_id = ch.workspace_id AND comment_id IN (
+    SELECT id FROM public.comments WHERE workspace_id = ch.workspace_id AND video_id = ANY(foreign_ids));
+  DELETE FROM public.topic_predictions WHERE workspace_id = ch.workspace_id AND comment_id IN (
+    SELECT id FROM public.comments WHERE workspace_id = ch.workspace_id AND video_id = ANY(foreign_ids));
+  DELETE FROM public.comment_reviews WHERE workspace_id = ch.workspace_id AND comment_id IN (
+    SELECT id FROM public.comments WHERE workspace_id = ch.workspace_id AND video_id = ANY(foreign_ids));
+  DELETE FROM public.topic_reviews WHERE workspace_id = ch.workspace_id AND comment_id IN (
+    SELECT id FROM public.comments WHERE workspace_id = ch.workspace_id AND video_id = ANY(foreign_ids));
+  DELETE FROM public.comment_annotations WHERE workspace_id = ch.workspace_id AND comment_id IN (
+    SELECT id FROM public.comments WHERE workspace_id = ch.workspace_id AND video_id = ANY(foreign_ids));
+  DELETE FROM public.comments WHERE workspace_id = ch.workspace_id AND video_id = ANY(foreign_ids);
+  GET DIAGNOSTICS n_comments = row_count;
+  DELETE FROM public.video_selections WHERE workspace_id = ch.workspace_id AND video_id = ANY(foreign_ids);
+  DELETE FROM public.videos WHERE workspace_id = ch.workspace_id AND id = ANY(foreign_ids);
+  GET DIAGNOSTICS n_videos = row_count;
+  PERFORM set_config('app.deleting_workspace', '', true);
+  RETURN jsonb_build_object('videos', n_videos, 'comments', n_comments);
+END $function$
+
 CREATE OR REPLACE FUNCTION private.reconcile_all_video_comment_stats()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -5426,10 +5474,11 @@ CREATE OR REPLACE FUNCTION private.worker_commit_catalogue(token_hash text, j uu
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-DECLARE w uuid; c uuid; c_platform text; n int; BEGIN
+DECLARE w uuid; c uuid; c_platform text; c_external text; n int; BEGIN
   w := private.worker_job(token_hash, j, t);
   SELECT channel_id INTO c FROM public.jobs WHERE id = j;
-  SELECT coalesce(platform, 'youtube') INTO c_platform FROM public.channels WHERE id = c;
+  SELECT coalesce(platform, 'youtube'), external_channel_id
+    INTO c_platform, c_external FROM public.channels WHERE id = c;
   IF payload IS NULL OR jsonb_typeof(payload) <> 'array' THEN
     RAISE EXCEPTION 'invalid_catalogue' USING errcode='22023'; END IF;
   IF EXISTS (
@@ -5451,6 +5500,13 @@ DECLARE w uuid; c uuid; c_platform text; n int; BEGIN
         OR (i ? 'comments_state' AND i->>'comments_state' NOT IN ('open','disabled','unknown'))
         OR (i ? 'field_provenance' AND jsonb_typeof(i->'field_provenance') <> 'object')) THEN
     RAISE EXCEPTION 'invalid_catalogue' USING errcode='22023'; END IF;
+  -- Whose videos these are. A YouTube video has one uploader and the API
+  -- names it; a list that is not all the job's channel's is not this
+  -- channel's catalogue, however well-formed.
+  IF c_platform = 'youtube' AND EXISTS (
+    SELECT 1 FROM jsonb_array_elements(payload) i
+     WHERE (i->>'channel_external_id') IS DISTINCT FROM c_external) THEN
+    RAISE EXCEPTION 'catalogue_channel_mismatch' USING errcode='22023'; END IF;
 
   INSERT INTO public.videos(workspace_id, channel_id, platform, external_video_id, title, kind,
     published_at, duration_sec, thumbnail_url, reported_comment_count, comments_state,
@@ -9387,6 +9443,7 @@ grant EXECUTE on function private.prune_oauth_states(interval) to "postgres";
 grant EXECUTE on function private.prune_oauth_states(interval) to "service_role";
 grant EXECUTE on function private.purge_comment_text(interval) to "postgres";
 grant EXECUTE on function private.purge_comment_text(interval) to "service_role";
+grant EXECUTE on function private.purge_foreign_catalogue(uuid,text) to "postgres";
 grant EXECUTE on function private.reconcile_all_video_comment_stats() to "postgres";
 grant EXECUTE on function private.reconcile_all_video_comment_stats() to "service_role";
 grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "postgres";

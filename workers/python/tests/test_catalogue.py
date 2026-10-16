@@ -6,8 +6,11 @@ from collectors.protocol import CollectionError
 from collectors.youtube_api import YouTubeAPI
 
 
+OWN = "UCxxxxxxxxxxxxxxxxxxxxxx"
+
+
 def channel(uploads="UUxxxxxxxxxxxxxxxxxxxxxx"):
-    return {"items": [{"contentDetails": {"relatedPlaylists": {"uploads": uploads}}}]}
+    return {"items": [{"id": OWN, "contentDetails": {"relatedPlaylists": {"uploads": uploads}}}]}
 
 
 def items(ids, next_page=None):
@@ -21,6 +24,7 @@ def stats(rows):
     return {"items": [
         {"id": r["id"],
          "snippet": {"title": r.get("title", r["id"]), "publishedAt": "2026-01-02T03:04:05Z",
+                     "channelId": r.get("channel", OWN),
                      "thumbnails": {"medium": {"url": f"https://i/{r['id']}.jpg"}}},
          "statistics": ({"commentCount": str(r["comments"])} if r.get("comments") is not None else {}),
          "contentDetails": {"duration": r.get("duration", "PT1M5S")}}
@@ -124,6 +128,37 @@ def test_a_failing_statistics_call_is_not_a_complete_catalogue():
         YouTubeAPI(None, client, access_token="tok").catalogue()
     assert e.value.code == "source_unavailable"
     assert e.value.retryable is True
+
+
+def test_every_video_names_the_channel_that_uploaded_it():
+    # The database files a catalogue under the job's channel and checks this
+    # name against it: a list that is not the job's channel is refused whole.
+    client, _ = serve(
+        {"UULFxxxxxxxxxxxxxxxxxxxxxx": ["aaaaaaaaaaa"], "UUSHxxxxxxxxxxxxxxxxxxxxxx": None,
+         "UULVxxxxxxxxxxxxxxxxxxxxxx": None},
+        [{"id": "aaaaaaaaaaa", "comments": 1}],
+    )
+    cat = YouTubeAPI(None, client, access_token="tok").catalogue()
+    assert cat.videos[0]["channel_external_id"] == OWN
+
+
+@pytest.mark.parametrize("named", [None, OWN])
+def test_a_video_of_another_channel_stops_the_catalogue(named):
+    # The list the source returned is not the channel this run was sent to
+    # read — a token that is not the owner's read as if it were lists the
+    # token's own channel. Nothing of it is returned to be filed.
+    client, _ = serve(
+        {"UULFxxxxxxxxxxxxxxxxxxxxxx": ["aaaaaaaaaaa", "bbbbbbbbbbb"],
+         "UUSHxxxxxxxxxxxxxxxxxxxxxx": None, "UULVxxxxxxxxxxxxxxxxxxxxxx": None},
+        [{"id": "aaaaaaaaaaa", "comments": 1},
+         {"id": "bbbbbbbbbbb", "comments": 1, "channel": "UCyyyyyyyyyyyyyyyyyyyyyy"}],
+    )
+    api = (YouTubeAPI(None, client, access_token="tok", public_reader=True) if named
+           else YouTubeAPI(None, client, access_token="tok"))
+    with pytest.raises(CollectionError) as e:
+        api.catalogue(named)
+    assert e.value.code == "catalogue_channel_mismatch"
+    assert e.value.outcome == "blocked"
 
 
 def test_needs_the_owner_token():

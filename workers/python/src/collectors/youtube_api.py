@@ -367,6 +367,12 @@ class YouTubeAPI:
         except (KeyError, TypeError):
             raise CollectionError("invalid_response") from None
         base = uploads[2:]
+        # The channel this list is meant to be: the one named, else the one
+        # the owner's grant answered for. Every video carries the channel
+        # that uploaded it, and the database refuses a catalogue that is not
+        # the job's channel; a mismatch here stops the run before anything of
+        # it travels.
+        expected = channel_id or data["items"][0].get("id")
 
         found: dict[str, dict] = {}
         any_tab = False
@@ -406,8 +412,12 @@ class YouTubeAPI:
                                   "discovered_in_tabs": found[vid]["tabs"]}
                     if unclassified:
                         provenance["kind_unclassified"] = True
+                    uploader = s.get("channelId")
+                    if expected and uploader and uploader != expected:
+                        raise CollectionError("catalogue_channel_mismatch", "blocked")
                     videos.append({
                         "external_video_id": vid,
+                        "channel_external_id": uploader,
                         "title": s.get("title") or "",
                         "kind": found[vid]["kind"],
                         "published_at": s.get("publishedAt"),

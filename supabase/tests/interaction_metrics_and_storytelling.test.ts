@@ -92,6 +92,7 @@ describe("interaction metrics and storytelling", () => {
     const cataloguePayload = [
       {
         external_video_id: "dQw4w9WgXcQ",
+        channel_external_id: "UC1234567890123456789012",
         title: "Arabic AI Sentiment Tutorial",
         kind: "video",
         published_at: "2026-09-01T12:00:00Z",

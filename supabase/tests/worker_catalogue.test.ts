@@ -114,7 +114,11 @@ describe("worker catalogue and due lists", () => {
         lease.id,
         lease.lease_token,
         JSON.stringify([
-          { external_video_id: "ok_id_11chr", title: "x" },
+          {
+            external_video_id: "ok_id_11chr",
+            title: "x",
+            channel_external_id: `UC${"a".repeat(22)}`,
+          },
           { external_video_id: "too-short" },
         ]),
       ]),
@@ -133,6 +137,7 @@ describe("worker catalogue and due lists", () => {
         JSON.stringify([
           {
             external_video_id: "aaaaaaaaaaa",
+            channel_external_id: `UC${"a".repeat(22)}`,
             title: "أول",
             kind: "video",
             published_at: "2026-01-01T00:00:00Z",
@@ -145,6 +150,7 @@ describe("worker catalogue and due lists", () => {
           },
           {
             external_video_id: "bbbbbbbbbbb",
+            channel_external_id: `UC${"a".repeat(22)}`,
             title: "معطّل",
             kind: "short",
             reported_comment_count: null,
@@ -201,6 +207,7 @@ describe("worker catalogue and due lists", () => {
       JSON.stringify([
         {
           external_video_id: "aaaaaaaaaaa",
+          channel_external_id: `UC${"a".repeat(22)}`,
           title: "aaaaaaaaaaa",
           reported_comment_count: 15,
         },

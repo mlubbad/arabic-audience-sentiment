@@ -62,6 +62,8 @@ export interface WorkerDb {
     credentialHash: string,
     jobId: string,
     leaseToken: string,
+    /** The worker said it knows a reader lease; see the claim route. */
+    reader: boolean,
   ): Promise<{
     access_token: string;
     access_token_expires_at: string;
@@ -150,6 +152,10 @@ const STATUS: Record<string, number> = {
   batch_too_large: 400,
   invalid_outcome: 400,
   invalid_catalogue: 400,
+  // A YouTube catalogue whose videos are not the job's channel's (or do not
+  // say whose they are). Refused whole: filed, it would show one channel's
+  // uploads as another's.
+  catalogue_channel_mismatch: 400,
   invalid_counts: 400,
   invalid_video: 400,
   invalid_job_type: 400,
@@ -250,7 +256,19 @@ export async function handleWorkerRequest(
       // its own; when the claim named one and no grant opened, the platform
       // reader is the reading credential. An id with neither reader nor key
       // is still an honest claim: the worker reports the configuration gap.
-      if (!granted && claimed.external_channel_id && db.readerTokenFor)
+      //
+      // The reader goes only to a worker that says it knows a reader lease
+      // (`reader: true`). One built before the reader reads any token as the
+      // channel owner's, drops the id and lists `mine=true` — the reader's own
+      // channel — and files that list under the job's channel: AJ360's uploads
+      // reached 73 public channels that way (2026-10-12 → 2026-10-16). Without
+      // the token such a worker reads by id with its key, or reports blocked.
+      if (
+        !granted &&
+        claimed.external_channel_id &&
+        body.reader === true &&
+        db.readerTokenFor
+      )
         granted = await db.readerTokenFor(credential);
       const type = String(claimed.type ?? "collect");
       const videos =
@@ -317,7 +335,10 @@ export async function handleWorkerRequest(
       // other leased call: a lost lease is refused, not honoured with a
       // token. Null on success means the channel's grant is gone — the
       // worker stops asking, and the retry path reports the channel.
-      return json(200, await db.renewToken(credential, job, lease));
+      return json(
+        200,
+        await db.renewToken(credential, job, lease, body.reader === true),
+      );
     }
     if (path.endsWith("/worker/commit-batch")) {
       const key = str(body, "batch_key");

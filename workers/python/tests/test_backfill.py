@@ -96,7 +96,7 @@ def test_the_backfill_claims_collect_and_nothing_else():
         [{"video_id": "v1", "external_video_id": "v1", "title": "الأولى"}],
     )
     assert worked is True
-    assert sent["claim_body"] == {"types": ["collect"]}
+    assert sent["claim_body"] == {"types": ["collect"], "reader": True}
 
 
 def test_a_finished_video_is_recorded_and_never_read_again():

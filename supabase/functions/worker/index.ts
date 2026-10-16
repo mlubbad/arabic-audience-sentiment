@@ -176,6 +176,7 @@ async function renewToken(
   credentialHash: string,
   jobId: string,
   leaseToken: string,
+  reader: boolean,
 ): Promise<{ access_token: string; access_token_expires_at: string } | null> {
   const { data, error } = await db.rpc("svc_worker_renew_grant", {
     credential_hash: credentialHash,
@@ -200,7 +201,9 @@ async function renewToken(
   }
   // A public job has no channel grant to renew; its run renews the platform
   // reader instead, but only when the job's channel really is public — the
-  // reader is never handed to a connected channel's run.
+  // reader is never handed to a connected channel's run — and only to a
+  // worker that asked for it, as at claim time.
+  if (!reader) return null;
   const { data: job } = await db
     .from("jobs")
     .select("channel_id")
