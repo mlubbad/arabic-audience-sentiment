@@ -13,3 +13,8 @@ c675bda2d35d40b82ddaabfd9bc4bad4826bee32:workers/python/tests/fixtures/golden_ba
 
 # real credential, rotated 2026-09-28
 edfd8a3645aa51189d3d68b16217c4364b71f7c4:scripts/run_telegram_collect.py:generic-api-key:42
+#
+# scripts/monitor.test.ts passes the monitor a placeholder worker credential,
+# "test-worker-credential", to a stand-in server on localhost (and asserts the
+# monitor never prints it). Not a credential; flagged by generic-api-key.
+c3a5b05092ca31dda5d469d537dd7193d99a5638:scripts/monitor.test.ts:generic-api-key:75
