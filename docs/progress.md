@@ -1,5 +1,30 @@
 # Progress
 
+## 2026-10-17 — The external monitor never ran; it now runs off the Mac and judges each channel
+
+**Found:** the crontab entry installed on 2026-09-19 (`*/5 … ./scripts/monitor.sh`) was refused
+by macOS privacy protection on every run: `.worker-logs/monitor.log` holds 1,930 lines, all
+`Operation not permitted`, and has not been written since 2026-09-26. No `ALERT_WEBHOOK_URL` was
+ever set. So for four weeks there was no external alarm, while `docs/verification.md` (2026-09-19)
+recorded the crontab as installed.
+
+**Masked incident (read-only, production, 2026-10-16 21:30 UTC):** 18 channels have selected
+videos; 16 have had no successful collection in 48 hours, 7 never had one. Each was attempted
+42–45 times in those 48 hours, almost all `blocked` on `quota_exceeded` (the two Telegram channels
+on `invalid_batch`). The monitor's freshness check read the platform's newest prediction ("1h
+old, OK"), so two healthy channels hid the other sixteen.
+
+**Change (branch `claude/monitor-runs-off-mac`):** (1) `20261030000000` adds
+`svc_monitor_channel_freshness()` (service_role only, counts only), built on the console's
+`admin_channel_states`; `monitor.sh` fails when any collected channel is stale. (2)
+`.github/workflows/monitor.yml` runs the monitor every 30 minutes on the hosted runner, away from
+the worker's machine; `scripts/monitor-alerts.mjs` keeps one issue labelled `monitor` open per
+failing check and closes it on recovery. (3) The monitor reports its own missing configuration as
+a failing check, and probes the public site without basic auth. **Owner:** create the `monitor`
+environment (branch `main` only) with four secrets; until then the first run opens
+"Monitor: monitor is failing" naming them. **Not done here:** the quota incident itself, and the
+`failures` check, which fails on any blocked job and will stay open while quota blocks continue.
+
 ## 2026-10-16 — AJ360's uploads filed under 73 public channels; a catalogue now names its channel
 
 **Reported:** Yahea Alzo3bi's video list mixed in Al Jazeera 360 videos. **Measured (read-only,

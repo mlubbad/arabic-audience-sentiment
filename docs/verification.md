@@ -1,5 +1,34 @@
 # Verification
 
+## 2026-10-17 — The external monitor: off the Mac, and stale channels fail it
+
+**Correction to 2026-09-19 below:** that entry records the crontab as "Installed". It was
+installed, and it never ran: on the owner's Mac (2026-10-16), `.worker-logs/monitor.log` holds
+1,930 lines, every one `/bin/sh: ./scripts/monitor.sh: Operation not permitted` (macOS privacy
+protection refusing `cron` access to `~/Documents`), last written 2026-09-26; the state files in
+`.cache/` changed only on hand runs.
+
+Read-only probes against production, 2026-10-16 ~21:30 UTC (service key, counts only):
+
+| Command / observation                                  | Actual result                                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `./scripts/monitor.sh` (main's version, by hand)       | rest 200 · gateway 204 · leases none · **FAIL failures 199_failed_or_blocked_24h** · worker 0m · **OK freshness newest_1h_old** · site 200                         |
+| `jobs` failed/blocked in 24 h, by type and code        | 97 blocked discover `quota_exceeded` · 75 blocked collect `quota_exceeded` · 18 failed collect `retry_exhausted:api_error` · 6 failed collect `lease_thrashing:20` |
+| Each channel with selected videos: last ok collect run | 18 channels: 2 within 48 h (2026-10-16 10:41, 14:23); 9 between 2026-09-27 and 2026-10-13; **7 never**. Every one attempted 34–45 times in 48 h                    |
+| `./scripts/monitor.sh` (this branch, RPC not deployed) | `OK monitor configured` · same probes · `WARN freshness unreadable_counts` · exit 2                                                                                |
+
+Local checks on `claude/monitor-runs-off-mac`:
+
+| Command                                                           | Actual result                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npx vitest run supabase/tests/monitor_channel_freshness.test.ts` | 6 passed: `{collected: 5, stale: 3, never: 2}` from one fresh, one lapsed, two never-collected (one labelled 'collecting'), one just-selected, one paused, one unselected channel; refused to another workspace's member, the admin's user key and anon |
+| `npx vitest run scripts/monitor.test.ts` (this branch)            | 7 passed, against a localhost stand-in with `MONITOR_ENV_FILE=""`                                                                                                                                                                                       |
+| same, against `git show HEAD:scripts/monitor.sh`                  | **5 failed**, e.g. `expected 'OK freshness newest_1h_old' to be 'FAIL freshness 16_of_18_collected_channels_stale_48h_7_never_collected'`                                                                                                               |
+| `npx vitest run scripts/monitor-alerts.test.ts …workflow tests`   | 4 files, 36 passed                                                                                                                                                                                                                                      |
+| `semgrep scan` (CI's packs + `p/github-actions`), 6 files         | 72 rules, 0 findings                                                                                                                                                                                                                                    |
+| `npm run db:snapshot:check`                                       | stale after the migration; regenerated, +35 lines (the one function)                                                                                                                                                                                    |
+| `npm run check`                                                 | exit 0: lint, format, typecheck, functions; 169 files / 1,367 tests; DB 75 files / 639 tests; worker 340 passed; build; secret scan 973 files |
+
 ## 2026-10-16 — Another channel's videos in a public channel's list
 
 Read-only PostgREST GETs against production (service key, counts and provenance only, no
