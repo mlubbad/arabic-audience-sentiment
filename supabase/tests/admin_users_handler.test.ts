@@ -72,6 +72,34 @@ describe("admin-users handler", () => {
     }
   });
 
+  it("never hands another admin's account a link, a new email or a confirmation", async () => {
+    const other = { ...PERSON, is_admin: true };
+    for (const body of [
+      { action: "recovery_link", user_id: USER },
+      { action: "change_email", user_id: USER, email: "mine@example.com" },
+      { action: "confirm_email", user_id: USER },
+    ]) {
+      const f = fakes(other);
+      expect(await run(body, f)).toEqual({
+        status: 409,
+        body: { code: "cannot_act_on_admin" },
+      });
+      expect(f.auth.recoveryLink).not.toHaveBeenCalled();
+      expect(f.auth.update).not.toHaveBeenCalled();
+      expect(f.db.record).not.toHaveBeenCalled();
+    }
+    // The caller's own account, which is also an admin's, is still theirs.
+    const self = fakes({ ...PERSON, is_admin: true, is_self: true });
+    expect(
+      (await run({ action: "recovery_link", user_id: USER }, self)).status,
+    ).toBe(200);
+    // Lifting a suspension is no way in, so it stays open.
+    const lift = fakes(other);
+    expect(
+      (await run({ action: "unsuspend", user_id: USER }, lift)).status,
+    ).toBe(200);
+  });
+
   it("makes a reset link that lands on the app's own reset page", async () => {
     const f = fakes();
     expect(await run({ action: "recovery_link", user_id: USER }, f)).toEqual({

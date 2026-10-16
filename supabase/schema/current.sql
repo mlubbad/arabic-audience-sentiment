@@ -36,6 +36,26 @@ alter table "private"."admin_digests" add constraint "admin_digests_recorded_at_
 
 CREATE UNIQUE INDEX admin_digests_pkey ON private.admin_digests USING btree (day);
 
+create table "private"."admin_notes" (
+  "id" uuid default gen_random_uuid() not null,
+  "workspace_id" uuid,
+  "subject" text not null,
+  "ref" text,
+  "note" text not null,
+  "actor_id" uuid,
+  "created_at" timestamp with time zone default now() not null
+);
+
+alter table "private"."admin_notes" add constraint "admin_notes_created_at_not_null" NOT NULL created_at;
+alter table "private"."admin_notes" add constraint "admin_notes_id_not_null" NOT NULL id;
+alter table "private"."admin_notes" add constraint "admin_notes_note_check" CHECK (length(note) >= 1);
+alter table "private"."admin_notes" add constraint "admin_notes_note_not_null" NOT NULL note;
+alter table "private"."admin_notes" add constraint "admin_notes_pkey" PRIMARY KEY (id);
+alter table "private"."admin_notes" add constraint "admin_notes_subject_check" CHECK (subject = ANY (ARRAY['plan'::text, 'pack'::text]));
+alter table "private"."admin_notes" add constraint "admin_notes_subject_not_null" NOT NULL subject;
+
+CREATE UNIQUE INDEX admin_notes_pkey ON private.admin_notes USING btree (id);
+
 create table "private"."auto_selected_videos" (
   "workspace_id" uuid not null,
   "video_id" uuid not null,
@@ -510,7 +530,8 @@ create table "public"."audit_events" (
   "action" text not null,
   "target_type" text not null,
   "target_id" text,
-  "created_at" timestamp with time zone default now() not null
+  "created_at" timestamp with time zone default now() not null,
+  "former_workspace_id" uuid
 );
 alter table "public"."audit_events" enable row level security;
 
@@ -1695,6 +1716,20 @@ declare root uuid; begin
   insert into private.billing_events(event_id, event_type, occurred_at, workspace_id, applied_at, outcome, payload)
   values (event_id, 'transaction.completed', occurred_at, root, now(), 'applied', payload);
   return 'applied';
+end $function$
+
+CREATE OR REPLACE FUNCTION private.audit_plan_change()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if new is distinct from old then
+    insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+    values (null, auth.uid(), 'plan_updated', 'plan', new.key);
+  end if;
+  return new;
 end $function$
 
 CREATE OR REPLACE FUNCTION private.auto_select_after_catalogue()
@@ -4669,10 +4704,20 @@ CREATE OR REPLACE FUNCTION private.reject_review_mutation()
  SET search_path TO ''
 AS $function$
 begin
-  if tg_op = 'DELETE'
-     and current_setting('app.deleting_workspace', true) is not null
+  if current_setting('app.deleting_workspace', true) is not null
      and current_setting('app.deleting_workspace', true) = old.workspace_id::text then
-    return old;
+    if tg_table_name <> 'audit_events' then
+      if tg_op = 'DELETE' then return old; end if;
+    elsif tg_op = 'UPDATE' then
+      if new.workspace_id is null
+         and old.former_workspace_id is null
+         and new.former_workspace_id = old.workspace_id
+         and (new.id, new.actor_id, new.action, new.target_type, new.target_id, new.created_at)
+             is not distinct from
+             (old.id, old.actor_id, old.action, old.target_type, old.target_id, old.created_at) then
+        return new;
+      end if;
+    end if;
   end if;
   raise exception 'comment_reviews_is_append_only' using errcode='0A000';
 end $function$
@@ -6283,10 +6328,12 @@ CREATE OR REPLACE FUNCTION public.admin_audit(p_limit integer DEFAULT 100)
 AS $function$
 begin
   if not public.is_platform_admin() then raise exception 'forbidden' using errcode='42501'; end if;
-  if p_limit < 1 or p_limit > 500 then raise exception 'invalid_limit' using errcode='22023'; end if;
+  if p_limit is null or p_limit < 1 or p_limit > 500 then raise exception 'invalid_limit' using errcode='22023'; end if;
   return query
     select jsonb_build_object(
-      'id', a.id, 'workspace_id', a.workspace_id, 'workspace_name', coalesce(w.name, 'Platform'),
+      'id', a.id, 'workspace_id', a.workspace_id,
+      'workspace_name', coalesce(w.name, case when a.former_workspace_id is not null then 'Deleted workspace' else 'Platform' end),
+      'former_workspace_id', a.former_workspace_id,
       'actor_id', a.actor_id, 'actor_email', u.email,
       'action', a.action, 'target_type', a.target_type, 'target_id', a.target_id,
       'created_at', to_jsonb(a.created_at))
@@ -7593,7 +7640,9 @@ declare me uuid; my_home uuid; begin
   delete from public.worker_seen where workspace_id = w;
   delete from public.memberships where workspace_id = w;
   delete from public.subscriptions where workspace_id = w;
-  delete from public.audit_events where workspace_id = w;
+  -- The audit trail is detached, not deleted: who impersonated, who set a
+  -- plan, who granted a pack must survive the workspace (review finding 6).
+  update public.audit_events set workspace_id = null, former_workspace_id = w where workspace_id = w;
   delete from public.workspaces where id = w;
 
   -- The act outlives the rows: recorded on the admin's own home.
@@ -7614,11 +7663,27 @@ CREATE OR REPLACE FUNCTION public.grant_pack(w uuid, kind text, units integer, n
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-begin
+declare ref text; g uuid; begin
   if not public.is_platform_admin() then raise exception 'forbidden' using errcode='42501'; end if;
+  -- The note is the retry key: the same note on the same workspace returns
+  -- the first grant. Scoped to the workspace, so another workspace's note
+  -- never swallows this grant, and hashed, so the workspace's members, who
+  -- can read usage_grants, never read the owner's words.
+  if note is not null then
+    ref := w::text || ':' || md5(note);
+    perform pg_advisory_xact_lock(hashtextextended('grant_pack:' || ref, 0));
+    select id into g from public.usage_grants where source = 'admin' and provider_ref = ref;
+    if found then return g; end if;
+  end if;
+  g := private.grant_units(w, kind, units, 'admin', ref);
+  -- Written only once a grant exists.
   insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
   values (w, auth.uid(), 'pack_granted', 'usage_grant', kind || ':' || units);
-  return private.grant_units(w, kind, units, 'admin', note);
+  if note is not null and note <> '' then
+    insert into private.admin_notes(workspace_id, subject, ref, note, actor_id)
+    values (w, 'pack', g::text, note, auth.uid());
+  end if;
+  return g;
 end $function$
 
 CREATE OR REPLACE FUNCTION public.import_historical_records(w uuid, c uuid DEFAULT NULL::uuid, payload jsonb DEFAULT NULL::jsonb, p_channel_id uuid DEFAULT NULL::uuid, p_payload jsonb DEFAULT NULL::jsonb)
@@ -7947,6 +8012,9 @@ declare conn record; begin
                                       granted_scopes, connected_by)
   values (conn.id, conn.encrypted_tokens, conn.key_version, conn.granted_scopes,
           conn.connected_by);
+  -- Platform-wide, so no workspace: its owner has no reason to read it.
+  insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+  values (null, auth.uid(), 'platform_reader_promoted', 'channel', c::text);
 end $function$
 
 CREATE OR REPLACE FUNCTION public.register_channel(w uuid, c uuid, external text)
@@ -8200,27 +8268,31 @@ begin
   on_paddle := found and live.provider = 'paddle' and live.status in ('active','past_due');
   if on_paddle and not override then
     raise exception 'paddle_subscription_active' using errcode='55000'; end if;
+  if note is not null and note <> '' then
+    insert into private.admin_notes(workspace_id, subject, ref, note, actor_id)
+    values (w, 'plan', plan, note, auth.uid());
+  end if;
   if on_paddle then
     update public.subscriptions
        set plan_key = plan, status = 'active', period_start = p_start, period_end = p_end
      where workspace_id = root or billing_workspace_id = root;
     insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
-    values (w, auth.uid(), 'plan_set', 'plan', plan || ':' || coalesce(note, ''));
+    values (w, auth.uid(), 'plan_set', 'plan', plan);
     return private.usage_summary_unchecked(w);
   end if;
   insert into public.subscriptions(workspace_id, plan_key, status, period_start, period_end, provider, provider_ref)
-  values (root, plan, 'active', p_start, p_end, 'admin', note)
+  values (root, plan, 'active', p_start, p_end, 'admin', null)
   on conflict (workspace_id) do update
     set plan_key = excluded.plan_key, status = 'active',
         period_start = excluded.period_start, period_end = excluded.period_end,
-        provider = 'admin', provider_ref = excluded.provider_ref, cancel_at_period_end = false;
+        provider = 'admin', provider_ref = null, cancel_at_period_end = false;
   -- Every client workspace billing through root copied its subscription row
   -- from the root at creation (private.create_workspace_impl); keep those
   -- copies in step rather than letting them read stale terms.
   update public.subscriptions
      set plan_key = plan, status = 'active',
          period_start = p_start, period_end = p_end,
-         provider = 'admin', provider_ref = note, cancel_at_period_end = false
+         provider = 'admin', provider_ref = null, cancel_at_period_end = false
    where billing_workspace_id = root;
   insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
   values (w, auth.uid(), 'plan_set', 'plan', plan);
@@ -8794,6 +8866,13 @@ grant SELECT on table "private"."admin_digests" to "postgres";
 grant TRIGGER on table "private"."admin_digests" to "postgres";
 grant TRUNCATE on table "private"."admin_digests" to "postgres";
 grant UPDATE on table "private"."admin_digests" to "postgres";
+grant DELETE on table "private"."admin_notes" to "postgres";
+grant INSERT on table "private"."admin_notes" to "postgres";
+grant REFERENCES on table "private"."admin_notes" to "postgres";
+grant SELECT on table "private"."admin_notes" to "postgres";
+grant TRIGGER on table "private"."admin_notes" to "postgres";
+grant TRUNCATE on table "private"."admin_notes" to "postgres";
+grant UPDATE on table "private"."admin_notes" to "postgres";
 grant DELETE on table "private"."auto_selected_videos" to "postgres";
 grant INSERT on table "private"."auto_selected_videos" to "postgres";
 grant REFERENCES on table "private"."auto_selected_videos" to "postgres";
@@ -9356,6 +9435,7 @@ grant EXECUTE on function private.analysis_remaining(uuid) to "postgres";
 grant EXECUTE on function private.analysis_remaining(uuid) to "service_role";
 grant EXECUTE on function private.apply_billing_event(text,text,timestamp with time zone,uuid,text,text,timestamp with time zone,timestamp with time zone,text,boolean,text,text,jsonb) to "postgres";
 grant EXECUTE on function private.apply_pack_event(text,timestamp with time zone,uuid,text,integer,text,jsonb) to "postgres";
+grant EXECUTE on function private.audit_plan_change() to "postgres";
 grant EXECUTE on function private.auto_select_after_catalogue() to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "service_role";
@@ -9672,8 +9752,8 @@ grant EXECUTE on function oauth_start(uuid,uuid,text,text,text,text) to "postgre
 grant EXECUTE on function plan_catalogue() to "anon";
 grant EXECUTE on function plan_catalogue() to "authenticated";
 grant EXECUTE on function plan_catalogue() to "postgres";
+grant EXECUTE on function promote_platform_reader(uuid,uuid) to "authenticated";
 grant EXECUTE on function promote_platform_reader(uuid,uuid) to "postgres";
-grant EXECUTE on function promote_platform_reader(uuid,uuid) to "public";
 grant EXECUTE on function register_channel(uuid,uuid,text) to "authenticated";
 grant EXECUTE on function register_channel(uuid,uuid,text) to "postgres";
 grant EXECUTE on function register_public_channel(uuid,uuid,text,text,text,text) to "authenticated";
