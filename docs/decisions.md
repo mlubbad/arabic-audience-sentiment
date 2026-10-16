@@ -9,7 +9,10 @@ because it touches tenant isolation. (2) The owner applies now for YouTube's Der
 policy (API form, section 5, "Analytics & Reporting"). Until it is accepted, overlap results
 live on the same 30-day cycle as the commenter identities they come from; after acceptance the
 aggregates (never the identities) may be kept up to 36 months. (3) Tracked competitors per plan
-are 3 / 10 / 25. Whether overlap is limited to the higher plans is still open. (4) Taxonomy v1's
+are 3 / 10 / 25. Overlap is for the two higher plans only (10 and 25) and does not appear on
+the first plan. The gate lives in SQL: the overlap RPCs refuse a first-plan workspace with a
+stable code (`plan_feature_unavailable`), tested by direct request, and the UI hides the section
+on top of that, never instead of it. (4) Taxonomy v1's
 eighteen top-level genres stand as listed in §4.1. Levels two and three, with their IAB 3.1
 mapping, are written next and reviewed by the owner. (5) Competitors ship first: phase 2 is
 competitor discovery, and audience overlap moves to phase 3. The competitor score runs without
