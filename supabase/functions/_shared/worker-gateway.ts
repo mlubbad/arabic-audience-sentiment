@@ -94,6 +94,17 @@ export interface WorkerDb {
     jobId: string,
     leaseToken: string,
   ): Promise<unknown>;
+  /**
+   * The videos a discover job's channel already has, newest first, so a
+   * refresh reads each tab only down to them. Null when the whole channel is
+   * to be read (a first discover, a platform without newest-first tabs).
+   * Optional: without it every discover reads its channel whole, as before.
+   */
+  knownVideos?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+  ): Promise<unknown>;
   commitCatalogue(
     credentialHash: string,
     jobId: string,
@@ -279,6 +290,21 @@ export async function handleWorkerRequest(
               String(claimed.lease_token),
             )
           : [];
+      // A saving, never a condition of the claim: the job is already leased,
+      // and if the list cannot be read (a database a migration behind, a
+      // blip) the worker reads the channel whole, which is what it did before.
+      let known: unknown = null;
+      if (type === "discover" && db.knownVideos) {
+        try {
+          known = await db.knownVideos(
+            credential,
+            String(claimed.id),
+            String(claimed.lease_token),
+          );
+        } catch {
+          known = null;
+        }
+      }
       return json(200, {
         job_id: claimed.id,
         lease_token: claimed.lease_token,
@@ -300,6 +326,9 @@ export async function handleWorkerRequest(
             : null,
         type,
         videos,
+        // Present only when the server has a list to offer. A worker that
+        // does not know the key ignores it and reads the channel whole.
+        ...(Array.isArray(known) ? { known_video_ids: known } : {}),
       });
     }
 

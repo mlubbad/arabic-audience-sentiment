@@ -245,6 +245,21 @@ def _collector_for(control: ControlPlane, lease: dict, build_collector):
     return collector, None, channel_id
 
 
+def _known_videos(lease: dict) -> frozenset[str] | None:
+    """The ids a YouTube refresh may stop at, or None to read the channel whole.
+
+    Only a YouTube lease uses the list: its tabs are newest first, which is
+    what makes stopping at known videos sound. Anything that is not a list of
+    ids is no list — the safe reading is the whole channel, never a guess.
+    """
+    known = lease.get("known_video_ids")
+    if (lease.get("platform") or "youtube") != "youtube" or not isinstance(known, list):
+        return None
+    if not all(isinstance(v, str) for v in known):
+        return None
+    return frozenset(known)
+
+
 def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
     """List the channel's videos and commit the list. The lease is already claimed.
 
@@ -257,8 +272,14 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
         return True
     try:
         # The OAuth collector reads the channel its grant names; the public
-        # collector is told which id it was built for.
-        result = collector.catalogue(channel_id)
+        # collector is told which id it was built for. A refresh of a YouTube
+        # channel is handed what the channel already has, and reads only
+        # what is new; a lease without the list reads the channel whole.
+        known = _known_videos(lease)
+        if known is None:
+            result = collector.catalogue(channel_id)
+        else:
+            result = collector.catalogue(channel_id, known=known)
         control.heartbeat(lease)
         control.commit_catalogue(lease, result.videos)
         control.finish(lease, "exhausted" if result.complete else "partial",

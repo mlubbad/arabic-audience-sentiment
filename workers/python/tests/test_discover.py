@@ -21,13 +21,14 @@ class Lister:
         return self.result
 
 
-def plane(sent, lease_type="discover", token="tok", catalogue_refusal=None):
+def plane(sent, lease_type="discover", token="tok", catalogue_refusal=None, lease_extra=None):
     def handler(request):
         path = request.url.path.rsplit("/", 1)[-1]
         if path == "claim":
             return httpx.Response(200, json={
                 "job_id": "j", "lease_token": "t", "type": lease_type, "checkpoint": None,
-                "videos": [], **({"access_token": token} if token else {})})
+                "videos": [], **({"access_token": token} if token else {}),
+                **(lease_extra or {})})
         if path == "commit-catalogue" and catalogue_refusal:
             return httpx.Response(400, json={"code": catalogue_refusal})
         if path == "commit-catalogue":
@@ -84,3 +85,34 @@ def test_a_catalogue_the_database_says_is_another_channels_ends_blocked():
     run_discover(plane(sent, catalogue_refusal="catalogue_channel_mismatch"),
                  lambda tok, expires_at=None, renew=None: Lister(Catalogue(videos, True)))
     assert (sent["finish"], sent["error_code"]) == ("blocked", "catalogue_channel_mismatch")
+
+
+class KnownLister(Lister):
+    def catalogue(self, channel_id=None, known=None):
+        self.known = known
+        return super().catalogue(channel_id)
+
+
+def test_a_refresh_hands_the_collector_what_the_channel_already_has():
+    sent = {}
+    lister = KnownLister(Catalogue([], True))
+    known = ["a" * 11, "b" * 11]
+    assert run_discover(plane(sent, lease_extra={"known_video_ids": known}),
+                        lambda tok, expires_at=None, renew=None: lister) is True
+    assert lister.known == frozenset(known)
+    # Nothing new is a complete answer: committed (so the channel counts as
+    # catalogued now) and the job succeeds.
+    assert sent["catalogue"] == []
+    assert sent["finish"] == "succeeded"
+
+
+def test_without_a_usable_list_the_channel_is_read_whole():
+    for extra in ({}, {"known_video_ids": None}, {"known_video_ids": "aaaaaaaaaaa"},
+                  {"known_video_ids": ["aaaaaaaaaaa", 7]},
+                  {"known_video_ids": ["aaaaaaaaaaa"], "platform": "telegram"}):
+        sent = {}
+        lister = KnownLister(Catalogue([], True))
+        run_discover(plane(sent, lease_extra=extra),
+                     lambda tok, expires_at=None, renew=None, lister=lister: lister)
+        assert lister.known is None, extra
+        assert sent["finish"] == "succeeded"
