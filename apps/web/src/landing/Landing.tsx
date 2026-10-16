@@ -6,6 +6,7 @@ import { homeSeo } from "../seo";
 import { PageHead, usePublicLocale } from "../PageHead";
 import { PublicShell } from "../public/PublicShell";
 import { Hero } from "./Hero";
+import { Intro } from "./Intro";
 import { Why } from "./Why";
 import { Demo } from "./Demo";
 import { Benefits } from "./Benefits";
@@ -43,6 +44,7 @@ export function Landing({ locale }: { locale: Locale }) {
     >
       <PageHead seo={homeSeo(locale, S)} />
       <Hero locale={locale} />
+      <Intro locale={locale} />
       <Why locale={locale} />
       <Demo locale={locale} />
       <Benefits locale={locale} />

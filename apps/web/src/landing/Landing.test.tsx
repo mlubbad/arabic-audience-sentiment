@@ -15,7 +15,7 @@ vi.mock("../PageHead", () => ({
 }));
 
 describe("Landing", () => {
-  it("renders the eight sections in order under one H1, with the three anchors reachable", () => {
+  it("renders the nine sections in order under one H1, with the three anchors reachable", () => {
     const { container } = render(
       <MemoryRouter>
         <DirectionProvider dir="rtl">
@@ -27,8 +27,8 @@ describe("Landing", () => {
     const ids = [...container.querySelectorAll("main section[id]")].map(
       (s) => s.id,
     );
-    expect(ids).toEqual(["why", "experience", "questions"]);
-    expect(container.querySelectorAll("main > section")).toHaveLength(8);
+    expect(ids).toEqual(["intro", "why", "experience", "questions"]);
+    expect(container.querySelectorAll("main > section")).toHaveLength(9);
     expect(
       container.querySelectorAll("[data-testid='product-window']"),
     ).toHaveLength(2);
