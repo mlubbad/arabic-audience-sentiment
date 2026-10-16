@@ -1,0 +1,894 @@
+/* The intro: a dark stage with four five-second scenes and a progress bar
+   per scene, the list of the same four steps under it. Every colour is a
+   token; the sentiment marks are the dashboard's own four. All movement is
+   inside `prefers-reduced-motion: no-preference` — without it the stage
+   shows each scene complete and still, and the reader picks the scene. */
+.lp-intro {
+  --ix-scene: 5s;
+  --ix-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding-top: clamp(24px, 4vw, 48px);
+}
+.lp-intro .lp-lead {
+  text-align: center;
+}
+.ix-player {
+  position: relative;
+  max-width: 980px;
+  margin-inline: auto;
+}
+
+/* ---- the stage ---- */
+.ix-stage {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--space-4);
+  aspect-ratio: 16 / 9;
+  min-height: 420px;
+  padding: var(--space-5) clamp(20px, 3.5vw, 40px);
+  border-radius: 28px;
+  overflow: hidden;
+  color: var(--ink-on-dark);
+  background-color: var(--plane-dark);
+  /* A faint drafting grid, like a storyboard sheet. */
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--ink-on-dark) 5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ink-on-dark) 5%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 36px 36px;
+  box-shadow:
+    var(--shadow-glow-indigo),
+    0 0 0 1px color-mix(in srgb, var(--ink-on-dark) 8%, transparent) inset;
+}
+.ix-glow {
+  position: absolute;
+  z-index: -1;
+  width: 55%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.ix-glow--a {
+  inset-block-start: -30%;
+  inset-inline-start: -15%;
+  background: var(--ml-indigo-500);
+}
+.ix-glow--b {
+  inset-block-end: -40%;
+  inset-inline-end: -10%;
+  background: var(--ml-cyan);
+  opacity: 0.18;
+}
+
+.ix-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--lp-t-xs);
+  font-weight: 700;
+  color: var(--ml-yellow);
+}
+/* The monospaced, tracked caps of a video preview read in Latin only;
+   tracking would break the joins of Arabic letters. */
+.ix-top:lang(en) {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ix-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ix-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ml-rose);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ml-rose) 25%, transparent);
+}
+
+/* ---- one scene: words on one side, picture on the other ---- */
+.ix-scene {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  align-items: center;
+  gap: clamp(20px, 4vw, 48px);
+  min-height: 0;
+}
+.ix-words {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.ix-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: var(--lp-t-xs);
+  font-weight: 700;
+  color: var(--ml-cyan);
+  background: color-mix(in srgb, var(--ml-cyan) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ml-cyan) 30%, transparent);
+}
+.ix-title {
+  margin: 0;
+  font-size: clamp(22px, 2.8vw, 36px);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.ix-w {
+  display: inline-block;
+  white-space: pre;
+}
+.ix-picture {
+  min-width: 0;
+}
+
+/* Pills: white on the sentiment colour clears 4.5:1 for all four. */
+.ix-label {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--lp-t-xs);
+  font-weight: 700;
+  color: var(--ink-on-dark);
+  background: var(--sentiment-neutral);
+}
+.ix-label.positive {
+  background: var(--sentiment-positive);
+}
+.ix-label.negative {
+  background: var(--sentiment-negative);
+}
+.ix-label.mixed {
+  background: var(--sentiment-mixed);
+}
+
+/* 1 — collect */
+.ix-collect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ix-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ix-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: var(--lp-t-xs);
+  font-weight: 700;
+  color: var(--ink-on-dark-2);
+  background: color-mix(in srgb, var(--ink-on-dark) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-on-dark) 14%, transparent);
+}
+.ix-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ix-bubble {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border-start-start-radius: 4px;
+  font-size: var(--lp-t-sm);
+  color: var(--text-1);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-2);
+}
+.ix-bubble:nth-child(even) {
+  margin-inline-start: 10%;
+}
+
+/* 2 — understand */
+.ix-read {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ix-focus {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: 18px;
+  color: var(--text-1);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+.ix-focus p {
+  margin: 0;
+  font-size: clamp(17px, 1.8vw, 22px);
+  font-weight: 600;
+  line-height: 1.7;
+}
+.ix-mark {
+  color: inherit;
+  padding-inline: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sentiment-neutral) 18%, transparent);
+  box-shadow: inset 0 -3px 0 var(--sentiment-neutral);
+}
+.ix-mark.positive {
+  background: color-mix(in srgb, var(--sentiment-positive) 18%, transparent);
+  box-shadow: inset 0 -3px 0 var(--sentiment-positive);
+}
+.ix-mark.negative {
+  background: color-mix(in srgb, var(--sentiment-negative) 16%, transparent);
+  box-shadow: inset 0 -3px 0 var(--sentiment-negative);
+}
+.ix-scan {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 30%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--ml-cyan) 35%, transparent),
+    transparent
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+.ix-dialects {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ix-dialects li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: var(--lp-t-sm);
+  color: var(--ink-on-dark-2);
+  background: color-mix(in srgb, var(--ink-on-dark) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-on-dark) 12%, transparent);
+}
+
+/* 3 — compare */
+.ix-compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--ink-on-dark) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-on-dark) 12%, transparent);
+}
+.ix-row {
+  display: grid;
+  grid-template-columns: 5.5em 1fr 3.5em;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--lp-t-sm);
+}
+.ix-row-name {
+  color: var(--ink-on-dark-2);
+}
+.ix-row-pct {
+  text-align: end;
+  color: var(--ink-on-dark);
+}
+.ix-bar {
+  display: block;
+  width: 100%;
+  height: 16px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+/* The track is drawn left to right; an Arabic page reads it from the
+   right, as the dashboard's bars do. */
+.ix-bar:dir(rtl) {
+  scale: -1 1;
+}
+.ix-seg {
+  fill: var(--sentiment-neutral);
+}
+.ix-seg.positive {
+  fill: var(--sentiment-positive);
+}
+.ix-seg.negative {
+  fill: var(--sentiment-negative);
+}
+.ix-seg.mixed {
+  fill: var(--sentiment-mixed);
+}
+.ix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--lp-t-xs);
+  color: var(--ink-on-dark-2);
+}
+.ix-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 4 — decide */
+.ix-decide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+.ix-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  color: var(--ml-indigo);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-glow-rose);
+}
+.ix-badge .lp-mark {
+  width: 40px;
+  height: 40px;
+}
+.ix-badge::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 28px;
+  border: 2px solid color-mix(in srgb, var(--ml-yellow) 70%, transparent);
+  opacity: 0;
+}
+.ix-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--lp-t-md);
+}
+.ix-checks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ix-tick {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  color: var(--plane-dark);
+  background: var(--ml-cyan);
+}
+.ix-final {
+  margin: 0;
+  font-size: clamp(20px, 2.2vw, 28px);
+  font-weight: 700;
+}
+.ix-final em {
+  color: var(--ml-yellow);
+}
+
+/* ---- the progress bars: one per scene; the active one is the clock ---- */
+.ix-progress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-inline-end: 56px;
+}
+.ix-progress span {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ink-on-dark) 20%, transparent);
+}
+.ix-progress i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--ink-on-dark);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.ix-progress i:dir(rtl) {
+  transform-origin: right;
+}
+.ix-progress .is-done i,
+.ix-progress .is-on i {
+  transform: scaleX(1);
+}
+
+.ix-toggle.ix-toggle {
+  position: absolute;
+  inset-block-end: 12px;
+  inset-inline-end: 14px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--ink-on-dark);
+  background: color-mix(in srgb, var(--ink-on-dark) 14%, transparent);
+  backdrop-filter: blur(6px);
+}
+.ix-toggle:hover {
+  background: color-mix(in srgb, var(--ink-on-dark) 24%, transparent);
+}
+.ix-toggle:focus-visible {
+  outline: 3px solid var(--focus-halo);
+  outline-offset: 2px;
+}
+.ix-icon-pause,
+.ix-icon-play {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+}
+.ix-icon-pause {
+  width: 12px;
+  background: linear-gradient(
+    90deg,
+    currentColor 0 35%,
+    transparent 35% 65%,
+    currentColor 65%
+  );
+}
+/* A media control: the triangle points right in both languages. */
+.ix-icon-play {
+  clip-path: polygon(15% 0, 100% 50%, 15% 100%);
+}
+
+/* ---- the step list under the stage ---- */
+.ix-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+  max-width: 980px;
+  margin: var(--space-5) auto 0;
+  padding: 0;
+  list-style: none;
+}
+.ix-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-3);
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color 200ms ease-out,
+    box-shadow 200ms ease-out,
+    translate 200ms ease-out;
+}
+.ix-step::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline: 16px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--ml-grad-warm-cool-h);
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+.ix-step.is-on {
+  border-color: var(--ml-indigo-300);
+  box-shadow: var(--shadow-2);
+  translate: 0 -2px;
+}
+.ix-step.is-on::before {
+  opacity: 1;
+}
+.ix-step:hover {
+  border-color: var(--border-2);
+}
+.ix-step:has(button:focus-visible) {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.ix-step-tag {
+  font-size: var(--lp-t-xs);
+  font-weight: 700;
+  color: var(--ml-indigo);
+}
+.ix-step h3 {
+  margin: 0;
+  font-size: var(--lp-t-md);
+  line-height: 1.5;
+}
+/* The title is the button; its box stretches over the card, so the whole
+   card is the target without a heading inside a button. */
+.ix-step h3 button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-1);
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+}
+.ix-step h3 button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.ix-step h3 button:focus-visible {
+  outline: none;
+}
+.ix-step p {
+  margin: 0;
+  font-size: var(--lp-t-sm);
+  color: var(--text-2);
+}
+.ix-after {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  text-align: center;
+}
+
+/* ---- motion ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .ix-glow--a {
+    animation: ix-drift 14s ease-in-out infinite alternate;
+  }
+  .ix-glow--b {
+    animation: ix-drift 18s ease-in-out infinite alternate-reverse;
+  }
+  .ix-live i {
+    animation: ix-blink 1.4s ease-in-out infinite;
+  }
+  .ix-progress .is-on i {
+    transform: scaleX(0);
+    animation: ix-fill var(--ix-scene) linear forwards;
+  }
+  /* Every scene, while playing: its tag, then its title word by word.
+     The entrances are scoped to a playing player; see the paused rule. */
+  .ix-player[data-playing="true"] .ix-tag {
+    animation: ix-rise 500ms var(--ix-ease) 100ms both;
+  }
+  .ix-player[data-playing="true"] .ix-w {
+    animation: ix-word 600ms var(--ix-ease) both;
+    animation-delay: 250ms;
+  }
+  .ix-player[data-playing="true"] .ix-w:nth-child(2) {
+    animation-delay: 330ms;
+  }
+  .ix-player[data-playing="true"] .ix-w:nth-child(3) {
+    animation-delay: 410ms;
+  }
+  .ix-player[data-playing="true"] .ix-w:nth-child(4) {
+    animation-delay: 490ms;
+  }
+  .ix-player[data-playing="true"] .ix-w:nth-child(5) {
+    animation-delay: 570ms;
+  }
+  .ix-player[data-playing="true"] .ix-w:nth-child(6) {
+    animation-delay: 650ms;
+  }
+  .ix-player[data-playing="true"] .ix-w:nth-child(7) {
+    animation-delay: 730ms;
+  }
+  .ix-player[data-playing="true"] .ix-w:nth-child(8) {
+    animation-delay: 810ms;
+  }
+  .ix-player[data-playing="true"] .ix-w:nth-child(n + 9) {
+    animation-delay: 890ms;
+  }
+  /* The whole scene leaves in its last half-second, so the cut to the
+     next one is a dissolve, not a jump. */
+  .ix-player[data-playing="true"] .ix-scene {
+    animation: ix-leave 450ms ease-in calc(var(--ix-scene) - 450ms) both;
+  }
+
+  /* 1 — the channels light up, then the comments drop into one stream. */
+  .ix-player[data-playing="true"] .ix-chip {
+    animation: ix-chip 700ms var(--ix-ease) both;
+    animation-delay: 300ms;
+  }
+  .ix-player[data-playing="true"] .ix-chip:nth-child(2) {
+    animation-delay: 420ms;
+  }
+  .ix-player[data-playing="true"] .ix-chip:nth-child(3) {
+    animation-delay: 540ms;
+  }
+  .ix-player[data-playing="true"] .ix-chip:nth-child(4) {
+    animation-delay: 660ms;
+  }
+  .ix-player[data-playing="true"] .ix-chip:nth-child(5) {
+    animation-delay: 780ms;
+  }
+  .ix-player[data-playing="true"] .ix-chip:nth-child(6) {
+    animation-delay: 900ms;
+  }
+  .ix-player[data-playing="true"] .ix-bubble {
+    animation: ix-drop 600ms var(--ix-ease) both;
+    animation-delay: 1200ms;
+  }
+  .ix-player[data-playing="true"] .ix-bubble:nth-child(2) {
+    animation-delay: 1700ms;
+  }
+  .ix-player[data-playing="true"] .ix-bubble:nth-child(3) {
+    animation-delay: 2200ms;
+  }
+  .ix-player[data-playing="true"] .ix-bubble:nth-child(4) {
+    animation-delay: 2700ms;
+  }
+
+  /* 2 — a beam reads the comment; the two feelings light; the label lands. */
+  .ix-player[data-playing="true"] .ix-focus {
+    animation: ix-rise 500ms var(--ix-ease) 200ms both;
+  }
+  .ix-player[data-playing="true"] .ix-scan {
+    animation: ix-scan 1300ms ease-in-out 600ms both;
+  }
+  .ix-player[data-playing="true"] .ix-mark {
+    animation: ix-mark 500ms ease-out both;
+    animation-delay: 1200ms;
+  }
+  .ix-player[data-playing="true"] .ix-mark.negative {
+    animation-delay: 1600ms;
+  }
+  .ix-player[data-playing="true"] .ix-focus .ix-label {
+    animation: ix-pop 500ms var(--ix-ease) 2100ms both;
+  }
+  .ix-player[data-playing="true"] .ix-dialects li {
+    animation: ix-rise 450ms var(--ix-ease) both;
+    animation-delay: 2600ms;
+  }
+  .ix-player[data-playing="true"] .ix-dialects li:nth-child(2) {
+    animation-delay: 2800ms;
+  }
+  .ix-player[data-playing="true"] .ix-dialects li:nth-child(3) {
+    animation-delay: 3000ms;
+  }
+  .ix-player[data-playing="true"] .ix-dialects li:nth-child(4) {
+    animation-delay: 3200ms;
+  }
+
+  /* 3 — the three bars grow in turn, then their figures and the key. */
+  .ix-player[data-playing="true"] .ix-compare {
+    animation: ix-rise 500ms var(--ix-ease) 200ms both;
+  }
+  .ix-player[data-playing="true"] .ix-bar {
+    animation: ix-grow 1100ms var(--ix-ease) both;
+    animation-delay: 600ms;
+  }
+  .ix-player[data-playing="true"] .ix-row-pct {
+    animation: ix-pop 400ms var(--ix-ease) both;
+    animation-delay: 1500ms;
+  }
+  .ix-player[data-playing="true"] .ix-row:nth-child(2) .ix-bar {
+    animation-delay: 1000ms;
+  }
+  .ix-player[data-playing="true"] .ix-row:nth-child(2) .ix-row-pct {
+    animation-delay: 1900ms;
+  }
+  .ix-player[data-playing="true"] .ix-row:nth-child(3) .ix-bar {
+    animation-delay: 1400ms;
+  }
+  .ix-player[data-playing="true"] .ix-row:nth-child(3) .ix-row-pct {
+    animation-delay: 2300ms;
+  }
+  .ix-player[data-playing="true"] .ix-legend {
+    animation: ix-rise 500ms var(--ix-ease) 2600ms both;
+  }
+
+  /* 4 — the mark lands and pulses; what you keep; the closing line. */
+  .ix-player[data-playing="true"] .ix-badge {
+    animation: ix-pop 600ms var(--ix-ease) 200ms both;
+  }
+  .ix-player[data-playing="true"] .ix-badge::after {
+    animation: ix-ring 1800ms ease-out 900ms infinite;
+  }
+  .ix-player[data-playing="true"] .ix-checks li {
+    animation: ix-slide 500ms var(--ix-ease) both;
+    animation-delay: 800ms;
+  }
+  .ix-player[data-playing="true"] .ix-checks li:nth-child(2) {
+    animation-delay: 1150ms;
+  }
+  .ix-player[data-playing="true"] .ix-checks li:nth-child(3) {
+    animation-delay: 1500ms;
+  }
+  .ix-player[data-playing="true"] .ix-final {
+    animation: ix-word 700ms var(--ix-ease) 2100ms both;
+  }
+
+  /* Paused: the clock and the ambient light hold. The scenes' entrances
+     run only while playing (above), so a paused stage, or a scene chosen
+     while paused, shows the scene complete rather than its empty first
+     frame. */
+  .lp-intro .ix-player[data-playing="false"] .ix-progress i,
+  .lp-intro .ix-player[data-playing="false"] .ix-glow,
+  .lp-intro .ix-player[data-playing="false"] .ix-live i {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes ix-fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes ix-rise {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+  }
+}
+@keyframes ix-word {
+  from {
+    opacity: 0;
+    translate: 0 0.55em;
+    filter: blur(6px);
+  }
+}
+@keyframes ix-leave {
+  to {
+    opacity: 0;
+    translate: 0 -10px;
+    filter: blur(4px);
+  }
+}
+@keyframes ix-chip {
+  0% {
+    opacity: 0;
+    scale: 0.8;
+  }
+  60% {
+    opacity: 1;
+    scale: 1.06;
+    color: var(--ink-on-dark);
+    background: var(--ml-indigo-500);
+    border-color: var(--ml-indigo-300);
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes ix-drop {
+  from {
+    opacity: 0;
+    translate: 0 -28px;
+    scale: 0.95;
+  }
+}
+@keyframes ix-scan {
+  0% {
+    opacity: 1;
+    inset-inline-start: -30%;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    inset-inline-start: 100%;
+  }
+}
+@keyframes ix-mark {
+  from {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 transparent;
+  }
+}
+@keyframes ix-pop {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+  }
+  70% {
+    opacity: 1;
+    scale: 1.08;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes ix-grow {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes ix-slide {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+@keyframes ix-ring {
+  0% {
+    opacity: 0.9;
+    scale: 0.9;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.35;
+  }
+}
+@keyframes ix-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes ix-drift {
+  to {
+    translate: 12% 10%;
+  }
+}
+
+/* ---- narrow screens: the scene stacks, the steps wrap ---- */
+@media (max-width: 899px) {
+  .ix-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 719px) {
+  .ix-stage {
+    aspect-ratio: auto;
+    min-height: 540px;
+    border-radius: 22px;
+  }
+  .ix-scene {
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+  .ix-title {
+    font-size: 22px;
+  }
+}
+@media (max-width: 479px) {
+  .ix-steps {
+    grid-template-columns: 1fr;
+  }
+  .ix-step:not(.is-on) p {
+    display: none;
+  }
+  .ix-row {
+    grid-template-columns: 4.5em 1fr 3em;
+  }
+}

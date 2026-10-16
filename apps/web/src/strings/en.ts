@@ -1924,6 +1924,40 @@ export const en: Strings = {
   lpWhyLead:
     "Sentiment analysis brings your reading of audience opinion, the comparison between videos and the comments themselves into one place, and keeps the context behind every number — so you know what they liked, what bothered them, and what they are asking for next.",
   lpZoomIn: "Look closer",
+  lpIntroEyebrow: "The product in 20 seconds",
+  lpIntroLine1: "From thousands of comments",
+  lpIntroLine2: "to one clear decision.",
+  lpIntroLead:
+    "See how the product turns your audience's comments into a clear reading of how they feel: it collects them from your channels, reads them in Arabic and its dialects, shows the whole picture, and leaves the last word to you.",
+  lpIntroPreview: "Preview",
+  lpIntroMeta: "4 scenes · 20s",
+  lpIntroPlay: "Play the intro",
+  lpIntroPause: "Pause the intro",
+  lpIntroScenesLabel: "Intro scenes",
+  lpIntroSceneOf: (n: string, total: string) => `Scene ${n} of ${total}`,
+  lpIntroCaption:
+    "Illustrative scenes with authored comments and example figures.",
+  lpIntroScene1Tag: "Collect",
+  lpIntroScene1Title: "Every channel's comments, in one place.",
+  lpIntroScene1:
+    "Connect your channel and comments are collected on your plan's schedule — no copying and pasting by hand.",
+  lpIntroScene2Tag: "Understand",
+  lpIntroScene2Title: "Every comment read in Arabic and its dialects.",
+  lpIntroScene2:
+    "Positive, negative, neutral or mixed — because “nice, but…” is not a neutral comment.",
+  lpIntroScene3Tag: "Compare",
+  lpIntroScene3Title: "Your whole audience in one picture.",
+  lpIntroScene3:
+    "Compare how your videos were received under the same filters, and go from a share to the comments behind it.",
+  lpIntroScene4Tag: "Decide",
+  lpIntroScene4Title: "Your next move, built on your audience's voice.",
+  lpIntroScene4:
+    "Review and correct labels, export a report that keeps the filters — the last word is yours.",
+  lpIntroVideo: (n: string) => `Video ${n}`,
+  lpIntroDialects: ["Gulf", "Maghrebi", "Egyptian", "Levantine"],
+  lpIntroReview: "Human review of every label",
+  lpIntroExport: "A report that keeps the filters",
+  lpIntroWorkspaces: "A separate workspace per client",
   lpExperienceEyebrow: "Try the idea",
   lpExperienceLine1: "The sentiment dashboard:",
   lpExperienceLine2: "from the whole audience to a single comment.",

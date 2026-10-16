@@ -1922,6 +1922,42 @@ export const ar = {
   lpWhyLead:
     "تحليل المشاعر يجمع قراءتك لآراء الجمهور والمقارنات بين الفيديوهات والتعليقات نفسها في مكان واحد، ويحتفظ بالسياق خلف كل رقم — فتعرف ما الذي أعجبهم، وما الذي أزعجهم، وما الذي يطلبونه في الفيديو التالي.",
   lpZoomIn: "قرّب الصورة",
+  // The 20-second intro under the hero (Intro.tsx): four scenes, each a
+  // step of the product's work. The stage is a picture; these lines are
+  // what a reader and a search engine read.
+  lpIntroEyebrow: "المنتج في ٢٠ ثانية",
+  lpIntroLine1: "من آلاف التعليقات",
+  lpIntroLine2: "إلى قرار واضح.",
+  lpIntroLead:
+    "شاهد كيف تحوّل الأداة تعليقات جمهورك إلى قراءة واضحة لمشاعره: تجمعها من قنواتك، وتقرؤها بالعربية ولهجاتها، وتعرض الصورة كاملة، وتترك القرار الأخير لك.",
+  lpIntroPreview: "مقدّمة",
+  lpIntroMeta: "٤ مشاهد · ٢٠ ثانية",
+  lpIntroPlay: "تشغيل المقدّمة",
+  lpIntroPause: "إيقاف المقدّمة مؤقتًا",
+  lpIntroScenesLabel: "مشاهد المقدّمة",
+  lpIntroSceneOf: (n: string, total: string) => `المشهد ${n} من ${total}`,
+  lpIntroCaption: "مشاهد توضيحية بتعليقات مؤلّفة وأرقام على سبيل المثال.",
+  lpIntroScene1Tag: "اجمع",
+  lpIntroScene1Title: "تعليقات كل قنواتك، في مكان واحد.",
+  lpIntroScene1:
+    "اربط قناتك، وتُجمع التعليقات تلقائيًا وفق خطتك — بدل نسخها ولصقها يدويًا.",
+  lpIntroScene2Tag: "افهم",
+  lpIntroScene2Title: "كل تعليق يُقرأ بالعربية ولهجاتها.",
+  lpIntroScene2:
+    "إيجابي، سلبي، محايد أو مختلط — لأن «حلو، بس…» ليس تعليقًا محايدًا.",
+  lpIntroScene3Tag: "قارن",
+  lpIntroScene3Title: "صورة واحدة لجمهورك كله.",
+  lpIntroScene3:
+    "قارن استقبال فيديوهاتك ضمن الفلاتر نفسها، وانزل من النسبة إلى التعليقات التي صنعتها.",
+  lpIntroScene4Tag: "قرّر",
+  lpIntroScene4Title: "خطوتك التالية، مبنية على صوت جمهورك.",
+  lpIntroScene4:
+    "راجع التصنيفات وصحّحها، وصدّر تقريرًا يحفظ الفلاتر — والكلمة الأخيرة لك.",
+  lpIntroVideo: (n: string) => `الفيديو ${n}`,
+  lpIntroDialects: ["خليجي", "مغاربي", "مصري", "شامي"],
+  lpIntroReview: "مراجعة بشرية للتصنيف",
+  lpIntroExport: "تقرير يحفظ الفلاتر",
+  lpIntroWorkspaces: "مساحة مستقلة لكل عميل",
   lpExperienceEyebrow: "جرّب الفكرة",
   lpExperienceLine1: "لوحة تحليل المشاعر:",
   lpExperienceLine2: "من صورة الجمهور الكاملة إلى التعليق الواحد.",
