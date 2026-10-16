@@ -3,13 +3,13 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { Intro } from "./Intro";
+import { IntroPlayer } from "./IntroPlayer";
 import { ar } from "../strings/ar";
 
 const wrap = () =>
   render(
     <MemoryRouter>
-      <Intro locale="ar" />
+      <IntroPlayer locale="ar" />
     </MemoryRouter>,
   );
 
@@ -28,19 +28,13 @@ const animationEnd = (el: Element) =>
 const clock = (container: HTMLElement) =>
   container.querySelector(".ix-progress .is-on i") as HTMLElement;
 
-describe("Intro", () => {
+describe("IntroPlayer", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("is a labelled section whose four steps are text, with the stage hidden as a picture", () => {
+  it("is a captioned figure whose four steps are text, with the stage hidden as a picture", () => {
     const { container } = wrap();
-    expect(container.querySelector("section#intro")).toHaveAttribute(
-      "aria-labelledby",
-      "intro-title",
-    );
-    expect(screen.getByRole("heading", { level: 2 })).toHaveAttribute(
-      "id",
-      "intro-title",
-    );
+    // The hero's keyword sentence stays the figure's caption.
+    expect(screen.getByRole("figure")).toHaveTextContent(ar.lpHeroAlt);
     expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(4);
     expect(screen.getByText(ar.lpIntroScene4)).toBeInTheDocument();
     expect(container.querySelector(".ix-stage")).toHaveAttribute(
@@ -48,7 +42,25 @@ describe("Intro", () => {
       "true",
     );
     expect(steps()).toEqual(["step", null, null, null]);
-    expect(screen.getByText(ar.lpIntroCaption)).toBeInTheDocument();
+  });
+
+  it("keeps the first scene as painted until the story first moves on", () => {
+    const { container } = wrap();
+    const player = screen.getByTestId("intro-player");
+    // Prerendered complete: no entrance may blank it on hydration.
+    expect(player).toHaveAttribute("data-fresh");
+    animationEnd(clock(container));
+    expect(player).not.toHaveAttribute("data-fresh");
+  });
+
+  it("is no longer fresh once a scene is chosen by hand", () => {
+    wrap();
+    fireEvent.click(
+      screen.getByRole("button", { name: new RegExp(ar.lpIntroScene1Title) }),
+    );
+    expect(screen.getByTestId("intro-player")).not.toHaveAttribute(
+      "data-fresh",
+    );
   });
 
   it("moves to the next scene when the active bar runs out, and loops", () => {

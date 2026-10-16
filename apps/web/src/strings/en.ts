@@ -1924,19 +1924,12 @@ export const en: Strings = {
   lpWhyLead:
     "Sentiment analysis brings your reading of audience opinion, the comparison between videos and the comments themselves into one place, and keeps the context behind every number — so you know what they liked, what bothered them, and what they are asking for next.",
   lpZoomIn: "Look closer",
-  lpIntroEyebrow: "The product in 20 seconds",
-  lpIntroLine1: "From thousands of comments",
-  lpIntroLine2: "to one clear decision.",
-  lpIntroLead:
-    "See how the product turns your audience's comments into a clear reading of how they feel: it collects them from your channels, reads them in Arabic and its dialects, shows the whole picture, and leaves the last word to you.",
   lpIntroPreview: "Preview",
   lpIntroMeta: "4 scenes · 20s",
   lpIntroPlay: "Play the intro",
   lpIntroPause: "Pause the intro",
   lpIntroScenesLabel: "Intro scenes",
   lpIntroSceneOf: (n: string, total: string) => `Scene ${n} of ${total}`,
-  lpIntroCaption:
-    "Illustrative scenes with authored comments and example figures.",
   lpIntroScene1Tag: "Collect",
   lpIntroScene1Title: "Every channel's comments, in one place.",
   lpIntroScene1:

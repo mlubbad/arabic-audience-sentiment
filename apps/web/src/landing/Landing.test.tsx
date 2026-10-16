@@ -15,7 +15,7 @@ vi.mock("../PageHead", () => ({
 }));
 
 describe("Landing", () => {
-  it("renders the nine sections in order under one H1, with the three anchors reachable", () => {
+  it("renders the eight sections in order under one H1, with the three anchors reachable", () => {
     const { container } = render(
       <MemoryRouter>
         <DirectionProvider dir="rtl">
@@ -27,10 +27,14 @@ describe("Landing", () => {
     const ids = [...container.querySelectorAll("main section[id]")].map(
       (s) => s.id,
     );
-    expect(ids).toEqual(["intro", "why", "experience", "questions"]);
-    expect(container.querySelectorAll("main > section")).toHaveLength(9);
+    expect(ids).toEqual(["why", "experience", "questions"]);
+    expect(container.querySelectorAll("main > section")).toHaveLength(8);
+    // The hero's picture is the intro; the product window is the demo's.
     expect(
       container.querySelectorAll("[data-testid='product-window']"),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
+    expect(
+      container.querySelector(".lp-hero [data-testid='intro-player']"),
+    ).not.toBeNull();
   });
 });
