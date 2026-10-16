@@ -47,26 +47,27 @@
     var(--shadow-glow-indigo),
     0 0 0 1px color-mix(in srgb, var(--ink-on-dark) 8%, transparent) inset;
 }
+/* The two lights are radial gradients, not blurred discs: a `filter:
+   blur()` on a moving element is repainted every frame, and on a machine
+   without a GPU (the CI runner, a cheap phone) that alone loads the CPU. */
 .ix-glow {
   position: absolute;
   z-index: -1;
-  width: 55%;
+  width: 80%;
   aspect-ratio: 1;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.55;
+  opacity: 0.6;
   pointer-events: none;
 }
 .ix-glow--a {
-  inset-block-start: -30%;
-  inset-inline-start: -15%;
-  background: var(--ml-indigo-500);
+  inset-block-start: -45%;
+  inset-inline-start: -30%;
+  background: radial-gradient(closest-side, var(--ml-indigo-500), transparent);
 }
 .ix-glow--b {
-  inset-block-end: -40%;
-  inset-inline-end: -10%;
-  background: var(--ml-cyan);
-  opacity: 0.18;
+  inset-block-end: -55%;
+  inset-inline-end: -25%;
+  background: radial-gradient(closest-side, var(--ml-cyan), transparent);
+  opacity: 0.2;
 }
 
 .ix-top {
@@ -441,7 +442,6 @@
   cursor: pointer;
   color: var(--ink-on-dark);
   background: color-mix(in srgb, var(--ink-on-dark) 14%, transparent);
-  backdrop-filter: blur(6px);
 }
 .ix-toggle:hover {
   background: color-mix(in srgb, var(--ink-on-dark) 24%, transparent);
@@ -761,14 +761,12 @@
   from {
     opacity: 0;
     translate: 0 0.55em;
-    filter: blur(6px);
   }
 }
 @keyframes ix-leave {
   to {
     opacity: 0;
     translate: 0 -10px;
-    filter: blur(4px);
   }
 }
 @keyframes ix-chip {
