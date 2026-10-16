@@ -269,6 +269,13 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
         control.finish(
             lease, exc.outcome if exc.outcome in _DECLARABLE else "blocked", exc.code
         )
+    except ControlPlaneError as exc:
+        # The database refused the list as another channel's videos. That is
+        # an answer about this run, not a blip: end it named, rather than hold
+        # the lease until a reclaim reads and is refused the same list again.
+        if exc.code != "catalogue_channel_mismatch":
+            raise
+        control.finish(lease, "blocked", exc.code)
     return True
 
 

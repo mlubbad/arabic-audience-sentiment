@@ -21,13 +21,15 @@ class Lister:
         return self.result
 
 
-def plane(sent, lease_type="discover", token="tok"):
+def plane(sent, lease_type="discover", token="tok", catalogue_refusal=None):
     def handler(request):
         path = request.url.path.rsplit("/", 1)[-1]
         if path == "claim":
             return httpx.Response(200, json={
                 "job_id": "j", "lease_token": "t", "type": lease_type, "checkpoint": None,
                 "videos": [], **({"access_token": token} if token else {})})
+        if path == "commit-catalogue" and catalogue_refusal:
+            return httpx.Response(400, json={"code": catalogue_refusal})
         if path == "commit-catalogue":
             sent["catalogue"] = json.loads(request.content)["payload"]
             return httpx.Response(200, json={"videos": len(sent["catalogue"])})
@@ -71,3 +73,14 @@ def test_run_job_dispatches_on_the_lease_type():
     sent = {}
     assert run_job(plane(sent), lambda tok, expires_at=None, renew=None: Lister(Catalogue([], True))) is True
     assert sent["finish"] == "succeeded" and "catalogue" in sent
+
+
+def test_a_catalogue_the_database_says_is_another_channels_ends_blocked():
+    # The database refuses a list whose videos are not the job's channel's.
+    # The run ends there, named, rather than holding its lease until it lapses
+    # and a reclaim reads and refuses the same list again.
+    sent = {}
+    videos = [{"external_video_id": "a" * 11, "channel_external_id": "UC" + "y" * 22}]
+    run_discover(plane(sent, catalogue_refusal="catalogue_channel_mismatch"),
+                 lambda tok, expires_at=None, renew=None: Lister(Catalogue(videos, True)))
+    assert (sent["finish"], sent["error_code"]) == ("blocked", "catalogue_channel_mismatch")

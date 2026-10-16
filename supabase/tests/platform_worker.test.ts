@@ -268,6 +268,7 @@ describe("a platform worker credential", () => {
           JSON.stringify([
             {
               external_video_id: "bbbbbbbbbbb",
+              channel_external_id: "UC_B",
               title: "B1",
               kind: "video",
               reported_comment_count: 4,

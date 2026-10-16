@@ -191,7 +191,12 @@ class ControlPlane:
         worker that can. The server never finishes a job it did not run: the
         caller says what it can run, and the oldest matching job comes back.
         """
-        body = {"types": job_types} if job_types else {}
+        body: dict[str, Any] = {"types": job_types} if job_types else {}
+        # This worker knows a reader lease: a token beside an
+        # `external_channel_id` is the platform reader's, read by that id and
+        # never as `mine=true`. The gateway keeps the reader's token from any
+        # claim that does not say so.
+        body["reader"] = True
         return self._post("/worker/claim", body)
 
     def renew_token(self, lease: dict[str, Any]) -> dict[str, Any] | None:
@@ -208,6 +213,7 @@ class ControlPlane:
         """
         return self._post("/worker/renew-token", {
             "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+            "reader": True,
         })
 
     def heartbeat(self, lease: dict[str, Any]) -> None:

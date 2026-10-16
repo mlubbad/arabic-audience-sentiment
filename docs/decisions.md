@@ -1511,3 +1511,23 @@ As live comment collection on active workspaces scaled past 60,000 comments, the
 - **Automated Remote Database Migrations**: Added `scripts/apply-migrations-remote.mjs` (`npm run db:migrate:remote`), executing pending migrations transactionally against the remote Supabase Management API (`https://api.supabase.com/v1/projects/{ref}/database/query`) and recording versions in `supabase_migrations.schema_migrations`.
 - **Graceful Secret Detection**: The workflow checks for required repository secrets and logs helpful GitHub notices instead of blocking PRs or failing unconfigured runs if secrets are pending setup in GitHub Settings.
 
+## 2026-10-16 — the database checks whose videos a catalogue is
+
+A catalogue was filed under the job's channel on the worker's word. A stale worker's word put
+AJ360's 4,604 uploads under 73 public channels. Two guards, both kept:
+
+- **The gateway hands the platform reader's token only to a worker that declares `reader: true`.**
+  It closes the path that happened: a pre-reader worker reads any token as the owner's and lists
+  `mine=true`. Declared rather than versioned, because what matters is one behaviour (a token
+  beside an id is read by that id), not a release number.
+- **`worker_commit_catalogue` refuses a YouTube list unless every item names the job's channel
+  (`channel_external_id`).** Absence is refused, not waved through: a worker that cannot say
+  whose videos they are is exactly the one that filed the wrong ones. YouTube only, because its
+  API names each video's uploader; Telegram/X/TikTok/Meta items carry no such field yet.
+  Rollout cost accepted: a worker older than this change has its YouTube discovery refused until
+  it is updated.
+- **Cleanup is a function, not a migration.** `private.purge_foreign_catalogue(channel, source)`
+  deletes another channel's videos (and their comments, predictions, reviews, annotations,
+  selections) from one channel; a video catalogued under the source channel cannot also be the
+  target's, since a YouTube video has one uploader. It deletes production data, so the owner runs
+  it; it is out of reach of every API role. Metered usage is left alone: refunds are a billing call.

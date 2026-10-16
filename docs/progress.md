@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-10-16 — AJ360's uploads filed under 73 public channels; a catalogue now names its channel
+
+**Reported:** Yahea Alzo3bi's video list mixed in Al Jazeera 360 videos. **Measured (read-only,
+production):** Yahea's workspace holds one channel and 6,073 videos: 1,476 its own (catalogued
+2026-10-11 by the platform reader) and 4,597 AJ360 uploads filed under Yahea's channel by one
+discover run on 2026-10-15 (07:20–07:29, `videos_found: 4597`). Across the platform, **73 of the
+107 public YouTube channels** carry the same AJ360 catalogue: **335,218 foreign rows**, written
+2026-10-12 → 2026-10-16 08:00.
+
+**Cause:** a worker built before the platform reader (code older than b0535b4, 2026-09-19) is
+still claiming jobs. For a public channel the gateway hands the reader's token beside the
+channel's id; that worker reads any token as the channel owner's, drops the id, lists
+`channels?mine=true` — the reader's own channel, AJ360 — and commits it under the job's channel.
+The rows' provenance is that build's signature: `source: youtube_oauth` with no
+`credential_kind` (AJ360's own rows carry `owner_grant`). The Mac worker (3a3ae7b) and the
+Oracle worker (cc0e331) are newer and not the writer; the stale one is not on the Mac.
+
+**Fix (branch `claude/catalogue-channel-guard`):** (1) the gateway gives the reader's token only
+to a claim or renewal that says `reader: true`; an old worker gets the id alone and reads it with
+its key or reports blocked. (2) The worker says so, names each video's uploader
+(`channel_external_id` = snippet.channelId) and stops on a video of another channel. (3)
+`20261029000000` refuses a YouTube catalogue whose items are not all the job's channel's, or do
+not say (`catalogue_channel_mismatch`, refused whole), and adds `private.purge_foreign_catalogue`
+for the owner to take the foreign rows back out. **Not done here:** the purge itself (the owner's,
+it deletes), retiring the stale worker's credential, and whether to refund usage metered on
+foreign videos.
+
 ## 2026-10-13 — Owner console review batch A live; the two channels it could not count
 
 Batch A (#132) is live: the comparison counts one channel a minute and the System page shows

@@ -138,7 +138,9 @@ describe("what a claim hands the worker", () => {
       accessTokenFor: async () => null,
       readerTokenFor,
     };
-    const body = (await (await post(db)).json()) as Record<string, unknown>;
+    const body = (await (
+      await post(db, "/worker/claim", "cred", { reader: true })
+    ).json()) as Record<string, unknown>;
     expect(body.access_token).toBe("ya29.platform-reader");
     expect(body.external_channel_id).toBe("UCTPIL6f7yNpK8yc-H3cEtFg");
     expect(readerTokenFor).toHaveBeenCalledWith(expect.any(String));
@@ -149,12 +151,57 @@ describe("what a claim hands the worker", () => {
       accessTokenFor: async () => null,
       readerTokenFor,
     };
-    const second = (await (await post(connected)).json()) as Record<
-      string,
-      unknown
-    >;
+    const second = (await (
+      await post(connected, "/worker/claim", "cred", { reader: true })
+    ).json()) as Record<string, unknown>;
     expect(second.access_token).toBeNull();
     expect(readerTokenFor).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the reader's token from a worker that did not ask for it", async () => {
+    // A worker built before the platform reader reads any token in a lease as
+    // the channel owner's: it drops the channel id and lists `mine=true`,
+    // which for the reader's token is the reader's own channel. One such
+    // worker filed AJ360's 4,604 uploads under 73 public channels
+    // (2026-10-12 → 2026-10-16). Only a claim that says it knows a reader
+    // lease gets the reader's token; any other gets the id alone, which an
+    // old worker reads with its API key or reports blocked.
+    const readerTokenFor = vi.fn(async () => ({
+      access_token: "ya29.platform-reader",
+      access_token_expires_at: "2026-09-19T17:00:00Z",
+    }));
+    const db: WorkerDb = {
+      ...base(),
+      claim: async () => ({
+        id: "job-6",
+        lease_token: "l",
+        checkpoint: null,
+        type: "discover",
+        external_channel_id: "UCTPIL6f7yNpK8yc-H3cEtFg",
+      }),
+      accessTokenFor: async () => null,
+      readerTokenFor,
+    };
+    for (const body of [{}, { types: ["discover"] }, { reader: "yes" }]) {
+      const out = (await (
+        await post(db, "/worker/claim", "cred", body)
+      ).json()) as Record<string, unknown>;
+      expect(out.access_token).toBeNull();
+      expect(out.external_channel_id).toBe("UCTPIL6f7yNpK8yc-H3cEtFg");
+    }
+    expect(readerTokenFor).not.toHaveBeenCalled();
+  });
+
+  it("renews through the reader only for a worker that asked for it", async () => {
+    const renewToken = vi.fn(async () => null);
+    const db: WorkerDb = { ...base(), renewToken };
+    const lease = { job_id: "j", lease_token: "l" };
+    await post(db, "/worker/renew-token", "cred", lease);
+    await post(db, "/worker/renew-token", "cred", { ...lease, reader: true });
+    expect(renewToken.mock.calls.map((c) => (c as unknown[])[3])).toEqual([
+      false,
+      true,
+    ]);
   });
 
   it("asks for the token against the claimed job, not against anything sent", async () => {
@@ -462,6 +509,7 @@ describe("the mid-run token renewal", () => {
       expect.any(String),
       "job-2",
       "lease-2",
+      false,
     );
     // The workspace is derived inside the data layer, never read from the body.
     const [passedHash] = renewToken.mock.calls[0] as unknown as [string];

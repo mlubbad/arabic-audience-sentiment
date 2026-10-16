@@ -1,5 +1,27 @@
 # Verification
 
+## 2026-10-16 — Another channel's videos in a public channel's list
+
+Read-only PostgREST GETs against production (service key, counts and provenance only, no
+comment text), 2026-10-16:
+
+| Query                                                                      | Result                                                                                                                                                                                                    |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `channels` titled Alzo3bi / 360                                            | Yahea `a88ef88d…` (`public_unverified`) and AJ360 `b7de589f…` (`connected`), in **different** workspaces; Yahea's workspace has no other channel.                                                         |
+| `videos` per channel                                                       | Yahea's channel 6,073; AJ360's 4,604; neither has rows under the other's channel id.                                                                                                                      |
+| Yahea's 6,073 by provenance, against AJ360's ids                           | 1,476 `youtube_data_api_public` / `platform_reader`, catalogued 2026-10-11, none of them AJ360's. 4,597 `youtube_oauth` with no `credential_kind`, catalogued 2026-10-15T07, **all** of them AJ360's ids. |
+| `sync_runs` for that hour                                                  | discover run 07:20 → 07:29, `succeeded`, `videos_found: 4597` (2,389 short, 2,199 video, 9 stream); its job reclaimed once.                                                                               |
+| AJ360's own 4,604                                                          | 4,588 `credential_kind: owner_grant` (current workers); the foreign copies lack the field, so a different, older writer.                                                                                  |
+| All 107 `public_unverified` YouTube channels, `source=youtube_oauth` count | 73 affected, 335,218 rows, catalogued 2026-10-12 → 2026-10-16T08.                                                                                                                                         |
+| Mac worker (pid 81654, since 2026-10-11)                                   | checkout 3a3ae7b (2026-09-24), imports `src/` (no installed copy): writes `credential_kind`, not the writer.                                                                                              |
+
+| Command                                                                                      | Actual result                                                                                                |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `npx vitest run supabase/tests/worker_gateway_handler.test.ts`, new tests on the old gateway | 2 failed (`expected 'ya29.platform-reader' to be null`; renew flag `undefined`). With the change: 21 passed. |
+| `uv … pytest tests/test_catalogue.py tests/test_gateway.py`, new tests on the old worker     | 5 failed. With the change, the worker suite: 340 passed; `ruff check`: clean.                                |
+| `npx vitest run supabase/tests/catalogue_channel_guard.test.ts` without `20261029000000`     | 3 failed, 1 passed (the Telegram case passes both ways by design). With it: 4 passed.                        |
+| `npx vitest run` worker_catalogue, interaction_metrics, platform_worker                      | 11 failed with the guard and unnamed payloads (as intended); 27 passed once each payload names its channel.  |
+
 ## 2026-10-13 — Background counts plan without stale estimates
 
 After `20261025000000` went live, the comparison step counted channel after channel. Two channels

@@ -121,14 +121,17 @@ def test_the_claim_names_the_kinds_of_work_the_caller_can_run():
     control = plane(handler)
     # Scoped: a collection-only run asks for collections, and the body says so.
     control.claim(["collect"])
-    assert seen["body"] == {"types": ["collect"]}
+    assert seen["body"] == {"types": ["collect"], "reader": True}
     control.claim(["collect", "discover"])
-    assert seen["body"] == {"types": ["collect", "discover"]}
-    # Unscoped: a worker that can run everything sends an empty body, which the
+    assert seen["body"] == {"types": ["collect", "discover"], "reader": True}
+    # Unscoped: a worker that can run everything sends no types, which the
     # gateway reads as no preference. It never sends types=null as a string or
-    # a half-formed list for the server to guess at.
+    # a half-formed list for the server to guess at. Every claim says the
+    # worker knows a reader lease: the gateway keeps the platform reader's
+    # token from a worker that does not say so (it would read the token as the
+    # owner's and list the reader's own channel).
     control.claim()
-    assert seen["body"] == {}
+    assert seen["body"] == {"reader": True}
 
 
 def test_video_counts_posts_each_count_under_the_lease_and_returns_the_answer():
@@ -179,7 +182,7 @@ def test_renew_token_posts_under_the_lease_and_returns_the_fresh_pair():
     lease = {"job_id": "j", "lease_token": "t"}
     answer = plane(handler).renew_token(lease)
     assert seen["path"].endswith("/worker/renew-token")
-    assert seen["body"] == {"job_id": "j", "lease_token": "t"}
+    assert seen["body"] == {"job_id": "j", "lease_token": "t", "reader": True}
     assert "workspace_id" not in seen["body"]
     assert answer == {
         "access_token": "ya29.renewed",
