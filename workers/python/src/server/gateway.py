@@ -268,6 +268,13 @@ class ControlPlane:
             {"job_id": lease["job_id"], "lease_token": lease["lease_token"], "payload": _canonicalise(videos)},
         )
 
+    def commit_channel(self, lease: dict[str, Any], channel: dict[str, Any]) -> dict[str, Any] | None:
+        return self._post(
+            "/worker/commit-channel",
+            {"job_id": lease["job_id"], "lease_token": lease["lease_token"],
+             "profile": _canonicalise(channel)},
+        )
+
     def video_finished(self, lease: dict[str, Any], video_id: str, outcome: str,
                        error_code: str | None = None) -> None:
         self._post(
