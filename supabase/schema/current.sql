@@ -546,6 +546,9 @@ alter table "public"."audit_events" add constraint "audit_events_target_type_che
 alter table "public"."audit_events" add constraint "audit_events_target_type_not_null" NOT NULL target_type;
 alter table "public"."audit_events" add constraint "audit_events_workspace_id_fkey" FOREIGN KEY (workspace_id) REFERENCES workspaces(id);
 
+CREATE INDEX audit_events_by_actor ON public.audit_events USING btree (actor_id, created_at DESC);
+CREATE INDEX audit_events_by_target ON public.audit_events USING btree (target_type, target_id);
+CREATE INDEX audit_events_by_time ON public.audit_events USING btree (created_at DESC);
 CREATE UNIQUE INDEX audit_events_pkey ON public.audit_events USING btree (id);
 CREATE INDEX audit_events_recent ON public.audit_events USING btree (workspace_id, created_at DESC);
 
@@ -4503,7 +4506,16 @@ CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats(pairs jsonb)
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
+declare
+  deleting text := nullif(current_setting('app.deleting_workspace', true), '');
 begin
+  if deleting is not null then
+    select coalesce(jsonb_agg(e), '[]'::jsonb) into pairs
+    from jsonb_array_elements(coalesce(pairs, '[]'::jsonb)) e
+    where e->>'workspace_id' is distinct from deleting;
+    if pairs = '[]'::jsonb then return; end if;
+  end if;
+
   insert into private.video_comment_stats(workspace_id, video_id, total, analysed)
   select distinct p.workspace_id, p.video_id, 0, 0
   from jsonb_to_recordset(coalesce(pairs, '[]'::jsonb))
@@ -6954,6 +6966,7 @@ CREATE OR REPLACE FUNCTION public.admin_ops()
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
 declare
   overview jsonb;
@@ -6963,6 +6976,8 @@ begin
   select jsonb_build_object(
     'workspaces', (select count(*) from public.workspaces),
     'channels', (select count(*) from public.channels),
+    -- Collected this week, by first_seen_at (comments_first_seen), whatever
+    -- the comment's own date: an import of old comments counts here.
     'comments_7d', (
       select count(*) from public.comments
       where first_seen_at >= now() - interval '7 days'),
@@ -6978,7 +6993,11 @@ begin
     'sync_failed_7d', (
       select count(*) from public.sync_runs
       where started_at >= now() - interval '7 days'
-        and status in ('failed','partial')))
+        and status = 'failed'),
+    'sync_partial_7d', (
+      select count(*) from public.sync_runs
+      where started_at >= now() - interval '7 days'
+        and status = 'partial'))
   into overview;
   select coalesce(jsonb_agg(jsonb_build_object(
       'workspace_id', j.workspace_id, 'workspace_name', w.name,
@@ -7575,6 +7594,7 @@ CREATE OR REPLACE FUNCTION public.admin_workspace_footprint(w uuid)
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''
+ SET statement_timeout TO '60s'
 AS $function$
 begin
   if not public.is_platform_admin() then raise exception 'forbidden' using errcode='42501'; end if;
@@ -7736,6 +7756,7 @@ CREATE OR REPLACE FUNCTION public.delete_workspace(w uuid)
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
+ SET statement_timeout TO '120s'
 AS $function$
 declare me uuid; my_home uuid; begin
   me := auth.uid();

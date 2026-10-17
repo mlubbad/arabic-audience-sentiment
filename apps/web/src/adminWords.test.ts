@@ -233,3 +233,11 @@ describe("admin errors", () => {
     );
   });
 });
+
+describe("a refusal in words", () => {
+  it("says a call ran out of time in a sentence, not as 57014", () => {
+    expect(
+      adminErrorMessage({ code: "57014", message: "live_unavailable" }, ar),
+    ).toBe(ar.adminTimedOut);
+  });
+});

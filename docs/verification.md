@@ -1,5 +1,43 @@
 # Verification
 
+## 2026-10-17 — Owner console batch E: definitions and scale
+
+Findings 9, 10, 11 and 20 of `docs/reviews/2026-10-13-owner-console-review.md`. Migration
+`20261110000000_admin_definitions_and_scale.sql`.
+
+| Command | Actual result |
+| --- | --- |
+| `npm run check` | All checks passed. Web 170 files / 1,381 tests; DB 80 files / 677 tests; worker 364 passed; build and scans passed. |
+| `npx vitest run supabase/tests/admin_definitions_and_scale.test.ts` | 5 passed. |
+| `npx vitest run apps/web/src/admin/AdminOpsPage.test.tsx apps/web/src/adminWords.test.ts` | 15 passed. |
+
+Local Postgres 16.13 (`perf`), workspace of 155,822 comments, 185,530 predictions and 4,583
+videos; each delete inside a transaction rolled back:
+
+| Measurement | Result |
+| --- | --- |
+| `delete_workspace`, current recount, three runs | 12.0 s, 11.4 s, 12.3 s |
+| `delete_workspace`, recount skipped, three runs | 9.8 s, 10.8 s, 9.9 s |
+| Per statement, recount skipped | comments 9.2 s (`explain analyze`: five FK triggers, 155,822 calls each); predictions 0.6 s; videos 0.3 s; the rest under 20 ms |
+| `admin_workspace_footprint` on it, warm | 0.09 to 0.11 s |
+| `admin_ops`'s collected-this-week count (218,130 rows) | 0.1 s |
+
+The first run measured 21 s cold. Production disks are slower, so the 120 s limit, not the
+saving, is what lets the delete finish.
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| Recount not skipped during a delete | 1 failed |
+| `delete_workspace` without its limit | 1 failed |
+| `admin_workspace_footprint` without its limit | 1 failed |
+| `admin_ops` without its limit | 1 failed |
+| Failed syncs counted with partial ones again | 1 failed |
+| No actor index on `audit_events` | 1 failed |
+| `57014` shown as a code | 1 failed |
+| Ops page shows partial syncs as 0 | 1 failed |
+
 ## 2026-10-17 — Owner console batch D: honest errors and labels
 
 Findings 7, 15, 16 and 17 of `docs/reviews/2026-10-13-owner-console-review.md`. Web only, no
