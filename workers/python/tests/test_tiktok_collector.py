@@ -48,7 +48,7 @@ def test_tiktok_collector_fixture_catalogue_and_batches():
                     "text": "محتوى ممتاز وطرح قيم جداً",
                     "create_time": "2026-09-20T12:10:00Z",
                     "digg_count": 15,
-                    "user": {"unique_id": "user_arab_1", "nickname": "فاطمة"},
+                    "user": {"id": 1001, "unique_id": "user_arab_1", "nickname": "فاطمة"},
                 },
                 {
                     "id": 9182736451,
@@ -56,7 +56,7 @@ def test_tiktok_collector_fixture_catalogue_and_batches():
                     "parent_id": 9182736450,
                     "create_time": "2026-09-20T12:15:00Z",
                     "digg_count": 2,
-                    "user": {"unique_id": "user_arab_2", "nickname": "عمر"},
+                    "user": {"id": 1002, "unique_id": "user_arab_2", "nickname": "عمر"},
                 },
             ]
         },
@@ -426,6 +426,5 @@ def test_tiktok_collector_batches_falls_back_to_display_api_when_scrapers_empty(
     assert len(batches[0].comments) == 1
     assert batches[0].comments[0].id == "tt_api_comment_1"
     assert batches[0].comments[0].text == "تعليق رسمي عبر واجهة تيك توك"
-
 
 

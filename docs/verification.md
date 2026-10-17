@@ -1,5 +1,48 @@
 # Verification
 
+## 2026-10-16 — Owner console batch C: admin actions leave a trail
+
+Findings 5, 6, 8, 18 and 19 of `docs/reviews/2026-10-13-owner-console-review.md`. Migration
+`20261102000000_admin_actions_leave_a_trail.sql`, plus the `admin-users` handler.
+
+| Command | Actual result |
+| --- | --- |
+| `npm run check` | All checks passed. Web 167 files / 1,349 tests; DB 75 files / 642 tests; worker 340 passed; build and scans passed. |
+| `npx vitest run` admin_actions_trail, platform_admin, platform_reader, workspace_lifecycle, admin_users_handler, admin_account_file | All passed (new file: 6 tests). |
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| `admin-users`: drop the another-admin guard | 1 failed |
+| `delete_workspace` deletes audit rows again | 2 failed |
+| Guard allows a detach that also edits the row | 1 failed |
+| Guard still allows deleting an audit row | 1 failed |
+| No trigger on `plans` | 2 failed |
+| Trigger records saves that change nothing | 1 failed |
+| `promote_platform_reader` left executable by PUBLIC | 1 failed |
+| `promote_platform_reader` writes no audit row | 1 failed |
+| `admin_audit(null)` allowed | 1 failed |
+| `grant_pack` key not scoped to the workspace | 2 failed |
+| `grant_pack` retry writes a second audit row | 1 failed |
+| Plan note kept in the root's `provider_ref` | 3 failed |
+| Plan note kept in the clients' `provider_ref` | 1 failed |
+| Paddle-override audit row carries the note | 1 failed |
+| Migration does not clear the stored notes | 1 failed |
+| `private.admin_notes` readable by `authenticated` | 1 failed |
+
+One mutation survived and was replaced: the note in the plain `insert … values` of
+`set_workspace_plan`. Every workspace already has a subscription row, so that value is never used
+and only the `on conflict` update runs; the rows above mutate that update instead.
+
+Renumbered `20261030000000` → `20261102000000` on 2026-10-17: #140 had taken `20261030000000`, and
+#142/#143 take `20261031000000` and `20261101000000`. The runner skips a version already applied, so
+the second PR to merge with a shared version would have shipped without its migration.
+
+Not verified here: the `admin-users` guard in production, which needs the owner's redeploy of the
+function, and the migration's rewrite of existing notes on the production data (tested on a
+database seeded with notes before the migration).
+
 ## 2026-10-16 — Another channel's videos in a public channel's list
 
 Read-only PostgREST GETs against production (service key, counts and provenance only, no

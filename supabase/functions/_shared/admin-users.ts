@@ -6,7 +6,10 @@
  * Who may ask is the database's answer, not this handler's: `target` runs
  * `admin_user_target` with the caller's own token, and that function answers
  * only a platform admin. It also says whether the person is the caller or
- * another admin; neither is ever suspended. Every action that happened is
+ * another admin; neither is ever suspended, and another admin's account is
+ * never handed a sign-in link, a new email or a confirmation (owner console
+ * review, 2026-10-13: one admin could otherwise take over another, or the
+ * owner). Every action that happened is
  * then recorded through `admin_record_user_action`, again as the caller.
  *
  * Pure, with the database and the auth admin API injected, so it is tested
@@ -51,7 +54,13 @@ export type AdminUsersOutcome =
   | { status: 404; body: { code: "user_not_found" } }
   | {
       status: 409;
-      body: { code: "cannot_suspend_admin" | "no_email" | "email_taken" };
+      body: {
+        code:
+          | "cannot_suspend_admin"
+          | "cannot_act_on_admin"
+          | "no_email"
+          | "email_taken";
+      };
     }
   | { status: 502; body: { code: "unavailable" } };
 
@@ -137,6 +146,16 @@ export async function adminUserAction(
 
   if (action === "suspend" && (target.is_self || target.is_admin))
     return { status: 409, body: { code: "cannot_suspend_admin" } };
+  // A link, a new address or a confirmation on another admin's account is a
+  // way into it; their own account page is where they change those.
+  if (
+    (action === "recovery_link" ||
+      action === "change_email" ||
+      action === "confirm_email") &&
+    target.is_admin &&
+    !target.is_self
+  )
+    return { status: 409, body: { code: "cannot_act_on_admin" } };
   if (action === "recovery_link" && !target.email)
     return { status: 409, body: { code: "no_email" } };
 
