@@ -11,6 +11,7 @@ import uuid
 from collections.abc import Iterator
 from datetime import datetime, timezone
 import httpx
+from .identity import stable_author_id
 from .protocol import Batch, Catalogue, CollectionError, RawComment
 
 
@@ -302,7 +303,7 @@ class TelegramCollector:
                     parent_source="api",
                     published_at=c.get("published_at", datetime.now(timezone.utc).isoformat()),
                     timestamp_precision="second",
-                    author_channel_id=str(c.get("author_id", "tg_unknown")),
+                    author_channel_id=stable_author_id(c.get("author_id")),
                     author_name=c.get("author_name", "مستخدم تليجرام"),
                     likes_value=c.get("reactions_count", 0),
                     likes_raw=str(c.get("reactions_count", 0)),
@@ -331,7 +332,8 @@ class TelegramCollector:
                     if not text:
                         continue
                     author_name = "مستخدم تليجرام"
-                    author_id = f"tg_{msg.sender_id}" if getattr(msg, "sender_id", None) else "tg_unknown"
+                    sender_id = getattr(msg, "sender_id", None)
+                    author_id = stable_author_id(f"tg_{sender_id}") if sender_id else None
                     if getattr(msg, "sender", None):
                         first = getattr(msg.sender, "first_name", "") or ""
                         last = getattr(msg.sender, "last_name", "") or ""
