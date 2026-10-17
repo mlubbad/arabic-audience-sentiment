@@ -282,7 +282,7 @@ describe("interaction metrics and storytelling", () => {
       }>;
     }
     const aggRes = await db.query<{ dashboard_aggregates_impl: AggData }>(
-      "select private.dashboard_aggregates_impl($1, '{}'::jsonb) as dashboard_aggregates_impl",
+      "select private.dashboard_aggregates_compute($1, '{}'::jsonb) as dashboard_aggregates_impl",
       [W],
     );
     const agg = aggRes.rows[0].dashboard_aggregates_impl;
@@ -415,9 +415,10 @@ describe("interaction metrics and storytelling", () => {
     await user(owner);
     const aggRes = await db.query<{
       dashboard_aggregates: Record<string, unknown>;
-    }>("select dashboard_aggregates($1, '{}'::jsonb) as dashboard_aggregates", [
-      W_NO_CHANNEL,
-    ]);
+    }>(
+      "select private.dashboard_aggregates_compute($1, '{}'::jsonb) as dashboard_aggregates",
+      [W_NO_CHANNEL],
+    );
     const agg = aggRes.rows[0].dashboard_aggregates;
     expect(agg.channel).toBeNull();
     expect(agg.total).toBe(0);

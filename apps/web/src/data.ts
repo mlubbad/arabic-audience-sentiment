@@ -28,7 +28,13 @@ import {
   type ContentKind,
 } from "@sentiment/contracts";
 import { supabase } from "./supabase";
-export { isStatementTimeout, shouldRetryDashboardQuery } from "./queryRetry";
+import { DashboardPendingError } from "./queryRetry";
+export {
+  DashboardPendingError,
+  PENDING_RETRY_MS,
+  isStatementTimeout,
+  shouldRetryDashboardQuery,
+} from "./queryRetry";
 /**
  * Who a fixture-mode correction is attributed to. Deliberately not a UUID and
  * clearly synthetic: there is no authenticated user in fixture mode, and
@@ -152,8 +158,8 @@ export const adminFixtureCatalogue = PlanCatalogueSchema.parse([
   {
     key: "pilot",
     segment: "internal",
-    title_ar: "شريك مؤسِّس",
-    title_en: "Founding Partner",
+    title_ar: "شريك تسويقي",
+    title_en: "Marketing Partner",
     price_monthly_cents: 0,
     price_yearly_cents: 0,
     self_serve: false,
@@ -891,6 +897,16 @@ export async function loadDashboardAggregates(
       },
       signal,
     );
+    // The server answers from a cache the database fills in the background
+    // (20261111010000). Until a first payload exists it says so; a compute that
+    // failed names its SQLSTATE, which the page shows as the error code.
+    const cache = (
+      data as { cache?: { state?: string; error?: string } } | null
+    )?.cache;
+    if (cache?.state === "pending") throw new DashboardPendingError();
+    if (cache?.state === "failed") {
+      throw new DashboardRpcError("live_unavailable", { code: cache.error });
+    }
     return DashboardAggregatesSchema.parse(data);
   }
 

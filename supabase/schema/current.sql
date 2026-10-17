@@ -213,6 +213,30 @@ alter table "private"."channel_compare_units" add constraint "channel_compare_un
 CREATE INDEX channel_compare_units_due ON private.channel_compare_units USING btree (attempts, dirty_since) WHERE (dirty_since IS NOT NULL);
 CREATE UNIQUE INDEX channel_compare_units_pkey ON private.channel_compare_units USING btree (workspace_id, channel_id);
 
+create table "private"."dashboard_aggregates_cache" (
+  "workspace_id" uuid not null,
+  "filter_key" text not null,
+  "filters" jsonb not null,
+  "payload" jsonb,
+  "computed_at" timestamp with time zone,
+  "requested_at" timestamp with time zone default now() not null,
+  "attempts" integer default 0 not null,
+  "next_attempt_at" timestamp with time zone,
+  "last_error" text
+);
+alter table "private"."dashboard_aggregates_cache" enable row level security;
+
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_attempts_not_null" NOT NULL attempts;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_filter_key_not_null" NOT NULL filter_key;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_filters_not_null" NOT NULL filters;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_pkey" PRIMARY KEY (workspace_id, filter_key);
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_requested_at_not_null" NOT NULL requested_at;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_workspace_id_fkey" FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX dashboard_aggregates_cache_due_idx ON private.dashboard_aggregates_cache USING btree (requested_at);
+CREATE UNIQUE INDEX dashboard_aggregates_cache_pkey ON private.dashboard_aggregates_cache USING btree (workspace_id, filter_key);
+
 create table "private"."job_batches" (
   "job_id" uuid not null,
   "batch_key" text not null,
@@ -2542,12 +2566,11 @@ declare w uuid; home uuid; allowed int; owned int; begin
   return w;
 end $function$
 
-CREATE OR REPLACE FUNCTION private.dashboard_aggregates_impl(w uuid, f jsonb DEFAULT '{}'::jsonb)
+CREATE OR REPLACE FUNCTION private.dashboard_aggregates_compute(w uuid, f jsonb DEFAULT '{}'::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''
- SET statement_timeout TO '30s'
 AS $function$
 DECLARE
   active text;
@@ -2953,6 +2976,74 @@ BEGIN
 
   RETURN res;
 END;
+$function$
+
+CREATE OR REPLACE FUNCTION private.dashboard_aggregates_fresh_for()
+ RETURNS interval
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$ select interval '60 seconds' $function$
+
+CREATE OR REPLACE FUNCTION private.dashboard_aggregates_impl(w uuid, f jsonb DEFAULT '{}'::jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  filters jsonb := jsonb_strip_nulls(coalesce(f, '{}'::jsonb));
+  k       text;
+  c       private.dashboard_aggregates_cache;
+  stale   boolean;
+begin
+  if not (coalesce(current_setting('request.jwt.claim.role', true), '') = 'service_role'
+          or private.has_role(w)) then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  -- Free-text search is open-ended (a row per typed string would never be read
+  -- twice) and is served by the trigram index, so it is still answered live.
+  if nullif(trim(filters->>'q'), '') is not null then
+    return private.dashboard_aggregates_compute(w, filters);
+  end if;
+
+  k := md5(filters::text);
+
+  select * into c from private.dashboard_aggregates_cache
+   where workspace_id = w and filter_key = k;
+
+  if not found then
+    insert into private.dashboard_aggregates_cache(workspace_id, filter_key, filters)
+    values (w, k, filters)
+    on conflict do nothing;
+    return jsonb_build_object('cache', jsonb_build_object('state', 'pending'));
+  end if;
+
+  if c.payload is null then
+    update private.dashboard_aggregates_cache
+       set requested_at = now()
+     where workspace_id = w and filter_key = k;
+    if c.last_error is not null then
+      return jsonb_build_object('cache',
+        jsonb_build_object('state', 'failed', 'error', c.last_error));
+    end if;
+    return jsonb_build_object('cache', jsonb_build_object('state', 'pending'));
+  end if;
+
+  stale := c.computed_at < now() - private.dashboard_aggregates_fresh_for();
+  if stale or c.requested_at < now() - interval '1 hour' then
+    -- Queue a refresh (and keep the row alive); once per staleness, not per read.
+    if c.requested_at <= c.computed_at or c.requested_at < now() - interval '1 hour' then
+      update private.dashboard_aggregates_cache
+         set requested_at = now()
+       where workspace_id = w and filter_key = k;
+    end if;
+  end if;
+
+  return c.payload || jsonb_build_object('cache', jsonb_build_object(
+    'state', case when stale then 'stale' else 'fresh' end,
+    'computed_at', c.computed_at));
+end
 $function$
 
 CREATE OR REPLACE FUNCTION private.dashboard_comments_impl(w uuid, f jsonb DEFAULT '{}'::jsonb)
@@ -3534,6 +3625,49 @@ begin
   end loop;
   return done;
 end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.drain_dashboard_aggregates(max_rows integer DEFAULT 2)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  r record;
+  done int := 0;
+begin
+  delete from private.dashboard_aggregates_cache
+   where requested_at < now() - interval '7 days';
+
+  for r in
+    select workspace_id, filter_key, filters
+      from private.dashboard_aggregates_cache
+     where (computed_at is null or requested_at > computed_at)
+       and coalesce(next_attempt_at, '-infinity') <= now()
+     order by requested_at
+     limit max_rows
+       for update skip locked
+  loop
+    -- compute authorises as the service role; the row was authorised when asked.
+    perform set_config('request.jwt.claim.role', 'service_role', true);
+    begin
+      update private.dashboard_aggregates_cache
+         set payload = private.dashboard_aggregates_compute(r.workspace_id, r.filters),
+             computed_at = now(), attempts = 0, next_attempt_at = null, last_error = null
+       where workspace_id = r.workspace_id and filter_key = r.filter_key;
+      done := done + 1;
+    exception when others then
+      update private.dashboard_aggregates_cache
+         set attempts = attempts + 1,
+             last_error = sqlstate,
+             next_attempt_at = now() + make_interval(secs => least(60 * power(2, attempts), 3600))
+       where workspace_id = r.workspace_id and filter_key = r.filter_key;
+    end;
+  end loop;
+  perform set_config('request.jwt.claim.role', '', true);
+  return done;
+end
 $function$
 
 CREATE OR REPLACE FUNCTION private.due_videos(w uuid, c uuid)
@@ -7903,11 +8037,11 @@ AS $function$ select private.create_workspace_impl(workspace_name) $function$
 CREATE OR REPLACE FUNCTION public.dashboard_aggregates(w uuid, f jsonb DEFAULT '{}'::jsonb)
  RETURNS jsonb
  LANGUAGE sql
- STABLE SECURITY DEFINER
+ SECURITY DEFINER
  SET search_path TO ''
  SET statement_timeout TO '30s'
 AS $function$
-  SELECT private.dashboard_aggregates_impl(w, f);
+  select private.dashboard_aggregates_impl(w, f);
 $function$
 
 CREATE OR REPLACE FUNCTION public.dashboard_comments(w uuid, f jsonb DEFAULT '{}'::jsonb)
@@ -9378,6 +9512,13 @@ grant SELECT on table "private"."channel_compare_units" to "postgres";
 grant TRIGGER on table "private"."channel_compare_units" to "postgres";
 grant TRUNCATE on table "private"."channel_compare_units" to "postgres";
 grant UPDATE on table "private"."channel_compare_units" to "postgres";
+grant DELETE on table "private"."dashboard_aggregates_cache" to "postgres";
+grant INSERT on table "private"."dashboard_aggregates_cache" to "postgres";
+grant REFERENCES on table "private"."dashboard_aggregates_cache" to "postgres";
+grant SELECT on table "private"."dashboard_aggregates_cache" to "postgres";
+grant TRIGGER on table "private"."dashboard_aggregates_cache" to "postgres";
+grant TRUNCATE on table "private"."dashboard_aggregates_cache" to "postgres";
+grant UPDATE on table "private"."dashboard_aggregates_cache" to "postgres";
 grant DELETE on table "private"."job_batches" to "postgres";
 grant INSERT on table "private"."job_batches" to "postgres";
 grant REFERENCES on table "private"."job_batches" to "postgres";
@@ -9938,6 +10079,11 @@ grant EXECUTE on function private.confirm_usage(uuid,text[]) to "postgres";
 grant EXECUTE on function private.confirm_usage(uuid,text[]) to "service_role";
 grant EXECUTE on function private.create_workspace_impl(text) to "authenticated";
 grant EXECUTE on function private.create_workspace_impl(text) to "postgres";
+grant EXECUTE on function private.dashboard_aggregates_compute(uuid,jsonb) to "authenticated";
+grant EXECUTE on function private.dashboard_aggregates_compute(uuid,jsonb) to "postgres";
+grant EXECUTE on function private.dashboard_aggregates_compute(uuid,jsonb) to "service_role";
+grant EXECUTE on function private.dashboard_aggregates_fresh_for() to "postgres";
+grant EXECUTE on function private.dashboard_aggregates_fresh_for() to "public";
 grant EXECUTE on function private.dashboard_aggregates_impl(uuid,jsonb) to "authenticated";
 grant EXECUTE on function private.dashboard_aggregates_impl(uuid,jsonb) to "postgres";
 grant EXECUTE on function private.dashboard_aggregates_impl(uuid,jsonb) to "service_role";
@@ -9948,6 +10094,7 @@ grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "authenticate
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "postgres";
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "service_role";
 grant EXECUTE on function private.drain_channel_compare(integer) to "postgres";
+grant EXECUTE on function private.drain_dashboard_aggregates(integer) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "service_role";
 grant EXECUTE on function private.enforce_genre_taxonomy_parent_level() to "postgres";
