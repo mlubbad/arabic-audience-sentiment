@@ -282,6 +282,14 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
             result = collector.catalogue(channel_id, known=known)
         control.heartbeat(lease)
         control.commit_catalogue(lease, result.videos)
+        if (lease.get("platform") or "youtube") == "youtube" and result.channel is not None:
+            try:
+                control.commit_channel(lease, result.channel)
+            except LeaseLost:
+                raise
+            except ControlPlaneError:
+                control.finish(lease, "partial", "channel_profile_commit_failed")
+                return True
         control.finish(lease, "exhausted" if result.complete else "partial",
                        None if result.complete else result.reason)
     except LeaseLost:

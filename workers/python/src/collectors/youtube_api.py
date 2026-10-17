@@ -17,6 +17,12 @@ from .protocol import Batch, Catalogue, CollectionError, RawComment
 # this margin is renewed before the next request is sent rather than after
 # the source refuses it.
 _RENEW_MARGIN_SECONDS = 120
+_KEYWORD_PARTS = re.compile(r'"([^"]*)"?|(\S+)')
+
+
+def _parse_keywords(value: str) -> list[str]:
+    """Split YouTube keywords without interpreting apostrophes or backslashes."""
+    return [quoted or word for quoted, word in _KEYWORD_PARTS.findall(value) if quoted or word]
 
 
 class YouTubeAPI:
@@ -310,6 +316,53 @@ class YouTubeAPI:
     _TABS = (("video", "LF"), ("short", "SH"), ("stream", "LV"))
     _DURATION = re.compile(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
 
+    @staticmethod
+    def _channel_profile(item: dict, requested_channel_id: str | None = None) -> dict:
+        """Build one observation without turning an unreturned part into data."""
+        try:
+            external_channel_id = requested_channel_id or item["id"]
+            profile = {"external_channel_id": external_channel_id}
+            if "snippet" in item:
+                snippet = item["snippet"] or {}
+                profile.update({
+                    "description": snippet.get("description") or None,
+                    "country": snippet.get("country") or None,
+                    "default_language": snippet.get("defaultLanguage") or None,
+                    "channel_published_at": snippet.get("publishedAt") or None,
+                })
+            if "brandingSettings" in item:
+                raw_keywords = ((item["brandingSettings"] or {}).get("channel") or {}).get(
+                    "keywords"
+                )
+                profile["keywords"] = (
+                    _parse_keywords(raw_keywords) if isinstance(raw_keywords, str) else None
+                )
+            if "topicDetails" in item:
+                categories = (item["topicDetails"] or {}).get("topicCategories")
+                profile["topic_categories"] = categories if isinstance(categories, list) else None
+            if "statistics" in item:
+                statistics = item["statistics"] or {}
+                hidden = statistics.get("hiddenSubscriberCount")
+                raw_counts = (
+                    statistics.get("subscriberCount"),
+                    statistics.get("viewCount"),
+                    statistics.get("videoCount"),
+                )
+                if (hidden is True or raw_counts[0] is not None) and all(
+                    value is not None for value in raw_counts[1:]
+                ):
+                    profile.update({
+                        "subscriber_count": None if hidden is True else int(raw_counts[0]),
+                        "view_count": int(raw_counts[1]),
+                        "video_count": int(raw_counts[2]),
+                        "subscriber_count_hidden": (
+                            hidden if isinstance(hidden, bool) else None
+                        ),
+                    })
+            return profile
+        except (KeyError, TypeError, ValueError):
+            raise CollectionError("invalid_response") from None
+
     def _playlist(self, playlist_id: str,
                   known: AbstractSet[str] | None = None) -> list[str] | None:
         """The playlist's video ids, or None when the playlist is absent.
@@ -377,16 +430,24 @@ class YouTubeAPI:
                 raise ValueError("invalid_channel_id")
             if self.token and not self.public_reader:
                 raise ValueError("owner_token_reads_mine_only")
-            params = {"part": "contentDetails", "id": channel_id}
+            params = {
+                "part": "contentDetails,snippet,statistics,brandingSettings,topicDetails",
+                "id": channel_id,
+            }
         else:
-            params = {"part": "contentDetails", "mine": "true"}
+            params = {
+                "part": "contentDetails,snippet,statistics,brandingSettings,topicDetails",
+                "mine": "true",
+            }
         data = self._get("channels", params)
         if not data["items"]:
             raise CollectionError(
                 "channel_not_found" if channel_id else "no_channel_for_credential", "blocked"
             )
+        channel_item = data["items"][0]
+        profile = self._channel_profile(channel_item, channel_id)
         try:
-            uploads = data["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+            uploads = channel_item["contentDetails"]["relatedPlaylists"]["uploads"]
         except (KeyError, TypeError):
             raise CollectionError("invalid_response") from None
         base = uploads[2:]
@@ -395,7 +456,7 @@ class YouTubeAPI:
         # that uploaded it, and the database refuses a catalogue that is not
         # the job's channel; a mismatch here stops the run before anything of
         # it travels.
-        expected = channel_id or data["items"][0].get("id")
+        expected = channel_id or channel_item.get("id")
 
         found: dict[str, dict] = {}
         any_tab = False
@@ -461,7 +522,7 @@ class YouTubeAPI:
                     })
                 except (KeyError, TypeError, ValueError):
                     raise CollectionError("invalid_response") from None
-        return Catalogue(videos=videos, complete=True)
+        return Catalogue(videos=videos, complete=True, channel=profile)
 
     @classmethod
     def _seconds(cls, iso: str | None) -> int | None:
