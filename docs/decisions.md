@@ -17,7 +17,8 @@ eighteen top-level genres stand as listed in §4.1. Levels two and three, with t
 mapping, are written next and reviewed by the owner. (5) Competitors ship first: phase 2 is
 competitor discovery, and audience overlap moves to phase 3. The competitor score runs without
 its overlap term until then, with that weight redistributed rather than read as zero, and the
-competitors tracked in phase 2 give phase 3 its data.
+competitors tracked in phase 2 give phase 3 its data. The owner approved the roadmap as a whole the
+same day (PR #141); work orders WO-18 to WO-21 (#144–#147) implement its phase 1.
 
 2026-10-13 — A Facebook account that manages several pages chooses one inside the product.
 The first live connect (the owner's own account) ended at `ambiguous_channel`; the way
