@@ -191,6 +191,39 @@ export type BatchComment = z.infer<typeof BatchCommentSchema>;
 export type BatchPrediction = z.infer<typeof BatchPredictionSchema>;
 
 /**
+ * A channel observation made while discovering its catalogue.
+ *
+ * Every observation is optional: an absent key was not observed and must not
+ * erase an older value. An explicit null is an observed unknown and does erase
+ * it. The workspace remains server-derived from the credential and job.
+ */
+const ChannelProfile = z
+  .object({
+    external_channel_id: z.string().min(1).max(200),
+    description: z.string().nullable().optional(),
+    keywords: z.array(z.string()).nullable().optional(),
+    topic_categories: z.array(z.string()).nullable().optional(),
+    country: z.string().nullable().optional(),
+    default_language: z.string().nullable().optional(),
+    channel_published_at: timestamp.nullable().optional(),
+    subscriber_count: z.number().int().nonnegative().nullable().optional(),
+    view_count: z.number().int().nonnegative().nullable().optional(),
+    video_count: z.number().int().nonnegative().nullable().optional(),
+    subscriber_count_hidden: z.boolean().nullable().optional(),
+  })
+  .strict();
+
+export const ChannelProfileCommit = z
+  .object({
+    job_id: z.string().uuid(),
+    lease_token: z.string().uuid(),
+    profile: ChannelProfile,
+  })
+  .strict();
+
+export type ChannelProfileCommit = z.infer<typeof ChannelProfileCommit>;
+
+/**
  * The billable event key for one analysed comment.
  *
  * Keyed on the comment alone, not on its text. One unique comment costs one

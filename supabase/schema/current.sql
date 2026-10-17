@@ -552,6 +552,27 @@ CREATE INDEX audit_events_by_time ON public.audit_events USING btree (created_at
 CREATE UNIQUE INDEX audit_events_pkey ON public.audit_events USING btree (id);
 CREATE INDEX audit_events_recent ON public.audit_events USING btree (workspace_id, created_at DESC);
 
+create table "public"."channel_stats_daily" (
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "day" date not null,
+  "subscriber_count" bigint,
+  "view_count" bigint,
+  "video_count" bigint,
+  "observed_at" timestamp with time zone not null
+);
+alter table "public"."channel_stats_daily" enable row level security;
+
+alter table "public"."channel_stats_daily" add constraint "channel_stats_daily_channel_id_not_null" NOT NULL channel_id;
+alter table "public"."channel_stats_daily" add constraint "channel_stats_daily_day_not_null" NOT NULL day;
+alter table "public"."channel_stats_daily" add constraint "channel_stats_daily_observed_at_not_null" NOT NULL observed_at;
+alter table "public"."channel_stats_daily" add constraint "channel_stats_daily_pkey" PRIMARY KEY (workspace_id, channel_id, day);
+alter table "public"."channel_stats_daily" add constraint "channel_stats_daily_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "public"."channel_stats_daily" add constraint "channel_stats_daily_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE UNIQUE INDEX channel_stats_daily_pkey ON public.channel_stats_daily USING btree (workspace_id, channel_id, day);
+CREATE INDEX channel_stats_daily_retention ON public.channel_stats_daily USING btree (observed_at);
+
 create table "public"."channels" (
   "id" uuid default gen_random_uuid() not null,
   "workspace_id" uuid not null,
@@ -568,7 +589,16 @@ create table "public"."channels" (
   "video_count" bigint,
   "avatar_url" text,
   "paused_at" timestamp with time zone,
-  "paused_by" uuid
+  "paused_by" uuid,
+  "description" text,
+  "keywords" text[],
+  "topic_categories" text[],
+  "country" text,
+  "default_language" text,
+  "channel_published_at" timestamp with time zone,
+  "subscriber_count_hidden" boolean,
+  "profile_observed_at" timestamp with time zone,
+  "stats_observed_at" timestamp with time zone
 );
 alter table "public"."channels" enable row level security;
 
@@ -4193,6 +4223,29 @@ begin
   return removed+pending_removed;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.purge_channel_profile(retain_text interval DEFAULT '30 days'::interval, retain_stats interval DEFAULT '30 days'::interval)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE cleared integer; removed integer;
+BEGIN
+  IF retain_text < interval '0' OR retain_stats < interval '0' THEN
+    RAISE EXCEPTION 'invalid_input' USING errcode='22023';
+  END IF;
+  UPDATE public.channels SET
+    description = NULL, keywords = NULL, topic_categories = NULL
+   WHERE profile_observed_at < now() - retain_text
+     AND (description IS NOT NULL OR keywords IS NOT NULL
+          OR topic_categories IS NOT NULL);
+  GET DIAGNOSTICS cleared = row_count;
+  DELETE FROM public.channel_stats_daily
+   WHERE observed_at < now() - retain_stats;
+  GET DIAGNOSTICS removed = row_count;
+  RETURN jsonb_build_object('profiles', cleared, 'stats', removed);
+END $function$
+
 CREATE OR REPLACE FUNCTION private.purge_comment_text(retain interval DEFAULT '30 days'::interval)
  RETURNS integer
  LANGUAGE plpgsql
@@ -5768,6 +5821,132 @@ DECLARE w uuid; c uuid; c_platform text; c_external text; n int; BEGIN
                             FROM jsonb_array_elements(payload) i GROUP BY 1) x))
    WHERE workspace_id = w AND job_id = j;
   RETURN jsonb_build_object('videos', n);
+END $function$
+
+CREATE OR REPLACE FUNCTION private.worker_commit_channel(token_hash text, j uuid, t uuid, profile jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE
+  w uuid;
+  c uuid;
+  expected_external text;
+  observed timestamptz := now();
+  has_profile boolean;
+  has_stats boolean;
+  k text;
+BEGIN
+  w := private.worker_job(token_hash, j, t);
+  SELECT channel_id INTO c FROM public.jobs
+   WHERE workspace_id = w AND id = j;
+  SELECT external_channel_id INTO expected_external FROM public.channels
+   WHERE workspace_id = w AND id = c;
+
+  IF profile IS NULL OR jsonb_typeof(profile) <> 'object' THEN
+    RAISE EXCEPTION 'invalid_channel_profile' USING errcode='22023';
+  END IF;
+  IF NOT profile ? 'external_channel_id'
+     OR jsonb_typeof(profile->'external_channel_id') <> 'string' THEN
+    RAISE EXCEPTION 'invalid_channel_profile' USING errcode='22023';
+  END IF;
+  IF profile->>'external_channel_id' IS DISTINCT FROM expected_external THEN
+    RAISE EXCEPTION 'channel_profile_mismatch' USING errcode='22023';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM jsonb_each(profile) f(key, value)
+     WHERE key NOT IN (
+       'external_channel_id', 'description', 'keywords', 'topic_categories',
+       'country', 'default_language', 'channel_published_at',
+       'subscriber_count', 'view_count', 'video_count',
+       'subscriber_count_hidden')
+        OR (key IN ('subscriber_count', 'view_count', 'video_count')
+            AND jsonb_typeof(value) NOT IN ('number', 'null'))
+        OR (key IN ('keywords', 'topic_categories')
+            AND jsonb_typeof(value) NOT IN ('array', 'null'))
+        OR (key IN ('description', 'country', 'default_language',
+                    'channel_published_at')
+            AND jsonb_typeof(value) NOT IN ('string', 'null'))
+        OR (key = 'subscriber_count_hidden'
+            AND jsonb_typeof(value) NOT IN ('boolean', 'null'))
+  ) THEN
+    RAISE EXCEPTION 'invalid_channel_profile' USING errcode='22023';
+  END IF;
+
+  FOREACH k IN ARRAY ARRAY['keywords', 'topic_categories'] LOOP
+    IF profile ? k AND jsonb_typeof(profile->k) = 'array'
+       AND EXISTS (
+         SELECT 1 FROM jsonb_array_elements(profile->k) item
+          WHERE jsonb_typeof(item) <> 'string') THEN
+      RAISE EXCEPTION 'invalid_channel_profile' USING errcode='22023';
+    END IF;
+  END LOOP;
+
+  FOREACH k IN ARRAY ARRAY['subscriber_count', 'view_count', 'video_count'] LOOP
+    IF profile ? k AND jsonb_typeof(profile->k) = 'number'
+       AND ((profile->>k)::numeric < 0
+         OR (profile->>k)::numeric <> trunc((profile->>k)::numeric)
+         OR (profile->>k)::numeric > 9223372036854775807) THEN
+      RAISE EXCEPTION 'invalid_channel_profile' USING errcode='22023';
+    END IF;
+  END LOOP;
+
+  has_profile := profile ?| ARRAY[
+    'description', 'keywords', 'topic_categories', 'country',
+    'default_language', 'channel_published_at'];
+  has_stats := profile ?| ARRAY[
+    'subscriber_count', 'view_count', 'video_count',
+    'subscriber_count_hidden'];
+
+  BEGIN
+    UPDATE public.channels SET
+      description = CASE WHEN profile ? 'description'
+        THEN profile->>'description' ELSE description END,
+      keywords = CASE WHEN profile ? 'keywords' THEN
+        CASE WHEN jsonb_typeof(profile->'keywords') = 'null' THEN NULL
+             ELSE ARRAY(SELECT jsonb_array_elements_text(profile->'keywords')) END
+        ELSE keywords END,
+      topic_categories = CASE WHEN profile ? 'topic_categories' THEN
+        CASE WHEN jsonb_typeof(profile->'topic_categories') = 'null' THEN NULL
+             ELSE ARRAY(SELECT jsonb_array_elements_text(profile->'topic_categories')) END
+        ELSE topic_categories END,
+      country = CASE WHEN profile ? 'country'
+        THEN profile->>'country' ELSE country END,
+      default_language = CASE WHEN profile ? 'default_language'
+        THEN profile->>'default_language' ELSE default_language END,
+      channel_published_at = CASE WHEN profile ? 'channel_published_at' THEN
+        (profile->>'channel_published_at')::timestamptz ELSE channel_published_at END,
+      subscriber_count = CASE WHEN profile ? 'subscriber_count' THEN
+        (profile->>'subscriber_count')::bigint ELSE subscriber_count END,
+      total_view_count = CASE WHEN profile ? 'view_count' THEN
+        (profile->>'view_count')::bigint ELSE total_view_count END,
+      video_count = CASE WHEN profile ? 'video_count' THEN
+        (profile->>'video_count')::bigint ELSE video_count END,
+      subscriber_count_hidden = CASE WHEN profile ? 'subscriber_count_hidden' THEN
+        (profile->>'subscriber_count_hidden')::boolean ELSE subscriber_count_hidden END,
+      profile_observed_at = CASE WHEN has_profile THEN observed ELSE profile_observed_at END,
+      stats_observed_at = CASE WHEN has_stats THEN observed ELSE stats_observed_at END
+     WHERE workspace_id = w AND id = c;
+  EXCEPTION WHEN invalid_datetime_format OR datetime_field_overflow THEN
+    RAISE EXCEPTION 'invalid_channel_profile' USING errcode='22023';
+  END;
+
+  IF has_stats THEN
+    INSERT INTO public.channel_stats_daily(
+      workspace_id, channel_id, day, subscriber_count, view_count,
+      video_count, observed_at)
+    SELECT workspace_id, id, (observed AT TIME ZONE 'utc')::date,
+           subscriber_count, total_view_count, video_count, observed
+      FROM public.channels WHERE workspace_id = w AND id = c
+    ON CONFLICT (workspace_id, channel_id, day) DO UPDATE SET
+      subscriber_count = excluded.subscriber_count,
+      view_count = excluded.view_count,
+      video_count = excluded.video_count,
+      observed_at = excluded.observed_at;
+  END IF;
+
+  RETURN jsonb_build_object('channel_id', c);
 END $function$
 
 CREATE OR REPLACE FUNCTION private.worker_commit_topics(token_hash text, j uuid, t uuid, b text, records jsonb)
@@ -8752,6 +8931,14 @@ CREATE OR REPLACE FUNCTION public.svc_worker_commit_catalogue(credential_hash te
 AS $function$
   select private.worker_commit_catalogue(credential_hash, j, t, payload) $function$
 
+CREATE OR REPLACE FUNCTION public.svc_worker_commit_channel(credential_hash text, j uuid, t uuid, profile jsonb)
+ RETURNS jsonb
+ LANGUAGE sql
+ SET search_path TO ''
+AS $function$
+  SELECT private.worker_commit_channel(credential_hash, j, t, profile)
+$function$
+
 CREATE OR REPLACE FUNCTION public.svc_worker_commit_topics(credential_hash text, j uuid, t uuid, b text, records jsonb)
  RETURNS jsonb
  LANGUAGE sql
@@ -9082,6 +9269,7 @@ $function$
 create policy "addon_prices_read" on "public"."addon_prices" to anon, authenticated for select using (true);
 create policy "tenant_read" on "public"."analysis_runs" to authenticated for select using (private.has_role(workspace_id));
 create policy "owner_read" on "public"."audit_events" to authenticated for select using (private.has_role(workspace_id, ARRAY['workspace_owner'::text]));
+create policy "tenant_read" on "public"."channel_stats_daily" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."channels" to authenticated for select using (private.has_role(workspace_id));
 create policy "clients_insert" on "public"."clients" to authenticated for insert with check (private.has_role(workspace_id, ARRAY['workspace_owner'::text]));
 create policy "clients_update" on "public"."clients" to authenticated for update using (private.has_role(workspace_id, ARRAY['workspace_owner'::text])) with check (private.has_role(workspace_id, ARRAY['workspace_owner'::text]));
@@ -9336,6 +9524,14 @@ grant SELECT on table "public"."audit_events" to "service_role";
 grant TRIGGER on table "public"."audit_events" to "service_role";
 grant TRUNCATE on table "public"."audit_events" to "service_role";
 grant UPDATE on table "public"."audit_events" to "service_role";
+grant SELECT on table "public"."channel_stats_daily" to "authenticated";
+grant DELETE on table "public"."channel_stats_daily" to "postgres";
+grant INSERT on table "public"."channel_stats_daily" to "postgres";
+grant REFERENCES on table "public"."channel_stats_daily" to "postgres";
+grant SELECT on table "public"."channel_stats_daily" to "postgres";
+grant TRIGGER on table "public"."channel_stats_daily" to "postgres";
+grant TRUNCATE on table "public"."channel_stats_daily" to "postgres";
+grant UPDATE on table "public"."channel_stats_daily" to "postgres";
 grant SELECT on table "public"."channels" to "authenticated";
 grant DELETE on table "public"."channels" to "postgres";
 grant INSERT on table "public"."channels" to "postgres";
@@ -9799,6 +9995,8 @@ grant EXECUTE on function private.platform_owner() to "postgres";
 grant EXECUTE on function private.prevent_comment_move() to "postgres";
 grant EXECUTE on function private.prune_oauth_states(interval) to "postgres";
 grant EXECUTE on function private.prune_oauth_states(interval) to "service_role";
+grant EXECUTE on function private.purge_channel_profile(interval,interval) to "postgres";
+grant EXECUTE on function private.purge_channel_profile(interval,interval) to "service_role";
 grant EXECUTE on function private.purge_comment_text(interval) to "postgres";
 grant EXECUTE on function private.purge_comment_text(interval) to "service_role";
 grant EXECUTE on function private.purge_foreign_catalogue(uuid,text) to "postgres";
@@ -9888,6 +10086,8 @@ grant EXECUTE on function private.worker_commit_batch(text,uuid,uuid,text,text,j
 grant EXECUTE on function private.worker_commit_batch(text,uuid,uuid,text,text,jsonb) to "service_role";
 grant EXECUTE on function private.worker_commit_catalogue(text,uuid,uuid,jsonb) to "postgres";
 grant EXECUTE on function private.worker_commit_catalogue(text,uuid,uuid,jsonb) to "service_role";
+grant EXECUTE on function private.worker_commit_channel(text,uuid,uuid,jsonb) to "postgres";
+grant EXECUTE on function private.worker_commit_channel(text,uuid,uuid,jsonb) to "service_role";
 grant EXECUTE on function private.worker_commit_topics(text,uuid,uuid,text,jsonb) to "postgres";
 grant EXECUTE on function private.worker_commit_topics(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function private.worker_due_videos(text,uuid,uuid) to "postgres";
@@ -10100,6 +10300,8 @@ grant EXECUTE on function svc_worker_commit_batch(text,uuid,uuid,text,text,jsonb
 grant EXECUTE on function svc_worker_commit_batch(text,uuid,uuid,text,text,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_commit_catalogue(text,uuid,uuid,jsonb) to "postgres";
 grant EXECUTE on function svc_worker_commit_catalogue(text,uuid,uuid,jsonb) to "service_role";
+grant EXECUTE on function svc_worker_commit_channel(text,uuid,uuid,jsonb) to "postgres";
+grant EXECUTE on function svc_worker_commit_channel(text,uuid,uuid,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_commit_topics(text,uuid,uuid,text,jsonb) to "postgres";
 grant EXECUTE on function svc_worker_commit_topics(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_due_videos(text,uuid,uuid) to "postgres";

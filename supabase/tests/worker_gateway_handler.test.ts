@@ -14,6 +14,7 @@ const base = (): WorkerDb => ({
   commitBatch: vi.fn(async () => ({})),
   finish: vi.fn(async () => {}),
   commitCatalogue: vi.fn(async () => ({ videos: 0 })),
+  commitChannel: vi.fn(async () => ({ channel: "c" })),
   videoFinished: vi.fn(async () => {}),
   topicsDue: vi.fn(async () => ({})),
   commitTopics: vi.fn(async () => ({})),
@@ -363,6 +364,33 @@ describe("the due list and the catalogue", () => {
       "j",
       "l",
       [],
+    );
+  });
+
+  it("commits a channel profile only as an object under a live lease", async () => {
+    const db = base();
+    const missing = await send(db, "/worker/commit-channel", {
+      job_id: "j",
+      lease_token: "l",
+    });
+    expect(missing.status).toBe(400);
+
+    const profile = {
+      external_channel_id: "UCchannel",
+      subscriber_count: null,
+      subscriber_count_hidden: true,
+    };
+    const ok = await send(db, "/worker/commit-channel", {
+      job_id: "j",
+      lease_token: "l",
+      profile,
+    });
+    expect(ok.status).toBe(200);
+    expect(db.commitChannel).toHaveBeenCalledWith(
+      expect.any(String),
+      "j",
+      "l",
+      profile,
     );
   });
 
