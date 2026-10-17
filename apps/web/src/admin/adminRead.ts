@@ -127,6 +127,7 @@ export type AdminUserActionCode =
   | "forbidden"
   | "user_not_found"
   | "cannot_suspend_admin"
+  | "cannot_act_on_admin"
   | "no_email"
   | "email_taken"
   | "invalid_request"
@@ -143,6 +144,7 @@ const KNOWN: readonly AdminUserActionCode[] = [
   "forbidden",
   "user_not_found",
   "cannot_suspend_admin",
+  "cannot_act_on_admin",
   "no_email",
   "email_taken",
   "invalid_request",

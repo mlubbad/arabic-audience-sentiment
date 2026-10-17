@@ -517,6 +517,16 @@ describe("workspace lifecycle", () => {
       )
     ).rows[0].n;
     expect(billingEventsAfter).toBe(totalBillingEvents);
+    // The audit trail is detached, not deleted (review finding 6): the
+    // seeded row survives, names no workspace, and remembers which it was.
+    const kept = await db.query<{
+      action: string;
+      workspace_id: string | null;
+    }>(
+      "select action, workspace_id from audit_events where former_workspace_id=$1",
+      [d],
+    );
+    expect(kept.rows).toEqual([{ action: "seeded", workspace_id: null }]);
     const adminHome = await home(ADMIN);
     const a = await db.query<{
       action: string;
@@ -562,6 +572,24 @@ describe("workspace lifecycle", () => {
     ]);
     await expect(
       db.query("delete from audit_events where workspace_id=$1", [g]),
+    ).rejects.toThrow(/append_only/);
+    // Even with the GUC set for THIS workspace, an audit row is never
+    // deleted, and the one update allowed is the detach, nothing else.
+    await db.query("select set_config('app.deleting_workspace',$1,false)", [g]);
+    await expect(
+      db.query("delete from audit_events where workspace_id=$1", [g]),
+    ).rejects.toThrow(/append_only/);
+    await expect(
+      db.query(
+        "update audit_events set workspace_id=null, former_workspace_id=$1, action='edited' where workspace_id=$1",
+        [g],
+      ),
+    ).rejects.toThrow(/append_only/);
+    await expect(
+      db.query(
+        "update audit_events set workspace_id=null, former_workspace_id=gen_random_uuid() where workspace_id=$1",
+        [g],
+      ),
     ).rejects.toThrow(/append_only/);
     await db.query("select set_config('app.deleting_workspace','',false)");
     // The other leg: even with the GUC set for THIS workspace, a tenant role

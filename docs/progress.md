@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-10-16 — Owner console review batch C: permissions and audit
+
+The owner said «ابدأ الدفعة C» (2026-10-16). Batch C of
+[`docs/reviews/2026-10-13-owner-console-review.md`](reviews/2026-10-13-owner-console-review.md)
+covers findings 5, 6, 8, 18 and 19. Branch `claude/keen-keller-skwwpm`, migration `20261102000000`.
+
+- **5, another admin's account:** `admin-users` now refuses `recovery_link`, `change_email` and
+  `confirm_email` on another admin (`409 cannot_act_on_admin`). The caller's own account and
+  lifting a suspension stay open. **The owner redeploys `admin-users`** after merge
+  (`npx supabase functions deploy admin-users`); until then the old guard is live.
+- **6, delete keeps the trail:** `delete_workspace` detaches the workspace's audit rows
+  (`workspace_id` null, new `former_workspace_id` keeps the id) instead of deleting them. The
+  append-only guard allows that one update and no longer allows an audit row to be deleted.
+  `admin_audit` names such rows "Deleted workspace".
+- **8, plan-wide changes:** a trigger on `public.plans` writes `plan_updated` (no workspace,
+  target `plan`) on any real change, which covers the public-channels toggle and the limits
+  dialog. `promote_platform_reader` writes `platform_reader_promoted`.
+- **18:** `promote_platform_reader` is executable by `authenticated` only, not PUBLIC or anon.
+  `admin_audit(null)` is refused. `grant_pack`'s retry key is scoped to the workspace (hashed),
+  and its audit row is written only when a grant is made.
+- **19, notes:** the owner's plan and pack notes go to `private.admin_notes`, which no tenant role
+  can read. The migration copies the notes already stored, then clears `subscriptions.provider_ref`
+  on admin rows and re-keys admin `usage_grants.provider_ref` to `workspace:md5(note)`. **This
+  migration rewrites existing production rows**; the move is tested on a database seeded before it.
+- **Not in this batch:** impersonation rows still name the target's first workspace (security §6);
+  the audit page still shows raw action names (batch D).
+
 ## 2026-10-16 — AJ360's uploads filed under 73 public channels; a catalogue now names its channel
 
 **Reported:** Yahea Alzo3bi's video list mixed in Al Jazeera 360 videos. **Measured (read-only,

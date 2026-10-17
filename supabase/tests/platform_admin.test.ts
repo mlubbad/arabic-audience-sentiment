@@ -90,10 +90,21 @@ describe("platform admin", () => {
       "select provider,provider_ref from subscriptions where workspace_id=$1",
       [w],
     );
-    expect(sub.rows[0]).toEqual({
-      provider: "admin",
-      provider_ref: "invoice 17",
-    });
+    // The note is the owner's, not the tenant's: members read subscriptions,
+    // so it is kept in private.admin_notes instead (review finding 19).
+    expect(sub.rows[0]).toEqual({ provider: "admin", provider_ref: null });
+    const notes = await db.query<{
+      subject: string;
+      ref: string;
+      note: string;
+      actor_id: string;
+    }>(
+      "select subject, ref, note, actor_id from private.admin_notes where workspace_id=$1",
+      [w],
+    );
+    expect(notes.rows).toEqual([
+      { subject: "plan", ref: "agency", note: "invoice 17", actor_id: ADMIN },
+    ]);
   });
 
   it("setting the owner plan removes every ceiling", async () => {
@@ -153,6 +164,69 @@ describe("platform admin", () => {
       [w],
     );
     expect(a.rows[0].grant_pack).toBe(b.rows[0].grant_pack);
+    await db.exec("reset role");
+    // A retry grants nothing and records nothing a second time.
+    const trail = await db.query<{ n: string }>(
+      "select count(*) n from audit_events where workspace_id=$1 and action='pack_granted'",
+      [w],
+    );
+    expect(Number(trail.rows[0].n)).toBe(1);
+    // The members of the workspace read usage_grants; the note is not there.
+    const g = await db.query<{ provider_ref: string }>(
+      "select provider_ref from usage_grants where id=$1",
+      [a.rows[0].grant_pack],
+    );
+    expect(g.rows[0].provider_ref).not.toContain("gift-1");
+    const notes = await db.query<{
+      subject: string;
+      ref: string;
+      note: string;
+    }>(
+      "select subject, ref, note from private.admin_notes where workspace_id=$1 and subject='pack'",
+      [w],
+    );
+    expect(notes.rows).toEqual([
+      { subject: "pack", ref: a.rows[0].grant_pack, note: "gift-1" },
+    ]);
+  });
+
+  it("grant_pack's note is a key per workspace: the same note elsewhere is a new grant", async () => {
+    await db.exec("reset role");
+    const [userHome, adminHome] = await Promise.all(
+      [USER, ADMIN].map(
+        async (u) =>
+          (
+            await db.query<{ id: string }>(
+              "select id from workspaces where created_by=$1 order by created_at asc limit 1",
+              [u],
+            )
+          ).rows[0].id,
+      ),
+    );
+    await as(ADMIN);
+    const first = await db.query<{ grant_pack: string }>(
+      "select grant_pack($1,'comment_analysis',500,'bonus')",
+      [userHome],
+    );
+    const second = await db.query<{ grant_pack: string }>(
+      "select grant_pack($1,'comment_analysis',700,'bonus')",
+      [adminHome],
+    );
+    await db.exec("reset role");
+    expect(second.rows[0].grant_pack).not.toBe(first.rows[0].grant_pack);
+    const rows = await db.query<{ workspace_id: string; units: number }>(
+      "select workspace_id, units from usage_grants where id = any($1::uuid[]) order by units",
+      [[first.rows[0].grant_pack, second.rows[0].grant_pack]],
+    );
+    expect(rows.rows).toEqual([
+      { workspace_id: userHome, units: 500 },
+      { workspace_id: adminHome, units: 700 },
+    ]);
+    const trail = await db.query<{ target_id: string }>(
+      "select target_id from audit_events where workspace_id=$1 and action='pack_granted'",
+      [adminHome],
+    );
+    expect(trail.rows).toEqual([{ target_id: "comment_analysis:700" }]);
   });
 
   it("activating a client workspace's plan propagates to the root and every sibling", async () => {
@@ -201,7 +275,7 @@ describe("platform admin", () => {
     expect(homeSub).toMatchObject({
       plan_key: "creator_plus",
       provider: "admin",
-      provider_ref: "propagate",
+      provider_ref: null,
     });
 
     // (b) client b, never named in the call, followed the root it bills
@@ -219,7 +293,7 @@ describe("platform admin", () => {
     ).rows[0];
     expect(clientBSub).toEqual({
       plan_key: "creator_plus",
-      provider_ref: "propagate",
+      provider_ref: null,
       period_end: homeSub.period_end,
       billing_workspace_id: home,
     });
@@ -299,7 +373,7 @@ describe("set_workspace_plan over a Paddle subscription", () => {
     ).rejects.toThrow(/paddle_subscription_active/);
   });
 
-  it("with override changes the plan and period but keeps the Paddle link, and audits plan:note", async () => {
+  it("with override changes the plan and period but keeps the Paddle link, and audits the plan without the note", async () => {
     await as(ADMIN);
     const r = await db.query<{
       set_workspace_plan: {
@@ -349,10 +423,14 @@ describe("set_workspace_plan over a Paddle subscription", () => {
       "select action,target_id from audit_events where workspace_id=$1 order by created_at desc limit 1",
       [clientA],
     );
-    expect(audit.rows[0]).toEqual({
-      action: "plan_set",
-      target_id: "agency:goodwill",
-    });
+    // The workspace's owner reads its audit rows, so the note is not there;
+    // it is kept in private.admin_notes (review finding 19).
+    expect(audit.rows[0]).toEqual({ action: "plan_set", target_id: "agency" });
+    const note = await db.query<{ note: string }>(
+      "select note from private.admin_notes where workspace_id=$1 and subject='plan' order by created_at desc limit 1",
+      [clientA],
+    );
+    expect(note.rows[0].note).toBe("goodwill");
   });
 
   it("a root not on Paddle behaves as before, override or not", async () => {
@@ -377,7 +455,7 @@ describe("set_workspace_plan over a Paddle subscription", () => {
     expect(s.rows[0]).toEqual({
       plan_key: "creator",
       provider: "admin",
-      provider_ref: "note 9",
+      provider_ref: null,
     });
     const audit = await db.query<{ target_id: string }>(
       "select target_id from audit_events where workspace_id=$1 order by created_at desc limit 1",

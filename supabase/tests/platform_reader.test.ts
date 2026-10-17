@@ -99,6 +99,34 @@ describe("the platform reader", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe("active");
     expect(rows[0].tokens).toBe("6162"); // the copied seal, byte for byte
+    // Recorded platform-wide (review finding 8), with no workspace, so the
+    // channel's owner does not read the platform's choice.
+    const trail = await db.query<{
+      workspace_id: string | null;
+      actor_id: string;
+      target_id: string;
+    }>(
+      "select workspace_id, actor_id, target_id from audit_events where action='platform_reader_promoted'",
+    );
+    expect(trail.rows).toEqual([
+      { workspace_id: null, actor_id: adminUser, target_id: A },
+    ]);
+  });
+
+  it("is executable by signed-in callers only, never PUBLIC or anon", async () => {
+    await admin();
+    const { rows } = await db.query<{
+      anon: boolean;
+      authed: boolean;
+      pub: boolean;
+    }>(
+      `select has_function_privilege('anon', 'public.promote_platform_reader(uuid,uuid)', 'execute') as anon,
+              has_function_privilege('authenticated', 'public.promote_platform_reader(uuid,uuid)', 'execute') as authed,
+              exists (select 1 from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                       where p.oid = 'public.promote_platform_reader(uuid,uuid)'::regprocedure
+                         and a.grantee = 0 and a.privilege_type = 'EXECUTE') as pub`,
+    );
+    expect(rows[0]).toEqual({ anon: false, authed: true, pub: false });
   });
 
   it("re-promotion retires the old row and keeps exactly one active", async () => {
