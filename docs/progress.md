@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-10-17 — Owner console review batch E: definitions and scale
+
+The owner said «ابدأ الدفعة E» (2026-10-17): findings 9, 10, 11 and 20 of
+[`docs/reviews/2026-10-13-owner-console-review.md`](reviews/2026-10-13-owner-console-review.md).
+Migration `20261110000000`.
+
+- **10, deleting the largest workspace:** `delete_workspace` has a 120 s limit and
+  `admin_workspace_footprint` 60 s (PostgREST applies a limit set on the function it calls). The
+  stats recount skips the workspace being deleted. A refusal for time (`57014`) is a sentence in
+  the dialog, not a code. Measured locally on the 155,822-comment workspace: about 12 s before,
+  10 s after. 9.2 s of it is the comments delete itself, five foreign-key checks per comment,
+  which no setting short of superuser can skip; the 120 s limit is what makes it finish.
+- **11, Ops:** `admin_ops` has a 30 s limit. "This week's comments" now says they are the ones
+  collected this week (`first_seen_at`, already indexed; 0.1 s locally over 218k rows).
+- **9, definitions:** "failed" on Ops is failed runs only, with partial runs counted beside it;
+  the services line says its count is failed, blocked or partial. "Analysed" now says which
+  count it is: "analysed, any version" (Home, Channels, digest: the stats table) or "analysed
+  (active analysis)" (Comparison). "Collected" says it includes the channel's own comments.
+- **20:** `audit_events` indexes by time, by actor and by target.
+- **Not in this batch:** recounting a video on every write (finding 8 of the correctness appendix)
+  and one shared definition of "failed" across Home, digest and services; each count now says
+  what it counts instead.
+
 ## 2026-10-17 — Owner console review batch D: honest errors and labels
 
 The owner said «ابدأ» to batch D (2026-10-17): findings 7, 15, 16 and 17 of

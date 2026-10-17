@@ -132,6 +132,8 @@ export function adminErrorMessage(error: unknown, S: Strings): string {
   if (e.message === "paddle_subscription_active") return S.adminPaddleActive;
   if (e.message === "billing_root") return S.adminDeleteBillingRoot;
   if (e.message === "last_workspace") return S.adminDeleteLast;
+  // The database's statement limit (57014): said in words, not as a code.
+  if (e.code === "57014") return S.adminTimedOut;
   const code =
     typeof e.message === "string" && KNOWN.has(e.message)
       ? e.message

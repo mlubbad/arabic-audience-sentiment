@@ -146,7 +146,11 @@ export const AdminOpsSchema = z
     worker_last_seen: timestamp.nullable(),
     jobs_open: z.number().int().nonnegative(),
     sync_runs_7d: z.number().int().nonnegative(),
+    /** Failed runs only, since 20261110000000; partial ones are apart. */
     sync_failed_7d: z.number().int().nonnegative(),
+    // Optional so a page built before 20261110000000 and one built after
+    // both read either database.
+    sync_partial_7d: z.number().int().nonnegative().optional(),
     failed_runs: AdminFailedRunsSchema,
   })
   .strict();

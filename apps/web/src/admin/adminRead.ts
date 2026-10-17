@@ -489,7 +489,8 @@ export function buildLiveServicesReport(
     service.details =
       `آخر نجاح: ${lastSuccess}` +
       ` · التشغيلات خلال 24 ساعة: ${health.runs_24h ?? 0}` +
-      ` · الإخفاقات: ${health.failures_24h ?? 0}`;
+      // failures_24h counts failed, blocked and partial runs; said so.
+      ` · فشل أو توقف أو جزئي: ${health.failures_24h ?? 0}`;
   }
 
   const paddle = services.find((s) => s.id === "paddle_billing");
