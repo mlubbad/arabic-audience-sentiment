@@ -1,5 +1,25 @@
 # Implementation decisions
 
+2026-10-17 — Audience overlap and competitor discovery: the owner's five calls on the
+roadmap (`docs/roadmap/2026-10-17-audience-overlap-and-competitors.md` §9). (1) Overlap is
+measured inside one workspace first: between the channels it already collects, its own and the
+competitors it tracks. A platform-wide registry of public channels, where every tenant's
+collection would feed one shared universe through anonymous sketches, waits for ADR-0004,
+because it touches tenant isolation. (2) The owner applies now for YouTube's Derived Metrics
+policy (API form, section 5, "Analytics & Reporting"). Until it is accepted, overlap results
+live on the same 30-day cycle as the commenter identities they come from; after acceptance the
+aggregates (never the identities) may be kept up to 36 months. (3) Tracked competitors per plan
+are 3 / 10 / 25. Overlap is for the two higher plans only (10 and 25) and does not appear on
+the first plan. The gate lives in SQL: the overlap RPCs refuse a first-plan workspace with a
+stable code (`plan_feature_unavailable`), tested by direct request, and the UI hides the section
+on top of that, never instead of it. (4) Taxonomy v1's
+eighteen top-level genres stand as listed in §4.1. Levels two and three, with their IAB 3.1
+mapping, are written next and reviewed by the owner. (5) Competitors ship first: phase 2 is
+competitor discovery, and audience overlap moves to phase 3. The competitor score runs without
+its overlap term until then, with that weight redistributed rather than read as zero, and the
+competitors tracked in phase 2 give phase 3 its data. The owner approved the roadmap as a whole the
+same day (PR #141); work orders WO-18 to WO-21 (#144–#147) implement its phase 1.
+
 2026-10-17 — The external monitor runs as a scheduled workflow on GitHub's hosted runner, not on
 the owner's Mac, and alerts by opening one issue per failing check. The Mac crontab of
 2026-09-19 never ran (macOS refused `cron` access to `~/Documents`), and a monitor on the
