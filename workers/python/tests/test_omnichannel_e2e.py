@@ -222,14 +222,14 @@ def test_e2e_tiktok_pipeline_success():
                     "text": "﹢ تقرير ممتاز ومفيد جداً، شكراً لكم",
                     "create_time": "2026-09-21T11:15:00Z",
                     "digg_count": 25,
-                    "user": {"unique_id": "usr_10", "nickname": "منى"},
+                    "user": {"id": 1010, "unique_id": "usr_10", "nickname": "منى"},
                 },
                 {
                     "id": 9988776656,
                     "text": "﹦ تقرير عادي جداً ومكرر",
                     "create_time": "2026-09-21T11:20:00Z",
                     "digg_count": 0,
-                    "user": {"unique_id": "usr_11", "nickname": "خالد"},
+                    "user": {"id": 1011, "unique_id": "usr_11", "nickname": "خالد"},
                 },
             ]
         },

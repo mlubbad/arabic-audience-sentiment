@@ -747,6 +747,53 @@ create view "public"."connection_status" as
     platform
    FROM channels c;;
 
+create table "public"."genre_taxonomy" (
+  "version" integer not null,
+  "key" text not null,
+  "parent_key" text,
+  "level" smallint not null,
+  "name_ar" text not null,
+  "name_en" text not null,
+  "description" text not null,
+  "iab_id" text,
+  "position" integer not null
+);
+alter table "public"."genre_taxonomy" enable row level security;
+
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_check" CHECK ((level = 1) = (parent_key IS NULL));
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_description_check" CHECK (length(description) >= 1 AND length(description) <= 400);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_description_not_null" NOT NULL description;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_key_check" CHECK (key ~ '^[a-z][a-z0-9_]{0,39}$'::text);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_key_not_null" NOT NULL key;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_level_check" CHECK (level >= 1 AND level <= 3);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_level_not_null" NOT NULL level;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_name_ar_check" CHECK (length(name_ar) >= 1 AND length(name_ar) <= 80);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_name_ar_not_null" NOT NULL name_ar;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_name_en_check" CHECK (length(name_en) >= 1 AND length(name_en) <= 80);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_name_en_not_null" NOT NULL name_en;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_parent_level" TRIGGER DEFERRABLE;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_pkey" PRIMARY KEY (version, key);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_position_not_null" NOT NULL "position";
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_version_fkey" FOREIGN KEY (version) REFERENCES genre_taxonomy_versions(version);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_version_not_null" NOT NULL version;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_version_parent_key_fkey" FOREIGN KEY (version, parent_key) REFERENCES genre_taxonomy(version, key);
+
+CREATE UNIQUE INDEX genre_taxonomy_pkey ON public.genre_taxonomy USING btree (version, key);
+
+create table "public"."genre_taxonomy_versions" (
+  "version" integer not null,
+  "published_at" timestamp with time zone default now() not null,
+  "notes" text
+);
+alter table "public"."genre_taxonomy_versions" enable row level security;
+
+alter table "public"."genre_taxonomy_versions" add constraint "genre_taxonomy_versions_pkey" PRIMARY KEY (version);
+alter table "public"."genre_taxonomy_versions" add constraint "genre_taxonomy_versions_published_at_not_null" NOT NULL published_at;
+alter table "public"."genre_taxonomy_versions" add constraint "genre_taxonomy_versions_version_check" CHECK (version > 0);
+alter table "public"."genre_taxonomy_versions" add constraint "genre_taxonomy_versions_version_not_null" NOT NULL version;
+
+CREATE UNIQUE INDEX genre_taxonomy_versions_pkey ON public.genre_taxonomy_versions USING btree (version);
+
 create table "public"."imports" (
   "id" uuid default gen_random_uuid() not null,
   "workspace_id" uuid not null,
@@ -3430,6 +3477,40 @@ AS $function$
    where s.workspace_id = w and s.channel_id = c
      and s.next_check_at <= now()
      and v.comments_state <> 'disabled';
+$function$
+
+CREATE OR REPLACE FUNCTION private.enforce_genre_taxonomy_parent_level()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare
+  parent_level smallint;
+begin
+  if new.parent_key is not null then
+    select parent.level
+      into parent_level
+      from public.genre_taxonomy parent
+     where parent.version = new.version
+       and parent.key = new.parent_key;
+
+    if parent_level is not null and new.level <> parent_level + 1 then
+      raise exception 'invalid_genre_parent_level' using errcode = '23514';
+    end if;
+  end if;
+
+  if exists (
+    select 1
+      from public.genre_taxonomy child
+     where child.version = new.version
+       and child.parent_key = new.key
+       and child.level <> new.level + 1
+  ) then
+    raise exception 'invalid_genre_parent_level' using errcode = '23514';
+  end if;
+
+  return new;
+end
 $function$
 
 CREATE OR REPLACE FUNCTION private.enqueue_scheduled(w uuid, c uuid, kind text)
@@ -7657,6 +7738,57 @@ CREATE OR REPLACE FUNCTION public.enqueue_sync(w uuid, c uuid, k text)
  SET search_path TO ''
 AS $function$select private.enqueue_sync_impl(w,c,k)$function$
 
+CREATE OR REPLACE FUNCTION public.genre_taxonomy(p_version integer DEFAULT NULL::integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  selected_version int;
+  result jsonb;
+begin
+  selected_version := p_version;
+  if selected_version is null then
+    select max(v.version)
+      into selected_version
+      from public.genre_taxonomy_versions v;
+  end if;
+
+  if not exists (
+    select 1
+      from public.genre_taxonomy_versions v
+     where v.version = selected_version
+  ) then
+    raise exception 'invalid_input' using errcode = '22023';
+  end if;
+
+  select jsonb_build_object(
+    'version', selected_version,
+    'genres', coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'key', genre.key,
+          'parent_key', genre.parent_key,
+          'level', genre.level,
+          'name_ar', genre.name_ar,
+          'name_en', genre.name_en,
+          'description', genre.description,
+          'iab_id', genre.iab_id,
+          'position', genre.position
+        ) order by genre.level, genre.position
+      ),
+      '[]'::jsonb
+    )
+  )
+    into result
+    from public.genre_taxonomy genre
+   where genre.version = selected_version;
+
+  return result;
+end
+$function$
+
 CREATE OR REPLACE FUNCTION public.grant_pack(w uuid, kind text, units integer, note text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -9158,6 +9290,20 @@ grant SELECT on table "public"."connection_status" to "postgres";
 grant TRIGGER on table "public"."connection_status" to "postgres";
 grant TRUNCATE on table "public"."connection_status" to "postgres";
 grant UPDATE on table "public"."connection_status" to "postgres";
+grant DELETE on table "public"."genre_taxonomy" to "postgres";
+grant INSERT on table "public"."genre_taxonomy" to "postgres";
+grant REFERENCES on table "public"."genre_taxonomy" to "postgres";
+grant SELECT on table "public"."genre_taxonomy" to "postgres";
+grant TRIGGER on table "public"."genre_taxonomy" to "postgres";
+grant TRUNCATE on table "public"."genre_taxonomy" to "postgres";
+grant UPDATE on table "public"."genre_taxonomy" to "postgres";
+grant DELETE on table "public"."genre_taxonomy_versions" to "postgres";
+grant INSERT on table "public"."genre_taxonomy_versions" to "postgres";
+grant REFERENCES on table "public"."genre_taxonomy_versions" to "postgres";
+grant SELECT on table "public"."genre_taxonomy_versions" to "postgres";
+grant TRIGGER on table "public"."genre_taxonomy_versions" to "postgres";
+grant TRUNCATE on table "public"."genre_taxonomy_versions" to "postgres";
+grant UPDATE on table "public"."genre_taxonomy_versions" to "postgres";
 grant SELECT on table "public"."imports" to "authenticated";
 grant DELETE on table "public"."imports" to "postgres";
 grant INSERT on table "public"."imports" to "postgres";
@@ -9477,6 +9623,7 @@ grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "service_role
 grant EXECUTE on function private.drain_channel_compare(integer) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "service_role";
+grant EXECUTE on function private.enforce_genre_taxonomy_parent_level() to "postgres";
 grant EXECUTE on function private.enqueue_scheduled(uuid,uuid,text) to "postgres";
 grant EXECUTE on function private.enqueue_scheduled(uuid,uuid,text) to "service_role";
 grant EXECUTE on function private.enqueue_sync_impl(uuid,uuid,text) to "authenticated";
@@ -9729,6 +9876,9 @@ grant EXECUTE on function delete_workspace(uuid) to "authenticated";
 grant EXECUTE on function delete_workspace(uuid) to "postgres";
 grant EXECUTE on function enqueue_sync(uuid,uuid,text) to "authenticated";
 grant EXECUTE on function enqueue_sync(uuid,uuid,text) to "postgres";
+grant EXECUTE on function genre_taxonomy(integer) to "authenticated";
+grant EXECUTE on function genre_taxonomy(integer) to "postgres";
+grant EXECUTE on function genre_taxonomy(integer) to "service_role";
 grant EXECUTE on function grant_pack(uuid,text,integer,text) to "authenticated";
 grant EXECUTE on function grant_pack(uuid,text,integer,text) to "postgres";
 grant EXECUTE on function import_historical_records(uuid,uuid,jsonb,uuid,jsonb) to "authenticated";

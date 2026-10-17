@@ -5,6 +5,7 @@ Supports Bright Data Datasets/Scraping API and Web Unlocker Proxy.
 
 from datetime import datetime, timezone
 import httpx
+from ..identity import stable_author_id
 from ..meta_graph import parse_graph_time
 from ..protocol import CollectionError
 
@@ -192,7 +193,7 @@ class BrightDataClient:
                         "is_reply": True,
                         "published_at": created_at,
                         "author_name": author_name,
-                        "author_channel_id": str(r.get("user_id") or r.get("user_posted") or ""),
+                        "author_channel_id": stable_author_id(r.get("user_id")),
                         "likes_value": int(likes) if isinstance(likes, (int, float)) else 0,
                     }
                 )
@@ -275,7 +276,7 @@ class BrightDataClient:
                     "is_reply": False,
                     "published_at": created_at,
                     "author_name": author_name,
-                    "author_channel_id": str(item.get("user_id") or ""),
+                    "author_channel_id": stable_author_id(item.get("user_id")),
                     "likes_value": int(likes) if isinstance(likes, (int, float)) else 0,
                 }
             )

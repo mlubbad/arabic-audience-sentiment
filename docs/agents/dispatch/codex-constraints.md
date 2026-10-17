@@ -5,8 +5,11 @@ by design, and the dispatcher script outside the sandbox owns every git write. W
 
 1. **Edit and test only.** Make the code changes the work order asks for, run the repository's
    real commands (`npm run lint`, `npm test`, `npm run test:db`, `npm run db:snapshot:check`,
-   `npm run test:e2e`, `npm run worker:test` — whichever the work order's Definition of Done
-   names) and paste their real output in your final message.
+   `npm run worker:test`, `npm run check` — whichever the work order's Definition of Done
+   names) and paste their real output in your final message. **Do not run `npm run test:e2e`**,
+   even if the work order lists it: Chromium cannot start inside this sandbox
+   (`bootstrap_check_in … MachPortRendezvousServer: Permission denied`), and CI runs e2e on
+   your PR (PLAYBOOK §1). Say in your final message that you skipped it for this reason.
 2. **Do not run git writes.** No `git switch/checkout -b`, `commit`, `push`, `merge`, `rebase`,
    `reset --hard`, `stash`, `tag`. Reads are fine: `git status`, `git diff`, `git log`,
    `git fetch`, `git show`. If any command is blocked by the sandbox, say so verbatim in your
