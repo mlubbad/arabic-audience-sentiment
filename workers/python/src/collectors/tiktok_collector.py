@@ -10,6 +10,7 @@ import re
 from collections.abc import Iterator
 from datetime import datetime, timezone
 import httpx
+from .identity import stable_author_id
 from .protocol import Batch, Catalogue, CollectionError, RawComment
 from .scrapers.apify import ApifyClient
 from .scrapers.brightdata import BrightDataClient
@@ -316,6 +317,12 @@ class TikTokCollector:
             raw_comments = self.fixture_data["comments"].get(clean_id, [])
             comments = []
             for c in raw_comments:
+                user = c.get("user", {})
+                author_id = (
+                    stable_author_id(c.get("author_id"))
+                    or stable_author_id(user.get("id"))
+                    or stable_author_id(user.get("uid"))
+                )
                 comments.append(
                     RawComment(
                         id=str(c["id"]),
@@ -325,8 +332,8 @@ class TikTokCollector:
                         is_reply=bool(c.get("parent_id")),
                         parent_source="tiktok_reply" if c.get("parent_id") else "root",
                         published_at=c.get("create_time", datetime.now(timezone.utc).isoformat()),
-                        author_name=c.get("user", {}).get("nickname") or c.get("author_name", ""),
-                        author_channel_id=c.get("user", {}).get("unique_id") or c.get("author_id"),
+                        author_name=user.get("nickname") or c.get("author_name", ""),
+                        author_channel_id=author_id,
                         likes_value=c.get("digg_count", c.get("likes_count", 0)),
                         source=self.source,
                         platform="tiktok",
@@ -448,4 +455,3 @@ class TikTokCollector:
             return
 
         raise CollectionError("comments_scraper_not_configured", "blocked")
-
