@@ -21,6 +21,10 @@ def comment(cid: str, video_id: str = "v1") -> RawComment:
     )
 
 
+# The outcomes private.commit_batch accepts on a batch.
+COMMIT_OUTCOMES = ("partial", "exhausted", "blocked", "failed")
+
+
 class Plan:
     """A collector whose pages are declared per video."""
 
@@ -53,6 +57,11 @@ def drive(pages, videos, checkpoint=None, access_token="ya29.ok"):
             })
         if path == "commit-batch":
             body = json.loads(request.content)["payload"]
+            # private.commit_batch refuses any other outcome as invalid_batch.
+            # A stand-in that took them all hid the Telegram stall of
+            # 2026-10-13: every post without a discussion refused the run.
+            if body["outcome"] not in COMMIT_OUTCOMES:
+                return httpx.Response(400, json={"code": "invalid_batch"})
             sent["commits"].append(
                 (body["external_video_id"], body["video_title"], body["checkpoint"])
             )
@@ -474,14 +483,19 @@ def test_backfill_video_with_reported_comments_and_zero_collected_is_partial_not
     assert sent["finish"] == "partial"
 
 
-def test_backfill_yielded_explicitly_disabled_skips_video_as_blocked():
+@pytest.mark.parametrize("verdict", ["explicitly_disabled", "unavailable"])
+def test_backfill_yielded_explicitly_disabled_skips_video_as_blocked(verdict):
     """A yielded explicitly_disabled or unavailable batch outcome is a property of the video,
     not of the run. It must skip the video, mark it blocked with its error code in the catalogue,
     and proceed to read the next video without failing the whole run.
+
+    The verdict is not a batch outcome the server takes, so the empty batch
+    is never committed: sent, it was refused invalid_batch and the run ended
+    there, on the same post, every hour.
     """
     worked, sent, _ = drive(
         {
-            "v1": [Batch([], None, "explicitly_disabled")],
+            "v1": [Batch([], None, verdict)],
             "v2": [Batch([comment("c2")], None, "exhausted")],
         },
         [
@@ -490,8 +504,26 @@ def test_backfill_yielded_explicitly_disabled_skips_video_as_blocked():
         ],
     )
     assert worked is True
-    assert ("v1", "blocked", "explicitly_disabled") in sent["video_finished"]
+    assert sent["error_code"] is None
+    assert [c[0] for c in sent["commits"]] == ["v2"]
+    assert ("v1", "blocked", verdict) in sent["video_finished"]
     assert ("v2", "exhausted", None) in sent["video_finished"]
+    assert sent["finish"] == "succeeded"
+
+
+def test_comments_read_before_a_verdict_are_kept_as_progress():
+    """A verdict batch that still carries comments commits them as progress.
+
+    No collector does this today; if one does, the comments are not dropped,
+    and the batch goes out under an outcome the server takes.
+    """
+    worked, sent, _ = drive(
+        {"v1": [Batch([comment("c1")], None, "unavailable")]},
+        [{"video_id": "v1", "external_video_id": "v1", "title": "الأولى"}],
+    )
+    assert worked is True
+    assert [c[0] for c in sent["commits"]] == ["v1"]
+    assert sent["video_finished"] == [("v1", "blocked", "unavailable")]
     assert sent["finish"] == "succeeded"
 
 

@@ -215,3 +215,109 @@ def test_catalogue_extracts_video_interaction_metrics():
     assert v["category_id"] == "27"
     assert v["duration_sec"] == 330
 
+
+
+# ---- A refresh reads only what is new --------------------------------------
+#
+# Every list call here costs one quota unit: channels, each playlistItems
+# page, each videos.list of up to fifty ids. Refresh discovers spent about
+# 7,600 of the shared project's 10,000 a day re-reading whole catalogues
+# (2026-10-17).
+
+LF, SH, LV = ("UULFxxxxxxxxxxxxxxxxxxxxxx", "UUSHxxxxxxxxxxxxxxxxxxxxxx",
+              "UULVxxxxxxxxxxxxxxxxxxxxxx")
+
+
+def pages(ids):
+    return [ids[i:i + 50] for i in range(0, len(ids), 50)]
+
+
+def thousand_video_channel(new_videos=(), new_shorts=()):
+    """700 videos, 250 shorts, 50 streams, newest first, plus any new ones on top."""
+    videos = [f"v{i:010d}" for i in range(700)]
+    shorts = [f"s{i:010d}" for i in range(250)]
+    streams = [f"l{i:010d}" for i in range(50)]
+    tabs = {LF: pages(list(new_videos) + videos), SH: pages(list(new_shorts) + shorts),
+            LV: pages(streams)}
+    every = videos + shorts + streams + list(new_videos) + list(new_shorts)
+    return tabs, [{"id": v, "comments": 1} for v in every], set(videos + shorts + streams)
+
+
+def units(calls):
+    return len(calls)
+
+
+def test_a_first_discover_still_reads_the_whole_channel():
+    tabs, rows, _ = thousand_video_channel()
+    client, calls = serve(tabs, rows)
+    cat = YouTubeAPI(None, client, access_token="tok").catalogue()
+    assert cat.complete is True
+    assert len(cat.videos) == 1000
+    # 1 channel + 14 + 5 + 1 pages + 20 lookups of fifty.
+    assert units(calls) == 41
+
+
+def test_a_refresh_of_a_known_channel_with_nothing_new_costs_four_units():
+    tabs, rows, known = thousand_video_channel()
+    client, calls = serve(tabs, rows)
+    cat = YouTubeAPI(None, client, access_token="tok").catalogue(known=known)
+    assert cat.complete is True
+    assert cat.videos == []
+    # The channel, then the first page of each tab — already all known.
+    assert units(calls) == 4
+    assert not any(p.endswith("/videos") for p, _ in calls)
+    assert all(c.get("pageToken") is None for p, c in calls if p.endswith("/playlistItems"))
+
+
+def test_a_refresh_asks_only_about_the_new_videos_and_lists_only_them():
+    new_videos, new_shorts = ["n0000000001", "n0000000002", "n0000000003"], ["n0000000004"]
+    tabs, rows, known = thousand_video_channel(new_videos, new_shorts)
+    client, calls = serve(tabs, rows)
+    cat = YouTubeAPI(None, client, access_token="tok").catalogue(known=known)
+    assert cat.complete is True
+    by = {v["external_video_id"]: v for v in cat.videos}
+    assert sorted(by) == sorted(new_videos + new_shorts)
+    assert by["n0000000001"]["kind"] == "video"
+    assert by["n0000000004"]["kind"] == "short"
+    assert by["n0000000004"]["field_provenance"]["discovered_in_tabs"] == ["short"]
+    lookups = [c["id"].split(",") for p, c in calls if p.endswith("/videos")]
+    assert lookups == [new_videos + new_shorts]
+    # 1 channel; two pages each for the tabs with something new (the first
+    # page mixes new and known, so it is not proof); one for streams; one
+    # lookup.
+    assert units(calls) == 1 + 2 + 2 + 1 + 1
+
+
+def test_a_refresh_with_a_tab_full_of_new_videos_reads_down_to_the_known_ones():
+    new_videos = [f"n{i:010d}" for i in range(120)]
+    tabs, rows, known = thousand_video_channel(new_videos)
+    client, calls = serve(tabs, rows)
+    cat = YouTubeAPI(None, client, access_token="tok").catalogue(known=known)
+    assert {v["external_video_id"] for v in cat.videos} == set(new_videos)
+    lf_pages = [c for p, c in calls if p.endswith("/playlistItems") and c["playlistId"] == LF]
+    # 120 new + 700 known in pages of fifty: pages 1-3 hold new ids, page 4 is
+    # the first made only of known ones.
+    assert len(lf_pages) == 4
+    assert sum(1 for p, _ in calls if p.endswith("/videos")) == 3
+
+
+def test_a_refresh_still_refuses_another_channels_new_video():
+    tabs, rows, known = thousand_video_channel(["n0000000001"])
+    rows = [dict(r, channel="UCzzzzzzzzzzzzzzzzzzzzzz") if r["id"] == "n0000000001" else r
+            for r in rows]
+    client, _ = serve(tabs, rows)
+    with pytest.raises(CollectionError) as err:
+        YouTubeAPI(None, client, access_token="tok").catalogue(known=known)
+    assert err.value.code == "catalogue_channel_mismatch"
+
+
+def test_a_channel_without_tabs_stops_its_uploads_list_at_the_known_videos():
+    tabs, rows, known = thousand_video_channel()
+    uploads = [v for tab in (LF, SH, LV) for page in tabs[tab] for v in page]
+    client, calls = serve({"UUxxxxxxxxxxxxxxxxxxxxxx": pages(["n0000000001"] + uploads)},
+                          rows + [{"id": "n0000000001", "comments": 0}])
+    cat = YouTubeAPI(None, client, access_token="tok").catalogue(known=known)
+    assert [v["external_video_id"] for v in cat.videos] == ["n0000000001"]
+    assert cat.videos[0]["field_provenance"]["kind_unclassified"] is True
+    # channel + three absent tabs + two uploads pages + one lookup.
+    assert units(calls) == 1 + 3 + 2 + 1

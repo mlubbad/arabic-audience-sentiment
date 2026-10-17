@@ -8,6 +8,10 @@
 # same HTTP paths a real worker and a real browser use.
 #
 # Checks, in order of severity:
+#   monitor    The probe's own configuration. A monitor that cannot run must
+#              say so as loudly as a failing check (2026-10-16: a crontab
+#              entry on the owner's Mac had been refused by macOS privacy
+#              protection on every run since it was installed on 2026-09-19).
 #   rest       GET /rest/v1/workspaces — the whole API path (Kong → PostgREST
 #              → Postgres), authenticated with the service role.
 #   gateway    POST /worker/claim {"types":["__monitor__"]} — the full edge
@@ -20,39 +24,35 @@
 #   failures   Jobs that ended failed or blocked in the last 24 hours.
 #   worker     worker_seen freshness — no sighting in 30 minutes means the
 #              worker stopped asking (the «متصل» panel shows the same fact).
-#   freshness  The newest prediction's age. A quiet channel is healthy; a
-#              channel being collected is not. This check is advisory: it
-#              warns, it never fails the run.
-#   site       The deployed front-end, when PREVIEW_URL and basic-auth
-#              credentials are configured.
+#   freshness  Channels being collected (selected videos, not paused) whose
+#              last successful collection is over 48 hours old. Any such
+#              channel fails the run. The platform's newest prediction is not
+#              the measure: one healthy channel hid 16 stalled ones on
+#              2026-10-16 (20261030000000).
+#   site       The deployed front-end, when PREVIEW_URL is set; basic auth
+#              only when PREVIEW_BASIC_AUTH_USER is.
 #
-# Alerts are edge-triggered: a state file (.cache/monitor-state) records the
-# last status of each check, and a webhook fires only on a transition — one
-# alarm when something breaks, one when it recovers, never a stream. Every
-# run is logged either way.
+# It runs every 30 minutes from .github/workflows/monitor.yml on a hosted
+# runner, away from the Mac that runs the worker: a monitor on the worker's
+# machine sleeps and dies with it. There each failing check opens one GitHub
+# issue and its recovery closes it (scripts/monitor-alerts.mjs).
 #
-# Exit codes: 0 healthy · 1 warning · 2 failure (used by cron/launchd).
+# Run by hand, alerts are edge-triggered: a state file per check
+# ($MONITOR_STATE_DIR, default .cache) records its last level, and
+# ALERT_WEBHOOK_URL, when set, fires only on a transition.
 #
-# Cron (every 5 minutes):
-#   */5 * * * * cd <repo> && ./scripts/monitor.sh >> .worker-logs/monitor.log 2>&1
+# Exit codes: 0 healthy · 1 warning · 2 failure.
 #
-# Secrets come from .env.local, which is gitignored. This script prints
-# statuses and codes only — never a key, a URL with a token, or a response
-# body that could carry one.
+# Configuration comes from the environment, or from .env.local when that
+# exists (gitignored). This script prints statuses and counts only — never a
+# key, a URL with a token, a customer's data, or a response body that could
+# carry one: its output lands in a public repository's workflow log.
 set -u
 cd "$(dirname "$0")/.."
 
-STATE_FILE=".cache/monitor-state"
-mkdir -p .cache .worker-logs
+STATE_FILE="${MONITOR_STATE_DIR:-.cache}/monitor-state"
+mkdir -p "$(dirname "$STATE_FILE")"
 
-if [ ! -f .env.local ]; then
-  echo "$(stamp) FAIL monitor no_env_file"
-  exit 2
-fi
-# shellcheck disable=SC1091
-. ./.env.local
-
-ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL:-}"
 now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
 stamp() { date -u '+%Y-%m-%dT%H:%M:%S%z'; }
 # ISO timestamp offset into the past; BSD (macOS) and GNU date both covered.
@@ -83,13 +83,35 @@ settle() {
 }
 
 notify() {
-  [ -n "$ALERT_WEBHOOK_URL" ] || return 0
+  [ -n "${ALERT_WEBHOOK_URL:-}" ] || return 0
   # A generic JSON text payload: Slack, Discord (via /slack compat) and most
   # relays accept it. The message names the check, never a credential.
   curl -sS --max-time 10 -X POST "$ALERT_WEBHOOK_URL" \
     -H 'content-type: application/json' \
     -d "{\"text\":\"$1\"}" >/dev/null 2>&1 || true
 }
+
+# --- 0. Configuration ------------------------------------------------------
+# MONITOR_ENV_FILE="" reads the environment alone; the tests set it so the
+# owner's .env.local can never point them at production.
+ENV_FILE="${MONITOR_ENV_FILE-.env.local}"
+if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "./$ENV_FILE"
+fi
+missing=""
+need() { [ -n "$2" ] || missing="${missing:+$missing,}$1"; }
+need SUPABASE_URL "${SUPABASE_URL:-}"
+need SUPABASE_SERVICE_ROLE_KEY "${SUPABASE_SERVICE_ROLE_KEY:-}"
+need WORKER_API_BASE_URL "${WORKER_API_BASE_URL:-}"
+need WORKER_CREDENTIAL "${WORKER_CREDENTIAL:-}"
+if [ -n "$missing" ]; then
+  # The names of what is missing, never a value.
+  settle monitor fail "not_configured:$missing"
+  echo "$(stamp) DONE overall=$overall"
+  exit "$worst"
+fi
+settle monitor ok "configured"
 
 # PostgREST count via HEAD: Prefer: count=exact puts the total into
 # Content-Range, so no response body (and no jq) is needed.
@@ -103,6 +125,11 @@ rest_count() {
     | grep -i '^content-range:' \
     | sed -n 's|.*/||p' \
     | tr -d '\r'
+}
+
+# An integer field of a flat JSON object, or nothing.
+json_int() {
+  printf '%s' "$2" | sed -n "s/.*\"$1\" *: *\([0-9][0-9]*\).*/\1/p"
 }
 
 # --- 1. REST path ----------------------------------------------------------
@@ -166,31 +193,36 @@ case "$last_epoch" in
     ;;
 esac
 
-# --- 6. Newest prediction age (advisory) -----------------------------------
-pred=$(curl -sS --max-time 15 \
+# --- 6. Collection freshness, channel by channel ---------------------------
+fresh=$(curl -sS --max-time 40 -X POST \
   -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-  "$SUPABASE_URL/rest/v1/sentiment_predictions?select=predicted_at&order=predicted_at.desc&limit=1" 2>/dev/null \
-  | sed 's/.*"predicted_at":"\([^"]*\)".*/\1/')
-pred_epoch=$(date -u -j -f '%Y-%m-%dT%H:%M:%S' "$(echo "$pred" | cut -c1-19)" +%s 2>/dev/null \
-  || date -u -d "$pred" +%s 2>/dev/null)
-case "$pred_epoch" in
-  ""|*[!0-9]*) settle freshness warn "no_predictions_readable" ;;
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  "$SUPABASE_URL/rest/v1/rpc/svc_monitor_channel_freshness" 2>/dev/null)
+collected=$(json_int collected "$fresh")
+stale=$(json_int stale "$fresh")
+never=$(json_int never "$fresh")
+case "$collected:$stale:$never" in
+  *::*|:*|*:) settle freshness warn "unreadable_counts" ;;
   *)
-    age_h=$(( (now_epoch - pred_epoch) / 3600 ))
-    if [ "$age_h" -gt 48 ]; then
-      settle freshness warn "newest_prediction_${age_h}h_old"
+    if [ "$stale" -gt 0 ]; then
+      settle freshness fail "${stale}_of_${collected}_collected_channels_stale_48h_${never}_never_collected"
     else
-      settle freshness ok "newest_${age_h}h_old"
+      settle freshness ok "${collected}_collected_channels_fresh"
     fi
     ;;
 esac
 
 # --- 7. Deployed front-end (only when configured) --------------------------
-if [ -n "${PREVIEW_URL:-}" ] && [ -n "${PREVIEW_BASIC_AUTH_USER:-}" ]; then
-  code=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' \
-    -u "$PREVIEW_BASIC_AUTH_USER:$PREVIEW_BASIC_AUTH_PASSWORD" \
-    "$PREVIEW_URL" 2>/dev/null)
+if [ -n "${PREVIEW_URL:-}" ]; then
+  if [ -n "${PREVIEW_BASIC_AUTH_USER:-}" ]; then
+    code=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' \
+      -u "$PREVIEW_BASIC_AUTH_USER:${PREVIEW_BASIC_AUTH_PASSWORD:-}" \
+      "$PREVIEW_URL" 2>/dev/null)
+  else
+    code=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$PREVIEW_URL" 2>/dev/null)
+  fi
   case "$code" in
     200) settle site ok "200" ;;
     000) settle site fail "timeout_or_unreachable" ;;

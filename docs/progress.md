@@ -1,5 +1,116 @@
 # Progress
 
+## 2026-10-17 — The external monitor never ran; it now runs off the Mac and judges each channel
+
+**Found:** the crontab entry installed on 2026-09-19 (`*/5 … ./scripts/monitor.sh`) was refused
+by macOS privacy protection on every run: `.worker-logs/monitor.log` holds 1,930 lines, all
+`Operation not permitted`, and has not been written since 2026-09-26. No `ALERT_WEBHOOK_URL` was
+ever set. So for four weeks there was no external alarm, while `docs/verification.md` (2026-09-19)
+recorded the crontab as installed.
+
+**Masked incident (read-only, production, 2026-10-16 21:30 UTC):** 18 channels have selected
+videos; 16 have had no successful collection in 48 hours, 7 never had one. Each was attempted
+42–45 times in those 48 hours, almost all `blocked` on `quota_exceeded` (the two Telegram channels
+on `invalid_batch`). The monitor's freshness check read the platform's newest prediction ("1h
+old, OK"), so two healthy channels hid the other sixteen.
+
+**Change (branch `claude/monitor-runs-off-mac`):** (1) `20261030000000` adds
+`svc_monitor_channel_freshness()` (service_role only, counts only), built on the console's
+`admin_channel_states`; `monitor.sh` fails when any collected channel is stale. (2)
+`.github/workflows/monitor.yml` runs the monitor every 30 minutes on the hosted runner, away from
+the worker's machine; `scripts/monitor-alerts.mjs` keeps one issue labelled `monitor` open per
+failing check and closes it on recovery. (3) The monitor reports its own missing configuration as
+a failing check, and probes the public site without basic auth. The `monitor` environment
+(branch `main` only) and its four secrets were set on 2026-10-17. **Not done here:** the
+`failures` check, which fails on any blocked job and will stay open while quota blocks continue. The quota incident is fixed separately in #142 (merged 2026-10-17).
+
+## 2026-10-17 — The YouTube quota went to re-reading catalogues every day; Telegram stalled on one post
+
+**Reported:** after #140 made the monitor's freshness per channel, 16 of the 18 channels with
+selected videos had no successful collection in 48 hours (2026-10-16 ~21:30 UTC).
+
+**Measured (read-only, production, jobs created 2026-10-14 00:00 → 10-16 21:36 UTC, 16,768
+jobs):** 7,072 collect and 6,075 discover attempts ended blocked `quota_exceeded` (most then
+cancelled `superseded_by_active_job`, 16,110 in all), across 115 YouTube channels in 115
+workspaces, about one attempt per channel and kind every hour. Collect jobs went out for all
+116 channels, not only the 18 the monitor counts as selected. The only YouTube successes
+were in one window a day, starting at 07:00 UTC (midnight Pacific, when the quota resets):
+discovers ended 07:08–07:54 on 10-14 (49), 07:09–07:55 on 10-15 (42), 07:02–08:28 on 10-16 (90),
+plus one collect. Every other run in those windows was a discover. After it the quota stayed
+spent until the next reset. Successful discovers read 110k, 80k and 183k videos on the three
+days (median 670–860 per channel, an estimated 3.5–7.9k quota units, two units per 50 videos
+plus four per channel). About half of that was the stale worker's AJ360 misreads (see 10-16),
+and blocked discovers spent more on partial reads before they were cut off.
+
+**Cause, three parts:**
+1. *Retried hourly whatever the block said.* `worker_finish` set a quota block's `not_before` to
+   the billing period end (2026-11-05 here), and nothing honoured it. 60 minutes after the block,
+   `enqueue_scheduled`'s backoff queued a fresh job, and `unblock_due_jobs` cancelled the blocked
+   one as superseded.
+2. *The wrong reset.* That period end is the plan's units, not the source's daily quota.
+3. *Discovers first.* `claim_job` hands every discover out before any collect. At the reset,
+   about 100 channels re-read their whole catalogue (`catalogue_interval` 1440 on these plans)
+   and spent the day's quota before any comments were read.
+
+**The questions asked:** (a) A blocked attempt itself costs little: one or two requests (`channels.list`, or
+`videos.list` then `commentThreads.list`) before the refusal. The hourly retries did their damage at the reset, when they
+became real catalogue reads. (b) Yes. One Google project's quota serves the platform reader
+(107 public channels) and every owner grant (5 connected channels). (c) Telegram: the collector
+yields `explicitly_disabled`/`unavailable` for a post without a discussion. The runner committed
+that empty batch before checking, and `commit_batch` accepts only
+`partial|exhausted|blocked|failed`, so it refused `invalid_batch`. The run ended there, on the
+same post, every hour from 2026-10-13. Both channels' last successful collects were 10-13. The
+runner test passed because its stand-in control plane accepted any outcome. (d) Yes, to the
+source's reset when the plan has units left, and to the period end only when it has none.
+
+**Fix (branch `claude/quota-backoff`):** `20261031000000`: `private.blocked_until` (quota →
+midnight `America/Los_Angeles`, or the period end when the kind's plan units are spent;
+`rate_limited` → one hour; other reasons → no clock, as before); `enqueue_scheduled` queues
+nothing while the latest job of the kind is blocked until a known time (`unblock_due_jobs`
+requeues that same job); `claim_job` claims a refresh discover after collects and analyses, and
+a channel's first discover still goes first; existing quota blocks are repaired, otherwise the
+hold would keep them until 11-05. Worker: a verdict batch is not committed (comments it carries
+are committed as `partial`); the video is marked blocked and the run goes on. Tests:
+`quota_reset_hold.test.ts` (6 of 9 red with the behaviour changes removed), two
+`test_backfill.py` cases red on the old runner with the production code `invalid_batch`.
+
+**Not done here:**
+- A discover still re-reads the whole catalogue: about 7.6k units a day for 179k videos even
+  without the misreads. Collects now go first, but the refresh cost is the next fix: incremental
+  tabs, or a longer `catalogue_interval` for public channels (the owner's call).
+- Measured but not investigated: 41 collect blocks `channel_not_connected`, 52
+  `retry_exhausted:api_error`, 16 `lease_thrashing:20`, and the worker tick refused `55P03`/
+  `57014` (lock and statement timeouts) on most ticks since 2026-10-17 00:02 +0300.
+- The Telegram collector's Telethon and HTML paths stamp a missing date as now(), which breaks
+  invariant 3.
+
+## 2026-10-16 — Owner console review batch C: permissions and audit
+
+The owner said «ابدأ الدفعة C» (2026-10-16). Batch C of
+[`docs/reviews/2026-10-13-owner-console-review.md`](reviews/2026-10-13-owner-console-review.md)
+covers findings 5, 6, 8, 18 and 19. Branch `claude/keen-keller-skwwpm`, migration `20261102000000`.
+
+- **5, another admin's account:** `admin-users` now refuses `recovery_link`, `change_email` and
+  `confirm_email` on another admin (`409 cannot_act_on_admin`). The caller's own account and
+  lifting a suspension stay open. **The owner redeploys `admin-users`** after merge
+  (`npx supabase functions deploy admin-users`); until then the old guard is live.
+- **6, delete keeps the trail:** `delete_workspace` detaches the workspace's audit rows
+  (`workspace_id` null, new `former_workspace_id` keeps the id) instead of deleting them. The
+  append-only guard allows that one update and no longer allows an audit row to be deleted.
+  `admin_audit` names such rows "Deleted workspace".
+- **8, plan-wide changes:** a trigger on `public.plans` writes `plan_updated` (no workspace,
+  target `plan`) on any real change, which covers the public-channels toggle and the limits
+  dialog. `promote_platform_reader` writes `platform_reader_promoted`.
+- **18:** `promote_platform_reader` is executable by `authenticated` only, not PUBLIC or anon.
+  `admin_audit(null)` is refused. `grant_pack`'s retry key is scoped to the workspace (hashed),
+  and its audit row is written only when a grant is made.
+- **19, notes:** the owner's plan and pack notes go to `private.admin_notes`, which no tenant role
+  can read. The migration copies the notes already stored, then clears `subscriptions.provider_ref`
+  on admin rows and re-keys admin `usage_grants.provider_ref` to `workspace:md5(note)`. **This
+  migration rewrites existing production rows**; the move is tested on a database seeded before it.
+- **Not in this batch:** impersonation rows still name the target's first workspace (security §6);
+  the audit page still shows raw action names (batch D).
+
 ## 2026-10-16 — AJ360's uploads filed under 73 public channels; a catalogue now names its channel
 
 **Reported:** Yahea Alzo3bi's video list mixed in Al Jazeera 360 videos. **Measured (read-only,

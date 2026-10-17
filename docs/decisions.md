@@ -20,6 +20,21 @@ its overlap term until then, with that weight redistributed rather than read as 
 competitors tracked in phase 2 give phase 3 its data. The owner approved the roadmap as a whole the
 same day (PR #141); work orders WO-18 to WO-21 (#144–#147) implement its phase 1.
 
+2026-10-17 — The external monitor runs as a scheduled workflow on GitHub's hosted runner, not on
+the owner's Mac, and alerts by opening one issue per failing check. The Mac crontab of
+2026-09-19 never ran (macOS refused `cron` access to `~/Documents`), and a monitor on the
+machine that runs the worker would sleep and die with it, which is the outage it most needs to
+see. A launchd agent from outside `~/Documents` (the worker's own trick) was rejected for that
+reason. No webhook exists, and a failing run would email every 30 minutes, so an open issue
+labelled `monitor` is the alert's state: one notification when a check breaks, one when it
+recovers. The cost is the service role key in GitHub, in a `monitor` environment limited to
+`main` (the deploy's `SUPABASE_ACCESS_TOKEN` is already there and is stronger), and alert issues
+that are public while the repository is: they carry check names and counts only. Every 30
+minutes, not 5: about 1,440 runner minutes a month fits the private plan's 2,000 if the
+repository goes private again. Freshness is judged per channel through
+`svc_monitor_channel_freshness()` (the console's own staleness rule), because the platform's
+newest prediction hid 16 stalled channels behind 2 healthy ones on 2026-10-16.
+
 2026-10-13 — A Facebook account that manages several pages chooses one inside the product.
 The first live connect (the owner's own account) ended at `ambiguous_channel`; the way
 through, Meta's "Edit settings" screen with one page ticked, worked but is not something an

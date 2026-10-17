@@ -7,7 +7,7 @@ directly.
 """
 import json
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Set as AbstractSet
 from datetime import datetime, timezone, timedelta
 import httpx
 from .protocol import Batch, Catalogue, CollectionError, RawComment
@@ -310,8 +310,16 @@ class YouTubeAPI:
     _TABS = (("video", "LF"), ("short", "SH"), ("stream", "LV"))
     _DURATION = re.compile(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
 
-    def _playlist(self, playlist_id: str) -> list[str] | None:
-        """Every video id in a playlist, or None when the playlist is absent."""
+    def _playlist(self, playlist_id: str,
+                  known: AbstractSet[str] | None = None) -> list[str] | None:
+        """The playlist's video ids, or None when the playlist is absent.
+
+        Every id, unless `known` is given: the tab playlists are newest
+        first, so a page made only of videos the channel already has means
+        the rest of the playlist is known as well, and reading stops there.
+        A page with even one new id is not proof of that, so the next page
+        is read too.
+        """
         ids: list[str] = []
         page = None
         while True:
@@ -322,9 +330,12 @@ class YouTubeAPI:
             if data is None:
                 return None if not ids else ids
             try:
-                ids.extend(i["contentDetails"]["videoId"] for i in data["items"])
+                page_ids = [i["contentDetails"]["videoId"] for i in data["items"]]
             except (KeyError, TypeError):
                 raise CollectionError("invalid_response") from None
+            ids.extend(page_ids)
+            if known and page_ids and all(v in known for v in page_ids):
+                return ids
             nxt = data.get("nextPageToken")
             if nxt and nxt == page:
                 raise CollectionError("repeated_page_token", "partial")
@@ -332,7 +343,8 @@ class YouTubeAPI:
             if not page:
                 return ids
 
-    def catalogue(self, channel_id: str | None = None) -> Catalogue:
+    def catalogue(self, channel_id: str | None = None,
+                  known: AbstractSet[str] | None = None) -> Catalogue:
         """The channel's videos across its three tabs, with the source's counts.
 
         Cost: about two quota units per fifty videos. The tab playlists are the
@@ -348,6 +360,17 @@ class YouTubeAPI:
         channel its credential was never granted for: an owner token plus an
         id. An id that names no channel is a blocked dead end, not an empty
         catalogue.
+
+        With `known` — the ids the channel already has, which the server
+        hands a refresh — each tab is read only down to its first page of
+        known videos, and only the videos not in `known` are looked up and
+        returned. The commit upserts what it is sent and leaves every other
+        video as it was, so the list is the new videos alone (possibly none),
+        and it is complete: everything past the stop is already catalogued.
+        A refresh of a known channel with nothing new costs four units (the
+        channel and one page per tab) where the whole read cost two per
+        fifty videos. Without `known`, as on a first discover, every tab is
+        read to its end.
         """
         if channel_id is not None:
             if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id):
@@ -377,7 +400,7 @@ class YouTubeAPI:
         found: dict[str, dict] = {}
         any_tab = False
         for kind, suffix in self._TABS:
-            ids = self._playlist(f"UU{suffix}{base}")
+            ids = self._playlist(f"UU{suffix}{base}", known)
             if ids is None:
                 continue
             any_tab = True
@@ -389,11 +412,14 @@ class YouTubeAPI:
         unclassified = False
         if not any_tab:
             unclassified = True
-            for vid in self._playlist(uploads) or []:
+            for vid in self._playlist(uploads, known) or []:
                 found.setdefault(vid, {"kind": "video", "tabs": []})
 
         videos: list[dict] = []
-        ids = list(found)
+        # What the channel already has is not asked about again: its row
+        # keeps the counts it has, and the collect path's live check keeps
+        # the comment count of every video due for a read current.
+        ids = [vid for vid in found if not known or vid not in known]
         for start in range(0, len(ids), 50):
             chunk = ids[start:start + 50]
             data = self._get("videos", {"part": "snippet,statistics,contentDetails",

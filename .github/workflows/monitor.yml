@@ -1,0 +1,59 @@
+# Probes the live platform from outside every 30 minutes (scripts/monitor.sh)
+# and keeps one open issue per failing check (scripts/monitor-alerts.mjs).
+#
+# Why here: the monitor was a crontab entry on the owner's Mac, and macOS
+# privacy protection refused it on every run from 2026-09-19 (1,930 logged
+# refusals, then not even the log), so for four weeks there was no external
+# alarm while the docs said there was. A monitor on the machine that runs the
+# worker would also sleep and die with it. So it runs on the hosted runner by
+# name: never on CI_RUNNER or DEPLOY_RUNNER, which may be that machine.
+#
+# Its secrets live in the `monitor` environment, which should allow `main`
+# only. Missing ones are not skipped: the run reports `monitor` failing and
+# opens an issue saying which names are missing.
+#
+# The run's exit code is recorded, not raised: a failing check is reported
+# by its issue, once, rather than by a failed run every 30 minutes. A run
+# whose alerting step fails does fail, so a broken alarm is loud too.
+name: Platform monitor
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: platform-monitor
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: monitor
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Probe the platform from outside
+        shell: bash
+        env:
+          MONITOR_ENV_FILE: ""
+          MONITOR_STATE_DIR: ${{ runner.temp }}/monitor-state
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          WORKER_API_BASE_URL: ${{ secrets.WORKER_API_BASE_URL }}
+          WORKER_CREDENTIAL: ${{ secrets.WORKER_CREDENTIAL }}
+          PREVIEW_URL: https://app.sky-develop.net/
+        run: |
+          set -uo pipefail
+          output="$RUNNER_TEMP/monitor-output.txt"
+          sh scripts/monitor.sh > "$output" 2>&1
+          code=$?
+          cat "$output"
+          echo "monitor.sh exited $code (0 healthy, 1 warning, 2 failure)"
+      - name: Open or close one issue per failing check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/monitor-alerts.mjs "$RUNNER_TEMP/monitor-output.txt"

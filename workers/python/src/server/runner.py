@@ -8,7 +8,7 @@ picks up where it stopped rather than starting the video again.
 import hashlib
 import time
 
-from collectors.protocol import CollectionError
+from collectors.protocol import Batch, CollectionError
 from topics.analysis import classify
 from topics.protocol import TopicError
 
@@ -245,6 +245,21 @@ def _collector_for(control: ControlPlane, lease: dict, build_collector):
     return collector, None, channel_id
 
 
+def _known_videos(lease: dict) -> frozenset[str] | None:
+    """The ids a YouTube refresh may stop at, or None to read the channel whole.
+
+    Only a YouTube lease uses the list: its tabs are newest first, which is
+    what makes stopping at known videos sound. Anything that is not a list of
+    ids is no list — the safe reading is the whole channel, never a guess.
+    """
+    known = lease.get("known_video_ids")
+    if (lease.get("platform") or "youtube") != "youtube" or not isinstance(known, list):
+        return None
+    if not all(isinstance(v, str) for v in known):
+        return None
+    return frozenset(known)
+
+
 def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
     """List the channel's videos and commit the list. The lease is already claimed.
 
@@ -257,8 +272,14 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
         return True
     try:
         # The OAuth collector reads the channel its grant names; the public
-        # collector is told which id it was built for.
-        result = collector.catalogue(channel_id)
+        # collector is told which id it was built for. A refresh of a YouTube
+        # channel is handed what the channel already has, and reads only
+        # what is new; a lease without the list reads the channel whole.
+        known = _known_videos(lease)
+        if known is None:
+            result = collector.catalogue(channel_id)
+        else:
+            result = collector.catalogue(channel_id, known=known)
         control.heartbeat(lease)
         control.commit_catalogue(lease, result.videos)
         control.finish(lease, "exhausted" if result.complete else "partial",
@@ -343,22 +364,31 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                 video_skipped_blocked = False
                 for batch in batch_iter:
                     collected_for_video += len(batch.comments)
-                    predictions: list = []
-                    if analyzer is not None:
-                        try:
-                            predictions = analyse(analyzer, batch.comments)
-                        except AnalysisError:
-                            analysis_failed = True
-                    control.heartbeat(lease)
-                    progress_dict = {"video": vid, "done": sorted(done)}
-                    if is_hist:
-                        progress_dict["is_historical"] = True
-                    control.commit_batch(
-                        lease, vid, video.get("title"), batch, predictions,
-                        progress=progress_dict,
-                    )
-                    if batch.outcome in ("explicitly_disabled", "unavailable"):
-                        control.video_finished(lease, video["video_id"], "blocked", batch.outcome)
+                    # The source's verdict on the video is not a batch outcome
+                    # the server takes: commit_batch refuses it whole as
+                    # invalid_batch, and the run ended on that post every hour.
+                    # Comments read before the verdict still travel, as progress.
+                    verdict = (batch.outcome
+                               if batch.outcome in ("explicitly_disabled", "unavailable") else None)
+                    if verdict:
+                        batch = Batch(batch.comments, batch.checkpoint, "partial")
+                    if batch.comments or not verdict:
+                        predictions: list = []
+                        if analyzer is not None:
+                            try:
+                                predictions = analyse(analyzer, batch.comments)
+                            except AnalysisError:
+                                analysis_failed = True
+                        control.heartbeat(lease)
+                        progress_dict = {"video": vid, "done": sorted(done)}
+                        if is_hist:
+                            progress_dict["is_historical"] = True
+                        control.commit_batch(
+                            lease, vid, video.get("title"), batch, predictions,
+                            progress=progress_dict,
+                        )
+                    if verdict:
+                        control.video_finished(lease, video["video_id"], "blocked", verdict)
                         done.add(vid)
                         video_skipped_blocked = True
                         break

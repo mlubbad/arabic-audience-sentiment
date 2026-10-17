@@ -28,6 +28,27 @@ const gitWrites = code.filter((line) =>
   /^\s*git\b(?:\s+-c\s+\S+)*\s+(commit|push)\b/.test(line),
 );
 
+describe("codex-dispatch sandbox caches", () => {
+  // workspace-write lets Codex write only inside the workspace; a cache under ~
+  // fails the first `uv run` (WO-18, 2026-10-17).
+  it("points uv and npm caches inside the workspace before Codex runs", () => {
+    const body = code.join("\n");
+    const exported = body.indexOf(
+      'export UV_CACHE_DIR="$workspace/.cache/uv" npm_config_cache="$workspace/.cache/npm"',
+    );
+    expect(exported).toBeGreaterThan(-1);
+    expect(exported).toBeLessThan(body.indexOf('codex_cmd=("$codex_bin" exec'));
+  });
+
+  it("keeps those caches out of every commit", () => {
+    const ignore = readFileSync(
+      new URL("../.gitignore", import.meta.url),
+      "utf8",
+    );
+    expect(ignore.split("\n")).toContain(".cache/");
+  });
+});
+
 describe("codex-dispatch git writes", () => {
   it("never enables the repository hooks in the workspace", () => {
     expect(code.join("\n")).not.toMatch(
