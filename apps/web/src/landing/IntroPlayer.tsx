@@ -1,13 +1,9 @@
-import { Link } from "react-router";
 import "./intro.css";
 import type { Locale } from "../locale";
 import { useStrings } from "../strings";
-import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
 import { numerals } from "./demoData";
 import { IntroScene } from "./IntroScenes";
 import { useIntroPlayer } from "./useIntroPlayer";
-import { useReveal } from "./useReveal";
 
 /* Two-digit ordinals ("01", "٠١") for the scene tags. */
 const ordinals: Record<Locale, Intl.NumberFormat> = {
@@ -18,14 +14,15 @@ const ordinals: Record<Locale, Intl.NumberFormat> = {
   en: new Intl.NumberFormat("en", { minimumIntegerDigits: 2 }),
 };
 
-/** The product in twenty seconds: four five-second scenes on a dark stage
- *  — collect, understand, compare, decide — with a progress bar per scene.
- *  The stage is a moving picture; the list under it carries the same four
- *  steps as text, is what assistive technology and search engines read, and
- *  is how a reader jumps to a scene. */
-export function Intro({ locale }: { locale: Locale }) {
+/** The product in twenty seconds, as the hero's picture: four five-second
+ *  scenes on a dark stage — collect, understand, compare, decide — with a
+ *  progress bar per scene. The stage is a moving picture inside the hero's
+ *  figure, captioned with the sentence the keyword map keeps there; the list
+ *  under it carries the same four steps as text, is what assistive
+ *  technology and search engines read, and is how a reader jumps to a
+ *  scene. */
+export function IntroPlayer({ locale }: { locale: Locale }) {
   const S = useStrings(locale);
-  const reveal = useReveal<HTMLElement>();
   const scenes = [
     {
       tag: S.lpIntroScene1Tag,
@@ -53,29 +50,17 @@ export function Intro({ locale }: { locale: Locale }) {
   const active = scenes[index] ?? scenes[0]!;
   const total = numerals[locale].format(scenes.length);
   return (
-    <section
-      ref={reveal}
-      className="lp-section lp-intro"
-      id="intro"
-      aria-labelledby="intro-title"
-    >
-      <div className="lp-container">
-        <div className="lp-section-head">
-          <Badge tone="neutral" className="lp-eyebrow">
-            {S.lpIntroEyebrow}
-          </Badge>
-          <h2 id="intro-title">
-            {S.lpIntroLine1}
-            <br />
-            <em>{S.lpIntroLine2}</em>
-          </h2>
-          <p className="lp-lead">{S.lpIntroLead}</p>
-        </div>
-
+    <>
+      {/* The sentence that was the hero illustration's alt is a place in
+          the keyword map; it stays as the figure's caption, read and
+          indexed, unseen. */}
+      <figure className="lp-hero-figure">
+        <span className="lp-hero-halo" aria-hidden="true" />
         <div
           ref={player.ref}
           className="ix-player"
           data-playing={player.playing ? "true" : "false"}
+          data-fresh={player.fresh ? "" : undefined}
           data-testid="intro-player"
         >
           <div className="ix-stage" aria-hidden="true">
@@ -135,45 +120,32 @@ export function Intro({ locale }: { locale: Locale }) {
             </button>
           )}
         </div>
+        <figcaption className="ui-sr-only">{S.lpHeroAlt}</figcaption>
+      </figure>
 
-        <ol className="ix-steps" aria-label={S.lpIntroScenesLabel}>
-          {scenes.map((s, i) => (
-            <li
-              key={s.tag}
-              className={i === index ? "ix-step is-on" : "ix-step"}
-            >
-              <span className="ix-step-tag">
-                <b className="ui-num">{ordinals[locale].format(i + 1)}</b>{" "}
-                {s.tag}
-              </span>
-              <h3>
-                <button
-                  type="button"
-                  onClick={() => player.goTo(i)}
-                  aria-current={i === index ? "step" : undefined}
-                >
-                  <span className="ui-sr-only">
-                    {S.lpIntroSceneOf(numerals[locale].format(i + 1), total)}
-                    {S.listSeparator}
-                  </span>
-                  {s.title}
-                </button>
-              </h3>
-              <p>{s.text}</p>
-            </li>
-          ))}
-        </ol>
-
-        <div className="ix-after">
-          <Button asChild>
-            <Link to="/dashboard">
-              {S.lpExploreDashboard}{" "}
-              <span aria-hidden="true">{S.arrowForward}</span>
-            </Link>
-          </Button>
-          <p className="lp-caption">{S.lpIntroCaption}</p>
-        </div>
-      </div>
-    </section>
+      <ol className="ix-steps" aria-label={S.lpIntroScenesLabel}>
+        {scenes.map((s, i) => (
+          <li key={s.tag} className={i === index ? "ix-step is-on" : "ix-step"}>
+            <span className="ix-step-tag">
+              <b className="ui-num">{ordinals[locale].format(i + 1)}</b> {s.tag}
+            </span>
+            <h3>
+              <button
+                type="button"
+                onClick={() => player.goTo(i)}
+                aria-current={i === index ? "step" : undefined}
+              >
+                <span className="ui-sr-only">
+                  {S.lpIntroSceneOf(numerals[locale].format(i + 1), total)}
+                  {S.listSeparator}
+                </span>
+                {s.title}
+              </button>
+            </h3>
+            <p>{s.text}</p>
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }

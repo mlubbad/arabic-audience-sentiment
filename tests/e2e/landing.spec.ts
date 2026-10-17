@@ -84,7 +84,7 @@ test("mobile landing has working navigation, keyboard access, and no page overfl
   }
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await expect(
-    page.locator(".lp-hero [data-testid='product-window']"),
+    page.locator(".lp-hero [data-testid='intro-player']"),
   ).toBeVisible();
   expect(await page.locator(".lp-hero img").count()).toBe(0);
 });

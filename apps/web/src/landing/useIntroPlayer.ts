@@ -14,6 +14,11 @@ export function useIntroPlayer<T extends HTMLElement>(count: number) {
   const [inView, setInView] = useState(false);
   const [paused, setPaused] = useState(false);
   const [reduced, setReduced] = useState(false);
+  // The first scene's first pass. The prerendered page paints scene 1
+  // complete; were its entrances to run on hydration, the hero's picture
+  // would flash empty and redraw. Until the story first moves on, the scene
+  // stays as painted and only the clock and the light move.
+  const [fresh, setFresh] = useState(true);
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
@@ -29,14 +34,20 @@ export function useIntroPlayer<T extends HTMLElement>(count: number) {
     if (!el || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(
       (entries) => setInView(entries.some((e) => e.isIntersecting)),
-      { threshold: 0.35 },
+      { threshold: 0.2 },
     );
     io.observe(el);
     return () => io.disconnect();
   }, []);
 
-  const next = useCallback(() => setIndex((i) => (i + 1) % count), [count]);
-  const goTo = useCallback((i: number) => setIndex(i), []);
+  const next = useCallback(() => {
+    setFresh(false);
+    setIndex((i) => (i + 1) % count);
+  }, [count]);
+  const goTo = useCallback((i: number) => {
+    setFresh(false);
+    setIndex(i);
+  }, []);
   const toggle = useCallback(() => setPaused((p) => !p), []);
 
   return {
@@ -49,6 +60,8 @@ export function useIntroPlayer<T extends HTMLElement>(count: number) {
     /** Reduced motion: no autoplay and no play button; the scenes are
      *  chosen by hand. */
     reduced,
+    /** Still on the first pass of the first scene, as prerendered. */
+    fresh,
     next,
     goTo,
     toggle,
