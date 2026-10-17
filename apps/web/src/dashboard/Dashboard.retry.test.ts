@@ -21,6 +21,8 @@ vi.mock("../supabase", () => ({
 }));
 
 import {
+  DashboardPendingError,
+  DashboardRpcError,
   loadDashboardAggregates,
   loadDashboardComments,
   loadOpsSource,
@@ -167,5 +169,49 @@ describe("Dashboard single retry layer and timeout isolation", () => {
     await loadOpsSource("live", "ws-1", controller.signal);
 
     expect(abortSignalMock).toHaveBeenCalledWith(controller.signal);
+  });
+
+  describe("the aggregates cache states", () => {
+    it("serves a stale payload, and says it is stale", async () => {
+      rpcMock.mockResolvedValue({
+        data: {
+          ...mockAggregates,
+          cache: { state: "stale", computed_at: "2026-10-17T10:00:00Z" },
+        },
+        error: null,
+      });
+      const data = await loadDashboardAggregates("live", "ws-1", {});
+      expect(data.cache?.state).toBe("stale");
+      expect(data.total).toBe(0);
+    });
+
+    it("a pending answer is a wait, not a failure", async () => {
+      rpcMock.mockResolvedValue({
+        data: { cache: { state: "pending" } },
+        error: null,
+      });
+      await expect(
+        loadDashboardAggregates("live", "ws-1", {}),
+      ).rejects.toBeInstanceOf(DashboardPendingError);
+    });
+
+    it("a failed compute names the database code the drain recorded", async () => {
+      rpcMock.mockResolvedValue({
+        data: { cache: { state: "failed", error: "57014" } },
+        error: null,
+      });
+      const error = await loadDashboardAggregates("live", "ws-1", {}).catch(
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(DashboardRpcError);
+      expect((error as DashboardRpcError).code).toBe("57014");
+    });
+
+    it("keeps waiting while the numbers are prepared, but not forever", () => {
+      const pending = new DashboardPendingError();
+      expect(shouldRetryDashboardQuery(0, pending, 1)).toBe(true);
+      expect(shouldRetryDashboardQuery(30, pending, 1)).toBe(true);
+      expect(shouldRetryDashboardQuery(90, pending, 1)).toBe(false);
+    });
   });
 });

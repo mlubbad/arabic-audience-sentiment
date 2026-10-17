@@ -218,7 +218,9 @@ describe("cross-workspace deduplication", () => {
         analysed: number;
         sentiments: { positive: number };
       };
-    }>("select private.dashboard_aggregates_impl($1, '{}'::jsonb) as agg", [B]);
+    }>("select private.dashboard_aggregates_compute($1, '{}'::jsonb) as agg", [
+      B,
+    ]);
     expect(aggBeforeSelection.rows[0].agg.total).toBe(1);
     expect(aggBeforeSelection.rows[0].agg.analysed).toBe(0);
     expect(aggBeforeSelection.rows[0].agg.sentiments.positive).toBe(0);

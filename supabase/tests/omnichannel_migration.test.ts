@@ -193,7 +193,10 @@ describe("omnichannel multi-platform migration", () => {
         total: number;
         platform_breakdown: Record<string, number>;
       };
-    }>("select dashboard_aggregates($1, '{}'::jsonb)", [A]);
+    }>(
+      "select private.dashboard_aggregates_compute($1, '{}'::jsonb) as dashboard_aggregates",
+      [A],
+    );
     const aggAllRes = aggAll.rows[0].dashboard_aggregates;
     expect(aggAllRes.total).toBe(2);
     expect(aggAllRes.platform_breakdown).toEqual({ youtube: 1, telegram: 1 });
@@ -204,9 +207,10 @@ describe("omnichannel multi-platform migration", () => {
         total: number;
         platform_breakdown: Record<string, number>;
       };
-    }>('select dashboard_aggregates($1, \'{"platform":"telegram"}\'::jsonb)', [
-      A,
-    ]);
+    }>(
+      'select private.dashboard_aggregates_compute($1, \'{"platform":"telegram"}\'::jsonb) as dashboard_aggregates',
+      [A],
+    );
     const aggTgRes = aggTg.rows[0].dashboard_aggregates;
     expect(aggTgRes.total).toBe(1);
     expect(aggTgRes.platform_breakdown).toEqual({ telegram: 1 });
