@@ -101,6 +101,12 @@ if [ ! -d "$workspace/node_modules" ] && [ "${CODEX_DRY_RUN:-0}" != "1" ]; then
   echo "codex-dispatch: first run in this workspace, installing dependencies (npm run setup)"
   (cd "$workspace" && npm run setup)
 fi
+# The sandbox writes only inside the workspace, and uv and npm keep their caches
+# under ~ by default, so Codex's first `uv run` died with "Operation not
+# permitted" on ~/.cache/uv (WO-18, 2026-10-17). Both caches live in the
+# workspace's own .cache/ (gitignored); Codex's shells inherit this environment.
+export UV_CACHE_DIR="$workspace/.cache/uv" npm_config_cache="$workspace/.cache/npm"
+mkdir -p "$UV_CACHE_DIR" "$npm_config_cache"
 base_sha="$(git -C "$workspace" rev-parse HEAD)"
 echo "codex-dispatch: $branch @ $base_sha ($base_ref, $round round) in $workspace"
 
