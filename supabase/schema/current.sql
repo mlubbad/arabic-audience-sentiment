@@ -5985,6 +5985,29 @@ declare w uuid; owner uuid; begin
   return owner;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.worker_known_videos(token_hash text, j uuid, t uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid; c uuid; job_type text; c_platform text; c_catalogued timestamptz; BEGIN
+  w := private.worker_job(token_hash, j, t);
+  SELECT channel_id, type INTO c, job_type FROM public.jobs WHERE id = j;
+  SELECT coalesce(platform, 'youtube'), catalogued_at
+    INTO c_platform, c_catalogued
+    FROM public.channels WHERE workspace_id = w AND id = c;
+  IF job_type <> 'discover' OR c_platform <> 'youtube' OR c_catalogued IS NULL THEN
+    RETURN NULL;
+  END IF;
+  RETURN coalesce((
+    SELECT jsonb_agg(k.external_video_id ORDER BY k.published_at DESC NULLS LAST, k.external_video_id)
+      FROM (SELECT v.external_video_id, v.published_at
+              FROM public.videos v
+             WHERE v.workspace_id = w AND v.channel_id = c AND v.platform = 'youtube'
+             ORDER BY v.published_at DESC NULLS LAST, v.external_video_id
+             LIMIT 5000) k), '[]'::jsonb);
+END $function$
+
 CREATE OR REPLACE FUNCTION private.worker_mark_revoked(token_hash text, j uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -8738,6 +8761,13 @@ AS $function$
   select private.worker_heartbeat(credential_hash, j, t)
 $function$
 
+CREATE OR REPLACE FUNCTION public.svc_worker_known_videos(credential_hash text, j uuid, t uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ SET search_path TO ''
+AS $function$
+  SELECT private.worker_known_videos(credential_hash, j, t) $function$
+
 CREATE OR REPLACE FUNCTION public.svc_worker_mark_revoked(credential_hash text, j uuid)
  RETURNS void
  LANGUAGE sql
@@ -9847,6 +9877,8 @@ grant EXECUTE on function private.worker_heartbeat(text,uuid,uuid) to "postgres"
 grant EXECUTE on function private.worker_heartbeat(text,uuid,uuid) to "service_role";
 grant EXECUTE on function private.worker_job(text,uuid,uuid) to "postgres";
 grant EXECUTE on function private.worker_job(text,uuid,uuid) to "service_role";
+grant EXECUTE on function private.worker_known_videos(text,uuid,uuid) to "postgres";
+grant EXECUTE on function private.worker_known_videos(text,uuid,uuid) to "service_role";
 grant EXECUTE on function private.worker_mark_revoked(text,uuid) to "postgres";
 grant EXECUTE on function private.worker_mark_revoked(text,uuid) to "service_role";
 grant EXECUTE on function private.worker_reader_grant(text) to "postgres";
@@ -10055,6 +10087,8 @@ grant EXECUTE on function svc_worker_finish(text,uuid,uuid,text,text) to "postgr
 grant EXECUTE on function svc_worker_finish(text,uuid,uuid,text,text) to "service_role";
 grant EXECUTE on function svc_worker_heartbeat(text,uuid,uuid) to "postgres";
 grant EXECUTE on function svc_worker_heartbeat(text,uuid,uuid) to "service_role";
+grant EXECUTE on function svc_worker_known_videos(text,uuid,uuid) to "postgres";
+grant EXECUTE on function svc_worker_known_videos(text,uuid,uuid) to "service_role";
 grant EXECUTE on function svc_worker_mark_revoked(text,uuid) to "postgres";
 grant EXECUTE on function svc_worker_mark_revoked(text,uuid) to "service_role";
 grant EXECUTE on function svc_worker_reader_grant(text) to "postgres";

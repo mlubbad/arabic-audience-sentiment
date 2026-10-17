@@ -305,6 +305,45 @@ describe("the due list and the catalogue", () => {
     expect(dueVideos).toHaveBeenCalledTimes(1);
   });
 
+  it("hands a discover claim the channel's known videos, and a collect claim none", async () => {
+    const knownVideos = vi.fn(async () => ["a".repeat(11), "b".repeat(11)]);
+    const claimOf =
+      (type: string): WorkerDb["claim"] =>
+      async () => ({ id: "j", lease_token: "l", checkpoint: null, type });
+    const d = (await (
+      await post({ ...base(), claim: claimOf("discover"), knownVideos })
+    ).json()) as Record<string, unknown>;
+    expect(d.known_video_ids).toEqual(["a".repeat(11), "b".repeat(11)]);
+    expect(knownVideos).toHaveBeenCalledWith(expect.any(String), "j", "l");
+
+    const c = (await (
+      await post({ ...base(), claim: claimOf("collect"), knownVideos })
+    ).json()) as Record<string, unknown>;
+    expect(c).not.toHaveProperty("known_video_ids");
+    expect(knownVideos).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the known list off when the server has none or cannot say, and still hands the job over", async () => {
+    const claim: WorkerDb["claim"] = async () => ({
+      id: "j",
+      lease_token: "l",
+      checkpoint: null,
+      type: "discover",
+    });
+    for (const knownVideos of [
+      async () => null,
+      async () => {
+        throw new Error("function svc_worker_known_videos does not exist");
+      },
+    ]) {
+      const res = await post({ ...base(), claim, knownVideos });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toMatchObject({ job_id: "j", type: "discover" });
+      expect(body).not.toHaveProperty("known_video_ids");
+    }
+  });
+
   it("commits a catalogue only as an array under a live lease", async () => {
     const db = base();
     const bad = await send(db, "/worker/commit-catalogue", {
