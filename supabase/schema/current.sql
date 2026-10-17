@@ -1945,6 +1945,44 @@ declare n int; begin
   return n;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.blocked_until(w uuid, kind text, reason text)
+ RETURNS timestamp with time zone
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO ''
+AS $function$
+declare
+  remaining bigint;
+  plan_reset timestamptz;
+begin
+  if reason = 'rate_limited' then
+    return now() + interval '1 hour';
+  end if;
+  if reason is null or reason not ilike '%quota%' then
+    return null;
+  end if;
+
+  begin
+    remaining := case when kind = 'analyse' then private.topic_units_remaining(w)
+                      else private.analysis_remaining(w) end;
+  exception when sqlstate '53400' then
+    -- no_active_plan: there are no plan units to have spent.
+    remaining := null;
+  end;
+
+  if remaining is not null and remaining <= 0 then
+    select s.period_end into plan_reset
+      from public.subscriptions s
+     where s.workspace_id = private.billing_root(w);
+    if plan_reset is not null and plan_reset > now()
+       and plan_reset <= now() + interval '366 days' then
+      return plan_reset;
+    end if;
+  end if;
+
+  return private.source_quota_resets_at();
+end $function$
+
 CREATE OR REPLACE FUNCTION private.bootstrap_personal_workspace()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -2205,7 +2243,13 @@ begin
         and (q.status = 'queued'
              or (q.status = 'running' and q.lease_expires_at <= now()))
       order by
-        case when q.type = 'discover' then 0 else 1 end,
+        case
+          when q.type <> 'discover' then 1
+          when exists (select 1 from public.channels ch
+                        where ch.id = q.channel_id and ch.catalogued_at is not null)
+            then 2
+          else 0
+        end,
         case when w is null then (
           select count(*) from public.jobs r
            where r.workspace_id = q.workspace_id
@@ -3518,21 +3562,26 @@ CREATE OR REPLACE FUNCTION private.enqueue_scheduled(w uuid, c uuid, kind text)
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare j uuid; gap int; begin
+declare j uuid; gap int; latest public.jobs; begin
   if exists(select 1 from public.jobs where workspace_id=w and channel_id=c and type=kind
              and status in ('queued','running')) then return null; end if;
+  select * into latest from public.jobs
+   where workspace_id=w and channel_id=c and type=kind
+   order by created_at desc limit 1;
+  -- Blocked until a reset: unblock_due_jobs requeues this same job then. A
+  -- fresh job before it would only ask the source the question it has
+  -- already answered, and spend quota to hear it.
+  if latest.status = 'blocked' and latest.not_before > now() then
+    return null; end if;
   -- A job of this kind that just ended badly is not tried again for an hour,
   -- whatever the plan's rate limit says: on a plan with no rate limit the
   -- idle tick re-enqueued a failing collection every time it ran. Measured
   -- from the run's end where one was recorded, else from the job's creation.
-  if exists(
-       select 1 from public.jobs q
-         left join public.sync_runs r on r.workspace_id=q.workspace_id and r.job_id=q.id
-        where q.id = (select id from public.jobs
-                       where workspace_id=w and channel_id=c and type=kind
-                       order by created_at desc limit 1)
-          and q.status in ('failed','blocked','partial','cancelled')
-          and coalesce(r.ended_at, q.created_at) > now() - interval '60 minutes') then
+  if latest.id is not null
+     and latest.status in ('failed','blocked','partial','cancelled')
+     and coalesce((select r.ended_at from public.sync_runs r
+                    where r.workspace_id = w and r.job_id = latest.id),
+                  latest.created_at) > now() - interval '60 minutes' then
     return null; end if;
   gap := private.plan_limit(w, 'sync_interval');
   if gap is not null and gap > 0 and exists(
@@ -5233,6 +5282,16 @@ declare v int; begin
   return v;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.source_quota_resets_at()
+ RETURNS timestamp with time zone
+ LANGUAGE sql
+ STABLE
+ SET search_path TO ''
+AS $function$
+  select (date_trunc('day', now() at time zone 'America/Los_Angeles') + interval '1 day')
+         at time zone 'America/Los_Angeles'
+$function$
+
 CREATE OR REPLACE FUNCTION private.submit_comment_review_impl(w uuid, c uuid, seen_hash text, verdict text, why text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -5815,19 +5874,19 @@ AS $function$
 declare
   w uuid;
   ch uuid;
+  j_type text;
   start_time timestamptz;
   dur_sec integer;
   j_attempt integer;
   backoff_seconds integer;
-  sub_reset timestamptz;
   blocked_not_before timestamptz;
 begin
   perform private.worker_job(token_hash, j, t);
   if outcome not in ('succeeded','partial','failed','blocked','cancelled') then
     raise exception 'invalid_outcome' using errcode='22023'; end if;
 
-  select created_at, attempt, workspace_id, channel_id
-    into start_time, j_attempt, w, ch
+  select created_at, attempt, workspace_id, channel_id, type
+    into start_time, j_attempt, w, ch, j_type
     from public.jobs
    where id = j;
   dur_sec := greatest(1, round(extract(epoch from (now() - coalesce(start_time, now())))))::int;
@@ -5860,22 +5919,8 @@ begin
     return;
   end if;
 
-  -- On blocked, set not_before by reason (quota -> next reset; plan_inactive/source_access_denied -> not time-based)
   if outcome = 'blocked' then
-    if reason ilike '%quota%' or reason in ('quota_exceeded', 'rate_limited') then
-      select s.period_end into sub_reset
-        from public.subscriptions s
-       where s.workspace_id = private.billing_root(w);
-
-      if sub_reset is not null and sub_reset > now() and sub_reset <= (now() + interval '366 days') then
-        blocked_not_before := sub_reset;
-      else
-        blocked_not_before := (date_trunc('day', now() at time zone 'utc') + interval '1 day');
-      end if;
-    else
-      -- plan_inactive, source_access_denied, and other non-quota reasons are not time-based
-      blocked_not_before := null;
-    end if;
+    blocked_not_before := private.blocked_until(w, j_type, reason);
   end if;
 
   update public.jobs set status = outcome,
@@ -9591,6 +9636,8 @@ grant EXECUTE on function private.backoff_after(integer) to "postgres";
 grant EXECUTE on function private.billing_root(uuid) to "postgres";
 grant EXECUTE on function private.billing_root(uuid) to "service_role";
 grant EXECUTE on function private.billing_sweep() to "postgres";
+grant EXECUTE on function private.blocked_until(uuid,text,text) to "postgres";
+grant EXECUTE on function private.blocked_until(uuid,text,text) to "service_role";
 grant EXECUTE on function private.bootstrap_personal_workspace() to "postgres";
 grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "postgres";
 grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "service_role";
@@ -9720,6 +9767,8 @@ grant EXECUTE on function private.select_videos_impl(uuid,uuid,uuid[],uuid[]) to
 grant EXECUTE on function private.select_videos_impl(uuid,uuid,uuid[],uuid[]) to "postgres";
 grant EXECUTE on function private.set_workspace_topics_impl(uuid,jsonb) to "authenticated";
 grant EXECUTE on function private.set_workspace_topics_impl(uuid,jsonb) to "postgres";
+grant EXECUTE on function private.source_quota_resets_at() to "postgres";
+grant EXECUTE on function private.source_quota_resets_at() to "service_role";
 grant EXECUTE on function private.submit_comment_review_impl(uuid,uuid,text,text,text) to "authenticated";
 grant EXECUTE on function private.submit_comment_review_impl(uuid,uuid,text,text,text) to "postgres";
 grant EXECUTE on function private.submit_topic_review_impl(uuid,uuid,text,text,text) to "authenticated";
