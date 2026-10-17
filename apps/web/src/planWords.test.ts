@@ -41,8 +41,8 @@ const titled = (used: number) => ({
   plan: {
     key: "pilot",
     segment: "internal" as const,
-    title_ar: "شريك مؤسِّس",
-    title_en: "Founding Partner",
+    title_ar: "شريك تسويقي",
+    title_en: "Marketing Partner",
     price_monthly_cents: 0,
     price_yearly_cents: 0,
     self_serve: false,
@@ -63,10 +63,10 @@ const titled = (used: number) => ({
 describe("the rail's plan card", () => {
   it("names the plan by its title in the reader's language, never by its key", () => {
     expect(planCardWords({ ...base, plan: titled(0) }, ar, "ar").title).toBe(
-      "شريك مؤسِّس",
+      "شريك تسويقي",
     );
     expect(planCardWords({ ...base, plan: titled(0) }, ar, "en").title).toBe(
-      "Founding Partner",
+      "Marketing Partner",
     );
     // A summary without a plan block (an older shape) still says something.
     expect(planCardWords({ ...base, plan: plan(0) }, ar, "ar").title).toBe(

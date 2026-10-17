@@ -1566,3 +1566,25 @@ AJ360's 4,604 uploads under 73 public channels. Two guards, both kept:
   selections) from one channel; a video catalogued under the source channel cannot also be the
   target's, since a YouTube video has one uploader. It deletes production data, so the owner runs
   it; it is out of reach of every API role. Metered usage is left alone: refunds are a billing call.
+
+## 2026-10-17 — the dashboard reads a cache; the count happens in the background
+
+`read:live_unavailable:57014` came back on the owner's AJ360 overview after five patches
+(windowing, indexes, a 30 s timeout, retries, a lighter ops read). Cause: `dashboard_aggregates`
+re-counted every comment of the workspace on each page load, so its cost grew with the workspace
+and with what the worker was writing, and any ceiling was eventually crossed. The earlier fixes
+moved the ceiling; none removed the work from the request.
+
+Decision (`20261111010000_dashboard_aggregates_cache.sql`): a read looks a row up in
+`private.dashboard_aggregates_cache`, one row per (workspace, filter set). pg_cron
+`dashboard-aggregates-drain` (every minute, 10 min budget) recomputes only the rows somebody asked
+for, at most once per row however many viewers or retries asked. The old function is kept as
+`private.dashboard_aggregates_compute`, so the filter and effective-label rules live in one place.
+A payload older than 60 s is served as `stale` while its refresh is queued; a never-computed filter
+set answers `pending` (the page waits and asks again); a failed compute answers `failed` with its
+SQLSTATE, which the page prints. Free-text search (`q`) stays live (trigram index, open-ended keys).
+Rows nobody read for 7 days are dropped.
+
+Not solved by this: the drain's count is still proportional to the workspace. If it ever exceeds 10
+minutes the next step is incremental rollups, not a longer budget. The worker tick's own `55P03` /
+`57014` (progress.md, 2026-10-17) is a separate cause.
