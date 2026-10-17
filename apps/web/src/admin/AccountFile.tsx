@@ -19,6 +19,7 @@ import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminUserDetail } from "@sentiment/contracts";
 import { useStrings } from "../strings";
+import { auditActionLabel } from "../adminWords";
 import { failureCode } from "../failure";
 import { useAdminPlanCatalogue } from "../planCatalogue";
 import { Badge } from "../ui/Badge";
@@ -719,7 +720,7 @@ function History({ detail }: { detail: AdminUserDetail }) {
             <li key={`${h.at}-${i}`}>
               <time dateTime={h.at}>{h.at.slice(0, 16).replace("T", " ")}</time>
               <span>
-                {S.adminAccountActions[h.action] ?? h.action}
+                {auditActionLabel(h.action, S)}
                 {h.workspace_name && (
                   <span dir="auto"> · {h.workspace_name}</span>
                 )}

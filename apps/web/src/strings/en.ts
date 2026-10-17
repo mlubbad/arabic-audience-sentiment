@@ -514,6 +514,22 @@ export const en: Strings = {
   adminImportCollectionNote:
     "Each new workspace bills to your home workspace's plan. The channel's videos are catalogued at once, its latest 20 are then selected for comment collection, and videos it publishes later are added automatically, at most 5 a day.",
   adminImportClear: "Clear the list",
+  adminNoDemo:
+    "This page shows the platform's live data only, so it has no demo. The demo covers workspaces and accounts.",
+  adminNoDemoLink: "Open the workspaces demo",
+  adminStatusLabels: {
+    active: "Active",
+    past_due: "Past due",
+    paused: "Paused",
+    cancelled: "Cancelled",
+  } as Record<string, string>,
+  adminProviderLabels: {
+    paddle: "Paddle",
+    admin: "By hand",
+  } as Record<string, string>,
+  adminNoEnd: "No end date",
+  adminAuditPaddlePlan: (event: string) => `Paddle: subscription ${event}`,
+  adminUntitledChannel: (id: string) => `Untitled channel (${id})`,
   adminImportDemo: "The import works on live data only.",
   // plans & account types
   adminPlansTitle: "Account Types & Permissions",
@@ -687,6 +703,19 @@ export const en: Strings = {
     channel_catalogue_requested: "Channel catalogue refresh requested",
     auto_selection_set: "Automatic selection numbers set",
     channel_imported: "Channel imported",
+    plan_set: "Plan set by hand",
+    plan_updated: "Plan changed for all its subscribers",
+    plan_dropped: "Workspace moved back to the free plan",
+    pack_granted: "Unit pack granted",
+    pack_paddle: "Pack bought through Paddle",
+    platform_reader_promoted: "Platform reader set",
+    workspace_deleted: "Workspace deleted",
+    workspace_retired: "Workspace closed",
+    workspace_renamed: "Workspace renamed",
+    workspace_shared: "Member added to a workspace",
+    workspace_unshared: "Member removed from a workspace",
+    user_marked_test: "Marked as a test account",
+    user_unmarked_test: "Test-account mark removed",
   } as Record<string, string>,
   // channels
   adminConsoleAll: "All",

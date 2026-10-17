@@ -58,7 +58,8 @@ test("the demo opens on six workspaces under the operator's head", async ({
     "TABLE",
   );
   await expect(row(page, 2)).toContainText("قناة ريم للطبخ");
-  await expect(planCell(row(page, 2))).toHaveText("creator_plus");
+  // Plans by their names, not their keys (owner console review, finding 17).
+  await expect(planCell(row(page, 2))).toHaveText("منشئ بلس");
   await expect(row(page, 6)).toContainText("لا خطة");
 });
 
@@ -70,11 +71,11 @@ test("setting a plan changes the row's plan cell and says so in the row", async 
   const form = r.getByTestId("admin-plan-form");
   await form.getByRole("button", { name: "تعيين الخطة" }).click();
   await expect(form.getByRole("status")).toHaveText(DONE);
-  await expect(planCell(r)).toHaveText("agency");
+  await expect(planCell(r)).toHaveText("وكالة");
   // The reducer marks the row admin-provided and active.
-  await expect(r).toContainText("admin");
+  await expect(r).toContainText("يدوي");
   // The other rows did not move.
-  await expect(planCell(row(page, 1))).toHaveText("enterprise");
+  await expect(planCell(row(page, 1))).toHaveText("مؤسسات");
   await expect(rows(page)).toHaveCount(6);
 });
 
@@ -86,16 +87,16 @@ test("a workspace on an active Paddle subscription refuses a plan until override
   await pick(page, r, "اختر خطة", "ميديا");
   await form.getByRole("button", { name: "تعيين الخطة" }).click();
   await expect(form.getByRole("status")).toHaveText(PADDLE_ACTIVE);
-  await expect(planCell(r)).toHaveText("agency");
+  await expect(planCell(r)).toHaveText("وكالة");
 
   await form
     .getByRole("checkbox", { name: "تجاوز اشتراك Paddle النشط" })
     .click();
   await form.getByRole("button", { name: "تعيين الخطة" }).click();
   await expect(form.getByRole("status")).toHaveText(DONE);
-  await expect(planCell(r)).toHaveText("media");
+  await expect(planCell(r)).toHaveText("ميديا");
   // Overridden, not moved off Paddle: the provider stays.
-  await expect(r).toContainText("paddle");
+  await expect(r).toContainText("Paddle");
 });
 
 test("a pack lands on an active plan and is refused where there is none", async ({

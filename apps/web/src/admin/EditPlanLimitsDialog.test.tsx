@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import type { Plan } from "@sentiment/contracts";
 import { EditPlanLimitsDialog, parseLimit } from "./EditPlanLimitsDialog";
 import * as adminRead from "./adminRead";
+import { ar } from "../strings/ar";
 
 vi.mock("./adminRead", () => ({
   updatePlanLimits: vi.fn(),
@@ -154,10 +155,12 @@ describe("EditPlanLimitsDialog", () => {
     });
   });
 
-  it("displays error message when update fails", async () => {
+  it("says the save failed in its own words, with the database's code, never the raw error", async () => {
     const user = userEvent.setup();
+    // What adminRead throws for a refused RPC: the message is always
+    // `live_unavailable`, the code is PostgREST's.
     vi.mocked(adminRead.updatePlanLimits).mockRejectedValueOnce(
-      new Error("Database error updating plan"),
+      Object.assign(new Error("live_unavailable"), { code: "23514" }),
     );
 
     render(
@@ -172,11 +175,11 @@ describe("EditPlanLimitsDialog", () => {
     const saveBtn = screen.getByTestId("btn-save-plan-limits");
     await user.click(saveBtn);
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Database error updating plan"),
-      ).toBeInTheDocument();
-    });
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      `${ar.adminPlanLimitsUpdateFailed} (23514)`,
+    );
+    expect(alert).not.toHaveTextContent("live_unavailable");
   });
 
   it("never saves a cleared field as 0", async () => {

@@ -8,6 +8,7 @@
  * the owner arrived at can be sent or bookmarked as it is.
  */
 import type { AdminConsoleChannel, ChannelState } from "@sentiment/contracts";
+import type { Strings } from "../strings";
 import { fold } from "./AdminCommandPalette";
 
 /** Trouble first: the order the home lists states in and the default sort. */
@@ -76,6 +77,20 @@ export function writeFilter(f: ConsoleFilter): URLSearchParams {
 
 export const channelName = (c: AdminConsoleChannel) =>
   c.title ?? c.handle ?? c.external_channel_id;
+
+/** The name a page prints: an untitled channel says so beside its id rather
+ *  than passing the bare id off as a name (owner console review, 2026-10-13,
+ *  finding 17). The CSV keeps `channelName`, the raw value. */
+export function channelLabel(
+  c: {
+    title: string | null;
+    handle: string | null;
+    external_channel_id: string;
+  },
+  S: Strings,
+): string {
+  return c.title ?? c.handle ?? S.adminUntitledChannel(c.external_channel_id);
+}
 
 function matchesQuery(c: AdminConsoleChannel, query: string): boolean {
   const words = fold(query).split(/\s+/).filter(Boolean);
@@ -154,10 +169,14 @@ const CSV_COLUMNS = [
 ] as const;
 
 export function csvCell(value: string | number | null): string {
-  const text = value === null ? "" : String(value);
-  // Quote what would break a row; a leading = + - @ is neutralised so a
-  // spreadsheet never reads a channel name as a formula.
-  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  if (value === null) return "";
+  // A number is the database's own figure: written as is, so -12 stays a
+  // number in the spreadsheet rather than the text '-12.
+  if (typeof value === "number") return String(value);
+  // Quote what would break a row; text that starts with = + - @, a tab or a
+  // carriage return is neutralised so a spreadsheet never reads a channel
+  // name as a formula (a leading tab or CR is skipped before the = is seen).
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 

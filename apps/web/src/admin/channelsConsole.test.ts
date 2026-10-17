@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AdminConsoleChannel } from "@sentiment/contracts";
 import {
   channelsCsv,
+  csvCell,
   readFilter,
   scoped,
   stateCounts,
@@ -162,5 +163,16 @@ describe("channelsCsv", () => {
     const lines = csv.slice(1).trimEnd().split("\r\n");
     expect(lines[1]!.startsWith('"Say ""hi"", all",')).toBe(true);
     expect(lines[2]!.startsWith("'=HYPERLINK(1),")).toBe(true);
+  });
+
+  it("neutralises a formula behind a leading tab or carriage return, and leaves numbers as numbers", () => {
+    // A spreadsheet skips a leading tab or CR and then reads the =.
+    expect(csvCell("\t=HYPERLINK(1)")).toBe("'\t=HYPERLINK(1)");
+    expect(csvCell("\r=1+1")).toBe('"\'\r=1+1"');
+    expect(csvCell("-1+1")).toBe("'-1+1");
+    // The database's own figures: -12 is a number, not the text '-12.
+    expect(csvCell(-12)).toBe("-12");
+    expect(csvCell(-0.25)).toBe("-0.25");
+    expect(csvCell(null)).toBe("");
   });
 });

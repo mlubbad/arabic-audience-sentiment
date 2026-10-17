@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-10-17 — Owner console review batch D: honest errors and labels
+
+The owner said «ابدأ» to batch D (2026-10-17): findings 7, 15, 16 and 17 of
+[`docs/reviews/2026-10-13-owner-console-review.md`](reviews/2026-10-13-owner-console-review.md).
+Web only; no migration.
+
+- **7, plans page:** a refused public-channels save now says so (`adminPlanToggleFailed` plus the
+  database code) and leaves the toggle where the database has it. It used to report success and
+  flip it. The limits dialog says `adminPlanLimitsUpdateFailed` with the code instead of the raw
+  `live_unavailable`.
+- **15, demo:** in `?demo`, `useAdminShell` opens only pages that say they have fixtures
+  (accounts, services, import). Plans, channels, comparison, audit, ops and system say they show
+  live data only, link to the workspaces demo, and read and write nothing.
+- **16, CSV:** text starting with `= + - @`, a tab or a carriage return is neutralised; numbers
+  are written as numbers, so `-12` stays `-12`.
+- **17, labels:** plan names instead of keys (workspaces, accounts), statuses and providers in
+  words, "no end date" instead of a date a century out, every audit action the database writes
+  named in both languages (a test reads the schema to keep it so), Paddle subscription events
+  named, untitled channels labelled as such beside their id, the System "healthy" badge green only
+  above zero, and a bulk collect that queued nothing shown neutral, not green.
+- **Not in this batch:** the plans page's own hard-coded Arabic/English ternaries and inline
+  styles (pre-existing, left as they are); layout (batch F).
+
 ## 2026-10-17 — The external monitor never ran; it now runs off the Mac and judges each channel
 
 **Found:** the crontab entry installed on 2026-09-19 (`*/5 … ./scripts/monitor.sh`) was refused

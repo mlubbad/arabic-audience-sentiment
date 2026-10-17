@@ -285,8 +285,8 @@ function Workspaces({
   const locale = useLocale();
   const narrow = useMediaQuery("(max-width: 760px)");
   const stacked = forceStacked ?? narrow;
-  const rows = adminRows(list, S);
   const options = adminPlanOptions(catalogue, locale);
+  const rows = adminRows(list, S, options);
   const keys = options.map((o) => o.key);
   const rowFor = (w: AdminWorkspace, i: number) => (
     <WorkspaceRow

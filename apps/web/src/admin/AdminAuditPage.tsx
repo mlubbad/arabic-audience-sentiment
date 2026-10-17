@@ -6,6 +6,7 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useStrings } from "../strings";
+import { auditActionLabel } from "../adminWords";
 import { failureCode } from "../failure";
 import { ChartEmpty, LoadError, Loading } from "../pageStates/PageStates";
 import {
@@ -89,7 +90,9 @@ export function AdminAuditPage() {
                   <TableCell>{e.workspace_name}</TableCell>
                   <TableCell>{e.actor_email ?? "—"}</TableCell>
                   <TableCell>
-                    <span className="admin-audit-action">{e.action}</span>
+                    <span className="admin-audit-action">
+                      {auditActionLabel(e.action, S)}
+                    </span>
                   </TableCell>
                   <TableCell>
                     {e.target_type}

@@ -522,6 +522,22 @@ export const ar = {
   adminImportCollectionNote:
     "كل مساحة جديدة تتبع خطة مساحتك الأساسية. تُفهرس فيديوهات القناة فورًا، ثم يُختار آخر 20 فيديو لجمع تعليقاتها، وبعدها تُضاف الفيديوهات التي تنشرها القناة تلقائيًا، 5 يوميًا كحد أقصى.",
   adminImportClear: "امسح القائمة",
+  adminNoDemo:
+    "هذه الصفحة تعرض بيانات المنصة الحية فقط، فلا مثال توضيحي لها. المثال يشمل مساحات العمل والحسابات.",
+  adminNoDemoLink: "افتح مثال مساحات العمل",
+  adminStatusLabels: {
+    active: "فعّالة",
+    past_due: "متأخرة الدفع",
+    paused: "موقوفة مؤقتاً",
+    cancelled: "ملغاة",
+  } as Record<string, string>,
+  adminProviderLabels: {
+    paddle: "Paddle",
+    admin: "يدوي",
+  } as Record<string, string>,
+  adminNoEnd: "بلا تاريخ انتهاء",
+  adminAuditPaddlePlan: (event: string) => `Paddle: حدث اشتراك (${event})`,
+  adminUntitledChannel: (id: string) => `قناة بلا عنوان (${id})`,
   adminImportDemo: "الاستيراد يعمل على البيانات الحية فقط.",
   // plans & account types
   adminPlansTitle: "أنواع الحسابات والصلاحيات",
@@ -691,6 +707,19 @@ export const ar = {
     channel_catalogue_requested: "طُلب تحديث فهرس قناة",
     auto_selection_set: "عُدّلت أرقام الاختيار التلقائي",
     channel_imported: "استُوردت قناة",
+    plan_set: "فُعّلت خطة يدوياً",
+    plan_updated: "عُدّلت خطة لكل مشتركيها",
+    plan_dropped: "أُعيدت المساحة إلى الخطة المجانية",
+    pack_granted: "مُنحت حزمة وحدات",
+    pack_paddle: "اشتُريت حزمة عبر Paddle",
+    platform_reader_promoted: "عُيّن قارئ المنصة",
+    workspace_deleted: "حُذفت مساحة عمل",
+    workspace_retired: "أُغلقت مساحة عمل",
+    workspace_renamed: "أُعيدت تسمية مساحة عمل",
+    workspace_shared: "أُضيف عضو إلى مساحة",
+    workspace_unshared: "أُزيل عضو من مساحة",
+    user_marked_test: "عُلّم الحساب حساب تجربة",
+    user_unmarked_test: "أُزيلت علامة حساب التجربة",
   } as Record<string, string>,
   // channels
   adminConsoleAll: "الكل",
