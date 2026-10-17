@@ -36,7 +36,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Probe the platform from outside
+        id: probe
         shell: bash
+        timeout-minutes: 5
         env:
           MONITOR_ENV_FILE: ""
           MONITOR_STATE_DIR: ${{ runner.temp }}/monitor-state
@@ -45,15 +47,24 @@ jobs:
           WORKER_API_BASE_URL: ${{ secrets.WORKER_API_BASE_URL }}
           WORKER_CREDENTIAL: ${{ secrets.WORKER_CREDENTIAL }}
           PREVIEW_URL: https://app.sky-develop.net/
+        # GitHub runs `shell: bash` as `bash -eo pipefail`, so a bare failing
+        # command ends the step on the spot. Both first runs (2026-10-17) died
+        # that way on monitor.sh's exit 2: no output in the log and no issue.
+        # The `||` keeps -e from firing; the code is recorded, not raised.
         run: |
           set -uo pipefail
           output="$RUNNER_TEMP/monitor-output.txt"
-          sh scripts/monitor.sh > "$output" 2>&1
-          code=$?
+          code=0
+          sh scripts/monitor.sh > "$output" 2>&1 || code=$?
           cat "$output"
           echo "monitor.sh exited $code (0 healthy, 1 warning, 2 failure)"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      # Runs after a probe that failed or timed out too: a probe that left no
+      # result is the `monitor` check failing, and that needs its issue most.
       - name: Open or close one issue per failing check
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          MONITOR_EXIT_CODE: ${{ steps.probe.outputs.code }}
         run: node scripts/monitor-alerts.mjs "$RUNNER_TEMP/monitor-output.txt"
