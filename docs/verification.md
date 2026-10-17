@@ -3,7 +3,7 @@
 ## 2026-10-16 — Owner console batch C: admin actions leave a trail
 
 Findings 5, 6, 8, 18 and 19 of `docs/reviews/2026-10-13-owner-console-review.md`. Migration
-`20261030000000_admin_actions_leave_a_trail.sql`, plus the `admin-users` handler.
+`20261102000000_admin_actions_leave_a_trail.sql`, plus the `admin-users` handler.
 
 | Command | Actual result |
 | --- | --- |
@@ -34,6 +34,10 @@ Mutation check, each reverted after the run:
 One mutation survived and was replaced: the note in the plain `insert … values` of
 `set_workspace_plan`. Every workspace already has a subscription row, so that value is never used
 and only the `on conflict` update runs; the rows above mutate that update instead.
+
+Renumbered `20261030000000` → `20261102000000` on 2026-10-17: #140 had taken `20261030000000`, and
+#142/#143 take `20261031000000` and `20261101000000`. The runner skips a version already applied, so
+the second PR to merge with a shared version would have shipped without its migration.
 
 Not verified here: the `admin-users` guard in production, which needs the owner's redeploy of the
 function, and the migration's rewrite of existing notes on the production data (tested on a

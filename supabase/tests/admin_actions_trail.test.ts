@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // private.admin_notes when the migration runs.
 const ADMIN = "10000000-0000-4000-8000-00000000000a";
 const USER = "10000000-0000-4000-8000-00000000000b";
-const MIGRATION = "20261030000000_admin_actions_leave_a_trail.sql";
+const MIGRATION = "20261102000000_admin_actions_leave_a_trail.sql";
 
 const BOOT = `create role anon; create role authenticated; create role service_role bypassrls;
   create schema auth; create table auth.users(id uuid primary key, email text);

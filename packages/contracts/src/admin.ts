@@ -163,7 +163,7 @@ export const AdminAuditEventSchema = z
     workspace_name: z.string(),
     // Set when the workspace was deleted: the row is kept and detached
     // (`admin_audit` names it "Deleted workspace"). Optional so a page built
-    // before 20261030000000 and one built after both read either database.
+    // before 20261102000000 and one built after both read either database.
     former_workspace_id: z.string().uuid().nullable().optional(),
     actor_id: z.string().uuid().nullable(),
     actor_email: z.string().email().nullable(),

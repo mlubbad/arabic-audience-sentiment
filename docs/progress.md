@@ -4,7 +4,7 @@
 
 The owner said «ابدأ الدفعة C» (2026-10-16). Batch C of
 [`docs/reviews/2026-10-13-owner-console-review.md`](reviews/2026-10-13-owner-console-review.md)
-covers findings 5, 6, 8, 18 and 19. Branch `claude/keen-keller-skwwpm`, migration `20261030000000`.
+covers findings 5, 6, 8, 18 and 19. Branch `claude/keen-keller-skwwpm`, migration `20261102000000`.
 
 - **5, another admin's account:** `admin-users` now refuses `recovery_link`, `change_email` and
   `confirm_email` on another admin (`409 cannot_act_on_admin`). The caller's own account and
