@@ -102,6 +102,36 @@ def test_missing_statistics_omits_every_statistics_key():
     assert result.channel == {"external_channel_id": CHANNEL_ID}
 
 
+def test_keyword_apostrophe_is_part_of_a_word():
+    result, _ = catalogue(item(
+        brandingSettings={"channel": {"keywords": "Let's play"}},
+    ))
+    assert result.channel == {
+        "external_channel_id": CHANNEL_ID,
+        "keywords": ["Let's", "play"],
+    }
+
+
+def test_unbalanced_double_quote_keeps_the_rest_as_one_phrase():
+    result, _ = catalogue(item(
+        brandingSettings={"channel": {"keywords": 'a "b c'}},
+    ))
+    assert result.channel == {
+        "external_channel_id": CHANNEL_ID,
+        "keywords": ["a", "b c"],
+    }
+
+
+def test_keyword_backslash_is_preserved():
+    result, _ = catalogue(item(
+        brandingSettings={"channel": {"keywords": r"back\slash"}},
+    ))
+    assert result.channel == {
+        "external_channel_id": CHANNEL_ID,
+        "keywords": [r"back\slash"],
+    }
+
+
 def test_an_incomplete_count_set_is_not_sent_and_unknown_text_is_none():
     result, _ = catalogue(item(
         snippet={},
@@ -114,6 +144,10 @@ def test_an_incomplete_count_set_is_not_sent_and_unknown_text_is_none():
         "country": None,
         "default_language": None,
         "channel_published_at": None,
-        "subscriber_count_hidden": False,
     }
-    assert not ({"subscriber_count", "view_count", "video_count"} & result.channel.keys())
+    assert not ({
+        "subscriber_count",
+        "view_count",
+        "video_count",
+        "subscriber_count_hidden",
+    } & result.channel.keys())

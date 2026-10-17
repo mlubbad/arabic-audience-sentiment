@@ -7,7 +7,6 @@ directly.
 """
 import json
 import re
-import shlex
 from collections.abc import Iterator, Set as AbstractSet
 from datetime import datetime, timezone, timedelta
 import httpx
@@ -18,6 +17,12 @@ from .protocol import Batch, Catalogue, CollectionError, RawComment
 # this margin is renewed before the next request is sent rather than after
 # the source refuses it.
 _RENEW_MARGIN_SECONDS = 120
+_KEYWORD_PARTS = re.compile(r'"([^"]*)"?|(\S+)')
+
+
+def _parse_keywords(value: str) -> list[str]:
+    """Split YouTube keywords without interpreting apostrophes or backslashes."""
+    return [quoted or word for quoted, word in _KEYWORD_PARTS.findall(value) if quoted or word]
 
 
 class YouTubeAPI:
@@ -330,7 +335,7 @@ class YouTubeAPI:
                     "keywords"
                 )
                 profile["keywords"] = (
-                    shlex.split(raw_keywords) if isinstance(raw_keywords, str) else None
+                    _parse_keywords(raw_keywords) if isinstance(raw_keywords, str) else None
                 )
             if "topicDetails" in item:
                 categories = (item["topicDetails"] or {}).get("topicCategories")
@@ -338,9 +343,6 @@ class YouTubeAPI:
             if "statistics" in item:
                 statistics = item["statistics"] or {}
                 hidden = statistics.get("hiddenSubscriberCount")
-                profile["subscriber_count_hidden"] = (
-                    hidden if isinstance(hidden, bool) else None
-                )
                 raw_counts = (
                     statistics.get("subscriberCount"),
                     statistics.get("viewCount"),
@@ -353,6 +355,9 @@ class YouTubeAPI:
                         "subscriber_count": None if hidden is True else int(raw_counts[0]),
                         "view_count": int(raw_counts[1]),
                         "video_count": int(raw_counts[2]),
+                        "subscriber_count_hidden": (
+                            hidden if isinstance(hidden, bool) else None
+                        ),
                     })
             return profile
         except (KeyError, TypeError, ValueError):
