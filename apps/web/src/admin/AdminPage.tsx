@@ -40,11 +40,23 @@ import { failureCode } from "../failure";
 import { useMediaQuery } from "../ui/useMediaQuery";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
-import { Table, TableHead, TableHeaderCell, TableRow } from "../ui/Table";
+import { Button } from "../ui/Button";
+import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
+import { Input } from "../ui/Input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from "../ui/Table";
 import { ChartEmpty, Loading, LoadError } from "../pageStates/PageStates";
 import type { Footprint } from "../DeleteWorkspaceDialog";
 import { AdminTabs } from "./AdminShell";
-import { loadAdminDemo, reduceAdminDemo } from "./adminDemo";
+import { DEMO_USERS, loadAdminDemo, reduceAdminDemo } from "./adminDemo";
+import { readAdminAccounts } from "./adminRead";
+import { fold } from "./AdminCommandPalette";
 import { WorkspaceRow, type AdminAction } from "./WorkspaceRow";
 import "../pages.css";
 import "./admin.css";
@@ -107,6 +119,8 @@ function demoFootprint(w: AdminWorkspace): Footprint {
   };
 }
 
+const DEMO_OWNERS: Owners = new Map(DEMO_USERS.map((u) => [u.id, u.email]));
+
 const DEMO_PLAN_KEYS: ReadonlySet<string> = new Set(
   fixtureCatalogue.map((p) => p.key),
 );
@@ -130,6 +144,12 @@ export function AdminPage() {
     enabled: admin,
   });
   const catalogue = useAdminPlanCatalogue(admin);
+  // The accounts page's read and cache key: the owner column, nothing more.
+  const accounts = useQuery({
+    queryKey: ["admin", "accounts", "live"],
+    queryFn: readAdminAccounts,
+    enabled: admin,
+  });
   const demoList = useQuery({
     queryKey: ["admin", "demo"],
     queryFn: ({ signal }) => loadAdminDemo(signal),
@@ -200,7 +220,14 @@ export function AdminPage() {
       />,
     );
   return shell(
-    <LiveWorkspaces rows={list.data} catalogue={catalogue.data ?? []} />,
+    <LiveWorkspaces
+      rows={list.data}
+      catalogue={catalogue.data ?? []}
+      owners={
+        accounts.data &&
+        new Map(accounts.data.map((a) => [a.id, a.email] as const))
+      }
+    />,
   );
 }
 
@@ -212,11 +239,13 @@ export function LiveWorkspaces({
   rows,
   catalogue,
   stacked,
+  owners,
 }: {
   rows: AdminWorkspace[];
   catalogue: { key: string; title_ar: string; title_en: string }[];
   /** Cards whatever the screen: the account file is a narrow panel. */
   stacked?: boolean;
+  owners?: Owners;
 }) {
   const queryClient = useQueryClient();
   const act = async (action: AdminAction) => {
@@ -236,7 +265,13 @@ export function LiveWorkspaces({
     ]);
   };
   return (
-    <Workspaces rows={rows} catalogue={catalogue} act={act} stacked={stacked} />
+    <Workspaces
+      rows={rows}
+      catalogue={catalogue}
+      act={act}
+      stacked={stacked}
+      owners={owners}
+    />
   );
 }
 
@@ -262,54 +297,166 @@ function DemoWorkspaces({ initial }: { initial: AdminWorkspace[] }) {
       catalogue={fixtureCatalogue}
       act={act}
       readFootprint={demoFootprint}
+      owners={DEMO_OWNERS}
     />
   );
 }
 
-/** The section both tables share: the head, the empty card, and the rows —
- *  as a `ui/Table` on a wide screen, as stacked `Card`s under 760px. */
+/** Who owns each workspace, by `created_by`: an email, or null for an
+ *  account with none. Read from `admin_accounts()`, the accounts page's own
+ *  read (and its cache), so the list needs no new RPC. */
+export type Owners = ReadonlyMap<string, string | null>;
+
+/** The name, the owner's email and the id, folded the way every console
+ *  search folds them: many workspaces are called «مساحة العمل الشخصية»,
+ *  and the owner is what tells them apart. */
+export function matchesWorkspace(
+  w: AdminWorkspace,
+  owner: string | null | undefined,
+  query: string,
+): boolean {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = fold([w.name, owner, w.id].filter(Boolean).join(" "));
+  return words.every((word) => hay.includes(word));
+}
+
+/** The section both pages share. On the workspaces page: a searchable list
+ *  (a `ui/Table` on a wide screen, cards under 760px) whose «إدارة» opens
+ *  the workspace in a side panel, the levers and the delete inside it (owner
+ *  console review, 2026-10-13, finding 12). In the account file
+ *  (`stacked`): one card per workspace, levers in the card, since a person
+ *  holds a few. */
 function Workspaces({
   rows: list,
   catalogue,
   act,
   readFootprint,
-  stacked: forceStacked,
+  stacked,
+  owners,
 }: {
   rows: AdminWorkspace[];
   catalogue: { key: string; title_ar: string; title_en: string }[];
   act: (action: AdminAction) => Promise<void>;
   readFootprint?: (w: AdminWorkspace) => Promise<Footprint> | Footprint;
   stacked?: boolean;
+  owners?: Owners;
 }) {
   const S = useStrings();
   const locale = useLocale();
   const narrow = useMediaQuery("(max-width: 760px)");
-  const stacked = forceStacked ?? narrow;
+  const [query, setQuery] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
   const options = adminPlanOptions(catalogue, locale);
   const rows = adminRows(list, S, options);
   const keys = options.map((o) => o.key);
-  const rowFor = (w: AdminWorkspace, i: number) => (
+  const levers = (w: AdminWorkspace, i: number, layout: "card" | "panel") => (
     <WorkspaceRow
       key={w.id}
       workspace={w}
-      row={rows[i]}
+      row={rows[i]!}
       keys={keys}
       options={options}
       act={act}
       readFootprint={readFootprint && (() => Promise.resolve(readFootprint(w)))}
-      stacked={stacked}
+      layout={layout}
     />
   );
+  // Not in the map: the accounts read has not answered (or failed, which
+  // the list survives). In it as null: an account with no email.
+  const ownerOf = (w: AdminWorkspace) => {
+    const email = owners?.get(w.created_by);
+    return email === undefined
+      ? S.adminWorkspaceOwnerUnknown
+      : (email ?? S.adminUsersNoEmail);
+  };
+
+  if (rows.length === 0)
+    return (
+      <section className="db-section" aria-labelledby="admin-table-heading">
+        <header>
+          <h2 id="admin-table-heading">{S.workspacesTitle}</h2>
+        </header>
+        <ChartEmpty testId="admin-empty">{S.adminEmpty}</ChartEmpty>
+      </section>
+    );
+  if (stacked)
+    return (
+      <section className="db-section" aria-labelledby="admin-table-heading">
+        <header>
+          <h2 id="admin-table-heading">{S.workspacesTitle}</h2>
+        </header>
+        <div className="db-admin-cards" data-testid="admin-workspaces">
+          {list.map((w, i) => levers(w, i, "card"))}
+        </div>
+      </section>
+    );
+
+  // Indexes into `list`, so a row keeps its `adminRows` entry when searched.
+  const shown = list
+    .map((w, i) => ({ w, i }))
+    .filter(({ w }) => matchesWorkspace(w, owners?.get(w.created_by), query));
+  // The open workspace is looked up, not kept: once it is deleted it leaves
+  // the list, and the panel closes with it.
+  const openAt = list.findIndex((w) => w.id === openId);
+  const open = openAt >= 0 ? list[openAt]! : null;
+  const manage = (w: AdminWorkspace, i: number) => (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={() => setOpenId(w.id)}
+      aria-label={S.adminWorkspaceManage(rows[i]!.name)}
+      data-testid={`admin-manage-ws-${w.id}`}
+    >
+      {S.adminUserManage}
+    </Button>
+  );
+
   return (
-    <section className="db-section" aria-labelledby="admin-table-heading">
+    <section
+      className="db-section admin-console"
+      aria-labelledby="admin-table-heading"
+    >
       <header>
         <h2 id="admin-table-heading">{S.workspacesTitle}</h2>
       </header>
-      {rows.length === 0 ? (
-        <ChartEmpty testId="admin-empty">{S.adminEmpty}</ChartEmpty>
-      ) : stacked ? (
+      <div className="admin-console-bar">
+        <Input
+          type="search"
+          aria-label={S.adminWorkspacesSearch}
+          placeholder={S.adminWorkspacesSearch}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+      <p className="admin-account-muted" aria-live="polite">
+        {S.adminWorkspacesCount(shown.length, list.length)}
+      </p>
+      {shown.length === 0 ? (
+        <ChartEmpty testId="admin-workspaces-no-match">
+          {S.adminWorkspacesNoMatch}
+        </ChartEmpty>
+      ) : narrow ? (
         <div className="db-admin-cards" data-testid="admin-workspaces">
-          {list.map(rowFor)}
+          {shown.map(({ w, i }) => (
+            <Card
+              key={w.id}
+              className="db-admin-card"
+              data-testid={`admin-row-${w.id}`}
+            >
+              <h3 className="db-card-title" dir="auto">
+                {rows[i]!.name}
+              </h3>
+              <p className="admin-channel-sub" dir="auto">
+                {ownerOf(w)}
+              </p>
+              <p>
+                {rows[i]!.plan} · {rows[i]!.status}
+              </p>
+              <div className="db-row-actions">{manage(w, i)}</div>
+            </Card>
+          ))}
         </div>
       ) : (
         <div className="table-wrap db-admin-wrap">
@@ -317,18 +464,56 @@ function Workspaces({
             <TableHead>
               <TableRow>
                 <TableHeaderCell>{S.workspaceNameLabel}</TableHeaderCell>
+                <TableHeaderCell>{S.adminWorkspaceOwner}</TableHeaderCell>
                 <TableHeaderCell>{S.adminPlan}</TableHeaderCell>
                 <TableHeaderCell>{S.adminStatus}</TableHeaderCell>
                 <TableHeaderCell>{S.adminPeriodEnd}</TableHeaderCell>
                 <TableHeaderCell>{S.adminProvider}</TableHeaderCell>
-                <TableHeaderCell>{S.adminDelete}</TableHeaderCell>
+                <TableHeaderCell>{S.adminUsersActions}</TableHeaderCell>
               </TableRow>
             </TableHead>
-            {/* Each row is its own `<tbody>` (see WorkspaceRow.tsx). */}
-            {list.map(rowFor)}
+            <TableBody>
+              {shown.map(({ w, i }) => (
+                <TableRow key={w.id} data-testid={`admin-row-${w.id}`}>
+                  <th scope="row" dir="auto">
+                    {rows[i]!.name}
+                  </th>
+                  <TableCell dir="auto">{ownerOf(w)}</TableCell>
+                  <TableCell>{rows[i]!.plan}</TableCell>
+                  <TableCell>{rows[i]!.status}</TableCell>
+                  <TableCell className="ui-num">{rows[i]!.periodEnd}</TableCell>
+                  <TableCell>{rows[i]!.provider}</TableCell>
+                  <TableCell>{manage(w, i)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
           </Table>
         </div>
       )}
+      <Dialog
+        open={open !== null}
+        onOpenChange={(isOpen) => !isOpen && setOpenId(null)}
+      >
+        <DialogContent
+          variant="sheet"
+          closeLabel={S.adminWorkspacePanelClose}
+          className="admin-account-sheet"
+          aria-describedby={undefined}
+          data-testid="admin-workspace-panel"
+        >
+          {open && (
+            <div className="admin-account">
+              <header className="admin-account-head">
+                <DialogTitle>
+                  <span dir="auto">{rows[openAt]!.name}</span>
+                </DialogTitle>
+                <small dir="auto">{ownerOf(open)}</small>
+              </header>
+              {levers(open, openAt, "panel")}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

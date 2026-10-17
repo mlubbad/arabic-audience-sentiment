@@ -1,5 +1,37 @@
 # Verification
 
+## 2026-10-17 — Owner console batch F: layout
+
+Findings 12, 13, 14 and 21 of `docs/reviews/2026-10-13-owner-console-review.md`. Web only.
+
+| Command | Actual result |
+| --- | --- |
+| `npm test` | 171 files / 1,388 tests passed (before the style guard below was added). |
+| `npx tsc --noEmit`, `eslint` on the changed files, `npm run format:check`, `npm run build` | Passed. |
+| `npx vitest run` on `AdminPage`, `WorkspaceRow`, `AdminChannelsPage` and `adminStyles` tests | 35 passed. |
+| Playwright, whole suite (local Chromium 1194) | 131 passed. |
+
+Browser measurements at 390 px and 1440 px, real app against stubbed Supabase answers (27
+workspaces, admin session; a throwaway spec, deleted after):
+
+| Page | Before | After |
+| --- | --- | --- |
+| `/admin/import` at 390 px, empty and with rows | `scrollWidth` 413 | 390 |
+| `/admin/workspaces` at 1440 px | 7,471 px tall (review) | 2,622 px, no overflow |
+| `/admin/workspaces` at 390 px | forms on every card | list cards, no overflow |
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| Import column back to the `auto` floor | 1 failed |
+| Search ignores the owner's email | 1 failed |
+| Levers back on every list row | 5 failed |
+| Delete beside the inspect link in the panel | 1 failed |
+| No phone cards on Channels | 1 failed |
+| Rail keeps the customer blocks inside `/admin` (browser suite) | 1 failed |
+| Control: a no-op edit | 0 failed |
+
 ## 2026-10-17 — Owner console batch E: definitions and scale
 
 Findings 9, 10, 11 and 20 of `docs/reviews/2026-10-13-owner-console-review.md`. Migration

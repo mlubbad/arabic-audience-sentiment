@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-10-17 — Owner console review batch F: layout
+
+The owner said «ابدأ الدفعة F» (2026-10-17): findings 12, 13, 14 and 21 of
+[`docs/reviews/2026-10-13-owner-console-review.md`](reviews/2026-10-13-owner-console-review.md).
+Web only; no migration.
+
+- **12, Workspaces:** the page is a list (name, owner, plan, status, period end, provider) with a
+  search over name, owner email and id. «إدارة» opens the workspace in a side panel: its facts, the
+  inspect link, the plan and pack forms, and last, under «منطقة الحذف», the delete. No row carries
+  a form or a delete any more. 27 workspaces at 1440 px: 2,622 px instead of 7,471. The owner
+  comes from `admin_accounts()`, the accounts page's read and cache, so no new RPC. The account
+  file still lists a person's workspaces as cards with their levers.
+- **13, Channels on a phone:** under 640 px each channel is a card with its state, error, counts
+  and last success; selection works the same way.
+- **14, the rail:** inside `/admin` the rail drops the workspace switch, collection state, plan
+  card and tour, and says the numbers are the platform's.
+- **21, Import:** the 23 px overflow at 390 px was the file input's own width setting the grid
+  column's floor; the column is now `minmax(0, 1fr)`. Measured 413 → 390 px.
+- **Not in this batch:** the rail ending short of a long page (it is a sticky 100vh plane by
+  design), and the panel forms' two-column field row, which is the account file's existing card
+  style.
+
 ## 2026-10-17 — The monitor workflow failed blind on its first two runs
 
 **Found** while verifying the WO-21 deploy: both scheduled "Platform monitor" runs after #140
@@ -227,7 +249,6 @@ refusal is what this branch (`claude/meta-page-chooser`) removes: the person pic
 from a list on `/connected`. The same branch makes the result page platform-neutral, stops
 printing the channel's database id on success, and names Meta, Facebook and Instagram on the
 two channel-choice cards.
-
 
 ## 2026-10-13 — Facebook and Instagram channels: two doors, one worker
 
@@ -682,7 +703,6 @@ Implemented comprehensive quota optimization in the YouTube Data API collector a
   - Full repo verification (`npm run check`): 276 worker tests, 1299 vitest tests, 392 DB tests, Playwright tests, builds, and secret checks passed 100% green.
 
 ## 2026-09-22 — Comprehensive Audit Improvements Execution (P0 & P1 Hardening) & Live Deployment
-
 
 Executed the prioritized improvements derived from the 360-degree architecture, security, performance, and typography audit, applied remote migrations, deployed live, and verified across all test tiers:
 
