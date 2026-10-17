@@ -21,6 +21,8 @@ export const en: Strings = {
   menuOpen: "Menu ☰",
   menuClose: "Close ×",
   navLabel: "Main navigation",
+  railConsoleNote:
+    "Owner console: the numbers here are the whole platform's, not one workspace's.",
   navCaption: "Navigate",
   railWorkspaceCaption: "Workspace",
   railWorkspaceNone: "No workspace chosen yet",
@@ -393,6 +395,18 @@ export const en: Strings = {
   adminDemoLead:
     "An illustrative copy of the admin page: changes stay in this session.",
   adminInspectWorkspace: "Inspect workspace",
+  // ---- the workspaces list and its panel (owner console review, finding 12) ----
+  adminWorkspacesSearch: "Search by workspace name, owner email or id",
+  adminWorkspacesCount: (shown: number, total: number) =>
+    `${shown} of ${total} workspaces`,
+  adminWorkspacesNoMatch: "No workspace matches this search.",
+  adminWorkspaceOwner: "Owner",
+  adminWorkspaceOwnerUnknown: "Unknown",
+  adminWorkspaceManage: (name: string) => `Manage ${name}`,
+  adminWorkspacePanelClose: "Close the workspace details",
+  adminWorkspaceDanger: "Delete zone",
+  adminWorkspaceDangerNote:
+    "Deleting is permanent: its channels, comments and analyses go with it, and its members lose access.",
   adminInspectionBadge: "Supervisor Mode",
   adminInspectionBanner: (name: string, owner?: string) =>
     owner

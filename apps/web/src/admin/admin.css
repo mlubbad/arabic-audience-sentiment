@@ -587,14 +587,23 @@
 }
 
 /* ---------------- bulk channel import ---------------- */
+/* `minmax(0, 1fr)`, not the default `auto` minimum: a native file input's
+   own width (its button and "no file chosen") set the column's floor, and at
+   390px the card ran 23px past the screen (owner console review, finding 21).
+   The results table keeps its own sideways scroll inside `.table-wrap`. */
 .admin-import {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 .admin-import-file {
   display: grid;
   gap: var(--space-1);
   font-weight: 600;
+}
+.admin-import-file input[type="file"] {
+  max-width: 100%;
+  min-width: 0;
 }
 .admin-import-hint {
   margin: var(--space-1) 0 0;
@@ -1086,4 +1095,87 @@
   justify-self: start;
   font-size: var(--fs-small);
   color: var(--accent);
+}
+
+/* ---------------- workspaces: the panel (review finding 12) ---------------- */
+/* The levers stack in the panel as they do in a card; the delete comes last,
+   under its own heading and rule, never beside a routine action. */
+.admin-workspace-detail .db-admin-levers {
+  grid-template-columns: 1fr;
+  margin-top: var(--space-4);
+  padding-top: 0;
+}
+.admin-workspace-detail .db-admin-lever {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-1);
+}
+.admin-workspace-detail .db-row-actions {
+  margin-top: var(--space-3);
+}
+.admin-workspace-danger {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-danger);
+}
+.admin-workspace-danger h3 {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-danger);
+}
+.admin-workspace-danger p {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--text-3);
+}
+.admin-workspace-danger > :last-child {
+  justify-self: start;
+}
+
+/* ---------------- channels: cards on a phone (review finding 13) ---------------- */
+.admin-console-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+.admin-console-cards-all {
+  display: flex;
+  justify-content: flex-start;
+}
+.admin-console-card {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.admin-console-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+}
+.admin-console-card-head > div {
+  display: grid;
+  min-width: 0;
+}
+.admin-console-card .admin-channel-sub,
+.admin-console-card .admin-channel-error {
+  overflow-wrap: anywhere;
+}
+.admin-console-card-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+.admin-console-card-facts > div {
+  display: contents;
+}
+.admin-console-card-facts dt {
+  color: var(--text-3);
+  font-size: var(--fs-small);
+}
+.admin-console-card-facts dd {
+  margin: 0;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
 }

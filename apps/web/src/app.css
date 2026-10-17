@@ -591,6 +591,17 @@
      caught this one, which is what that test is for. */
   color: rgba(255, 255, 255, 0.62);
 }
+/* In the owner console the workspace block gives way to one line saying
+   whose numbers these are (owner console review, finding 14). */
+.app-rail-console {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.78);
+}
 .app-shell .app-rail .app-nav a {
   position: relative;
   display: grid;

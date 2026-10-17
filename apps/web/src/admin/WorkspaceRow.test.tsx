@@ -42,29 +42,20 @@ const options = [
 ];
 const keys = options.map((o) => o.key);
 
-function mount(act: (action: AdminAction) => Promise<void>, stacked = false) {
+function mount(
+  act: (action: AdminAction) => Promise<void>,
+  layout: "card" | "panel" = "card",
+) {
   const [row] = adminRows([workspace], ar);
   return render(
-    stacked ? (
-      <WorkspaceRow
-        workspace={workspace}
-        row={row}
-        keys={keys}
-        options={options}
-        act={act}
-        stacked
-      />
-    ) : (
-      <table>
-        <WorkspaceRow
-          workspace={workspace}
-          row={row}
-          keys={keys}
-          options={options}
-          act={act}
-        />
-      </table>
-    ),
+    <WorkspaceRow
+      workspace={workspace}
+      row={row}
+      keys={keys}
+      options={options}
+      act={act}
+      layout={layout}
+    />,
   );
 }
 
@@ -89,11 +80,14 @@ beforeEach(() => {
 });
 
 describe("WorkspaceRow", () => {
-  it("carries its workspace id as its test id, prints the row's values, and offers both forms", () => {
+  it("as a card it carries its workspace id, its name as a heading, its values and both forms", () => {
     mount(vi.fn(async () => {}));
     const row = screen.getByTestId(`admin-row-${W}`);
-    expect(row.tagName).toBe("TBODY");
-    expect(row).toHaveTextContent("وكالة نبض الإعلامية");
+    expect(row.tagName).toBe("DIV");
+    expect(row.querySelector("dl")).not.toBeNull();
+    expect(
+      within(row).getByRole("heading", { name: "وكالة نبض الإعلامية" }),
+    ).toBeInTheDocument();
     expect(row).toHaveTextContent("agency");
     expect(row).toHaveTextContent("2026-10-01");
     // The provider and status in words (review finding 17).
@@ -107,23 +101,34 @@ describe("WorkspaceRow", () => {
     expect(inspectLink).toHaveAttribute("href", `/dashboard?ws=${W}`);
   });
 
-  it("stacked, it is a card with a definition list rather than a table row", () => {
+  it("in the panel the delete sits apart, under its own heading, after both forms (review finding 12)", () => {
     mount(
       vi.fn(async () => {}),
-      true,
+      "panel",
     );
-    const row = screen.getByTestId(`admin-row-${W}`);
-    expect(row.tagName).toBe("DIV");
-    expect(row.querySelector("dl")).not.toBeNull();
+    const detail = screen.getByTestId("admin-workspace-detail");
+    // The panel carries the title; the body repeats no name heading, and is
+    // not mistaken for a list row.
     expect(
-      within(row).getByRole("heading", { name: "وكالة نبض الإعلامية" }),
-    ).toBeInTheDocument();
-    expect(within(row).getByTestId("admin-plan-form")).toBeInTheDocument();
-    expect(within(row).getByTestId("admin-pack-form")).toBeInTheDocument();
-    const inspectLink = within(row).getByRole("link", {
-      name: ar.adminInspectWorkspace,
+      within(detail).queryByRole("heading", { name: "وكالة نبض الإعلامية" }),
+    ).toBeNull();
+    expect(screen.queryByTestId(`admin-row-${W}`)).toBeNull();
+    const danger = within(detail).getByRole("region", {
+      name: ar.adminWorkspaceDanger,
     });
-    expect(inspectLink).toHaveAttribute("href", `/dashboard?ws=${W}`);
+    expect(danger).toHaveTextContent(ar.adminWorkspaceDangerNote);
+    const remove = within(danger).getByRole("button", { name: ar.adminDelete });
+    // Exactly one delete, and it is the danger section's.
+    expect(
+      within(detail).getAllByRole("button", { name: ar.adminDelete }),
+    ).toEqual([remove]);
+    const pack = within(detail).getByTestId("admin-pack-form");
+    expect(
+      pack.compareDocumentPosition(danger) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(detail).getByRole("link", { name: ar.adminInspectWorkspace }),
+    ).toHaveAttribute("href", `/dashboard?ws=${W}`);
   });
 
   it("the plan form sends the chosen plan, the months, a null note for an empty one, and the override", async () => {
