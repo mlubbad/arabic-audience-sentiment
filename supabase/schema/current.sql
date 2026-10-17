@@ -36,6 +36,26 @@ alter table "private"."admin_digests" add constraint "admin_digests_recorded_at_
 
 CREATE UNIQUE INDEX admin_digests_pkey ON private.admin_digests USING btree (day);
 
+create table "private"."admin_notes" (
+  "id" uuid default gen_random_uuid() not null,
+  "workspace_id" uuid,
+  "subject" text not null,
+  "ref" text,
+  "note" text not null,
+  "actor_id" uuid,
+  "created_at" timestamp with time zone default now() not null
+);
+
+alter table "private"."admin_notes" add constraint "admin_notes_created_at_not_null" NOT NULL created_at;
+alter table "private"."admin_notes" add constraint "admin_notes_id_not_null" NOT NULL id;
+alter table "private"."admin_notes" add constraint "admin_notes_note_check" CHECK (length(note) >= 1);
+alter table "private"."admin_notes" add constraint "admin_notes_note_not_null" NOT NULL note;
+alter table "private"."admin_notes" add constraint "admin_notes_pkey" PRIMARY KEY (id);
+alter table "private"."admin_notes" add constraint "admin_notes_subject_check" CHECK (subject = ANY (ARRAY['plan'::text, 'pack'::text]));
+alter table "private"."admin_notes" add constraint "admin_notes_subject_not_null" NOT NULL subject;
+
+CREATE UNIQUE INDEX admin_notes_pkey ON private.admin_notes USING btree (id);
+
 create table "private"."auto_selected_videos" (
   "workspace_id" uuid not null,
   "video_id" uuid not null,
@@ -510,7 +530,8 @@ create table "public"."audit_events" (
   "action" text not null,
   "target_type" text not null,
   "target_id" text,
-  "created_at" timestamp with time zone default now() not null
+  "created_at" timestamp with time zone default now() not null,
+  "former_workspace_id" uuid
 );
 alter table "public"."audit_events" enable row level security;
 
@@ -725,6 +746,53 @@ create view "public"."connection_status" as
     catalogued_at,
     platform
    FROM channels c;;
+
+create table "public"."genre_taxonomy" (
+  "version" integer not null,
+  "key" text not null,
+  "parent_key" text,
+  "level" smallint not null,
+  "name_ar" text not null,
+  "name_en" text not null,
+  "description" text not null,
+  "iab_id" text,
+  "position" integer not null
+);
+alter table "public"."genre_taxonomy" enable row level security;
+
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_check" CHECK ((level = 1) = (parent_key IS NULL));
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_description_check" CHECK (length(description) >= 1 AND length(description) <= 400);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_description_not_null" NOT NULL description;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_key_check" CHECK (key ~ '^[a-z][a-z0-9_]{0,39}$'::text);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_key_not_null" NOT NULL key;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_level_check" CHECK (level >= 1 AND level <= 3);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_level_not_null" NOT NULL level;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_name_ar_check" CHECK (length(name_ar) >= 1 AND length(name_ar) <= 80);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_name_ar_not_null" NOT NULL name_ar;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_name_en_check" CHECK (length(name_en) >= 1 AND length(name_en) <= 80);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_name_en_not_null" NOT NULL name_en;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_parent_level" TRIGGER DEFERRABLE;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_pkey" PRIMARY KEY (version, key);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_position_not_null" NOT NULL "position";
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_version_fkey" FOREIGN KEY (version) REFERENCES genre_taxonomy_versions(version);
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_version_not_null" NOT NULL version;
+alter table "public"."genre_taxonomy" add constraint "genre_taxonomy_version_parent_key_fkey" FOREIGN KEY (version, parent_key) REFERENCES genre_taxonomy(version, key);
+
+CREATE UNIQUE INDEX genre_taxonomy_pkey ON public.genre_taxonomy USING btree (version, key);
+
+create table "public"."genre_taxonomy_versions" (
+  "version" integer not null,
+  "published_at" timestamp with time zone default now() not null,
+  "notes" text
+);
+alter table "public"."genre_taxonomy_versions" enable row level security;
+
+alter table "public"."genre_taxonomy_versions" add constraint "genre_taxonomy_versions_pkey" PRIMARY KEY (version);
+alter table "public"."genre_taxonomy_versions" add constraint "genre_taxonomy_versions_published_at_not_null" NOT NULL published_at;
+alter table "public"."genre_taxonomy_versions" add constraint "genre_taxonomy_versions_version_check" CHECK (version > 0);
+alter table "public"."genre_taxonomy_versions" add constraint "genre_taxonomy_versions_version_not_null" NOT NULL version;
+
+CREATE UNIQUE INDEX genre_taxonomy_versions_pkey ON public.genre_taxonomy_versions USING btree (version);
 
 create table "public"."imports" (
   "id" uuid default gen_random_uuid() not null,
@@ -1697,6 +1765,20 @@ declare root uuid; begin
   return 'applied';
 end $function$
 
+CREATE OR REPLACE FUNCTION private.audit_plan_change()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if new is distinct from old then
+    insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+    values (null, auth.uid(), 'plan_updated', 'plan', new.key);
+  end if;
+  return new;
+end $function$
+
 CREATE OR REPLACE FUNCTION private.auto_select_after_catalogue()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1861,6 +1943,44 @@ declare n int; begin
     returning workspace_id)
   select count(*) into n from audited;
   return n;
+end $function$
+
+CREATE OR REPLACE FUNCTION private.blocked_until(w uuid, kind text, reason text)
+ RETURNS timestamp with time zone
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO ''
+AS $function$
+declare
+  remaining bigint;
+  plan_reset timestamptz;
+begin
+  if reason = 'rate_limited' then
+    return now() + interval '1 hour';
+  end if;
+  if reason is null or reason not ilike '%quota%' then
+    return null;
+  end if;
+
+  begin
+    remaining := case when kind = 'analyse' then private.topic_units_remaining(w)
+                      else private.analysis_remaining(w) end;
+  exception when sqlstate '53400' then
+    -- no_active_plan: there are no plan units to have spent.
+    remaining := null;
+  end;
+
+  if remaining is not null and remaining <= 0 then
+    select s.period_end into plan_reset
+      from public.subscriptions s
+     where s.workspace_id = private.billing_root(w);
+    if plan_reset is not null and plan_reset > now()
+       and plan_reset <= now() + interval '366 days' then
+      return plan_reset;
+    end if;
+  end if;
+
+  return private.source_quota_resets_at();
 end $function$
 
 CREATE OR REPLACE FUNCTION private.bootstrap_personal_workspace()
@@ -2123,7 +2243,13 @@ begin
         and (q.status = 'queued'
              or (q.status = 'running' and q.lease_expires_at <= now()))
       order by
-        case when q.type = 'discover' then 0 else 1 end,
+        case
+          when q.type <> 'discover' then 1
+          when exists (select 1 from public.channels ch
+                        where ch.id = q.channel_id and ch.catalogued_at is not null)
+            then 2
+          else 0
+        end,
         case when w is null then (
           select count(*) from public.jobs r
            where r.workspace_id = q.workspace_id
@@ -3397,26 +3523,65 @@ AS $function$
      and v.comments_state <> 'disabled';
 $function$
 
+CREATE OR REPLACE FUNCTION private.enforce_genre_taxonomy_parent_level()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare
+  parent_level smallint;
+begin
+  if new.parent_key is not null then
+    select parent.level
+      into parent_level
+      from public.genre_taxonomy parent
+     where parent.version = new.version
+       and parent.key = new.parent_key;
+
+    if parent_level is not null and new.level <> parent_level + 1 then
+      raise exception 'invalid_genre_parent_level' using errcode = '23514';
+    end if;
+  end if;
+
+  if exists (
+    select 1
+      from public.genre_taxonomy child
+     where child.version = new.version
+       and child.parent_key = new.key
+       and child.level <> new.level + 1
+  ) then
+    raise exception 'invalid_genre_parent_level' using errcode = '23514';
+  end if;
+
+  return new;
+end
+$function$
+
 CREATE OR REPLACE FUNCTION private.enqueue_scheduled(w uuid, c uuid, kind text)
  RETURNS uuid
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare j uuid; gap int; begin
+declare j uuid; gap int; latest public.jobs; begin
   if exists(select 1 from public.jobs where workspace_id=w and channel_id=c and type=kind
              and status in ('queued','running')) then return null; end if;
+  select * into latest from public.jobs
+   where workspace_id=w and channel_id=c and type=kind
+   order by created_at desc limit 1;
+  -- Blocked until a reset: unblock_due_jobs requeues this same job then. A
+  -- fresh job before it would only ask the source the question it has
+  -- already answered, and spend quota to hear it.
+  if latest.status = 'blocked' and latest.not_before > now() then
+    return null; end if;
   -- A job of this kind that just ended badly is not tried again for an hour,
   -- whatever the plan's rate limit says: on a plan with no rate limit the
   -- idle tick re-enqueued a failing collection every time it ran. Measured
   -- from the run's end where one was recorded, else from the job's creation.
-  if exists(
-       select 1 from public.jobs q
-         left join public.sync_runs r on r.workspace_id=q.workspace_id and r.job_id=q.id
-        where q.id = (select id from public.jobs
-                       where workspace_id=w and channel_id=c and type=kind
-                       order by created_at desc limit 1)
-          and q.status in ('failed','blocked','partial','cancelled')
-          and coalesce(r.ended_at, q.created_at) > now() - interval '60 minutes') then
+  if latest.id is not null
+     and latest.status in ('failed','blocked','partial','cancelled')
+     and coalesce((select r.ended_at from public.sync_runs r
+                    where r.workspace_id = w and r.job_id = latest.id),
+                  latest.created_at) > now() - interval '60 minutes' then
     return null; end if;
   gap := private.plan_limit(w, 'sync_interval');
   if gap is not null and gap > 0 and exists(
@@ -4669,10 +4834,20 @@ CREATE OR REPLACE FUNCTION private.reject_review_mutation()
  SET search_path TO ''
 AS $function$
 begin
-  if tg_op = 'DELETE'
-     and current_setting('app.deleting_workspace', true) is not null
+  if current_setting('app.deleting_workspace', true) is not null
      and current_setting('app.deleting_workspace', true) = old.workspace_id::text then
-    return old;
+    if tg_table_name <> 'audit_events' then
+      if tg_op = 'DELETE' then return old; end if;
+    elsif tg_op = 'UPDATE' then
+      if new.workspace_id is null
+         and old.former_workspace_id is null
+         and new.former_workspace_id = old.workspace_id
+         and (new.id, new.actor_id, new.action, new.target_type, new.target_id, new.created_at)
+             is not distinct from
+             (old.id, old.actor_id, old.action, old.target_type, old.target_id, old.created_at) then
+        return new;
+      end if;
+    end if;
   end if;
   raise exception 'comment_reviews_is_append_only' using errcode='0A000';
 end $function$
@@ -5106,6 +5281,16 @@ declare v int; begin
    where id = w returning topic_taxonomy_version into v;
   return v;
 end $function$
+
+CREATE OR REPLACE FUNCTION private.source_quota_resets_at()
+ RETURNS timestamp with time zone
+ LANGUAGE sql
+ STABLE
+ SET search_path TO ''
+AS $function$
+  select (date_trunc('day', now() at time zone 'America/Los_Angeles') + interval '1 day')
+         at time zone 'America/Los_Angeles'
+$function$
 
 CREATE OR REPLACE FUNCTION private.submit_comment_review_impl(w uuid, c uuid, seen_hash text, verdict text, why text)
  RETURNS uuid
@@ -5689,19 +5874,19 @@ AS $function$
 declare
   w uuid;
   ch uuid;
+  j_type text;
   start_time timestamptz;
   dur_sec integer;
   j_attempt integer;
   backoff_seconds integer;
-  sub_reset timestamptz;
   blocked_not_before timestamptz;
 begin
   perform private.worker_job(token_hash, j, t);
   if outcome not in ('succeeded','partial','failed','blocked','cancelled') then
     raise exception 'invalid_outcome' using errcode='22023'; end if;
 
-  select created_at, attempt, workspace_id, channel_id
-    into start_time, j_attempt, w, ch
+  select created_at, attempt, workspace_id, channel_id, type
+    into start_time, j_attempt, w, ch, j_type
     from public.jobs
    where id = j;
   dur_sec := greatest(1, round(extract(epoch from (now() - coalesce(start_time, now())))))::int;
@@ -5734,22 +5919,8 @@ begin
     return;
   end if;
 
-  -- On blocked, set not_before by reason (quota -> next reset; plan_inactive/source_access_denied -> not time-based)
   if outcome = 'blocked' then
-    if reason ilike '%quota%' or reason in ('quota_exceeded', 'rate_limited') then
-      select s.period_end into sub_reset
-        from public.subscriptions s
-       where s.workspace_id = private.billing_root(w);
-
-      if sub_reset is not null and sub_reset > now() and sub_reset <= (now() + interval '366 days') then
-        blocked_not_before := sub_reset;
-      else
-        blocked_not_before := (date_trunc('day', now() at time zone 'utc') + interval '1 day');
-      end if;
-    else
-      -- plan_inactive, source_access_denied, and other non-quota reasons are not time-based
-      blocked_not_before := null;
-    end if;
+    blocked_not_before := private.blocked_until(w, j_type, reason);
   end if;
 
   update public.jobs set status = outcome,
@@ -6306,10 +6477,12 @@ CREATE OR REPLACE FUNCTION public.admin_audit(p_limit integer DEFAULT 100)
 AS $function$
 begin
   if not public.is_platform_admin() then raise exception 'forbidden' using errcode='42501'; end if;
-  if p_limit < 1 or p_limit > 500 then raise exception 'invalid_limit' using errcode='22023'; end if;
+  if p_limit is null or p_limit < 1 or p_limit > 500 then raise exception 'invalid_limit' using errcode='22023'; end if;
   return query
     select jsonb_build_object(
-      'id', a.id, 'workspace_id', a.workspace_id, 'workspace_name', coalesce(w.name, 'Platform'),
+      'id', a.id, 'workspace_id', a.workspace_id,
+      'workspace_name', coalesce(w.name, case when a.former_workspace_id is not null then 'Deleted workspace' else 'Platform' end),
+      'former_workspace_id', a.former_workspace_id,
       'actor_id', a.actor_id, 'actor_email', u.email,
       'action', a.action, 'target_type', a.target_type, 'target_id', a.target_id,
       'created_at', to_jsonb(a.created_at))
@@ -7616,7 +7789,9 @@ declare me uuid; my_home uuid; begin
   delete from public.worker_seen where workspace_id = w;
   delete from public.memberships where workspace_id = w;
   delete from public.subscriptions where workspace_id = w;
-  delete from public.audit_events where workspace_id = w;
+  -- The audit trail is detached, not deleted: who impersonated, who set a
+  -- plan, who granted a pack must survive the workspace (review finding 6).
+  update public.audit_events set workspace_id = null, former_workspace_id = w where workspace_id = w;
   delete from public.workspaces where id = w;
 
   -- The act outlives the rows: recorded on the admin's own home.
@@ -7631,17 +7806,84 @@ CREATE OR REPLACE FUNCTION public.enqueue_sync(w uuid, c uuid, k text)
  SET search_path TO ''
 AS $function$select private.enqueue_sync_impl(w,c,k)$function$
 
+CREATE OR REPLACE FUNCTION public.genre_taxonomy(p_version integer DEFAULT NULL::integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  selected_version int;
+  result jsonb;
+begin
+  selected_version := p_version;
+  if selected_version is null then
+    select max(v.version)
+      into selected_version
+      from public.genre_taxonomy_versions v;
+  end if;
+
+  if not exists (
+    select 1
+      from public.genre_taxonomy_versions v
+     where v.version = selected_version
+  ) then
+    raise exception 'invalid_input' using errcode = '22023';
+  end if;
+
+  select jsonb_build_object(
+    'version', selected_version,
+    'genres', coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'key', genre.key,
+          'parent_key', genre.parent_key,
+          'level', genre.level,
+          'name_ar', genre.name_ar,
+          'name_en', genre.name_en,
+          'description', genre.description,
+          'iab_id', genre.iab_id,
+          'position', genre.position
+        ) order by genre.level, genre.position
+      ),
+      '[]'::jsonb
+    )
+  )
+    into result
+    from public.genre_taxonomy genre
+   where genre.version = selected_version;
+
+  return result;
+end
+$function$
+
 CREATE OR REPLACE FUNCTION public.grant_pack(w uuid, kind text, units integer, note text)
  RETURNS uuid
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-begin
+declare ref text; g uuid; begin
   if not public.is_platform_admin() then raise exception 'forbidden' using errcode='42501'; end if;
+  -- The note is the retry key: the same note on the same workspace returns
+  -- the first grant. Scoped to the workspace, so another workspace's note
+  -- never swallows this grant, and hashed, so the workspace's members, who
+  -- can read usage_grants, never read the owner's words.
+  if note is not null then
+    ref := w::text || ':' || md5(note);
+    perform pg_advisory_xact_lock(hashtextextended('grant_pack:' || ref, 0));
+    select id into g from public.usage_grants where source = 'admin' and provider_ref = ref;
+    if found then return g; end if;
+  end if;
+  g := private.grant_units(w, kind, units, 'admin', ref);
+  -- Written only once a grant exists.
   insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
   values (w, auth.uid(), 'pack_granted', 'usage_grant', kind || ':' || units);
-  return private.grant_units(w, kind, units, 'admin', note);
+  if note is not null and note <> '' then
+    insert into private.admin_notes(workspace_id, subject, ref, note, actor_id)
+    values (w, 'pack', g::text, note, auth.uid());
+  end if;
+  return g;
 end $function$
 
 CREATE OR REPLACE FUNCTION public.import_historical_records(w uuid, c uuid DEFAULT NULL::uuid, payload jsonb DEFAULT NULL::jsonb, p_channel_id uuid DEFAULT NULL::uuid, p_payload jsonb DEFAULT NULL::jsonb)
@@ -7970,6 +8212,9 @@ declare conn record; begin
                                       granted_scopes, connected_by)
   values (conn.id, conn.encrypted_tokens, conn.key_version, conn.granted_scopes,
           conn.connected_by);
+  -- Platform-wide, so no workspace: its owner has no reason to read it.
+  insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+  values (null, auth.uid(), 'platform_reader_promoted', 'channel', c::text);
 end $function$
 
 CREATE OR REPLACE FUNCTION public.register_channel(w uuid, c uuid, external text)
@@ -8223,27 +8468,31 @@ begin
   on_paddle := found and live.provider = 'paddle' and live.status in ('active','past_due');
   if on_paddle and not override then
     raise exception 'paddle_subscription_active' using errcode='55000'; end if;
+  if note is not null and note <> '' then
+    insert into private.admin_notes(workspace_id, subject, ref, note, actor_id)
+    values (w, 'plan', plan, note, auth.uid());
+  end if;
   if on_paddle then
     update public.subscriptions
        set plan_key = plan, status = 'active', period_start = p_start, period_end = p_end
      where workspace_id = root or billing_workspace_id = root;
     insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
-    values (w, auth.uid(), 'plan_set', 'plan', plan || ':' || coalesce(note, ''));
+    values (w, auth.uid(), 'plan_set', 'plan', plan);
     return private.usage_summary_unchecked(w);
   end if;
   insert into public.subscriptions(workspace_id, plan_key, status, period_start, period_end, provider, provider_ref)
-  values (root, plan, 'active', p_start, p_end, 'admin', note)
+  values (root, plan, 'active', p_start, p_end, 'admin', null)
   on conflict (workspace_id) do update
     set plan_key = excluded.plan_key, status = 'active',
         period_start = excluded.period_start, period_end = excluded.period_end,
-        provider = 'admin', provider_ref = excluded.provider_ref, cancel_at_period_end = false;
+        provider = 'admin', provider_ref = null, cancel_at_period_end = false;
   -- Every client workspace billing through root copied its subscription row
   -- from the root at creation (private.create_workspace_impl); keep those
   -- copies in step rather than letting them read stale terms.
   update public.subscriptions
      set plan_key = plan, status = 'active',
          period_start = p_start, period_end = p_end,
-         provider = 'admin', provider_ref = note, cancel_at_period_end = false
+         provider = 'admin', provider_ref = null, cancel_at_period_end = false
    where billing_workspace_id = root;
   insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
   values (w, auth.uid(), 'plan_set', 'plan', plan);
@@ -8824,6 +9073,13 @@ grant SELECT on table "private"."admin_digests" to "postgres";
 grant TRIGGER on table "private"."admin_digests" to "postgres";
 grant TRUNCATE on table "private"."admin_digests" to "postgres";
 grant UPDATE on table "private"."admin_digests" to "postgres";
+grant DELETE on table "private"."admin_notes" to "postgres";
+grant INSERT on table "private"."admin_notes" to "postgres";
+grant REFERENCES on table "private"."admin_notes" to "postgres";
+grant SELECT on table "private"."admin_notes" to "postgres";
+grant TRIGGER on table "private"."admin_notes" to "postgres";
+grant TRUNCATE on table "private"."admin_notes" to "postgres";
+grant UPDATE on table "private"."admin_notes" to "postgres";
 grant DELETE on table "private"."auto_selected_videos" to "postgres";
 grant INSERT on table "private"."auto_selected_videos" to "postgres";
 grant REFERENCES on table "private"."auto_selected_videos" to "postgres";
@@ -9109,6 +9365,20 @@ grant SELECT on table "public"."connection_status" to "postgres";
 grant TRIGGER on table "public"."connection_status" to "postgres";
 grant TRUNCATE on table "public"."connection_status" to "postgres";
 grant UPDATE on table "public"."connection_status" to "postgres";
+grant DELETE on table "public"."genre_taxonomy" to "postgres";
+grant INSERT on table "public"."genre_taxonomy" to "postgres";
+grant REFERENCES on table "public"."genre_taxonomy" to "postgres";
+grant SELECT on table "public"."genre_taxonomy" to "postgres";
+grant TRIGGER on table "public"."genre_taxonomy" to "postgres";
+grant TRUNCATE on table "public"."genre_taxonomy" to "postgres";
+grant UPDATE on table "public"."genre_taxonomy" to "postgres";
+grant DELETE on table "public"."genre_taxonomy_versions" to "postgres";
+grant INSERT on table "public"."genre_taxonomy_versions" to "postgres";
+grant REFERENCES on table "public"."genre_taxonomy_versions" to "postgres";
+grant SELECT on table "public"."genre_taxonomy_versions" to "postgres";
+grant TRIGGER on table "public"."genre_taxonomy_versions" to "postgres";
+grant TRUNCATE on table "public"."genre_taxonomy_versions" to "postgres";
+grant UPDATE on table "public"."genre_taxonomy_versions" to "postgres";
 grant SELECT on table "public"."imports" to "authenticated";
 grant DELETE on table "public"."imports" to "postgres";
 grant INSERT on table "public"."imports" to "postgres";
@@ -9386,6 +9656,7 @@ grant EXECUTE on function private.analysis_remaining(uuid) to "postgres";
 grant EXECUTE on function private.analysis_remaining(uuid) to "service_role";
 grant EXECUTE on function private.apply_billing_event(text,text,timestamp with time zone,uuid,text,text,timestamp with time zone,timestamp with time zone,text,boolean,text,text,jsonb) to "postgres";
 grant EXECUTE on function private.apply_pack_event(text,timestamp with time zone,uuid,text,integer,text,jsonb) to "postgres";
+grant EXECUTE on function private.audit_plan_change() to "postgres";
 grant EXECUTE on function private.auto_select_after_catalogue() to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "service_role";
@@ -9395,6 +9666,8 @@ grant EXECUTE on function private.backoff_after(integer) to "postgres";
 grant EXECUTE on function private.billing_root(uuid) to "postgres";
 grant EXECUTE on function private.billing_root(uuid) to "service_role";
 grant EXECUTE on function private.billing_sweep() to "postgres";
+grant EXECUTE on function private.blocked_until(uuid,text,text) to "postgres";
+grant EXECUTE on function private.blocked_until(uuid,text,text) to "service_role";
 grant EXECUTE on function private.bootstrap_personal_workspace() to "postgres";
 grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "postgres";
 grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "service_role";
@@ -9427,6 +9700,7 @@ grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "service_role
 grant EXECUTE on function private.drain_channel_compare(integer) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "service_role";
+grant EXECUTE on function private.enforce_genre_taxonomy_parent_level() to "postgres";
 grant EXECUTE on function private.enqueue_scheduled(uuid,uuid,text) to "postgres";
 grant EXECUTE on function private.enqueue_scheduled(uuid,uuid,text) to "service_role";
 grant EXECUTE on function private.enqueue_sync_impl(uuid,uuid,text) to "authenticated";
@@ -9523,6 +9797,8 @@ grant EXECUTE on function private.select_videos_impl(uuid,uuid,uuid[],uuid[]) to
 grant EXECUTE on function private.select_videos_impl(uuid,uuid,uuid[],uuid[]) to "postgres";
 grant EXECUTE on function private.set_workspace_topics_impl(uuid,jsonb) to "authenticated";
 grant EXECUTE on function private.set_workspace_topics_impl(uuid,jsonb) to "postgres";
+grant EXECUTE on function private.source_quota_resets_at() to "postgres";
+grant EXECUTE on function private.source_quota_resets_at() to "service_role";
 grant EXECUTE on function private.submit_comment_review_impl(uuid,uuid,text,text,text) to "authenticated";
 grant EXECUTE on function private.submit_comment_review_impl(uuid,uuid,text,text,text) to "postgres";
 grant EXECUTE on function private.submit_topic_review_impl(uuid,uuid,text,text,text) to "authenticated";
@@ -9681,6 +9957,9 @@ grant EXECUTE on function delete_workspace(uuid) to "authenticated";
 grant EXECUTE on function delete_workspace(uuid) to "postgres";
 grant EXECUTE on function enqueue_sync(uuid,uuid,text) to "authenticated";
 grant EXECUTE on function enqueue_sync(uuid,uuid,text) to "postgres";
+grant EXECUTE on function genre_taxonomy(integer) to "authenticated";
+grant EXECUTE on function genre_taxonomy(integer) to "postgres";
+grant EXECUTE on function genre_taxonomy(integer) to "service_role";
 grant EXECUTE on function grant_pack(uuid,text,integer,text) to "authenticated";
 grant EXECUTE on function grant_pack(uuid,text,integer,text) to "postgres";
 grant EXECUTE on function import_historical_records(uuid,uuid,jsonb,uuid,jsonb) to "authenticated";
@@ -9704,8 +9983,8 @@ grant EXECUTE on function oauth_start(uuid,uuid,text,text,text,text) to "postgre
 grant EXECUTE on function plan_catalogue() to "anon";
 grant EXECUTE on function plan_catalogue() to "authenticated";
 grant EXECUTE on function plan_catalogue() to "postgres";
+grant EXECUTE on function promote_platform_reader(uuid,uuid) to "authenticated";
 grant EXECUTE on function promote_platform_reader(uuid,uuid) to "postgres";
-grant EXECUTE on function promote_platform_reader(uuid,uuid) to "public";
 grant EXECUTE on function register_channel(uuid,uuid,text) to "authenticated";
 grant EXECUTE on function register_channel(uuid,uuid,text) to "postgres";
 grant EXECUTE on function register_public_channel(uuid,uuid,text,text,text,text) to "authenticated";

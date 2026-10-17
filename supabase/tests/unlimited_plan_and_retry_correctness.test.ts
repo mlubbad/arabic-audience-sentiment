@@ -408,7 +408,10 @@ describe("Unlimited plans overflow protection and worker retry lifecycle", () =>
       expect(syncRun.error_code).toBeNull();
     });
 
-    it("sets not_before to next reset on blocked: quota_exceeded", async () => {
+    // The owner plan's units are unlimited, so this refusal is the source's
+    // daily quota: it resets at midnight Pacific, not at the period end
+    // (20261031000000; quota_reset_hold.test.ts has the spent-plan case).
+    it("sets not_before to the source's next reset on blocked: quota_exceeded", async () => {
       await asServiceRole();
       const jobId = "00000000-0000-4000-8000-000000000030";
       const leaseToken = "00000000-0000-4000-8000-000000000031";
@@ -441,9 +444,18 @@ describe("Unlimited plans overflow protection and worker retry lifecycle", () =>
         ])
       ).rows[0];
 
+      const reset = (
+        await db.query<{ r: string }>(
+          "select private.source_quota_resets_at() as r",
+        )
+      ).rows[0].r;
+
       expect(job.status).toBe("blocked");
       expect(job.error_code).toBe("quota_exceeded");
       expect(new Date(job.not_before).toISOString()).toBe(
+        new Date(reset).toISOString(),
+      );
+      expect(new Date(job.not_before).toISOString()).not.toBe(
         new Date(periodEnd).toISOString(),
       );
     });

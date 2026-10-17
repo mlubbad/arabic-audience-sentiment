@@ -661,6 +661,8 @@ export const en: Strings = {
     user_not_found: "This account no longer exists.",
     cannot_suspend_admin:
       "Neither your account nor another admin's is suspended.",
+    cannot_act_on_admin:
+      "Another admin's account gets no sign-in link, email change or confirmation from here.",
     no_email: "This account has no email.",
     email_taken: "Another account already uses this email.",
     invalid_request: "The request is not valid; check the email.",

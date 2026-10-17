@@ -5,6 +5,7 @@ Invokes Apify actors via the Apify REST API (run-sync-get-dataset-items).
 
 from datetime import datetime, timezone
 import httpx
+from ..identity import stable_author_id
 from ..meta_graph import parse_graph_time
 from ..protocol import CollectionError
 
@@ -169,7 +170,7 @@ class ApifyClient:
                     "is_reply": True,
                     "published_at": created_at,
                     "author_name": author_info.get("name") or author_info.get("userName") or "",
-                    "author_channel_id": str(author_info.get("id") or ""),
+                    "author_channel_id": stable_author_id(author_info.get("id")),
                     "likes_value": int(likes) if isinstance(likes, (int, float)) else 0,
                 }
             )
@@ -249,7 +250,8 @@ class ApifyClient:
                     "is_reply": bool(item.get("replyToReplyId")),
                     "published_at": created_at,
                     "author_name": author.get("nickname") or author.get("uniqueId") or "",
-                    "author_channel_id": str(author.get("id") or author.get("uid") or ""),
+                    "author_channel_id": stable_author_id(author.get("id"))
+                    or stable_author_id(author.get("uid")),
                     "likes_value": int(likes) if isinstance(likes, (int, float)) else 0,
                 }
             )

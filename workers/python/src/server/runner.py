@@ -8,7 +8,7 @@ picks up where it stopped rather than starting the video again.
 import hashlib
 import time
 
-from collectors.protocol import CollectionError
+from collectors.protocol import Batch, CollectionError
 from topics.analysis import classify
 from topics.protocol import TopicError
 
@@ -364,22 +364,31 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                 video_skipped_blocked = False
                 for batch in batch_iter:
                     collected_for_video += len(batch.comments)
-                    predictions: list = []
-                    if analyzer is not None:
-                        try:
-                            predictions = analyse(analyzer, batch.comments)
-                        except AnalysisError:
-                            analysis_failed = True
-                    control.heartbeat(lease)
-                    progress_dict = {"video": vid, "done": sorted(done)}
-                    if is_hist:
-                        progress_dict["is_historical"] = True
-                    control.commit_batch(
-                        lease, vid, video.get("title"), batch, predictions,
-                        progress=progress_dict,
-                    )
-                    if batch.outcome in ("explicitly_disabled", "unavailable"):
-                        control.video_finished(lease, video["video_id"], "blocked", batch.outcome)
+                    # The source's verdict on the video is not a batch outcome
+                    # the server takes: commit_batch refuses it whole as
+                    # invalid_batch, and the run ended on that post every hour.
+                    # Comments read before the verdict still travel, as progress.
+                    verdict = (batch.outcome
+                               if batch.outcome in ("explicitly_disabled", "unavailable") else None)
+                    if verdict:
+                        batch = Batch(batch.comments, batch.checkpoint, "partial")
+                    if batch.comments or not verdict:
+                        predictions: list = []
+                        if analyzer is not None:
+                            try:
+                                predictions = analyse(analyzer, batch.comments)
+                            except AnalysisError:
+                                analysis_failed = True
+                        control.heartbeat(lease)
+                        progress_dict = {"video": vid, "done": sorted(done)}
+                        if is_hist:
+                            progress_dict["is_historical"] = True
+                        control.commit_batch(
+                            lease, vid, video.get("title"), batch, predictions,
+                            progress=progress_dict,
+                        )
+                    if verdict:
+                        control.video_finished(lease, video["video_id"], "blocked", verdict)
                         done.add(vid)
                         video_skipped_blocked = True
                         break
