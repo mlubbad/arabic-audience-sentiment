@@ -120,6 +120,40 @@ describe("AdminChannelsPage (channels console)", () => {
     expect(screen.getByText(ar.adminConsoleCount(3, 3))).toBeInTheDocument();
   });
 
+  it("on a phone each channel is a card carrying its state, counts and last success (review finding 13)", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(max-width: 640px)",
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    try {
+      mount();
+      const list = await screen.findByTestId("admin-channels");
+      expect(list.tagName).toBe("DIV");
+      expect(within(list).queryByRole("table")).toBeNull();
+      expect(names()).toEqual(["Failing one", "Customer shop", "Healthy one"]);
+      const failing = screen.getByTestId(`admin-console-row-${ROWS[1]!.id}`);
+      expect(failing).toHaveTextContent(ar.adminChannelStates.failing!);
+      expect(failing).toHaveTextContent("quota_exceeded");
+      expect(failing).toHaveTextContent(ar.adminHomeNever);
+      expect(failing).toHaveTextContent("100 · 20");
+      expect(failing).toHaveTextContent("2,000");
+      const healthy = screen.getByTestId(`admin-console-row-${ROWS[0]!.id}`);
+      expect(healthy).toHaveTextContent("2026-10-09 06:00");
+      // The selection works the same way: one box per card, one for all.
+      await userEvent.click(
+        within(list).getByRole("checkbox", { name: ar.adminBulkSelectAll }),
+      );
+      expect(
+        within(list)
+          .getAllByRole("checkbox")
+          .every((b) => b.getAttribute("aria-checked") === "true"),
+      ).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("opens on the state the home linked to, and a chip changes the address", async () => {
     mount("/admin/channels?state=failing");
     await screen.findByTestId("admin-channels");

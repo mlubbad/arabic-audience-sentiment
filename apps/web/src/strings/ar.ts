@@ -30,6 +30,7 @@ export const ar = {
   menuOpen: "القائمة ☰",
   menuClose: "إغلاق ×",
   navLabel: "التنقل الرئيسي",
+  railConsoleNote: "لوحة المالك: الأرقام هنا للمنصة كلها، لا لمساحة عمل واحدة.",
   navCaption: "التنقّل",
   // The rail carries state, not signposts: which workspace, and whether
   // collection is running — said in the same words the operations page uses.
@@ -399,6 +400,18 @@ export const ar = {
   adminDemoLead:
     "هذه نسخة توضيحية من صفحة الإدارة: التغييرات تبقى في هذه الجلسة فقط.",
   adminInspectWorkspace: "استعراض المساحة",
+  // ---- the workspaces list and its panel (owner console review, finding 12) ----
+  adminWorkspacesSearch: "ابحث باسم المساحة أو بريد المالك أو المعرّف",
+  adminWorkspacesCount: (shown: number, total: number) =>
+    `${shown} من ${total} مساحة`,
+  adminWorkspacesNoMatch: "لا مساحة تطابق هذا البحث.",
+  adminWorkspaceOwner: "المالك",
+  adminWorkspaceOwnerUnknown: "غير معروف",
+  adminWorkspaceManage: (name: string) => `إدارة ${name}`,
+  adminWorkspacePanelClose: "إغلاق تفاصيل المساحة",
+  adminWorkspaceDanger: "منطقة الحذف",
+  adminWorkspaceDangerNote:
+    "الحذف نهائي: تذهب معها القنوات والتعليقات والتحليلات، ويفقد أعضاؤها الوصول.",
   adminInspectionBadge: "وضع المشرف",
   adminInspectionBanner: (name: string, owner?: string) =>
     owner

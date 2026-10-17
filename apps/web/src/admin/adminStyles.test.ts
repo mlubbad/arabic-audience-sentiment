@@ -14,6 +14,22 @@ describe("admin styles", () => {
     expect(shell).toMatch(/import "\.\.\/pages\.css";/);
   });
 
+  // At 390px the import card ran 23px past the screen: a native file input's
+  // own width set the grid column's floor (owner console review, finding 21;
+  // measured in a browser, 413 → 390 px with this rule). jsdom lays nothing
+  // out, so the rule itself is what is held here.
+  it("lets the import column shrink below the file input's own width", () => {
+    const css = read("admin.css");
+    const rule = (selector: string) =>
+      css.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+    expect(rule("\\.admin-import")).toMatch(
+      /grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+    );
+    expect(rule('\\.admin-import-file input\\[type="file"\\]')).toMatch(
+      /max-width:\s*100%/,
+    );
+  });
+
   it("every admin page renders through the shell", () => {
     const pages = readdirSync(dir).filter(
       (f) => /^Admin\w*Page\.tsx$/.test(f) && f !== "AdminShell.tsx",
