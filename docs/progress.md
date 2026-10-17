@@ -1,5 +1,7 @@
 # Progress
 
+## 2026-10-17 — The monitor workflow failed blind on its first two runs
+
 ## 2026-10-17 — Owner console review batch E: definitions and scale
 
 The owner said «ابدأ الدفعة E» (2026-10-17): findings 9, 10, 11 and 20 of
