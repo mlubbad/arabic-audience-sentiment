@@ -22,6 +22,25 @@ Web only; no migration.
   design), and the panel forms' two-column field row, which is the account file's existing card
   style.
 
+## 2026-10-17 — The monitor workflow failed blind on its first two runs
+
+**Found** while verifying the WO-21 deploy: both scheduled "Platform monitor" runs after #140
+merged (39025271644, 39038417163) ended "exit code 2" in the probe step, with no monitor output,
+no "monitor.sh exited" line and no `monitor` issue. GitHub runs `shell: bash` as
+`bash --noprofile --norc -eo pipefail`; the step's `set -uo pipefail` leaves `-e` on, so
+monitor.sh's exit 2 ended the step before the output was printed, and the alert step was skipped.
+
+**Change (branch `claude/monitor-workflow-exit-code`):** the probe captures the exit code with
+`|| code=$?`, always prints the output and passes the code on; the alert step runs on
+`!cancelled()`, and the probe has its own 5-minute timeout, so a probe that dies still gets its
+issue. `monitor-alerts.mjs` reads a missing output as `monitor` FAIL `no_result` and an exit code
+outside 0–2 as `exit_<n>`. A failing check still leaves the run green (the issue is the alert);
+a broken alert step turns it red. **Verified** on the branch, run without the environment (no
+secrets): 39041794690 printed `FAIL monitor not_configured:…`, exited 2, opened #160; 39041826952
+reported "no change". #160 closes itself on the first run on `main` after the merge.
+**Not known yet:** which check failed the two blind runs. Its secrets are limited to `main`, so
+the first run after the merge names it; `failures` (quota blocks, below) is the likely one.
+
 ## 2026-10-17 — Owner console review batch E: definitions and scale
 
 The owner said «ابدأ الدفعة E» (2026-10-17): findings 9, 10, 11 and 20 of
@@ -230,7 +249,6 @@ refusal is what this branch (`claude/meta-page-chooser`) removes: the person pic
 from a list on `/connected`. The same branch makes the result page platform-neutral, stops
 printing the channel's database id on success, and names Meta, Facebook and Instagram on the
 two channel-choice cards.
-
 
 ## 2026-10-13 — Facebook and Instagram channels: two doors, one worker
 
@@ -685,7 +703,6 @@ Implemented comprehensive quota optimization in the YouTube Data API collector a
   - Full repo verification (`npm run check`): 276 worker tests, 1299 vitest tests, 392 DB tests, Playwright tests, builds, and secret checks passed 100% green.
 
 ## 2026-09-22 — Comprehensive Audit Improvements Execution (P0 & P1 Hardening) & Live Deployment
-
 
 Executed the prioritized improvements derived from the 360-degree architecture, security, performance, and typography audit, applied remote migrations, deployed live, and verified across all test tiers:
 
