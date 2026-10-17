@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BatchPayloadSchema, CommitBatchSchema, usageEventKey } from "./index";
+import {
+  BatchPayloadSchema,
+  ChannelProfileCommit,
+  CommitBatchSchema,
+  usageEventKey,
+} from "./index";
 
 const comment = (id: string, over = {}) => ({
   external_comment_id: id,
@@ -183,5 +188,64 @@ describe("worker batch contract", () => {
     const withoutVideo: Record<string, unknown> = { ...payload() };
     delete withoutVideo.external_video_id;
     expect(BatchPayloadSchema.safeParse(withoutVideo).success).toBe(false);
+  });
+});
+
+describe("channel profile commit contract", () => {
+  const commit = (profile: Record<string, unknown>) => ({
+    job_id: "20000000-0000-4000-8000-000000000001",
+    lease_token: "30000000-0000-4000-8000-000000000001",
+    profile,
+  });
+
+  it("accepts observed profile text and nullable channel statistics", () => {
+    expect(
+      ChannelProfileCommit.safeParse(
+        commit({
+          external_channel_id: "UCchannel",
+          description: "وصف القناة",
+          keywords: ["أخبار", "اقتصاد"],
+          topic_categories: ["https://example.test/topic/news"],
+          country: "TR",
+          default_language: "ar",
+          channel_published_at: "2020-01-02T03:04:05Z",
+          subscriber_count: null,
+          subscriber_count_hidden: true,
+          view_count: 123,
+          video_count: 7,
+        }),
+      ).success,
+    ).toBe(true);
+  });
+
+  it("keeps every observation optional and refuses malformed values", () => {
+    expect(
+      ChannelProfileCommit.safeParse(
+        commit({ external_channel_id: "UCchannel" }),
+      ).success,
+    ).toBe(true);
+    for (const profile of [
+      { external_channel_id: "UCchannel", subscriber_count: "12" },
+      { external_channel_id: "UCchannel", keywords: ["valid", 12] },
+      { external_channel_id: "UCchannel", subscriber_count_hidden: "yes" },
+    ])
+      expect(ChannelProfileCommit.safeParse(commit(profile)).success).toBe(
+        false,
+      );
+  });
+
+  it("carries no tenant selector and requires the profile envelope", () => {
+    expect(
+      ChannelProfileCommit.safeParse({
+        ...commit({ external_channel_id: "UCchannel" }),
+        workspace_id: "00000000-0000-4000-8000-000000000002",
+      }).success,
+    ).toBe(false);
+    expect(
+      ChannelProfileCommit.safeParse({
+        job_id: "20000000-0000-4000-8000-000000000001",
+        lease_token: "30000000-0000-4000-8000-000000000001",
+      }).success,
+    ).toBe(false);
   });
 });

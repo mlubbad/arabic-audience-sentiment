@@ -111,6 +111,12 @@ export interface WorkerDb {
     leaseToken: string,
     payload: unknown[],
   ): Promise<unknown>;
+  commitChannel?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    profile: Record<string, unknown>,
+  ): Promise<unknown>;
   videoFinished(
     credentialHash: string,
     jobId: string,
@@ -167,6 +173,8 @@ const STATUS: Record<string, number> = {
   // say whose they are). Refused whole: filed, it would show one channel's
   // uploads as another's.
   catalogue_channel_mismatch: 400,
+  invalid_channel_profile: 400,
+  channel_profile_mismatch: 400,
   invalid_counts: 400,
   invalid_video: 400,
   invalid_job_type: 400,
@@ -343,6 +351,7 @@ export async function handleWorkerRequest(
       "/worker/commit-batch",
       "/worker/finish",
       "/worker/commit-catalogue",
+      ...(db.commitChannel ? ["/worker/commit-channel"] : []),
       "/worker/video-finished",
       ...(db.videoCounts ? ["/worker/video-counts"] : []),
       "/worker/topics-due",
@@ -397,6 +406,23 @@ export async function handleWorkerRequest(
       return json(
         200,
         await db.commitCatalogue(credential, job, lease, body.payload),
+      );
+    }
+    if (path.endsWith("/worker/commit-channel") && db.commitChannel) {
+      if (
+        body.profile === null ||
+        typeof body.profile !== "object" ||
+        Array.isArray(body.profile)
+      )
+        return refuse("invalid_channel_profile");
+      return json(
+        200,
+        await db.commitChannel(
+          credential,
+          job,
+          lease,
+          body.profile as Record<string, unknown>,
+        ),
       );
     }
     if (path.endsWith("/worker/video-finished")) {
