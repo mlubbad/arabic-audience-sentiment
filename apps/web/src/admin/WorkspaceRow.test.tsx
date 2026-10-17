@@ -96,7 +96,9 @@ describe("WorkspaceRow", () => {
     expect(row).toHaveTextContent("وكالة نبض الإعلامية");
     expect(row).toHaveTextContent("agency");
     expect(row).toHaveTextContent("2026-10-01");
-    expect(row).toHaveTextContent("paddle");
+    // The provider and status in words (review finding 17).
+    expect(row).toHaveTextContent("Paddle");
+    expect(row).toHaveTextContent(ar.adminStatusLabels.active!);
     expect(within(row).getByTestId("admin-plan-form")).toBeInTheDocument();
     expect(within(row).getByTestId("admin-pack-form")).toBeInTheDocument();
     const inspectLink = within(row).getByRole("link", {

@@ -10,12 +10,12 @@
  * right here.
  */
 import { useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Plan } from "@sentiment/contracts";
 import { useStrings } from "../strings";
 import { useLocale } from "../locale";
 import { failureCode } from "../failure";
+import { adminWriteFailure } from "../adminWords";
 import { ChartEmpty, LoadError, Loading } from "../pageStates/PageStates";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -35,12 +35,11 @@ import { EditPlanLimitsDialog } from "./EditPlanLimitsDialog";
 export function AdminPlansPage() {
   const S = useStrings();
   const locale = useLocale();
-  const [searchParams] = useSearchParams();
-  const demo = searchParams.get("demo") === "1";
+  // Live data only: in the demo the shell says so and nothing is read or
+  // written (owner console review, 2026-10-13, finding 15).
   const { admin, shell } = useAdminShell();
-  const effectiveAdmin = admin || demo;
   const queryClient = useQueryClient();
-  const catalogueQuery = useAdminPlanCatalogue(effectiveAdmin);
+  const catalogueQuery = useAdminPlanCatalogue(admin);
 
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
@@ -49,37 +48,32 @@ export function AdminPlansPage() {
     tone: "success" | "error";
   } | null>(null);
 
-  // Demo state overrides if running in mock/demo mode
-  const [demoOverrides, setDemoOverrides] = useState<Record<string, boolean>>(
-    {},
-  );
-
   async function handleToggle(plan: Plan) {
     if (plan.key === "owner") return;
-    const currentAllowed =
-      demoOverrides[plan.key] ?? plan.allow_public_channels;
-    const nextAllowed = !currentAllowed;
+    const nextAllowed = !plan.allow_public_channels;
 
     setTogglingKey(plan.key);
     setFeedback(null);
 
     try {
-      // If we are in live mode, call server RPC
       await updatePlanPublicChannels(plan.key, nextAllowed);
       await queryClient.invalidateQueries({ queryKey: ["admin", "catalogue"] });
       await queryClient.invalidateQueries({ queryKey: ["catalogue"] });
       setFeedback({ msg: S.adminPlanToggleSuccess, tone: "success" });
-    } catch {
-      // In demo or fallback mode, apply local override
-      setDemoOverrides((prev) => ({ ...prev, [plan.key]: nextAllowed }));
-      setFeedback({ msg: S.adminPlanToggleSuccess, tone: "success" });
+    } catch (error) {
+      // The save did not happen: say so, and leave the toggle where the
+      // database has it (it used to report success and flip it anyway).
+      setFeedback({
+        msg: adminWriteFailure(S.adminPlanToggleFailed, error),
+        tone: "error",
+      });
     } finally {
       setTogglingKey(null);
     }
   }
 
   let body: ReactNode;
-  if (!effectiveAdmin) body = null;
+  if (!admin) body = null;
   else if (catalogueQuery.isPending)
     body = <Loading S={S} label={S.adminPlansLoading} shape="ops" />;
   else if (catalogueQuery.isError)
@@ -138,9 +132,7 @@ export function AdminPlansPage() {
             <TableBody>
               {plans.map((p) => {
                 const isOwner = p.key === "owner";
-                const isAllowed = isOwner
-                  ? true
-                  : (demoOverrides[p.key] ?? p.allow_public_channels);
+                const isAllowed = isOwner ? true : p.allow_public_channels;
                 const isBusy = togglingKey === p.key;
 
                 const name = locale === "ar" ? p.title_ar : p.title_en;
@@ -294,15 +286,6 @@ export function AdminPlansPage() {
           />
         )}
       </section>
-    );
-  }
-
-  if (demo) {
-    return (
-      <div className="db-page">
-        <AdminPageHead title={S.adminPlansTitle} lead={S.adminPlansLead} />
-        {body}
-      </div>
     );
   }
 

@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useStrings } from "../strings";
+import { auditActionLabel } from "../adminWords";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
 import { readAdminAudit, readAdminServicesHealth } from "./adminRead";
@@ -42,7 +43,10 @@ export function AdminSystemPage() {
     const s = services.data.summary;
     servicesLine = (
       <p className="admin-system-chips" data-testid="admin-system-services">
-        <Badge tone="success">{S.adminSystemHealthy(s.healthy)}</Badge>
+        {/* Green only when something is healthy: "0 healthy" is not good news. */}
+        <Badge tone={s.healthy > 0 ? "success" : "neutral"}>
+          {S.adminSystemHealthy(s.healthy)}
+        </Badge>
         {s.degraded > 0 && (
           <Badge tone="warning">{S.adminSystemDegraded(s.degraded)}</Badge>
         )}
@@ -63,7 +67,7 @@ export function AdminSystemPage() {
           {audit.data.slice(0, 5).map((e, i) => (
             <li key={`${e.created_at}-${i}`}>
               <time dateTime={e.created_at}>{when(e.created_at)}</time>
-              <span>{S.adminAccountActions[e.action] ?? e.action}</span>
+              <span>{auditActionLabel(e.action, S)}</span>
             </li>
           ))}
         </ol>

@@ -12,8 +12,8 @@ vi.mock("../session");
 vi.mock("../adminAccess");
 vi.mock("../impersonation");
 
-function TestAdminConsumer() {
-  const { admin, shell } = useAdminShell();
+function TestAdminConsumer({ demo }: { demo?: boolean } = {}) {
+  const { admin, shell } = useAdminShell(demo ? { demo } : undefined);
   return (
     <div>
       <div data-testid="admin-flag">{String(admin)}</div>
@@ -115,6 +115,57 @@ describe("useAdminShell authorization and impersonation protection", () => {
     const forbidden = screen.getByTestId("admin-forbidden");
     expect(forbidden).toBeInTheDocument();
     expect(forbidden).toHaveTextContent(ar.adminForbidden);
+  });
+});
+
+describe("in the demo", () => {
+  beforeEach(() => {
+    window.history.pushState({}, "", "/admin/audit?demo=1");
+    vi.spyOn(sessionModule, "useSession").mockReturnValue({
+      session: null,
+      loading: false,
+    });
+    vi.spyOn(adminAccessModule, "useIsPlatformAdmin").mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof adminAccessModule.useIsPlatformAdmin>);
+    vi.spyOn(impersonationModule, "useImpersonation").mockReturnValue({
+      isImpersonating: false,
+      impersonatedUser: null,
+      loading: false,
+      startImpersonation: vi.fn(),
+      stopImpersonation: vi.fn(),
+    });
+  });
+
+  it("opens no page that has no fixtures: it says live data only and is not admin, so nothing is read", () => {
+    render(
+      <MemoryRouter>
+        <TestAdminConsumer />
+      </MemoryRouter>,
+    );
+    // `admin` is what every page's query waits on (`enabled: admin`).
+    expect(screen.getByTestId("admin-flag")).toHaveTextContent("false");
+    expect(screen.queryByTestId("admin-body")).toBeNull();
+    expect(screen.getByTestId("admin-no-demo")).toHaveTextContent(
+      ar.adminNoDemo,
+    );
+    expect(
+      screen.getByRole("link", { name: ar.adminNoDemoLink }),
+    ).toHaveAttribute("href", "/admin/workspaces?demo=1");
+  });
+
+  it("opens a page that says it has fixtures", () => {
+    render(
+      <MemoryRouter>
+        <TestAdminConsumer demo />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("admin-flag")).toHaveTextContent("true");
+    expect(screen.getByTestId("admin-body")).toBeInTheDocument();
   });
 });
 

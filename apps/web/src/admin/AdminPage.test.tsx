@@ -23,6 +23,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { ar } from "../strings/ar";
+import { fixtureCatalogue } from "../data";
 
 vi.mock("../supabase", () => ({ supabase: null }));
 vi.mock("../ui/Toast", () => ({ toast: vi.fn() }));
@@ -124,7 +125,11 @@ describe("AdminPage in demo mode", () => {
       within(form).getByRole("button", { name: ar.adminSetPlan }),
     );
     expect(await within(form).findByText(ar.adminDone)).toBeVisible();
-    expect(within(row).getAllByRole("cell")[0]).toHaveTextContent("enterprise");
+    // The plan by its name, not its key (review finding 17).
+    const enterprise = fixtureCatalogue.find((p) => p.key === "enterprise")!;
+    expect(within(row).getAllByRole("cell")[0]).toHaveTextContent(
+      enterprise.title_ar,
+    );
   });
 
   it("a deleted workspace leaves the table; the billing root refuses", async () => {

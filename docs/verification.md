@@ -1,5 +1,36 @@
 # Verification
 
+## 2026-10-17 — Owner console batch D: honest errors and labels
+
+Findings 7, 15, 16 and 17 of `docs/reviews/2026-10-13-owner-console-review.md`. Web only, no
+migration.
+
+| Command | Actual result |
+| --- | --- |
+| `npm run check` | All checks passed. Web 168 files / 1,360 tests; DB 77 files / 656 tests; worker 356 passed; build and scans passed. |
+| `npx playwright test` (all of `tests/e2e`, local Chromium 1194) | 130 passed. Three admin assertions first failed on the intended change (a plan's name where its key was, `يدوي` / `Paddle` where `admin` / `paddle` were) and were updated. |
+| `npx vitest run apps/web/src/admin apps/web/src/adminWords.test.ts` after merging `main` at `3b8f8c4` | 244 passed. |
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| Plans toggle reports success on a refused save | 1 failed |
+| Limits dialog prints the error's own message | 1 failed |
+| Demo opens every admin page | 1 failed |
+| CSV guard misses a leading tab or CR | 1 failed |
+| CSV neutralises numbers again (`-12` → `'-12`) | 1 failed |
+| Status shown raw | 1 failed |
+| Plan key shown instead of its name | 1 failed |
+| A century-out period shown as a date | 1 failed |
+| Paddle subscription events unnamed | 1 failed |
+| One audit action left without an English label | 1 failed |
+| Write failure echoes a code that is not a database code | 1 failed |
+
+Two existing unit tests and three browser assertions expected the raw codes this batch replaces
+(`enterprise`, `paddle`, `creator_plus`, `agency`, `media`, `admin`) and were updated to the
+labels. The old dialog test asserted the bug itself: a raw error message on screen.
+
 ## 2026-10-17 — The external monitor: off the Mac, and stale channels fail it
 
 **Correction to 2026-09-19 below:** that entry records the crontab as "Installed". It was

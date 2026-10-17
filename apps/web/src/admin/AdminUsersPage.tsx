@@ -15,6 +15,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminAccount } from "@sentiment/contracts";
 import { useStrings } from "../strings";
+import { useLocale } from "../locale";
+import { adminPlanOptions, periodEndLabel } from "../adminWords";
+import { useAdminPlanCatalogue } from "../planCatalogue";
 import { failureCode } from "../failure";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
@@ -98,7 +101,7 @@ export function AdminUsersPage() {
   const demo =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("demo");
-  const { admin, shell } = useAdminShell();
+  const { admin, shell } = useAdminShell({ demo: true });
   const { session } = useSession();
   const currentUserId = demo ? DEMO_OWNER_ID : session?.user.id;
   const { startImpersonation, loading: impersonateLoading } =
@@ -112,6 +115,11 @@ export function AdminUsersPage() {
       demo ? Promise.resolve(DEMO_ACCOUNTS) : readAdminAccounts(),
     enabled: admin,
   });
+  // Plan names for the plan column; the demo reads nothing live, so its
+  // rows keep their keys.
+  const locale = useLocale();
+  const catalogue = useAdminPlanCatalogue(admin && !demo);
+  const plans = adminPlanOptions(catalogue.data ?? [], locale);
 
   // `?u=<id>`: the search box's way to one person's file.
   const wanted =
@@ -204,6 +212,12 @@ export function AdminUsersPage() {
                   <AccountRow
                     key={u.id}
                     account={u}
+                    planLabel={
+                      u.plan_key
+                        ? (plans.find((p) => p.key === u.plan_key)?.label ??
+                          u.plan_key)
+                        : null
+                    }
                     isCurrent={currentUserId === u.id}
                     onImpersonate={startImpersonation}
                     onManage={demo ? undefined : setManaging}
@@ -232,12 +246,15 @@ export function AdminUsersPage() {
 
 function AccountRow({
   account: u,
+  planLabel,
   isCurrent,
   onImpersonate,
   onManage,
   disabled,
 }: {
   account: AdminAccount;
+  /** The plan's name, or its key when the catalogue has not answered. */
+  planLabel: string | null;
   isCurrent: boolean;
   onImpersonate: (user: { id: string; email: string | null }) => void;
   /** Absent on the demo, which has no server to read a file from. */
@@ -271,9 +288,11 @@ function AccountRow({
         </span>
       </TableCell>
       <TableCell>
-        {u.plan_key ?? S.adminAccountsNoPlan}
+        {planLabel ?? S.adminAccountsNoPlan}
         {u.period_end && (
-          <span className="admin-channel-sub">{day(u.period_end)}</span>
+          <span className="admin-channel-sub">
+            {periodEndLabel(u.period_end, S)}
+          </span>
         )}
       </TableCell>
       <TableCell>

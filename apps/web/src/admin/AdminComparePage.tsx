@@ -32,7 +32,7 @@ import {
 } from "../ui/Table";
 import { readAdminChannelsCompare } from "./adminRead";
 import { AdminPageHead, useAdminShell } from "./AdminShell";
-import type { OwnerFilter } from "./channelsConsole";
+import { channelLabel, type OwnerFilter } from "./channelsConsole";
 import {
   MIN_SAMPLE,
   compareCsv,
@@ -306,9 +306,9 @@ function ChannelLink({ channel: c }: { channel: ComparedChannel }) {
     <Link
       className="admin-console-name"
       to={`/admin/channels?q=${encodeURIComponent(c.external_channel_id)}`}
-      aria-label={S.adminCompareOpen(c.name)}
+      aria-label={S.adminCompareOpen(channelLabel(c, S))}
     >
-      <span dir="auto">{c.name}</span>
+      <span dir="auto">{channelLabel(c, S)}</span>
     </Link>
   );
 }

@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "../ui/Dialog";
 import { updatePlanLimits } from "./adminRead";
+import { adminWriteFailure } from "../adminWords";
 
 /** A whole number of at least -1 (-1 means unlimited), or null for a blank
  *  or malformed field. */
@@ -114,9 +115,9 @@ export function EditPlanLimitsDialog({
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      setErrorMsg(
-        err instanceof Error ? err.message : S.adminPlanLimitsUpdateFailed,
-      );
+      // The error's own message is always `live_unavailable`; the sentence
+      // is ours, with the database's code when it sent one.
+      setErrorMsg(adminWriteFailure(S.adminPlanLimitsUpdateFailed, err));
     } finally {
       setSaving(false);
     }

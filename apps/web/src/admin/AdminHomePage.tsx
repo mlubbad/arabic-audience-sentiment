@@ -20,6 +20,7 @@ import { Link, Navigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { AdminConsoleOverview } from "@sentiment/contracts";
 import { useStrings } from "../strings";
+import { auditActionLabel } from "../adminWords";
 import { failureCode } from "../failure";
 import { Badge } from "../ui/Badge";
 import { Card } from "../ui/Card";
@@ -174,7 +175,7 @@ function Overview({ o }: { o: AdminConsoleOverview }) {
                 <li key={`${e.at}-${i}`}>
                   <time dateTime={e.at}>{when(e.at)}</time>
                   <span>
-                    {S.adminAccountActions[e.action] ?? e.action}
+                    {auditActionLabel(e.action, S)}
                     {e.workspace_name && (
                       <span dir="auto"> · {e.workspace_name}</span>
                     )}

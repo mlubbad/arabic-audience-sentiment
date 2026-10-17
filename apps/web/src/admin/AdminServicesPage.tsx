@@ -35,7 +35,7 @@ const DEFAULT_INTERVAL_MS = 30000; // 30s recommended default
 export function AdminServicesPage() {
   const S = useStrings();
   const searchInputId = useId();
-  const { admin, shell } = useAdminShell();
+  const { admin, shell } = useAdminShell({ demo: true });
   const wantsDemo =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("demo");

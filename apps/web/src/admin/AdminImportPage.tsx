@@ -72,7 +72,7 @@ function rpcCode(error: { code?: string; message?: string }): string {
 
 export function AdminImportPage() {
   const S = useStrings();
-  const { admin, shell } = useAdminShell();
+  const { admin, shell } = useAdminShell({ demo: true });
   const { session } = useSession();
   const demo =
     typeof window !== "undefined" &&

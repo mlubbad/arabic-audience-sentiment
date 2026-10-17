@@ -43,7 +43,7 @@ import { AdminPageHead, useAdminShell } from "./AdminShell";
 import {
   STATE_ORDER,
   STATE_TONE,
-  channelName,
+  channelLabel,
   channelsCsv,
   readFilter,
   scoped,
@@ -235,7 +235,7 @@ function Console({ rows }: { rows: AdminConsoleChannel[] }) {
                 <TableRow key={c.id} data-testid={`admin-console-row-${c.id}`}>
                   <TableCell className="admin-console-check">
                     <Checkbox
-                      label={S.adminBulkSelect(channelName(c))}
+                      label={S.adminBulkSelect(channelLabel(c, S))}
                       hideLabel
                       checked={picked.has(c.id)}
                       onCheckedChange={(on) => toggle(c.id, on === true)}
@@ -246,9 +246,9 @@ function Console({ rows }: { rows: AdminConsoleChannel[] }) {
                       type="button"
                       className="admin-console-name"
                       onClick={() => setOpenId(c.id)}
-                      aria-label={S.adminConsoleOpen(channelName(c))}
+                      aria-label={S.adminConsoleOpen(channelLabel(c, S))}
                     >
-                      <span dir="auto">{channelName(c)}</span>
+                      <span dir="auto">{channelLabel(c, S)}</span>
                     </button>
                     <span className="admin-channel-sub" dir="auto">
                       {c.mine
@@ -289,7 +289,7 @@ function Console({ rows }: { rows: AdminConsoleChannel[] }) {
             back: `/admin/channels${params.size ? `?${params}` : ""}`,
             items: shown.map((c) => ({
               workspace_id: c.workspace_id,
-              name: channelName(c),
+              name: channelLabel(c, S),
             })),
           })
         }
@@ -330,7 +330,7 @@ function ChannelPanel({
           <div className="admin-account">
             <header className="admin-account-head">
               <DialogTitle>
-                <span dir="auto">{channelName(c)}</span>
+                <span dir="auto">{channelLabel(c, S)}</span>
               </DialogTitle>
               {c.handle && <small dir="ltr">{c.handle}</small>}
               <div className="admin-account-chips">
@@ -525,15 +525,26 @@ function BulkBar({
   const [autoOpen, setAutoOpen] = useState(false);
   const [initial, setInitial] = useState("20");
   const [daily, setDaily] = useState("5");
-  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [note, setNote] = useState<{
+    ok: boolean;
+    /** Done, but nothing was queued: not a success to show in green. */
+    none?: boolean;
+    text: string;
+  } | null>(null);
 
-  async function run(action: () => Promise<string>) {
+  async function run(
+    action: () => Promise<string | { text: string; none: boolean }>,
+  ) {
     setBusy(true);
     setNote(null);
     setConfirmPause(false);
     try {
-      const text = await action();
-      setNote({ ok: true, text });
+      const done = await action();
+      setNote(
+        typeof done === "string"
+          ? { ok: true, text: done }
+          : { ok: true, none: done.none, text: done.text },
+      );
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["admin", "channels", "console"],
@@ -585,7 +596,10 @@ function BulkBar({
           onClick={() =>
             void run(async () => {
               const r = await requestChannelWork(ids, "collect");
-              return S.adminBulkQueued(r.queued, r.skipped);
+              return {
+                text: S.adminBulkQueued(r.queued, r.skipped),
+                none: r.queued === 0,
+              };
             })
           }
         >
@@ -599,7 +613,10 @@ function BulkBar({
           onClick={() =>
             void run(async () => {
               const r = await requestChannelWork(ids, "discover");
-              return S.adminBulkQueued(r.queued, r.skipped);
+              return {
+                text: S.adminBulkQueued(r.queued, r.skipped),
+                none: r.queued === 0,
+              };
             })
           }
         >
@@ -708,7 +725,14 @@ function BulkBar({
       {note && (
         <p
           role={note.ok ? "status" : "alert"}
-          className={note.ok ? "admin-account-ok" : "admin-account-error"}
+          className={
+            !note.ok
+              ? "admin-account-error"
+              : note.none
+                ? "admin-account-muted"
+                : "admin-account-ok"
+          }
+          data-testid="admin-bulk-note"
         >
           {note.text}
         </p>

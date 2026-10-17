@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { ar } from "./strings/ar";
+import { en } from "./strings/en";
 import {
   adminErrorMessage,
   adminMonths,
   adminPlanOptions,
   adminRows,
   adminUnits,
+  adminWriteFailure,
+  auditActionLabel,
+  periodEndLabel,
 } from "./adminWords";
 
 describe("admin rows", () => {
@@ -31,7 +36,7 @@ describe("admin rows", () => {
       provider: "—",
     });
   });
-  it("a subscribed workspace reads its key, its state and its day", () => {
+  it("a subscribed workspace reads its plan's name, its state and provider in words, and its day", () => {
     const rows = adminRows(
       [
         {
@@ -45,15 +50,115 @@ describe("admin rows", () => {
         },
       ],
       ar,
+      [{ key: "creator", label: "صانع المحتوى" }],
     );
     expect(rows[0]).toEqual({
       id: "w1",
       name: "x",
-      plan: "creator",
-      status: "active",
+      plan: "صانع المحتوى",
+      status: ar.adminStatusLabels.active,
       periodEnd: "2026-10-01",
-      provider: "paddle",
+      provider: "Paddle",
     });
+  });
+
+  it("shows an unknown plan, status or provider as is rather than hiding it", () => {
+    const [row] = adminRows(
+      [
+        {
+          id: "w1",
+          name: "x",
+          created_by: "u",
+          plan_key: "t",
+          status: "trialing",
+          period_end: null,
+          provider: "stripe",
+        },
+      ],
+      ar,
+    );
+    expect(row).toMatchObject({
+      plan: "t",
+      status: "trialing",
+      provider: "stripe",
+    });
+  });
+});
+
+describe("a period's end", () => {
+  const now = new Date("2026-10-13T00:00:00Z");
+  it("is the day for a real end, and 'no end date' for one a century out", () => {
+    expect(periodEndLabel("2026-11-13T00:00:00+00:00", ar, now)).toBe(
+      "2026-11-13",
+    );
+    // The free plan is written 100 years ahead (review finding 17: 2126-10-13).
+    expect(periodEndLabel("2126-10-13T00:00:00+00:00", ar, now)).toBe(
+      ar.adminNoEnd,
+    );
+    expect(periodEndLabel("2076-10-13T00:00:00+00:00", ar, now)).toBe(
+      ar.adminNoEnd,
+    );
+    expect(periodEndLabel("2075-10-13T00:00:00+00:00", ar, now)).toBe(
+      "2075-10-13",
+    );
+    expect(periodEndLabel(null, ar, now)).toBe("—");
+  });
+});
+
+describe("audit actions in words", () => {
+  it("names every action the database writes, in both languages", () => {
+    // Every literal action in an `insert into public.audit_events` of the
+    // current schema, plus the ones the admin-users Edge Function records.
+    const schema = readFileSync("supabase/schema/current.sql", "utf8");
+    const written = new Set<string>();
+    for (const m of schema.matchAll(
+      /insert into public\.audit_events\s*\([^)]*\)\s*(?:values\s*\(|select)([\s\S]*?)(?:;|\)\s*(?:on conflict|returning|$))/gi,
+    ))
+      for (const a of (m[1] ?? "").matchAll(/'([a-z]+(?:_[a-z]+)+)'/g))
+        written.add(a[1]!);
+    for (const a of [
+      "password_link_created",
+      "user_suspended",
+      "user_unsuspended",
+      "email_confirmed",
+      "email_changed",
+      "password_reset_sent",
+    ])
+      written.add(a);
+    // Targets and arguments that share the lists' shape but are not actions.
+    for (const notAction of ["usage_grant", "plan_paddle_"])
+      written.delete(notAction);
+    expect(written.size).toBeGreaterThan(20);
+    const missing = [...written].filter(
+      (a) => !ar.adminAccountActions[a] || !en.adminAccountActions[a],
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("names Paddle's subscription events, and shows anything else as is", () => {
+    expect(auditActionLabel("plan_set", ar)).toBe(
+      ar.adminAccountActions.plan_set,
+    );
+    expect(auditActionLabel("plan_paddle_updated", en)).toBe(
+      "Paddle: subscription updated",
+    );
+    expect(auditActionLabel("something_new", ar)).toBe("something_new");
+  });
+});
+
+describe("a write that did not happen", () => {
+  it("is the page's sentence with the database's code, never the error's text", () => {
+    const refused = Object.assign(new Error("live_unavailable"), {
+      code: "42501",
+    });
+    expect(adminWriteFailure("تعذر الحفظ.", refused)).toBe(
+      "تعذر الحفظ. (42501)",
+    );
+    // A code that is not a database code is dropped, not echoed.
+    expect(
+      adminWriteFailure("تعذر الحفظ.", { code: "https://x.supabase.co?key=1" }),
+    ).toBe("تعذر الحفظ.");
+    expect(adminWriteFailure("تعذر الحفظ.", undefined)).toBe("تعذر الحفظ.");
   });
 });
 

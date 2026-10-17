@@ -1,8 +1,12 @@
 /**
  * What the four observability pages share: the gate and the frame.
  *
- * `useAdminShell` is the read-only twin of the guard in `AdminPage.tsx`,
- * without the demo door — these pages read live data only. Nothing is said
+ * `useAdminShell` is the read-only twin of the guard in `AdminPage.tsx`.
+ * In the demo (`?demo`) a page opens only if it says it has fixtures
+ * (`{ demo: true }`: accounts, services, import); every other page says it
+ * shows live data only and reads and writes nothing. It used to open them
+ * all as admin, so the demo reached live admin calls (owner console review,
+ * 2026-10-13, finding 15). Nothing is said
  * until it is known: a "forbidden" that flips to a table a moment later
  * reads as the page changing its mind about who you are, so the page holds
  * one sentence until `is_platform_admin()` answers. The hiding is a
@@ -31,7 +35,7 @@ import { AdminCommandPalette } from "./AdminCommandPalette";
 import "../pages.css";
 import "./admin.css";
 
-export function useAdminShell(): {
+export function useAdminShell(options?: { demo?: boolean }): {
   admin: boolean;
   shell: (body: ReactNode) => ReactNode;
 } {
@@ -45,6 +49,21 @@ export function useAdminShell(): {
   const admin =
     demo || (!isImpersonating && !!(session && access.data === true));
   const shell = (body: ReactNode) => <div className="db-page">{body}</div>;
+  if (demo && !options?.demo)
+    return {
+      admin: false,
+      shell: () =>
+        shell(
+          <div className="db-hero">
+            <Badge tone="neutral">{`${S.adminEyebrow} · ${S.dashDemoTag}`}</Badge>
+            <h1>{S.adminTitle}</h1>
+            <Card>
+              <p data-testid="admin-no-demo">{S.adminNoDemo}</p>
+              <Link to="/admin/workspaces?demo=1">{S.adminNoDemoLink}</Link>
+            </Card>
+          </div>,
+        ),
+    };
   if (!demo) {
     if (loading || (session && access.isPending))
       return {
