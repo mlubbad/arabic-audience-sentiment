@@ -104,12 +104,17 @@ work**; use it only to throw a run away. To keep it, from the repository root on
    `codex exec -C .codex-workspace -s workspace-write "Write only .codex-handoff/commit.txt and .codex-handoff/pr.md for the changes now in this tree (<WO>, issue #<N>), as item 3 of docs/agents/dispatch/codex-constraints.md says. Change no other file. Do not run semgrep, gitleaks or e2e. Rerun npm run check if you need real numbers."`
 4. Check both files exist and are not empty: `ls -l .codex-workspace/.codex-handoff/`.
    Line 1 of `pr.md` must start with `<WO>: `.
-5. Commit, push and open the PR. These are the dispatcher's own step 6 commands, with hooks off:
+   If Codex cannot run (a usage limit, say), the PM writes both files instead, from Codex's
+   reported results, and says so in the PR.
+5. Commit, push and open the PR. These are the dispatcher's own step 6 commands, with hooks off,
+   chained with `&&` so a failed step stops the rest (2026-10-18: a missing `commit.txt` failed
+   the commit and the push still ran, publishing a branch with no new commit):
    ```sh
-   cd .codex-workspace
-   git add -A
-   git -c core.hooksPath=/dev/null commit --no-verify -F .codex-handoff/commit.txt
-   git -c core.hooksPath=/dev/null push --no-verify -u origin "$(git branch --show-current)"
+   cd .codex-workspace &&
+   test -s .codex-handoff/commit.txt && test -s .codex-handoff/pr.md &&
+   git add -A &&
+   git -c core.hooksPath=/dev/null commit --no-verify -F .codex-handoff/commit.txt &&
+   git -c core.hooksPath=/dev/null push --no-verify -u origin "$(git branch --show-current)" &&
    gh pr create --base main --title "$(head -n 1 .codex-handoff/pr.md)" --body "$(tail -n +2 .codex-handoff/pr.md)"
    ```
    Then comment on the issue: `gh issue comment <N> --body "Ready for review: PR #<n> @ <sha>"`.
