@@ -2353,11 +2353,14 @@ begin
              or (q.status = 'running' and q.lease_expires_at <= now()))
       order by
         case
-          when q.type <> 'discover' then 1
-          when exists (select 1 from public.channels ch
-                        where ch.id = q.channel_id and ch.catalogued_at is not null)
-            then 2
-          else 0
+          when q.type = 'discover' and not exists (
+                 select 1 from public.channels ch
+                  where ch.id = q.channel_id and ch.catalogued_at is not null)
+            then 0
+          when q.type = 'discover' and q.created_at <= now() - interval '6 hours'
+            then 1
+          when q.type <> 'discover' then 2
+          else 3
         end,
         case when w is null then (
           select count(*) from public.jobs r
