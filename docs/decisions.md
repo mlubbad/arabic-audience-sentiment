@@ -1,5 +1,18 @@
 # Implementation decisions
 
+2026-10-18 — Competitors phase starts behind YouTube's policy gate. YouTube's base Developer
+Policies forbid inferring a video's or channel's category, custom channel scores and ranking
+channels against each other; the Derived Metrics amendment allows them once our use case is
+accepted (`docs/2026-10-18-youtube-derived-metrics-application.md`). So (1) genre classification
+(WO-22, #164) ships switched off: `private.platform_switches('genre_classification')` is false
+until the owner turns it on after acceptance, and nothing is enqueued before that. (2) Genre
+classification draws no plan units for now; the 50-recent-videos cap bounds the cost, and the
+owner decides charging later. (3) B-3 is split: WO-23 (#165, Codex) builds the candidate pool
+from manual picks and featured channels (`channelSections`, 1 unit); `search.list` (100 units)
+needs a platform-level job outside any workspace and becomes B-3b once that design is set.
+(4) Taxonomy v2 (task 0.4) adds levels 2 and 3 as a new version; v1 stays as published, and
+language, dialect, market and format stay facets, not genres.
+
 2026-10-17 — Audience overlap and competitor discovery: the owner's five calls on the
 roadmap (`docs/roadmap/2026-10-17-audience-overlap-and-competitors.md` §9). (1) Overlap is
 measured inside one workspace first: between the channels it already collects, its own and the
