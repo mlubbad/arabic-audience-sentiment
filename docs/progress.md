@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-10-18 — WO-23 merged; WO-22 to Codex
+
+- **WO-23 (#171) merged** (`54402a0`), after one review round. Migration `20261114010000` applied by
+  Deploy Preview. The owner updated the cloud worker to `54402a0`, so featured channels are
+  collected on each channel's next discover.
+- **WO-22 reassigned to Codex** (decision in `docs/decisions.md`); migration range from
+  `20261113010000`.
+- **Dependabot:** #155 declined (Python 3.14); #157, #158 and #170 rebased for review.
+
 ## 2026-10-18 — CI refuses a reused migration version
 
 The owner said «أضف فحص CI يرفض رقم ترحيل مستعمل». `scripts/check-migrations.mjs` fails when
