@@ -43,6 +43,7 @@ class Catalogue:
     videos: list[dict]
     complete: bool
     reason: str | None = None
+    channel: dict | None = None
 
 
 class CollectionError(Exception):

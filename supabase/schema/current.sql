@@ -213,6 +213,30 @@ alter table "private"."channel_compare_units" add constraint "channel_compare_un
 CREATE INDEX channel_compare_units_due ON private.channel_compare_units USING btree (attempts, dirty_since) WHERE (dirty_since IS NOT NULL);
 CREATE UNIQUE INDEX channel_compare_units_pkey ON private.channel_compare_units USING btree (workspace_id, channel_id);
 
+create table "private"."dashboard_aggregates_cache" (
+  "workspace_id" uuid not null,
+  "filter_key" text not null,
+  "filters" jsonb not null,
+  "payload" jsonb,
+  "computed_at" timestamp with time zone,
+  "requested_at" timestamp with time zone default now() not null,
+  "attempts" integer default 0 not null,
+  "next_attempt_at" timestamp with time zone,
+  "last_error" text
+);
+alter table "private"."dashboard_aggregates_cache" enable row level security;
+
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_attempts_not_null" NOT NULL attempts;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_filter_key_not_null" NOT NULL filter_key;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_filters_not_null" NOT NULL filters;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_pkey" PRIMARY KEY (workspace_id, filter_key);
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_requested_at_not_null" NOT NULL requested_at;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_workspace_id_fkey" FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX dashboard_aggregates_cache_due_idx ON private.dashboard_aggregates_cache USING btree (requested_at);
+CREATE UNIQUE INDEX dashboard_aggregates_cache_pkey ON private.dashboard_aggregates_cache USING btree (workspace_id, filter_key);
+
 create table "private"."job_batches" (
   "job_id" uuid not null,
   "batch_key" text not null,
@@ -546,6 +570,9 @@ alter table "public"."audit_events" add constraint "audit_events_target_type_che
 alter table "public"."audit_events" add constraint "audit_events_target_type_not_null" NOT NULL target_type;
 alter table "public"."audit_events" add constraint "audit_events_workspace_id_fkey" FOREIGN KEY (workspace_id) REFERENCES workspaces(id);
 
+CREATE INDEX audit_events_by_actor ON public.audit_events USING btree (actor_id, created_at DESC);
+CREATE INDEX audit_events_by_target ON public.audit_events USING btree (target_type, target_id);
+CREATE INDEX audit_events_by_time ON public.audit_events USING btree (created_at DESC);
 CREATE UNIQUE INDEX audit_events_pkey ON public.audit_events USING btree (id);
 CREATE INDEX audit_events_recent ON public.audit_events USING btree (workspace_id, created_at DESC);
 
@@ -595,7 +622,8 @@ create table "public"."channels" (
   "channel_published_at" timestamp with time zone,
   "subscriber_count_hidden" boolean,
   "profile_observed_at" timestamp with time zone,
-  "stats_observed_at" timestamp with time zone
+  "stats_observed_at" timestamp with time zone,
+  "featured_checked_at" timestamp with time zone
 );
 alter table "public"."channels" enable row level security;
 
@@ -764,6 +792,43 @@ CREATE INDEX comments_video_date ON public.comments USING btree (workspace_id, v
 CREATE UNIQUE INDEX comments_workspace_id_id_key ON public.comments USING btree (workspace_id, id);
 CREATE UNIQUE INDEX comments_workspace_id_platform_external_comment_id_key ON public.comments USING btree (workspace_id, platform, external_comment_id);
 CREATE INDEX comments_workspace_published_desc_idx ON public.comments USING btree (workspace_id, published_at DESC NULLS LAST, id DESC);
+
+create table "public"."competitor_candidates" (
+  "id" uuid default gen_random_uuid() not null,
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "platform" text default 'youtube'::text not null,
+  "candidate_external_id" text not null,
+  "title" text,
+  "handle" text,
+  "source" text not null,
+  "added_by" uuid,
+  "first_seen_at" timestamp with time zone default now() not null,
+  "last_seen_at" timestamp with time zone default now() not null
+);
+alter table "public"."competitor_candidates" enable row level security;
+
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_added_by_fkey" FOREIGN KEY (added_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_added_by_source" CHECK (source = 'manual'::text OR added_by IS NULL);
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_candidate_external_id_check" CHECK (private.valid_youtube_channel_id(candidate_external_id));
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_candidate_external_id_not_null" NOT NULL candidate_external_id;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_channel_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_channel_id_not_null" NOT NULL channel_id;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_first_seen_at_not_null" NOT NULL first_seen_at;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_id_not_null" NOT NULL id;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_identity_key" UNIQUE (workspace_id, channel_id, platform, candidate_external_id, source);
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_last_seen_at_not_null" NOT NULL last_seen_at;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_metadata_length" CHECK ((title IS NULL OR length(title) <= 200) AND (handle IS NULL OR length(handle) <= 200));
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_pkey" PRIMARY KEY (id);
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_platform_check" CHECK (platform = 'youtube'::text);
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_platform_not_null" NOT NULL platform;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_seen_order" CHECK (last_seen_at >= first_seen_at);
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_source_check" CHECK (source = ANY (ARRAY['manual'::text, 'featured'::text]));
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_source_not_null" NOT NULL source;
+alter table "public"."competitor_candidates" add constraint "competitor_candidates_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE UNIQUE INDEX competitor_candidates_identity_key ON public.competitor_candidates USING btree (workspace_id, channel_id, platform, candidate_external_id, source);
+CREATE UNIQUE INDEX competitor_candidates_pkey ON public.competitor_candidates USING btree (id);
 
 create view "public"."connection_status" as
  SELECT workspace_id,
@@ -2539,12 +2604,11 @@ declare w uuid; home uuid; allowed int; owned int; begin
   return w;
 end $function$
 
-CREATE OR REPLACE FUNCTION private.dashboard_aggregates_impl(w uuid, f jsonb DEFAULT '{}'::jsonb)
+CREATE OR REPLACE FUNCTION private.dashboard_aggregates_compute(w uuid, f jsonb DEFAULT '{}'::jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''
- SET statement_timeout TO '30s'
 AS $function$
 DECLARE
   active text;
@@ -2950,6 +3014,74 @@ BEGIN
 
   RETURN res;
 END;
+$function$
+
+CREATE OR REPLACE FUNCTION private.dashboard_aggregates_fresh_for()
+ RETURNS interval
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$ select interval '60 seconds' $function$
+
+CREATE OR REPLACE FUNCTION private.dashboard_aggregates_impl(w uuid, f jsonb DEFAULT '{}'::jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  filters jsonb := jsonb_strip_nulls(coalesce(f, '{}'::jsonb));
+  k       text;
+  c       private.dashboard_aggregates_cache;
+  stale   boolean;
+begin
+  if not (coalesce(current_setting('request.jwt.claim.role', true), '') = 'service_role'
+          or private.has_role(w)) then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  -- Free-text search is open-ended (a row per typed string would never be read
+  -- twice) and is served by the trigram index, so it is still answered live.
+  if nullif(trim(filters->>'q'), '') is not null then
+    return private.dashboard_aggregates_compute(w, filters);
+  end if;
+
+  k := md5(filters::text);
+
+  select * into c from private.dashboard_aggregates_cache
+   where workspace_id = w and filter_key = k;
+
+  if not found then
+    insert into private.dashboard_aggregates_cache(workspace_id, filter_key, filters)
+    values (w, k, filters)
+    on conflict do nothing;
+    return jsonb_build_object('cache', jsonb_build_object('state', 'pending'));
+  end if;
+
+  if c.payload is null then
+    update private.dashboard_aggregates_cache
+       set requested_at = now()
+     where workspace_id = w and filter_key = k;
+    if c.last_error is not null then
+      return jsonb_build_object('cache',
+        jsonb_build_object('state', 'failed', 'error', c.last_error));
+    end if;
+    return jsonb_build_object('cache', jsonb_build_object('state', 'pending'));
+  end if;
+
+  stale := c.computed_at < now() - private.dashboard_aggregates_fresh_for();
+  if stale or c.requested_at < now() - interval '1 hour' then
+    -- Queue a refresh (and keep the row alive); once per staleness, not per read.
+    if c.requested_at <= c.computed_at or c.requested_at < now() - interval '1 hour' then
+      update private.dashboard_aggregates_cache
+         set requested_at = now()
+       where workspace_id = w and filter_key = k;
+    end if;
+  end if;
+
+  return c.payload || jsonb_build_object('cache', jsonb_build_object(
+    'state', case when stale then 'stale' else 'fresh' end,
+    'computed_at', c.computed_at));
+end
 $function$
 
 CREATE OR REPLACE FUNCTION private.dashboard_comments_impl(w uuid, f jsonb DEFAULT '{}'::jsonb)
@@ -3531,6 +3663,49 @@ begin
   end loop;
   return done;
 end;
+$function$
+
+CREATE OR REPLACE FUNCTION private.drain_dashboard_aggregates(max_rows integer DEFAULT 2)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  r record;
+  done int := 0;
+begin
+  delete from private.dashboard_aggregates_cache
+   where requested_at < now() - interval '7 days';
+
+  for r in
+    select workspace_id, filter_key, filters
+      from private.dashboard_aggregates_cache
+     where (computed_at is null or requested_at > computed_at)
+       and coalesce(next_attempt_at, '-infinity') <= now()
+     order by requested_at
+     limit max_rows
+       for update skip locked
+  loop
+    -- compute authorises as the service role; the row was authorised when asked.
+    perform set_config('request.jwt.claim.role', 'service_role', true);
+    begin
+      update private.dashboard_aggregates_cache
+         set payload = private.dashboard_aggregates_compute(r.workspace_id, r.filters),
+             computed_at = now(), attempts = 0, next_attempt_at = null, last_error = null
+       where workspace_id = r.workspace_id and filter_key = r.filter_key;
+      done := done + 1;
+    exception when others then
+      update private.dashboard_aggregates_cache
+         set attempts = attempts + 1,
+             last_error = sqlstate,
+             next_attempt_at = now() + make_interval(secs => least(60 * power(2, attempts), 3600))
+       where workspace_id = r.workspace_id and filter_key = r.filter_key;
+    end;
+  end loop;
+  perform set_config('request.jwt.claim.role', '', true);
+  return done;
+end
 $function$
 
 CREATE OR REPLACE FUNCTION private.due_videos(w uuid, c uuid)
@@ -4556,7 +4731,16 @@ CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats(pairs jsonb)
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
+declare
+  deleting text := nullif(current_setting('app.deleting_workspace', true), '');
 begin
+  if deleting is not null then
+    select coalesce(jsonb_agg(e), '[]'::jsonb) into pairs
+    from jsonb_array_elements(coalesce(pairs, '[]'::jsonb)) e
+    where e->>'workspace_id' is distinct from deleting;
+    if pairs = '[]'::jsonb then return; end if;
+  end if;
+
   insert into private.video_comment_stats(workspace_id, video_id, total, analysed)
   select distinct p.workspace_id, p.video_id, 0, 0
   from jsonb_to_recordset(coalesce(pairs, '[]'::jsonb))
@@ -4808,61 +4992,59 @@ CREATE OR REPLACE FUNCTION private.register_public_channel_impl(w uuid, c uuid, 
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
-  ch public.channels;
-begin
-  if not private.has_role(w, array['workspace_owner','analyst']) then
-    raise exception 'forbidden' using errcode='42501';
-  end if;
-  if not exists (
-    select 1
-    from public.subscriptions s
-    join public.plans p on p.key = s.plan_key
-    where s.workspace_id = private.billing_root(w)
-      and private.subscription_open(s)
-      and (p.allow_public_channels or p.internal)
-  ) then
-    raise exception 'public_channels_not_allowed_on_plan' using errcode='53400';
-  end if;
-  if not exists(select 1 from public.clients where workspace_id=w and id=c) then
-    raise exception 'invalid_client' using errcode='23503';
-  end if;
-  if p_platform not in ('youtube', 'telegram', 'x', 'tiktok', 'facebook', 'instagram') then
-    raise exception 'invalid_platform' using errcode='22023';
-  end if;
-  if p_platform = 'youtube' then
-    if external !~ '^UC[A-Za-z0-9_-]{22}$' then
-      raise exception 'invalid_channel_id' using errcode='22023'; end if;
-  elsif p_platform = 'telegram' then
-    if external !~ '^(@?[A-Za-z0-9_]{4,64}|-?[0-9]+)$' then
-      raise exception 'invalid_channel_id' using errcode='22023'; end if;
-  elsif length(trim(external)) < 1 or length(external) > 100 then
-    raise exception 'invalid_channel_id' using errcode='22023';
-  end if;
-
+DECLARE ch public.channels;
+BEGIN
+  IF NOT private.has_role(w, ARRAY['workspace_owner','analyst']) THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.subscriptions s JOIN public.plans p ON p.key = s.plan_key
+     WHERE s.workspace_id = private.billing_root(w) AND private.subscription_open(s)
+       AND (p.allow_public_channels OR p.internal)
+  ) THEN
+    RAISE EXCEPTION 'public_channels_not_allowed_on_plan' USING errcode = '53400';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.clients WHERE workspace_id = w AND id = c) THEN
+    RAISE EXCEPTION 'invalid_client' USING errcode = '23503';
+  END IF;
+  IF p_platform NOT IN ('youtube','telegram','x','tiktok','facebook','instagram') THEN
+    RAISE EXCEPTION 'invalid_platform' USING errcode = '22023';
+  END IF;
+  IF p_platform = 'youtube' THEN
+    IF NOT private.valid_youtube_channel_id(external) THEN
+      RAISE EXCEPTION 'invalid_channel_id' USING errcode = '22023';
+    END IF;
+  ELSIF p_platform = 'telegram' THEN
+    IF external !~ '^(@?[A-Za-z0-9_]{4,64}|-?[0-9]+)$' THEN
+      RAISE EXCEPTION 'invalid_channel_id' USING errcode = '22023';
+    END IF;
+  ELSIF length(trim(external)) < 1 OR length(external) > 100 THEN
+    RAISE EXCEPTION 'invalid_channel_id' USING errcode = '22023';
+  END IF;
   handle := nullif(trim(coalesce(handle, '')), '');
   title := nullif(trim(coalesce(title, '')), '');
-  if handle is not null and length(handle) > 50 then
-    raise exception 'invalid_channel_handle' using errcode='22023'; end if;
-  if title is not null and length(title) > 200 then
-    raise exception 'invalid_channel_title' using errcode='22023'; end if;
-
-  insert into public.channels(workspace_id, client_id, external_channel_id, handle, title, platform)
-  values (w, c, external, handle, title, p_platform)
-  on conflict (workspace_id, platform, external_channel_id) do nothing
-  returning * into ch;
-  if ch.id is null then
-    select * into ch from public.channels
-     where workspace_id = w and platform = p_platform
-       and external_channel_id = external and client_id = c;
-    if ch.id is null then
-      raise exception 'channel_claimed_by_other_client' using errcode='23505';
-    end if;
-  end if;
-
-  perform private.adopt_channel_content(w, ch.id);
-  return ch;
-end $function$
+  IF handle IS NOT NULL AND length(handle) > 50 THEN
+    RAISE EXCEPTION 'invalid_channel_handle' USING errcode = '22023';
+  END IF;
+  IF title IS NOT NULL AND length(title) > 200 THEN
+    RAISE EXCEPTION 'invalid_channel_title' USING errcode = '22023';
+  END IF;
+  INSERT INTO public.channels(workspace_id, client_id, external_channel_id, handle, title, platform)
+  VALUES (w, c, external, handle, title, p_platform)
+  ON CONFLICT (workspace_id, platform, external_channel_id) DO NOTHING
+  RETURNING * INTO ch;
+  IF ch.id IS NULL THEN
+    SELECT * INTO ch FROM public.channels
+     WHERE workspace_id = w AND platform = p_platform
+       AND external_channel_id = external AND client_id = c;
+    IF ch.id IS NULL THEN
+      RAISE EXCEPTION 'channel_claimed_by_other_client' USING errcode = '23505';
+    END IF;
+  END IF;
+  PERFORM private.adopt_channel_content(w, ch.id);
+  RETURN ch;
+END
+$function$
 
 CREATE OR REPLACE FUNCTION private.register_worker_credential(secret text, label text, w uuid)
  RETURNS uuid
@@ -5510,6 +5692,26 @@ declare count int := 0; begin
           and a.id <> b.id
      );
 
+  -- Of several due blocks of one channel and kind, only the newest comes back
+  -- (the update below); the rest are superseded by it. Without this the update
+  -- below requeues them all at once and the one-outstanding index refuses it.
+  update public.jobs b
+     set status = 'cancelled',
+         error_code = 'superseded_by_active_job'
+   where b.status = 'blocked'
+     and b.not_before is not null
+     and b.not_before <= now()
+     and exists (
+       select 1 from public.jobs n
+        where n.workspace_id = b.workspace_id
+          and n.channel_id = b.channel_id
+          and n.type = b.type
+          and n.status = 'blocked'
+          and n.not_before is not null
+          and n.not_before <= now()
+          and (n.created_at, n.id) > (b.created_at, b.id)
+     );
+
   -- Unblock due jobs that have no outstanding active job without resetting attempt/reclaims
   update public.jobs j
      set status = 'queued',
@@ -5607,6 +5809,13 @@ AS $function$
      and u.workspace_id in (select s.workspace_id from public.subscriptions s
                             where coalesce(s.billing_workspace_id, s.workspace_id) = private.billing_root(w));
 $function$
+
+CREATE OR REPLACE FUNCTION private.valid_youtube_channel_id(value text)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$ SELECT value ~ '^UC[A-Za-z0-9_-]{22}$' $function$
 
 CREATE OR REPLACE FUNCTION private.video_stats_reconcile_step()
  RETURNS text
@@ -5937,6 +6146,68 @@ BEGIN
   RETURN jsonb_build_object('channel_id', c);
 END $function$
 
+CREATE OR REPLACE FUNCTION private.worker_commit_featured(token_hash text, j uuid, t uuid, b text, candidates jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE
+  w uuid; c uuid; kind text; external text; hash text; prior text; n int;
+BEGIN
+  w := private.worker_job(token_hash, j, t);
+  SELECT channel_id, type INTO c, kind FROM public.jobs WHERE id = j;
+  IF kind <> 'discover' THEN RAISE EXCEPTION 'invalid_job_type' USING errcode = '22023'; END IF;
+  SELECT external_channel_id INTO external FROM public.channels
+   WHERE workspace_id = w AND id = c AND platform = 'youtube';
+  IF external IS NULL OR b IS NULL OR length(b) NOT BETWEEN 1 AND 200
+     OR candidates IS NULL OR jsonb_typeof(candidates) <> 'array'
+     OR jsonb_array_length(candidates) > 100 THEN
+    RAISE EXCEPTION 'invalid_batch' USING errcode = '22023';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(candidates) item
+     WHERE jsonb_typeof(item) <> 'object'
+        OR item - ARRAY['candidate_external_id','title','handle'] <> '{}'::jsonb
+        OR NOT private.valid_youtube_channel_id(item->>'candidate_external_id')
+        OR item->>'candidate_external_id' = external
+        OR (item ? 'title' AND jsonb_typeof(item->'title') NOT IN ('string','null'))
+        OR (item ? 'handle' AND jsonb_typeof(item->'handle') NOT IN ('string','null'))
+        OR length(item->>'title') > 200 OR length(item->>'handle') > 200
+  ) OR (SELECT count(DISTINCT item->>'candidate_external_id')
+          FROM jsonb_array_elements(candidates) item) <> jsonb_array_length(candidates) THEN
+    RAISE EXCEPTION 'invalid_batch' USING errcode = '22023';
+  END IF;
+
+  hash := encode(sha256(convert_to(candidates::text, 'UTF8')), 'hex');
+  SELECT payload_hash INTO prior FROM private.job_batches WHERE job_id = j AND batch_key = b;
+  IF found THEN
+    IF prior IS DISTINCT FROM hash THEN RAISE EXCEPTION 'batch_conflict' USING errcode = '23505'; END IF;
+    RETURN jsonb_build_object('replayed', true, 'stored', 0);
+  END IF;
+
+  DELETE FROM public.competitor_candidates old
+   WHERE old.workspace_id = w AND old.channel_id = c AND old.platform = 'youtube'
+     AND old.source = 'featured'
+     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(candidates) item
+                      WHERE item->>'candidate_external_id' = old.candidate_external_id);
+
+  INSERT INTO public.competitor_candidates(
+    workspace_id, channel_id, candidate_external_id, title, handle, source, added_by
+  )
+  SELECT w, c, x.candidate_external_id, nullif(trim(x.title), ''),
+         nullif(trim(x.handle), ''), 'featured', NULL
+    FROM jsonb_to_recordset(candidates) AS x(candidate_external_id text, title text, handle text)
+  ON CONFLICT (workspace_id, channel_id, platform, candidate_external_id, source)
+  DO UPDATE SET title = excluded.title, handle = excluded.handle, last_seen_at = now();
+  GET DIAGNOSTICS n = ROW_COUNT;
+
+  UPDATE public.channels SET featured_checked_at = now() WHERE workspace_id = w AND id = c;
+  INSERT INTO private.job_batches(job_id, batch_key, checkpoint, payload_hash, outcome)
+  VALUES (j, b, '{}'::jsonb, hash, 'partial');
+  RETURN jsonb_build_object('replayed', false, 'stored', n);
+END
+$function$
+
 CREATE OR REPLACE FUNCTION private.worker_commit_topics(token_hash text, j uuid, t uuid, b text, records jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6044,6 +6315,23 @@ declare w uuid; c uuid; kind text; begin
   if kind <> 'collect' then raise exception 'invalid_job_type' using errcode='22023'; end if;
   return private.due_videos(w, c);
 end $function$
+
+CREATE OR REPLACE FUNCTION private.worker_featured_due(token_hash text, j uuid, t uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid; c uuid; kind text; due boolean;
+BEGIN
+  w := private.worker_job(token_hash, j, t);
+  SELECT channel_id, type INTO c, kind FROM public.jobs WHERE id = j;
+  IF kind <> 'discover' THEN RAISE EXCEPTION 'invalid_job_type' USING errcode = '22023'; END IF;
+  SELECT coalesce(ch.platform = 'youtube'
+                  AND (ch.featured_checked_at IS NULL OR ch.featured_checked_at < now() - interval '7 days'), false)
+    INTO due FROM public.channels ch WHERE ch.workspace_id = w AND ch.id = c;
+  RETURN jsonb_build_object('due', coalesce(due, false));
+END
+$function$
 
 CREATE OR REPLACE FUNCTION private.worker_finish(token_hash text, j uuid, t uuid, outcome text, reason text)
  RETURNS void
@@ -7133,6 +7421,7 @@ CREATE OR REPLACE FUNCTION public.admin_ops()
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
 declare
   overview jsonb;
@@ -7142,6 +7431,8 @@ begin
   select jsonb_build_object(
     'workspaces', (select count(*) from public.workspaces),
     'channels', (select count(*) from public.channels),
+    -- Collected this week, by first_seen_at (comments_first_seen), whatever
+    -- the comment's own date: an import of old comments counts here.
     'comments_7d', (
       select count(*) from public.comments
       where first_seen_at >= now() - interval '7 days'),
@@ -7157,7 +7448,11 @@ begin
     'sync_failed_7d', (
       select count(*) from public.sync_runs
       where started_at >= now() - interval '7 days'
-        and status in ('failed','partial')))
+        and status = 'failed'),
+    'sync_partial_7d', (
+      select count(*) from public.sync_runs
+      where started_at >= now() - interval '7 days'
+        and status = 'partial'))
   into overview;
   select coalesce(jsonb_agg(jsonb_build_object(
       'workspace_id', j.workspace_id, 'workspace_name', w.name,
@@ -7754,6 +8049,7 @@ CREATE OR REPLACE FUNCTION public.admin_workspace_footprint(w uuid)
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO ''
+ SET statement_timeout TO '60s'
 AS $function$
 begin
   if not public.is_platform_admin() then raise exception 'forbidden' using errcode='42501'; end if;
@@ -7874,6 +8170,100 @@ AS $function$
     from private.platform_reader r
    where r.status = 'active' order by r.created_at desc limit 1 $function$
 
+CREATE OR REPLACE FUNCTION public.competitor_candidate_add(p_channel uuid, p_external text, p_title text, p_handle text)
+ RETURNS competitor_candidates
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  ch public.channels;
+  result public.competitor_candidates;
+BEGIN
+  SELECT * INTO ch FROM public.channels WHERE id = p_channel;
+  IF ch.id IS NULL OR NOT private.has_role(ch.workspace_id, ARRAY['workspace_owner','analyst']) THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
+  IF NOT private.valid_youtube_channel_id(p_external)
+     OR p_title IS NOT NULL AND length(p_title) > 200
+     OR p_handle IS NOT NULL AND length(p_handle) > 200 THEN
+    RAISE EXCEPTION 'invalid_input' USING errcode = '22023';
+  END IF;
+  IF ch.platform <> 'youtube' OR p_external = ch.external_channel_id THEN
+    RAISE EXCEPTION 'invalid_candidate' USING errcode = '22023';
+  END IF;
+  IF NOT EXISTS (
+       SELECT 1 FROM public.competitor_candidates c
+       WHERE c.workspace_id = ch.workspace_id AND c.channel_id = ch.id
+         AND c.platform = 'youtube' AND c.candidate_external_id = p_external
+         AND c.source = 'manual'
+     ) AND (SELECT count(*) FROM public.competitor_candidates c
+             WHERE c.workspace_id = ch.workspace_id AND c.channel_id = ch.id
+               AND c.platform = 'youtube' AND c.source = 'manual') >= 100 THEN
+    RAISE EXCEPTION 'candidate_limit_reached' USING errcode = '53400';
+  END IF;
+
+  INSERT INTO public.competitor_candidates(
+    workspace_id, channel_id, candidate_external_id, title, handle, source, added_by
+  ) VALUES (
+    ch.workspace_id, ch.id, p_external, nullif(trim(p_title), ''),
+    nullif(trim(p_handle), ''), 'manual', auth.uid()
+  )
+  ON CONFLICT (workspace_id, channel_id, platform, candidate_external_id, source)
+  DO UPDATE SET
+    title = coalesce(excluded.title, competitor_candidates.title),
+    handle = coalesce(excluded.handle, competitor_candidates.handle),
+    last_seen_at = now()
+  RETURNING * INTO result;
+  RETURN result;
+END
+$function$
+
+CREATE OR REPLACE FUNCTION public.competitor_candidate_remove(p_channel uuid, p_external text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE ch public.channels; removed_count int;
+BEGIN
+  SELECT * INTO ch FROM public.channels WHERE id = p_channel;
+  IF ch.id IS NULL OR NOT private.has_role(ch.workspace_id, ARRAY['workspace_owner','analyst']) THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
+  DELETE FROM public.competitor_candidates c
+   WHERE c.workspace_id = ch.workspace_id AND c.channel_id = ch.id
+     AND c.platform = 'youtube' AND c.candidate_external_id = p_external
+     AND c.source = 'manual';
+  GET DIAGNOSTICS removed_count = ROW_COUNT;
+  RETURN removed_count > 0;
+END
+$function$
+
+CREATE OR REPLACE FUNCTION public.competitor_candidates(p_channel uuid)
+ RETURNS TABLE(candidate_external_id text, title text, handle text, sources text[], first_seen_at timestamp with time zone, last_seen_at timestamp with time zone)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE ch public.channels;
+BEGIN
+  SELECT * INTO ch FROM public.channels WHERE id = p_channel;
+  IF ch.id IS NULL OR NOT private.has_role(ch.workspace_id) THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
+  RETURN QUERY
+  SELECT c.candidate_external_id,
+         (array_agg(c.title ORDER BY (c.title IS NULL), c.last_seen_at DESC))[1],
+         (array_agg(c.handle ORDER BY (c.handle IS NULL), c.last_seen_at DESC))[1],
+         array_agg(c.source ORDER BY c.source), min(c.first_seen_at), max(c.last_seen_at)
+    FROM public.competitor_candidates c
+   WHERE c.workspace_id = ch.workspace_id AND c.channel_id = ch.id AND c.platform = 'youtube'
+   GROUP BY c.candidate_external_id
+   ORDER BY max(c.last_seen_at) DESC, c.candidate_external_id;
+END
+$function$
+
 CREATE OR REPLACE FUNCTION public.create_workspace(workspace_name text)
  RETURNS uuid
  LANGUAGE sql
@@ -7883,11 +8273,11 @@ AS $function$ select private.create_workspace_impl(workspace_name) $function$
 CREATE OR REPLACE FUNCTION public.dashboard_aggregates(w uuid, f jsonb DEFAULT '{}'::jsonb)
  RETURNS jsonb
  LANGUAGE sql
- STABLE SECURITY DEFINER
+ SECURITY DEFINER
  SET search_path TO ''
  SET statement_timeout TO '30s'
 AS $function$
-  SELECT private.dashboard_aggregates_impl(w, f);
+  select private.dashboard_aggregates_impl(w, f);
 $function$
 
 CREATE OR REPLACE FUNCTION public.dashboard_comments(w uuid, f jsonb DEFAULT '{}'::jsonb)
@@ -7915,6 +8305,7 @@ CREATE OR REPLACE FUNCTION public.delete_workspace(w uuid)
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
+ SET statement_timeout TO '120s'
 AS $function$
 declare me uuid; my_home uuid; begin
   me := auth.uid();
@@ -8918,6 +9309,12 @@ AS $function$
   SELECT private.worker_commit_channel(credential_hash, j, t, profile)
 $function$
 
+CREATE OR REPLACE FUNCTION public.svc_worker_commit_featured(credential_hash text, j uuid, t uuid, b text, candidates jsonb)
+ RETURNS jsonb
+ LANGUAGE sql
+ SET search_path TO ''
+AS $function$ SELECT private.worker_commit_featured(credential_hash, j, t, b, candidates) $function$
+
 CREATE OR REPLACE FUNCTION public.svc_worker_commit_topics(credential_hash text, j uuid, t uuid, b text, records jsonb)
  RETURNS jsonb
  LANGUAGE sql
@@ -8931,6 +9328,12 @@ CREATE OR REPLACE FUNCTION public.svc_worker_due_videos(credential_hash text, j 
  SET search_path TO ''
 AS $function$
   select private.worker_due_videos(credential_hash, j, t) $function$
+
+CREATE OR REPLACE FUNCTION public.svc_worker_featured_due(credential_hash text, j uuid, t uuid)
+ RETURNS jsonb
+ LANGUAGE sql
+ SET search_path TO ''
+AS $function$ SELECT private.worker_featured_due(credential_hash, j, t) $function$
 
 CREATE OR REPLACE FUNCTION public.svc_worker_finish(credential_hash text, j uuid, t uuid, outcome text, error_code text)
  RETURNS void
@@ -9256,6 +9659,7 @@ create policy "tenant_read" on "public"."clients" to authenticated for select us
 create policy "tenant_read" on "public"."comment_annotations" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."comment_reviews" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."comments" to authenticated for select using (private.has_role(workspace_id));
+create policy "competitor_candidates_member_read" on "public"."competitor_candidates" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."imports" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."jobs" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."memberships" to authenticated for select using (private.has_role(workspace_id));
@@ -9357,6 +9761,13 @@ grant SELECT on table "private"."channel_compare_units" to "postgres";
 grant TRIGGER on table "private"."channel_compare_units" to "postgres";
 grant TRUNCATE on table "private"."channel_compare_units" to "postgres";
 grant UPDATE on table "private"."channel_compare_units" to "postgres";
+grant DELETE on table "private"."dashboard_aggregates_cache" to "postgres";
+grant INSERT on table "private"."dashboard_aggregates_cache" to "postgres";
+grant REFERENCES on table "private"."dashboard_aggregates_cache" to "postgres";
+grant SELECT on table "private"."dashboard_aggregates_cache" to "postgres";
+grant TRIGGER on table "private"."dashboard_aggregates_cache" to "postgres";
+grant TRUNCATE on table "private"."dashboard_aggregates_cache" to "postgres";
+grant UPDATE on table "private"."dashboard_aggregates_cache" to "postgres";
 grant DELETE on table "private"."job_batches" to "postgres";
 grant INSERT on table "private"."job_batches" to "postgres";
 grant REFERENCES on table "private"."job_batches" to "postgres";
@@ -9586,6 +9997,18 @@ grant SELECT on table "public"."comments" to "service_role";
 grant TRIGGER on table "public"."comments" to "service_role";
 grant TRUNCATE on table "public"."comments" to "service_role";
 grant UPDATE on table "public"."comments" to "service_role";
+grant SELECT on table "public"."competitor_candidates" to "authenticated";
+grant DELETE on table "public"."competitor_candidates" to "postgres";
+grant INSERT on table "public"."competitor_candidates" to "postgres";
+grant REFERENCES on table "public"."competitor_candidates" to "postgres";
+grant SELECT on table "public"."competitor_candidates" to "postgres";
+grant TRIGGER on table "public"."competitor_candidates" to "postgres";
+grant TRUNCATE on table "public"."competitor_candidates" to "postgres";
+grant UPDATE on table "public"."competitor_candidates" to "postgres";
+grant DELETE on table "public"."competitor_candidates" to "service_role";
+grant INSERT on table "public"."competitor_candidates" to "service_role";
+grant SELECT on table "public"."competitor_candidates" to "service_role";
+grant UPDATE on table "public"."competitor_candidates" to "service_role";
 grant SELECT on table "public"."connection_status" to "authenticated";
 grant DELETE on table "public"."connection_status" to "postgres";
 grant INSERT on table "public"."connection_status" to "postgres";
@@ -9917,6 +10340,11 @@ grant EXECUTE on function private.confirm_usage(uuid,text[]) to "postgres";
 grant EXECUTE on function private.confirm_usage(uuid,text[]) to "service_role";
 grant EXECUTE on function private.create_workspace_impl(text) to "authenticated";
 grant EXECUTE on function private.create_workspace_impl(text) to "postgres";
+grant EXECUTE on function private.dashboard_aggregates_compute(uuid,jsonb) to "authenticated";
+grant EXECUTE on function private.dashboard_aggregates_compute(uuid,jsonb) to "postgres";
+grant EXECUTE on function private.dashboard_aggregates_compute(uuid,jsonb) to "service_role";
+grant EXECUTE on function private.dashboard_aggregates_fresh_for() to "postgres";
+grant EXECUTE on function private.dashboard_aggregates_fresh_for() to "public";
 grant EXECUTE on function private.dashboard_aggregates_impl(uuid,jsonb) to "authenticated";
 grant EXECUTE on function private.dashboard_aggregates_impl(uuid,jsonb) to "postgres";
 grant EXECUTE on function private.dashboard_aggregates_impl(uuid,jsonb) to "service_role";
@@ -9927,6 +10355,7 @@ grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "authenticate
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "postgres";
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "service_role";
 grant EXECUTE on function private.drain_channel_compare(integer) to "postgres";
+grant EXECUTE on function private.drain_dashboard_aggregates(integer) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "service_role";
 grant EXECUTE on function private.enforce_genre_taxonomy_parent_level() to "postgres";
@@ -10056,6 +10485,8 @@ grant EXECUTE on function private.usage_summary_impl(uuid) to "postgres";
 grant EXECUTE on function private.usage_summary_unchecked(uuid) to "postgres";
 grant EXECUTE on function private.used_units(uuid,text,timestamp with time zone) to "postgres";
 grant EXECUTE on function private.used_units(uuid,text,timestamp with time zone) to "service_role";
+grant EXECUTE on function private.valid_youtube_channel_id(text) to "postgres";
+grant EXECUTE on function private.valid_youtube_channel_id(text) to "service_role";
 grant EXECUTE on function private.video_stats_reconcile_step() to "postgres";
 grant EXECUTE on function private.worker_channel_grant(text,uuid) to "postgres";
 grant EXECUTE on function private.worker_channel_grant(text,uuid) to "service_role";
@@ -10067,10 +10498,14 @@ grant EXECUTE on function private.worker_commit_catalogue(text,uuid,uuid,jsonb) 
 grant EXECUTE on function private.worker_commit_catalogue(text,uuid,uuid,jsonb) to "service_role";
 grant EXECUTE on function private.worker_commit_channel(text,uuid,uuid,jsonb) to "postgres";
 grant EXECUTE on function private.worker_commit_channel(text,uuid,uuid,jsonb) to "service_role";
+grant EXECUTE on function private.worker_commit_featured(text,uuid,uuid,text,jsonb) to "postgres";
+grant EXECUTE on function private.worker_commit_featured(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function private.worker_commit_topics(text,uuid,uuid,text,jsonb) to "postgres";
 grant EXECUTE on function private.worker_commit_topics(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function private.worker_due_videos(text,uuid,uuid) to "postgres";
 grant EXECUTE on function private.worker_due_videos(text,uuid,uuid) to "service_role";
+grant EXECUTE on function private.worker_featured_due(text,uuid,uuid) to "postgres";
+grant EXECUTE on function private.worker_featured_due(text,uuid,uuid) to "service_role";
 grant EXECUTE on function private.worker_finish(text,uuid,uuid,text,text) to "postgres";
 grant EXECUTE on function private.worker_finish(text,uuid,uuid,text,text) to "service_role";
 grant EXECUTE on function private.worker_heartbeat(text,uuid,uuid) to "postgres";
@@ -10175,6 +10610,12 @@ grant EXECUTE on function cancel_job(uuid,uuid) to "authenticated";
 grant EXECUTE on function cancel_job(uuid,uuid) to "postgres";
 grant EXECUTE on function channel_lookup_reader_grant() to "postgres";
 grant EXECUTE on function channel_lookup_reader_grant() to "service_role";
+grant EXECUTE on function competitor_candidate_add(uuid,text,text,text) to "authenticated";
+grant EXECUTE on function competitor_candidate_add(uuid,text,text,text) to "postgres";
+grant EXECUTE on function competitor_candidate_remove(uuid,text) to "authenticated";
+grant EXECUTE on function competitor_candidate_remove(uuid,text) to "postgres";
+grant EXECUTE on function competitor_candidates(uuid) to "authenticated";
+grant EXECUTE on function competitor_candidates(uuid) to "postgres";
 grant EXECUTE on function create_workspace(text) to "authenticated";
 grant EXECUTE on function create_workspace(text) to "postgres";
 grant EXECUTE on function dashboard_aggregates(uuid,jsonb) to "authenticated";
@@ -10281,10 +10722,14 @@ grant EXECUTE on function svc_worker_commit_catalogue(text,uuid,uuid,jsonb) to "
 grant EXECUTE on function svc_worker_commit_catalogue(text,uuid,uuid,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_commit_channel(text,uuid,uuid,jsonb) to "postgres";
 grant EXECUTE on function svc_worker_commit_channel(text,uuid,uuid,jsonb) to "service_role";
+grant EXECUTE on function svc_worker_commit_featured(text,uuid,uuid,text,jsonb) to "postgres";
+grant EXECUTE on function svc_worker_commit_featured(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_commit_topics(text,uuid,uuid,text,jsonb) to "postgres";
 grant EXECUTE on function svc_worker_commit_topics(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_due_videos(text,uuid,uuid) to "postgres";
 grant EXECUTE on function svc_worker_due_videos(text,uuid,uuid) to "service_role";
+grant EXECUTE on function svc_worker_featured_due(text,uuid,uuid) to "postgres";
+grant EXECUTE on function svc_worker_featured_due(text,uuid,uuid) to "service_role";
 grant EXECUTE on function svc_worker_finish(text,uuid,uuid,text,text) to "postgres";
 grant EXECUTE on function svc_worker_finish(text,uuid,uuid,text,text) to "service_role";
 grant EXECUTE on function svc_worker_heartbeat(text,uuid,uuid) to "postgres";

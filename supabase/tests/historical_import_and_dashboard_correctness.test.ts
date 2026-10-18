@@ -352,7 +352,7 @@ describe("WO-5a Part 2: Historical Import & Dashboard SQL Correctness", () => {
 
       await user(owner);
       const res = await db.query<{ dashboard_aggregates: DashboardAggregates }>(
-        "select public.dashboard_aggregates($1, '{}'::jsonb)",
+        "select private.dashboard_aggregates_compute($1, '{}'::jsonb) as dashboard_aggregates",
         [W_DASH],
       );
       const data = res.rows[0].dashboard_aggregates;
@@ -413,7 +413,7 @@ describe("WO-5a Part 2: Historical Import & Dashboard SQL Correctness", () => {
 
       await user(owner);
       const res = await db.query<{ dashboard_aggregates: DashboardAggregates }>(
-        "select public.dashboard_aggregates($1, '{}'::jsonb)",
+        "select private.dashboard_aggregates_compute($1, '{}'::jsonb) as dashboard_aggregates",
         [W_METRICS],
       );
       const data = res.rows[0].dashboard_aggregates;
@@ -428,13 +428,16 @@ describe("WO-5a Part 2: Historical Import & Dashboard SQL Correctness", () => {
     it("refuses unauthorized callers and permits platform admin", async () => {
       await user(outsider);
       await expect(
-        db.query("select public.dashboard_aggregates($1, '{}'::jsonb)", [W]),
+        db.query(
+          "select private.dashboard_aggregates_compute($1, '{}'::jsonb) as dashboard_aggregates",
+          [W],
+        ),
       ).rejects.toThrow(/forbidden/);
 
       // Platform admin can inspect
       await user(adminUser);
       const res = await db.query<{ dashboard_aggregates: DashboardAggregates }>(
-        "select public.dashboard_aggregates($1, '{}'::jsonb)",
+        "select private.dashboard_aggregates_compute($1, '{}'::jsonb) as dashboard_aggregates",
         [W],
       );
       expect(res.rows[0].dashboard_aggregates).toBeDefined();

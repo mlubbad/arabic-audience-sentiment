@@ -22,7 +22,7 @@ describe("Table", () => {
         </TableHead>
         <TableBody>
           <TableRow>
-            <TableCell>شريك مؤسِّس</TableCell>
+            <TableCell>شريك تسويقي</TableCell>
           </TableRow>
         </TableBody>
       </Table>,
@@ -32,7 +32,7 @@ describe("Table", () => {
       screen.getByRole("columnheader", { name: "الخطة" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("cell", { name: "شريك مؤسِّس" }),
+      screen.getByRole("cell", { name: "شريك تسويقي" }),
     ).toBeInTheDocument();
   });
 });

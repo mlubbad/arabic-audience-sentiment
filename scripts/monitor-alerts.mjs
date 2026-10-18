@@ -25,8 +25,11 @@ export const LABEL = "monitor";
 const LINE = /^\S+ (OK|WARN|FAIL) ([a-z]+) (\S+)$/;
 const marker = (check) => `<!-- monitor-check:${check} -->`;
 
-/** The checks one run reported: name → { level, detail }. */
-export function parseRun(output) {
+/**
+ * The checks one run reported: name → { level, detail }. `exitCode` is
+ * monitor.sh's, as the workflow recorded it; empty when it was not.
+ */
+export function parseRun(output, exitCode = "") {
   const checks = new Map();
   for (const line of output.split("\n")) {
     const m = LINE.exec(line.trim());
@@ -35,6 +38,10 @@ export function parseRun(output) {
   // A run that died before its summary line proved nothing healthy.
   if (!/ DONE overall=/.test(output))
     checks.set("monitor", { level: "FAIL", detail: "no_result" });
+  // monitor.sh exits 0, 1 or 2; anything else means it did not finish its
+  // own way (killed, or a shell error), whatever it printed before.
+  else if (!["", "0", "1", "2"].includes(exitCode))
+    checks.set("monitor", { level: "FAIL", detail: `exit_${exitCode}` });
   return checks;
 }
 
@@ -83,8 +90,18 @@ function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8" });
 }
 
+/** The run's output, or nothing when the probe died before writing it. */
+function readRun(path) {
+  try {
+    return readFileSync(path, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  }
+}
+
 function main(path) {
-  const checks = parseRun(readFileSync(path, "utf8"));
+  const checks = parseRun(readRun(path), process.env.MONITOR_EXIT_CODE ?? "");
   const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
   const owner = process.env.GITHUB_REPOSITORY_OWNER ?? "";
   const openIssues = JSON.parse(

@@ -1,0 +1,20 @@
+{
+  "channel_published_at": "2020-01-02T03:04:05Z",
+  "country": "TR",
+  "default_language": "ar",
+  "description": "قناة للوصفات",
+  "external_channel_id": "UCxxxxxxxxxxxxxxxxxxxxxx",
+  "keywords": [
+    "طبخ",
+    "حلويات شرقية",
+    "وصفات"
+  ],
+  "subscriber_count": 1200,
+  "subscriber_count_hidden": false,
+  "topic_categories": [
+    "https://en.wikipedia.org/wiki/Food",
+    "https://en.wikipedia.org/wiki/Lifestyle_(sociology)"
+  ],
+  "video_count": 56,
+  "view_count": 34000
+}

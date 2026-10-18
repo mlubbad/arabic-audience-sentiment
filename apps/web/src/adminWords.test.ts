@@ -166,13 +166,13 @@ describe("admin plan keys", () => {
   it("plan options carry the title in the reader's language, keyed by the key", () => {
     const rows = [
       { key: "free", title_ar: "مجاني", title_en: "Free" },
-      { key: "pilot", title_ar: "شريك مؤسِّس", title_en: "Founding Partner" },
+      { key: "pilot", title_ar: "شريك تسويقي", title_en: "Marketing Partner" },
     ];
     expect(adminPlanOptions(rows, "ar")).toEqual([
       { key: "free", label: "مجاني" },
-      { key: "pilot", label: "شريك مؤسِّس" },
+      { key: "pilot", label: "شريك تسويقي" },
     ]);
-    expect(adminPlanOptions(rows, "en")[1].label).toBe("Founding Partner");
+    expect(adminPlanOptions(rows, "en")[1].label).toBe("Marketing Partner");
   });
 });
 
@@ -231,5 +231,13 @@ describe("admin errors", () => {
     expect(adminErrorMessage(new TypeError("Failed to fetch"), ar)).toBe(
       ar.adminFailed("unknown_error"),
     );
+  });
+});
+
+describe("a refusal in words", () => {
+  it("says a call ran out of time in a sentence, not as 57014", () => {
+    expect(
+      adminErrorMessage({ code: "57014", message: "live_unavailable" }, ar),
+    ).toBe(ar.adminTimedOut);
   });
 });

@@ -65,8 +65,9 @@ describe("genre taxonomy", () => {
   });
 
   it("returns the same ordered v1 taxonomy to users of different workspaces", async () => {
+    // v1 by number: the latest version is v2 (genre_taxonomy_v2.test.ts).
     await as("authenticated", OWNER);
-    const latest = await taxonomy();
+    const latest = await taxonomy(1);
     await as("authenticated", OTHER_OWNER);
     const explicit = await taxonomy(1);
 
@@ -121,37 +122,38 @@ describe("genre taxonomy", () => {
   });
 
   it("enforces root shape, child shape, parent depth, and key format", async () => {
+    // A scratch version: 1 and 2 are the published ones.
     await db.exec("reset role");
     await db.query(
-      "insert into public.genre_taxonomy_versions(version, notes) values (2, 'constraint tests')",
+      "insert into public.genre_taxonomy_versions(version, notes) values (99, 'constraint tests')",
     );
     await db.query(
       `insert into public.genre_taxonomy(version,key,level,name_ar,name_en,description,position)
-       values (2,'root',1,'جذر','Root','Root genre',1)`,
+       values (99,'root',1,'جذر','Root','Root genre',1)`,
     );
 
     await expect(
       db.query(
         `insert into public.genre_taxonomy(version,key,parent_key,level,name_ar,name_en,description,position)
-         values (2,'root_with_parent','root',1,'جذر','Root','Invalid root',2)`,
+         values (99,'root_with_parent','root',1,'جذر','Root','Invalid root',2)`,
       ),
     ).rejects.toThrow();
     await expect(
       db.query(
         `insert into public.genre_taxonomy(version,key,level,name_ar,name_en,description,position)
-         values (2,'orphan',2,'يتيم','Orphan','Invalid child',2)`,
+         values (99,'orphan',2,'يتيم','Orphan','Invalid child',2)`,
       ),
     ).rejects.toThrow();
     await expect(
       db.query(
         `insert into public.genre_taxonomy(version,key,parent_key,level,name_ar,name_en,description,position)
-         values (2,'skipped_level','root',3,'خاطئ','Skipped','Invalid parent depth',2)`,
+         values (99,'skipped_level','root',3,'خاطئ','Skipped','Invalid parent depth',2)`,
       ),
     ).rejects.toThrow(/invalid_genre_parent_level/);
     await expect(
       db.query(
         `insert into public.genre_taxonomy(version,key,level,name_ar,name_en,description,position)
-         values (2,'Bad-Key',1,'خاطئ','Bad key','Invalid key',2)`,
+         values (99,'Bad-Key',1,'خاطئ','Bad key','Invalid key',2)`,
       ),
     ).rejects.toThrow();
   });

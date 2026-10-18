@@ -1,5 +1,36 @@
 # Implementation decisions
 
+2026-10-18 — WO-22 (B-1, video genres) moves from Gemini to Codex. The owner delegated task and
+decision calls to the PM on 2026-10-18. Codex is free since WO-23 merged, and its dispatch path from
+the owner's Mac is scripted and documented, while WO-22 had not started with Gemini. B-2 and B-4
+both wait on B-1, so this is the shortest path through phase 2. WO-22's migration range now starts
+at `20261113010000`, because #167 took `20261113000000`. Merges to `main` stay with the owner.
+Also decided the same day, on the Dependabot queue: #155 (Python 3.14 base image) is declined and
+its minor line ignored. The worker pins 3.12.10 in its Dockerfile, its CI setup and a test, and the
+PR fails that test and the model image build. A runtime move is its own planned change.
+#157, #158 and #170 were rebased onto the current `main` for review.
+
+2026-10-18 — A migration's version is checked, not trusted. The Deploy runner applies a file
+only when its version is missing remotely, so a reused version is skipped in production while
+PGlite, which applies every file, stays green. `scripts/check-migrations.mjs` now fails the
+build on a reused version, and on a pull request on any change to a migration the base branch
+already has: a merged migration is applied, so fixing it means a new migration. The base
+branch reaches the shell through `env`, never `${{ }}` in `run:`. Two open PRs can still
+claim the same new version; the second to merge `main` in turns red, which is the point.
+
+2026-10-18 — Competitors phase starts behind YouTube's policy gate. YouTube's base Developer
+Policies forbid inferring a video's or channel's category, custom channel scores and ranking
+channels against each other; the Derived Metrics amendment allows them once our use case is
+accepted (`docs/2026-10-18-youtube-derived-metrics-application.md`). So (1) genre classification
+(WO-22, #164) ships switched off: `private.platform_switches('genre_classification')` is false
+until the owner turns it on after acceptance, and nothing is enqueued before that. (2) Genre
+classification draws no plan units for now; the 50-recent-videos cap bounds the cost, and the
+owner decides charging later. (3) B-3 is split: WO-23 (#165, Codex) builds the candidate pool
+from manual picks and featured channels (`channelSections`, 1 unit); `search.list` (100 units)
+needs a platform-level job outside any workspace and becomes B-3b once that design is set.
+(4) Taxonomy v2 (task 0.4) adds levels 2 and 3 as a new version; v1 stays as published, and
+language, dialect, market and format stay facets, not genres.
+
 2026-10-17 — Audience overlap and competitor discovery: the owner's five calls on the
 roadmap (`docs/roadmap/2026-10-17-audience-overlap-and-competitors.md` §9). (1) Overlap is
 measured inside one workspace first: between the channels it already collects, its own and the
@@ -1566,3 +1597,25 @@ AJ360's 4,604 uploads under 73 public channels. Two guards, both kept:
   selections) from one channel; a video catalogued under the source channel cannot also be the
   target's, since a YouTube video has one uploader. It deletes production data, so the owner runs
   it; it is out of reach of every API role. Metered usage is left alone: refunds are a billing call.
+
+## 2026-10-17 — the dashboard reads a cache; the count happens in the background
+
+`read:live_unavailable:57014` came back on the owner's AJ360 overview after five patches
+(windowing, indexes, a 30 s timeout, retries, a lighter ops read). Cause: `dashboard_aggregates`
+re-counted every comment of the workspace on each page load, so its cost grew with the workspace
+and with what the worker was writing, and any ceiling was eventually crossed. The earlier fixes
+moved the ceiling; none removed the work from the request.
+
+Decision (`20261111010000_dashboard_aggregates_cache.sql`): a read looks a row up in
+`private.dashboard_aggregates_cache`, one row per (workspace, filter set). pg_cron
+`dashboard-aggregates-drain` (every minute, 10 min budget) recomputes only the rows somebody asked
+for, at most once per row however many viewers or retries asked. The old function is kept as
+`private.dashboard_aggregates_compute`, so the filter and effective-label rules live in one place.
+A payload older than 60 s is served as `stale` while its refresh is queued; a never-computed filter
+set answers `pending` (the page waits and asks again); a failed compute answers `failed` with its
+SQLSTATE, which the page prints. Free-text search (`q`) stays live (trigram index, open-ended keys).
+Rows nobody read for 7 days are dropped.
+
+Not solved by this: the drain's count is still proportional to the workspace. If it ever exceeds 10
+minutes the next step is incremental rollups, not a longer budget. The worker tick's own `55P03` /
+`57014` (progress.md, 2026-10-17) is a separate cause.

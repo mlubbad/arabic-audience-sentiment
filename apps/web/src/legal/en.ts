@@ -214,7 +214,7 @@ export const legalEn: LegalSet = {
       },
       {
         id: "pilot",
-        heading: "Founding partners",
+        heading: "Marketing partners",
         paragraphs: [
           "We may grant a limited number of channels a “founding partner” plan at no charge, in exchange for their feedback on the product. This plan is a grant, not an entitlement, and may be ended or converted to a published plan with reasonable notice.",
         ],

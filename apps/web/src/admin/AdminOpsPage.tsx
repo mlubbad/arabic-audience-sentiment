@@ -61,6 +61,11 @@ export function AdminOpsPage() {
               value={ops.data.sync_failed_7d}
               warn={ops.data.sync_failed_7d > 0}
             />
+            {/* Partial runs apart from failed ones (review finding 9). */}
+            <Metric
+              label={S.adminOpsPartial7d}
+              value={ops.data.sync_partial_7d ?? 0}
+            />
             <Metric label={S.adminOpsJobsOpen} value={ops.data.jobs_open} />
             <WorkerCard
               fresh={ops.data.worker_fresh}

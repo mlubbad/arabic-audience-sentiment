@@ -154,6 +154,14 @@ export const DashboardAggregatesSchema = z.object({
   active_analysis_key: z.string().nullable(),
   active_topic_key: z.string().nullable(),
   revision: z.string().nullable(),
+  // Present on live reads: how old the figures are. `stale` is still a full
+  // payload, served while the database recomputes it.
+  cache: z
+    .object({
+      state: z.enum(["fresh", "stale"]),
+      computed_at: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 export type DashboardAggregates = z.infer<typeof DashboardAggregatesSchema>;

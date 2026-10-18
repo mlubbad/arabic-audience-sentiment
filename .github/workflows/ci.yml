@@ -54,6 +54,17 @@ jobs:
       # checked-in snapshot (supabase/schema/current.sql). Regenerate with
       # `npm run db:snapshot`.
       - run: npm run db:snapshot:check
+      # A migration's version is its identity in production: a reused one is
+      # skipped there silently, and a merged one is already applied. See
+      # scripts/check-migrations.mjs.
+      - run: npm run check:migrations
+      - name: Merged migrations are unchanged
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+          node scripts/check-migrations.mjs --base "origin/$BASE_REF"
 
   unit:
     name: Unit and worker tests
