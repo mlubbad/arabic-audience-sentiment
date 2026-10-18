@@ -92,6 +92,9 @@ describe("admin channel collection freshness", () => {
   });
 
   it("keeps the latest successful or partial collection apart from the latest sync", async () => {
+    // Counts are recounted in the background (20261115000000).
+    await db.exec("reset role");
+    await db.query("select private.drain_video_comment_stats()");
     await asAdmin();
     const raw = (
       await db.query<{ row: unknown }>("select admin_channels() as row")

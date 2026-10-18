@@ -112,6 +112,9 @@ describe("workspace_ops_snapshot RPC", () => {
       [A, videoId],
     );
 
+    // Counts are recounted in the background (20261115000000).
+    await db.exec("reset role");
+    await db.query("select private.drain_video_comment_stats()");
     await as(ownerA);
     const data = await readOps(A);
     const parsed = OpsSnapshotSchema.parse(data);

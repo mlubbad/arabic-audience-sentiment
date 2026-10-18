@@ -170,8 +170,13 @@ async function expectParity(
   database: PGlite,
   workspace: string,
   owner: string,
+  drain = true,
 ) {
   const expected = await bruteForce(database, workspace);
+  // The counts are recounted in the background (20261115000000): run the
+  // drain the minute's cron run would. A database stopped before that
+  // migration still recounts inline.
+  if (drain) await database.query("select private.drain_video_comment_stats()");
   const snapshot = await readOps(database, workspace, owner);
   const actual = [...snapshot.video_counts].sort((a, b) =>
     a.id.localeCompare(b.id),
@@ -426,7 +431,7 @@ describe("precomputed ops snapshot video counters", () => {
         [A, videoA1],
       );
       expect(stats.rows).toEqual([{ total: 2, analysed: 1 }]);
-      await expectParity(backfillDb, A, ownerA);
+      await expectParity(backfillDb, A, ownerA, false);
     } finally {
       await backfillDb.close();
     }
