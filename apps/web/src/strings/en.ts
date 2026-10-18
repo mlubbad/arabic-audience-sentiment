@@ -21,6 +21,8 @@ export const en: Strings = {
   menuOpen: "Menu ☰",
   menuClose: "Close ×",
   navLabel: "Main navigation",
+  railConsoleNote:
+    "Owner console: the numbers here are the whole platform's, not one workspace's.",
   navCaption: "Navigate",
   railWorkspaceCaption: "Workspace",
   railWorkspaceNone: "No workspace chosen yet",
@@ -393,6 +395,18 @@ export const en: Strings = {
   adminDemoLead:
     "An illustrative copy of the admin page: changes stay in this session.",
   adminInspectWorkspace: "Inspect workspace",
+  // ---- the workspaces list and its panel (owner console review, finding 12) ----
+  adminWorkspacesSearch: "Search by workspace name, owner email or id",
+  adminWorkspacesCount: (shown: number, total: number) =>
+    `${shown} of ${total} workspaces`,
+  adminWorkspacesNoMatch: "No workspace matches this search.",
+  adminWorkspaceOwner: "Owner",
+  adminWorkspaceOwnerUnknown: "Unknown",
+  adminWorkspaceManage: (name: string) => `Manage ${name}`,
+  adminWorkspacePanelClose: "Close the workspace details",
+  adminWorkspaceDanger: "Delete zone",
+  adminWorkspaceDangerNote:
+    "Deleting is permanent: its channels, comments and analyses go with it, and its members lose access.",
   adminInspectionBadge: "Supervisor Mode",
   adminInspectionBanner: (name: string, owner?: string) =>
     owner
@@ -414,8 +428,8 @@ export const en: Strings = {
   adminHomeFunnel: "Data path",
   adminHomeVideos: "Videos catalogued",
   adminHomeSelected: "Selected for collection",
-  adminHomeComments: "Comments collected",
-  adminHomeAnalysed: "Comments analysed",
+  adminHomeComments: "Collected (incl. the channel's own)",
+  adminHomeAnalysed: "Analysed, any version",
   adminHomeStates: "Channel states",
   adminChannelStates: {
     paused: "Collection paused",
@@ -852,7 +866,7 @@ export const en: Strings = {
   adminDigestFailingNow: "Failing now",
   adminDigestNoneFailing: "No channel is failing.",
   adminDigestCollected: "Comments collected",
-  adminDigestAnalysed: "Comments analysed",
+  adminDigestAnalysed: "Analysed, any version",
   adminDigestStale: "Stale channels",
   adminDigestFailedRuns: "Failed runs (24 h)",
   adminDigestImported: "Channels imported (24 h)",
@@ -874,7 +888,7 @@ export const en: Strings = {
   adminCompareSortVolume: "Most analysed comments",
   adminCompareCsv: "Export CSV",
   adminCompareRank: "#",
-  adminCompareAnalysed: "Analysed comments",
+  adminCompareAnalysed: "Analysed (active analysis)",
   adminCompareNet: "Net sentiment",
   adminCompareChange: "Change since last week",
   adminCompareTopic: "Top topic",
@@ -903,9 +917,12 @@ export const en: Strings = {
   adminOpsHeading: "Platform state",
   adminOpsWorkspaces: "Workspaces",
   adminOpsChannels: "Channels",
-  adminOpsComments7d: "Comments this week",
+  adminOpsComments7d: "Collected this week",
   adminOpsRuns7d: "Syncs this week",
   adminOpsFailed7d: "Failed syncs",
+  adminOpsPartial7d: "Partial syncs",
+  adminTimedOut:
+    "The request took longer than allowed and did not run. Try again in a moment.",
   adminOpsJobsOpen: "Jobs in queue",
   adminOpsWorkerFresh: "Worker active",
   adminOpsWorkerStale: "Worker silent",

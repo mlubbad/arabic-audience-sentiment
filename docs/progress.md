@@ -1,5 +1,104 @@
 # Progress
 
+## 2026-10-18 — WO-23 merged; WO-22 to Codex
+
+- **WO-23 (#171) merged** (`54402a0`), after one review round. Migration `20261114010000` applied by
+  Deploy Preview. The owner updated the cloud worker to `54402a0`, so featured channels are
+  collected on each channel's next discover.
+- **WO-22 reassigned to Codex** (decision in `docs/decisions.md`); migration range from
+  `20261113010000`.
+- **Dependabot:** #155 declined (Python 3.14); #157, #158 and #170 rebased for review.
+
+## 2026-10-18 — CI refuses a reused migration version
+
+The owner said «أضف فحص CI يرفض رقم ترحيل مستعمل». `scripts/check-migrations.mjs` fails when
+two migration files share a version or a name breaks `<14 digits>_<lowercase>.sql`, and, on a
+pull request, when a migration already on the base branch was edited, renamed or deleted. It
+runs in `npm run check` and in CI's static job; the Deploy runner refuses to apply on a
+duplicate too. It happened four times (#133/#129, #134/#135, #139/#140, #167/#166).
+
+## 2026-10-18 — Taxonomy v2 and the first two competitor work orders
+
+The owner said (2026-10-17): start task 0.4, then issue B-1 and B-3, with B-3 moved to Codex.
+
+- **Task 0.4:** `20261112000000_genre_taxonomy_v2.sql` publishes taxonomy v2: v1's 18 level-1
+  genres unchanged, 120 level-2 and 27 level-3 genres, Arabic and English names and an Arabic
+  description each. Every IAB id was checked against the official Content Taxonomy 3.1 file at
+  the same commit as v1; null where none fits. Review copy:
+  `docs/taxonomy/2026-10-17-genre-taxonomy-v2.md`. Merging is the owner's approval.
+- **WO-22 (#164, Gemini), B-1:** each video gets a genre from v2, on the topics pattern, behind
+  a platform switch that stays off until YouTube accepts the Derived Metrics use case.
+- **WO-23 (#165, Codex), B-3 first part:** the competitor candidate pool, from manual picks and
+  featured channels. Search is B-3b.
+- **Derived Metrics:** step-by-step application guide with paste-ready answers in
+  `docs/2026-10-18-youtube-derived-metrics-application.md`. Two corrections to the 2026-09-16
+  request found on the way: it said the data is in the EU, while the pooler host is
+  `ap-south-1` (to confirm), and it did not list `search.list`, which channel lookup uses.
+
+## 2026-10-17 — Owner console review batch F: layout
+
+The owner said «ابدأ الدفعة F» (2026-10-17): findings 12, 13, 14 and 21 of
+[`docs/reviews/2026-10-13-owner-console-review.md`](reviews/2026-10-13-owner-console-review.md).
+Web only; no migration.
+
+- **12, Workspaces:** the page is a list (name, owner, plan, status, period end, provider) with a
+  search over name, owner email and id. «إدارة» opens the workspace in a side panel: its facts, the
+  inspect link, the plan and pack forms, and last, under «منطقة الحذف», the delete. No row carries
+  a form or a delete any more. 27 workspaces at 1440 px: 2,622 px instead of 7,471. The owner
+  comes from `admin_accounts()`, the accounts page's read and cache, so no new RPC. The account
+  file still lists a person's workspaces as cards with their levers.
+- **13, Channels on a phone:** under 640 px each channel is a card with its state, error, counts
+  and last success; selection works the same way.
+- **14, the rail:** inside `/admin` the rail drops the workspace switch, collection state, plan
+  card and tour, and says the numbers are the platform's.
+- **21, Import:** the 23 px overflow at 390 px was the file input's own width setting the grid
+  column's floor; the column is now `minmax(0, 1fr)`. Measured 413 → 390 px.
+- **Not in this batch:** the rail ending short of a long page (it is a sticky 100vh plane by
+  design), and the panel forms' two-column field row, which is the account file's existing card
+  style.
+
+## 2026-10-17 — The monitor workflow failed blind on its first two runs
+
+**Found** while verifying the WO-21 deploy: both scheduled "Platform monitor" runs after #140
+merged (39025271644, 39038417163) ended "exit code 2" in the probe step, with no monitor output,
+no "monitor.sh exited" line and no `monitor` issue. GitHub runs `shell: bash` as
+`bash --noprofile --norc -eo pipefail`; the step's `set -uo pipefail` leaves `-e` on, so
+monitor.sh's exit 2 ended the step before the output was printed, and the alert step was skipped.
+
+**Change (branch `claude/monitor-workflow-exit-code`):** the probe captures the exit code with
+`|| code=$?`, always prints the output and passes the code on; the alert step runs on
+`!cancelled()`, and the probe has its own 5-minute timeout, so a probe that dies still gets its
+issue. `monitor-alerts.mjs` reads a missing output as `monitor` FAIL `no_result` and an exit code
+outside 0–2 as `exit_<n>`. A failing check still leaves the run green (the issue is the alert);
+a broken alert step turns it red. **Verified** on the branch, run without the environment (no
+secrets): 39041794690 printed `FAIL monitor not_configured:…`, exited 2, opened #160; 39041826952
+reported "no change". #160 closes itself on the first run on `main` after the merge.
+**Not known yet:** which check failed the two blind runs. Its secrets are limited to `main`, so
+the first run after the merge names it; `failures` (quota blocks, below) is the likely one.
+
+## 2026-10-17 — Owner console review batch E: definitions and scale
+
+The owner said «ابدأ الدفعة E» (2026-10-17): findings 9, 10, 11 and 20 of
+[`docs/reviews/2026-10-13-owner-console-review.md`](reviews/2026-10-13-owner-console-review.md).
+Migration `20261110000000`.
+
+- **10, deleting the largest workspace:** `delete_workspace` has a 120 s limit and
+  `admin_workspace_footprint` 60 s (PostgREST applies a limit set on the function it calls). The
+  stats recount skips the workspace being deleted. A refusal for time (`57014`) is a sentence in
+  the dialog, not a code. Measured locally on the 155,822-comment workspace: about 12 s before,
+  10 s after. 9.2 s of it is the comments delete itself, five foreign-key checks per comment,
+  which no setting short of superuser can skip; the 120 s limit is what makes it finish.
+- **11, Ops:** `admin_ops` has a 30 s limit. "This week's comments" now says they are the ones
+  collected this week (`first_seen_at`, already indexed; 0.1 s locally over 218k rows).
+- **9, definitions:** "failed" on Ops is failed runs only, with partial runs counted beside it;
+  the services line says its count is failed, blocked or partial. "Analysed" now says which
+  count it is: "analysed, any version" (Home, Channels, digest: the stats table) or "analysed
+  (active analysis)" (Comparison). "Collected" says it includes the channel's own comments.
+- **20:** `audit_events` indexes by time, by actor and by target.
+- **Not in this batch:** recounting a video on every write (finding 8 of the correctness appendix)
+  and one shared definition of "failed" across Home, digest and services; each count now says
+  what it counts instead.
+
 ## 2026-10-17 — Owner console review batch D: honest errors and labels
 
 The owner said «ابدأ» to batch D (2026-10-17): findings 7, 15, 16 and 17 of
@@ -185,7 +284,6 @@ refusal is what this branch (`claude/meta-page-chooser`) removes: the person pic
 from a list on `/connected`. The same branch makes the result page platform-neutral, stops
 printing the channel's database id on success, and names Meta, Facebook and Instagram on the
 two channel-choice cards.
-
 
 ## 2026-10-13 — Facebook and Instagram channels: two doors, one worker
 
@@ -640,7 +738,6 @@ Implemented comprehensive quota optimization in the YouTube Data API collector a
   - Full repo verification (`npm run check`): 276 worker tests, 1299 vitest tests, 392 DB tests, Playwright tests, builds, and secret checks passed 100% green.
 
 ## 2026-09-22 — Comprehensive Audit Improvements Execution (P0 & P1 Hardening) & Live Deployment
-
 
 Executed the prioritized improvements derived from the 360-degree architecture, security, performance, and typography audit, applied remote migrations, deployed live, and verified across all test tiers:
 
@@ -2249,7 +2346,7 @@ What remains before live keys, per the same 2026-09-16 list: the tax-mode PATCH 
 the sandbox plus one more sandbox payment to confirm the invoice shows tax (item 2). Items 1
 (this entry) and 4 (the `20260917060000` migration) are done — that migration matched
 `local`/`remote` in `supabase migration list --linked` before this session touched anything
-today. Setting `PADDLE_ENV=production` and the live API key, webhook secret and client
+today. Setting `PADDLE_ENV=live` and the live API key, webhook secret and client
 token themselves is the owner's own action — this session has no access to those values and
 does not ask for them in chat.
 
@@ -2275,7 +2372,7 @@ comment-analysis budget moved from 100 to 10,100 within seconds, no manual step.
 workspace was then deleted from `/admin` (0 channels, 1 member — nothing else attached).
 
 Both halves of the last open item are done. Nothing on the 2026-09-16 "before live keys"
-list remains outstanding; setting `PADDLE_ENV=production` and the live API key, webhook
+list remains outstanding; setting `PADDLE_ENV=live` and the live API key, webhook
 secret and client token is the owner's own action, as before.
 
 ## 2026-09-17 — the dashboard rebuilt: one page in `dashboard/`, sticky filters, sections on the design system
@@ -3144,3 +3241,13 @@ While `channel-lookup` responded successfully to backend and curl requests, in-b
 - **Verification**:
   - `uv run python src/collectors/diagnostics.py --platform all` reported YouTube as `HEALTHY (OAuth Platform Reader Active)`.
   - All CI verification gates passed cleanly via `npm run check` (web unit tests, database tests, python tests, production build, and secret scanning).
+
+## 2026-10-18 — `PADDLE_ENV` takes `live`, not `production`
+
+`paddle-checkout`, `billing-portal`, `scripts/paddle-sync-prices.mjs` and the web bundle's
+`VITE_PADDLE_ENV` all switch to `api.paddle.com` only on the exact value `live`; anything
+else, `production` included, stays on the sandbox. `supabase/functions/README.md` and the
+two 2026-09-16/17 entries above said `production`, which would have left a "live" switch
+silently on sandbox. Corrected in place (the README row also now lists `paddle-checkout`,
+which reads both `PADDLE_ENV` and `PADDLE_API_KEY`). Docs only; no code, secret or variable
+changed. The owner's switch to live remains their own action.

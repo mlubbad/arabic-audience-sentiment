@@ -35,7 +35,7 @@ function ExampleSelect({
       </SelectTrigger>
       <SelectContent>
         <DirectionProbe />
-        <SelectItem value="founding_partner">شريك مؤسِّس</SelectItem>
+        <SelectItem value="founding_partner">شريك تسويقي</SelectItem>
         <SelectItem value="growth">نمو</SelectItem>
         <SelectItem value="scale">توسّع</SelectItem>
       </SelectContent>
@@ -47,7 +47,7 @@ describe("Select", () => {
   it("shows the default value on the closed trigger", () => {
     render(<ExampleSelect onValueChange={vi.fn()} />);
     expect(screen.getByRole("combobox", { name: "الخطة" })).toHaveTextContent(
-      "شريك مؤسِّس",
+      "شريك تسويقي",
     );
   });
 

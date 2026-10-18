@@ -35,6 +35,8 @@ import {
   fixtureWorkspace,
   loadSource,
   loadDashboardAggregates,
+  DashboardPendingError,
+  PENDING_RETRY_MS,
   loadDashboardComments,
   filtersToRpc,
   toLabelledComment,
@@ -266,7 +268,12 @@ function DashboardBody({
     enabled: mode === "live" && !read.data,
     retry: (failureCount, error) =>
       shouldRetryDashboardQuery(failureCount, error, 1),
-    retryDelay: 1000,
+    // The database prepares numbers it has not served before in the background:
+    // ask again shortly while it does, and pick up a stale payload's refresh.
+    retryDelay: (_attempt, error) =>
+      error instanceof DashboardPendingError ? PENDING_RETRY_MS : 1000,
+    refetchInterval: (query) =>
+      query.state.data?.cache?.state === "stale" ? 15_000 : false,
   });
 
   const pageOffset = cursors.length * limit;

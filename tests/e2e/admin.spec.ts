@@ -30,9 +30,25 @@ async function pick(
   await page.getByRole("option", { name: option, exact: true }).click();
 }
 
-/** The plan value on a wide-table row: the first `<td>` after the row's
- *  `<th scope="row">`. */
-const planCell = (r: Locator) => r.getByRole("cell").first();
+/** The plan value on a wide-table row: the second `<td>` after the row's
+ *  `<th scope="row">` (the first is the owner). */
+const planCell = (r: Locator) => r.getByRole("cell").nth(1);
+
+/** Opens workspace n's side panel from its row («إدارة …») and returns it:
+ *  the levers and the delete live there, not on the row (owner console
+ *  review, finding 12). */
+async function panel(page: Page, n: number) {
+  await row(page, n)
+    .getByRole("button", { name: /^إدارة / })
+    .click();
+  const p = page.getByTestId("admin-workspace-panel");
+  await expect(p).toBeVisible();
+  return p;
+}
+const closePanel = async (page: Page) => {
+  await page.getByRole("button", { name: "إغلاق تفاصيل المساحة" }).click();
+  await expect(page.getByTestId("admin-workspace-panel")).toHaveCount(0);
+};
 
 const DONE = "تم التنفيذ.";
 const PADDLE_ACTIVE = "المساحة على اشتراك Paddle نشط؛ فعّل التجاوز لتغييره";
@@ -61,16 +77,36 @@ test("the demo opens on six workspaces under the operator's head", async ({
   // Plans by their names, not their keys (owner console review, finding 17).
   await expect(planCell(row(page, 2))).toHaveText("منشئ بلس");
   await expect(row(page, 6)).toContainText("لا خطة");
+  // A list: no form and no delete on any row; the owner on each.
+  await expect(page.getByTestId("admin-plan-form")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "حذف نهائي" })).toHaveCount(0);
+  await expect(row(page, 2)).toContainText("reem@cooking.example");
+  // The console's rail says whose numbers these are, and drops the
+  // customer's tour (finding 14).
+  await expect(page.getByTestId("rail-console-note")).toBeAttached();
+  await expect(page.getByTestId("tour-replay")).toHaveCount(0);
+});
+
+test("the search narrows the list by owner email", async ({ page }) => {
+  await page
+    .getByRole("searchbox", {
+      name: "ابحث باسم المساحة أو بريد المالك أو المعرّف",
+    })
+    .fill("nabd@");
+  await expect(rows(page)).toHaveCount(1);
+  await expect(row(page, 3)).toBeVisible();
 });
 
 test("setting a plan changes the row's plan cell and says so in the row", async ({
   page,
 }) => {
   const r = row(page, 2);
-  await pick(page, r, "اختر خطة", "وكالة");
-  const form = r.getByTestId("admin-plan-form");
+  const p = await panel(page, 2);
+  await pick(page, p, "اختر خطة", "وكالة");
+  const form = p.getByTestId("admin-plan-form");
   await form.getByRole("button", { name: "تعيين الخطة" }).click();
   await expect(form.getByRole("status")).toHaveText(DONE);
+  await closePanel(page);
   await expect(planCell(r)).toHaveText("وكالة");
   // The reducer marks the row admin-provided and active.
   await expect(r).toContainText("يدوي");
@@ -83,17 +119,19 @@ test("a workspace on an active Paddle subscription refuses a plan until override
   page,
 }) => {
   const r = row(page, 3);
-  const form = r.getByTestId("admin-plan-form");
-  await pick(page, r, "اختر خطة", "ميديا");
+  const p = await panel(page, 3);
+  const form = p.getByTestId("admin-plan-form");
+  await pick(page, p, "اختر خطة", "ميديا");
   await form.getByRole("button", { name: "تعيين الخطة" }).click();
   await expect(form.getByRole("status")).toHaveText(PADDLE_ACTIVE);
-  await expect(planCell(r)).toHaveText("وكالة");
+  await expect(p).toContainText("وكالة");
 
   await form
     .getByRole("checkbox", { name: "تجاوز اشتراك Paddle النشط" })
     .click();
   await form.getByRole("button", { name: "تعيين الخطة" }).click();
   await expect(form.getByRole("status")).toHaveText(DONE);
+  await closePanel(page);
   await expect(planCell(r)).toHaveText("ميديا");
   // Overridden, not moved off Paddle: the provider stays.
   await expect(r).toContainText("Paddle");
@@ -103,7 +141,7 @@ test("a pack lands on an active plan and is refused where there is none", async 
   page,
 }) => {
   const grant = async (n: number) => {
-    const form = row(page, n).getByTestId("admin-pack-form");
+    const form = (await panel(page, n)).getByTestId("admin-pack-form");
     const units = form.getByLabel("الوحدات", { exact: true });
     await units.fill("2500");
     await form.getByLabel("ملاحظة", { exact: true }).fill(`حزمة ${n}`);
@@ -112,15 +150,17 @@ test("a pack lands on an active plan and is refused where there is none", async 
   };
   // Row 5 is on the free plan, active: the pack attaches.
   await expect(await grant(5)).toHaveText(DONE);
+  await closePanel(page);
   // Row 6 never had a plan: grant_units refuses, named by its code.
   await expect(await grant(6)).toHaveText("تعذّر التنفيذ: no_active_plan");
+  await closePanel(page);
   await expect(rows(page)).toHaveCount(6);
 });
 
 test("the pack form waits for a note: the note is the grant's idempotency key", async ({
   page,
 }) => {
-  const form = row(page, 5).getByTestId("admin-pack-form");
+  const form = (await panel(page, 5)).getByTestId("admin-pack-form");
   await expect(form.getByRole("button", { name: "منح حزمة" })).toBeDisabled();
   await form.getByLabel("ملاحظة", { exact: true }).fill("x");
   await expect(form.getByRole("button", { name: "منح حزمة" })).toBeEnabled();
@@ -130,8 +170,13 @@ test("delete asks for the name typed back, refuses the billing root, and removes
   page,
 }) => {
   const openDelete = async (n: number, name: string) => {
-    await row(page, n).getByRole("button", { name: "حذف نهائي" }).click();
-    const dialog = page.getByRole("dialog");
+    const p = await panel(page, n);
+    // The delete sits under its own heading, after the levers.
+    await p
+      .getByRole("region", { name: "منطقة الحذف" })
+      .getByRole("button", { name: "حذف نهائي" })
+      .click();
+    const dialog = page.getByRole("dialog", { name: `حذف «${name}» نهائيًا` });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(`حذف «${name}» نهائيًا`);
     const confirm = dialog.getByRole("button", { name: "احذف نهائيًا" });
@@ -153,18 +198,20 @@ test("delete asks for the name typed back, refuses the billing root, and removes
   await expect(first.dialog.getByRole("alert")).toHaveText(BILLING_ROOT);
   await expect(rows(page)).toHaveCount(6);
   await first.dialog.getByRole("button", { name: "إلغاء" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(first.dialog).toHaveCount(0);
+  await closePanel(page);
 
   // Row 6 has no plan and no billing: it goes, and the table is five.
   const sixth = await openDelete(6, "مساحة بلا خطة");
   await expect(sixth.dialog).toContainText("0 قناة · 0 فيديو");
   await sixth.confirm.click();
+  // The confirm closes, and the panel with it: its workspace is gone.
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(row(page, 6)).toHaveCount(0);
   await expect(rows(page)).toHaveCount(5);
 });
 
-test("at 390px the six rows are six cards and nothing scrolls sideways", async ({
+test("at 390px the six rows are six cards, the levers in the panel, and nothing scrolls sideways", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -175,9 +222,12 @@ test("at 390px the six rows are six cards and nothing scrolls sideways", async (
     "DIV",
   );
   await expect(row(page, 2)).toContainText("قناة ريم للطبخ");
-  // The card's levers are the same forms.
-  await expect(row(page, 2).getByTestId("admin-plan-form")).toBeVisible();
-  await expect(row(page, 2).getByTestId("admin-pack-form")).toBeVisible();
+  await expect(row(page, 2)).toContainText("reem@cooking.example");
+  await expect(row(page, 2).getByTestId("admin-plan-form")).toHaveCount(0);
+  const p = await panel(page, 2);
+  await expect(p.getByTestId("admin-plan-form")).toBeVisible();
+  await expect(p.getByTestId("admin-pack-form")).toBeVisible();
+  await closePanel(page);
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(390);
 });

@@ -117,6 +117,18 @@ export interface WorkerDb {
     leaseToken: string,
     profile: Record<string, unknown>,
   ): Promise<unknown>;
+  featuredDue?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+  ): Promise<unknown>;
+  commitFeatured?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    batchKey: string,
+    candidates: unknown[],
+  ): Promise<unknown>;
   videoFinished(
     credentialHash: string,
     jobId: string,
@@ -224,6 +236,10 @@ const str = (body: Record<string, unknown>, key: string) =>
   typeof body[key] === "string" && (body[key] as string).length > 0
     ? (body[key] as string)
     : null;
+
+const hasOnlyKeys = (value: Record<string, unknown>, keys: string[]) =>
+  Object.keys(value).every((key) => keys.includes(key)) &&
+  keys.every((key) => key in value);
 
 export async function handleWorkerRequest(
   request: Request,
@@ -352,6 +368,8 @@ export async function handleWorkerRequest(
       "/worker/finish",
       "/worker/commit-catalogue",
       ...(db.commitChannel ? ["/worker/commit-channel"] : []),
+      ...(db.featuredDue ? ["/worker/featured-due"] : []),
+      ...(db.commitFeatured ? ["/worker/commit-featured"] : []),
       "/worker/video-finished",
       ...(db.videoCounts ? ["/worker/video-counts"] : []),
       "/worker/topics-due",
@@ -423,6 +441,22 @@ export async function handleWorkerRequest(
           lease,
           body.profile as Record<string, unknown>,
         ),
+      );
+    }
+    if (path.endsWith("/worker/featured-due") && db.featuredDue) {
+      return json(200, await db.featuredDue(credential, job, lease));
+    }
+    if (path.endsWith("/worker/commit-featured") && db.commitFeatured) {
+      const key = str(body, "batch_key");
+      if (
+        !key ||
+        !Array.isArray(body.candidates) ||
+        !hasOnlyKeys(body, ["job_id", "lease_token", "batch_key", "candidates"])
+      )
+        return refuse("invalid_batch");
+      return json(
+        200,
+        await db.commitFeatured(credential, job, lease, key, body.candidates),
       );
     }
     if (path.endsWith("/worker/video-finished")) {

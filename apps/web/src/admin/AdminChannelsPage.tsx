@@ -22,9 +22,11 @@ import { failureCode } from "../failure";
 import { ChartEmpty, LoadError, Loading } from "../pageStates/PageStates";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
+import { Card } from "../ui/Card";
 import { Checkbox } from "../ui/Checkbox";
 import { Dialog, DialogContent, DialogTitle } from "../ui/Dialog";
 import { Input } from "../ui/Input";
+import { useMediaQuery } from "../ui/useMediaQuery";
 import {
   Table,
   TableBody,
@@ -121,6 +123,60 @@ function Console({ rows }: { rows: AdminConsoleChannel[] }) {
       return next;
     });
   const openIndex = shown.findIndex((c) => c.id === openId);
+  const phone = useMediaQuery("(max-width: 640px)");
+
+  // The pieces a row shows, the same whether it is a table row or a card.
+  const selectAll = (
+    <Checkbox
+      label={S.adminBulkSelectAll}
+      hideLabel
+      checked={allShown}
+      onCheckedChange={(on) =>
+        setPicked((prev) => {
+          const next = new Set(prev);
+          for (const c of shown)
+            if (on === true) next.add(c.id);
+            else next.delete(c.id);
+          return next;
+        })
+      }
+    />
+  );
+  const pick = (c: AdminConsoleChannel) => (
+    <Checkbox
+      label={S.adminBulkSelect(channelLabel(c, S))}
+      hideLabel
+      checked={picked.has(c.id)}
+      onCheckedChange={(on) => toggle(c.id, on === true)}
+    />
+  );
+  const name = (c: AdminConsoleChannel) => (
+    <button
+      type="button"
+      className="admin-console-name"
+      onClick={() => setOpenId(c.id)}
+      aria-label={S.adminConsoleOpen(channelLabel(c, S))}
+    >
+      <span dir="auto">{channelLabel(c, S)}</span>
+    </button>
+  );
+  const where = (c: AdminConsoleChannel) => (
+    <span className="admin-channel-sub" dir="auto">
+      {c.mine
+        ? c.workspace_name
+        : `${c.workspace_name} · ${c.owner_email ?? ""}`}
+    </span>
+  );
+  const state = (c: AdminConsoleChannel) => (
+    <>
+      <Badge tone={STATE_TONE[c.state]}>
+        {S.adminChannelStates[c.state] ?? c.state}
+      </Badge>
+      {c.last_error && (
+        <span className="admin-channel-error">{c.last_error}</span>
+      )}
+    </>
+  );
 
   return (
     <section
@@ -202,26 +258,52 @@ function Console({ rows }: { rows: AdminConsoleChannel[] }) {
         <ChartEmpty testId="admin-console-empty">
           {S.adminConsoleEmpty}
         </ChartEmpty>
+      ) : phone ? (
+        // A card per channel under 640px: as a table only the name column
+        // fitted a phone, and the state, counts and last success were cut off
+        // (owner console review, 2026-10-13, finding 13).
+        <div className="admin-console-cards" data-testid="admin-channels">
+          <div className="admin-console-cards-all">{selectAll}</div>
+          {shown.map((c) => (
+            <Card
+              key={c.id}
+              className="admin-console-card"
+              data-testid={`admin-console-row-${c.id}`}
+            >
+              <div className="admin-console-card-head">
+                {pick(c)}
+                <div>
+                  {name(c)}
+                  {where(c)}
+                </div>
+              </div>
+              {state(c)}
+              <dl className="admin-console-card-facts">
+                <div>
+                  <dt>{S.adminConsoleVideos}</dt>
+                  <dd>
+                    {n(c.videos)} · {n(c.selected)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{S.adminChannelsComments}</dt>
+                  <dd>{n(c.comments)}</dd>
+                </div>
+                <div>
+                  <dt>{S.adminHomeLastOk}</dt>
+                  <dd>{when(c.last_ok_at) ?? S.adminHomeNever}</dd>
+                </div>
+              </dl>
+            </Card>
+          ))}
+        </div>
       ) : (
         <div className="table-wrap db-admin-wrap">
           <Table data-testid="admin-channels">
             <TableHead>
               <TableRow>
                 <TableHeaderCell className="admin-console-check">
-                  <Checkbox
-                    label={S.adminBulkSelectAll}
-                    hideLabel
-                    checked={allShown}
-                    onCheckedChange={(on) =>
-                      setPicked((prev) => {
-                        const next = new Set(prev);
-                        for (const c of shown)
-                          if (on === true) next.add(c.id);
-                          else next.delete(c.id);
-                        return next;
-                      })
-                    }
-                  />
+                  {selectAll}
                 </TableHeaderCell>
                 <TableHeaderCell>{S.adminChannelsChannel}</TableHeaderCell>
                 <TableHeaderCell>{S.adminChannelsStatus}</TableHeaderCell>
@@ -234,38 +316,13 @@ function Console({ rows }: { rows: AdminConsoleChannel[] }) {
               {shown.map((c) => (
                 <TableRow key={c.id} data-testid={`admin-console-row-${c.id}`}>
                   <TableCell className="admin-console-check">
-                    <Checkbox
-                      label={S.adminBulkSelect(channelLabel(c, S))}
-                      hideLabel
-                      checked={picked.has(c.id)}
-                      onCheckedChange={(on) => toggle(c.id, on === true)}
-                    />
+                    {pick(c)}
                   </TableCell>
                   <TableCell>
-                    <button
-                      type="button"
-                      className="admin-console-name"
-                      onClick={() => setOpenId(c.id)}
-                      aria-label={S.adminConsoleOpen(channelLabel(c, S))}
-                    >
-                      <span dir="auto">{channelLabel(c, S)}</span>
-                    </button>
-                    <span className="admin-channel-sub" dir="auto">
-                      {c.mine
-                        ? c.workspace_name
-                        : `${c.workspace_name} · ${c.owner_email ?? ""}`}
-                    </span>
+                    {name(c)}
+                    {where(c)}
                   </TableCell>
-                  <TableCell>
-                    <Badge tone={STATE_TONE[c.state]}>
-                      {S.adminChannelStates[c.state] ?? c.state}
-                    </Badge>
-                    {c.last_error && (
-                      <span className="admin-channel-error">
-                        {c.last_error}
-                      </span>
-                    )}
-                  </TableCell>
+                  <TableCell>{state(c)}</TableCell>
                   <TableCell>
                     {n(c.videos)} · {n(c.selected)}
                   </TableCell>

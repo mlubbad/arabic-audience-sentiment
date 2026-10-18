@@ -1,5 +1,106 @@
 # Verification
 
+## 2026-10-18 — Migration version check
+
+| Command | Actual result |
+| --- | --- |
+| `npx vitest run scripts` | 13 files / 124 tests passed, 10 of them in `check-migrations.test.ts`. |
+| `node scripts/check-migrations.mjs --base origin/main` | Passed: 144 files, every version used once, nothing merged changed. |
+| `eslint` on the changed scripts, `prettier --check`, `npm run typecheck` | Passed. |
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| A copy of `20261112000000_genre_taxonomy_v2.sql` under the same version | exit 1, naming both files |
+| A line appended to the merged taxonomy v2 migration, with `--base origin/main` | exit 1, "must not be edited" |
+| #167's head (`20261112000000_unblock_one_job_per_channel.sql`) after it merges `main` | will fail until renamed, as intended |
+
+## 2026-10-18 — Genre taxonomy v2
+
+| Command | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/genre_taxonomy.test.ts supabase/tests/genre_taxonomy_v2.test.ts` | 10 passed. |
+| Generator check against IAB Content Taxonomy 3.1 TSV (commit `de75783`) | Every non-null `iab_id` exists in the file; keys unique and within `^[a-z][a-z0-9_]{0,39}$`; names 1–80 and descriptions 1–400 characters. |
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| v2's level 1 copied without one genre | migration fails to load (children point at a missing parent); file failed |
+| Two siblings with the same Arabic name | 1 failed |
+| A gap in sibling positions | 1 failed |
+
+## 2026-10-17 — Owner console batch F: layout
+
+Findings 12, 13, 14 and 21 of `docs/reviews/2026-10-13-owner-console-review.md`. Web only.
+
+| Command | Actual result |
+| --- | --- |
+| `npm test` | 171 files / 1,388 tests passed (before the style guard below was added). |
+| `npx tsc --noEmit`, `eslint` on the changed files, `npm run format:check`, `npm run build` | Passed. |
+| `npx vitest run` on `AdminPage`, `WorkspaceRow`, `AdminChannelsPage` and `adminStyles` tests | 35 passed. |
+| Playwright, whole suite (local Chromium 1194) | 131 passed. |
+
+Browser measurements at 390 px and 1440 px, real app against stubbed Supabase answers (27
+workspaces, admin session; a throwaway spec, deleted after):
+
+| Page | Before | After |
+| --- | --- | --- |
+| `/admin/import` at 390 px, empty and with rows | `scrollWidth` 413 | 390 |
+| `/admin/workspaces` at 1440 px | 7,471 px tall (review) | 2,622 px, no overflow |
+| `/admin/workspaces` at 390 px | forms on every card | list cards, no overflow |
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| Import column back to the `auto` floor | 1 failed |
+| Search ignores the owner's email | 1 failed |
+| Levers back on every list row | 5 failed |
+| Delete beside the inspect link in the panel | 1 failed |
+| No phone cards on Channels | 1 failed |
+| Rail keeps the customer blocks inside `/admin` (browser suite) | 1 failed |
+| Control: a no-op edit | 0 failed |
+
+## 2026-10-17 — Owner console batch E: definitions and scale
+
+Findings 9, 10, 11 and 20 of `docs/reviews/2026-10-13-owner-console-review.md`. Migration
+`20261110000000_admin_definitions_and_scale.sql`.
+
+| Command | Actual result |
+| --- | --- |
+| `npm run check` | All checks passed. Web 170 files / 1,381 tests; DB 80 files / 677 tests; worker 364 passed; build and scans passed. |
+| `npx vitest run supabase/tests/admin_definitions_and_scale.test.ts` | 5 passed. |
+| `npx vitest run apps/web/src/admin/AdminOpsPage.test.tsx apps/web/src/adminWords.test.ts` | 15 passed. |
+
+Local Postgres 16.13 (`perf`), workspace of 155,822 comments, 185,530 predictions and 4,583
+videos; each delete inside a transaction rolled back:
+
+| Measurement | Result |
+| --- | --- |
+| `delete_workspace`, current recount, three runs | 12.0 s, 11.4 s, 12.3 s |
+| `delete_workspace`, recount skipped, three runs | 9.8 s, 10.8 s, 9.9 s |
+| Per statement, recount skipped | comments 9.2 s (`explain analyze`: five FK triggers, 155,822 calls each); predictions 0.6 s; videos 0.3 s; the rest under 20 ms |
+| `admin_workspace_footprint` on it, warm | 0.09 to 0.11 s |
+| `admin_ops`'s collected-this-week count (218,130 rows) | 0.1 s |
+
+The first run measured 21 s cold. Production disks are slower, so the 120 s limit, not the
+saving, is what lets the delete finish.
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| Recount not skipped during a delete | 1 failed |
+| `delete_workspace` without its limit | 1 failed |
+| `admin_workspace_footprint` without its limit | 1 failed |
+| `admin_ops` without its limit | 1 failed |
+| Failed syncs counted with partial ones again | 1 failed |
+| No actor index on `audit_events` | 1 failed |
+| `57014` shown as a code | 1 failed |
+| Ops page shows partial syncs as 0 | 1 failed |
+
 ## 2026-10-17 — Owner console batch D: honest errors and labels
 
 Findings 7, 15, 16 and 17 of `docs/reviews/2026-10-13-owner-console-review.md`. Web only, no

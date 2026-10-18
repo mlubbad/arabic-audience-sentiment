@@ -21,7 +21,8 @@ class Lister:
         return self.result
 
 
-def plane(sent, lease_type="discover", token="tok", catalogue_refusal=None, lease_extra=None):
+def plane(sent, lease_type="discover", token="tok", catalogue_refusal=None,
+          channel_refusal=None, lease_extra=None):
     def handler(request):
         path = request.url.path.rsplit("/", 1)[-1]
         if path == "claim":
@@ -33,7 +34,14 @@ def plane(sent, lease_type="discover", token="tok", catalogue_refusal=None, leas
             return httpx.Response(400, json={"code": catalogue_refusal})
         if path == "commit-catalogue":
             sent["catalogue"] = json.loads(request.content)["payload"]
+            sent.setdefault("commits", []).append("catalogue")
             return httpx.Response(200, json={"videos": len(sent["catalogue"])})
+        if path == "commit-channel" and channel_refusal:
+            return httpx.Response(500, json={"code": channel_refusal})
+        if path == "commit-channel":
+            sent["channel"] = json.loads(request.content)["profile"]
+            sent.setdefault("commits", []).append("channel")
+            return httpx.Response(200, json={"channel_id": "c"})
         if path == "finish":
             b = json.loads(request.content)
             sent["finish"], sent["error_code"] = b["outcome"], b["error_code"]
@@ -56,6 +64,30 @@ def test_an_incomplete_catalogue_is_partial():
     sent = {}
     assert run_discover(plane(sent), lambda tok, expires_at=None, renew=None: Lister(Catalogue([], False, "uploads_lookup_failed"))) is True
     assert (sent["finish"], sent["error_code"]) == ("partial", "uploads_lookup_failed")
+
+
+def test_a_youtube_profile_is_committed_after_the_catalogue():
+    sent = {}
+    profile = {"external_channel_id": "UC" + "x" * 22, "subscriber_count": 10,
+               "view_count": 20, "video_count": 3}
+    result = Catalogue([], True, channel=profile)
+    run_discover(plane(sent, lease_extra={"platform": "youtube"}),
+                 lambda tok, expires_at=None, renew=None: Lister(result))
+    assert sent["commits"] == ["catalogue", "channel"]
+    assert sent["channel"] == profile
+    assert sent["finish"] == "succeeded"
+
+
+def test_a_failed_channel_profile_commit_makes_the_discover_partial():
+    sent = {}
+    result = Catalogue([], True, channel={"external_channel_id": "UC" + "x" * 22})
+    run_discover(plane(sent, channel_refusal="source_unavailable",
+                       lease_extra={"platform": "youtube"}),
+                 lambda tok, expires_at=None, renew=None: Lister(result))
+    assert sent["catalogue"] == []
+    assert (sent["finish"], sent["error_code"]) == (
+        "partial", "channel_profile_commit_failed"
+    )
 
 
 def test_a_refusal_is_blocked_with_its_code():

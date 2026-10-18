@@ -44,6 +44,17 @@ describe("reading a monitor run", () => {
     });
     expect(parseRun("").get("monitor")?.level).toBe("FAIL");
   });
+
+  test("an exit code monitor.sh never gives is the monitor failing", () => {
+    expect(parseRun(run(`${at} OK rest 200`), "143").get("monitor")).toEqual({
+      level: "FAIL",
+      detail: "exit_143",
+    });
+    for (const code of ["", "0", "1", "2"])
+      expect(parseRun(run(`${at} OK rest 200`), code).has("monitor")).toBe(
+        false,
+      );
+  });
 });
 
 describe("planning alerts", () => {
@@ -149,5 +160,20 @@ describe("the monitor workflow", () => {
   test("reports through issues, so a failing check is not a failed run every 30 minutes", () => {
     expect(workflow).toContain("node scripts/monitor-alerts.mjs");
     expect(workflow).not.toContain("continue-on-error");
+  });
+
+  // 2026-10-17: GitHub's `bash -e` ended the step on monitor.sh's exit 2,
+  // before the output was printed, and the alert step never ran.
+  test("a failing probe still prints its output and reaches the alert step", () => {
+    expect(workflow).toContain(
+      'sh scripts/monitor.sh > "$output" 2>&1 || code=$?',
+    );
+    expect(workflow).not.toMatch(/monitor\.sh > "\$output" 2>&1\n/);
+    expect(workflow).toMatch(
+      /- name: Open or close one issue per failing check\n {8}if: \$\{\{ !cancelled\(\) \}\}\n/,
+    );
+    expect(workflow).toContain(
+      "MONITOR_EXIT_CODE: ${{ steps.probe.outputs.code }}",
+    );
   });
 });

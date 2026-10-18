@@ -26,7 +26,7 @@ async function asUser(id: string) {
 
 async function aggregate(filters: Record<string, string>): Promise<Kpis> {
   const result = await db.query<{ aggregate: Kpis }>(
-    "select private.dashboard_aggregates_impl($1, $2::jsonb) as aggregate",
+    "select private.dashboard_aggregates_compute($1, $2::jsonb) as aggregate",
     [A, JSON.stringify(filters)],
   );
   const { replies, unknown_dates, unique_authors } = result.rows[0].aggregate;

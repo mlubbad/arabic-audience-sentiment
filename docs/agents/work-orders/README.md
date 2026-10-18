@@ -23,4 +23,6 @@ not edit them.
 | [WO-18.md](WO-18.md) | #144 | Codex |
 | [WO-19.md](WO-19.md) | #145 | Codex |
 | [WO-20.md](WO-20.md) | #146 | Codex |
-| [WO-21.md](WO-21.md) | #147 | Gemini |
+| [WO-21.md](WO-21.md) | #147 | Codex |
+| [WO-22.md](WO-22.md) | #164 | Codex (from Gemini, 2026-10-18) |
+| [WO-23.md](WO-23.md) | #165 | Codex |

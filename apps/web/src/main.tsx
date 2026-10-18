@@ -314,6 +314,11 @@ function AppLayout() {
   const { pathname, search } = useLocation();
   useRecoveryLanding(pathname);
   const carried = carriedSearch(search);
+  // Inside the owner console the rail's workspace, collection and plan are
+  // one customer's, and the console's numbers are the platform's: shown
+  // there, they asked "whose workspace? whose plan?" (owner console review,
+  // 2026-10-13, finding 14). The tour is the customer's tour.
+  const inConsole = pathname === "/admin" || pathname.startsWith("/admin/");
   // The same test `ops/Sync.tsx` and `account/Account.tsx` make: the demo
   // is a signed-in shell for the tour's purposes.
   const wantsDemo = new URLSearchParams(search).has("demo");
@@ -421,7 +426,13 @@ function AppLayout() {
             </span>
           </Link>
 
-          <RailState part="workspace" />
+          {inConsole ? (
+            <p className="app-rail-console" data-testid="rail-console-note">
+              {S.railConsoleNote}
+            </p>
+          ) : (
+            <RailState part="workspace" />
+          )}
 
           <nav className="app-nav" aria-label={S.navLabel} data-tour="rail">
             {/* A heading for the group, not decoration: the rail carries three
@@ -443,14 +454,18 @@ function AppLayout() {
           </nav>
 
           <div className="app-rail-foot">
-            <RailState part="collection" />
-            <RailState part="plan" />
+            {!inConsole && (
+              <>
+                <RailState part="collection" />
+                <RailState part="plan" />
+              </>
+            )}
             {/* The tour's way back in, above the session: a reader who has
                 met it once finds it here on every page — a signed-in one,
                 or the demo's; signed out, the tour's pages refuse the
                 walk, and a door onto six skipped steps would only write
                 "seen" on a browser that never saw it. */}
-            {(session || wantsDemo) && (
+            {(session || wantsDemo) && !inConsole && (
               <TourEntry onActivate={() => setMenuOpen(false)} />
             )}
             <SessionControl />

@@ -30,6 +30,7 @@ export const ar = {
   menuOpen: "القائمة ☰",
   menuClose: "إغلاق ×",
   navLabel: "التنقل الرئيسي",
+  railConsoleNote: "لوحة المالك: الأرقام هنا للمنصة كلها، لا لمساحة عمل واحدة.",
   navCaption: "التنقّل",
   // The rail carries state, not signposts: which workspace, and whether
   // collection is running — said in the same words the operations page uses.
@@ -399,6 +400,18 @@ export const ar = {
   adminDemoLead:
     "هذه نسخة توضيحية من صفحة الإدارة: التغييرات تبقى في هذه الجلسة فقط.",
   adminInspectWorkspace: "استعراض المساحة",
+  // ---- the workspaces list and its panel (owner console review, finding 12) ----
+  adminWorkspacesSearch: "ابحث باسم المساحة أو بريد المالك أو المعرّف",
+  adminWorkspacesCount: (shown: number, total: number) =>
+    `${shown} من ${total} مساحة`,
+  adminWorkspacesNoMatch: "لا مساحة تطابق هذا البحث.",
+  adminWorkspaceOwner: "المالك",
+  adminWorkspaceOwnerUnknown: "غير معروف",
+  adminWorkspaceManage: (name: string) => `إدارة ${name}`,
+  adminWorkspacePanelClose: "إغلاق تفاصيل المساحة",
+  adminWorkspaceDanger: "منطقة الحذف",
+  adminWorkspaceDangerNote:
+    "الحذف نهائي: تذهب معها القنوات والتعليقات والتحليلات، ويفقد أعضاؤها الوصول.",
   adminInspectionBadge: "وضع المشرف",
   adminInspectionBanner: (name: string, owner?: string) =>
     owner
@@ -420,8 +433,8 @@ export const ar = {
   adminHomeFunnel: "مسار البيانات",
   adminHomeVideos: "فيديوهات مفهرسة",
   adminHomeSelected: "مختارة للجمع",
-  adminHomeComments: "تعليقات مجموعة",
-  adminHomeAnalysed: "تعليقات محللة",
+  adminHomeComments: "تعليقات جُمعت (مع تعليقات القناة)",
+  adminHomeAnalysed: "حُللت بأي إصدار",
   adminHomeStates: "حالة القنوات",
   adminChannelStates: {
     paused: "الجمع موقوف",
@@ -856,7 +869,7 @@ export const ar = {
   adminDigestFailingNow: "تفشل الآن",
   adminDigestNoneFailing: "لا قناة تفشل.",
   adminDigestCollected: "تعليقات جُمعت",
-  adminDigestAnalysed: "تعليقات حُللت",
+  adminDigestAnalysed: "حُللت بأي إصدار",
   adminDigestStale: "قنوات متأخرة",
   adminDigestFailedRuns: "تشغيلات فشلت (24 ساعة)",
   adminDigestImported: "قنوات استُوردت (24 ساعة)",
@@ -878,7 +891,7 @@ export const ar = {
   adminCompareSortVolume: "الأكثر تعليقات محللة",
   adminCompareCsv: "تصدير CSV",
   adminCompareRank: "#",
-  adminCompareAnalysed: "تعليقات محللة",
+  adminCompareAnalysed: "محللة بالتحليل الفعّال",
   adminCompareNet: "صافي المشاعر",
   adminCompareChange: "التغيّر عن الأسبوع الماضي",
   adminCompareTopic: "أبرز موضوع",
@@ -905,9 +918,12 @@ export const ar = {
   adminOpsHeading: "حالة المنصة",
   adminOpsWorkspaces: "مساحات العمل",
   adminOpsChannels: "القنوات",
-  adminOpsComments7d: "تعليقات هذا الأسبوع",
+  adminOpsComments7d: "تعليقات جُمعت هذا الأسبوع",
   adminOpsRuns7d: "مزامنات هذا الأسبوع",
-  adminOpsFailed7d: "مزامنات فاشلة",
+  adminOpsFailed7d: "مزامنات فشلت",
+  adminOpsPartial7d: "مزامنات جزئية",
+  adminTimedOut:
+    "استغرق الطلب أطول من الحد المسموح ولم يُنفّذ. حاول مرة أخرى بعد قليل.",
   adminOpsJobsOpen: "مهام في الطابور",
   adminOpsWorkerFresh: "العامل يعمل",
   adminOpsWorkerStale: "العامل صامت",

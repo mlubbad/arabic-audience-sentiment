@@ -83,6 +83,15 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
 });
 
+const ROW = (n: number) => `admin-row-00000000-0000-4000-8000-00000000000${n}`;
+
+/** Opens workspace n's panel from its row and returns the panel. */
+async function openPanel(n: number) {
+  const row = await screen.findByTestId(ROW(n));
+  await userEvent.click(within(row).getByRole("button", { name: /^إدارة / }));
+  return screen.findByTestId("admin-workspace-panel");
+}
+
 describe("AdminPage in demo mode", () => {
   it("renders the six rows to a visitor with no session, under the demo eyebrow and lead", async () => {
     mount();
@@ -99,19 +108,63 @@ describe("AdminPage in demo mode", () => {
     expect(screen.queryByTestId("admin-forbidden")).toBeNull();
   });
 
-  it("a plan set over an active Paddle subscription is refused in the row, as the server refuses it", async () => {
+  it("lists without levers: no form and no delete on any row, an owner on each (review finding 12)", async () => {
     mount();
-    const row = await screen.findByTestId(
-      "admin-row-00000000-0000-4000-8000-000000000003",
+    const table = await screen.findByTestId("admin-workspaces");
+    expect(within(table).queryByTestId("admin-plan-form")).toBeNull();
+    expect(within(table).queryByTestId("admin-pack-form")).toBeNull();
+    expect(
+      within(table).queryByRole("button", { name: ar.adminDelete }),
+    ).toBeNull();
+    // Two rows share the owner's account; the owner column tells them apart
+    // from the customers'.
+    expect(screen.getByTestId(ROW(2))).toHaveTextContent(
+      "reem@cooking.example",
     );
-    const form = within(row).getByTestId("admin-plan-form");
+    expect(screen.getByTestId(ROW(1))).toHaveTextContent(
+      "owner@sentiment.internal",
+    );
+  });
+
+  it("searches by name, by owner email and by id, and says when nothing matches", async () => {
+    mount();
+    const search = await screen.findByRole("searchbox", {
+      name: ar.adminWorkspacesSearch,
+    });
+    await userEvent.type(search, "nabd@");
+    expect(screen.getAllByTestId(/^admin-row-/)).toHaveLength(1);
+    expect(screen.getByTestId(ROW(3))).toBeInTheDocument();
+    expect(screen.getByText(ar.adminWorkspacesCount(1, 6))).toBeInTheDocument();
+
+    await userEvent.clear(search);
+    // Folded like every console search: «إستوديو المدي» finds «استوديو المدى».
+    await userEvent.type(search, "إستوديو المدي");
+    expect(screen.getAllByTestId(/^admin-row-/)).toHaveLength(1);
+    expect(screen.getByTestId(ROW(4))).toBeInTheDocument();
+
+    await userEvent.clear(search);
+    await userEvent.type(search, "000000000005");
+    expect(screen.getAllByTestId(/^admin-row-/)).toHaveLength(1);
+    expect(screen.getByTestId(ROW(5))).toBeInTheDocument();
+
+    await userEvent.clear(search);
+    await userEvent.type(search, "لا شيء بهذا الاسم");
+    expect(screen.getByTestId("admin-workspaces-no-match")).toHaveTextContent(
+      ar.adminWorkspacesNoMatch,
+    );
+  });
+
+  it("a plan set over an active Paddle subscription is refused in the panel, as the server refuses it", async () => {
+    mount();
+    const panel = await openPanel(3);
+    const form = within(panel).getByTestId("admin-plan-form");
     await userEvent.click(
       within(form).getByRole("button", { name: ar.adminSetPlan }),
     );
     expect(await within(form).findByRole("status")).toHaveTextContent(
       ar.adminPaddleActive,
     );
-    // Overridden, it goes through, and the row's plan reads the new key.
+    // Overridden, it goes through, and the row's plan reads the new name.
     await userEvent.click(
       within(form).getByRole("combobox", { name: ar.adminPlanPicker }),
     );
@@ -125,22 +178,24 @@ describe("AdminPage in demo mode", () => {
       within(form).getByRole("button", { name: ar.adminSetPlan }),
     );
     expect(await within(form).findByText(ar.adminDone)).toBeVisible();
-    // The plan by its name, not its key (review finding 17).
+    // The plan by its name, not its key (review finding 17); the list row
+    // behind the panel moved with it. Cell 0 is the owner, cell 1 the plan.
     const enterprise = fixtureCatalogue.find((p) => p.key === "enterprise")!;
-    expect(within(row).getAllByRole("cell")[0]).toHaveTextContent(
-      enterprise.title_ar,
-    );
+    const row = screen.getByTestId(ROW(3));
+    expect(
+      within(row).getAllByRole("cell", { hidden: true })[1],
+    ).toHaveTextContent(enterprise.title_ar);
   });
 
-  it("a deleted workspace leaves the table; the billing root refuses", async () => {
+  it("a deleted workspace leaves the list and closes its panel; the billing root refuses", async () => {
     mount();
-    const gone = await screen.findByTestId(
-      "admin-row-00000000-0000-4000-8000-000000000006",
-    );
+    const panel = await openPanel(6);
     await userEvent.click(
-      within(gone).getByRole("button", { name: ar.adminDelete }),
+      within(panel).getByRole("button", { name: ar.adminDelete }),
     );
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog", {
+      name: ar.adminDeleteTitle("مساحة بلا خطة"),
+    });
     await userEvent.type(
       within(dialog).getByLabelText(ar.adminDeleteTypeName("مساحة بلا خطة")),
       "مساحة بلا خطة",
@@ -150,32 +205,31 @@ describe("AdminPage in demo mode", () => {
     });
     await waitFor(() => expect(confirm).toBeEnabled());
     await userEvent.click(confirm);
+    await waitFor(() => expect(screen.queryByTestId(ROW(6))).toBeNull());
     await waitFor(() =>
-      expect(
-        screen.queryByTestId("admin-row-00000000-0000-4000-8000-000000000006"),
-      ).toBeNull(),
+      expect(screen.queryByTestId("admin-workspace-panel")).toBeNull(),
     );
     expect(screen.getAllByTestId(/^admin-row-/)).toHaveLength(5);
 
-    const root = screen.getByTestId(
-      "admin-row-00000000-0000-4000-8000-000000000001",
-    );
+    const second = await openPanel(1);
     await userEvent.click(
-      within(root).getByRole("button", { name: ar.adminDelete }),
+      within(second).getByRole("button", { name: ar.adminDelete }),
     );
-    const second = await screen.findByRole("dialog");
+    const confirmDialog = await screen.findByRole("dialog", {
+      name: ar.adminDeleteTitle("مساحة العمل الشخصية"),
+    });
     await userEvent.type(
-      within(second).getByLabelText(
+      within(confirmDialog).getByLabelText(
         ar.adminDeleteTypeName("مساحة العمل الشخصية"),
       ),
       "مساحة العمل الشخصية",
     );
-    const confirmRoot = within(second).getByRole("button", {
+    const confirmRoot = within(confirmDialog).getByRole("button", {
       name: ar.adminDeleteConfirm,
     });
     await waitFor(() => expect(confirmRoot).toBeEnabled());
     await userEvent.click(confirmRoot);
-    expect(await within(second).findByRole("alert")).toHaveTextContent(
+    expect(await within(confirmDialog).findByRole("alert")).toHaveTextContent(
       ar.adminDeleteBillingRoot,
     );
     expect(screen.getAllByTestId(/^admin-row-/)).toHaveLength(5);

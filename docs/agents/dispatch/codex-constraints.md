@@ -10,6 +10,11 @@ by design, and the dispatcher script outside the sandbox owns every git write. W
    even if the work order lists it: Chromium cannot start inside this sandbox
    (`bootstrap_check_in … MachPortRendezvousServer: Permission denied`), and CI runs e2e on
    your PR (PLAYBOOK §1). Say in your final message that you skipped it for this reason.
+   **Do not run `semgrep` or `gitleaks` either**, even where `AGENTS.md` asks for the local
+   equivalents: Semgrep writes its log under `~/.semgrep`, outside the sandbox
+   (`PermissionError … semgrep.log`), and gitleaks is not installed on the Mac. Both are CI
+   gates on your PR. Say that you skipped them, and **still write the handoff** (item 3): a
+   check you were told to skip is not a blocker.
 2. **Do not run git writes.** No `git switch/checkout -b`, `commit`, `push`, `merge`, `rebase`,
    `reset --hard`, `stash`, `tag`. Reads are fine: `git status`, `git diff`, `git log`,
    `git fetch`, `git show`. If any command is blocked by the sandbox, say so verbatim in your
