@@ -5656,6 +5656,26 @@ declare count int := 0; begin
           and a.id <> b.id
      );
 
+  -- Of several due blocks of one channel and kind, only the newest comes back
+  -- (the update below); the rest are superseded by it. Without this the update
+  -- below requeues them all at once and the one-outstanding index refuses it.
+  update public.jobs b
+     set status = 'cancelled',
+         error_code = 'superseded_by_active_job'
+   where b.status = 'blocked'
+     and b.not_before is not null
+     and b.not_before <= now()
+     and exists (
+       select 1 from public.jobs n
+        where n.workspace_id = b.workspace_id
+          and n.channel_id = b.channel_id
+          and n.type = b.type
+          and n.status = 'blocked'
+          and n.not_before is not null
+          and n.not_before <= now()
+          and (n.created_at, n.id) > (b.created_at, b.id)
+     );
+
   -- Unblock due jobs that have no outstanding active job without resetting attempt/reclaims
   update public.jobs j
      set status = 'queued',
