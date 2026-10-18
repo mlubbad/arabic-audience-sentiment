@@ -1,5 +1,13 @@
 # Implementation decisions
 
+2026-10-18 — A migration's version is checked, not trusted. The Deploy runner applies a file
+only when its version is missing remotely, so a reused version is skipped in production while
+PGlite, which applies every file, stays green. `scripts/check-migrations.mjs` now fails the
+build on a reused version, and on a pull request on any change to a migration the base branch
+already has: a merged migration is applied, so fixing it means a new migration. The base
+branch reaches the shell through `env`, never `${{ }}` in `run:`. Two open PRs can still
+claim the same new version; the second to merge `main` in turns red, which is the point.
+
 2026-10-18 — Competitors phase starts behind YouTube's policy gate. YouTube's base Developer
 Policies forbid inferring a video's or channel's category, custom channel scores and ranking
 channels against each other; the Derived Metrics amendment allows them once our use case is

@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-10-18 — CI refuses a reused migration version
+
+The owner said «أضف فحص CI يرفض رقم ترحيل مستعمل». `scripts/check-migrations.mjs` fails when
+two migration files share a version or a name breaks `<14 digits>_<lowercase>.sql`, and, on a
+pull request, when a migration already on the base branch was edited, renamed or deleted. It
+runs in `npm run check` and in CI's static job; the Deploy runner refuses to apply on a
+duplicate too. It happened four times (#133/#129, #134/#135, #139/#140, #167/#166).
+
 ## 2026-10-18 — Taxonomy v2 and the first two competitor work orders
 
 The owner said (2026-10-17): start task 0.4, then issue B-1 and B-3, with B-3 moved to Codex.

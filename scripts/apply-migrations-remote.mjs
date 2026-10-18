@@ -2,6 +2,7 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { versionProblems } from "./check-migrations.mjs";
 
 function loadLocalEnv() {
   if (existsSync(".env.local")) {
@@ -85,6 +86,11 @@ async function main() {
     console.log("No migrations directory found. Nothing to apply.");
     return;
   }
+
+  // A second file with an applied version would be skipped below without a
+  // word, so refuse the whole run instead.
+  const problems = versionProblems(readdirSync(migrationsDir));
+  if (problems.length) throw new Error(problems.join("\n"));
 
   const migrations = readdirSync(migrationsDir)
     .filter((file) => file.endsWith(".sql"))
