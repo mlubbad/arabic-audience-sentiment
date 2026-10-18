@@ -454,6 +454,20 @@ alter table "private"."video_comment_stats" add constraint "video_comment_stats_
 
 CREATE UNIQUE INDEX video_comment_stats_pkey ON private.video_comment_stats USING btree (workspace_id, video_id);
 
+create table "private"."video_comment_stats_dirty" (
+  "workspace_id" uuid not null,
+  "video_id" uuid not null,
+  "marked_at" timestamp with time zone default now() not null
+);
+alter table "private"."video_comment_stats_dirty" enable row level security;
+
+alter table "private"."video_comment_stats_dirty" add constraint "video_comment_stats_dirty_marked_at_not_null" NOT NULL marked_at;
+alter table "private"."video_comment_stats_dirty" add constraint "video_comment_stats_dirty_video_id_not_null" NOT NULL video_id;
+alter table "private"."video_comment_stats_dirty" add constraint "video_comment_stats_dirty_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX video_comment_stats_dirty_marked ON private.video_comment_stats_dirty USING btree (marked_at);
+CREATE INDEX video_comment_stats_dirty_video ON private.video_comment_stats_dirty USING btree (workspace_id, video_id);
+
 create table "private"."video_stats_reconcile_units" (
   "workspace_id" uuid not null,
   "reconciled_at" timestamp with time zone,
@@ -2339,11 +2353,14 @@ begin
              or (q.status = 'running' and q.lease_expires_at <= now()))
       order by
         case
-          when q.type <> 'discover' then 1
-          when exists (select 1 from public.channels ch
-                        where ch.id = q.channel_id and ch.catalogued_at is not null)
-            then 2
-          else 0
+          when q.type = 'discover' and not exists (
+                 select 1 from public.channels ch
+                  where ch.id = q.channel_id and ch.catalogued_at is not null)
+            then 0
+          when q.type = 'discover' and q.created_at <= now() - interval '6 hours'
+            then 1
+          when q.type <> 'discover' then 2
+          else 3
         end,
         case when w is null then (
           select count(*) from public.jobs r
@@ -2385,7 +2402,7 @@ BEGIN
   INTO w, ch, j_type, j_payload
   FROM public.jobs
   WHERE id=j AND lease_token=t AND lease_expires_at > now();
-  IF NOT FOUND THEN RAISE EXCEPTION 'lease_lost' USING errcode='40001'; END IF;
+  IF NOT FOUND THEN RAISE EXCEPTION 'lease_lost' USING errcode='P0001'; END IF;
   IF b IS NULL OR length(b) NOT BETWEEN 1 AND 200 OR hash !~ '^[0-9a-f]{64}$' THEN
     RAISE EXCEPTION 'invalid_batch' USING errcode='22023'; END IF;
   IF jsonb_array_length(coalesce(payload->'comments','[]'::jsonb)) > 500
@@ -2546,7 +2563,7 @@ AS $function$
 declare old jsonb; w uuid; covered text[]; wanted int; begin
  select workspace_id into w from public.jobs
  where id=j and lease_token=t and status='running' and lease_expires_at>now() for update;
- if not found then raise exception 'lease_lost' using errcode='40001'; end if;
+ if not found then raise exception 'lease_lost' using errcode='P0001'; end if;
  if jsonb_typeof(p)<>'object' or b is null or length(b) not between 1 and 200 then raise exception 'invalid_batch'; end if;
  select checkpoint into old from private.job_batches where job_id=j and batch_key=b;
  if found then
@@ -3708,6 +3725,47 @@ begin
 end
 $function$
 
+CREATE OR REPLACE FUNCTION private.drain_video_comment_stats(max_videos integer DEFAULT 1000, budget interval DEFAULT '00:00:30'::interval)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  target record;
+  done int := 0;
+  started timestamptz := clock_timestamp();
+begin
+  if not pg_try_advisory_xact_lock(hashtextextended('video_comment_stats_drain', 0)) then
+    return 0;
+  end if;
+
+  for target in
+    select d.workspace_id, d.video_id
+      from private.video_comment_stats_dirty d
+     group by d.workspace_id, d.video_id
+     order by min(d.marked_at), d.workspace_id, d.video_id
+     limit greatest(max_videos, 0)
+  loop
+    exit when clock_timestamp() - started > budget;
+    begin
+      delete from private.video_comment_stats_dirty
+       where workspace_id = target.workspace_id and video_id = target.video_id;
+      if exists (select 1 from public.videos v
+                  where v.workspace_id = target.workspace_id and v.id = target.video_id) then
+        perform private.refresh_video_comment_stats(jsonb_build_array(jsonb_build_object(
+          'workspace_id', target.workspace_id, 'video_id', target.video_id)));
+      end if;
+      done := done + 1;
+    exception when others then
+      raise warning 'video_comment_stats drain failed for %/%: %',
+        target.workspace_id, target.video_id, sqlerrm;
+    end;
+  end loop;
+  return done;
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION private.due_videos(w uuid, c uuid)
  RETURNS jsonb
  LANGUAGE sql
@@ -3956,7 +4014,7 @@ begin
      set heartbeats = heartbeats + 1,
          lease_expires_at = greatest(lease_expires_at, now() + interval '5 minutes')
    where id = j and lease_token = t and status = 'running' and lease_expires_at > now();
-  if not found then raise exception 'lease_lost' using errcode='40001'; end if;
+  if not found then raise exception 'lease_lost' using errcode='P0001'; end if;
 end $function$
 
 CREATE OR REPLACE FUNCTION private.mark_all_channel_compare()
@@ -4799,23 +4857,12 @@ CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_comment_del
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
-  pairs jsonb;
 begin
-  select coalesce(
-    jsonb_agg(jsonb_build_object(
-      'workspace_id', touched.workspace_id,
-      'video_id', touched.video_id
-    )),
-    '[]'::jsonb
-  )
-  into pairs
-  from (
-    select distinct workspace_id, video_id
-    from old_comments
-  ) touched;
-
-  perform private.refresh_video_comment_stats(pairs);
+  insert into private.video_comment_stats_dirty(workspace_id, video_id)
+  select distinct o.workspace_id, o.video_id
+    from old_comments o
+   where o.workspace_id::text is distinct from
+         nullif(current_setting('app.deleting_workspace', true), '');
   return null;
 end;
 $function$
@@ -4826,23 +4873,12 @@ CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_comment_ins
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
-  pairs jsonb;
 begin
-  select coalesce(
-    jsonb_agg(jsonb_build_object(
-      'workspace_id', touched.workspace_id,
-      'video_id', touched.video_id
-    )),
-    '[]'::jsonb
-  )
-  into pairs
-  from (
-    select distinct workspace_id, video_id
-    from new_comments
-  ) touched;
-
-  perform private.refresh_video_comment_stats(pairs);
+  insert into private.video_comment_stats_dirty(workspace_id, video_id)
+  select distinct n.workspace_id, n.video_id
+    from new_comments n
+   where n.workspace_id::text is distinct from
+         nullif(current_setting('app.deleting_workspace', true), '');
   return null;
 end;
 $function$
@@ -4853,26 +4889,15 @@ CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_prediction_
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
-  pairs jsonb;
 begin
-  select coalesce(
-    jsonb_agg(jsonb_build_object(
-      'workspace_id', touched.workspace_id,
-      'video_id', touched.video_id
-    )),
-    '[]'::jsonb
-  )
-  into pairs
-  from (
-    select distinct p.workspace_id, c.video_id
+  insert into private.video_comment_stats_dirty(workspace_id, video_id)
+  select distinct p.workspace_id, c.video_id
     from old_predictions p
     join public.comments c
       on c.workspace_id = p.workspace_id
      and c.id = p.comment_id
-  ) touched;
-
-  perform private.refresh_video_comment_stats(pairs);
+   where p.workspace_id::text is distinct from
+         nullif(current_setting('app.deleting_workspace', true), '');
   return null;
 end;
 $function$
@@ -4883,26 +4908,15 @@ CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_prediction_
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
-  pairs jsonb;
 begin
-  select coalesce(
-    jsonb_agg(jsonb_build_object(
-      'workspace_id', touched.workspace_id,
-      'video_id', touched.video_id
-    )),
-    '[]'::jsonb
-  )
-  into pairs
-  from (
-    select distinct p.workspace_id, c.video_id
+  insert into private.video_comment_stats_dirty(workspace_id, video_id)
+  select distinct p.workspace_id, c.video_id
     from new_predictions p
     join public.comments c
       on c.workspace_id = p.workspace_id
      and c.id = p.comment_id
-  ) touched;
-
-  perform private.refresh_video_comment_stats(pairs);
+   where p.workspace_id::text is distinct from
+         nullif(current_setting('app.deleting_workspace', true), '');
   return null;
 end;
 $function$
@@ -4913,36 +4927,17 @@ CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats_after_prediction_
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
-  pairs jsonb;
 begin
-  select coalesce(
-    jsonb_agg(jsonb_build_object(
-      'workspace_id', touched.workspace_id,
-      'video_id', touched.video_id
-    )),
-    '[]'::jsonb
-  )
-  into pairs
-  from (
-    select distinct changed.workspace_id, c.video_id
-    from (
-      select old_p.workspace_id, old_p.comment_id
-      from old_predictions old_p
-      join new_predictions new_p on new_p.id = old_p.id
-      where old_p.status is distinct from new_p.status
-      union
-      select new_p.workspace_id, new_p.comment_id
-      from new_predictions new_p
-      join old_predictions old_p on old_p.id = new_p.id
-      where old_p.status is distinct from new_p.status
-    ) changed
+  insert into private.video_comment_stats_dirty(workspace_id, video_id)
+  select distinct c.workspace_id, c.video_id
+    from old_predictions old_p
+    join new_predictions new_p on new_p.id = old_p.id
     join public.comments c
-      on c.workspace_id = changed.workspace_id
-     and c.id = changed.comment_id
-  ) touched;
-
-  perform private.refresh_video_comment_stats(pairs);
+      on c.workspace_id = new_p.workspace_id
+     and c.id = new_p.comment_id
+   where old_p.status is distinct from new_p.status
+     and new_p.workspace_id::text is distinct from
+         nullif(current_setting('app.deleting_workspace', true), '');
   return null;
 end;
 $function$
@@ -5541,7 +5536,7 @@ declare r uuid; current_hash text; begin
  if current_hash is null then raise exception 'invalid_comment' using errcode='23503'; end if;
  -- Optimistic concurrency on the text the reviewer actually read. If the comment
  -- was edited since, the verdict belongs to text that no longer exists.
- if current_hash is distinct from seen_hash then raise exception 'stale_comment_text' using errcode='40001'; end if;
+ if current_hash is distinct from seen_hash then raise exception 'stale_comment_text' using errcode='P0001'; end if;
  insert into public.comment_reviews(workspace_id,comment_id,content_hash,label,reviewer_id,reason,origin)
  values(w,c,current_hash,verdict,(select auth.uid()),trim(why),'human') returning id into r;
  return r;
@@ -5564,7 +5559,7 @@ declare r uuid; current_hash text; begin
   select content_hash into current_hash from public.comments where workspace_id=w and id=c;
   if current_hash is null then raise exception 'invalid_comment' using errcode='23503'; end if;
   if current_hash is distinct from seen_hash then
-    raise exception 'stale_comment_text' using errcode='40001'; end if;
+    raise exception 'stale_comment_text' using errcode='P0001'; end if;
   insert into public.topic_reviews(workspace_id,comment_id,content_hash,topic_key,reviewer_id,reason,origin)
   values (w, c, current_hash, topic, (select auth.uid()), trim(why), 'human') returning id into r;
   return r;
@@ -6447,7 +6442,7 @@ declare w uuid; owner uuid; begin
   w := private.worker_workspace(token_hash);
   select workspace_id into owner from public.jobs
   where id = j and lease_token = t and status = 'running' and lease_expires_at > now();
-  if owner is null then raise exception 'lease_lost' using errcode='40001'; end if;
+  if owner is null then raise exception 'lease_lost' using errcode='P0001'; end if;
   if w is not null and owner <> w then raise exception 'forbidden' using errcode='42501'; end if;
   return owner;
 end $function$
@@ -9854,6 +9849,13 @@ grant SELECT on table "private"."video_comment_stats" to "postgres";
 grant TRIGGER on table "private"."video_comment_stats" to "postgres";
 grant TRUNCATE on table "private"."video_comment_stats" to "postgres";
 grant UPDATE on table "private"."video_comment_stats" to "postgres";
+grant DELETE on table "private"."video_comment_stats_dirty" to "postgres";
+grant INSERT on table "private"."video_comment_stats_dirty" to "postgres";
+grant REFERENCES on table "private"."video_comment_stats_dirty" to "postgres";
+grant SELECT on table "private"."video_comment_stats_dirty" to "postgres";
+grant TRIGGER on table "private"."video_comment_stats_dirty" to "postgres";
+grant TRUNCATE on table "private"."video_comment_stats_dirty" to "postgres";
+grant UPDATE on table "private"."video_comment_stats_dirty" to "postgres";
 grant DELETE on table "private"."video_stats_reconcile_units" to "postgres";
 grant INSERT on table "private"."video_stats_reconcile_units" to "postgres";
 grant REFERENCES on table "private"."video_stats_reconcile_units" to "postgres";
@@ -10356,6 +10358,8 @@ grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "postgres";
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "service_role";
 grant EXECUTE on function private.drain_channel_compare(integer) to "postgres";
 grant EXECUTE on function private.drain_dashboard_aggregates(integer) to "postgres";
+grant EXECUTE on function private.drain_video_comment_stats(integer,interval) to "postgres";
+grant EXECUTE on function private.drain_video_comment_stats(integer,interval) to "service_role";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "postgres";
 grant EXECUTE on function private.due_videos(uuid,uuid) to "service_role";
 grant EXECUTE on function private.enforce_genre_taxonomy_parent_level() to "postgres";

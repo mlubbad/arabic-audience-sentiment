@@ -833,6 +833,7 @@ export const en: Strings = {
     "channel-compare-step": "Comparison count, one channel a minute",
     "channel-compare-nightly": "Nightly comparison recount",
     "reconcile-video-comment-stats-step": "Nightly comment-count correction",
+    "video-comment-stats-drain": "Comment counts, refreshed every minute",
     "admin-daily-digest": "Morning summary",
     "sentiment-tick": "Hourly work scheduling",
     "billing-sweep": "Subscription sweep",
