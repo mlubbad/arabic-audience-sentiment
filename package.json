@@ -38,9 +38,10 @@
     "db:snapshot:check": "node scripts/snapshot-schema.mjs --check",
     "demo:fixture": "node apps/web/scripts/make-demo-fixture.mjs",
     "check:functions": "npx --yes deno check --config supabase/functions/deno.json supabase/functions/*/index.ts",
+    "check:migrations": "node scripts/check-migrations.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "setup": "npm ci --cache .cache/npm && uv --directory workers/python --cache-dir ../../.cache/uv sync --frozen && playwright install chromium",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run check:functions && npm test && npm run test:db && npm run worker:test && npm run build && npm run check:secrets"
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run check:functions && npm test && npm run test:db && npm run worker:test && npm run build && npm run check:secrets && npm run check:migrations"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

@@ -1,5 +1,21 @@
 # Verification
 
+## 2026-10-18 — Migration version check
+
+| Command | Actual result |
+| --- | --- |
+| `npx vitest run scripts` | 13 files / 124 tests passed, 10 of them in `check-migrations.test.ts`. |
+| `node scripts/check-migrations.mjs --base origin/main` | Passed: 144 files, every version used once, nothing merged changed. |
+| `eslint` on the changed scripts, `prettier --check`, `npm run typecheck` | Passed. |
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| A copy of `20261112000000_genre_taxonomy_v2.sql` under the same version | exit 1, naming both files |
+| A line appended to the merged taxonomy v2 migration, with `--base origin/main` | exit 1, "must not be edited" |
+| #167's head (`20261112000000_unblock_one_job_per_channel.sql`) after it merges `main` | will fail until renamed, as intended |
+
 ## 2026-10-18 — Genre taxonomy v2
 
 | Command | Actual result |
