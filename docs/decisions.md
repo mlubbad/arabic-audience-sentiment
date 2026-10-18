@@ -1,5 +1,15 @@
 # Implementation decisions
 
+2026-10-18 — WO-22 (B-1, video genres) moves from Gemini to Codex. The owner delegated task and
+decision calls to the PM on 2026-10-18. Codex is free since WO-23 merged, and its dispatch path from
+the owner's Mac is scripted and documented, while WO-22 had not started with Gemini. B-2 and B-4
+both wait on B-1, so this is the shortest path through phase 2. WO-22's migration range now starts
+at `20261113010000`, because #167 took `20261113000000`. Merges to `main` stay with the owner.
+Also decided the same day, on the Dependabot queue: #155 (Python 3.14 base image) is declined and
+its minor line ignored. The worker pins 3.12.10 in its Dockerfile, its CI setup and a test, and the
+PR fails that test and the model image build. A runtime move is its own planned change.
+#157, #158 and #170 were rebased onto the current `main` for review.
+
 2026-10-18 — A migration's version is checked, not trusted. The Deploy runner applies a file
 only when its version is missing remotely, so a reused version is skipped in production while
 PGlite, which applies every file, stays green. `scripts/check-migrations.mjs` now fails the
