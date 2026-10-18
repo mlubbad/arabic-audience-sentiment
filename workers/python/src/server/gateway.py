@@ -275,6 +275,26 @@ class ControlPlane:
              "profile": _canonicalise(channel)},
         )
 
+    def featured_due(self, lease: dict[str, Any]) -> bool:
+        data = self._post(
+            "/worker/featured-due",
+            {"job_id": lease["job_id"], "lease_token": lease["lease_token"]},
+        )
+        return bool(data and data.get("due") is True)
+
+    def commit_featured(
+        self, lease: dict[str, Any], candidates: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
+        return self._post(
+            "/worker/commit-featured",
+            {
+                "job_id": lease["job_id"],
+                "lease_token": lease["lease_token"],
+                "batch_key": "featured",
+                "candidates": _canonicalise(candidates),
+            },
+        )
+
     def video_finished(self, lease: dict[str, Any], video_id: str, outcome: str,
                        error_code: str | None = None) -> None:
         self._post(
