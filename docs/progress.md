@@ -2329,7 +2329,7 @@ What remains before live keys, per the same 2026-09-16 list: the tax-mode PATCH 
 the sandbox plus one more sandbox payment to confirm the invoice shows tax (item 2). Items 1
 (this entry) and 4 (the `20260917060000` migration) are done — that migration matched
 `local`/`remote` in `supabase migration list --linked` before this session touched anything
-today. Setting `PADDLE_ENV=production` and the live API key, webhook secret and client
+today. Setting `PADDLE_ENV=live` and the live API key, webhook secret and client
 token themselves is the owner's own action — this session has no access to those values and
 does not ask for them in chat.
 
@@ -2355,7 +2355,7 @@ comment-analysis budget moved from 100 to 10,100 within seconds, no manual step.
 workspace was then deleted from `/admin` (0 channels, 1 member — nothing else attached).
 
 Both halves of the last open item are done. Nothing on the 2026-09-16 "before live keys"
-list remains outstanding; setting `PADDLE_ENV=production` and the live API key, webhook
+list remains outstanding; setting `PADDLE_ENV=live` and the live API key, webhook
 secret and client token is the owner's own action, as before.
 
 ## 2026-09-17 — the dashboard rebuilt: one page in `dashboard/`, sticky filters, sections on the design system
@@ -3224,3 +3224,13 @@ While `channel-lookup` responded successfully to backend and curl requests, in-b
 - **Verification**:
   - `uv run python src/collectors/diagnostics.py --platform all` reported YouTube as `HEALTHY (OAuth Platform Reader Active)`.
   - All CI verification gates passed cleanly via `npm run check` (web unit tests, database tests, python tests, production build, and secret scanning).
+
+## 2026-10-18 — `PADDLE_ENV` takes `live`, not `production`
+
+`paddle-checkout`, `billing-portal`, `scripts/paddle-sync-prices.mjs` and the web bundle's
+`VITE_PADDLE_ENV` all switch to `api.paddle.com` only on the exact value `live`; anything
+else, `production` included, stays on the sandbox. `supabase/functions/README.md` and the
+two 2026-09-16/17 entries above said `production`, which would have left a "live" switch
+silently on sandbox. Corrected in place (the README row also now lists `paddle-checkout`,
+which reads both `PADDLE_ENV` and `PADDLE_API_KEY`). Docs only; no code, secret or variable
+changed. The owner's switch to live remains their own action.
