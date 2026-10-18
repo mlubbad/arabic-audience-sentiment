@@ -95,7 +95,12 @@ class Lister:
         return []
 
 
-def discover_plane(sent: dict, due: bool, commit_failure: bool = False):
+def discover_plane(
+    sent: dict,
+    due: bool,
+    commit_failure: bool = False,
+    due_failure: bool = False,
+):
     def handler(request):
         path = request.url.path.rsplit("/", 1)[-1]
         if path == "claim":
@@ -104,6 +109,8 @@ def discover_plane(sent: dict, due: bool, commit_failure: bool = False):
                 "checkpoint": None, "access_token": "tok", "platform": "youtube",
             })
         if path == "featured-due":
+            if due_failure:
+                return httpx.Response(500, json={"code": "source_unavailable"})
             return httpx.Response(200, json={"due": due})
         if path == "commit-featured" and commit_failure:
             return httpx.Response(500, json={"code": "source_unavailable"})
@@ -128,13 +135,14 @@ def test_runner_makes_no_featured_request_when_not_due():
 
 
 def test_runner_reports_fetch_or_commit_failure_as_partial():
-    for lister, commit_failure in [
-        (Lister(CollectionError("source_unavailable", retryable=True)), False),
-        (Lister(), True),
+    for lister, commit_failure, due_failure in [
+        (Lister(CollectionError("source_unavailable", retryable=True)), False, False),
+        (Lister(), True, False),
+        (Lister(), False, True),
     ]:
         sent = {}
         run_discover(
-            discover_plane(sent, True, commit_failure),
+            discover_plane(sent, True, commit_failure, due_failure),
             lambda *args, _lister=lister, **kwargs: _lister,
         )
         assert sent["finish"] == ("partial", "featured_channels_failed")

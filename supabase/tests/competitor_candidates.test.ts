@@ -115,6 +115,12 @@ describe("manual competitor candidates", () => {
       "Manual",
       "@manual",
     ]);
+    await db.query("select competitor_candidate_add($1,$2,null,null)", [A, C1]);
+    const metadata = await db.query<{ title: string; handle: string }>(
+      "select title,handle from competitor_candidates where channel_id=$1 and candidate_external_id=$2 and source='manual'",
+      [A, C1],
+    );
+    expect(metadata.rows).toEqual([{ title: "Manual", handle: "@manual" }]);
     await admin();
     await db.query(
       `insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,title,handle,source)

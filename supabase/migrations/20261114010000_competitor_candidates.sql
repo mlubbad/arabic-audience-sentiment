@@ -149,7 +149,10 @@ BEGIN
     nullif(trim(p_handle), ''), 'manual', auth.uid()
   )
   ON CONFLICT (workspace_id, channel_id, platform, candidate_external_id, source)
-  DO UPDATE SET title = excluded.title, handle = excluded.handle, last_seen_at = now()
+  DO UPDATE SET
+    title = coalesce(excluded.title, competitor_candidates.title),
+    handle = coalesce(excluded.handle, competitor_candidates.handle),
+    last_seen_at = now()
   RETURNING * INTO result;
   RETURN result;
 END
