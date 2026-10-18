@@ -1,0 +1,17 @@
+{
+  "batch_key": "featured",
+  "candidates": [
+    {
+      "candidate_external_id": "UCaaaaaaaaaaaaaaaaaaaaaa",
+      "handle": "@a",
+      "title": "ألف"
+    },
+    {
+      "candidate_external_id": "UCbbbbbbbbbbbbbbbbbbbbbb",
+      "handle": null,
+      "title": null
+    }
+  ],
+  "job_id": "20000000-0000-4000-8000-000000000001",
+  "lease_token": "30000000-0000-4000-8000-000000000001"
+}

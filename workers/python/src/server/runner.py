@@ -290,6 +290,23 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
             except ControlPlaneError:
                 control.finish(lease, "partial", "channel_profile_commit_failed")
                 return True
+        if (lease.get("platform") or "youtube") == "youtube":
+            try:
+                if control.featured_due(lease):
+                    candidates = collector.featured_channels(
+                        channel_id or result.channel["external_channel_id"]
+                    )
+                    control.commit_featured(lease, candidates)
+            except LeaseLost:
+                raise
+            except CollectionError as exc:
+                if exc.code == "quota_exceeded":
+                    raise
+                control.finish(lease, "partial", "featured_channels_failed")
+                return True
+            except ControlPlaneError:
+                control.finish(lease, "partial", "featured_channels_failed")
+                return True
         control.finish(lease, "exhausted" if result.complete else "partial",
                        None if result.complete else result.reason)
     except LeaseLost:

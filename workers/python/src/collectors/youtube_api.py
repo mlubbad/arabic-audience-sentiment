@@ -313,6 +313,57 @@ class YouTubeAPI:
                     raise CollectionError("statistics_lookup_failed", retryable=True) from None
         return counts
 
+    def featured_channels(self, external_channel_id: str) -> list[dict]:
+        """Return the channel identities featured on a YouTube channel page."""
+        data = self._get(
+            "channelSections",
+            {"part": "contentDetails", "channelId": external_channel_id},
+        )
+        try:
+            ids: list[str] = []
+            seen: set[str] = set()
+            for section in data["items"]:
+                channels = (section.get("contentDetails") or {}).get("channels") or []
+                if not isinstance(channels, list):
+                    raise TypeError
+                for channel_id in channels:
+                    if not isinstance(channel_id, str):
+                        raise TypeError
+                    if channel_id != external_channel_id and channel_id not in seen:
+                        seen.add(channel_id)
+                        ids.append(channel_id)
+                        if len(ids) == 100:
+                            break
+                if len(ids) == 100:
+                    break
+        except (KeyError, TypeError, AttributeError):
+            raise CollectionError("invalid_response") from None
+
+        details: dict[str, dict[str, str | None]] = {}
+        for start in range(0, len(ids), 50):
+            chunk = ids[start:start + 50]
+            response = self._get(
+                "channels", {"part": "snippet", "id": ",".join(chunk)}
+            )
+            try:
+                for item in response["items"]:
+                    channel_id = item["id"]
+                    snippet = item.get("snippet") or {}
+                    details[channel_id] = {
+                        "title": snippet.get("title") or None,
+                        "handle": snippet.get("customUrl") or None,
+                    }
+            except (KeyError, TypeError, AttributeError):
+                raise CollectionError("invalid_response") from None
+        return [
+            {
+                "candidate_external_id": channel_id,
+                "title": details.get(channel_id, {}).get("title"),
+                "handle": details.get(channel_id, {}).get("handle"),
+            }
+            for channel_id in ids
+        ]
+
     _TABS = (("video", "LF"), ("short", "SH"), ("stream", "LV"))
     _DURATION = re.compile(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
 
