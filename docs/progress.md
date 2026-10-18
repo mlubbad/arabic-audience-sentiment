@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-10-18 — Taxonomy v2 and the first two competitor work orders
+
+The owner said (2026-10-17): start task 0.4, then issue B-1 and B-3, with B-3 moved to Codex.
+
+- **Task 0.4:** `20261112000000_genre_taxonomy_v2.sql` publishes taxonomy v2: v1's 18 level-1
+  genres unchanged, 120 level-2 and 27 level-3 genres, Arabic and English names and an Arabic
+  description each. Every IAB id was checked against the official Content Taxonomy 3.1 file at
+  the same commit as v1; null where none fits. Review copy:
+  `docs/taxonomy/2026-10-17-genre-taxonomy-v2.md`. Merging is the owner's approval.
+- **WO-22 (#164, Gemini), B-1:** each video gets a genre from v2, on the topics pattern, behind
+  a platform switch that stays off until YouTube accepts the Derived Metrics use case.
+- **WO-23 (#165, Codex), B-3 first part:** the competitor candidate pool, from manual picks and
+  featured channels. Search is B-3b.
+- **Derived Metrics:** step-by-step application guide with paste-ready answers in
+  `docs/2026-10-18-youtube-derived-metrics-application.md`. Two corrections to the 2026-09-16
+  request found on the way: it said the data is in the EU, while the pooler host is
+  `ap-south-1` (to confirm), and it did not list `search.list`, which channel lookup uses.
+
 ## 2026-10-17 — Owner console review batch F: layout
 
 The owner said «ابدأ الدفعة F» (2026-10-17): findings 12, 13, 14 and 21 of

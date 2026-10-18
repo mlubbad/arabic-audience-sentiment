@@ -1,5 +1,20 @@
 # Verification
 
+## 2026-10-18 — Genre taxonomy v2
+
+| Command | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/genre_taxonomy.test.ts supabase/tests/genre_taxonomy_v2.test.ts` | 10 passed. |
+| Generator check against IAB Content Taxonomy 3.1 TSV (commit `de75783`) | Every non-null `iab_id` exists in the file; keys unique and within `^[a-z][a-z0-9_]{0,39}$`; names 1–80 and descriptions 1–400 characters. |
+
+Mutation check, each reverted after the run:
+
+| Mutation | Result |
+| --- | --- |
+| v2's level 1 copied without one genre | migration fails to load (children point at a missing parent); file failed |
+| Two siblings with the same Arabic name | 1 failed |
+| A gap in sibling positions | 1 failed |
+
 ## 2026-10-17 — Owner console batch F: layout
 
 Findings 12, 13, 14 and 21 of `docs/reviews/2026-10-13-owner-console-review.md`. Web only.
