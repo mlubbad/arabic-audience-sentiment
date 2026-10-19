@@ -1,5 +1,5 @@
 # 0004. Edge functions deploy from main, in the gated deploy job
-Status: proposed
+Status: accepted (owner, 2026-10-19)
 Date: 2026-10-19
 
 ## Context
