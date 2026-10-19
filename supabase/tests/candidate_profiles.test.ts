@@ -81,10 +81,19 @@ describe("candidate profile SQL contract", () => {
       [A, CANDIDATE],
     );
     await db.query(
-      "insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,source,profile_observed_at) values ($1,$1,$2,'manual',now()),($1,$1,$3,'manual',null)",
-      [A, `UC${"f".repeat(22)}`, `UC${"g".repeat(22)}`],
+      "insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,source,profile_observed_at) values ($1,$1,$2,'manual',now()-interval '1 day'),($1,$1,$3,'manual',null),($1,$1,$4,'manual',now()-interval '8 days')",
+      [A, `UC${"f".repeat(22)}`, `UC${"g".repeat(22)}`, `UC${"h".repeat(22)}`],
     );
-    for (let index = 0; index < 55; index += 1)
+    const otherChannel = "00000000-0000-4000-8000-0000000000c1";
+    await db.query(
+      "insert into channels(id,workspace_id,client_id,external_channel_id,status,platform) values ($1,$2,$2,$3,'connected','youtube')",
+      [otherChannel, A, `UC${"e".repeat(22)}`],
+    );
+    await db.query(
+      "insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,source,profile_observed_at) values ($1,$2,$3,'manual',null)",
+      [A, otherChannel, `UC${"i".repeat(22)}`],
+    );
+    for (let index = 0; index < 46; index += 1)
       await db.query(
         "insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,source,profile_observed_at) values ($1,$1,$2,'manual',now()-interval '8 days')",
         [A, `UC${"z".repeat(18)}${index.toString().padStart(4, "0")}`],
@@ -93,10 +102,15 @@ describe("candidate profile SQL contract", () => {
       "select svc_worker_candidates_due($1,$2,$3) ids",
       [HASH, job.id, job.lease_token],
     );
-    expect(rows[0]!.ids).toHaveLength(50);
+    expect(rows[0]!.ids).toHaveLength(49);
     expect(rows[0]!.ids).toContain(CANDIDATE);
+    expect(rows[0]!.ids).toContain(`UC${"h".repeat(22)}`);
+    expect(rows[0]!.ids.indexOf(`UC${"g".repeat(22)}`)).toBeLessThan(
+      rows[0]!.ids.indexOf(`UC${"h".repeat(22)}`),
+    );
     expect(rows[0]!.ids).not.toContain(`UC${"f".repeat(22)}`);
     expect(rows[0]!.ids).not.toContain(`UC${"d".repeat(22)}`);
+    expect(rows[0]!.ids).not.toContain(`UC${"i".repeat(22)}`);
     await expect(
       db.query("select svc_worker_candidates_due($1,$2,$3)", [
         TOKEN_B,
@@ -111,6 +125,21 @@ describe("candidate profile SQL contract", () => {
         crypto.randomUUID(),
       ]),
     ).rejects.toThrow(/lease_lost/);
+    await db.query("update jobs set status='cancelled' where id=$1", [job.id]);
+  });
+
+  it("caps due candidate ids at fifty", async () => {
+    const job = await lease();
+    for (let index = 0; index < 55; index += 1)
+      await db.query(
+        "insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,source,profile_observed_at) values ($1,$1,$2,'manual',now()-interval '8 days')",
+        [A, `UC${"q".repeat(18)}${index.toString().padStart(4, "0")}`],
+      );
+    const { rows } = await db.query<{ ids: string[] }>(
+      "select svc_worker_candidates_due($1,$2,$3) ids",
+      [HASH, job.id, job.lease_token],
+    );
+    expect(rows[0]!.ids).toHaveLength(50);
     await db.query("update jobs set status='cancelled' where id=$1", [job.id]);
   });
 

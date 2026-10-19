@@ -6112,7 +6112,7 @@ BEGIN
   w := private.worker_job(token_hash, j, t);
   SELECT channel_id, type INTO c, kind FROM public.jobs WHERE id=j;
   IF kind <> 'discover' THEN RAISE EXCEPTION 'invalid_job_type' USING errcode='22023'; END IF;
-  SELECT coalesce(jsonb_agg(candidate_external_id ORDER BY observed, candidate_external_id), '[]'::jsonb)
+  SELECT coalesce(jsonb_agg(candidate_external_id ORDER BY observed NULLS FIRST, candidate_external_id), '[]'::jsonb)
     INTO ids FROM (
       SELECT DISTINCT cc.candidate_external_id, min(cc.profile_observed_at) observed
       FROM public.competitor_candidates cc
