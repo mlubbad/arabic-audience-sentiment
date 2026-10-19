@@ -119,4 +119,80 @@ describe("channel genre profiles", () => {
       ).rows[0].result,
     ).toEqual({ blocked: "genre_classification_off" });
   });
+
+  it("uses one latest classification key and sums channel videos across Main genres", async () => {
+    await db.exec("reset role");
+    await db.query(
+      "update private.platform_switches set enabled=true where key='genre_classification'",
+    );
+    await db.query("delete from channel_genres where channel_id=$1", [C]);
+    const mains = (
+      await db.query<{ key: string }>(
+        "select key from genre_taxonomy where version=2 and level=1 order by position limit 2",
+      )
+    ).rows;
+    expect(mains).toHaveLength(2);
+    await db.query(
+      `insert into channel_genres(workspace_id,channel_id,classification_key,taxonomy_version,genre_key,level,weight,videos,computed_at)
+       values ($1,$2,'old-key',2,$3,1,.99,3,now()-interval '1 minute'),
+              ($1,$2,'old-key',2,$4,1,.01,3,now()-interval '1 minute'),
+              ($1,$2,'new-key',2,$3,1,.5,3,now()),
+              ($1,$2,'new-key',2,$4,1,.5,3,now())`,
+      [W, C, mains[0].key, mains[1].key],
+    );
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [U]);
+    await db.exec("set role authenticated");
+    const profile = (
+      await db.query<{ result: Record<string, unknown> }>(
+        "select public.channel_genre_profile($1) result",
+        [C],
+      )
+    ).rows[0].result;
+    expect(profile.classification_key).toBe("new-key");
+    expect(profile.main).toBe(mains[0].key);
+    expect(profile.videos).toBe(6);
+    expect(profile.weights).toHaveLength(2);
+  });
+
+  it("excludes Primary's level-three child from Secondary", async () => {
+    await db.exec("reset role");
+    await db.query(
+      "update private.platform_switches set enabled=true where key='genre_classification'",
+    );
+    await db.query("delete from channel_genres where channel_id=$1", [C]);
+    const tree = (
+      await db.query<{
+        main: string;
+        primary: string;
+        child: string;
+        outside: string;
+      }>(
+        `select m.key main, p.key primary, c.key child, x.key outside
+           from genre_taxonomy m
+           join genre_taxonomy p on p.version=m.version and p.parent_key=m.key and p.level=2
+           join genre_taxonomy c on c.version=p.version and c.parent_key=p.key and c.level=3
+           join genre_taxonomy p2 on p2.version=m.version and p2.parent_key=m.key and p2.key<>p.key and p2.level=2
+           join genre_taxonomy x on x.version=p2.version and x.parent_key=p2.key and x.level=3
+          where m.version=2 order by m.position,p.position,c.position,x.position limit 1`,
+      )
+    ).rows[0];
+    await db.query(
+      `insert into channel_genres(workspace_id,channel_id,classification_key,taxonomy_version,genre_key,level,weight,videos,computed_at)
+       values ($1,$2,'secondary-key',2,$3,1,1,5,now()),
+              ($1,$2,'secondary-key',2,$4,2,1,5,now()),
+              ($1,$2,'secondary-key',2,$5,3,.3,2,now()),
+              ($1,$2,'secondary-key',2,$6,3,.3,2,now())`,
+      [W, C, tree.main, tree.primary, tree.child, tree.outside],
+    );
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [U]);
+    await db.exec("set role authenticated");
+    const profile = (
+      await db.query<{ result: { secondary: string[] } }>(
+        "select public.channel_genre_profile($1) result",
+        [C],
+      )
+    ).rows[0].result;
+    expect(profile.secondary).toContain(tree.outside);
+    expect(profile.secondary).not.toContain(tree.child);
+  });
 });
