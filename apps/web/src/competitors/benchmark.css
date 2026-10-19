@@ -1,0 +1,67 @@
+.competitor-benchmark {
+  padding: 1rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.75rem;
+  margin-block: 1rem;
+}
+.competitor-benchmark header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.benchmark-table-wrap {
+  overflow: auto;
+}
+.competitor-benchmark table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.competitor-benchmark th,
+.competitor-benchmark td {
+  padding: 0.6rem;
+  text-align: start;
+  border-bottom: 1px solid var(--border, #ddd);
+}
+.competitor-benchmark th small {
+  display: block;
+  font-weight: normal;
+}
+.benchmark-own {
+  background: color-mix(in srgb, var(--accent, #6558d3) 10%, transparent);
+}
+.benchmark-chart {
+  height: 20rem;
+  margin-block: 1rem;
+}
+.benchmark-cards {
+  display: none;
+}
+@media (max-width: 760px) {
+  .benchmark-table-wrap {
+    display: none;
+  }
+  .benchmark-cards {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .benchmark-cards article {
+    padding: 0.75rem;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 0.5rem;
+  }
+  .benchmark-cards dl {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .benchmark-cards dl div {
+    display: flex;
+    justify-content: space-between;
+  }
+  .benchmark-cards dd {
+    margin: 0;
+  }
+  .competitor-benchmark header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

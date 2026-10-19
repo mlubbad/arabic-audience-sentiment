@@ -41,6 +41,33 @@ export const suggestionsSchema = z.object({
   candidates: z.array(candidateSchema),
 });
 export type Suggestions = z.infer<typeof suggestionsSchema>;
+const benchmarkPointSchema = z.object({
+  day: z.string(),
+  subscriber_count: nullableNumber,
+  view_count: nullableNumber,
+  video_count: nullableNumber,
+});
+const benchmarkKpisSchema = z.object({
+  subscribers: nullableNumber,
+  views: nullableNumber,
+  subscribers_change: nullableNumber,
+  views_change: nullableNumber,
+  videos_per_week: nullableNumber,
+  views_per_video: nullableNumber,
+});
+export const competitorBenchmarkSchema = z.object({
+  days: z.number(),
+  series: z.array(
+    z.object({
+      kind: z.enum(["own", "competitor"]),
+      external_id: z.string(),
+      title: z.string(),
+      points: z.array(benchmarkPointSchema),
+      kpis: benchmarkKpisSchema,
+    }),
+  ),
+});
+export type CompetitorBenchmark = z.infer<typeof competitorBenchmarkSchema>;
 export const competitorKeys = {
   all: ["competitors"] as const,
   channel: (id: string) => ["competitors", id] as const,
@@ -129,6 +156,22 @@ export async function loadCompetitors(channel: string, signal?: AbortSignal) {
       )?.[0] ?? "competitor_suggestions_failed",
     );
   return suggestionsSchema.parse(data);
+}
+export async function loadCompetitorBenchmark(
+  channel: string,
+  days: number,
+  signal?: AbortSignal,
+) {
+  if (!supabase) throw new Error("live_unavailable");
+  const { data, error } = await supabase
+    .rpc("competitor_benchmark", { p_channel: channel, p_days: days })
+    .abortSignal(signal ?? new AbortController().signal);
+  if (error)
+    throw new Error(
+      error.message.match(/forbidden|invalid_input/)?.[0] ??
+        "competitor_benchmark_failed",
+    );
+  return competitorBenchmarkSchema.parse(data);
 }
 export async function decideCompetitor(
   channel: string,
