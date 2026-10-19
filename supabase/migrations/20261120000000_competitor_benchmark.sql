@@ -10,8 +10,10 @@ BEGIN
    d.day,d.subscriber_count,d.view_count,d.video_count,0 ord
   FROM public.channel_stats_daily d WHERE d.workspace_id=ch.workspace_id AND d.channel_id=ch.id AND d.day >= (current_date-(p_days-1))
   UNION ALL
-  SELECT 'competitor',cc.candidate_external_id,coalesce(cc.title,cc.handle,cc.candidate_external_id),d.day,d.subscriber_count,d.view_count,d.video_count,1
-  FROM public.competitor_decisions cd JOIN public.competitor_candidates cc ON cc.workspace_id=cd.workspace_id AND cc.channel_id=cd.channel_id AND cc.platform=cd.platform AND cc.candidate_external_id=cd.candidate_external_id
+  SELECT 'competitor',cd.candidate_external_id,
+   coalesce((SELECT cc.title FROM public.competitor_candidates cc WHERE cc.workspace_id=cd.workspace_id AND cc.channel_id=cd.channel_id AND cc.platform=cd.platform AND cc.candidate_external_id=cd.candidate_external_id ORDER BY (cc.title IS NULL),cc.last_seen_at DESC LIMIT 1),cd.candidate_external_id),
+   d.day,d.subscriber_count,d.view_count,d.video_count,1
+  FROM public.competitor_decisions cd
   LEFT JOIN public.competitor_stats_daily d ON d.workspace_id=cd.workspace_id AND d.channel_id=cd.channel_id AND d.candidate_external_id=cd.candidate_external_id AND d.day >= (current_date-(p_days-1))
   WHERE cd.workspace_id=ch.workspace_id AND cd.channel_id=ch.id AND cd.platform='youtube' AND cd.status='tracked'
  ), grouped AS (
@@ -37,7 +39,7 @@ BEGIN
    'views_change',CASE WHEN point_count>=2 AND first_views IS NOT NULL AND last_views IS NOT NULL THEN last_views-first_views END,
    'videos_per_week',CASE WHEN last_day-first_day>=7 AND first_videos IS NOT NULL AND last_videos IS NOT NULL THEN (last_videos-first_videos)::numeric/((last_day-first_day)::numeric/7) END,
    'views_per_video',CASE WHEN last_views IS NOT NULL AND last_videos IS NOT NULL AND last_videos<>0 THEN last_views::numeric/last_videos END
-  )) ORDER BY ord,external_id),'[]'::jsonb)) INTO result FROM complete;
+  )) ORDER BY ord,CASE WHEN ord=0 THEN NULL ELSE last_sub END DESC NULLS LAST,external_id),'[]'::jsonb)) INTO result FROM complete;
  RETURN result;
 END $$;
 REVOKE ALL ON FUNCTION public.competitor_benchmark(uuid,integer) FROM PUBLIC,anon;

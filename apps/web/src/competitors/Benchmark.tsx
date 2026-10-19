@@ -1,11 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { Line } from "react-chartjs-2";
 import { useState } from "react";
-import { competitorKeys, loadCompetitorBenchmark } from "../api/competitors";
+import {
+  competitorKeys,
+  loadCompetitorBenchmark,
+  type CompetitorBenchmark,
+} from "../api/competitors";
 import type { Strings } from "../strings";
 import { n } from "../dashboard/format";
 import { lineOptions } from "../dashboard/chartOptions";
 import type { ChartData } from "chart.js";
+import { Labelled } from "../ui/Labelled";
+import { SelectItem } from "../ui/Select";
+import { Button } from "../ui/Button";
 import "./benchmark.css";
 
 const colors = [
@@ -16,6 +23,26 @@ const colors = [
   "#3985cf",
   "#ad5bb8",
 ];
+export function benchmarkChartData(
+  series: CompetitorBenchmark["series"],
+  metric: "subscriber_count" | "view_count",
+): ChartData<"line", (number | null)[], string> {
+  const labels = [
+    ...new Set(series.flatMap((s) => s.points.map((p) => p.day))),
+  ].sort();
+  return {
+    labels,
+    datasets: series.map((s, i) => ({
+      label: s.title,
+      data: labels.map(
+        (day) => s.points.find((p) => p.day === day)?.[metric] ?? null,
+      ),
+      borderColor: colors[i % colors.length],
+      backgroundColor: colors[i % colors.length],
+      spanGaps: false,
+    })),
+  };
+}
 export function Benchmark({
   channel,
   tracked,
@@ -49,21 +76,7 @@ export function Benchmark({
       </p>
     );
   const series = query.data.series;
-  const labels = [
-    ...new Set(series.flatMap((s) => s.points.map((p) => p.day))),
-  ].sort();
-  const data: ChartData<"line", (number | null)[], string> = {
-    labels,
-    datasets: series.map((s, i) => ({
-      label: s.title,
-      data: labels.map(
-        (day) => s.points.find((p) => p.day === day)?.[metric] ?? null,
-      ),
-      borderColor: colors[i % colors.length],
-      backgroundColor: colors[i % colors.length],
-      spanGaps: false,
-    })),
-  };
+  const data = benchmarkChartData(series, metric);
   const cols = [
     { key: "subscribers", title: S.compSubscribers, calculated: false },
     {
@@ -79,20 +92,18 @@ export function Benchmark({
     <section className="competitor-benchmark">
       <header>
         <h2>{S.compBenchmark}</h2>
-        <label>
-          {S.compWindow}
-          <select
-            aria-label={S.compWindow}
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-          >
-            {[7, 30, 90].map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Labelled
+          id="benchmark-window"
+          label={S.compWindow}
+          value={String(days)}
+          onValueChange={(v) => setDays(Number(v))}
+        >
+          {[7, 30, 90].map((d) => (
+            <SelectItem key={d} value={String(d)}>
+              {d}
+            </SelectItem>
+          ))}
+        </Labelled>
       </header>
       {days > 30 && <p>{S.compHistory}</p>}
       <p>
@@ -126,10 +137,24 @@ export function Benchmark({
                   <td
                     key={c.key}
                     title={
-                      c.key.endsWith("_per_week") ? S.compLessWeek : undefined
+                      s.kpis[c.key] == null
+                        ? c.key.endsWith("_per_week")
+                          ? S.compLessWeek
+                          : c.key.endsWith("_per_video")
+                            ? S.compNoVideos
+                            : c.key.endsWith("_change")
+                              ? S.compNeedsTwoDays
+                              : S.compNoStats
+                        : undefined
                     }
                   >
-                    {s.kpis[c.key] == null ? "—" : n(s.kpis[c.key]!)}
+                    {s.kpis[c.key] == null
+                      ? "—"
+                      : c.key === "videos_per_week"
+                        ? n(Number(s.kpis[c.key]!.toFixed(1)))
+                        : c.key === "views_per_video"
+                          ? n(Math.round(s.kpis[c.key]!))
+                          : n(s.kpis[c.key]!)}
                   </td>
                 ))}
               </tr>
@@ -153,20 +178,20 @@ export function Benchmark({
         ))}
       </div>
       <nav aria-label={S.compChartMetric}>
-        <button
+        <Button
           type="button"
           aria-pressed={metric === "subscriber_count"}
           onClick={() => setMetric("subscriber_count")}
         >
           {S.compSubscribers}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           aria-pressed={metric === "view_count"}
           onClick={() => setMetric("view_count")}
         >
           {S.compViews}
-        </button>
+        </Button>
       </nav>
       <div className="benchmark-chart">
         <Line data={data} options={{ ...lineOptions, spanGaps: false }} />
