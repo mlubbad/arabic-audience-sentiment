@@ -143,6 +143,9 @@ describe("admin observability reads", () => {
   });
 
   it("admin_channels: the channel with its counts and its failed run", async () => {
+    // Counts are recounted in the background (20261115000000).
+    await db.exec("reset role");
+    await db.query("select private.drain_video_comment_stats()");
     await as(ADMIN);
     const r = (
       await db.query<Record<string, unknown>>("select admin_channels() as c")

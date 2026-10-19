@@ -217,6 +217,10 @@ describe("precomputed comment counts", () => {
       [W_S],
     );
 
+    // Counts are recounted in the background (20261115000000): bring them up
+    // to date the way the minute's drain would before either path reads them.
+    await db.exec("reset role");
+    await db.query("select private.drain_video_comment_stats()");
     oldSelection = await callSelection();
     oldQuotaCode = await callOverQuota();
     await db.exec("reset role");
