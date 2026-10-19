@@ -53,6 +53,19 @@ describe("deployment verification gate", () => {
     expect(workflow).toContain("ref: ${{ env.TARGET_SHA }}");
   });
 
+  test("waits for a job the jobs list still shows unfinished instead of failing it", () => {
+    // 2026-10-18, run 39123719963: Security had completed green, but its jobs
+    // list still showed 'Dependency audit' with conclusion null.
+    const gate = workflow.slice(
+      workflow.indexOf("require_workflow_jobs() {"),
+      workflow.indexOf("require_workflow_jobs ci.yml verify"),
+    );
+    const wait = gate.indexOf('select(.status != "completed")');
+    expect(wait).toBeGreaterThan(-1);
+    expect(gate.indexOf("sleep 10", wait)).toBeGreaterThan(wait);
+    expect(wait).toBeLessThan(gate.indexOf('for job in "$@"; do'));
+  });
+
   test("fails on missing secrets and migrates before uploading", () => {
     expect(workflow).toContain("Missing required deployment secret");
     expect(workflow).not.toContain("Skipping FTP upload");

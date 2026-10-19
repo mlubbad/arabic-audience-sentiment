@@ -839,6 +839,7 @@ export const ar = {
     "channel-compare-step": "عدّ المقارنة، قناة كل دقيقة",
     "channel-compare-nightly": "إعادة عدّ المقارنة ليلاً",
     "reconcile-video-comment-stats-step": "تصحيح أعداد التعليقات ليلاً",
+    "video-comment-stats-drain": "تحديث أعداد التعليقات كل دقيقة",
     "admin-daily-digest": "ملخص الصباح",
     "sentiment-tick": "جدولة العمل كل ساعة",
     "billing-sweep": "مراجعة الاشتراكات",

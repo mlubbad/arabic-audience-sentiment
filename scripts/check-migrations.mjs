@@ -45,8 +45,9 @@ export function versionProblems(files) {
 }
 
 /** What changed in migrations already on the base branch: each one there
- *  must still exist, under the same name, with the same bytes. `base` and
- *  `head` map a file name to its content. */
+ *  must still exist, under the same name, with the same bytes, and every new
+ *  one must sort after them. `base` and `head` map a file name to its
+ *  content. */
 export function mergedProblems(base, head) {
   const problems = [];
   for (const [file, content] of base) {
@@ -59,6 +60,23 @@ export function mergedProblems(base, head) {
         `${file}: merged migrations are applied in production and must not be edited; add a new migration instead`,
       );
   }
+  // A new migration must sort after every merged one. The Deploy runner
+  // applies any missing version, so a lower one still runs in production, but
+  // after the newer merged files, while PGlite applies every file by name.
+  // The two orders then differ.
+  const newest = [...base.keys()]
+    .map((f) => NAME.exec(f)?.[1])
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  if (newest)
+    for (const file of head.keys()) {
+      const version = NAME.exec(file)?.[1];
+      if (!base.has(file) && version && version <= newest)
+        problems.push(
+          `${file}: a new migration must have a version above ${newest}, the newest merged one; production would apply it after that one while the tests apply it before`,
+        );
+    }
   return problems;
 }
 

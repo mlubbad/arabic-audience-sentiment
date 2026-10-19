@@ -125,7 +125,13 @@ merging to `main`.
   project). Changes reach it only through a reviewed PR merged by the owner.
 - Migrations are immutable once merged. Add a new timestamped file inside the timestamp range
   your work order gives you. Never edit an existing migration.
-- Continuous deployment runs from `.github/workflows/deploy.yml` on `main`. Agents never run
-  `npm run deploy:preview`, `npm run db:migrate:remote`, `supabase db push` or
-  `supabase functions deploy`, and never call live paid services from tests.
+- Continuous deployment runs from `.github/workflows/deploy.yml` on `main`: the web app, the
+  migrations and, since ADR 0004, every edge function whose code on main is newer than production.
+  Agents never run `npm run deploy:preview`, `npm run db:migrate:remote`, `supabase db push`,
+  `supabase functions deploy` or `npm run functions:deploy`, and never call live paid services
+  from tests.
+- A new edge function declares `[functions.<name>] verify_jwt` in `supabase/config.toml`
+  (`scripts/deploy-functions.test.ts` fails without it). Changing an existing function's
+  `verify_jwt` is the owner's decision: the deploy job refuses to run while the declaration and
+  production disagree.
 - Keep changes reviewable: small coherent commits carrying the commands and results that back them.

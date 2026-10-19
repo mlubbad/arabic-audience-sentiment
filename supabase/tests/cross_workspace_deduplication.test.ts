@@ -265,7 +265,11 @@ describe("cross-workspace deduplication", () => {
     expect(bSelections.rows[0].last_outcome).toBeNull();
     expect(bSelections.rows[0].last_seen_comment_count).toBeNull();
 
-    // 5. Check workspace_ops_snapshot for Workspace B
+    // 5. Check workspace_ops_snapshot for Workspace B, once the background
+    // recount (20261115000000) has run.
+    await db.exec("reset role");
+    await db.query("select private.drain_video_comment_stats()");
+    await db.exec("set role authenticated");
     const opsSnap = await db.query<{
       r: {
         video_counts: Array<{ id: string; total: number; analysed: number }>;

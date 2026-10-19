@@ -54,13 +54,14 @@ async function seed(name: string, comments: number): Promise<string> {
   return w;
 }
 
+// The counts are recounted in the background (20261115000000): each read first
+// runs the drain the minute's cron run would.
 const stats = async (w: string) =>
-  (
-    await db.query<{ total: number; analysed: number }>(
-      "select total, analysed from private.video_comment_stats where workspace_id=$1",
-      [w],
-    )
-  ).rows[0];
+  (await db.query("select private.drain_video_comment_stats()"),
+  await db.query<{ total: number; analysed: number }>(
+    "select total, analysed from private.video_comment_stats where workspace_id=$1",
+    [w],
+  )).rows[0];
 
 describe("admin definitions and scale", () => {
   beforeAll(async () => {

@@ -65,6 +65,13 @@ describe("merged migrations", () => {
     expect(mergedProblems(base, head)).toEqual([]);
   });
 
+  test("a new migration below the newest merged version is refused", () => {
+    const head = new Map([...base, ["20261111500000_late.sql", "select 9;\n"]]);
+    expect(mergedProblems(base, head)).toEqual([
+      expect.stringContaining("must have a version above 20261112000000"),
+    ]);
+  });
+
   test("an edited, a deleted and a renamed migration are each refused", () => {
     const edited = new Map(base).set("20261112000000_b.sql", "select 22;\n");
     expect(mergedProblems(base, edited)).toEqual([

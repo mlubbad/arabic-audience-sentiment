@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-19 — #178 merged; WO-22 round 3 needs the dispatcher to merge main
+
+- **#178 merged** (`49411d4`) with `20261116000000`, the version #176 (WO-22) also uses. The PM
+  had flagged it on #178 before the merge. Merged together, `check-migrations` fails, so #176's
+  round 3 merges `main` and renames to `20261116010000`.
+- **Round 3 stopped three times on the owner's Mac:**
+  - twice on a model set in `~/.codex/config.toml` that the ChatGPT account doesn't support;
+  - once when the watcher misread `git merge-base` as a git write.
+- **Fixed in the dispatcher:** the watcher pattern, and `CODEX_MERGE_MAIN=1`, because Codex may not
+  merge (failure rows 18 and 19 in `docs/engineering/codex-dispatch.md`).
+
 ## 2026-10-18 — WO-23 merged; WO-22 to Codex
 
 - **WO-23 (#171) merged** (`54402a0`), after one review round. Migration `20261114010000` applied by

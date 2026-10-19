@@ -11,6 +11,9 @@
 #
 # Usage:
 #   scripts/codex-dispatch.sh <WO-N> <issue-number> <codex/wo-N-slug> [extra prompt]
+# A run that stopped before its handoff (a sandbox block, a usage limit, a
+# question to the PM) is continued with CODEX_RESUME=1 and the same arguments;
+# put the PM's answer in [extra prompt].
 # Run the same command again after a PM review for a follow-up round: when the
 # branch already exists on origin with an open PR, the script continues from its
 # tip, hands Codex the latest "## PM review" as data, and pushes a fast-forward.
@@ -18,6 +21,8 @@
 #   CODEX_WORKSPACE  dedicated clone Codex works in (default: <repo>/.codex-workspace)
 #   CODEX_BIN        path to the codex binary (default: PATH, then the ChatGPT.app bundle)
 #   CODEX_DRY_RUN=1  prepare the workspace and print the command, do not run Codex
+#   CODEX_RESUME=1   continue the uncommitted work of a run that stopped before its handoff
+#   CODEX_MERGE_MAIN=1  follow-up round only: merge origin/main into the branch before Codex runs
 #   CODEX_ALLOW_WORKFLOWS=1  let this work order change .github/workflows/**
 set -euo pipefail
 
@@ -71,14 +76,30 @@ if [ ! -d "$workspace/.git" ]; then
   git clone --quiet "$remote_url" "$workspace"
 fi
 git -C "$workspace" fetch --quiet origin main
-if [ -n "$(git -C "$workspace" status --porcelain)" ]; then
-  die "workspace has uncommitted changes from an earlier run: $workspace (inspect, then 'git reset --hard && git clean -fd' there)"
-fi
 # BEGIN base selection (pinned by scripts/codex-dispatch.test.ts)
-# A branch already on origin is a follow-up round: continue from its tip, so the
-# earlier commits and the open PR survive and the push stays a fast-forward.
-# Only a branch that does not exist yet starts from origin/main.
-if git -C "$workspace" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+# CODEX_RESUME=1 continues a run that stopped before its handoff: Codex's
+# uncommitted work stays in place and Codex is asked to finish it. Three times
+# on 2026-10-18 (WO-23 twice, WO-22 once) a stopped run left only `git reset
+# --hard`, which deletes the work, or a manual commit by the owner. The
+# workspace must already be on the work-order branch, and that branch on
+# origin, if it exists, must not be ahead of it, so the push stays a
+# fast-forward.
+# Otherwise a branch already on origin is a follow-up round: continue from its
+# tip, so the earlier commits and the open PR survive and the push stays a
+# fast-forward. Only a branch that does not exist yet starts from origin/main.
+if [ "${CODEX_RESUME:-0}" = "1" ]; then
+  current="$(git -C "$workspace" branch --show-current)"
+  [ "$current" = "$branch" ] || die "resume: the workspace is on '$current', not $branch"
+  if git -C "$workspace" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+    git -C "$workspace" fetch --quiet origin "+refs/heads/$branch:refs/remotes/origin/$branch"
+    git -C "$workspace" merge-base --is-ancestor "origin/$branch" HEAD ||
+      die "resume: $branch on origin has commits this workspace lacks"
+  fi
+  base_ref="$branch, resumed"
+  round="resume"
+elif [ -n "$(git -C "$workspace" status --porcelain)" ]; then
+  die "workspace has uncommitted changes from an earlier run: $workspace (rerun with CODEX_RESUME=1 to continue them; 'git reset --hard && git clean -fd' there deletes them)"
+elif git -C "$workspace" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
   git -C "$workspace" fetch --quiet origin "+refs/heads/$branch:refs/remotes/origin/$branch"
   base_ref="origin/$branch"
   round="follow-up"
@@ -86,7 +107,7 @@ else
   base_ref="origin/main"
   round="first"
 fi
-git -C "$workspace" switch --quiet -C "$branch" "$base_ref"
+[ "$round" = "resume" ] || git -C "$workspace" switch --quiet -C "$branch" "$base_ref"
 # END base selection
 # The repository hooks must never run here. Every git command after Codex runs
 # outside its sandbox, and a hook resolves tools from the workspace Codex could
@@ -107,6 +128,22 @@ fi
 # workspace's own .cache/ (gitignored); Codex's shells inherit this environment.
 export UV_CACHE_DIR="$workspace/.cache/uv" npm_config_cache="$workspace/.cache/npm"
 mkdir -p "$UV_CACHE_DIR" "$npm_config_cache"
+# BEGIN main merge (pinned by scripts/codex-dispatch.test.ts)
+# CODEX_MERGE_MAIN=1 merges origin/main into a follow-up round's branch before
+# Codex runs. Codex can't: git writes are this script's. A PR whose base moved
+# on needs it, as #176 did on 2026-10-19 when #178 took its migration version.
+# It runs after the hooks are unset, and with them disabled. A conflict aborts
+# the merge and stops here, because resolving it is the owner's call.
+merged_main=""
+if [ "${CODEX_MERGE_MAIN:-0}" = "1" ]; then
+  [ "$round" = "follow-up" ] || die "CODEX_MERGE_MAIN=1 applies to a follow-up round only (this is a $round round)"
+  if ! git -C "$workspace" -c core.hooksPath=/dev/null merge --no-verify --no-edit --quiet origin/main; then
+    git -C "$workspace" merge --abort || true
+    die "merging origin/main into $branch conflicts; resolve it by hand in $workspace, or ask the PM"
+  fi
+  merged_main="$(git -C "$workspace" rev-parse --short origin/main)"
+fi
+# END main merge
 base_sha="$(git -C "$workspace" rev-parse HEAD)"
 echo "codex-dispatch: $branch @ $base_sha ($base_ref, $round round) in $workspace"
 
@@ -117,6 +154,9 @@ constraints_text="$(cat "$constraints")"
 if [ "$round" = "first" ]; then
   task="نفّذ $wo من docs/agents/work-orders/$wo.md (issue #$issue). أنت الآن على الفرع $branch المُنشأ من آخر origin/main. اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
   review=""
+elif [ "$round" = "resume" ]; then
+  task="استكمل $wo (issue #$issue) من التغييرات الموجودة في هذه الشجرة: توقّف تشغيل سابق قبل التسليم، وعمله كله ما زال هنا على الفرع $branch. نص أمر العمل في docs/agents/work-orders/$wo.md، وأي جواب من PM منسوخ أدناه. لا تبدأ من جديد ولا تحذف عملًا موجودًا: أكمل ما ينقص، وشغّل الأوامر الحقيقية حتى تنجح، ثم اكتب .codex-handoff كالعادة. اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
+  review=""
 else
   # The PM's latest review on the open PR, fetched here (outside the sandbox,
   # fixed arguments) because Codex has no GitHub credentials. It is passed as
@@ -126,6 +166,9 @@ else
   review="$(gh pr view "$open_pr" --json reviews --jq '[.reviews[] | select(.body | startswith("## PM review"))] | sort_by(.submittedAt) | last | .body // ""')"
   [ -n "$review" ] || die "no PM review found on PR #$open_pr; nothing for a follow-up round to address"
   task="جولة تعديل على $wo (issue #$issue, PR #$open_pr). نص أمر العمل في docs/agents/work-orders/$wo.md، ومراجعة PM منسوخة أدناه؛ لا تقرأ GitHub. أنت على الفرع $branch من آخر رأس له على origin، والتزاماتك السابقة موجودة. عالج بنود مراجعة PM أدناه فقط، ثم حدّث .codex-handoff كالعادة (commit.txt لهذا الالتزام فقط، وpr.md بالنص الكامل المحدّث للـPR). اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
+  if [ -n "$merged_main" ]; then
+    task="$task دمج الموزّع origin/main ($merged_main) في هذا الفرع قبل بدئك، فبند الدمج في المراجعة منفّذ. لا تشغّل git merge ولا أي كتابة git."
+  fi
 fi
 prompt="$(printf '%s\n' "$task" "$extra" "" "$review" "" "$constraints_text")"
 

@@ -64,10 +64,16 @@ refuses to continue unless both of these passed for that exact commit:
    `VITE_SUPABASE_PUBLISHABLE_KEY` is missing (#58).
 3. **Migrate.** `npm run db:migrate:remote` applies pending migrations to the Supabase
    project, each in its own transaction.
-4. **Upload.** `scripts/deploy-preview.sh` runs `check-secrets` against the built bundle,
+4. **Edge functions.** `npm run functions:deploy` (`scripts/deploy-functions.mjs`, ADR 0004)
+   deploys every function whose last main change (its folder, `_shared/`, `deno.json`,
+   `deno.lock`) is newer than production's `updated_at`. It uses the repository's pinned CLI
+   with `--use-api` and the `verify_jwt` declared in `supabase/config.toml`, and it refuses the
+   run if a declaration differs from production. Afterwards it reads every function back from the
+   Management API and fails if one didn't move or is still older than main.
+5. **Upload.** `scripts/deploy-preview.sh` runs `check-secrets` against the built bundle,
    uploads `dist/` over FTPS (`curl --ssl-reqd`, so TLS on both the control and data
    channels), then deletes the previous build's hashed files from `static/`.
-5. **Verify.** `scripts/verify-deploy.mjs` fetches `/account` on the public host and
+6. **Verify.** `scripts/verify-deploy.mjs` fetches `/account` on the public host and
    requires it to load the entry script this build produced (#57). Without this step an
    upload to the wrong folder looks exactly like success; see the incident below.
 
@@ -78,7 +84,8 @@ refuses to continue unless both of these passed for that exact commit:
 - `PREVIEW_FTP_USER`: `deploy@app.sky-develop.net`, an FTP account whose root **is**
   `public_html` (DirectAdmin → FTP Accounts). Never the account's main login.
 - `PREVIEW_FTP_PASSWORD`: that FTP account's password.
-- `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`: used for the remote migrations.
+- `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`: used for the remote migrations and the
+  edge function deploy.
 
 ### Repository Variables (same page → Variables)
 
@@ -222,9 +229,10 @@ What to do with that:
 
 ## What is not part of this pipeline
 
-- **Edge Functions** (`supabase/functions/*`: `oauth-start`, `oauth-callback`,
-  `oauth-complete`, `channel-lookup`, `paddle-checkout`, `paddle-webhook`,
-  `billing-portal`, `worker`). The owner deploys these with `supabase functions deploy`;
-  CI does not.
+- **Changing an edge function's `verify_jwt`.** The deploy job deploys every function older than
+  main (ADR 0004), with the `verify_jwt` declared in `supabase/config.toml`, and refuses to run
+  while a declaration differs from production. The owner changes the declaration and deploys that
+  function by hand in the same step. `npm run functions:check`, run with the owner's token, reports
+  any function production runs older than main.
 - **The Python worker.** It runs on the owner's machine as a LaunchAgent
   (`scripts/worker-service-update.sh`).

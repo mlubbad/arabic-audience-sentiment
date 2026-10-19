@@ -34,6 +34,8 @@
     "telegram:auth": "uv --directory workers/python --cache-dir ../../.cache/uv run --frozen python ../../scripts/telegram_auth.py",
     "deploy:preview": "sh scripts/deploy-preview.sh",
     "db:migrate:remote": "node scripts/apply-migrations-remote.mjs",
+    "functions:deploy": "node scripts/deploy-functions.mjs",
+    "functions:check": "node scripts/deploy-functions.mjs --check",
     "db:snapshot": "node scripts/snapshot-schema.mjs",
     "db:snapshot:check": "node scripts/snapshot-schema.mjs --check",
     "demo:fixture": "node apps/web/scripts/make-demo-fixture.mjs",

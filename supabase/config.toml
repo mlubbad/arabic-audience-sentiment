@@ -388,13 +388,44 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Every deployed function declares verify_jwt here, matching production
+# (read from the Management API on 2026-10-19). deploy.yml deploys with these
+# values and refuses to run when one differs from production: a JWT change is
+# the owner's decision, deployed by hand (ADR 0004).
+# scripts/deploy-functions.test.ts fails when a function has no entry.
+
 # Paddle calls this one, not a signed-in user: it carries no Supabase JWT, and
 # the HMAC on the raw body is the authentication (supabase/functions/paddle-webhook).
-# Deploy with `--no-verify-jwt` too; this setting is what `supabase start` reads.
 [functions.paddle-webhook]
 verify_jwt = false
 
+# The Python worker's bearer is a platform worker credential, not a Supabase
+# JWT; the gateway hashes and checks it (_shared/worker-gateway.ts).
+[functions.worker]
+verify_jwt = false
+
+# The provider redirects the browser here; the request carries no JWT, and the
+# signed state is the authentication.
+[functions.oauth-callback]
+verify_jwt = false
+
+# Checks the caller's Supabase session itself, through public.oauth_start.
+[functions.oauth-start]
+verify_jwt = false
+
 [functions.oauth-complete]
+verify_jwt = true
+
+[functions.channel-lookup]
+verify_jwt = true
+
+[functions.admin-users]
+verify_jwt = true
+
+[functions.billing-portal]
+verify_jwt = true
+
+[functions.paddle-checkout]
 verify_jwt = true
 
 [analytics]
