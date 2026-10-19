@@ -25,6 +25,33 @@ export const GenrePredictionRecordSchema = z
     "only a successful prediction carries a genre",
   );
 
+const ChannelGenreWeightSchema = z
+  .object({
+    genre_key: z.string(),
+    level: z.number().int().min(1).max(3),
+    weight: z.number().min(0).max(1),
+    name_ar: z.string(),
+    name_en: z.string(),
+  })
+  .strict();
+
+export const ChannelGenreProfileSchema = z.union([
+  z.object({ blocked: z.literal("genre_classification_off") }).strict(),
+  z
+    .object({
+      taxonomy_version: z.number().int().positive().nullable(),
+      classification_key: z.string().nullable(),
+      source: z.enum(["reviewed", "model"]).nullable(),
+      main: z.string().nullable(),
+      primary: z.string().nullable(),
+      secondary: z.array(z.string()),
+      weights: z.array(ChannelGenreWeightSchema),
+      videos: z.number().int().positive().nullable(),
+      computed_at: z.string().datetime({ offset: true }).nullable(),
+    })
+    .strict(),
+]);
+
 export const GenresDueSchema = z.union([
   z.object({ blocked: z.literal("genre_classification_off") }).passthrough(),
   z

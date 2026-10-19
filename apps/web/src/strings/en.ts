@@ -725,6 +725,8 @@ export const en: Strings = {
     platform_switch_set: "Platform switch changed",
     platform_switch: "Platform switch",
     platform_reader_promoted: "Platform reader set",
+    channel_genre_review_set: "Channel genre profile corrected",
+    channel_genre_review_clear: "Channel genre correction cleared",
     workspace_deleted: "Workspace deleted",
     workspace_retired: "Workspace closed",
     workspace_renamed: "Workspace renamed",

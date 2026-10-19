@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { GenrePredictionRecordSchema, GenresDueSchema } from "./genres";
+import {
+  ChannelGenreProfileSchema,
+  GenrePredictionRecordSchema,
+  GenresDueSchema,
+} from "./genres";
 
 describe("video genre contracts", () => {
   it("accepts the switched-off response", () => {
@@ -32,5 +36,29 @@ describe("video genre contracts", () => {
         genre_key: null,
       }).status,
     ).toBe("failed");
+  });
+
+  it("accepts blocked and empty channel profiles and rejects extra fields", () => {
+    expect(
+      ChannelGenreProfileSchema.parse({ blocked: "genre_classification_off" }),
+    ).toEqual({ blocked: "genre_classification_off" });
+    const emptyProfile = ChannelGenreProfileSchema.parse({
+      taxonomy_version: null,
+      classification_key: null,
+      source: null,
+      main: null,
+      primary: null,
+      secondary: [],
+      weights: [],
+      videos: null,
+      computed_at: null,
+    });
+    expect(emptyProfile).toHaveProperty("source", null);
+    expect(() =>
+      ChannelGenreProfileSchema.parse({
+        blocked: "genre_classification_off",
+        source: "model",
+      }),
+    ).toThrow();
   });
 });

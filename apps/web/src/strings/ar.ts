@@ -728,6 +728,8 @@ export const ar = {
     platform_switch_set: "عُدّل مفتاح تشغيل في المنصة",
     platform_switch: "مفتاح تشغيل المنصة",
     platform_reader_promoted: "عُيّن قارئ المنصة",
+    channel_genre_review_set: "صُحّح التصنيف النوعي للقناة",
+    channel_genre_review_clear: "أُزيل التصحيح النوعي للقناة",
     workspace_deleted: "حُذفت مساحة عمل",
     workspace_retired: "أُغلقت مساحة عمل",
     workspace_renamed: "أُعيدت تسمية مساحة عمل",
