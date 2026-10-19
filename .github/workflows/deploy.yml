@@ -74,6 +74,14 @@ jobs:
 
               jobs=$(gh api \
                 "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")
+              # The jobs list can lag the run: on 2026-10-18 (run 39123719963)
+              # a completed run still listed 'Dependency audit' with conclusion
+              # null and the gate failed a green commit. Wait for it instead.
+              if jq -e '[.jobs[] | select(.status != "completed")] | length > 0' \
+                <<<"$jobs" >/dev/null; then
+                sleep 10
+                continue
+              fi
               for job in "$@"; do
                 job_conclusion=$(jq -r --arg name "$job" \
                   '[.jobs[] | select(.name == $name)] | if length == 1 then .[0].conclusion else "missing" end' \
@@ -107,6 +115,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TARGET_SHA }}
+          # Full history: the edge function step compares the last main commit
+          # touching each function with what production runs.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Setup Node.js
@@ -178,6 +189,17 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: npm run db:migrate:remote
+
+      # Every function whose code on main is newer than production is deployed
+      # with the repository's pinned CLI, then each one's updated_at, status and
+      # verify_jwt are read back, and the job fails if any function is still
+      # older than main (ADR 0004). Before this, functions were deployed only by
+      # hand and the worker ran three days behind main (2026-10-19).
+      - name: Deploy changed edge functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: npm run functions:deploy
 
       - name: Deploy frontend to preview host via FTPS
         env:

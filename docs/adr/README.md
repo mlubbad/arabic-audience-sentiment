@@ -29,3 +29,4 @@ What gets easier, what gets harder, what we'll watch.
 | 0001 | Agent team operating model | proposed |
 | 0002 | Switchable CI runner (hosted by default, self-hosted on demand) | proposed |
 | 0003 | Hashed audience identities, kept 30 days, shown only above thresholds | proposed |
+| 0004 | Edge functions deploy from main, in the gated deploy job | proposed |

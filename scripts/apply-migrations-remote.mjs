@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { versionProblems } from "./check-migrations.mjs";
 
-function loadLocalEnv() {
+export function loadLocalEnv() {
   if (existsSync(".env.local")) {
     const envContent = readFileSync(".env.local", "utf8");
     for (const line of envContent.split("\n")) {

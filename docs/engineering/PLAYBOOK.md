@@ -7,7 +7,7 @@ gets fixed.
 ## 1. Roles
 | Role | Who | Responsible for | Never does |
 | --- | --- | --- | --- |
-| Owner | Mohammed | Product decisions, money, accounts, merging, production deploys/migrations, credential rotation | — |
+| Owner | Mohammed | Product decisions, money, accounts, merging (which deploys the app, migrations and edge functions, ADR 0004), credential rotation | — |
 | PM / architect / QA / DevOps / data lead | Claude | Roadmap; ADRs; work orders; reviews with independent verification; quality gates; CI/CD design; evaluation design; status board (#7); `docs/progress.md`, `docs/verification.md`, `docs/decisions.md` | Merge, touch production, spend money, contact anyone outside the repo |
 | Precision engineer | Codex | Small, high-stakes, fully specified work orders (security SQL, CI, auth, tricky fixes) | Broad exploration, large refactors, reading the long docs |
 | Volume engineer | Gemini | Refactors, test suites, UI, worker restructuring, investigations written up on the issue | Production credentials, merging |
