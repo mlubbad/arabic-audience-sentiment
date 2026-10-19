@@ -79,8 +79,8 @@ create unique index jobs_one_outstanding_genre_classify
 
 create function private.genres_pending(w uuid, c uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
-  with current_key as (
-    select private.genre_classification_key(max(version), 'gemini-3.6-flash', 'g1') as key
+  with current_taxonomy as (
+    select max(version) as version
       from public.genre_taxonomy_versions
   ), recent as (
     select v.id from public.videos v
@@ -89,11 +89,11 @@ language sql stable security definer set search_path = '' as $$
      limit 50
   )
   select exists (
-    select 1 from recent r, current_key k
+    select 1 from recent r, current_taxonomy t
      where not exists (
        select 1 from public.video_genre_predictions p
         where p.workspace_id = w and p.video_id = r.id
-          and p.classification_key = k.key
+          and p.classification_key like 'genres:v' || t.version::text || '+%'
           and p.status in ('succeeded','skipped','unsupported')
      )
   )

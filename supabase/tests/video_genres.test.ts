@@ -140,6 +140,38 @@ describe("video genre classification", () => {
     ).toBe(1);
   });
 
+  it("accepts a final prediction from another model as complete", async () => {
+    expect(
+      (
+        await db.query<{ pending: boolean }>(
+          "select private.genres_pending($1,$1) pending",
+          [A],
+        )
+      ).rows[0].pending,
+    ).toBe(true);
+    await db.query(
+      `insert into video_genre_predictions(
+         workspace_id,video_id,classification_key,taxonomy_version,status,genre_key,
+         confidence,model_id,prompt_version
+       )
+       select $1,id,'genres:v2+replacement-model+g2',2,'succeeded','sports_football',
+              0.8,'replacement-model','g2'
+         from videos where workspace_id=$1 and external_video_id='a-video-1'`,
+      [A],
+    );
+    const pending = (
+      await db.query<{ pending: boolean }>(
+        "select private.genres_pending($1,$1) pending",
+        [A],
+      )
+    ).rows[0].pending;
+    await db.query(
+      "delete from video_genre_predictions where workspace_id=$1",
+      [A],
+    );
+    expect(pending).toBe(false);
+  });
+
   it("schedules once per day while a recent titled video is pending", async () => {
     const scheduled = await db.query<{ result: { genre_classify: number } }>(
       "select private.schedule_due_work($1) result",
