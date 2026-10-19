@@ -323,6 +323,9 @@ describe("competitor scoring and tracking", () => {
     ]);
     await as(UA);
     await decide(A, CAND(5), "tracked");
+    // A dismissed candidate is not tracked either: its decision row must not
+    // count (PM review of #189: dropping `status='tracked'` survived).
+    await decide(A, CAND(6), "dismissed");
     await db.exec("reset role");
     const job = await lease();
     await db.exec("reset role");
