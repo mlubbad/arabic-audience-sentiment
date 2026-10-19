@@ -85,6 +85,9 @@ Case is inconsistent (some migrations use uppercase), so keep `-i`.
 
 ## 7. Environments
 - There is one Supabase project, and it is production. There is no staging project yet.
+- A merge to `main` deploys it all (`deploy.yml`): migrations, then every edge function older than
+  main (ADR 0004, `scripts/deploy-functions.mjs`), then the web app. Nobody deploys functions by
+  hand to keep up any more. Each function's `verify_jwt` is declared in `supabase/config.toml`.
 - `app.sky-develop.net` is the live site.
 - Tests never touch either: PGlite and Playwright fixtures only.
 
@@ -92,7 +95,7 @@ Case is inconsistent (some migrations use uppercase), so keep `-i`.
 - `docs/coordination/ACTIVE.md` and `docs/coordination/README.md`: the old multi-agent protocol.
 - `docs/agent-reports/*`.
 - `docs/implementation-plan.md` (M0 era).
-- `docs/deployment.md`: says there's no edge function and no worker, and that the site is password-protected. All false now.
+- `docs/deployment.md`: parts predate the edge functions and the worker, and it says the site is password-protected. Its "What is not part of this pipeline" section is current.
 - `docs/superpowers/plans/*`: write-once plans; the features shipped.
 - `docs/ONBOARDING.md` §2 test counts (from 2026-09-14).
 - `README.md` "Status" line.
