@@ -1,5 +1,13 @@
 # Implementation decisions
 
+2026-10-19 — A stopped Codex run is resumed, not reset. `CODEX_RESUME=1` makes the dispatcher keep
+the workspace's uncommitted work, provided the workspace is on the work-order branch and origin is
+not ahead of it. It then reruns Codex under the watcher, with the PM's answer as the extra prompt.
+The refusal message no longer offers `git reset --hard` as the only way on. Also: a new migration
+must sort after every merged one. The Deploy runner would still apply a lower version, but after
+the newer files, while PGlite applies them by name. `check-migrations --base` refuses it, and
+WO-22 moves to `20261116xxxxxx`.
+
 2026-10-18 — WO-22 (B-1, video genres) moves from Gemini to Codex. The owner delegated task and
 decision calls to the PM on 2026-10-18. Codex is free since WO-23 merged, and its dispatch path from
 the owner's Mac is scripted and documented, while WO-22 had not started with Gemini. B-2 and B-4

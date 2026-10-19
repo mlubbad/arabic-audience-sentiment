@@ -1,5 +1,15 @@
 # Verification
 
+## 2026-10-19 — Dispatcher resume; new migrations sort last
+
+| Command | Actual result |
+| --- | --- |
+| `npx vitest run scripts` (on `main` + this branch) | 13 files / 130 tests passed; `codex-dispatch.test.ts` 12 (5 new), `check-migrations.test.ts` 11 (1 new). |
+| `node scripts/check-migrations.mjs --base origin/main` | Passed: 147 files. |
+| A probe file `20261113500000_late_probe.sql` (deleted after) | Refused: "a new migration must have a version above 20261115000000". |
+
+Mutations, each reverted: the resume branch disabled gave 4 failures, and the origin-ahead check removed gave 1.
+
 ## 2026-10-18 — Migration version check
 
 | Command | Actual result |
