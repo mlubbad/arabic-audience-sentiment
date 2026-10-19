@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-10-19 — WO-22 and WO-24 merged
+
+- **WO-22 (#176) merged** (`cb42a65`) after 3 rounds. The owner updated the cloud worker to `cb42a65`. Genre classification stays behind its switch.
+- **WO-24 (#181) merged** (`514be46`) after 2 rounds:
+  - Round 1 had 2 bugs: the profile mixed classification keys, and `videos` was the largest genre's count, not the channel's. Secondary also listed Primary's children.
+  - Round 2 fixed all three, but again left most acceptance cases untested. The PM wrote them (`channel_genre_profile_acceptance.test.ts`, 10 tests, mutation-checked) and approved on that evidence. They land in their own PR because the PM does not push to an agent's branch.
+- **Next:** B-4, competitor scoring, needs a work order.
+
 ## 2026-10-19 — #178 merged; WO-22 round 3 needs the dispatcher to merge main
 
 - **#178 merged** (`49411d4`) with `20261116000000`, the version #176 (WO-22) also uses. The PM
