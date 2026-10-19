@@ -136,3 +136,45 @@ across workspaces internally and never expose one customer's data to another.
 - Endpoint list: `channelSections.list`, `search.list` and the wider `channels.list` parts were
   added.
 - Retention: channel profile text and daily statistics were added (WO-20, `20261105000000`).
+
+## 5. Follow-up: audience overlap (send before phase 3 is switched on)
+
+The 2026-10-19 submission declared viewer sentiment, our genre tags and channel benchmarking, but
+**not audience overlap** (paragraph C of `docs/2026-10-18-youtube-derived-metrics-application.md`
+was left out). YouTube's base Developer Policies forbid "estimating audience affinities", so
+overlap needs its own written request and acceptance. ADR-0003 §7 keeps phases A-1 and A-2 behind
+`private.platform_switches('audience_overlap')`, off until then.
+
+**How to send it (the owner):** reply on the email thread Google opened for the 2026-10-19
+submission, so it attaches to the same application. If there is no thread yet, wait for Google's
+first reply and add this to your answer. Don't open a second application.
+
+> Subject: Additional use case for our Derived Metrics application (Arabic Audience Sentiment, app.sky-develop.net)
+>
+> Hello,
+>
+> We would like to add one use case to the Derived Metrics application we submitted on
+> 19 October 2026. We are writing before building anything visible to customers, so you can tell us
+> if it is not allowed.
+>
+> 4. Engaged-audience overlap: for two channels inside the same customer workspace, the number and
+> share of distinct commenters who commented on both within a rolling 30-day window.
+> - It is computed from keyed one-way hashes (HMAC-SHA256 with a secret key kept in our database
+>   vault) of public commenter channel ids. The hashes are deleted on the same 30-day cycle as
+>   comment text and author ids.
+> - Only aggregate counts and ratios are stored and shown, and only when at least 100 commenters
+>   and 10 shared commenters are present. Below that the product says "not enough data".
+> - No individual commenter is ever shown, listed, exported, profiled or followed across channels.
+>   No protected attribute is inferred.
+> - Overlap is never computed across customers or across platforms.
+> - The aggregate figures are labelled as our own derived metric. We ask to keep them for up to
+>   36 months, like the other derived metrics.
+>
+> The feature stays switched off until you confirm that this use case is acceptable.
+>
+> Thank you,
+> [Owner name], Sky Develop
+
+**After a reply:** record the decision and its scope in `docs/decisions.md`. Turn the switch on
+only for what was accepted, in a reviewed PR. A refusal ends phase 3 as designed; the roadmap then
+falls back to phase 4's per-channel interests, which need no cross-channel identity.
