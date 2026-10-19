@@ -945,7 +945,7 @@ alter table "public"."competitor_decisions" add constraint "competitor_decisions
 alter table "public"."competitor_decisions" add constraint "competitor_decisions_decided_by_fkey" FOREIGN KEY (decided_by) REFERENCES auth.users(id) ON DELETE SET NULL;
 alter table "public"."competitor_decisions" add constraint "competitor_decisions_pkey" PRIMARY KEY (workspace_id, channel_id, platform, candidate_external_id);
 alter table "public"."competitor_decisions" add constraint "competitor_decisions_platform_not_null" NOT NULL platform;
-alter table "public"."competitor_decisions" add constraint "competitor_decisions_status_check" CHECK (status = ANY (ARRAY['tracked'::text, 'dismissed'::text, 'clear'::text]));
+alter table "public"."competitor_decisions" add constraint "competitor_decisions_status_check" CHECK (status = ANY (ARRAY['tracked'::text, 'dismissed'::text]));
 alter table "public"."competitor_decisions" add constraint "competitor_decisions_status_not_null" NOT NULL status;
 alter table "public"."competitor_decisions" add constraint "competitor_decisions_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
 alter table "public"."competitor_decisions" add constraint "competitor_decisions_workspace_id_not_null" NOT NULL workspace_id;

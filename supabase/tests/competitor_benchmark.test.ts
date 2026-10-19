@@ -145,9 +145,16 @@ describe("competitor_benchmark", () => {
       [A],
     );
     await db.query(
-      "insert into competitor_decisions(workspace_id,channel_id,candidate_external_id,status) values ($1,$1,'UC0000000000000000000004','clear'),($1,$1,'UC0000000000000000000005','tracked')",
+      "insert into competitor_decisions(workspace_id,channel_id,candidate_external_id,status) values ($1,$1,'UC0000000000000000000004','tracked'),($1,$1,'UC0000000000000000000005','tracked')",
       [A],
     );
+    // A clear deletes the decision row; it is never stored as a status.
+    await as("10000000-0000-4000-8000-0000000000a1");
+    await db.query(
+      "select competitor_decide($1,'UC0000000000000000000004','clear')",
+      [A],
+    );
+    await db.exec("reset role");
     await db.query(
       "insert into competitor_stats_daily(workspace_id,channel_id,candidate_external_id,day,subscriber_count,view_count,video_count,observed_at) values ($1,$1,'UC0000000000000000000001',current_date-40,999,999,99,now())",
       [A],
