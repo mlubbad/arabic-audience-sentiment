@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   session: { current: true },
@@ -132,11 +132,13 @@ function renderPage() {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/competitors"]}>
         <CompetitorsPage />
-        <ToastHost />
       </MemoryRouter>
+      {/* Outside the router, as in main.tsx. */}
+      <ToastHost />
     </QueryClientProvider>,
   );
 }
+afterEach(cleanup);
 beforeEach(() => {
   mocks.session.current = true;
   mocks.role.value = "analyst";
@@ -178,7 +180,7 @@ describe("CompetitorsPage", () => {
     expect(screen.getByText(/unlimited/)).toBeInTheDocument();
     expect(screen.getByText("Candidate")).toBeInTheDocument();
   });
-  it("shows a linked limit toast and leaves a candidate untracked", async () => {
+  it("shows the plan limit with a pricing link and leaves a candidate untracked", async () => {
     mocks.tracked = 3;
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "Track" }));

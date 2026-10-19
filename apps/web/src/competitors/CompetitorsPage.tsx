@@ -41,6 +41,8 @@ export function CompetitorsPage() {
   const lookup = useChannelLookup(ws, lookupInput);
   const adding = addCandidate.isPending;
   const [addError, setAddError] = useState<string | null>(null);
+  // Inline, not in the toast: ToastHost renders outside the router.
+  const [limitHit, setLimitHit] = useState(false);
   useEffect(() => {
     if (lookup.data) setResolved(lookup.data);
   }, [lookup.data]);
@@ -152,6 +154,12 @@ export function CompetitorsPage() {
                 label={S.compTracked}
                 sentence={`${S.compTracked}: ${data.tracked_count} ${S.compOf} ${data.limit == null ? S.compUnlimited : data.limit}`}
               />
+              {limitHit && data.limit != null && (
+                <p role="alert">
+                  {S.compLimitLead(data.limit)}{" "}
+                  <Link to="/pricing">{S.compSeePlans}</Link>
+                </p>
+              )}
             </section>
             <section>
               <h2>{S.compSuggestions}</h2>
@@ -195,22 +203,15 @@ export function CompetitorsPage() {
                       query.decide(
                         { id: x.external_id, decision },
                         {
-                          onError: (e) =>
+                          onError: (e) => {
+                            const limit =
+                              e.message === "competitor_limit_reached";
+                            setLimitHit(limit);
                             toast({
-                              title:
-                                e.message === "competitor_limit_reached"
-                                  ? S.compLimitError
-                                  : S.compError,
-                              description:
-                                e.message === "competitor_limit_reached" ? (
-                                  <>
-                                    {S.compLimitLead(data.limit ?? 0)}{" "}
-                                    <Link to="/pricing">{S.compSeePlans}</Link>
-                                  </>
-                                ) : (
-                                  e.message
-                                ),
-                            }),
+                              title: limit ? S.compLimitError : S.compError,
+                              description: limit ? undefined : e.message,
+                            });
+                          },
                         },
                       )
                     }
