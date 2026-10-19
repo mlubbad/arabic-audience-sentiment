@@ -121,12 +121,141 @@ describe("competitor_benchmark", () => {
     await expect(
       db.query("select competitor_benchmark($1,6)", [A]),
     ).rejects.toThrow("invalid_input");
-    await db.exec("reset role");
-    await expect(
-      db.query("select competitor_benchmark($1,6)", [A]),
-    ).rejects.toThrow("invalid_input");
     await expect(
       db.query("select competitor_benchmark($1,30)", [B]),
     ).rejects.toThrow("forbidden");
+  });
+  it("bounds the date window and returns only tracked candidates for this channel", async () => {
+    await db.exec("reset role");
+    const otherChannel = "00000000-0000-4000-8000-0000000000a4";
+    await db.query(
+      "insert into channels(id,workspace_id,client_id,external_channel_id,status,platform,title) values ($1,$2,$2,'UCA4','connected','youtube','Other workspace channel')",
+      [otherChannel, A],
+    );
+    await db.query(
+      "insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,source,title) values ($1,$2,'UC0000000000000000000009','manual','Other channel')",
+      [A, otherChannel],
+    );
+    await db.query(
+      "insert into competitor_decisions(workspace_id,channel_id,candidate_external_id,status) values ($1,$2,'UC0000000000000000000009','tracked')",
+      [A, otherChannel],
+    );
+    await db.query(
+      "insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,source,title) values ($1,$1,'UC0000000000000000000003','manual','No decision'),($1,$1,'UC0000000000000000000004','manual','Clear'),($1,$1,'UC0000000000000000000005','manual','No stats')",
+      [A],
+    );
+    await db.query(
+      "insert into competitor_decisions(workspace_id,channel_id,candidate_external_id,status) values ($1,$1,'UC0000000000000000000004','clear'),($1,$1,'UC0000000000000000000005','tracked')",
+      [A],
+    );
+    await db.query(
+      "insert into competitor_stats_daily(workspace_id,channel_id,candidate_external_id,day,subscriber_count,view_count,video_count,observed_at) values ($1,$1,'UC0000000000000000000001',current_date-40,999,999,99,now())",
+      [A],
+    );
+    await as("10000000-0000-4000-8000-0000000000a1");
+    const { rows } = await db.query<{
+      b: {
+        series: {
+          external_id: string;
+          points: unknown[];
+          kpis: Record<string, number | null>;
+        }[];
+      };
+    }>("select competitor_benchmark($1,30) b", [A]);
+    expect(rows[0]!.b.series.map((s) => s.external_id)).toEqual([
+      "UCA",
+      "UC0000000000000000000001",
+      "UC0000000000000000000005",
+    ]);
+    expect(rows[0]!.b.series[1]!.points).toHaveLength(1);
+    expect(rows[0]!.b.series[2]).toMatchObject({
+      points: [],
+      kpis: {
+        subscribers: null,
+        views: null,
+        subscribers_change: null,
+        views_change: null,
+        videos_per_week: null,
+        views_per_video: null,
+      },
+    });
+  });
+  it("keeps an own channel without stats first and orders competitors by latest subscribers", async () => {
+    await db.exec("reset role");
+    const own2 = "00000000-0000-4000-8000-0000000000a2";
+    await db.query(
+      "insert into channels(id,workspace_id,client_id,external_channel_id,status,platform,title) values ($1,$2,$2,'UCA2','connected','youtube','Own no stats')",
+      [own2, A],
+    );
+    await db.query(
+      "insert into competitor_candidates(workspace_id,channel_id,candidate_external_id,source,title) values ($1,$2,'UC0000000000000000000006','manual','Low'),($1,$2,'UC0000000000000000000007','manual','High'),($1,$2,'UC0000000000000000000008','manual','Null')",
+      [A, own2],
+    );
+    await db.query(
+      "insert into competitor_decisions(workspace_id,channel_id,candidate_external_id,status) values ($1,$2,'UC0000000000000000000006','tracked'),($1,$2,'UC0000000000000000000007','tracked'),($1,$2,'UC0000000000000000000008','tracked')",
+      [A, own2],
+    );
+    await db.query(
+      "insert into competitor_stats_daily(workspace_id,channel_id,candidate_external_id,day,subscriber_count,view_count,video_count,observed_at) values ($1,$2,'UC0000000000000000000006',current_date,50,1,1,now()),($1,$2,'UC0000000000000000000007',current_date,500,1,1,now()),($1,$2,'UC0000000000000000000008',current_date,null,1,1,now())",
+      [A, own2],
+    );
+    await as("10000000-0000-4000-8000-0000000000a1");
+    const { rows } = await db.query<{
+      b: {
+        series: {
+          external_id: string;
+          points: unknown[];
+          kpis: Record<string, number | null>;
+        }[];
+      };
+    }>("select competitor_benchmark($1,30) b", [own2]);
+    expect(rows[0]!.b.series.map((s) => s.external_id)).toEqual([
+      "UCA2",
+      "UC0000000000000000000007",
+      "UC0000000000000000000006",
+      "UC0000000000000000000008",
+    ]);
+    expect(rows[0]!.b.series[0]).toMatchObject({
+      points: [],
+      kpis: {
+        subscribers: null,
+        views: null,
+        subscribers_change: null,
+        views_change: null,
+        videos_per_week: null,
+        views_per_video: null,
+      },
+    });
+  });
+  it("computes changes across three days but leaves videos per week unknown", async () => {
+    await db.exec("reset role");
+    const own3 = "00000000-0000-4000-8000-0000000000a3";
+    await db.query(
+      "insert into channels(id,workspace_id,client_id,external_channel_id,status,platform,title) values ($1,$2,$2,'UCA3','connected','youtube','Own three days')",
+      [own3, A],
+    );
+    await db.query(
+      "insert into channel_stats_daily(workspace_id,channel_id,day,subscriber_count,view_count,video_count,observed_at) values ($1,$2,current_date-3,10,20,4,now()),($1,$2,current_date,15,35,5,now())",
+      [A, own3],
+    );
+    await as("10000000-0000-4000-8000-0000000000a1");
+    const { rows } = await db.query<{
+      b: { series: { kpis: Record<string, number | null> }[] };
+    }>("select competitor_benchmark($1,30) b", [own3]);
+    expect(rows[0]!.b.series[0]!.kpis).toMatchObject({
+      subscribers_change: 5,
+      views_change: 15,
+      videos_per_week: null,
+    });
+  });
+  it("allows workspace viewers and denies anon execution", async () => {
+    await as("10000000-0000-4000-8000-0000000000c1");
+    await expect(
+      db.query("select competitor_benchmark($1,30)", [A]),
+    ).resolves.toBeTruthy();
+    await db.exec("reset role; set role anon");
+    await expect(
+      db.query("select competitor_benchmark($1,30)", [A]),
+    ).rejects.toThrow(/permission denied/i);
   });
 });

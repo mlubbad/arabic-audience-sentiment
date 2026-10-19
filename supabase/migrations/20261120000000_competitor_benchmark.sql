@@ -1,3 +1,6 @@
+ALTER TABLE public.competitor_decisions DROP CONSTRAINT competitor_decisions_status_check;
+ALTER TABLE public.competitor_decisions ADD CONSTRAINT competitor_decisions_status_check CHECK(status IN ('tracked','dismissed','clear'));
+
 CREATE OR REPLACE FUNCTION public.competitor_benchmark(p_channel uuid,p_days integer DEFAULT 30) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
 DECLARE ch public.channels; result jsonb;

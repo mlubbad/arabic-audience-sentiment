@@ -43,6 +43,12 @@ export function benchmarkChartData(
     })),
   };
 }
+export function formatKpi(key: string, value: number | null): string {
+  if (value == null) return "—";
+  if (key === "videos_per_week") return n(Number(value.toFixed(1)));
+  if (key === "views_per_video") return n(Math.round(value));
+  return n(value);
+}
 export function Benchmark({
   channel,
   tracked,
@@ -148,13 +154,7 @@ export function Benchmark({
                         : undefined
                     }
                   >
-                    {s.kpis[c.key] == null
-                      ? "—"
-                      : c.key === "videos_per_week"
-                        ? n(Number(s.kpis[c.key]!.toFixed(1)))
-                        : c.key === "views_per_video"
-                          ? n(Math.round(s.kpis[c.key]!))
-                          : n(s.kpis[c.key]!)}
+                    {formatKpi(c.key, s.kpis[c.key])}
                   </td>
                 ))}
               </tr>
@@ -170,7 +170,21 @@ export function Benchmark({
               {cols.map((c) => (
                 <div key={c.key}>
                   <dt>{c.title}</dt>
-                  <dd>{s.kpis[c.key] == null ? "—" : n(s.kpis[c.key]!)}</dd>
+                  <dd
+                    title={
+                      s.kpis[c.key] == null
+                        ? c.key.endsWith("_per_week")
+                          ? S.compLessWeek
+                          : c.key.endsWith("_per_video")
+                            ? S.compNoVideos
+                            : c.key.endsWith("_change")
+                              ? S.compNeedsTwoDays
+                              : S.compNoStats
+                        : undefined
+                    }
+                  >
+                    {formatKpi(c.key, s.kpis[c.key])}
+                  </dd>
                 </div>
               ))}
             </dl>
