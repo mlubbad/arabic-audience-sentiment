@@ -9,6 +9,10 @@ import { SelectItem } from "../ui/Select";
 import { Button } from "../ui/Button";
 import { BudgetMeter } from "../ui/BudgetMeter";
 import { CandidateCard } from "./CandidateCard";
+import { Benchmark } from "./Benchmark";
+import { n } from "../dashboard/format";
+import { displayDate } from "../i18n";
+import { useLocale } from "../locale";
 import { AddCompetitor } from "./AddCompetitor";
 import {
   useAddCompetitorCandidate,
@@ -20,6 +24,7 @@ import {
 import "./competitors.css";
 
 export function CompetitorsPage() {
+  const lang = useLocale();
   const S = useStrings(),
     { session } = useSession(),
     { workspaces } = useWorkspaces(session);
@@ -138,10 +143,10 @@ export function CompetitorsPage() {
                 {S.compFromYoutube}: {S.compSubscribers}{" "}
                 {data.channel.subscriber_count == null
                   ? "—"
-                  : data.channel.subscriber_count}
+                  : n(data.channel.subscriber_count)}
               </p>
               {data.channel.profile_observed_at && (
-                <p>{data.channel.profile_observed_at}</p>
+                <p>{displayDate(data.channel.profile_observed_at, lang)}</p>
               )}
               <BudgetMeter
                 used={data.tracked_count}
@@ -219,6 +224,15 @@ export function CompetitorsPage() {
                 ))
               )}
             </section>
+            <Benchmark
+              channel={channel!}
+              tracked={
+                data.candidates.filter(
+                  (candidate) => candidate.status === "tracked",
+                ).length
+              }
+              S={S}
+            />
           </>
         )
       )}

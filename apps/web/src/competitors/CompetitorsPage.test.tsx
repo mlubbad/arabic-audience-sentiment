@@ -69,6 +69,7 @@ vi.mock("../session", () => ({
   useWorkspaces: () => ({ workspaces: [{ id: "workspace1" }] }),
 }));
 vi.mock("../strings", () => ({
+  stringsFor: () => ({ labels: {} }),
   useStrings: () => ({
     titleCompetitors: "Competitors",
     compDemo: "Sign in and connect a channel to see competitors",
