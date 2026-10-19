@@ -27,3 +27,4 @@ not edit them.
 | [WO-22.md](WO-22.md) | #164 | Codex (from Gemini, 2026-10-18) |
 | [WO-23.md](WO-23.md) | #165 | Codex |
 | [WO-24.md](WO-24.md) | #175 | Codex (after WO-22 merges) |
+| [WO-25.md](WO-25.md) | #182 | Codex |
