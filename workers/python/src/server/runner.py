@@ -11,6 +11,8 @@ import time
 from collectors.protocol import Batch, CollectionError
 from topics.analysis import classify
 from topics.protocol import TopicError
+from genres.analysis import classify as classify_genres
+from genres.protocol import GenreError
 
 from .analysis import AnalysisError, analyse
 from .gateway import ControlPlane, ControlPlaneError, LeaseLost
@@ -595,7 +597,59 @@ def run_topics(control: ControlPlane, lease: dict, classifier) -> bool:
     return True
 
 
-def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=None) -> bool:
+def _genre_batch_key(lease: dict, records: list[dict]) -> str:
+    ids = ",".join(sorted(record["external_video_id"] for record in records))
+    return hashlib.sha256(f"{lease['lease_token']}:{ids}".encode()).hexdigest()[:32]
+
+
+def run_genres(control: ControlPlane, lease: dict, classifier) -> bool:
+    if classifier is None:
+        control.finish(lease, "blocked", "no_genre_classifier")
+        return True
+    try:
+        due = control.genres_due(lease, classifier.model_id, classifier.prompt_version)
+        blocked = due.get("blocked")
+        if isinstance(blocked, str) and blocked:
+            control.finish(lease, "blocked", blocked)
+            return True
+        rows = [row for row in due.get("rows") or [] if isinstance(row, dict)]
+        if not rows:
+            control.finish(lease, "exhausted")
+            return True
+        control.heartbeat(lease)
+        records = classify_genres(
+            classifier, due.get("taxonomy") or [], due["classification_key"],
+            due["taxonomy_version"], rows,
+        )
+        first_failure = next(
+            (record["error_code"] or "classification_failed"
+             for record in records if record["status"] == "failed"), None
+        )
+        try:
+            control.commit_genres(lease, _genre_batch_key(lease, records), records)
+        except ControlPlaneError as exc:
+            control.finish(lease, "partial", exc.code)
+            return True
+        if first_failure in ("gemini_credits_depleted", "invalid_credentials"):
+            control.finish(lease, "blocked", first_failure)
+        elif first_failure:
+            control.finish(lease, "partial", first_failure)
+        else:
+            control.finish(lease, "exhausted")
+    except LeaseLost:
+        raise
+    except GenreError as exc:
+        outcome = "blocked" if exc.code in ("gemini_credits_depleted", "invalid_credentials") else "partial"
+        control.finish(lease, outcome, exc.code)
+    except ControlPlaneError as exc:
+        if exc.retryable:
+            raise
+        control.finish(lease, "blocked", exc.code)
+    return True
+
+
+def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=None,
+            genre_classifier=None) -> bool:
     """Claim whatever is next and run it by its type. False means no work.
 
     The claim is consumed here; the lease is handed down rather than claiming
@@ -605,7 +659,11 @@ def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=No
     # without a topic classifier claiming unscoped would take a topics job,
     # hold its lease, and finish it blocked — five minutes the queue waited
     # for nothing. Scope the claim to what can actually be dispatched.
-    job_types = None if classifier is not None else ["collect", "discover", "import"]
+    job_types = ["collect", "discover", "import"]
+    if classifier is not None:
+        job_types.append("analyse")
+    if genre_classifier is not None:
+        job_types.append("genre_classify")
     lease = control.claim(job_types)
     if lease is None:
         return False
@@ -613,4 +671,6 @@ def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=No
         return _discover(control, lease, build_collector)
     if lease.get("type") == "analyse":
         return run_topics(control, lease, classifier)
+    if lease.get("type") == "genre_classify":
+        return run_genres(control, lease, genre_classifier)
     return _backfill(control, lease, build_collector, analyzer)

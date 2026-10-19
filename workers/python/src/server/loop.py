@@ -209,6 +209,7 @@ def serve(
     build,
     analyzer=None,
     classifier=None,
+    genre_classifier=None,
     idle_seconds: float = 60.0,
     max_idle: int = 30,
     run=run_job,
@@ -232,7 +233,10 @@ def serve(
         control = queue[turn % len(queue)]
         turn += 1
         try:
-            worked = run(control, build, analyzer=analyzer, classifier=classifier)
+            kwargs = {"analyzer": analyzer, "classifier": classifier}
+            if genre_classifier is not None:
+                kwargs["genre_classifier"] = genre_classifier
+            worked = run(control, build, **kwargs)
         except LeaseLost:
             # Another worker owns this job. Not an error: take the next one.
             _log("lease lost, another worker has it")
@@ -324,6 +328,12 @@ def main() -> None:
         help="topic classifier; gemini needs GEMINI_API_KEY, typesafe needs TYPESAFE_API_KEY",
     )
     p.add_argument(
+        "--genres",
+        default=os.environ.get("GENRE_MODEL", "gemini" if os.environ.get("GEMINI_API_KEY") else "none"),
+        choices=["none", "gemini"],
+        help="video genre classifier; gemini needs GEMINI_API_KEY",
+    )
+    p.add_argument(
         "--idle-seconds",
         type=float,
         default=float(os.environ.get("WORKER_IDLE_SECONDS", "60.0")),
@@ -376,6 +386,16 @@ def main() -> None:
         from topics.deterministic import DeterministicTestClassifier
 
         classifier = DeterministicTestClassifier()
+
+    genre_classifier = None
+    if args.genres == "gemini":
+        from genres.gemini import GeminiGenreClassifier
+
+        key = os.environ.get("GEMINI_API_KEY", "")
+        if not key:
+            raise SystemExit("--genres gemini needs GEMINI_API_KEY")
+        genre_classifier = GeminiGenreClassifier(key, client)
+        _log(f"genre classifier: {genre_classifier.model_id}")
 
     credentials = [c.strip() for c in args.credential.split(",") if c.strip()]
     controls = [ControlPlane(args.base, c, client) for c in credentials]
@@ -440,7 +460,7 @@ def main() -> None:
     telegram_auth = bool(telegram_api_id and telegram_session_string)
     _log(
         f"worker up, model={args.model}, tenants={len(controls)}, "
-        f"topics={args.topics}, public={'yes' if api_key else 'no'}, "
+        f"topics={args.topics}, genres={args.genres}, public={'yes' if api_key else 'no'}, "
         f"scrapers={'yes' if has_scrapers else 'no'}, "
         f"telegram_auth={'yes' if telegram_auth else 'no'}"
     )
@@ -449,6 +469,7 @@ def main() -> None:
         build,
         analyzer=analyzer,
         classifier=classifier,
+        genre_classifier=genre_classifier,
         idle_seconds=args.idle_seconds,
         max_idle=args.max_idle,
     )

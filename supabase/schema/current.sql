@@ -411,6 +411,20 @@ alter table "private"."platform_reader" add constraint "platform_reader_status_n
 CREATE UNIQUE INDEX one_active_platform_reader ON private.platform_reader USING btree ((1)) WHERE (status = 'active'::text);
 CREATE UNIQUE INDEX platform_reader_pkey ON private.platform_reader USING btree (id);
 
+create table "private"."platform_switches" (
+  "key" text not null,
+  "enabled" boolean default false not null,
+  "updated_at" timestamp with time zone default now() not null,
+  "updated_by" uuid
+);
+
+alter table "private"."platform_switches" add constraint "platform_switches_enabled_not_null" NOT NULL enabled;
+alter table "private"."platform_switches" add constraint "platform_switches_key_not_null" NOT NULL key;
+alter table "private"."platform_switches" add constraint "platform_switches_pkey" PRIMARY KEY (key);
+alter table "private"."platform_switches" add constraint "platform_switches_updated_at_not_null" NOT NULL updated_at;
+
+CREATE UNIQUE INDEX platform_switches_pkey ON private.platform_switches USING btree (key);
+
 create table "private"."user_profiles" (
   "user_id" uuid not null,
   "display_name" text,
@@ -958,7 +972,7 @@ alter table "public"."jobs" add constraint "jobs_reclaims_check" CHECK (reclaims
 alter table "public"."jobs" add constraint "jobs_reclaims_not_null" NOT NULL reclaims;
 alter table "public"."jobs" add constraint "jobs_status_check" CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'succeeded'::text, 'partial'::text, 'failed'::text, 'blocked'::text, 'cancelled'::text]));
 alter table "public"."jobs" add constraint "jobs_status_not_null" NOT NULL status;
-alter table "public"."jobs" add constraint "jobs_type_check" CHECK (type = ANY (ARRAY['discover'::text, 'collect'::text, 'analyse'::text, 'import'::text, 'export'::text]));
+alter table "public"."jobs" add constraint "jobs_type_check" CHECK (type = ANY (ARRAY['discover'::text, 'collect'::text, 'analyse'::text, 'genre_classify'::text, 'import'::text, 'export'::text]));
 alter table "public"."jobs" add constraint "jobs_type_not_null" NOT NULL type;
 alter table "public"."jobs" add constraint "jobs_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id);
 alter table "public"."jobs" add constraint "jobs_workspace_id_dedupe_key_key" UNIQUE (workspace_id, dedupe_key);
@@ -968,6 +982,7 @@ alter table "public"."jobs" add constraint "jobs_workspace_id_not_null" NOT NULL
 CREATE INDEX jobs_claim ON public.jobs USING btree (status, not_before);
 CREATE UNIQUE INDEX jobs_one_outstanding_collect ON public.jobs USING btree (workspace_id, channel_id) WHERE ((type = 'collect'::text) AND (status = ANY (ARRAY['queued'::text, 'running'::text])));
 CREATE UNIQUE INDEX jobs_one_outstanding_discover ON public.jobs USING btree (workspace_id, channel_id) WHERE ((type = 'discover'::text) AND (status = ANY (ARRAY['queued'::text, 'running'::text])));
+CREATE UNIQUE INDEX jobs_one_outstanding_genre_classify ON public.jobs USING btree (workspace_id, channel_id) WHERE ((type = 'genre_classify'::text) AND (status = ANY (ARRAY['queued'::text, 'running'::text])));
 CREATE UNIQUE INDEX jobs_pkey ON public.jobs USING btree (id);
 CREATE INDEX jobs_running_fair_idx ON public.jobs USING btree (workspace_id, status, lease_expires_at) WHERE (status = 'running'::text);
 CREATE UNIQUE INDEX jobs_workspace_id_dedupe_key_key ON public.jobs USING btree (workspace_id, dedupe_key);
@@ -1287,6 +1302,42 @@ alter table "public"."usage_grants" add constraint "usage_grants_workspace_id_no
 CREATE INDEX usage_grants_live ON public.usage_grants USING btree (workspace_id, kind, expires_at);
 CREATE UNIQUE INDEX usage_grants_pkey ON public.usage_grants USING btree (id);
 CREATE UNIQUE INDEX usage_grants_source_provider_ref_key ON public.usage_grants USING btree (source, provider_ref);
+
+create table "public"."video_genre_predictions" (
+  "id" uuid default gen_random_uuid() not null,
+  "workspace_id" uuid not null,
+  "video_id" uuid not null,
+  "classification_key" text not null,
+  "taxonomy_version" integer not null,
+  "status" text not null,
+  "genre_key" text,
+  "confidence" numeric(4,3),
+  "model_id" text not null,
+  "prompt_version" text not null,
+  "error_code" text,
+  "predicted_at" timestamp with time zone default now() not null
+);
+alter table "public"."video_genre_predictions" enable row level security;
+
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_check" CHECK ((status = 'succeeded'::text) = (genre_key IS NOT NULL));
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_classification_key_not_null" NOT NULL classification_key;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_confidence_check" CHECK (confidence IS NULL OR confidence >= 0::numeric AND confidence <= 1::numeric);
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_id_not_null" NOT NULL id;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_model_id_not_null" NOT NULL model_id;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_pkey" PRIMARY KEY (id);
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_predicted_at_not_null" NOT NULL predicted_at;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_prompt_version_not_null" NOT NULL prompt_version;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_status_check" CHECK (status = ANY (ARRAY['succeeded'::text, 'skipped'::text, 'failed'::text, 'unsupported'::text]));
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_status_not_null" NOT NULL status;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_taxonomy_version_genre_key_fkey" FOREIGN KEY (taxonomy_version, genre_key) REFERENCES genre_taxonomy(version, key);
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_taxonomy_version_not_null" NOT NULL taxonomy_version;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_video_id_not_null" NOT NULL video_id;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_workspace_id_not_null" NOT NULL workspace_id;
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_workspace_id_video_id_classificatio_key" UNIQUE (workspace_id, video_id, classification_key);
+alter table "public"."video_genre_predictions" add constraint "video_genre_predictions_workspace_id_video_id_fkey" FOREIGN KEY (workspace_id, video_id) REFERENCES videos(workspace_id, id);
+
+CREATE UNIQUE INDEX video_genre_predictions_pkey ON public.video_genre_predictions USING btree (id);
+CREATE UNIQUE INDEX video_genre_predictions_workspace_id_video_id_classificatio_key ON public.video_genre_predictions USING btree (workspace_id, video_id, classification_key);
 
 create table "public"."video_selections" (
   "workspace_id" uuid not null,
@@ -3847,6 +3898,41 @@ declare j uuid; gap int; begin
   return j;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.genre_classification_key(taxonomy_version integer, model_id text, prompt_version text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select 'genres:v' || taxonomy_version || '+' || model_id || '+' || prompt_version
+$function$
+
+CREATE OR REPLACE FUNCTION private.genres_pending(w uuid, c uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  with current_key as (
+    select private.genre_classification_key(max(version), 'gemini-3.6-flash', 'g1') as key
+      from public.genre_taxonomy_versions
+  ), recent as (
+    select v.id from public.videos v
+     where v.workspace_id = w and v.channel_id = c and length(trim(v.title)) > 0
+     order by v.published_at desc nulls last, v.id
+     limit 50
+  )
+  select exists (
+    select 1 from recent r, current_key k
+     where not exists (
+       select 1 from public.video_genre_predictions p
+        where p.workspace_id = w and p.video_id = r.id
+          and p.classification_key = k.key
+          and p.status in ('succeeded','skipped','unsupported')
+     )
+  )
+$function$
+
 CREATE OR REPLACE FUNCTION private.grant_default_plan(w uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -5318,30 +5404,33 @@ CREATE OR REPLACE FUNCTION private.schedule_due_work(w uuid)
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare ch record; d int := 0; k int := 0; a int := 0; cat int; begin
-  -- Automatically unblock any blocked jobs whose wait duration elapsed
+declare ch record; d int := 0; k int := 0; a int := 0; g int := 0; cat int;
+        genres_enabled boolean := private.switch_on('genre_classification'); begin
   perform private.unblock_due_jobs();
-
   cat := coalesce(private.plan_limit(w, 'catalogue_interval'), 1440);
   for ch in select id, catalogued_at from public.channels
              where workspace_id = w and status in ('connected', 'public_unverified')
                and paused_at is null loop
-    if ch.catalogued_at is null
-       or ch.catalogued_at < now() - make_interval(mins => cat) then
+    if ch.catalogued_at is null or ch.catalogued_at < now() - make_interval(mins => cat) then
       if private.enqueue_scheduled(w, ch.id, 'discover') is not null then d := d + 1; end if;
     end if;
-
     perform private.auto_select_videos(w, ch.id);
-
     if private.has_due_videos(w, ch.id) then
       if private.enqueue_scheduled(w, ch.id, 'collect') is not null then k := k + 1; end if;
     end if;
-
     if private.topics_pending(w, ch.id) then
       if private.enqueue_scheduled(w, ch.id, 'analyse') is not null then a := a + 1; end if;
     end if;
+    if genres_enabled and private.genres_pending(w, ch.id)
+       and not exists (select 1 from public.jobs j where j.workspace_id = w
+                        and j.channel_id = ch.id and j.type = 'genre_classify'
+                        and j.created_at > now() - interval '24 hours') then
+      if private.enqueue_scheduled(w, ch.id, 'genre_classify') is not null then g := g + 1; end if;
+    end if;
   end loop;
-
+  if genres_enabled then
+    return jsonb_build_object('discover', d, 'collect', k, 'analyse', a, 'genre_classify', g);
+  end if;
   return jsonb_build_object('discover', d, 'collect', k, 'analyse', a);
 end $function$
 
@@ -5578,6 +5667,15 @@ CREATE OR REPLACE FUNCTION private.subscription_open(s subscriptions)
 AS $function$
   select (s.status = 'active'   and now() >= s.period_start and now() < s.period_end)
       or (s.status = 'past_due' and now() < s.period_end + interval '7 days')
+$function$
+
+CREATE OR REPLACE FUNCTION private.switch_on(p_key text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select coalesce((select s.enabled from private.platform_switches s where s.key = p_key), false)
 $function$
 
 CREATE OR REPLACE FUNCTION private.sync_purge_marker()
@@ -6208,6 +6306,88 @@ BEGIN
 END
 $function$
 
+CREATE OR REPLACE FUNCTION private.worker_commit_genres(token_hash text, j uuid, t uuid, b text, records jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare w uuid; c uuid; kind text; current_version int; hash text; prior text; n int;
+begin
+  w := private.worker_job(token_hash, j, t);
+  select channel_id, type into c, kind from public.jobs where id = j;
+  if kind <> 'genre_classify' then raise exception 'invalid_job_type' using errcode = '22023'; end if;
+  if b is null or length(b) not between 1 and 200 or records is null
+     or jsonb_typeof(records) <> 'array' then
+    raise exception 'invalid_batch' using errcode = '22023';
+  end if;
+  if jsonb_array_length(records) > 50 then raise exception 'batch_too_large' using errcode = '22023'; end if;
+  select max(version) into current_version from public.genre_taxonomy_versions;
+  if exists (
+    select 1 from jsonb_array_elements(records) r
+     where jsonb_typeof(r) <> 'object'
+        or jsonb_typeof(r->'external_video_id') <> 'string'
+        or coalesce(r->>'external_video_id','') = ''
+        or r->>'status' not in ('succeeded','skipped','failed','unsupported')
+        or ((r->>'status' = 'succeeded') <> (r->>'genre_key' is not null))
+        or case
+             when not r ? 'confidence' or jsonb_typeof(r->'confidence') = 'null' then false
+             when jsonb_typeof(r->'confidence') <> 'number' then true
+             else (r->>'confidence')::numeric not between 0 and 1
+           end
+        or jsonb_typeof(r->'model_id') <> 'string'
+        or coalesce(r->>'model_id','') !~ '^[A-Za-z0-9._-]{1,80}$'
+        or jsonb_typeof(r->'prompt_version') <> 'string'
+        or coalesce(r->>'prompt_version','') !~ '^[A-Za-z0-9._-]{1,20}$'
+        or case
+             when jsonb_typeof(r->'taxonomy_version') <> 'number'
+                  or coalesce(r->>'taxonomy_version','') !~ '^[1-9][0-9]*$' then true
+             when (r->>'taxonomy_version')::numeric > 2147483647 then true
+             else (r->>'taxonomy_version')::int <> current_version
+               or r->>'classification_key' is distinct from private.genre_classification_key(
+                    (r->>'taxonomy_version')::int, r->>'model_id', r->>'prompt_version')
+               or (r->>'genre_key' is not null and not exists (
+                    select 1 from public.genre_taxonomy g
+                     where g.version = (r->>'taxonomy_version')::int
+                       and g.key = r->>'genre_key'))
+           end
+        or not exists (
+             select 1 from public.videos vd where vd.workspace_id = w and vd.channel_id = c
+               and vd.external_video_id = r->>'external_video_id')
+  ) or (select count(distinct r->>'external_video_id') from jsonb_array_elements(records) r)
+       <> jsonb_array_length(records) then
+    raise exception 'invalid_batch' using errcode = '22023';
+  end if;
+  hash := encode(sha256(convert_to(records::text, 'UTF8')), 'hex');
+  select payload_hash into prior from private.job_batches where job_id = j and batch_key = b;
+  if found then
+    if prior is distinct from hash then raise exception 'batch_conflict' using errcode = '23505'; end if;
+    return jsonb_build_object('replayed', true, 'stored', 0);
+  end if;
+  with written as (
+    insert into public.video_genre_predictions(
+      workspace_id, video_id, classification_key, taxonomy_version, status, genre_key,
+      confidence, model_id, prompt_version, error_code)
+    select w, vd.id, r.classification_key, r.taxonomy_version, r.status, r.genre_key,
+           r.confidence, r.model_id, r.prompt_version, r.error_code
+      from jsonb_to_recordset(records) as r(
+        external_video_id text, classification_key text, taxonomy_version int,
+        status text, genre_key text, confidence numeric, model_id text,
+        prompt_version text, error_code text)
+      join public.videos vd on vd.workspace_id = w and vd.channel_id = c
+       and vd.external_video_id = r.external_video_id
+    on conflict (workspace_id, video_id, classification_key) do update set
+      taxonomy_version = excluded.taxonomy_version, status = excluded.status,
+      genre_key = excluded.genre_key, confidence = excluded.confidence,
+      model_id = excluded.model_id, prompt_version = excluded.prompt_version,
+      error_code = excluded.error_code, predicted_at = now()
+    where public.video_genre_predictions.status = 'failed'
+    returning 1)
+  select count(*)::int into n from written;
+  insert into private.job_batches(job_id, batch_key, checkpoint, payload_hash, outcome)
+  values (j, b, '{}'::jsonb, hash, 'partial');
+  return jsonb_build_object('replayed', false, 'stored', n);
+end $function$
+
 CREATE OR REPLACE FUNCTION private.worker_commit_topics(token_hash text, j uuid, t uuid, b text, records jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6425,6 +6605,60 @@ begin
     set status = excluded.status,
         ended_at = excluded.ended_at,
         error_code = excluded.error_code;
+end $function$
+
+CREATE OR REPLACE FUNCTION private.worker_genres_due(token_hash text, j uuid, t uuid, model_id text, prompt_version text, max_rows integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+declare w uuid; c uuid; kind text; v int; k text; cap int; taxonomy jsonb; rows jsonb;
+begin
+  w := private.worker_job(token_hash, j, t);
+  select channel_id, type into c, kind from public.jobs where id = j;
+  if kind <> 'genre_classify' then raise exception 'invalid_job_type' using errcode = '22023'; end if;
+  if not private.switch_on('genre_classification') then
+    return jsonb_build_object('blocked', 'genre_classification_off');
+  end if;
+  if model_id !~ '^[A-Za-z0-9._-]{1,80}$' or prompt_version !~ '^[A-Za-z0-9._-]{1,20}$' then
+    raise exception 'invalid_batch' using errcode = '22023';
+  end if;
+  select max(version) into v from public.genre_taxonomy_versions;
+  k := private.genre_classification_key(v, model_id, prompt_version);
+  cap := least(greatest(coalesce(max_rows, 50), 1), 50);
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'key', x.key, 'parent_key', x.parent_key, 'level', x.level,
+           'name_en', x.name_en, 'description', x.description)
+           order by x.level, x.parent_position, x.position), '[]'::jsonb)
+    into taxonomy
+    from (
+      select g.*, coalesce(parent.position, g.position) parent_position
+        from public.genre_taxonomy g
+        left join public.genre_taxonomy parent
+          on parent.version = g.version and parent.key = g.parent_key
+       where g.version = v
+    ) x;
+  with recent as (
+    select vd.* from public.videos vd
+     where vd.workspace_id = w and vd.channel_id = c and length(trim(vd.title)) > 0
+     order by vd.published_at desc nulls last, vd.id limit 50
+  ), due as (
+    select r.* from recent r
+     where not exists (
+       select 1 from public.video_genre_predictions p
+        where p.workspace_id = w and p.video_id = r.id and p.classification_key = k
+          and p.status in ('succeeded','skipped','unsupported'))
+     order by r.published_at desc nulls last, r.id limit cap
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'external_video_id', d.external_video_id, 'title', d.title,
+           'description', left(coalesce(d.description,''), 500),
+           'tags', coalesce(to_jsonb(d.tags), '[]'::jsonb),
+           'category_id', d.category_id, 'duration_sec', d.duration_sec)
+           order by d.published_at desc nulls last, d.id), '[]'::jsonb)
+    into rows from due d;
+  return jsonb_build_object('classification_key', k, 'taxonomy_version', v,
+                            'taxonomy', taxonomy, 'rows', rows);
 end $function$
 
 CREATE OR REPLACE FUNCTION private.worker_heartbeat(token_hash text, j uuid, t uuid)
@@ -7799,6 +8033,26 @@ begin
   end loop;
 
   return jsonb_build_object('changed', changed, 'cancelled_jobs', cancelled);
+end $function$
+
+CREATE OR REPLACE FUNCTION public.admin_set_platform_switch(p_key text, p_enabled boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare uid uuid := auth.uid(); changed int;
+begin
+  if uid is null or not public.is_platform_admin() then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  update private.platform_switches
+     set enabled = p_enabled, updated_at = now(), updated_by = uid
+   where key = p_key;
+  get diagnostics changed = row_count;
+  if changed = 0 then raise exception 'invalid_input' using errcode = '22023'; end if;
+  insert into public.audit_events(workspace_id, actor_id, action, target_type, target_id)
+  values (null, uid, 'platform_switch_set', 'platform_switch', p_key);
 end $function$
 
 CREATE OR REPLACE FUNCTION public.admin_set_user_test(p_user uuid, p_test boolean)
@@ -9315,6 +9569,14 @@ CREATE OR REPLACE FUNCTION public.svc_worker_commit_featured(credential_hash tex
  SET search_path TO ''
 AS $function$ SELECT private.worker_commit_featured(credential_hash, j, t, b, candidates) $function$
 
+CREATE OR REPLACE FUNCTION public.svc_worker_commit_genres(credential_hash text, j uuid, t uuid, b text, records jsonb)
+ RETURNS jsonb
+ LANGUAGE sql
+ SET search_path TO ''
+AS $function$
+  select private.worker_commit_genres(credential_hash, j, t, b, records)
+$function$
+
 CREATE OR REPLACE FUNCTION public.svc_worker_commit_topics(credential_hash text, j uuid, t uuid, b text, records jsonb)
  RETURNS jsonb
  LANGUAGE sql
@@ -9341,6 +9603,14 @@ CREATE OR REPLACE FUNCTION public.svc_worker_finish(credential_hash text, j uuid
  SET search_path TO ''
 AS $function$
   select private.worker_finish(credential_hash, j, t, outcome, error_code)
+$function$
+
+CREATE OR REPLACE FUNCTION public.svc_worker_genres_due(credential_hash text, j uuid, t uuid, model_id text, prompt_version text, max_rows integer)
+ RETURNS jsonb
+ LANGUAGE sql
+ SET search_path TO ''
+AS $function$
+  select private.worker_genres_due(credential_hash, j, t, model_id, prompt_version, max_rows)
 $function$
 
 CREATE OR REPLACE FUNCTION public.svc_worker_heartbeat(credential_hash text, j uuid, t uuid)
@@ -9670,6 +9940,7 @@ create policy "tenant_read" on "public"."topic_predictions" to authenticated for
 create policy "tenant_read" on "public"."topic_reviews" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."usage_events" to authenticated for select using (private.has_role(workspace_id));
 create policy "usage_grants_read" on "public"."usage_grants" to authenticated for select using (private.has_role(workspace_id));
+create policy "tenant_read" on "public"."video_genre_predictions" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."video_selections" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."videos" to authenticated for select using (private.has_role(workspace_id));
 create policy "worker_seen_read" on "public"."worker_seen" to authenticated for select using ((EXISTS ( SELECT 1
@@ -9840,6 +10111,13 @@ grant TRUNCATE on table "private"."platform_reader" to "postgres";
 grant UPDATE on table "private"."platform_reader" to "postgres";
 grant SELECT on table "private"."platform_reader" to "service_role";
 grant UPDATE on table "private"."platform_reader" to "service_role";
+grant DELETE on table "private"."platform_switches" to "postgres";
+grant INSERT on table "private"."platform_switches" to "postgres";
+grant REFERENCES on table "private"."platform_switches" to "postgres";
+grant SELECT on table "private"."platform_switches" to "postgres";
+grant TRIGGER on table "private"."platform_switches" to "postgres";
+grant TRUNCATE on table "private"."platform_switches" to "postgres";
+grant UPDATE on table "private"."platform_switches" to "postgres";
 grant DELETE on table "private"."user_profiles" to "postgres";
 grant INSERT on table "private"."user_profiles" to "postgres";
 grant REFERENCES on table "private"."user_profiles" to "postgres";
@@ -10186,6 +10464,21 @@ grant SELECT on table "public"."usage_grants" to "postgres";
 grant TRIGGER on table "public"."usage_grants" to "postgres";
 grant TRUNCATE on table "public"."usage_grants" to "postgres";
 grant UPDATE on table "public"."usage_grants" to "postgres";
+grant SELECT on table "public"."video_genre_predictions" to "authenticated";
+grant DELETE on table "public"."video_genre_predictions" to "postgres";
+grant INSERT on table "public"."video_genre_predictions" to "postgres";
+grant REFERENCES on table "public"."video_genre_predictions" to "postgres";
+grant SELECT on table "public"."video_genre_predictions" to "postgres";
+grant TRIGGER on table "public"."video_genre_predictions" to "postgres";
+grant TRUNCATE on table "public"."video_genre_predictions" to "postgres";
+grant UPDATE on table "public"."video_genre_predictions" to "postgres";
+grant DELETE on table "public"."video_genre_predictions" to "service_role";
+grant INSERT on table "public"."video_genre_predictions" to "service_role";
+grant REFERENCES on table "public"."video_genre_predictions" to "service_role";
+grant SELECT on table "public"."video_genre_predictions" to "service_role";
+grant TRIGGER on table "public"."video_genre_predictions" to "service_role";
+grant TRUNCATE on table "public"."video_genre_predictions" to "service_role";
+grant UPDATE on table "public"."video_genre_predictions" to "service_role";
 grant SELECT on table "public"."video_selections" to "authenticated";
 grant DELETE on table "public"."video_selections" to "postgres";
 grant INSERT on table "public"."video_selections" to "postgres";
@@ -10363,6 +10656,10 @@ grant EXECUTE on function private.enqueue_scheduled(uuid,uuid,text) to "postgres
 grant EXECUTE on function private.enqueue_scheduled(uuid,uuid,text) to "service_role";
 grant EXECUTE on function private.enqueue_sync_impl(uuid,uuid,text) to "authenticated";
 grant EXECUTE on function private.enqueue_sync_impl(uuid,uuid,text) to "postgres";
+grant EXECUTE on function private.genre_classification_key(integer,text,text) to "postgres";
+grant EXECUTE on function private.genre_classification_key(integer,text,text) to "service_role";
+grant EXECUTE on function private.genres_pending(uuid,uuid) to "postgres";
+grant EXECUTE on function private.genres_pending(uuid,uuid) to "service_role";
 grant EXECUTE on function private.grant_default_plan(uuid) to "postgres";
 grant EXECUTE on function private.grant_pilot_plan(uuid) to "postgres";
 grant EXECUTE on function private.grant_units(uuid,text,integer,text,text) to "postgres";
@@ -10465,6 +10762,8 @@ grant EXECUTE on function private.submit_topic_review_impl(uuid,uuid,text,text,t
 grant EXECUTE on function private.submit_topic_review_impl(uuid,uuid,text,text,text) to "postgres";
 grant EXECUTE on function private.subscription_open(subscriptions) to "postgres";
 grant EXECUTE on function private.subscription_open(subscriptions) to "service_role";
+grant EXECUTE on function private.switch_on(text) to "postgres";
+grant EXECUTE on function private.switch_on(text) to "service_role";
 grant EXECUTE on function private.sync_purge_marker() to "postgres";
 grant EXECUTE on function private.sync_purge_marker() to "public";
 grant EXECUTE on function private.topic_classification_key(uuid,text,text) to "postgres";
@@ -10500,6 +10799,8 @@ grant EXECUTE on function private.worker_commit_channel(text,uuid,uuid,jsonb) to
 grant EXECUTE on function private.worker_commit_channel(text,uuid,uuid,jsonb) to "service_role";
 grant EXECUTE on function private.worker_commit_featured(text,uuid,uuid,text,jsonb) to "postgres";
 grant EXECUTE on function private.worker_commit_featured(text,uuid,uuid,text,jsonb) to "service_role";
+grant EXECUTE on function private.worker_commit_genres(text,uuid,uuid,text,jsonb) to "postgres";
+grant EXECUTE on function private.worker_commit_genres(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function private.worker_commit_topics(text,uuid,uuid,text,jsonb) to "postgres";
 grant EXECUTE on function private.worker_commit_topics(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function private.worker_due_videos(text,uuid,uuid) to "postgres";
@@ -10508,6 +10809,8 @@ grant EXECUTE on function private.worker_featured_due(text,uuid,uuid) to "postgr
 grant EXECUTE on function private.worker_featured_due(text,uuid,uuid) to "service_role";
 grant EXECUTE on function private.worker_finish(text,uuid,uuid,text,text) to "postgres";
 grant EXECUTE on function private.worker_finish(text,uuid,uuid,text,text) to "service_role";
+grant EXECUTE on function private.worker_genres_due(text,uuid,uuid,text,text,integer) to "postgres";
+grant EXECUTE on function private.worker_genres_due(text,uuid,uuid,text,text,integer) to "service_role";
 grant EXECUTE on function private.worker_heartbeat(text,uuid,uuid) to "postgres";
 grant EXECUTE on function private.worker_heartbeat(text,uuid,uuid) to "service_role";
 grant EXECUTE on function private.worker_job(text,uuid,uuid) to "postgres";
@@ -10574,6 +10877,8 @@ grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "a
 grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "postgres";
 grant EXECUTE on function admin_set_channels_paused(uuid[],boolean) to "authenticated";
 grant EXECUTE on function admin_set_channels_paused(uuid[],boolean) to "postgres";
+grant EXECUTE on function admin_set_platform_switch(text,boolean) to "authenticated";
+grant EXECUTE on function admin_set_platform_switch(text,boolean) to "postgres";
 grant EXECUTE on function admin_set_user_test(uuid,boolean) to "authenticated";
 grant EXECUTE on function admin_set_user_test(uuid,boolean) to "postgres";
 grant EXECUTE on function admin_start_impersonation(uuid) to "authenticated";
@@ -10724,6 +11029,8 @@ grant EXECUTE on function svc_worker_commit_channel(text,uuid,uuid,jsonb) to "po
 grant EXECUTE on function svc_worker_commit_channel(text,uuid,uuid,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_commit_featured(text,uuid,uuid,text,jsonb) to "postgres";
 grant EXECUTE on function svc_worker_commit_featured(text,uuid,uuid,text,jsonb) to "service_role";
+grant EXECUTE on function svc_worker_commit_genres(text,uuid,uuid,text,jsonb) to "postgres";
+grant EXECUTE on function svc_worker_commit_genres(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_commit_topics(text,uuid,uuid,text,jsonb) to "postgres";
 grant EXECUTE on function svc_worker_commit_topics(text,uuid,uuid,text,jsonb) to "service_role";
 grant EXECUTE on function svc_worker_due_videos(text,uuid,uuid) to "postgres";
@@ -10732,6 +11039,8 @@ grant EXECUTE on function svc_worker_featured_due(text,uuid,uuid) to "postgres";
 grant EXECUTE on function svc_worker_featured_due(text,uuid,uuid) to "service_role";
 grant EXECUTE on function svc_worker_finish(text,uuid,uuid,text,text) to "postgres";
 grant EXECUTE on function svc_worker_finish(text,uuid,uuid,text,text) to "service_role";
+grant EXECUTE on function svc_worker_genres_due(text,uuid,uuid,text,text,integer) to "postgres";
+grant EXECUTE on function svc_worker_genres_due(text,uuid,uuid,text,text,integer) to "service_role";
 grant EXECUTE on function svc_worker_heartbeat(text,uuid,uuid) to "postgres";
 grant EXECUTE on function svc_worker_heartbeat(text,uuid,uuid) to "service_role";
 grant EXECUTE on function svc_worker_known_videos(text,uuid,uuid) to "postgres";

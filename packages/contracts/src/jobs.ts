@@ -9,7 +9,14 @@ export const JobSchema = z.object({
   id: z.string().uuid(),
   workspace_id: z.string().uuid(),
   channel_id: z.string().uuid(),
-  type: z.enum(["discover", "collect", "analyse", "import", "export"]),
+  type: z.enum([
+    "discover",
+    "collect",
+    "analyse",
+    "genre_classify",
+    "import",
+    "export",
+  ]),
   dedupe_key: z.string().min(1).max(200),
   status: z.enum([
     "queued",

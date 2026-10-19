@@ -166,6 +166,21 @@ export interface WorkerDb {
     batchKey: string,
     records: unknown[],
   ): Promise<unknown>;
+  genresDue?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    modelId: string,
+    promptVersion: string,
+    maxRows: number,
+  ): Promise<unknown>;
+  commitGenres?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    batchKey: string,
+    records: unknown[],
+  ): Promise<unknown>;
   /** Enqueue whatever is due for this credential's workspace. No lease. */
   tick(credentialHash: string): Promise<unknown>;
 }
@@ -374,6 +389,8 @@ export async function handleWorkerRequest(
       ...(db.videoCounts ? ["/worker/video-counts"] : []),
       "/worker/topics-due",
       "/worker/commit-topics",
+      ...(db.genresDue ? ["/worker/genres-due"] : []),
+      ...(db.commitGenres ? ["/worker/commit-genres"] : []),
     ];
     if (!leased.some((route) => path.endsWith(route)))
       return json(404, { code: "not_found" });
@@ -503,6 +520,26 @@ export async function handleWorkerRequest(
       return json(
         200,
         await db.commitTopics(credential, job, lease, key, body.records),
+      );
+    }
+    if (path.endsWith("/worker/genres-due") && db.genresDue) {
+      const model = str(body, "model_id");
+      const prompt = str(body, "prompt_version");
+      const max = body.max_rows === undefined ? 50 : body.max_rows;
+      if (!model || !prompt) return refuse("invalid_batch");
+      if (typeof max !== "number" || !Number.isInteger(max) || max < 1)
+        return refuse("invalid_batch");
+      return json(
+        200,
+        await db.genresDue(credential, job, lease, model, prompt, max),
+      );
+    }
+    if (path.endsWith("/worker/commit-genres") && db.commitGenres) {
+      const key = str(body, "batch_key");
+      if (!key || !Array.isArray(body.records)) return refuse("invalid_batch");
+      return json(
+        200,
+        await db.commitGenres(credential, job, lease, key, body.records),
       );
     }
     return json(404, { code: "not_found" });

@@ -335,3 +335,18 @@ class ControlPlane:
             "job_id": lease["job_id"], "lease_token": lease["lease_token"],
             "batch_key": batch_key, "records": _canonicalise(records),
         })
+
+    def genres_due(self, lease: dict[str, Any], model_id: str, prompt_version: str,
+                   max_rows: int = 50) -> dict[str, Any]:
+        data = self._post("/worker/genres-due", {
+            "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+            "model_id": model_id, "prompt_version": prompt_version, "max_rows": max_rows,
+        })
+        return data or {}
+
+    def commit_genres(self, lease: dict[str, Any], batch_key: str,
+                      records: list[dict[str, Any]]) -> dict[str, Any] | None:
+        return self._post("/worker/commit-genres", {
+            "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+            "batch_key": batch_key, "records": _canonicalise(records),
+        })

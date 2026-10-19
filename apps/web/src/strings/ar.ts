@@ -725,6 +725,8 @@ export const ar = {
     plan_dropped: "أُعيدت المساحة إلى الخطة المجانية",
     pack_granted: "مُنحت حزمة وحدات",
     pack_paddle: "اشتُريت حزمة عبر Paddle",
+    platform_switch_set: "عُدّل مفتاح تشغيل في المنصة",
+    platform_switch: "مفتاح تشغيل المنصة",
     platform_reader_promoted: "عُيّن قارئ المنصة",
     workspace_deleted: "حُذفت مساحة عمل",
     workspace_retired: "أُغلقت مساحة عمل",
