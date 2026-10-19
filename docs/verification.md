@@ -1,5 +1,25 @@
 # Verification
 
+## 2026-10-19 — WO-24 acceptance tests
+
+`supabase/tests/channel_genre_profile_acceptance.test.ts` was written by the PM after #181's two rounds left these cases untested. It was run against #181's head `7eede01` before that PR merged, and again on `main` at `514be46`.
+
+| Command | Actual result |
+| --- | --- |
+| `npx vitest run supabase/tests/channel_genre_profile_acceptance.test.ts` | 10 passed. |
+
+Mutations in `20261117000000_channel_genre_profile.sql`, each reverted:
+
+| Mutation | Failed tests |
+| --- | --- |
+| grandparent roll-up removed | 2 |
+| `coalesce(view_count,0)` removed | 7 |
+| null-date factor 0.5 → 1 | 1 |
+| `>= .15` → `> .15` | 1 |
+| tie-break by `position desc` | 1 |
+| `viewer` allowed to review | 4 |
+| minimum 5 → 4 | 1 |
+
 ## 2026-10-19 — Dispatcher resume; new migrations sort last
 
 | Command | Actual result |
