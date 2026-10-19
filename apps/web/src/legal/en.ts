@@ -17,7 +17,7 @@ const PADDLE_PRIVACY = "https://www.paddle.com/legal/privacy";
 const SUPABASE_PRIVACY = "https://supabase.com/privacy";
 const CLOUDFLARE_PRIVACY = "https://www.cloudflare.com/privacypolicy/";
 const SKY_DEVELOP = "https://sky-develop.net";
-const UPDATED = "2026-09-23";
+const UPDATED = "2026-10-19";
 
 export const legalEn: LegalSet = {
   privacy: {
@@ -49,6 +49,8 @@ export const legalEn: LegalSet = {
           "Account data: the email address and account identifier we receive when you sign in (through Google or any other sign-in provider that is enabled), and the time of sign-in. We never see or store your password.",
           "Workspace data: the workspace's name, the plan active on it, who owns it and who may enter it, and how much of its allowance has been used.",
           "Data from the connected YouTube channel: the channel's id and name, public video data (title, publish date, public statistics), and the public comments on those videos: the comment text, the author's display name and id, the time it was posted, its like count, and whether it is a reply. This reaches us from the YouTube Data API after you explicitly authorise it.",
+          "Public channels a workspace adds by link or search (YouTube, X, TikTok, Telegram, Facebook and Instagram): only what any visitor can see, namely the channel's public posts or videos and the public comments on them, read through the service's own read access or a managed collection provider (named in “Who we share it with”), never through another user's account.",
+          "A monitored channel's public profile and statistics: its description, keywords, topic categories, country and language, and its public subscriber, view and video counts, recorded once a day so the service can show growth over time.",
           "The OAuth tokens Google grants for reading your channel. They are stored encrypted, never appear in the browser, and are used for nothing but collecting from your channel.",
           "Billing data: when you subscribe to a paid plan, Paddle creates a customer and subscription record and sends us their identifiers, the subscription's status and the paid period. Your card details never reach us and are not stored by us; Paddle processes the payment.",
           "Technical data: IP address, browser type and request time in server logs and in the Cloudflare network that protects the site, for operation and security only.",
@@ -62,8 +64,9 @@ export const legalEn: LegalSet = {
           "We use and process the data collected above and authorized YouTube API data strictly to provide, maintain, and improve the service, specifically:",
         ],
         bullets: [
-          "Collecting your channel's public comments and metadata, and processing them locally on our dedicated secure servers to classify their sentiment (positive, negative, neutral, mixed) using self-hosted open-source Arabic NLP models. No comment or user data is ever sent to external third-party AI providers.",
+          "Collecting your channel's public comments and metadata, and processing them locally on our dedicated secure servers to classify their sentiment (positive, negative, neutral, mixed) using self-hosted open-source Arabic NLP models. To classify a comment's topic, its text (and, for a reply, the text it answers) is sent to Google's Gemini API without the author's name or id, the workspace or any account data; to classify a channel's genre, its public description and video titles are sent the same way. No account, workspace or billing data is sent to any AI provider.",
           "Showing aggregated analytics and sentiment trends in the dashboard, comparing videos, and producing downloadable reports and exports upon request.",
+          "Classifying channels into the service's own genre categories, which are ours and not YouTube's, and comparing channels, including the competitors a workspace tracks, by their public statistics. We never infer protected attributes of commenters or creators, such as age, gender, religion, political opinion, ethnicity, sexual orientation or health.",
           "Keeping your manual sentiment corrections and displaying updated analytics to you and members who share your workspace.",
           "Metering consumption against the workspace plan's allowance, and activating subscribed features and quotas.",
           "Operating, maintaining, and securing the service, monitoring system performance, and detecting faults, unauthorized access, and abuse.",
@@ -76,7 +79,7 @@ export const legalEn: LegalSet = {
           `The service uses YouTube API Services. By using it you agree to the [YouTube Terms of Service](${YOUTUBE_TERMS}), and the [Google Privacy Policy](${GOOGLE_PRIVACY}) applies to the data Google processes.`,
           "We ask Google for exactly one permission, youtube.force-ssl, and use it only to read: your channel and its video list, and the public comments and replies on the videos you choose. Google offers no narrower permission that allows reading a channel's comments as its owner, which is why this one is requested. We do not write to your channel, publish, delete, or reply to anyone in your name. We do not use your email to prove channel ownership; the authorisation itself proves it.",
           `Our use of information received from Google APIs, and its transfer to any other app, adheres to the [Google API Services User Data Policy](${GOOGLE_USER_DATA_POLICY}), including its Limited Use requirements. We do not sell this data, do not use it for advertising, and no human reads it except with your explicit consent for technical support or security, or where the law requires it.`,
-          "Stored YouTube data is refreshed or deleted within thirty days: the comment text and the author's name and id are permanently erased from our database thirty days after collection by an automated database purge, and only non-identifying aggregated metrics needed for dashboard statistics remain (a content fingerprint, the date, the like count, the sentiment label).",
+          "Stored YouTube data is refreshed or deleted within thirty days: the comment text and the author's name and id are permanently erased from our database thirty days after collection by an automated database purge, and only non-identifying aggregated metrics needed for dashboard statistics remain (a content fingerprint, the date, the like count, the sentiment label). A channel's description, keywords and topic categories are erased thirty days after they were last refreshed, and its daily public statistics are kept for thirty days, or longer only where YouTube's policies allow it (up to thirty-six months).",
           `Users can revoke that API Client's access to their data at any time via the Google security settings page at [https://myaccount.google.com/connections?filters=3,4&hl=en](${GOOGLE_PERMISSIONS}). Upon revocation, the service's access is immediately terminated, stored authorization tokens are invalidated, and all automated data collection stops at once.`,
         ],
       },
@@ -84,7 +87,7 @@ export const legalEn: LegalSet = {
         id: "retention",
         heading: "Retention and deletion",
         paragraphs: [
-          "Procedure for deleting stored YouTube data: Raw YouTube comment text and author identifying data (author name and channel ID) are automatically and permanently deleted from our database thirty days after collection via a scheduled daily purging routine. Non-identifying statistical aggregates (fingerprint, timestamp, like count, sentiment label) are retained to preserve historical dashboard analytics for as long as the workspace remains active.",
+          "Procedure for deleting stored YouTube data: Raw YouTube comment text and author identifying data (author name and channel ID) are automatically and permanently deleted from our database thirty days after collection via a scheduled daily purging routine. Non-identifying statistical aggregates (fingerprint, timestamp, like count, sentiment label) are retained to preserve historical dashboard analytics for as long as the workspace remains active. A channel's profile text (description, keywords, topic categories) is erased thirty days after its last refresh, and its daily public statistics are kept for thirty days, or up to thirty-six months only where YouTube's policies allow it.",
           "Procedure for disconnecting a channel and deleting tokens: You can disconnect your YouTube channel at any time from within the workspace settings or revoke access via Google security settings. Disconnecting the channel immediately invalidates and permanently purges stored OAuth access and refresh tokens from our systems, and cancels all scheduled data synchronization.",
           "Procedure for requesting complete data deletion: You can request the complete and permanent deletion of your account, workspace, and all associated stored data at any time by sending an email to support@sky-develop.net or privacy@sky-develop.net. Upon receiving and verifying your request, we permanently delete your account, workspace configuration, and all stored data from our active databases within seven days of the request, keeping only minimal financial transaction records strictly required by tax and legal regulations.",
           "Server logs: for the short period operation and security require, then deleted.",
@@ -102,6 +105,8 @@ export const legalEn: LegalSet = {
           `Supabase: cloud PostgreSQL database, authentication, and secure backend functions running in the EU ([Supabase privacy policy](${SUPABASE_PRIVACY})).`,
           `Paddle: payment, invoicing and tax; the merchant of record you buy the plan from ([Paddle privacy policy](${PADDLE_PRIVACY})).`,
           `Google / YouTube: the source of your channel's data, and a sign-in provider ([Google Privacy Policy](${GOOGLE_PRIVACY})).`,
+          `Google Gemini API: topic and genre classification of comment text and public channel text, without the author's identity ([Google Privacy Policy](${GOOGLE_PRIVACY})).`,
+          "Apify and Bright Data: collecting public posts and comments from the public X, TikTok, Facebook and Instagram pages a workspace adds ([Apify privacy policy](https://apify.com/privacy-policy), [Bright Data privacy policy](https://brightdata.com/legal/privacy-policy)).",
           `Cloudflare and the hosting provider: delivering and protecting the site's pages ([Cloudflare privacy policy](${CLOUDFLARE_PRIVACY})).`,
           "We also share data with an authority where the law obliges us to, or to protect our rights or the safety of users.",
         ],
