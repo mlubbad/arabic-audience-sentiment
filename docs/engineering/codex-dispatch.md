@@ -84,10 +84,23 @@ Every failure met while dispatching WO-13, its root cause, and the fix now in pl
 | 15 | WO-18 round 2 (2026-10-17): the work was done and `npm run check` green, but `npm run test:e2e` gave 130 failed: `bootstrap_check_in org.chromium.Chromium.MachPortRendezvousServer…: Permission denied (1100)`. Codex stopped before the handoff. | Chromium registers a Mach port at launch, which the macOS sandbox denies. Yet `codex-constraints.md` listed `npm run test:e2e` among the commands to run, against PLAYBOOK §1 ("CI runs e2e"). | The constraints now tell Codex never to run e2e there and to say so; CI is the e2e gate for Codex PRs. |
 | 16 | WO-23 (2026-10-18): suites green (`npm run check`, 13 new tests, `db:snapshot:check`), then `semgrep` died with `PermissionError: … ~/.semgrep/semgrep.log` and `gitleaks` was `command not found`. Codex stopped before writing `.codex-handoff/commit.txt`; the next run refused the dirty workspace. | `AGENTS.md` asks for local Semgrep and gitleaks runs before security changes; inside `workspace-write` Semgrep cannot write its log under `~`, and gitleaks is not installed. The constraints did not say these are CI-only for Codex. | The constraints tell Codex not to run either, to say so, and to write the handoff anyway. Recovery for a run that stopped before the handoff is below. |
 | 17 | WO-22 (2026-10-18): Codex stopped at `npm run check` to ask whether it could add two audit labels outside its owned paths (the right call). The answer could reach it only by a hand-run `codex exec`, outside the watcher, because the dispatcher refuses a dirty workspace and offered only `git reset --hard`. That was the third stopped run in a day. | The dispatcher had no way to continue uncommitted work. | `CODEX_RESUME=1` continues it in place under the watcher, with the PM's answer as the extra prompt (above). `scripts/codex-dispatch.test.ts` pins the refusal message, the resume, and the two refusals: wrong branch, and origin ahead. |
+| 18 | WO-22 round 3 (2026-10-19): `The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account`, twice, before Codex did anything. | `~/.codex/config.toml` on the Mac set `model = "gpt-5.6-sol"` and a `model_catalog_json` from an Ollama launcher; nothing in the repository picks a model. | The owner commented both lines out, so Codex uses its default. If the error comes back, run `codex`, pick a model with `/model`, and rerun. |
+| 19 | WO-22 round 3, next run: the watcher stopped Codex on `git log … && git merge-base --is-ancestor origin/main HEAD`, a read. The round's review also asked Codex to merge `origin/main`, which its sandbox forbids, after #178 merged with the migration version #176 used. | The git-write pattern ended in `\b`, which matches between `merge` and `-base`. No path let a follow-up round bring `main` in. | The pattern ends in `(?![-\w])` (`codex-watch.test.ts` pins `merge-base` as a read). `CODEX_MERGE_MAIN=1` makes the dispatcher merge `origin/main` into a follow-up round's branch before Codex runs, with hooks off; a conflict aborts and stops (`codex-dispatch.test.ts`). |
 
 Related, not a failure: `.claude/settings.local.json` is tracked, so the allow rule the owner
 added for run 3 shows as a local diff there. Keep machine-specific rules in
 `~/.claude/settings.json`, or revert the file with `git checkout -- .claude/settings.local.json`.
+
+## When the PR's base moved on
+
+When a review asks for `main` to be merged into the branch (a migration version taken, a conflict
+GitHub doesn't show yet), run the follow-up round with the dispatcher doing the merge:
+```sh
+CODEX_MERGE_MAIN=1 scripts/codex-dispatch.sh <WO-N> <issue> <codex/wo-N-slug>
+```
+It merges `origin/main` into the branch's tip, tells Codex the merge is done, then runs the round
+as usual; the push stays a fast-forward. On a conflict it aborts the merge and stops with the
+workspace unchanged; ask the PM.
 
 ## When Codex stopped before the handoff
 
