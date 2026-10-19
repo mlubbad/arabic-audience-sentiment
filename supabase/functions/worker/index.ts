@@ -348,6 +348,23 @@ Deno.serve((request) =>
       if (error) failed(error);
       return data;
     },
+    candidatesDue: async (hash, j, t) => {
+      const { data, error } = await db.rpc("svc_worker_candidates_due", {
+        credential_hash: hash,
+        j,
+        t,
+      });
+      if (error) failed(error);
+      return data;
+    },
+    commitCandidateProfiles: async (hash, j, t, profiles) => {
+      const { data, error } = await db.rpc(
+        "svc_worker_commit_candidate_profiles",
+        { credential_hash: hash, j, t, profiles },
+      );
+      if (error) failed(error);
+      return data;
+    },
     videoFinished: async (hash, j, t, v, outcome, errorCode) => {
       const { error } = await db.rpc("svc_worker_video_finished", {
         credential_hash: hash,

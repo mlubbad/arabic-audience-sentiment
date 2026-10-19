@@ -139,7 +139,8 @@ test("the admin door is not listed for a reader who is not an admin, and refuses
   // the link's absence is a courtesy, the page and the database are the gate.
   await page.goto("/dashboard");
   const nav = page.getByRole("navigation", { name: "التنقل الرئيسي" });
-  await expect(nav.getByRole("link")).toHaveCount(3);
+  await expect(nav.getByRole("link")).toHaveCount(4);
+  await expect(nav.getByRole("link", { name: "المنافسون" })).toHaveCount(1);
   await expect(nav.getByRole("link", { name: "الإدارة" })).toHaveCount(0);
   await page.goto("/admin");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(

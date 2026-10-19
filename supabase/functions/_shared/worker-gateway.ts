@@ -129,6 +129,17 @@ export interface WorkerDb {
     batchKey: string,
     candidates: unknown[],
   ): Promise<unknown>;
+  candidatesDue?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+  ): Promise<unknown>;
+  commitCandidateProfiles?(
+    credentialHash: string,
+    jobId: string,
+    leaseToken: string,
+    profiles: unknown[],
+  ): Promise<unknown>;
   videoFinished(
     credentialHash: string,
     jobId: string,
@@ -201,6 +212,7 @@ const STATUS: Record<string, number> = {
   // uploads as another's.
   catalogue_channel_mismatch: 400,
   invalid_channel_profile: 400,
+  invalid_candidate_profiles: 400,
   channel_profile_mismatch: 400,
   invalid_counts: 400,
   invalid_video: 400,
@@ -385,6 +397,10 @@ export async function handleWorkerRequest(
       ...(db.commitChannel ? ["/worker/commit-channel"] : []),
       ...(db.featuredDue ? ["/worker/featured-due"] : []),
       ...(db.commitFeatured ? ["/worker/commit-featured"] : []),
+      ...(db.candidatesDue ? ["/worker/candidates-due"] : []),
+      ...(db.commitCandidateProfiles
+        ? ["/worker/commit-candidate-profiles"]
+        : []),
       "/worker/video-finished",
       ...(db.videoCounts ? ["/worker/video-counts"] : []),
       "/worker/topics-due",
@@ -474,6 +490,23 @@ export async function handleWorkerRequest(
       return json(
         200,
         await db.commitFeatured(credential, job, lease, key, body.candidates),
+      );
+    }
+    if (path.endsWith("/worker/candidates-due") && db.candidatesDue)
+      return json(200, await db.candidatesDue(credential, job, lease));
+    if (
+      path.endsWith("/worker/commit-candidate-profiles") &&
+      db.commitCandidateProfiles
+    ) {
+      if (
+        !Array.isArray(body.profiles) ||
+        body.profiles.length > 50 ||
+        !hasOnlyKeys(body, ["job_id", "lease_token", "profiles"])
+      )
+        return refuse("invalid_candidate_profiles");
+      return json(
+        200,
+        await db.commitCandidateProfiles(credential, job, lease, body.profiles),
       );
     }
     if (path.endsWith("/worker/video-finished")) {

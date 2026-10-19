@@ -295,6 +295,16 @@ class ControlPlane:
             },
         )
 
+    def candidates_due(self, lease: dict[str, Any]) -> list[str]:
+        data = self._post("/worker/candidates-due", {"job_id": lease["job_id"], "lease_token": lease["lease_token"]})
+        return data if isinstance(data, list) else []
+
+    def commit_candidate_profiles(self, lease: dict[str, Any], profiles: list[dict[str, Any]]) -> dict[str, Any] | None:
+        return self._post("/worker/commit-candidate-profiles", {
+            "job_id": lease["job_id"], "lease_token": lease["lease_token"],
+            "profiles": _canonicalise(profiles),
+        })
+
     def video_finished(self, lease: dict[str, Any], video_id: str, outcome: str,
                        error_code: str | None = None) -> None:
         self._post(

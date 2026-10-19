@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BatchPayloadSchema,
   ChannelProfileCommit,
+  CandidateProfilesCommit,
   CommitBatchSchema,
   usageEventKey,
 } from "./index";
@@ -246,6 +247,48 @@ describe("channel profile commit contract", () => {
         job_id: "20000000-0000-4000-8000-000000000001",
         lease_token: "30000000-0000-4000-8000-000000000001",
       }).success,
+    ).toBe(false);
+  });
+});
+
+describe("candidate profile commit contract", () => {
+  const envelope = (profiles: unknown[]) => ({
+    job_id: "20000000-0000-4000-8000-000000000001",
+    lease_token: "30000000-0000-4000-8000-000000000001",
+    profiles,
+  });
+
+  it("accepts strict nullable observations and caps the batch at fifty", () => {
+    expect(
+      CandidateProfilesCommit.safeParse(
+        envelope([
+          {
+            external_channel_id: "UCchannel",
+            subscriber_count: null,
+            country: null,
+            topic_categories: ["topic"],
+          },
+        ]),
+      ).success,
+    ).toBe(true);
+    expect(
+      CandidateProfilesCommit.safeParse(
+        envelope(
+          Array.from({ length: 51 }, () => ({
+            external_channel_id: "UCchannel",
+          })),
+        ),
+      ).success,
+    ).toBe(false);
+    expect(
+      CandidateProfilesCommit.safeParse(
+        envelope([
+          {
+            external_channel_id: "UCchannel",
+            extra: true,
+          },
+        ]),
+      ).success,
     ).toBe(false);
   });
 });

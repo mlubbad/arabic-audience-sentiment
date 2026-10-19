@@ -1,0 +1,18 @@
+{
+  "job_id": "20000000-0000-4000-8000-000000000001",
+  "lease_token": "30000000-0000-4000-8000-000000000001",
+  "profiles": [
+    {
+      "country": "TR",
+      "default_language": "ar",
+      "external_channel_id": "UCcccccccccccccccccccccc",
+      "subscriber_count": 12,
+      "subscriber_count_hidden": null,
+      "topic_categories": [
+        "topic"
+      ],
+      "video_count": 3,
+      "view_count": 44
+    }
+  ]
+}

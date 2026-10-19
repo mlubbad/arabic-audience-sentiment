@@ -66,6 +66,11 @@ import { RESET_PATH, useRecoveryLanding } from "./account/recoveryLanding";
 const Dashboard = lazy(() =>
   import("./dashboard/Dashboard").then((m) => ({ default: m.Dashboard })),
 );
+const CompetitorsPage = lazy(() =>
+  import("./competitors/CompetitorsPage").then((m) => ({
+    default: m.CompetitorsPage,
+  })),
+);
 const Connected = lazy(() =>
   import("./Connected").then((m) => ({ default: m.Connected })),
 );
@@ -237,6 +242,12 @@ const DESTINATIONS = [
     to: "/dashboard",
     label: "navOverview",
     title: "titleOverview",
+    scoped: true,
+  },
+  {
+    to: "/competitors",
+    label: "navCompetitors",
+    title: "titleCompetitors",
     scoped: true,
   },
   {
@@ -553,6 +564,7 @@ const app = (
                 ))}
                 <Route element={<AppLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/competitors" element={<CompetitorsPage />} />
                   <Route path="/account" element={<Account />} />
                   <Route path={RESET_PATH} element={<ResetPassword />} />
                   <Route path="/sync" element={<Sync />} />
