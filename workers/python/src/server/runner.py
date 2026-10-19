@@ -309,6 +309,21 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
             except ControlPlaneError:
                 control.finish(lease, "partial", "featured_channels_failed")
                 return True
+        if (lease.get("platform") or "youtube") == "youtube":
+            try:
+                due = control.candidates_due(lease)
+                if due:
+                    profiles = collector.channel_profiles(due)
+                    returned = {p["external_channel_id"] for p in profiles}
+                    profiles.extend({"external_channel_id": external_id, "subscriber_count": None,
+                                     "view_count": None, "video_count": None}
+                                    for external_id in due if external_id not in returned)
+                    control.commit_candidate_profiles(lease, profiles)
+            except LeaseLost:
+                raise
+            except (ControlPlaneError, CollectionError):
+                control.finish(lease, "partial", "candidate_profiles_failed")
+                return True
         control.finish(lease, "exhausted" if result.complete else "partial",
                        None if result.complete else result.reason)
     except LeaseLost:

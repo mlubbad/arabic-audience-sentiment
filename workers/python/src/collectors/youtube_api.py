@@ -364,6 +364,25 @@ class YouTubeAPI:
             for channel_id in ids
         ]
 
+    def channel_profiles(self, ids: list[str]) -> list[dict]:
+        """Fetch one bounded YouTube profile batch and preserve unknowns."""
+        if not ids:
+            return []
+        if len(ids) > 50:
+            raise CollectionError("invalid_candidate_profiles")
+        data = self._get("channels", {"part": "snippet,statistics,topicDetails", "id": ",".join(ids)})
+        try:
+            profiles = []
+            for item in data["items"]:
+                profile = self._channel_profile(item)
+                profiles.append({key: value for key, value in profile.items() if key in {
+                    "external_channel_id", "subscriber_count", "subscriber_count_hidden",
+                    "view_count", "video_count", "country", "default_language", "topic_categories",
+                }})
+            return profiles
+        except (KeyError, TypeError, AttributeError):
+            raise CollectionError("invalid_response") from None
+
     _TABS = (("video", "LF"), ("short", "SH"), ("stream", "LV"))
     _DURATION = re.compile(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
 

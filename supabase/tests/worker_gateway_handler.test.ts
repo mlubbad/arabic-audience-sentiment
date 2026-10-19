@@ -394,6 +394,40 @@ describe("the due list and the catalogue", () => {
     );
   });
 
+  it("routes candidate profile reads and validates bounded strict commits", async () => {
+    const candidatesDue = vi.fn(async () => ["UCcandidate"]);
+    const commitCandidateProfiles = vi.fn(async () => ({ updated: 1 }));
+    const db: WorkerDb = { ...base(), candidatesDue, commitCandidateProfiles };
+    const lease = { job_id: "j", lease_token: "l" };
+    const due = await send(db, "/worker/candidates-due", lease);
+    expect(await due.json()).toEqual(["UCcandidate"]);
+    const profiles = [
+      { external_channel_id: "UCcandidate", subscriber_count: null },
+    ];
+    const ok = await send(db, "/worker/commit-candidate-profiles", {
+      ...lease,
+      profiles,
+    });
+    expect(ok.status).toBe(200);
+    expect(commitCandidateProfiles).toHaveBeenCalledWith(
+      expect.any(String),
+      "j",
+      "l",
+      profiles,
+    );
+    for (const bad of [null, {}, Array.from({ length: 51 }, () => ({}))]) {
+      const response = await send(db, "/worker/commit-candidate-profiles", {
+        ...lease,
+        profiles: bad,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        code: "invalid_candidate_profiles",
+      });
+    }
+    expect(commitCandidateProfiles).toHaveBeenCalledTimes(1);
+  });
+
   it("records a video's end with its outcome and code", async () => {
     const db = base();
     const r = await send(db, "/worker/video-finished", {
