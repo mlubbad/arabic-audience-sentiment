@@ -1,0 +1,16 @@
+{
+  "batch_key": "golden-genres",
+  "records": [
+    {
+      "external_video_id": "video-golden",
+      "classification_key": "genres:v2+gemini-3.6-flash+g1",
+      "taxonomy_version": 2,
+      "status": "succeeded",
+      "genre_key": "sports_football",
+      "confidence": 0.875,
+      "model_id": "gemini-3.6-flash",
+      "prompt_version": "g1",
+      "error_code": null
+    }
+  ]
+}

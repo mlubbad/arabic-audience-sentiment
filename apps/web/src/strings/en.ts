@@ -722,6 +722,8 @@ export const en: Strings = {
     plan_dropped: "Workspace moved back to the free plan",
     pack_granted: "Unit pack granted",
     pack_paddle: "Pack bought through Paddle",
+    platform_switch_set: "Platform switch changed",
+    platform_switch: "Platform switch",
     platform_reader_promoted: "Platform reader set",
     workspace_deleted: "Workspace deleted",
     workspace_retired: "Workspace closed",
