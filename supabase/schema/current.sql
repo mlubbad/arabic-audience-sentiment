@@ -2213,6 +2213,21 @@ declare current text; begin
    where workspace_id=w and id=j;
 end $function$
 
+CREATE OR REPLACE FUNCTION private.catalogue_interval_or_default(w uuid)
+ RETURNS integer
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select coalesce(
+    (select pl.catalogue_interval_minutes
+       from public.subscriptions s
+       join public.plans pl on pl.key = s.plan_key
+      where s.workspace_id = private.billing_root(w)
+        and s.status in ('active', 'past_due')),
+    1440)
+$function$
+
 CREATE OR REPLACE FUNCTION private.channel_compare_step()
  RETURNS text
  LANGUAGE plpgsql
@@ -2357,7 +2372,10 @@ begin
                  select 1 from public.channels ch
                   where ch.id = q.channel_id and ch.catalogued_at is not null)
             then 0
-          when q.type = 'discover' and q.created_at <= now() - interval '6 hours'
+          when q.type = 'discover' and (
+                 select ch.catalogued_at from public.channels ch where ch.id = q.channel_id)
+               <= now() - make_interval(mins => private.catalogue_interval_or_default(q.workspace_id))
+                        - interval '6 hours'
             then 1
           when q.type <> 'discover' then 2
           else 3
@@ -5707,9 +5725,14 @@ declare count int := 0; begin
           and (n.created_at, n.id) > (b.created_at, b.id)
      );
 
-  -- Unblock due jobs that have no outstanding active job without resetting attempt/reclaims
+  -- Unblock due jobs that have no outstanding active job. The run that ended in
+  -- this block was counted as an attempt when it was claimed; a wait for a
+  -- known reset is not a failure, so that one attempt is given back. Real
+  -- failures keep counting (20261001010000 stopped resetting attempts here
+  -- for that reason; this gives back one, never resets).
   update public.jobs j
      set status = 'queued',
+         attempt = greatest(j.attempt - 1, 0),
          error_code = null,
          lease_token = null,
          lease_expires_at = null,
@@ -10328,6 +10351,8 @@ grant EXECUTE on function private.budget_entry(text,bigint,bigint,bigint) to "se
 grant EXECUTE on function private.build_admin_digest() to "postgres";
 grant EXECUTE on function private.cancel_job_impl(uuid,uuid) to "authenticated";
 grant EXECUTE on function private.cancel_job_impl(uuid,uuid) to "postgres";
+grant EXECUTE on function private.catalogue_interval_or_default(uuid) to "postgres";
+grant EXECUTE on function private.catalogue_interval_or_default(uuid) to "service_role";
 grant EXECUTE on function private.channel_compare_step() to "postgres";
 grant EXECUTE on function private.claim_job(uuid) to "postgres";
 grant EXECUTE on function private.claim_job(uuid) to "service_role";

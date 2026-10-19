@@ -509,7 +509,7 @@ describe("Unlimited plans overflow protection and worker retry lifecycle", () =>
       expect(job2.not_before).toBeNull();
     });
 
-    it("unblock_due_jobs unblocks due quota jobs without resetting attempt or reclaims, and ignores NULL not_before", async () => {
+    it("unblock_due_jobs unblocks due quota jobs giving back the waiting run's attempt (never resetting), keeps reclaims, and ignores NULL not_before", async () => {
       await asServiceRole();
       const dueJobId = "00000000-0000-4000-8000-000000000036";
       const nonTimeJobId = "00000000-0000-4000-8000-000000000037";
@@ -527,7 +527,9 @@ describe("Unlimited plans overflow protection and worker retry lifecycle", () =>
       );
       expect(unblockedCount.rows[0].unblock_due_jobs).toBeGreaterThanOrEqual(1);
 
-      // Verify the due job unblocked to queued, and attempt/reclaims were preserved
+      // The due job is queued again. The run that ended in the quota block
+      // took one attempt; a wait is not a failure, so that one is given back
+      // (20261116000000). Attempts are never reset and reclaims are kept.
       const dueJob = (
         await db.query<{
           status: string;
@@ -540,7 +542,7 @@ describe("Unlimited plans overflow protection and worker retry lifecycle", () =>
         )
       ).rows[0];
       expect(dueJob.status).toBe("queued");
-      expect(dueJob.attempt).toBe(2);
+      expect(dueJob.attempt).toBe(1);
       expect(dueJob.reclaims).toBe(1);
       expect(dueJob.error_code).toBeNull();
 

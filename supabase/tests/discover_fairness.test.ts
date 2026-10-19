@@ -2,7 +2,10 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync, readdirSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-// A refresh discover that has waited six hours is claimed before collects.
+// An overdue refresh discover is claimed before collects. Overdue is the
+// channel's catalogue age (20261116000000): older than the plan's interval plus
+// 6 hours of grace, 30 hours here (no plan: 1440 minutes). It was the job's age
+// in 20261115000000, which a re-created job reset.
 //
 // Production, 2026-10-18 21:35 UTC: 116 refresh discovers queued and eligible,
 // 7 to 41 hours old (median 40), none claimed since 10-17: 20261031000000 put
@@ -15,6 +18,7 @@ const W = "00000000-0000-4000-8000-000000000001";
 const CATALOGUED = "00000000-0000-4000-8000-0000000000a1";
 const UNCATALOGUED = "00000000-0000-4000-8000-0000000000a2";
 const OTHER = "00000000-0000-4000-8000-0000000000a3";
+const FRESH = "00000000-0000-4000-8000-0000000000a4";
 
 let db: PGlite;
 
@@ -76,8 +80,9 @@ describe("claim order between refresh discovers and collects", () => {
       `insert into channels(id, workspace_id, client_id, external_channel_id, platform, catalogued_at)
        values ($1, $4, $4, 'UC_catalogued', 'youtube', now() - interval '2 days'),
               ($2, $4, $4, 'UC_uncatalogued', 'youtube', null),
-              ($3, $4, $4, 'UC_other', 'youtube', now() - interval '2 days')`,
-      [CATALOGUED, UNCATALOGUED, OTHER, W],
+              ($3, $4, $4, 'UC_other', 'youtube', now() - interval '2 days'),
+              ($5, $4, $4, 'UC_fresh', 'youtube', now() - interval '1 hour')`,
+      [CATALOGUED, UNCATALOGUED, OTHER, W, FRESH],
     );
   });
 
@@ -89,7 +94,7 @@ describe("claim order between refresh discovers and collects", () => {
     await db.exec("delete from sync_runs; delete from jobs");
   });
 
-  it("claims a refresh discover that has waited more than six hours before a collect", async () => {
+  it("claims a refresh discover for a two-day-old catalogue before a collect", async () => {
     // The collect has been eligible longer; under the old order it went first
     // and the discover waited for the queue of collects to run dry.
     await job("collect", OTHER, "collect", "10 hours", {
@@ -100,8 +105,8 @@ describe("claim order between refresh discovers and collects", () => {
     expect(await claim()).toBe("collect");
   });
 
-  it("keeps a younger refresh discover behind the collects", async () => {
-    await job("young-refresh", CATALOGUED, "discover", "5 hours", {
+  it("keeps a refresh discover behind the collects while its channel's catalogue is fresh", async () => {
+    await job("young-refresh", FRESH, "discover", "5 hours", {
       notBefore: "-5 hours",
     });
     await job("collect", OTHER, "collect", "1 hour");
