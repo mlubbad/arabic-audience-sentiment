@@ -120,8 +120,10 @@ across workspaces internally and never expose one customer's data to another.
       - genre classification as our own categories;
       - no inference of protected attributes.
 
-      A reviewer comparing this form with the policy would see the gap. The fix is roadmap task
-      0.5: a Claude PR with the Arabic and English text, approved by the owner.
+      A reviewer comparing this form with the policy would see the gap. **Fixed in the same PR
+      as this document** (`apps/web/src/legal/{en,ar}.ts`, updated 2026-10-19). It also corrects a
+      false line, "no comment … is sent to external AI providers": topics go to the Gemini API.
+      Submit only after that PR is merged and deployed.
 - [ ] Attach `docs/quota-application/supporting-materials.pdf`, architecture and user-flow
       diagrams. They predate public channels and channel stats, so regenerate them or add a note.
 
