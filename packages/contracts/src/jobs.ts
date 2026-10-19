@@ -230,6 +230,35 @@ export const ChannelProfileCommit = z
 
 export type ChannelProfileCommit = z.infer<typeof ChannelProfileCommit>;
 
+export const CandidateProfilesCommit = z
+  .object({
+    job_id: z.string().uuid(),
+    lease_token: z.string().uuid(),
+    profiles: z
+      .array(
+        z
+          .object({
+            external_channel_id: z.string().min(1).max(200),
+            subscriber_count: z
+              .number()
+              .int()
+              .nonnegative()
+              .nullable()
+              .optional(),
+            subscriber_count_hidden: z.boolean().nullable().optional(),
+            view_count: z.number().int().nonnegative().nullable().optional(),
+            video_count: z.number().int().nonnegative().nullable().optional(),
+            country: z.string().nullable().optional(),
+            default_language: z.string().nullable().optional(),
+            topic_categories: z.array(z.string()).nullable().optional(),
+          })
+          .strict(),
+      )
+      .max(50),
+  })
+  .strict();
+export type CandidateProfilesCommit = z.infer<typeof CandidateProfilesCommit>;
+
 /**
  * The billable event key for one analysed comment.
  *
