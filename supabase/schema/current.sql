@@ -604,6 +604,68 @@ CREATE INDEX audit_events_by_time ON public.audit_events USING btree (created_at
 CREATE UNIQUE INDEX audit_events_pkey ON public.audit_events USING btree (id);
 CREATE INDEX audit_events_recent ON public.audit_events USING btree (workspace_id, created_at DESC);
 
+create table "public"."channel_genre_reviews" (
+  "id" uuid default gen_random_uuid() not null,
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "taxonomy_version" integer not null,
+  "main_key" text not null,
+  "primary_key" text,
+  "secondary_keys" text[] default '{}'::text[] not null,
+  "reason" text,
+  "reviewer_id" uuid not null,
+  "created_at" timestamp with time zone default now() not null
+);
+alter table "public"."channel_genre_reviews" enable row level security;
+
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_channel_id_not_null" NOT NULL channel_id;
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_created_at_not_null" NOT NULL created_at;
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_id_not_null" NOT NULL id;
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_main_key_not_null" NOT NULL main_key;
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_pkey" PRIMARY KEY (id);
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_reviewer_id_fkey" FOREIGN KEY (reviewer_id) REFERENCES auth.users(id);
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_reviewer_id_not_null" NOT NULL reviewer_id;
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_secondary_keys_not_null" NOT NULL secondary_keys;
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_taxonomy_version_main_key_fkey" FOREIGN KEY (taxonomy_version, main_key) REFERENCES genre_taxonomy(version, key);
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_taxonomy_version_not_null" NOT NULL taxonomy_version;
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_taxonomy_version_primary_key_fkey" FOREIGN KEY (taxonomy_version, primary_key) REFERENCES genre_taxonomy(version, key);
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "public"."channel_genre_reviews" add constraint "channel_genre_reviews_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX channel_genre_reviews_latest ON public.channel_genre_reviews USING btree (workspace_id, channel_id, created_at DESC, id DESC);
+CREATE UNIQUE INDEX channel_genre_reviews_pkey ON public.channel_genre_reviews USING btree (id);
+
+create table "public"."channel_genres" (
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "classification_key" text not null,
+  "taxonomy_version" integer not null,
+  "genre_key" text not null,
+  "level" smallint not null,
+  "weight" numeric(5,4) not null,
+  "videos" integer not null,
+  "computed_at" timestamp with time zone not null
+);
+alter table "public"."channel_genres" enable row level security;
+
+alter table "public"."channel_genres" add constraint "channel_genres_channel_id_not_null" NOT NULL channel_id;
+alter table "public"."channel_genres" add constraint "channel_genres_classification_key_not_null" NOT NULL classification_key;
+alter table "public"."channel_genres" add constraint "channel_genres_computed_at_not_null" NOT NULL computed_at;
+alter table "public"."channel_genres" add constraint "channel_genres_genre_key_not_null" NOT NULL genre_key;
+alter table "public"."channel_genres" add constraint "channel_genres_level_check" CHECK (level >= 1 AND level <= 3);
+alter table "public"."channel_genres" add constraint "channel_genres_level_not_null" NOT NULL level;
+alter table "public"."channel_genres" add constraint "channel_genres_pkey" PRIMARY KEY (workspace_id, channel_id, classification_key, genre_key);
+alter table "public"."channel_genres" add constraint "channel_genres_taxonomy_version_genre_key_fkey" FOREIGN KEY (taxonomy_version, genre_key) REFERENCES genre_taxonomy(version, key);
+alter table "public"."channel_genres" add constraint "channel_genres_taxonomy_version_not_null" NOT NULL taxonomy_version;
+alter table "public"."channel_genres" add constraint "channel_genres_videos_check" CHECK (videos > 0);
+alter table "public"."channel_genres" add constraint "channel_genres_videos_not_null" NOT NULL videos;
+alter table "public"."channel_genres" add constraint "channel_genres_weight_check" CHECK (weight >= 0::numeric AND weight <= 1::numeric);
+alter table "public"."channel_genres" add constraint "channel_genres_weight_not_null" NOT NULL weight;
+alter table "public"."channel_genres" add constraint "channel_genres_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "public"."channel_genres" add constraint "channel_genres_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE UNIQUE INDEX channel_genres_pkey ON public.channel_genres USING btree (workspace_id, channel_id, classification_key, genre_key);
+
 create table "public"."channel_stats_daily" (
   "workspace_id" uuid not null,
   "channel_id" uuid not null,
@@ -4887,6 +4949,50 @@ begin
 end;
 $function$
 
+CREATE OR REPLACE FUNCTION private.refresh_channel_genres(w uuid, c uuid, p_key text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare v int;
+begin
+ select max(taxonomy_version) into v from public.video_genre_predictions p
+  join public.videos vd on vd.workspace_id=p.workspace_id and vd.id=p.video_id
+ where p.workspace_id=w and vd.channel_id=c and p.classification_key=p_key and p.status='succeeded';
+ delete from public.channel_genres where workspace_id=w and channel_id=c and classification_key=p_key;
+ if v is null then return; end if;
+ with recent as (
+  select p.genre_key,p.video_id,vd.published_at,vd.view_count,
+         ln(1+coalesce(vd.view_count,0)::numeric)+1 as popularity,
+         case when vd.published_at is null then 0.5 else power(0.5::numeric,
+           greatest(0,extract(epoch from (now()-vd.published_at))/86400)/90) end as recency
+   from public.video_genre_predictions p join public.videos vd
+    on vd.workspace_id=p.workspace_id and vd.id=p.video_id
+  where p.workspace_id=w and vd.channel_id=c and p.classification_key=p_key
+    and p.taxonomy_version=v and p.status='succeeded'
+  order by vd.published_at desc nulls last,vd.id limit 50
+ ), enough as (select count(distinct video_id) n from recent), rolled as (
+  select g.version,g.key,g.level,r.video_id,r.popularity*r.recency raw_weight
+   from recent r join public.genre_taxonomy leaf on leaf.version=v and leaf.key=r.genre_key
+   join public.genre_taxonomy g on g.version=leaf.version and
+    (g.key=leaf.key or g.key=leaf.parent_key or g.key=(select p.parent_key from public.genre_taxonomy p where p.version=leaf.version and p.key=leaf.parent_key))
+ ), agg as (
+  select version,key,level,count(distinct video_id)::int videos,sum(raw_weight) raw_weight
+    from rolled group by version,key,level
+ ), normalized as (
+  select a.*,sum(raw_weight) over(partition by level) total from agg a
+ )
+ insert into public.channel_genres(workspace_id,channel_id,classification_key,taxonomy_version,genre_key,level,weight,videos,computed_at)
+ select w,c,p_key,n.version,n.key,n.level,
+        case when row_number() over(partition by n.level order by n.raw_weight desc,n.key)=1
+          then (1 - coalesce(sum(round((n.raw_weight/n.total)::numeric,4)) over(partition by n.level
+                    order by n.raw_weight desc,n.key rows between 1 following and unbounded following),0))::numeric(5,4)
+          else round((raw_weight/total)::numeric,4) end,
+        videos,now()
+ from normalized n, enough where enough.n>=5;
+end $function$
+
 CREATE OR REPLACE FUNCTION private.refresh_video_comment_stats(pairs jsonb)
  RETURNS void
  LANGUAGE plpgsql
@@ -6329,7 +6435,7 @@ CREATE OR REPLACE FUNCTION private.worker_commit_genres(token_hash text, j uuid,
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare w uuid; c uuid; kind text; current_version int; hash text; prior text; n int;
+declare w uuid; c uuid; kind text; current_version int; hash text; prior text; n int; k text;
 begin
   w := private.worker_job(token_hash, j, t);
   select channel_id, type into c, kind from public.jobs where id = j;
@@ -6399,10 +6505,11 @@ begin
       model_id = excluded.model_id, prompt_version = excluded.prompt_version,
       error_code = excluded.error_code, predicted_at = now()
     where public.video_genre_predictions.status = 'failed'
-    returning 1)
-  select count(*)::int into n from written;
+    returning classification_key)
+  select count(*)::int, min(classification_key) into n, k from written;
   insert into private.job_batches(job_id, batch_key, checkpoint, payload_hash, outcome)
   values (j, b, '{}'::jsonb, hash, 'partial');
+  if k is not null then perform private.refresh_channel_genres(w, c, k); end if;
   return jsonb_build_object('replayed', false, 'stored', n);
 end $function$
 
@@ -8432,6 +8539,58 @@ CREATE OR REPLACE FUNCTION public.cancel_job(w uuid, j uuid)
  SET search_path TO ''
 AS $function$select private.cancel_job_impl(w,j)$function$
 
+CREATE OR REPLACE FUNCTION public.channel_genre_profile(p_channel uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare w uuid; outval jsonb;
+begin
+ select workspace_id into w from public.channels where id=p_channel;
+ if not private.has_role(w) then raise exception 'forbidden' using errcode='42501'; end if;
+ if not private.switch_on('genre_classification') then return jsonb_build_object('blocked','genre_classification_off'); end if;
+ with all_model_rows as (select cg.*,g.name_ar,g.name_en,g.parent_key,g.position from public.channel_genres cg join public.genre_taxonomy g on g.version=cg.taxonomy_version and g.key=cg.genre_key where cg.workspace_id=w and cg.channel_id=p_channel), totals as (select taxonomy_version,classification_key,max(computed_at) computed_at from all_model_rows group by 1,2 order by max(computed_at) desc limit 1), model_rows as (select a.* from all_model_rows a join totals t using(taxonomy_version,classification_key)), latest as (select * from public.channel_genre_reviews where workspace_id=w and channel_id=p_channel order by created_at desc,id desc limit 1), video_total as (select sum(videos)::int videos from model_rows where level=1), main as (select * from model_rows where level=1 order by weight desc,position limit 1), primary_genre as (select c.* from model_rows c join main m on c.parent_key=m.genre_key where c.level=2 order by c.weight desc,c.position limit 1)
+ select jsonb_build_object('taxonomy_version',t.taxonomy_version,'classification_key',t.classification_key,'source',case when rv.id is not null then 'reviewed' when t.taxonomy_version is not null then 'model' else null end,'main',coalesce(rv.main_key,m.genre_key),'primary',coalesce(rv.primary_key,pg.genre_key),'secondary',coalesce(to_jsonb(rv.secondary_keys), (select coalesce(jsonb_agg(x.genre_key order by x.position),'[]'::jsonb) from model_rows x where x.level in (2,3) and x.genre_key<>coalesce(pg.genre_key,'') and x.weight>=.15 and (m.genre_key is null or x.genre_key<>m.genre_key) and (pg.genre_key is null or x.parent_key<>pg.genre_key))),'weights',coalesce((select jsonb_agg(jsonb_build_object('genre_key',genre_key,'level',level,'weight',weight,'name_ar',name_ar,'name_en',name_en) order by level,position) from model_rows),'[]'::jsonb),'videos',vt.videos,'computed_at',t.computed_at) into outval from totals t full join (select 1) z on true left join video_total vt on true left join main m on true left join primary_genre pg on true left join latest rv on true;
+ return coalesce(outval,jsonb_build_object('taxonomy_version',null,'classification_key',null,'source',null,'main',null,'primary',null,'secondary','[]'::jsonb,'weights','[]'::jsonb,'videos',null,'computed_at',null));
+end $function$
+
+CREATE OR REPLACE FUNCTION public.channel_genre_review_clear(p_channel uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare w uuid; me uuid:=auth.uid(); begin
+ select workspace_id into w from public.channels where id=p_channel;
+ if me is null or not private.has_role(w,array['workspace_owner','analyst']) then raise exception 'forbidden' using errcode='42501'; end if;
+ delete from public.channel_genre_reviews where workspace_id=w and channel_id=p_channel;
+ insert into public.audit_events(workspace_id,actor_id,action,target_type,target_id) values(w,me,'channel_genre_review_clear','channel',p_channel::text);
+end $function$
+
+CREATE OR REPLACE FUNCTION public.channel_genre_review_set(p_channel uuid, p_main text, p_primary text, p_secondary text[], p_reason text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare w uuid; me uuid:=auth.uid(); v_taxonomy int; rid uuid;
+begin
+ select workspace_id into w from public.channels where id=p_channel;
+ if me is null or not private.has_role(w,array['workspace_owner','analyst']) then raise exception 'forbidden' using errcode='42501'; end if;
+ if p_reason is not null and length(p_reason) > 500 then
+   raise exception 'invalid_input' using errcode='22023';
+ end if;
+ select max(gtv.version) into v_taxonomy from public.genre_taxonomy_versions gtv;
+ if p_secondary is null or cardinality(p_secondary)>5 or cardinality(p_secondary)<>(select count(distinct x) from unnest(p_secondary) x)
+  or not exists(select 1 from public.genre_taxonomy g where g.version=v_taxonomy and g.key=p_main and g.level=1)
+  or (p_primary is not null and not exists(select 1 from public.genre_taxonomy g where g.version=v_taxonomy and g.key=p_primary and g.parent_key=p_main and g.level=2))
+  or exists(select 1 from unnest(p_secondary) x left join public.genre_taxonomy g on g.version=v_taxonomy and g.key=x where g.key is null or g.level not in (2,3)) then raise exception 'invalid_input' using errcode='22023'; end if;
+ insert into public.channel_genre_reviews(workspace_id,channel_id,taxonomy_version,main_key,primary_key,secondary_keys,reason,reviewer_id) values(w,p_channel,v_taxonomy,p_main,p_primary,p_secondary,p_reason,me) returning id into rid;
+ insert into public.audit_events(workspace_id,actor_id,action,target_type,target_id) values(w,me,'channel_genre_review_set','channel',p_channel::text);
+ return rid;
+end $function$
+
 CREATE OR REPLACE FUNCTION public.channel_lookup_reader_grant()
  RETURNS TABLE(connection_id uuid, encrypted_tokens bytea, key_version text)
  LANGUAGE sql
@@ -9939,6 +10098,8 @@ $function$
 create policy "addon_prices_read" on "public"."addon_prices" to anon, authenticated for select using (true);
 create policy "tenant_read" on "public"."analysis_runs" to authenticated for select using (private.has_role(workspace_id));
 create policy "owner_read" on "public"."audit_events" to authenticated for select using (private.has_role(workspace_id, ARRAY['workspace_owner'::text]));
+create policy "tenant_read" on "public"."channel_genre_reviews" to authenticated for select using (private.has_role(workspace_id));
+create policy "tenant_read" on "public"."channel_genres" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."channel_stats_daily" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."channels" to authenticated for select using (private.has_role(workspace_id));
 create policy "clients_insert" on "public"."clients" to authenticated for insert with check (private.has_role(workspace_id, ARRAY['workspace_owner'::text]));
@@ -10217,6 +10378,36 @@ grant SELECT on table "public"."audit_events" to "service_role";
 grant TRIGGER on table "public"."audit_events" to "service_role";
 grant TRUNCATE on table "public"."audit_events" to "service_role";
 grant UPDATE on table "public"."audit_events" to "service_role";
+grant SELECT on table "public"."channel_genre_reviews" to "authenticated";
+grant DELETE on table "public"."channel_genre_reviews" to "postgres";
+grant INSERT on table "public"."channel_genre_reviews" to "postgres";
+grant REFERENCES on table "public"."channel_genre_reviews" to "postgres";
+grant SELECT on table "public"."channel_genre_reviews" to "postgres";
+grant TRIGGER on table "public"."channel_genre_reviews" to "postgres";
+grant TRUNCATE on table "public"."channel_genre_reviews" to "postgres";
+grant UPDATE on table "public"."channel_genre_reviews" to "postgres";
+grant DELETE on table "public"."channel_genre_reviews" to "service_role";
+grant INSERT on table "public"."channel_genre_reviews" to "service_role";
+grant REFERENCES on table "public"."channel_genre_reviews" to "service_role";
+grant SELECT on table "public"."channel_genre_reviews" to "service_role";
+grant TRIGGER on table "public"."channel_genre_reviews" to "service_role";
+grant TRUNCATE on table "public"."channel_genre_reviews" to "service_role";
+grant UPDATE on table "public"."channel_genre_reviews" to "service_role";
+grant SELECT on table "public"."channel_genres" to "authenticated";
+grant DELETE on table "public"."channel_genres" to "postgres";
+grant INSERT on table "public"."channel_genres" to "postgres";
+grant REFERENCES on table "public"."channel_genres" to "postgres";
+grant SELECT on table "public"."channel_genres" to "postgres";
+grant TRIGGER on table "public"."channel_genres" to "postgres";
+grant TRUNCATE on table "public"."channel_genres" to "postgres";
+grant UPDATE on table "public"."channel_genres" to "postgres";
+grant DELETE on table "public"."channel_genres" to "service_role";
+grant INSERT on table "public"."channel_genres" to "service_role";
+grant REFERENCES on table "public"."channel_genres" to "service_role";
+grant SELECT on table "public"."channel_genres" to "service_role";
+grant TRIGGER on table "public"."channel_genres" to "service_role";
+grant TRUNCATE on table "public"."channel_genres" to "service_role";
+grant UPDATE on table "public"."channel_genres" to "service_role";
 grant SELECT on table "public"."channel_stats_daily" to "authenticated";
 grant DELETE on table "public"."channel_stats_daily" to "postgres";
 grant INSERT on table "public"."channel_stats_daily" to "postgres";
@@ -10741,6 +10932,8 @@ grant EXECUTE on function private.reconcile_video_comment_stats(uuid) to "servic
 grant EXECUTE on function private.record_admin_digest() to "postgres";
 grant EXECUTE on function private.refresh_channel_compare(uuid) to "postgres";
 grant EXECUTE on function private.refresh_channel_compare_channel(uuid,uuid) to "postgres";
+grant EXECUTE on function private.refresh_channel_genres(uuid,uuid,text) to "postgres";
+grant EXECUTE on function private.refresh_channel_genres(uuid,uuid,text) to "service_role";
 grant EXECUTE on function private.refresh_video_comment_stats(jsonb) to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_delete() to "postgres";
 grant EXECUTE on function private.refresh_video_comment_stats_after_comment_insert() to "postgres";
@@ -10942,6 +11135,12 @@ grant EXECUTE on function billing_record_unmapped(text,text,jsonb) to "postgres"
 grant EXECUTE on function billing_record_unmapped(text,text,jsonb) to "service_role";
 grant EXECUTE on function cancel_job(uuid,uuid) to "authenticated";
 grant EXECUTE on function cancel_job(uuid,uuid) to "postgres";
+grant EXECUTE on function channel_genre_profile(uuid) to "authenticated";
+grant EXECUTE on function channel_genre_profile(uuid) to "postgres";
+grant EXECUTE on function channel_genre_review_clear(uuid) to "authenticated";
+grant EXECUTE on function channel_genre_review_clear(uuid) to "postgres";
+grant EXECUTE on function channel_genre_review_set(uuid,text,text,text[],text) to "authenticated";
+grant EXECUTE on function channel_genre_review_set(uuid,text,text,text[],text) to "postgres";
 grant EXECUTE on function channel_lookup_reader_grant() to "postgres";
 grant EXECUTE on function channel_lookup_reader_grant() to "service_role";
 grant EXECUTE on function competitor_candidate_add(uuid,text,text,text) to "authenticated";
