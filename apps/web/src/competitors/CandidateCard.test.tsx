@@ -10,7 +10,7 @@ const entry = suggestionsSchema.parse({
     title: "قناتي",
     handle: null,
     subscriber_count: null,
-    subscriber_count_hidden: false,
+    subscriber_count_hidden: null,
     country: null,
     default_language: null,
     topic_categories: null,
@@ -49,6 +49,7 @@ describe("CandidateCard", () =>
     );
     expect(screen.getByText("@other")).toBeTruthy();
     expect(screen.getByText(/لا تكفي البيانات بعد/)).toBeTruthy();
+    expect(screen.queryByText("future_reason")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
     expect(document.querySelector(".competitor-card")?.textContent).toContain(
       "—",

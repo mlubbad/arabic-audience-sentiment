@@ -66,6 +66,10 @@ export const ar = {
   compStop: "إيقاف المتابعة",
   compDismiss: "إخفاء",
   compLimitError: "تم بلوغ حد الخطة. اطّلع على الخطط والأسعار.",
+  compLimitLead: (limit: number) =>
+    `تتيح خطتك متابعة ${limit} منافسين كحد أقصى.`,
+  compSeePlans: "اطّلع على الخطط",
+  compOf: "من",
   compAdd: "رابط قناة أو معرّفها",
   compSharedTopics: (n: string) => `${n} موضوعًا مشتركًا`,
   compSameLanguage: "اللغة نفسها",

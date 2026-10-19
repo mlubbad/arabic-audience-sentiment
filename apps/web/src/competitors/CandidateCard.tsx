@@ -1,6 +1,7 @@
 import { useStrings } from "../strings";
 import { n } from "../dashboard/format";
 import type { Suggestions } from "../api/competitors";
+import { Button } from "../ui/Button";
 export function CandidateCard({
   item,
   canEdit,
@@ -77,15 +78,19 @@ export function CandidateCard({
       </ul>
       {canEdit && (
         <div className="competitor-actions">
-          <button
+          <Button
             disabled={pending}
             onClick={() => act(item.status === "tracked" ? "clear" : "tracked")}
           >
             {item.status === "tracked" ? S.compStop : S.compTrack}
-          </button>
-          <button disabled={pending} onClick={() => act("dismissed")}>
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={pending}
+            onClick={() => act("dismissed")}
+          >
             {S.compDismiss}
-          </button>
+          </Button>
         </div>
       )}
     </article>

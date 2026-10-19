@@ -1,11 +1,11 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import * as ToastPrimitive from "@radix-ui/react-toast";
 import { cn } from "./cn";
 
 interface ToastItem {
   id: number;
   title: string;
-  description?: string;
+  description?: ReactNode;
 }
 
 let items: ToastItem[] = [];
@@ -29,7 +29,7 @@ function getSnapshot() {
  *  shape `locale.ts` already uses, and for the same reason: `toast()` must
  *  be callable from a mutation's onSuccess handler, far from any provider,
  *  with nothing to forget to wrap. */
-export function toast(input: { title: string; description?: string }) {
+export function toast(input: { title: string; description?: ReactNode }) {
   items = [...items, { id: nextId++, ...input }];
   emit();
 }

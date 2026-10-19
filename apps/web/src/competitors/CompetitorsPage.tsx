@@ -1,52 +1,52 @@
-import { useState } from "react";
-import { useSearchParams } from "react-router";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "../supabase";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import { useSession, useWorkspaces } from "../session";
 import { useStrings } from "../strings";
 import { toast } from "../ui/Toast";
 import { EmptyState, Loading, LoadError } from "../pageStates/PageStates";
+import { Labelled } from "../ui/Labelled";
+import { SelectItem } from "../ui/Select";
+import { Button } from "../ui/Button";
+import { BudgetMeter } from "../ui/BudgetMeter";
 import { CandidateCard } from "./CandidateCard";
 import { AddCompetitor } from "./AddCompetitor";
-import { useCompetitors } from "./useCompetitors";
+import {
+  useAddCompetitorCandidate,
+  useChannelLookup,
+  useCompetitorChannels,
+  useCompetitors,
+  useMyCompetitorRole,
+} from "./useCompetitors";
 import "./competitors.css";
+
 export function CompetitorsPage() {
   const S = useStrings(),
     { session } = useSession(),
     { workspaces } = useWorkspaces(session);
   const [params, setParams] = useSearchParams();
   const ws = params.get("ws") || workspaces[0]?.id || null;
-  const channels = useQuery({
-    queryKey: ["competitor-channels", ws],
-    enabled: !!ws && !!supabase,
-    queryFn: async () => {
-      const { data, error } = await supabase!
-        .from("channels")
-        .select("id,title,subscriber_count,view_count,video_count,platform")
-        .eq("workspace_id", ws!)
-        .eq("platform", "youtube");
-      if (error) throw error;
-      return data;
-    },
-  });
+  const channels = useCompetitorChannels(session ? ws : null);
   const channel = params.get("channel") || channels.data?.[0]?.id || null;
   const query = useCompetitors(channel);
-  const roleQuery = useQuery({
-    queryKey: ["competitor-role", ws],
-    enabled: !!ws && !!supabase,
-    queryFn: async () => {
-      const { data, error } = await supabase!
-        .from("memberships")
-        .select("role")
-        .eq("workspace_id", ws!)
-        .eq("user_id", session!.user.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data?.role;
-    },
-  });
+  const addCandidate = useAddCompetitorCandidate(channel);
+  const roleQuery = useMyCompetitorRole(session ? ws : null);
   const canEdit =
     roleQuery.data === "workspace_owner" || roleQuery.data === "analyst";
+  const [lookupInput, setLookupInput] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<{
+    id: string;
+    title: string;
+    handle: string | null;
+  } | null>(null);
+  const lookup = useChannelLookup(ws, lookupInput);
+  const adding = addCandidate.isPending;
+  const [addError, setAddError] = useState<string | null>(null);
+  useEffect(() => {
+    if (lookup.data) setResolved(lookup.data);
+  }, [lookup.data]);
+  useEffect(() => {
+    if (lookup.error) setAddError(lookup.error.message);
+  }, [lookup.error]);
   if (!session)
     return (
       <main className="competitors-page">
@@ -77,83 +77,45 @@ export function CompetitorsPage() {
       />
     );
   const data = query.data;
-  const [resolved, setResolved] = useState<{
-    id: string;
-    title: string;
-    handle: string | null;
-  } | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-  async function searchCandidate(input: string) {
+  function searchCandidate(input: string) {
     setAddError(null);
-    const { data: result, error } = await supabase!.functions.invoke(
-      "channel-lookup",
-      { body: { workspace_id: ws, query: input, platform: "youtube" } },
-    );
-    if (error) {
-      setAddError(error.message);
-      return;
-    }
-    const candidate = (
-      result as {
-        candidates?: {
-          external_id: string;
-          title: string;
-          handle?: string | null;
-        }[];
-      }
-    )?.candidates?.[0];
-    if (!candidate) {
-      setAddError("channel_lookup_empty");
-      return;
-    }
-    setResolved({
-      id: candidate.external_id,
-      title: candidate.title,
-      handle: candidate.handle ?? null,
-    });
+    setResolved(null);
+    setLookupInput(input);
   }
   async function addResolved() {
     if (!resolved || !channel) return;
-    setAdding(true);
-    const { error } = await supabase!.rpc("competitor_candidate_add", {
-      p_channel: channel,
-      p_external: resolved.id,
-      p_title: resolved.title,
-      p_handle: resolved.handle,
-    });
-    setAdding(false);
-    if (error) {
+    try {
+      await addCandidate.mutateAsync(resolved);
+      setResolved(null);
+      setLookupInput(null);
+      await query.refetch();
+    } catch (error) {
       setAddError(
-        error.message.match(
-          /forbidden|invalid_candidate|invalid_input|candidate_limit_reached/,
-        )?.[0] ?? "competitor_candidate_add_failed",
+        error instanceof Error
+          ? error.message
+          : "competitor_candidate_add_failed",
       );
-      return;
     }
-    setResolved(null);
-    await query.refetch();
   }
   return (
     <main className="competitors-page">
       <header>
         <h1>{S.titleCompetitors}</h1>
-        <label>
-          {S.compChoose}
-          <select
-            value={channel ?? ""}
-            onChange={(e) => {
-              params.set("channel", e.target.value);
-              setParams(params);
-            }}
-          >
-            {channels.data.map((c) => (
-              <option value={c.id} key={c.id}>
-                {c.title || c.id}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Labelled
+          id="competitor-channel"
+          label={S.compChoose}
+          value={channel ?? ""}
+          onValueChange={(value) => {
+            params.set("channel", value);
+            setParams(params);
+          }}
+        >
+          {channels.data.map((c) => (
+            <SelectItem value={c.id} key={c.id}>
+              {c.title || c.id}
+            </SelectItem>
+          ))}
+        </Labelled>
       </header>
       {query.isPending ? (
         <Loading S={S} />
@@ -174,40 +136,43 @@ export function CompetitorsPage() {
                 {S.compFromYoutube}: {S.compSubscribers}{" "}
                 {data.channel.subscriber_count == null
                   ? "—"
-                  : data.channel.subscriber_count}{" "}
-                · {S.compViews}{" "}
-                {data.channel.view_count == null
-                  ? "—"
-                  : data.channel.view_count}{" "}
-                · {S.compVideos}{" "}
-                {data.channel.video_count == null
-                  ? "—"
-                  : data.channel.video_count}
+                  : data.channel.subscriber_count}
               </p>
-              <p>
-                {S.compTracked}: {data.tracked_count} /{" "}
-                {data.limit == null ? S.compUnlimited : data.limit}
-              </p>
+              {data.channel.profile_observed_at && (
+                <p>{data.channel.profile_observed_at}</p>
+              )}
+              <BudgetMeter
+                used={data.tracked_count}
+                allowance={data.limit ?? -1}
+                state={
+                  data.limit != null && data.tracked_count >= data.limit
+                    ? "exhausted"
+                    : "ok"
+                }
+                label={S.compTracked}
+                sentence={`${S.compTracked}: ${data.tracked_count} ${S.compOf} ${data.limit == null ? S.compUnlimited : data.limit}`}
+              />
             </section>
             <section>
               <h2>{S.compSuggestions}</h2>
               {canEdit && (
                 <>
-                  <AddCompetitor
-                    onAdd={(input) => void searchCandidate(input)}
-                  />
+                  <AddCompetitor onAdd={searchCandidate} />
                   {resolved && (
                     <div role="dialog" aria-label={S.compAdd}>
                       <p>{resolved.title}</p>
-                      <button
+                      <Button
                         disabled={adding}
                         onClick={() => void addResolved()}
                       >
                         {S.compAdd}
-                      </button>
-                      <button onClick={() => setResolved(null)}>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setResolved(null)}
+                      >
                         {S.addChannelCancel}
-                      </button>
+                      </Button>
                     </div>
                   )}
                   {addError && (
@@ -237,9 +202,14 @@ export function CompetitorsPage() {
                                   ? S.compLimitError
                                   : S.compError,
                               description:
-                                e.message === "competitor_limit_reached"
-                                  ? `${data.limit} · /pricing`
-                                  : e.message,
+                                e.message === "competitor_limit_reached" ? (
+                                  <>
+                                    {S.compLimitLead(data.limit ?? 0)}{" "}
+                                    <Link to="/pricing">{S.compSeePlans}</Link>
+                                  </>
+                                ) : (
+                                  e.message
+                                ),
                             }),
                         },
                       )

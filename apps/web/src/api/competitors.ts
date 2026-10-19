@@ -1,19 +1,21 @@
 import { z } from "zod";
 import { supabase } from "../supabase";
+import { lookupCode } from "../account/channelLookupError";
 
 const nullableNumber = z.number().nullable();
 const channelSchema = z
   .object({
     id: z.string(),
-    title: z.string().nullable(),
-    handle: z.string().nullable(),
-    subscriber_count: nullableNumber,
-    subscriber_count_hidden: z.boolean(),
-    view_count: nullableNumber.optional(),
-    video_count: nullableNumber.optional(),
-    country: z.string().nullable(),
-    default_language: z.string().nullable(),
-    profile_observed_at: z.string().nullable(),
+    title: z.string().nullable().optional(),
+    handle: z.string().nullable().optional(),
+    subscriber_count: nullableNumber.optional(),
+    subscriber_count_hidden: z.boolean().nullable().optional(),
+    country: z.string().nullable().optional(),
+    default_language: z.string().nullable().optional(),
+    topic_categories: z.array(z.string()).nullable().optional(),
+    channel_published_at: z.string().nullable().optional(),
+    profile_observed_at: z.string().nullable().optional(),
+    stats_observed_at: z.string().nullable().optional(),
   })
   .passthrough();
 const candidateSchema = z
@@ -42,7 +44,79 @@ export type Suggestions = z.infer<typeof suggestionsSchema>;
 export const competitorKeys = {
   all: ["competitors"] as const,
   channel: (id: string) => ["competitors", id] as const,
+  channels: (workspaceId: string) =>
+    ["competitors", "channels", workspaceId] as const,
+  role: (workspaceId: string) => ["competitors", "role", workspaceId] as const,
+  lookup: (workspaceId: string, input: string) =>
+    ["competitors", "lookup", workspaceId, input] as const,
 };
+export async function loadMyRole(workspaceId: string) {
+  if (!supabase) throw new Error("live_unavailable");
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+  if (sessionError) throw new Error("membership_session_failed");
+  const userId = sessionData.session?.user.id;
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from("memberships")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error("membership_role_failed");
+  return data?.role ?? null;
+}
+export async function lookupChannel(workspaceId: string, input: string) {
+  if (!supabase) throw new Error("live_unavailable");
+  const { data, error } = await supabase.functions.invoke("channel-lookup", {
+    body: { workspace_id: workspaceId, query: input, platform: "youtube" },
+  });
+  if (error)
+    throw new Error((await lookupCode(error)) || "channel_lookup_failed");
+  const candidate = (
+    data as {
+      candidates?: {
+        external_id: string;
+        title: string;
+        handle?: string | null;
+      }[];
+    } | null
+  )?.candidates?.[0];
+  if (!candidate) throw new Error("channel_lookup_empty");
+  return {
+    id: candidate.external_id,
+    title: candidate.title,
+    handle: candidate.handle ?? null,
+  };
+}
+export async function loadChannels(workspaceId: string) {
+  if (!supabase) throw new Error("live_unavailable");
+  const { data, error } = await supabase
+    .from("channels")
+    .select("id,title,subscriber_count,platform")
+    .eq("workspace_id", workspaceId)
+    .eq("platform", "youtube");
+  if (error) throw new Error("channels_failed");
+  return data;
+}
+export async function addCompetitorCandidate(
+  channel: string,
+  candidate: { id: string; title: string; handle: string | null },
+) {
+  if (!supabase) throw new Error("live_unavailable");
+  const { error } = await supabase.rpc("competitor_candidate_add", {
+    p_channel: channel,
+    p_external: candidate.id,
+    p_title: candidate.title,
+    p_handle: candidate.handle,
+  });
+  if (error)
+    throw new Error(
+      error.message.match(
+        /forbidden|invalid_candidate|invalid_input|candidate_limit_reached/,
+      )?.[0] ?? "competitor_candidate_add_failed",
+    );
+}
 export async function loadCompetitors(channel: string, signal?: AbortSignal) {
   if (!supabase) throw new Error("live_unavailable");
   const { data, error } = await supabase

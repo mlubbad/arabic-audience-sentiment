@@ -56,6 +56,10 @@ export const en: Strings = {
   compStop: "Stop tracking",
   compDismiss: "Dismiss",
   compLimitError: "Plan limit reached. See plans and pricing.",
+  compLimitLead: (limit: number) =>
+    `Your plan tracks up to ${limit} competitors.`,
+  compSeePlans: "See plans",
+  compOf: "of",
   compAdd: "Channel link or handle",
   compSharedTopics: (n: string) => `${n} shared topics`,
   compSameLanguage: "Same language",
