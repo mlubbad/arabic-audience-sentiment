@@ -23,7 +23,9 @@ export const FORBIDDEN_PATTERNS = [
   },
   {
     reason: "git write (the dispatcher commits and pushes)",
-    re: /\bgit\s+(push|commit|merge|rebase|reset\s+--hard|switch\s+-[cC]|checkout\s+-b|branch\s+-[dD]|tag|remote\s+add)\b/,
+    // (?![-\w]), not \b: `git merge-base` is a read, and \b matched it as `git merge`,
+    // which killed WO-22's round 3 on 2026-10-19.
+    re: /\bgit\s+(push|commit|merge|rebase|reset\s+--hard|switch\s+-[cC]|checkout\s+-b|branch\s+-[dD]|tag|remote\s+add)(?![-\w])/,
   },
   {
     reason: "credential access",

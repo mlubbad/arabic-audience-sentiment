@@ -22,6 +22,7 @@
 #   CODEX_BIN        path to the codex binary (default: PATH, then the ChatGPT.app bundle)
 #   CODEX_DRY_RUN=1  prepare the workspace and print the command, do not run Codex
 #   CODEX_RESUME=1   continue the uncommitted work of a run that stopped before its handoff
+#   CODEX_MERGE_MAIN=1  follow-up round only: merge origin/main into the branch before Codex runs
 #   CODEX_ALLOW_WORKFLOWS=1  let this work order change .github/workflows/**
 set -euo pipefail
 
@@ -127,6 +128,22 @@ fi
 # workspace's own .cache/ (gitignored); Codex's shells inherit this environment.
 export UV_CACHE_DIR="$workspace/.cache/uv" npm_config_cache="$workspace/.cache/npm"
 mkdir -p "$UV_CACHE_DIR" "$npm_config_cache"
+# BEGIN main merge (pinned by scripts/codex-dispatch.test.ts)
+# CODEX_MERGE_MAIN=1 merges origin/main into a follow-up round's branch before
+# Codex runs. Codex can't: git writes are this script's. A PR whose base moved
+# on needs it, as #176 did on 2026-10-19 when #178 took its migration version.
+# It runs after the hooks are unset, and with them disabled. A conflict aborts
+# the merge and stops here, because resolving it is the owner's call.
+merged_main=""
+if [ "${CODEX_MERGE_MAIN:-0}" = "1" ]; then
+  [ "$round" = "follow-up" ] || die "CODEX_MERGE_MAIN=1 applies to a follow-up round only (this is a $round round)"
+  if ! git -C "$workspace" -c core.hooksPath=/dev/null merge --no-verify --no-edit --quiet origin/main; then
+    git -C "$workspace" merge --abort || true
+    die "merging origin/main into $branch conflicts; resolve it by hand in $workspace, or ask the PM"
+  fi
+  merged_main="$(git -C "$workspace" rev-parse --short origin/main)"
+fi
+# END main merge
 base_sha="$(git -C "$workspace" rev-parse HEAD)"
 echo "codex-dispatch: $branch @ $base_sha ($base_ref, $round round) in $workspace"
 
@@ -149,6 +166,9 @@ else
   review="$(gh pr view "$open_pr" --json reviews --jq '[.reviews[] | select(.body | startswith("## PM review"))] | sort_by(.submittedAt) | last | .body // ""')"
   [ -n "$review" ] || die "no PM review found on PR #$open_pr; nothing for a follow-up round to address"
   task="جولة تعديل على $wo (issue #$issue, PR #$open_pr). نص أمر العمل في docs/agents/work-orders/$wo.md، ومراجعة PM منسوخة أدناه؛ لا تقرأ GitHub. أنت على الفرع $branch من آخر رأس له على origin، والتزاماتك السابقة موجودة. عالج بنود مراجعة PM أدناه فقط، ثم حدّث .codex-handoff كالعادة (commit.txt لهذا الالتزام فقط، وpr.md بالنص الكامل المحدّث للـPR). اتبع AGENTS.md وdocs/engineering/PLAYBOOK.md."
+  if [ -n "$merged_main" ]; then
+    task="$task دمج الموزّع origin/main ($merged_main) في هذا الفرع قبل بدئك، فبند الدمج في المراجعة منفّذ. لا تشغّل git merge ولا أي كتابة git."
+  fi
 fi
 prompt="$(printf '%s\n' "$task" "$extra" "" "$review" "" "$constraints_text")"
 

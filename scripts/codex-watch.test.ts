@@ -26,6 +26,8 @@ describe("codex-watch classifyLine", () => {
       "/bin/zsh -lc 'git commit -m \"feat: x\"'",
       "/bin/zsh -lc 'git switch -c codex/wo-13-x origin/main'",
       "/bin/zsh -lc 'git push origin HEAD:main'",
+      "/bin/zsh -lc 'git merge --no-edit origin/main'",
+      "/bin/zsh -lc 'git status && git merge origin/main'",
     ]) {
       expect(classifyLine(started(cmd))?.kind, cmd).toBe("forbidden");
     }
@@ -53,6 +55,8 @@ describe("codex-watch classifyLine", () => {
       "/bin/zsh -lc 'npm run test:db && npm run db:snapshot:check'",
       "/bin/zsh -lc 'gh issue view 72 --json title,body'",
       "/bin/zsh -lc 'gh pr view 74 --json state'",
+      // WO-22 round 3 (2026-10-19) was killed for this read.
+      "/bin/zsh -lc 'git log -5 --oneline && git merge-base --is-ancestor origin/main HEAD'",
     ]) {
       expect(classifyLine(started(cmd))?.kind, cmd).toBe("command");
     }

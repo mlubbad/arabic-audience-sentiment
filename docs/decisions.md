@@ -1,5 +1,10 @@
 # Implementation decisions
 
+2026-10-19 — The dispatcher, not Codex, merges `main` into a work-order branch. `CODEX_MERGE_MAIN=1`
+does it before a follow-up round runs, with hooks off, and a conflict stops the run. That keeps git
+writes outside the sandbox. It came up when #178 merged with the migration version #176 used, so
+#176 has to merge `main` and rename. The watcher no longer reads `git merge-base` as a git write.
+
 2026-10-19 — A stopped Codex run is resumed, not reset. `CODEX_RESUME=1` makes the dispatcher keep
 the workspace's uncommitted work, provided the workspace is on the work-order branch and origin is
 not ahead of it. It then reruns Codex under the watcher, with the PM's answer as the extra prompt.
