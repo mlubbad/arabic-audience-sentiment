@@ -119,7 +119,13 @@ describe("codex-dispatch base selection", () => {
     dir = undefined;
   });
 
-  const setup = (withBranch: boolean) => {
+  type Options = {
+    resume?: boolean;
+    dirty?: boolean;
+    onBranch?: boolean;
+    originAhead?: boolean;
+  };
+  const setup = (withBranch: boolean, opts: Options = {}) => {
     dir = mkdtempSync(join(tmpdir(), "codex-base-"));
     const run = (cwd: string, ...args: string[]) =>
       execFileSync("git", args, { cwd, stdio: "pipe" }).toString().trim();
@@ -141,20 +147,46 @@ describe("codex-dispatch base selection", () => {
     }
     const workspace = join(dir, "workspace");
     run(dir, "clone", "--quiet", origin, workspace);
-    const out = execFileSync(
-      "bash",
-      ["-c", `set -euo pipefail\n${block}\necho "$round $base_ref"`],
-      {
-        cwd: dir,
-        env: { ...process.env, workspace, branch: "codex/wo-1-x" },
-        stdio: "pipe",
-      },
-    )
-      .toString()
-      .trim();
+    if (opts.onBranch) {
+      run(workspace, "switch", "--quiet", "-c", "codex/wo-1-x");
+      if (withBranch)
+        run(workspace, "reset", "--quiet", "--hard", "origin/codex/wo-1-x");
+    }
+    if (opts.originAhead) {
+      run(seed, "commit", "--quiet", "--allow-empty", "-m", "pushed elsewhere");
+      run(seed, "push", "--quiet", "origin", "codex/wo-1-x");
+    }
+    if (opts.dirty) writeFileSync(join(workspace, "unfinished.txt"), "work\n");
+    let out = "";
+    let error = "";
+    try {
+      out = execFileSync(
+        "bash",
+        [
+          "-c",
+          `set -euo pipefail\ndie() { echo "die: $*" >&2; exit 1; }\n${block}\necho "$round $base_ref"`,
+        ],
+        {
+          cwd: dir,
+          env: {
+            ...process.env,
+            workspace,
+            branch: "codex/wo-1-x",
+            CODEX_RESUME: opts.resume ? "1" : "0",
+          },
+          stdio: "pipe",
+        },
+      )
+        .toString()
+        .trim();
+    } catch (failure) {
+      error = (failure as { stderr: Buffer }).stderr.toString();
+    }
     return {
       out,
+      error,
       head: run(workspace, "rev-parse", "HEAD"),
+      kept: existsSync(join(workspace, "unfinished.txt")),
       mainSha,
       branchSha,
     };
@@ -170,5 +202,42 @@ describe("codex-dispatch base selection", () => {
     const r = setup(false);
     expect(r.out).toBe("first origin/main");
     expect(r.head).toBe(r.mainSha);
+  });
+
+  // 2026-10-18: three stopped runs (WO-23 twice, WO-22 once) left the owner
+  // with `git reset --hard`, which deletes Codex's work, or a manual commit.
+  it("refuses a dirty workspace and names the resume switch, keeping the work", () => {
+    const r = setup(false, { dirty: true });
+    expect(r.out).toBe("");
+    expect(r.error).toContain("CODEX_RESUME=1");
+    expect(r.kept).toBe(true);
+  });
+
+  it("resumes a stopped first run in place, keeping its uncommitted work", () => {
+    const r = setup(false, { resume: true, onBranch: true, dirty: true });
+    expect(r.out).toBe("resume codex/wo-1-x, resumed");
+    expect(r.kept).toBe(true);
+    expect(r.head).toBe(r.mainSha);
+  });
+
+  it("resumes on top of a branch already on origin", () => {
+    const r = setup(true, { resume: true, onBranch: true, dirty: true });
+    expect(r.out).toBe("resume codex/wo-1-x, resumed");
+    expect(r.head).toBe(r.branchSha);
+  });
+
+  it("refuses to resume from another branch", () => {
+    const r = setup(false, { resume: true, dirty: true });
+    expect(r.error).toContain("resume: the workspace is on 'main'");
+  });
+
+  it("refuses to resume when origin has commits the workspace lacks", () => {
+    const r = setup(true, {
+      resume: true,
+      onBranch: true,
+      dirty: true,
+      originAhead: true,
+    });
+    expect(r.error).toContain("has commits this workspace lacks");
   });
 });

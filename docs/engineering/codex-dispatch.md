@@ -83,6 +83,7 @@ Every failure met while dispatching WO-13, its root cause, and the fix now in pl
 | 14 | WO-18 (2026-10-17): Codex's first `uv run` failed with `Failed to initialize cache at ~/.cache/uv … Operation not permitted`. Codex stopped as the constraints say. WO-15's `npm run check` had met the same wall. | `workspace-write` lets Codex write only inside the workspace; uv and npm cache under `~` by default. | The script exports `UV_CACHE_DIR` and `npm_config_cache` under the workspace's `.cache/` (gitignored) before Codex runs; Codex's shells inherit them. `scripts/codex-dispatch.test.ts` pins the export and the ignore rule. |
 | 15 | WO-18 round 2 (2026-10-17): the work was done and `npm run check` green, but `npm run test:e2e` gave 130 failed: `bootstrap_check_in org.chromium.Chromium.MachPortRendezvousServer…: Permission denied (1100)`. Codex stopped before the handoff. | Chromium registers a Mach port at launch, which the macOS sandbox denies. Yet `codex-constraints.md` listed `npm run test:e2e` among the commands to run, against PLAYBOOK §1 ("CI runs e2e"). | The constraints now tell Codex never to run e2e there and to say so; CI is the e2e gate for Codex PRs. |
 | 16 | WO-23 (2026-10-18): suites green (`npm run check`, 13 new tests, `db:snapshot:check`), then `semgrep` died with `PermissionError: … ~/.semgrep/semgrep.log` and `gitleaks` was `command not found`. Codex stopped before writing `.codex-handoff/commit.txt`; the next run refused the dirty workspace. | `AGENTS.md` asks for local Semgrep and gitleaks runs before security changes; inside `workspace-write` Semgrep cannot write its log under `~`, and gitleaks is not installed. The constraints did not say these are CI-only for Codex. | The constraints tell Codex not to run either, to say so, and to write the handoff anyway. Recovery for a run that stopped before the handoff is below. |
+| 17 | WO-22 (2026-10-18): Codex stopped at `npm run check` to ask whether it could add two audit labels outside its owned paths (the right call). The answer could reach it only by a hand-run `codex exec`, outside the watcher, because the dispatcher refuses a dirty workspace and offered only `git reset --hard`. That was the third stopped run in a day. | The dispatcher had no way to continue uncommitted work. | `CODEX_RESUME=1` continues it in place under the watcher, with the PM's answer as the extra prompt (above). `scripts/codex-dispatch.test.ts` pins the refusal message, the resume, and the two refusals: wrong branch, and origin ahead. |
 
 Related, not a failure: `.claude/settings.local.json` is tracked, so the allow rule the owner
 added for run 3 shows as a local diff there. Keep machine-specific rules in
@@ -90,9 +91,9 @@ added for run 3 shows as a local diff there. Keep machine-specific rules in
 
 ## When Codex stopped before the handoff
 
-The work is in `.codex-workspace/`, uncommitted, and the next run refuses to start
-("workspace has uncommitted changes"). **`git reset --hard && git clean -fd` deletes that
-work**; use it only to throw a run away. To keep it, from the repository root on the Mac:
+The work is in `.codex-workspace/`, uncommitted. A plain rerun refuses to start ("workspace has
+uncommitted changes"). **`git reset --hard && git clean -fd` deletes that work**; use it only to
+throw a run away. To keep it, from the repository root on the Mac:
 
 1. Back it up: `rsync -a --exclude node_modules --exclude .cache .codex-workspace/ ~/Desktop/<WO>-backup/`.
 2. Look at it: `git -C .codex-workspace status --short`. Nothing may be listed under the
@@ -100,24 +101,28 @@ work**; use it only to throw a run away. To keep it, from the repository root on
    `docs/agents/dispatch/`, the dispatcher and watcher, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
    `docs/progress.md`, `docs/verification.md`, `docs/decisions.md`, `docs/adr/`). If something
    is, stop and tell the PM.
-3. Have Codex write the two handoff files only:
-   `codex exec -C .codex-workspace -s workspace-write "Write only .codex-handoff/commit.txt and .codex-handoff/pr.md for the changes now in this tree (<WO>, issue #<N>), as item 3 of docs/agents/dispatch/codex-constraints.md says. Change no other file. Do not run semgrep, gitleaks or e2e. Rerun npm run check if you need real numbers."`
-4. Check both files exist and are not empty: `ls -l .codex-workspace/.codex-handoff/`.
-   Line 1 of `pr.md` must start with `<WO>: `.
-   If Codex cannot run (a usage limit, say), the PM writes both files instead, from Codex's
-   reported results, and says so in the PR.
-5. Commit, push and open the PR. These are the dispatcher's own step 6 commands, with hooks off,
-   chained with `&&` so a failed step stops the rest (2026-10-18: a missing `commit.txt` failed
-   the commit and the push still ran, publishing a branch with no new commit):
+3. Resume with the same arguments, and put the PM's answer to any question Codex asked in the
+   extra prompt:
    ```sh
-   cd .codex-workspace &&
-   test -s .codex-handoff/commit.txt && test -s .codex-handoff/pr.md &&
-   git add -A &&
-   git -c core.hooksPath=/dev/null commit --no-verify -F .codex-handoff/commit.txt &&
-   git -c core.hooksPath=/dev/null push --no-verify -u origin "$(git branch --show-current)" &&
-   gh pr create --base main --title "$(head -n 1 .codex-handoff/pr.md)" --body "$(tail -n +2 .codex-handoff/pr.md)"
+   CODEX_RESUME=1 scripts/codex-dispatch.sh <WO-N> <issue> <codex/wo-N-slug> "<PM's answer, if any>"
    ```
-   Then comment on the issue: `gh issue comment <N> --body "Ready for review: PR #<n> @ <sha>"`.
+   The script keeps the uncommitted work, checks the workspace is on that branch and that the
+   branch on origin is not ahead of it, then runs Codex under the watcher with a "finish what is
+   here" prompt. The guards, the commit, the push, the PR and the issue comment are the usual
+   steps 5 and 6.
+
+If Codex cannot run at all (a usage limit, say), the PM writes `.codex-handoff/commit.txt` and
+`.codex-handoff/pr.md` from Codex's reported results and says so in the PR. The owner then
+commits by hand, chained with `&&` so a failed step stops the rest (2026-10-18: a missing
+`commit.txt` failed the commit and the push still ran, publishing a branch with no new commit):
+```sh
+cd .codex-workspace &&
+test -s .codex-handoff/commit.txt && test -s .codex-handoff/pr.md &&
+git add -A &&
+git -c core.hooksPath=/dev/null commit --no-verify -F .codex-handoff/commit.txt &&
+git -c core.hooksPath=/dev/null push --no-verify -u origin "$(git branch --show-current)" &&
+gh pr create --base main --title "$(head -n 1 .codex-handoff/pr.md)" --body "$(tail -n +2 .codex-handoff/pr.md)"
+```
 
 ## What the dispatcher reports
 
