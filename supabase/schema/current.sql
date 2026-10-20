@@ -56,6 +56,82 @@ alter table "private"."admin_notes" add constraint "admin_notes_subject_not_null
 
 CREATE UNIQUE INDEX admin_notes_pkey ON private.admin_notes USING btree (id);
 
+create table "private"."audience_drain_failures" (
+  "workspace_id" uuid not null,
+  "video_id" uuid not null,
+  "sqlstate" text not null,
+  "failed_at" timestamp with time zone default now() not null
+);
+alter table "private"."audience_drain_failures" enable row level security;
+
+alter table "private"."audience_drain_failures" add constraint "audience_drain_failures_failed_at_not_null" NOT NULL failed_at;
+alter table "private"."audience_drain_failures" add constraint "audience_drain_failures_pkey" PRIMARY KEY (workspace_id, video_id);
+alter table "private"."audience_drain_failures" add constraint "audience_drain_failures_sqlstate_not_null" NOT NULL sqlstate;
+alter table "private"."audience_drain_failures" add constraint "audience_drain_failures_video_id_not_null" NOT NULL video_id;
+alter table "private"."audience_drain_failures" add constraint "audience_drain_failures_workspace_id_not_null" NOT NULL workspace_id;
+alter table "private"."audience_drain_failures" add constraint "audience_drain_failures_workspace_id_video_id_fkey" FOREIGN KEY (workspace_id, video_id) REFERENCES videos(workspace_id, id) ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX audience_drain_failures_pkey ON private.audience_drain_failures USING btree (workspace_id, video_id);
+
+create table "private"."audience_drain_state" (
+  "singleton" boolean default true not null,
+  "last_seen_at" timestamp with time zone,
+  "last_id" uuid
+);
+alter table "private"."audience_drain_state" enable row level security;
+
+alter table "private"."audience_drain_state" add constraint "audience_drain_state_pkey" PRIMARY KEY (singleton);
+alter table "private"."audience_drain_state" add constraint "audience_drain_state_singleton_check" CHECK (singleton);
+alter table "private"."audience_drain_state" add constraint "audience_drain_state_singleton_not_null" NOT NULL singleton;
+
+CREATE UNIQUE INDEX audience_drain_state_pkey ON private.audience_drain_state USING btree (singleton);
+
+create table "private"."audience_member_videos" (
+  "workspace_id" uuid not null,
+  "video_id" uuid not null,
+  "member_hash" bytea not null,
+  "comment_count" integer not null,
+  "first_seen_at" timestamp with time zone not null,
+  "last_seen_at" timestamp with time zone not null
+);
+alter table "private"."audience_member_videos" enable row level security;
+
+alter table "private"."audience_member_videos" add constraint "audience_member_videos_comment_count_not_null" NOT NULL comment_count;
+alter table "private"."audience_member_videos" add constraint "audience_member_videos_first_seen_at_not_null" NOT NULL first_seen_at;
+alter table "private"."audience_member_videos" add constraint "audience_member_videos_last_seen_at_not_null" NOT NULL last_seen_at;
+alter table "private"."audience_member_videos" add constraint "audience_member_videos_member_hash_not_null" NOT NULL member_hash;
+alter table "private"."audience_member_videos" add constraint "audience_member_videos_pkey" PRIMARY KEY (workspace_id, video_id, member_hash);
+alter table "private"."audience_member_videos" add constraint "audience_member_videos_video_id_not_null" NOT NULL video_id;
+alter table "private"."audience_member_videos" add constraint "audience_member_videos_workspace_id_not_null" NOT NULL workspace_id;
+alter table "private"."audience_member_videos" add constraint "audience_member_videos_workspace_id_video_id_fkey" FOREIGN KEY (workspace_id, video_id) REFERENCES videos(workspace_id, id) ON DELETE CASCADE;
+
+CREATE INDEX audience_member_videos_hash ON private.audience_member_videos USING btree (workspace_id, member_hash);
+CREATE UNIQUE INDEX audience_member_videos_pkey ON private.audience_member_videos USING btree (workspace_id, video_id, member_hash);
+
+create table "private"."audience_members" (
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "member_hash" bytea not null,
+  "first_seen_at" timestamp with time zone not null,
+  "last_seen_at" timestamp with time zone not null,
+  "comment_count" integer not null,
+  "is_suspected_bot" boolean default false not null
+);
+alter table "private"."audience_members" enable row level security;
+
+alter table "private"."audience_members" add constraint "audience_members_channel_id_not_null" NOT NULL channel_id;
+alter table "private"."audience_members" add constraint "audience_members_comment_count_not_null" NOT NULL comment_count;
+alter table "private"."audience_members" add constraint "audience_members_first_seen_at_not_null" NOT NULL first_seen_at;
+alter table "private"."audience_members" add constraint "audience_members_is_suspected_bot_not_null" NOT NULL is_suspected_bot;
+alter table "private"."audience_members" add constraint "audience_members_last_seen_at_not_null" NOT NULL last_seen_at;
+alter table "private"."audience_members" add constraint "audience_members_member_hash_not_null" NOT NULL member_hash;
+alter table "private"."audience_members" add constraint "audience_members_pkey" PRIMARY KEY (workspace_id, channel_id, member_hash);
+alter table "private"."audience_members" add constraint "audience_members_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "private"."audience_members" add constraint "audience_members_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX audience_members_hash ON private.audience_members USING btree (workspace_id, member_hash);
+CREATE UNIQUE INDEX audience_members_pkey ON private.audience_members USING btree (workspace_id, channel_id, member_hash);
+
 create table "private"."auto_selected_videos" (
   "workspace_id" uuid not null,
   "video_id" uuid not null,
@@ -2043,6 +2119,20 @@ declare root uuid; begin
   return 'applied';
 end $function$
 
+CREATE OR REPLACE FUNCTION private.audience_pepper()
+ RETURNS bytea
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare value text;
+begin
+  select decrypted_secret into value from vault.decrypted_secrets where name = 'audience_pepper';
+  if value is null then raise exception 'pepper_missing' using errcode = 'P0001'; end if;
+  return decode(value, 'hex');
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION private.audit_plan_change()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -3838,6 +3928,125 @@ BEGIN
     'comments', rows);
 END $function$
 
+CREATE OR REPLACE FUNCTION private.drain_audience_members(max_comments integer DEFAULT 20000, budget interval DEFAULT '00:01:00'::interval)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  target record;
+  cursor_at timestamptz;
+  cursor_id uuid;
+  done int := 0;
+  started timestamptz := clock_timestamp();
+  owner_id text;
+  pepper bytea;
+  old_hashes bytea[];
+  channel uuid;
+  failure_state text;
+  first_unprocessed record;
+begin
+  if not private.switch_on('audience_overlap') then return 0; end if;
+  if not pg_try_advisory_xact_lock(hashtextextended('audience_members_drain', 0)) then return 0; end if;
+  pepper := private.audience_pepper();
+  select last_seen_at, last_id into cursor_at, cursor_id from private.audience_drain_state where singleton;
+  create temporary table if not exists audience_drain_picked (
+    workspace_id uuid not null, video_id uuid not null, last_seen_at timestamptz not null,
+    id uuid not null, processed boolean not null default false
+  ) on commit drop;
+  truncate pg_temp.audience_drain_picked;
+  insert into pg_temp.audience_drain_picked(workspace_id,video_id,last_seen_at,id)
+  select c.workspace_id,c.video_id,c.last_seen_at,c.id
+    from public.comments c
+   where c.content_purged_at is null
+     and (cursor_at is null or (c.last_seen_at,c.id) > (cursor_at,cursor_id))
+   order by c.last_seen_at,c.id limit greatest(max_comments,0);
+  for target in
+    select f.workspace_id,f.video_id,true retry,min(p.last_seen_at) first_at,
+           (array_agg(p.id order by p.last_seen_at,p.id))[1] first_id
+      from private.audience_drain_failures f
+      left join pg_temp.audience_drain_picked p using (workspace_id,video_id)
+     group by f.workspace_id,f.video_id
+    union all
+    select p.workspace_id,p.video_id,false,min(p.last_seen_at),
+           (array_agg(p.id order by p.last_seen_at,p.id))[1]
+      from pg_temp.audience_drain_picked p
+     where not exists (select 1 from private.audience_drain_failures f where f.workspace_id=p.workspace_id and f.video_id=p.video_id)
+     group by p.workspace_id,p.video_id
+     order by 3 desc,4 nulls last,5
+  loop
+    exit when clock_timestamp() - started > budget;
+    begin
+      select ch.external_channel_id into owner_id
+        from public.videos v join public.channels ch
+          on ch.workspace_id=v.workspace_id and ch.id=v.channel_id
+       where v.workspace_id=target.workspace_id and v.id=target.video_id;
+      if found then
+        channel := (select v.channel_id from public.videos v where v.workspace_id=target.workspace_id and v.id=target.video_id);
+        select array_agg(member_hash) into old_hashes from private.audience_member_videos
+         where workspace_id=target.workspace_id and video_id=target.video_id;
+        delete from private.audience_member_videos
+         where workspace_id=target.workspace_id and video_id=target.video_id;
+        insert into private.audience_member_videos(workspace_id,video_id,member_hash,comment_count,first_seen_at,last_seen_at)
+        select c.workspace_id, c.video_id,
+               extensions.hmac(convert_to(c.platform || ':' || c.author_channel_id, 'UTF8'), pepper, 'sha256'),
+               count(*)::int, min(c.first_seen_at), max(c.last_seen_at)
+          from public.comments c join public.videos v
+            on v.workspace_id=c.workspace_id and v.id=c.video_id
+         where c.workspace_id=target.workspace_id and c.video_id=target.video_id
+           and c.content_purged_at is null and c.author_channel_id is not null
+           and c.author_channel_id is distinct from owner_id
+         group by c.workspace_id,c.video_id,
+                  extensions.hmac(convert_to(c.platform || ':' || c.author_channel_id, 'UTF8'), pepper, 'sha256');
+        delete from private.audience_members m
+         where m.workspace_id=target.workspace_id
+           and m.channel_id=channel
+           and (m.member_hash=any(coalesce(old_hashes,'{}'::bytea[])) or exists (
+             select 1 from private.audience_member_videos amv where amv.workspace_id=target.workspace_id
+               and amv.video_id=target.video_id and amv.member_hash=m.member_hash));
+        insert into private.audience_members(workspace_id,channel_id,member_hash,first_seen_at,last_seen_at,comment_count)
+        select v.workspace_id,v.channel_id,amv.member_hash,min(amv.first_seen_at),max(amv.last_seen_at),sum(amv.comment_count)::int
+          from private.audience_member_videos amv
+          join public.videos v on v.workspace_id=amv.workspace_id and v.id=amv.video_id
+         where v.workspace_id=target.workspace_id
+           and v.channel_id=channel
+           and (amv.member_hash=any(coalesce(old_hashes,'{}'::bytea[])) or amv.member_hash in (
+             select amv2.member_hash from private.audience_member_videos amv2 where amv2.workspace_id=target.workspace_id and amv2.video_id=target.video_id))
+         group by v.workspace_id,v.channel_id,amv.member_hash;
+      end if;
+      delete from private.audience_drain_failures where workspace_id=target.workspace_id and video_id=target.video_id;
+      update pg_temp.audience_drain_picked set processed=true where workspace_id=target.workspace_id and video_id=target.video_id;
+      done := done + 1;
+    exception when others then
+      failure_state := sqlstate;
+      insert into private.audience_drain_failures(workspace_id,video_id,sqlstate)
+      values(target.workspace_id,target.video_id,failure_state) on conflict(workspace_id,video_id)
+      do update set sqlstate=excluded.sqlstate,failed_at=now();
+      update pg_temp.audience_drain_picked set processed=true where workspace_id=target.workspace_id and video_id=target.video_id;
+      raise warning 'audience_members drain failed for video % (SQLSTATE %)', target.video_id, failure_state;
+    end;
+  end loop;
+  select p.last_seen_at,p.id into first_unprocessed
+    from pg_temp.audience_drain_picked p
+   where not p.processed
+   order by p.last_seen_at,p.id limit 1;
+  if found then
+    update private.audience_drain_state s set (last_seen_at,last_id) = (
+      select p.last_seen_at,p.id from pg_temp.audience_drain_picked p
+       where (p.last_seen_at,p.id) < (first_unprocessed.last_seen_at,first_unprocessed.id)
+       order by p.last_seen_at desc,p.id desc limit 1
+    ) where singleton and exists (select 1 from pg_temp.audience_drain_picked p
+      where (p.last_seen_at,p.id) < (first_unprocessed.last_seen_at,first_unprocessed.id));
+  else
+    update private.audience_drain_state s set (last_seen_at,last_id) = (
+      select p.last_seen_at,p.id from pg_temp.audience_drain_picked p order by p.last_seen_at desc,p.id desc limit 1
+    ) where singleton and exists(select 1 from pg_temp.audience_drain_picked);
+  end if;
+  return done;
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION private.drain_channel_compare(max_workspaces integer DEFAULT 15)
  RETURNS integer
  LANGUAGE plpgsql
@@ -4693,16 +4902,14 @@ CREATE OR REPLACE FUNCTION private.purge_comment_text(retain interval DEFAULT '3
 AS $function$
 declare removed integer;
 begin
-  if retain < interval '0' then
-    raise exception 'invalid_input' using errcode='22023'; end if;
+  if retain < interval '0' then raise exception 'invalid_input' using errcode='22023'; end if;
   update public.comments set
-    text_raw = null, text_plain = null,
-    -- The author is personal data belonging to someone who is not the customer.
-    author_name = null, author_channel_id = null,
-    likes_raw = null,
-    content_purged_at = now()
+    text_raw = null, text_plain = null, author_name = null, author_channel_id = null,
+    likes_raw = null, content_purged_at = now()
   where content_purged_at is null and last_seen_at < now() - retain;
   get diagnostics removed = row_count;
+  delete from private.audience_member_videos where last_seen_at < now() - retain;
+  delete from private.audience_members where last_seen_at < now() - retain;
   return removed;
 end $function$
 
@@ -8029,6 +8236,26 @@ begin
   return jsonb_build_object('queued', queued, 'skipped', skipped);
 end $function$
 
+CREATE OR REPLACE FUNCTION public.admin_rotate_audience_pepper()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare secret_id uuid; uid uuid := auth.uid();
+begin
+  if uid is null or not public.is_platform_admin() then raise exception 'forbidden' using errcode='42501'; end if;
+  if to_regnamespace('vault') is null then raise exception 'pepper_missing' using errcode='P0001'; end if;
+  select id into secret_id from vault.secrets where name='audience_pepper';
+  if secret_id is null then raise exception 'pepper_missing' using errcode='P0001'; end if;
+  perform vault.update_secret(secret_id, encode(extensions.gen_random_bytes(32), 'hex'), 'audience_pepper', 'Audience identity HMAC pepper');
+  truncate table private.audience_member_videos, private.audience_members;
+  update private.audience_drain_state set last_seen_at=null,last_id=null where singleton;
+  insert into public.audit_events(workspace_id,actor_id,action,target_type,target_id)
+  values(null,uid,'audience_pepper_rotated','platform','audience_pepper');
+end;
+$function$
+
 CREATE OR REPLACE FUNCTION public.admin_services_health()
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -10408,6 +10635,62 @@ grant SELECT on table "private"."admin_notes" to "postgres";
 grant TRIGGER on table "private"."admin_notes" to "postgres";
 grant TRUNCATE on table "private"."admin_notes" to "postgres";
 grant UPDATE on table "private"."admin_notes" to "postgres";
+grant DELETE on table "private"."audience_drain_failures" to "postgres";
+grant INSERT on table "private"."audience_drain_failures" to "postgres";
+grant REFERENCES on table "private"."audience_drain_failures" to "postgres";
+grant SELECT on table "private"."audience_drain_failures" to "postgres";
+grant TRIGGER on table "private"."audience_drain_failures" to "postgres";
+grant TRUNCATE on table "private"."audience_drain_failures" to "postgres";
+grant UPDATE on table "private"."audience_drain_failures" to "postgres";
+grant DELETE on table "private"."audience_drain_failures" to "service_role";
+grant INSERT on table "private"."audience_drain_failures" to "service_role";
+grant REFERENCES on table "private"."audience_drain_failures" to "service_role";
+grant SELECT on table "private"."audience_drain_failures" to "service_role";
+grant TRIGGER on table "private"."audience_drain_failures" to "service_role";
+grant TRUNCATE on table "private"."audience_drain_failures" to "service_role";
+grant UPDATE on table "private"."audience_drain_failures" to "service_role";
+grant DELETE on table "private"."audience_drain_state" to "postgres";
+grant INSERT on table "private"."audience_drain_state" to "postgres";
+grant REFERENCES on table "private"."audience_drain_state" to "postgres";
+grant SELECT on table "private"."audience_drain_state" to "postgres";
+grant TRIGGER on table "private"."audience_drain_state" to "postgres";
+grant TRUNCATE on table "private"."audience_drain_state" to "postgres";
+grant UPDATE on table "private"."audience_drain_state" to "postgres";
+grant DELETE on table "private"."audience_drain_state" to "service_role";
+grant INSERT on table "private"."audience_drain_state" to "service_role";
+grant REFERENCES on table "private"."audience_drain_state" to "service_role";
+grant SELECT on table "private"."audience_drain_state" to "service_role";
+grant TRIGGER on table "private"."audience_drain_state" to "service_role";
+grant TRUNCATE on table "private"."audience_drain_state" to "service_role";
+grant UPDATE on table "private"."audience_drain_state" to "service_role";
+grant DELETE on table "private"."audience_member_videos" to "postgres";
+grant INSERT on table "private"."audience_member_videos" to "postgres";
+grant REFERENCES on table "private"."audience_member_videos" to "postgres";
+grant SELECT on table "private"."audience_member_videos" to "postgres";
+grant TRIGGER on table "private"."audience_member_videos" to "postgres";
+grant TRUNCATE on table "private"."audience_member_videos" to "postgres";
+grant UPDATE on table "private"."audience_member_videos" to "postgres";
+grant DELETE on table "private"."audience_member_videos" to "service_role";
+grant INSERT on table "private"."audience_member_videos" to "service_role";
+grant REFERENCES on table "private"."audience_member_videos" to "service_role";
+grant SELECT on table "private"."audience_member_videos" to "service_role";
+grant TRIGGER on table "private"."audience_member_videos" to "service_role";
+grant TRUNCATE on table "private"."audience_member_videos" to "service_role";
+grant UPDATE on table "private"."audience_member_videos" to "service_role";
+grant DELETE on table "private"."audience_members" to "postgres";
+grant INSERT on table "private"."audience_members" to "postgres";
+grant REFERENCES on table "private"."audience_members" to "postgres";
+grant SELECT on table "private"."audience_members" to "postgres";
+grant TRIGGER on table "private"."audience_members" to "postgres";
+grant TRUNCATE on table "private"."audience_members" to "postgres";
+grant UPDATE on table "private"."audience_members" to "postgres";
+grant DELETE on table "private"."audience_members" to "service_role";
+grant INSERT on table "private"."audience_members" to "service_role";
+grant REFERENCES on table "private"."audience_members" to "service_role";
+grant SELECT on table "private"."audience_members" to "service_role";
+grant TRIGGER on table "private"."audience_members" to "service_role";
+grant TRUNCATE on table "private"."audience_members" to "service_role";
+grant UPDATE on table "private"."audience_members" to "service_role";
 grant DELETE on table "private"."auto_selected_videos" to "postgres";
 grant INSERT on table "private"."auto_selected_videos" to "postgres";
 grant REFERENCES on table "private"."auto_selected_videos" to "postgres";
@@ -11100,6 +11383,8 @@ grant EXECUTE on function private.analysis_remaining(uuid) to "postgres";
 grant EXECUTE on function private.analysis_remaining(uuid) to "service_role";
 grant EXECUTE on function private.apply_billing_event(text,text,timestamp with time zone,uuid,text,text,timestamp with time zone,timestamp with time zone,text,boolean,text,text,jsonb) to "postgres";
 grant EXECUTE on function private.apply_pack_event(text,timestamp with time zone,uuid,text,integer,text,jsonb) to "postgres";
+grant EXECUTE on function private.audience_pepper() to "postgres";
+grant EXECUTE on function private.audience_pepper() to "service_role";
 grant EXECUTE on function private.audit_plan_change() to "postgres";
 grant EXECUTE on function private.auto_select_after_catalogue() to "postgres";
 grant EXECUTE on function private.auto_select_videos(uuid,uuid) to "postgres";
@@ -11148,6 +11433,8 @@ grant EXECUTE on function private.dashboard_comments_impl(uuid,jsonb) to "servic
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "authenticated";
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "postgres";
 grant EXECUTE on function private.dashboard_snapshot_impl(uuid) to "service_role";
+grant EXECUTE on function private.drain_audience_members(integer,interval) to "postgres";
+grant EXECUTE on function private.drain_audience_members(integer,interval) to "service_role";
 grant EXECUTE on function private.drain_channel_compare(integer) to "postgres";
 grant EXECUTE on function private.drain_dashboard_aggregates(integer) to "postgres";
 grant EXECUTE on function private.drain_video_comment_stats(integer,interval) to "postgres";
@@ -11380,6 +11667,8 @@ grant EXECUTE on function admin_record_user_action(uuid,text) to "authenticated"
 grant EXECUTE on function admin_record_user_action(uuid,text) to "postgres";
 grant EXECUTE on function admin_request_channel_work(uuid[],text) to "authenticated";
 grant EXECUTE on function admin_request_channel_work(uuid[],text) to "postgres";
+grant EXECUTE on function admin_rotate_audience_pepper() to "authenticated";
+grant EXECUTE on function admin_rotate_audience_pepper() to "postgres";
 grant EXECUTE on function admin_services_health() to "authenticated";
 grant EXECUTE on function admin_services_health() to "postgres";
 grant EXECUTE on function admin_set_auto_selection(uuid[],integer,integer) to "authenticated";
