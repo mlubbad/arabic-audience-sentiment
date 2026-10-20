@@ -54,6 +54,9 @@ beforeAll(async () => {
     .filter((f) => f.endsWith(".sql"))
     .sort())
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
+  await db.exec(
+    "alter table public.channels alter column external_channel_id drop not null",
+  );
   await db.query("insert into auth.users(id) values($1),($2)", [U1, U2]);
   for (const [w, u, name] of [
     [W1, U1, "A"],
@@ -94,13 +97,17 @@ beforeAll(async () => {
 afterAll(async () => db.close());
 beforeEach(async () => {
   await db.exec(
-    "truncate private.audience_member_videos, private.audience_members",
+    "truncate private.audience_member_videos, private.audience_members, private.audience_drain_failures",
   );
   await db.query(
     "update private.audience_drain_state set last_seen_at=null,last_id=null where singleton",
   );
   await db.query(
     "update private.platform_switches set enabled=false where key='audience_overlap'",
+  );
+  await db.query(
+    "update channels set external_channel_id=case id when $1 then 'UC_owner_a' when $2 then 'UC_owner_b' else 'UC_owner_c' end",
+    [C1, C2],
   );
   await db.query("delete from comments");
   await db.query("delete from vault.secrets where name='audience_pepper'");
@@ -149,6 +156,7 @@ describe("hashed audience identities", () => {
         [W1],
       )
     ).rows;
+    const oldHash = hashes[0].hash;
     expect(hashes[0].hash).toBe(hashes[1].hash);
     expect(hashes[0].bytes).toBe(32);
     expect(
@@ -159,16 +167,25 @@ describe("hashed audience identities", () => {
         )
       ).rows[0].raw,
     ).toBe(true);
-    await db.query("delete from vault.secrets where name='audience_pepper'");
+    await db.query(
+      "update vault.secrets set secret=encode(extensions.gen_random_bytes(32),'hex') where name='audience_pepper'",
+    );
+    await db.query(
+      "update private.audience_drain_state set last_seen_at=null,last_id=null where singleton",
+    );
     await db.query(
       "update comments set last_seen_at=now()+interval '1 second' where author_channel_id=$1",
       [PERSON],
     );
-    expect(await drain()).toBe(0);
+    expect(await drain()).toBe(3);
     expect(await n("select count(*) n from private.audience_members")).toBe(3);
-    await db.query(
-      "select vault.create_secret(encode(extensions.gen_random_bytes(32),'hex'),'audience_pepper','test')",
-    );
+    const newHash = (
+      await db.query<{ hash: string }>(
+        "select encode(member_hash,'hex') hash from private.audience_members where channel_id=$1",
+        [C1],
+      )
+    ).rows[0].hash;
+    expect(newHash).not.toBe(oldHash);
   });
 
   it("excludes null, purged, and owner identities and recomputes rather than incrementing", async () => {
@@ -200,6 +217,159 @@ describe("hashed audience identities", () => {
         [V1],
       ),
     ).toBe(1);
+  });
+
+  it("drains a whole picked video once and advances past all its comments", async () => {
+    await db.query(
+      "update private.platform_switches set enabled=true where key='audience_overlap'",
+    );
+    for (let i = 0; i < 5; i++) await comment(V1, `UC_bulk_${i}`);
+    const counts = [];
+    for (let i = 0; i < 6; i++) counts.push(await drain(5));
+    expect(counts).toEqual([1, 0, 0, 0, 0, 0]);
+    expect(
+      await n(
+        "select count(*) n from private.audience_member_videos where video_id=$1",
+        [V1],
+      ),
+    ).toBe(5);
+  });
+
+  it("keeps workspace B comments out of a workspace A video refresh and reads the pepper once", async () => {
+    await db.query(
+      "update private.platform_switches set enabled=true where key='audience_overlap'",
+    );
+    await comment(V1, PERSON, 2);
+    await comment(V3, PERSON, 1);
+    await db.exec(`create table private.pepper_calls(n integer not null); insert into private.pepper_calls values(0);
+      create or replace function private.audience_pepper() returns bytea language plpgsql security definer set search_path='' as $$
+      declare s text; begin update private.pepper_calls set n=n+1; select secret into s from vault.secrets where name='audience_pepper';
+      if s is null then raise exception 'pepper_missing' using errcode='P0001'; end if; return decode(s,'hex'); end$$;`);
+    await db.query("update private.pepper_calls set n=0");
+    expect(await drain(1)).toBe(1);
+    expect(await n("select n from private.pepper_calls")).toBe(1);
+    expect(
+      await n(
+        "select count(*) n from private.audience_member_videos where workspace_id=$1",
+        [W2],
+      ),
+    ).toBe(0);
+  });
+
+  it("counts an author when the channel owner id is unknown", async () => {
+    await db.query("update channels set external_channel_id=null where id=$1", [
+      C1,
+    ]);
+    await db.query(
+      "update private.platform_switches set enabled=true where key='audience_overlap'",
+    );
+    await comment(V1, PERSON);
+    expect(await drain()).toBe(1);
+    expect(
+      await n(
+        "select count(*) n from private.audience_members where channel_id=$1",
+        [C1],
+      ),
+    ).toBe(1);
+  });
+
+  it("records failed videos, drains later videos, and retries failures first", async () => {
+    await db.query(
+      "update private.platform_switches set enabled=true where key='audience_overlap'",
+    );
+    await comment(V1, PERSON, 2);
+    await comment(V2, PERSON, 1);
+    await db.exec(`create function private.fail_audience_video() returns trigger language plpgsql as $$
+      begin if new.video_id='${V1}'::uuid then raise exception 'synthetic failure' using errcode='22000'; end if; return new; end$$;
+      create trigger fail_audience_video before insert on private.audience_member_videos
+      for each row execute function private.fail_audience_video();`);
+    expect(await drain()).toBe(1);
+    expect(
+      await n(
+        "select count(*) n from private.audience_drain_failures where video_id=$1",
+        [V1],
+      ),
+    ).toBe(1);
+    expect(
+      await n(
+        "select count(*) n from private.audience_members where channel_id=$1",
+        [C2],
+      ),
+    ).toBe(1);
+    await db.exec(
+      "drop trigger fail_audience_video on private.audience_member_videos; drop function private.fail_audience_video()",
+    );
+    expect(await drain()).toBe(1);
+    expect(
+      await n("select count(*) n from private.audience_drain_failures"),
+    ).toBe(0);
+    expect(
+      await n(
+        "select count(*) n from private.audience_members where channel_id=$1",
+        [C1],
+      ),
+    ).toBe(1);
+  });
+
+  it("does not write identities or expose a secret when the pepper is missing", async () => {
+    await db.query(
+      "update private.platform_switches set enabled=true where key='audience_overlap'",
+    );
+    await comment(V1, PERSON);
+    const secret = (
+      await db.query<{ secret: string }>(
+        "select secret from vault.secrets where name='audience_pepper'",
+      )
+    ).rows[0].secret;
+    await db.query("delete from vault.secrets where name='audience_pepper'");
+    let errorText = "";
+    try {
+      await drain();
+    } catch (error) {
+      errorText = String(error);
+    }
+    expect(errorText).toMatch(/pepper_missing/);
+    expect(errorText).not.toContain(secret);
+    expect(
+      await n("select count(*) n from private.audience_member_videos"),
+    ).toBe(0);
+    expect(await n("select count(*) n from private.audience_members")).toBe(0);
+    expect(secret).not.toMatch(/pepper_missing/);
+  });
+
+  it("advances a budget-limited batch only through the processed prefix", async () => {
+    await db.query(
+      "update private.platform_switches set enabled=true where key='audience_overlap'",
+    );
+    await comment(V1, PERSON, 3);
+    await comment(V2, "UC_other", 2);
+    await comment(V3, "UC_workspace_b", 1);
+    expect(await n("select private.drain_audience_members(0) n")).toBe(0);
+    expect(await n("select count(*) n from private.audience_members")).toBe(0);
+    expect(await drain(3)).toBe(3);
+    expect(await n("select count(*) n from private.audience_members")).toBe(3);
+  });
+
+  it("resumes after a budget stops between videos without skipping the next video", async () => {
+    await db.query(
+      "update private.platform_switches set enabled=true where key='audience_overlap'",
+    );
+    await comment(V1, PERSON, 3);
+    await comment(V2, "UC_next", 2);
+    await db.exec(`create function private.slow_audience_video() returns trigger language plpgsql as $$
+      begin perform pg_sleep(0.03); return new; end$$;
+      create trigger slow_audience_video before insert on private.audience_member_videos
+      for each row execute function private.slow_audience_video();`);
+    expect(
+      await n(
+        "select private.drain_audience_members(2, interval '10 milliseconds') n",
+      ),
+    ).toBe(1);
+    await db.exec(
+      "drop trigger slow_audience_video on private.audience_member_videos; drop function private.slow_audience_video()",
+    );
+    expect(await drain(2)).toBe(1);
+    expect(await n("select count(*) n from private.audience_members")).toBe(2);
   });
 
   it("enforces private access, bounded batches and admin rotation", async () => {
@@ -241,6 +411,11 @@ describe("hashed audience identities", () => {
     expect(
       await n(
         "select count(*) n from public.audit_events where action='audience_pepper_rotated'",
+      ),
+    ).toBe(1);
+    expect(
+      await n(
+        "select count(*) n from public.audit_events where action='audience_pepper_rotated' and workspace_id is null",
       ),
     ).toBe(1);
     await drain();
