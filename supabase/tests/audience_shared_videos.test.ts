@@ -167,12 +167,13 @@ describe("audience_shared_videos", () => {
     await db.query(
       "update private.platform_switches set enabled=true where key='audience_overlap'",
     );
+    // |A| differs from |B| so an affinity computed against |A| is caught.
     await db.query(
-      "insert into private.audience_sizes values($1,$2,'youtube',100,now()),($1,$3,'youtube',100,now())",
+      "insert into private.audience_sizes values($1,$2,'youtube',200,now()),($1,$3,'youtube',100,now())",
       [W1, A, B],
     );
     await db.query(
-      "insert into private.audience_overlap_cells values($1,$2,$3,100,100,20,now())",
+      "insert into private.audience_overlap_cells values($1,$2,$3,200,100,20,now())",
       [W1, A, B],
     );
     await db.query(
@@ -242,11 +243,14 @@ describe("audience_shared_videos", () => {
     expect(rows.videos[0]).toMatchObject({
       external_video_id: "b1",
       title: "Bridge 1",
-      published_at: "2026-01-01T03:00:00+03:00",
       shared_commenters: 6,
       video_audience: 10,
       affinity: 300,
     });
+    // Compare instants: the text form follows the server's time zone.
+    expect(new Date(rows.videos[0].published_at as string).toISOString()).toBe(
+      "2026-01-01T00:00:00.000Z",
+    );
     expect(rows.videos[1]).toMatchObject({
       external_video_id: "b2",
       shared_commenters: 6,
@@ -265,5 +269,9 @@ describe("audience_shared_videos", () => {
       ].sort(),
     );
     expect(JSON.stringify(rows)).not.toMatch(/member_hash|comment_id|text_raw/);
+    // The limit keeps the tie's higher-affinity video, not the lower id.
+    const one = ((await call(A, B, 1)).rows[0] as Record<string, unknown>)
+      .audience_shared_videos as { videos: Array<Record<string, unknown>> };
+    expect(one.videos.map((v) => v.video_id)).toEqual([V1]);
   });
 });
