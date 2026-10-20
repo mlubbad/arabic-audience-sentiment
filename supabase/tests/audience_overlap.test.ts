@@ -173,8 +173,8 @@ describe("audience overlap", () => {
     );
     await pairMembers(200, 50, 20);
     await db.query(
-      "insert into private.audience_members(workspace_id,channel_id,member_hash,first_seen_at,last_seen_at,comment_count,is_suspected_bot) values($1,$2,decode(lpad(to_hex(99999),64,'0'),'hex'),now(),now(),1,true)",
-      [W1, A],
+      "insert into private.audience_members(workspace_id,channel_id,member_hash,first_seen_at,last_seen_at,comment_count,is_suspected_bot) values($1,$2,decode(lpad(to_hex(99999),64,'0'),'hex'),now(),now(),1,true),($1,$3,decode(lpad(to_hex(99999),64,'0'),'hex'),now(),now(),1,true)",
+      [W1, A, B],
     );
     expect(await refresh()).toBe(1);
     expect(
@@ -205,6 +205,37 @@ describe("audience overlap", () => {
       low: 0.0657,
       high: 0.1494,
     });
+  });
+
+  it("clears a workspace whose members have all aged out", async () => {
+    await db.query(
+      "update private.platform_switches set enabled=true where key='audience_overlap'",
+    );
+    await pairMembers(200, 50, 20);
+    await refresh();
+    expect(
+      await n(
+        "select count(*) n from private.audience_overlap_cells where workspace_id=$1",
+        [W1],
+      ),
+    ).toBe(1);
+    await db.query(
+      "delete from private.audience_members where workspace_id=$1",
+      [W1],
+    );
+    await refresh();
+    expect(
+      await n(
+        "select count(*) n from private.audience_overlap_cells where workspace_id=$1",
+        [W1],
+      ),
+    ).toBe(0);
+    expect(
+      await n(
+        "select coalesce(sum(size),0) n from private.audience_sizes where workspace_id=$1",
+        [W1],
+      ),
+    ).toBe(0);
   });
 
   it("returns null measures below thresholds and lists only same-platform channels", async () => {

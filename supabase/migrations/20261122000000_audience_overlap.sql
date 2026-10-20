@@ -74,11 +74,13 @@ declare
 begin
   if not private.switch_on('audience_overlap') then return 0; end if;
   if not pg_try_advisory_xact_lock(hashtextextended('audience_overlap_refresh', 0)) then return 0; end if;
+  -- A workspace whose members have all aged out still has sizes and cells
+  -- to clear, so it is listed from either table.
   for w in
-    select m.workspace_id
-      from private.audience_members m
-     group by m.workspace_id
-     order by (select min(s.computed_at) from private.audience_sizes s where s.workspace_id=m.workspace_id) nulls first, m.workspace_id
+    select k.workspace_id
+      from (select workspace_id from private.audience_members
+            union select workspace_id from private.audience_sizes) k
+     order by (select min(s.computed_at) from private.audience_sizes s where s.workspace_id=k.workspace_id) nulls first, k.workspace_id
   loop
     exit when clock_timestamp() - started >= budget;
     begin
