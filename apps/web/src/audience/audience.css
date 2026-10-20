@@ -1,0 +1,142 @@
+.audience-page {
+  max-width: 76rem;
+  margin-inline: auto;
+  padding: 1.5rem;
+}
+.audience-page > header,
+.audience-panel {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-block: 1rem;
+}
+.audience-page > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.audience-panel svg {
+  display: block;
+  width: min(100%, 24rem);
+  fill: color-mix(in srgb, var(--accent) 25%, transparent);
+  stroke: var(--accent);
+}
+.audience-panel svg text {
+  fill: var(--text);
+  stroke: none;
+  text-anchor: middle;
+  font-size: 12px;
+}
+.audience-table-wrap {
+  overflow-x: auto;
+}
+.audience-table {
+  width: 100%;
+}
+.audience-table tr {
+  cursor: pointer;
+}
+.audience-row-button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.audience-high {
+  display: inline-block;
+  margin-inline-start: 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+.audience-affinity {
+  position: relative;
+  display: block;
+  height: 0.5rem;
+  width: 8rem;
+  max-width: 100%;
+  background: var(--surface-raised);
+  margin-block-start: 0.35rem;
+}
+.audience-affinity::after {
+  content: "";
+  position: absolute;
+  inset-block: -0.2rem;
+  inset-inline-start: 50%;
+  border-inline-start: 2px solid var(--text);
+}
+.audience-affinity i {
+  display: block;
+  height: 100%;
+  width: var(--affinity-width, 50%);
+  background: var(--accent);
+}
+.audience-affinity-0 i {
+  width: 0%;
+}
+.audience-affinity-1 i {
+  width: 10%;
+}
+.audience-affinity-2 i {
+  width: 20%;
+}
+.audience-affinity-3 i {
+  width: 30%;
+}
+.audience-affinity-4 i {
+  width: 40%;
+}
+.audience-affinity-5 i {
+  width: 50%;
+}
+.audience-affinity-6 i {
+  width: 60%;
+}
+.audience-affinity-7 i {
+  width: 70%;
+}
+.audience-affinity-8 i {
+  width: 80%;
+}
+.audience-affinity-9 i {
+  width: 90%;
+}
+.audience-affinity-10 i {
+  width: 100%;
+}
+.audience-cards {
+  display: none;
+}
+.audience-card {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 1rem;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  text-align: start;
+}
+.audience-panel li {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-block: 0.5rem;
+}
+@media (max-width: 40rem) {
+  .audience-page {
+    padding: 0.75rem;
+  }
+  .audience-table {
+    display: none;
+  }
+  .audience-cards {
+    display: grid;
+    gap: 0.6rem;
+  }
+}
