@@ -780,6 +780,7 @@ export const ar = {
     pack_granted: "مُنحت حزمة وحدات",
     pack_paddle: "اشتُريت حزمة عبر Paddle",
     platform_switch_set: "عُدّل مفتاح تشغيل في المنصة",
+    audience_pepper_rotated: "دُوِّر مفتاح تجزئة هويات الجمهور",
     platform_switch: "مفتاح تشغيل المنصة",
     platform_reader_promoted: "عُيّن قارئ المنصة",
     channel_genre_review_set: "صُحّح التصنيف النوعي للقناة",
