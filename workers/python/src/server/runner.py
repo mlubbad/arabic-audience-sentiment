@@ -21,6 +21,18 @@ from .gateway import ControlPlane, ControlPlaneError, LeaseLost
 # than guessed at.
 _DECLARABLE = {"partial", "exhausted", "blocked", "failed"}
 
+# How long one collect run may hold the worker before it stands down. The
+# worker is single-threaded, and claim_job can only put an overdue discover
+# next once the collect in hand ends: on 2026-10-20 one collect ran from 22:39
+# to 01:54 UTC and 94 overdue discovers waited 31-44 minutes behind it. Thirty
+# minutes is under the ~55-minute median collect run that day, so it bites on
+# the runs that block, and a resume costs one claim and one statistics unit
+# per 50 due videos (one unit for the ~22-video channels behind the long runs).
+# The run finishes partial with this reason; worker_finish requeues it at once
+# with its checkpoint and gives the attempt back (20261121000000).
+COLLECT_BUDGET_SECONDS = 30 * 60
+TIME_BUDGET = "time_budget"
+
 
 def _log(message: str) -> None:
     # Unbuffered and timestamped: the service log is read while it runs.
@@ -350,7 +362,8 @@ def run_discover(control: ControlPlane, build_collector) -> bool:
     return _discover(control, lease, build_collector)
 
 
-def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None) -> bool:
+def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None,
+              budget_seconds: float | None = None, clock=time.monotonic) -> bool:
     """Walk the videos the server handed on the lease. The lease is already claimed.
 
     The whole channel is one job, not one job per video: the queue refuses a
@@ -362,7 +375,17 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     A video read to its end is reported finished and not read again this run.
     A video whose comments are switched off is reported and skipped; anything
     else that stops early leaves the run partial with the cursor held.
+
+    With a budget, the run stands down once it has held the worker that long:
+    after a committed batch with more to read, or before starting the next
+    video. It ends partial with `time_budget`, never succeeded, and the
+    checkpoint the last commit wrote is where the next claim resumes.
     """
+    started = clock()
+
+    def over_budget() -> bool:
+        return budget_seconds is not None and clock() - started >= budget_seconds
+
     collector, reason, _ = _collector_for(control, lease, build_collector)
     if collector is None:
         control.finish(lease, "blocked", reason)
@@ -379,6 +402,7 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     cursor = _resume_cursor(lease)
     analysis_failed = False
     outcome = "exhausted"
+    reason = None
 
     try:
         videos = _still_to_read(control, collector, lease, videos)
@@ -386,6 +410,11 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
             vid = video["external_video_id"]
             if vid in done:
                 continue
+            if over_budget():
+                # Videos behind this one are still due on the server, and the
+                # ones read this run are not, so the next claim starts here.
+                outcome, reason = "partial", TIME_BUDGET
+                break
             # The held cursor belongs to one video. Starting another video from
             # it would ask the source to continue a page sequence it never
             # issued.
@@ -439,6 +468,11 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                     )
                     if batch.outcome != "partial":
                         break
+                    if over_budget():
+                        # The batch is committed and its cursor with it; the
+                        # page after it is the next claim's to read.
+                        reason = TIME_BUDGET
+                        break
                 if video_skipped_blocked:
                     continue
             except CollectionError as exc:
@@ -478,7 +512,7 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
 
         if analysis_failed and outcome == "exhausted":
             outcome = "partial"
-        control.finish(lease, outcome)
+        control.finish(lease, outcome, reason if outcome == "partial" else None)
     except LeaseLost:
         raise
     except CollectionError as exc:
@@ -499,7 +533,8 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
     return True
 
 
-def run_backfill(control: ControlPlane, build_collector, analyzer=None) -> bool:
+def run_backfill(control: ControlPlane, build_collector, analyzer=None,
+                 budget_seconds: float | None = None, clock=time.monotonic) -> bool:
     """Claim one collect job and walk the videos the server handed it. False means no work.
 
     The claim is scoped to collect deliberately. A run that meant to collect
@@ -510,7 +545,7 @@ def run_backfill(control: ControlPlane, build_collector, analyzer=None) -> bool:
     lease = control.claim(["collect"])
     if lease is None:
         return False
-    return _backfill(control, lease, build_collector, analyzer)
+    return _backfill(control, lease, build_collector, analyzer, budget_seconds, clock)
 
 
 # How many due lists one analyse job will work through before standing down.
@@ -664,7 +699,8 @@ def run_genres(control: ControlPlane, lease: dict, classifier) -> bool:
 
 
 def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=None,
-            genre_classifier=None) -> bool:
+            genre_classifier=None, collect_budget_seconds: float | None = COLLECT_BUDGET_SECONDS,
+            clock=time.monotonic) -> bool:
     """Claim whatever is next and run it by its type. False means no work.
 
     The claim is consumed here; the lease is handed down rather than claiming
@@ -688,4 +724,4 @@ def run_job(control: ControlPlane, build_collector, analyzer=None, classifier=No
         return run_topics(control, lease, classifier)
     if lease.get("type") == "genre_classify":
         return run_genres(control, lease, genre_classifier)
-    return _backfill(control, lease, build_collector, analyzer)
+    return _backfill(control, lease, build_collector, analyzer, collect_budget_seconds, clock)

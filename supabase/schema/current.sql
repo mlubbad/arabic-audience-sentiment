@@ -6756,17 +6756,46 @@ declare
   dur_sec integer;
   j_attempt integer;
   backoff_seconds integer;
+  j_heartbeats integer;
   blocked_not_before timestamptz;
 begin
   perform private.worker_job(token_hash, j, t);
   if outcome not in ('succeeded','partial','failed','blocked','cancelled') then
     raise exception 'invalid_outcome' using errcode='22023'; end if;
 
-  select created_at, attempt, workspace_id, channel_id, type
-    into start_time, j_attempt, w, ch, j_type
+  select created_at, attempt, workspace_id, channel_id, type, heartbeats
+    into start_time, j_attempt, w, ch, j_type, j_heartbeats
     from public.jobs
    where id = j;
   dur_sec := greatest(1, round(extract(epoch from (now() - coalesce(start_time, now())))))::int;
+
+  -- A collect that stood down at its time budget after committing: back in
+  -- the queue now, with its checkpoint and the attempt its claim took.
+  if outcome = 'partial' and reason = 'time_budget'
+     and j_type in ('collect', 'import') and coalesce(j_heartbeats, 0) > 0 then
+    update public.jobs
+       set status = 'queued',
+           attempt = greatest(attempt - 1, 0),
+           not_before = now(),
+           lease_token = null,
+           lease_expires_at = null,
+           error_code = reason,
+           counters = jsonb_set(
+             coalesce(counters, '{}'::jsonb),
+             '{duration_seconds}',
+             to_jsonb(dur_sec)
+           )
+     where id = j;
+
+    insert into public.sync_runs(workspace_id, channel_id, job_id, mode, source,
+                                 status, ended_at, error_code)
+    values (w, ch, j, 'collect', 'unknown', 'partial', now(), reason)
+    on conflict (workspace_id, job_id) do update
+      set status = excluded.status,
+          ended_at = excluded.ended_at,
+          error_code = excluded.error_code;
+    return;
+  end if;
 
   -- Exponential backoff retry lifecycle for transient failures on attempts 1 and 2
   if outcome in ('failed', 'partial') and coalesce(j_attempt, 1) < 3 then
