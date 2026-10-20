@@ -29,7 +29,7 @@ _DECLARABLE = {"partial", "exhausted", "blocked", "failed"}
 # the runs that block, and a resume costs one claim and one statistics unit
 # per 50 due videos (one unit for the ~22-video channels behind the long runs).
 # The run finishes partial with this reason; worker_finish requeues it at once
-# with its checkpoint and gives the attempt back (20261121000000).
+# with its checkpoint and gives the attempt back (20261124000000).
 COLLECT_BUDGET_SECONDS = 30 * 60
 TIME_BUDGET = "time_budget"
 
