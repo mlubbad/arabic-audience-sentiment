@@ -777,6 +777,7 @@ export const en: Strings = {
     pack_granted: "Unit pack granted",
     pack_paddle: "Pack bought through Paddle",
     platform_switch_set: "Platform switch changed",
+    audience_pepper_rotated: "Audience identity key rotated",
     platform_switch: "Platform switch",
     platform_reader_promoted: "Platform reader set",
     channel_genre_review_set: "Channel genre profile corrected",
