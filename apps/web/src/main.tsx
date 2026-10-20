@@ -36,7 +36,8 @@ import { Landing } from "./landing/Landing";
 import "./pricing.css";
 import "./legal.css";
 import { BrandMark } from "./BrandMark";
-import { useSession } from "./session";
+import { useSession, useWorkspaces } from "./session";
+import { useAudienceAvailability } from "./audience/useAudience";
 import { useIsPlatformAdmin } from "./adminAccess";
 import { shouldRetryDashboardQuery } from "./queryRetry";
 import { ToastHost } from "./ui/Toast";
@@ -70,6 +71,9 @@ const CompetitorsPage = lazy(() =>
   import("./competitors/CompetitorsPage").then((m) => ({
     default: m.CompetitorsPage,
   })),
+);
+const AudiencePage = lazy(() =>
+  import("./audience/AudiencePage").then((m) => ({ default: m.AudiencePage })),
 );
 const Connected = lazy(() =>
   import("./Connected").then((m) => ({ default: m.Connected })),
@@ -251,6 +255,12 @@ const DESTINATIONS = [
     scoped: true,
   },
   {
+    to: "/audience",
+    label: "navAudience",
+    title: "titleAudience",
+    scoped: true,
+  },
+  {
     to: "/sync",
     label: "navOperations",
     title: "titleOperations",
@@ -337,10 +347,20 @@ function AppLayout() {
   const S = useStrings();
   // Signed out, nothing is asked; signed in, one query the admin page shares.
   const { session } = useSession();
+  const { workspaces } = useWorkspaces(session);
+  const audienceAvailability = useAudienceAvailability(
+    session
+      ? (new URLSearchParams(search).get("ws") ?? workspaces[0]?.id ?? null)
+      : null,
+  );
   const { isImpersonating } = useImpersonation();
   const access = useIsPlatformAdmin(session);
   const destinations = DESTINATIONS.filter(
-    (d) => !("admin" in d) || (access.data === true && !isImpersonating),
+    (d) =>
+      (!("admin" in d) || (access.data === true && !isImpersonating)) &&
+      (d.to !== "/audience" ||
+        (audienceAvailability.data?.switch_on === true &&
+          audienceAvailability.data.plan_allows === true)),
   );
   // The language lands on <html> before paint, where CSS `:lang()` and the
   // bidi algorithm read it. The shell is the only surface that speaks two
@@ -565,6 +585,7 @@ const app = (
                 <Route element={<AppLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/competitors" element={<CompetitorsPage />} />
+                  <Route path="/audience" element={<AudiencePage />} />
                   <Route path="/account" element={<Account />} />
                   <Route path={RESET_PATH} element={<ResetPassword />} />
                   <Route path="/sync" element={<Sync />} />
