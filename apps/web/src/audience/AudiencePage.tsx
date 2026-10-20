@@ -8,6 +8,7 @@ import { EmptyState, Loading, LoadError } from "../pageStates/PageStates";
 import { Labelled } from "../ui/Labelled";
 import { SelectItem } from "../ui/Select";
 import {
+  audienceVisible,
   useAudienceAvailability,
   useAudienceChannels,
   useAudienceOverlap,
@@ -61,7 +62,7 @@ export function AudiencePage() {
         onRetry={() => void availability.refetch()}
       />
     );
-  if (!availability.data.switch_on || !availability.data.plan_allows)
+  if (!audienceVisible(availability.data))
     return (
       <main className="audience-unavailable">
         <h1>{S.audienceUnavailable}</h1>
@@ -162,7 +163,12 @@ export function AudiencePage() {
                       lang={lang}
                       S={S}
                     />
-                    <BridgeVideos data={videos.data} lang={lang} S={S} />
+                    <BridgeVideos
+                      data={videos.data}
+                      platform={overlap.data.channel.platform}
+                      lang={lang}
+                      S={S}
+                    />
                   </>
                 )}
               </>

@@ -70,7 +70,10 @@ vi.mock("../strings", () => ({
 }));
 vi.mock("../locale", () => ({ useLocale: () => "en" }));
 vi.mock("../i18n", () => ({ displayDate: () => "Oct 20" }));
-vi.mock("./useAudience", () => ({
+vi.mock("./useAudience", async (importOriginal) => ({
+  // The real visibility rule, so the page test exercises it.
+  audienceVisible: (await importOriginal<typeof import("./useAudience")>())
+    .audienceVisible,
   useAudienceAvailability: () => ({
     isPending: false,
     isError: false,

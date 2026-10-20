@@ -94,5 +94,27 @@ describe("OverlapTable", () => {
     expect(screen.getAllByRole("row")[1]).not.toHaveTextContent(/\b0\b/);
     screen.getByRole("button", { name: "B" }).click();
     expect(select).toHaveBeenCalledWith("b");
+    // The phone card says the same as the table, never "—".
+    expect(document.querySelector(".audience-card")).toHaveTextContent(
+      "Not enough data",
+    );
+  });
+  it("labels the main share as our calculation, in the table and the card", () => {
+    render(
+      <OverlapTable
+        data={sample(0.12)}
+        selected={null}
+        onSelect={vi.fn()}
+        lang="en"
+        S={S}
+      />,
+    );
+    const row = screen.getAllByRole("row")[1]!;
+    expect(row.querySelectorAll("td")[2]).toHaveTextContent(
+      "our calculation: 12 % (9–15 %)",
+    );
+    expect(document.querySelector(".audience-card")).toHaveTextContent(
+      "our calculation: 12 % (9–15 %)",
+    );
   });
 });

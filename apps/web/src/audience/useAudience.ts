@@ -7,6 +7,11 @@ import {
   loadSharedVideos,
 } from "../api/audience";
 
+/** The section exists only with the switch on AND a plan that includes it
+ *  (owner, 2026-10-17: not shown on the lower plans). */
+export const audienceVisible = (
+  a: { switch_on: boolean; plan_allows: boolean } | undefined,
+) => a?.switch_on === true && a.plan_allows === true;
 export function useAudienceAvailability(workspace: string | null) {
   return useQuery({
     queryKey: audienceKeys.availability(workspace ?? ""),

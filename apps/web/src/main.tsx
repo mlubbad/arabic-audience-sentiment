@@ -37,7 +37,10 @@ import "./pricing.css";
 import "./legal.css";
 import { BrandMark } from "./BrandMark";
 import { useSession, useWorkspaces } from "./session";
-import { useAudienceAvailability } from "./audience/useAudience";
+import {
+  audienceVisible,
+  useAudienceAvailability,
+} from "./audience/useAudience";
 import { useIsPlatformAdmin } from "./adminAccess";
 import { shouldRetryDashboardQuery } from "./queryRetry";
 import { ToastHost } from "./ui/Toast";
@@ -358,9 +361,7 @@ function AppLayout() {
   const destinations = DESTINATIONS.filter(
     (d) =>
       (!("admin" in d) || (access.data === true && !isImpersonating)) &&
-      (d.to !== "/audience" ||
-        (audienceAvailability.data?.switch_on === true &&
-          audienceAvailability.data.plan_allows === true)),
+      (d.to !== "/audience" || audienceVisible(audienceAvailability.data)),
   );
   // The language lands on <html> before paint, where CSS `:lang()` and the
   // bidi algorithm read it. The shell is the only surface that speaks two
