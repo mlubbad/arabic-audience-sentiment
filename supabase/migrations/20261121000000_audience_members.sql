@@ -59,6 +59,10 @@ create table private.audience_drain_failures (
   foreign key (workspace_id, video_id) references public.videos(workspace_id, id) on delete cascade
 );
 insert into private.audience_drain_state(singleton) values (true);
+-- The member refresh filters a channel's rows by hash, and overlap (WO-30)
+-- self-joins members on the hash; neither can use the primary keys.
+create index audience_member_videos_hash on private.audience_member_videos(workspace_id, member_hash);
+create index audience_members_hash on private.audience_members(workspace_id, member_hash);
 alter table private.audience_member_videos enable row level security;
 alter table private.audience_members enable row level security;
 alter table private.audience_drain_state enable row level security;

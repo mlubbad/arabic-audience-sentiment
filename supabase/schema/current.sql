@@ -105,6 +105,7 @@ alter table "private"."audience_member_videos" add constraint "audience_member_v
 alter table "private"."audience_member_videos" add constraint "audience_member_videos_workspace_id_not_null" NOT NULL workspace_id;
 alter table "private"."audience_member_videos" add constraint "audience_member_videos_workspace_id_video_id_fkey" FOREIGN KEY (workspace_id, video_id) REFERENCES videos(workspace_id, id) ON DELETE CASCADE;
 
+CREATE INDEX audience_member_videos_hash ON private.audience_member_videos USING btree (workspace_id, member_hash);
 CREATE UNIQUE INDEX audience_member_videos_pkey ON private.audience_member_videos USING btree (workspace_id, video_id, member_hash);
 
 create table "private"."audience_members" (
@@ -128,6 +129,7 @@ alter table "private"."audience_members" add constraint "audience_members_pkey" 
 alter table "private"."audience_members" add constraint "audience_members_workspace_id_channel_id_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
 alter table "private"."audience_members" add constraint "audience_members_workspace_id_not_null" NOT NULL workspace_id;
 
+CREATE INDEX audience_members_hash ON private.audience_members USING btree (workspace_id, member_hash);
 CREATE UNIQUE INDEX audience_members_pkey ON private.audience_members USING btree (workspace_id, channel_id, member_hash);
 
 create table "private"."auto_selected_videos" (

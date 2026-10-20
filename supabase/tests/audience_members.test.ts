@@ -387,12 +387,20 @@ describe("hashed audience identities", () => {
     await expect(
       db.query("select private.audience_pepper()"),
     ).rejects.toThrow();
+    await expect(
+      db.query("select private.drain_audience_members()"),
+    ).rejects.toThrow(/permission denied/);
     await db.exec("reset role");
     await db.exec("set role anon");
     await expect(
       db.query("select * from private.audience_member_videos"),
     ).rejects.toThrow();
     await db.exec("reset role");
+    await expect(
+      db.query("select public.admin_rotate_audience_pepper()"),
+    ).rejects.toThrow(/forbidden/);
+    // Signed in but not a platform admin.
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [U2]);
     await expect(
       db.query("select public.admin_rotate_audience_pepper()"),
     ).rejects.toThrow(/forbidden/);
