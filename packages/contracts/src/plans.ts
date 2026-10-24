@@ -22,7 +22,7 @@ export const PlanSchema = z
     price_monthly_cents: z.number().int().nonnegative(),
     price_yearly_cents: z.number().int().nonnegative(),
     self_serve: z.boolean(),
-    provider_prices: z.record(z.string()).default({}),
+    provider_prices: z.record(z.string(), z.string()).default({}),
     allow_public_channels: z.boolean().default(false),
     backfill_units: z.number().int().min(-1).optional(),
     historical_days_limit: z.number().int().min(-1).optional(),
@@ -53,7 +53,7 @@ export const AddonSchema = z
     ]),
     units: z.number().int().positive(),
     price_cents: z.number().int().nonnegative(),
-    provider_prices: z.record(z.string()).default({}),
+    provider_prices: z.record(z.string(), z.string()).default({}),
   })
   .strict();
 

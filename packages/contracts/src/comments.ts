@@ -14,7 +14,7 @@ export const PredictionSchema = z
     revision: z.string().min(1),
     preprocessing_version: z.string().min(1),
     predicted_at: timestamp,
-    class_scores: z.record(LabelSchema, z.number().min(0).max(1)),
+    class_scores: z.record(z.string(), z.number().min(0).max(1)),
   })
   .strict()
   .refine(
@@ -108,7 +108,7 @@ export const CommentSchema = z
     parent_comment_id: z.string().nullable(),
     parent_source: z.enum(["api", "extractor", "inferred_id", "unknown"]),
     source: z.string().min(1),
-    field_provenance: z.record(z.unknown()),
+    field_provenance: z.record(z.string(), z.unknown()),
     comment_type: z.string().nullable(),
     // When the text was removed under the retention rule; null while retained.
     content_purged_at: timestamp.nullable().default(null),
