@@ -1,0 +1,49 @@
+.competitor-print {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .competitor-print,
+  .competitor-print * {
+    visibility: visible;
+  }
+
+  .competitor-print {
+    display: block !important;
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 0;
+    padding: 1.5rem;
+    color: #111827;
+    background: #ffffff;
+    font-family:
+      "IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif;
+  }
+
+  .competitor-print table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-block: 1rem 1.5rem;
+  }
+
+  .competitor-print thead {
+    display: table-header-group;
+  }
+
+  .competitor-print tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .competitor-print th,
+  .competitor-print td {
+    border: 1px solid #d1d5db;
+    padding: 0.5rem 0.65rem;
+    text-align: start;
+    vertical-align: top;
+  }
+}

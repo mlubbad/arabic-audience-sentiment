@@ -146,5 +146,7 @@ describe("the monitor's site check", () => {
   test("probes the public site without basic auth", async () => {
     const run = await monitor({ PREVIEW_URL: `${base}/rest/v1/workspaces` });
     expect(run.line("site")).toBe("OK site 200");
+    expect(run.line("leases")).toBe("OK leases none");
+    expect(run.line("failures")).toBe("OK failures none");
   });
 });

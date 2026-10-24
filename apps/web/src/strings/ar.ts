@@ -120,6 +120,14 @@ export const ar = {
   compTier_indirect: "غير مباشر: بعض الموضوعات متقاربة",
   compTier_aspirational: "طموح: قناة أكبر وموضوعات متقاربة",
   compTier_related: "مرتبط: صلة عامة بالموضوعات",
+  compTierLabel: "الفئة",
+  compReasons: "أسباب الاقتراح",
+  compExport: "تصدير",
+  compExportSuggestionsCsv: "الاقتراحات (CSV)",
+  compExportBenchmarkCsv: "المقارنة المرجعية (CSV)",
+  compExportPdf: "التقرير (PDF)",
+  compProvenanceNote:
+    "الأعداد من يوتيوب، ودرجات التطابق ومعدلات التغير من تقديرنا وحسابنا.",
   navOperations: "التشغيل",
   navAccount: "المصادر والحساب",
   /** Shown only to a platform admin; the page's own title is `adminTitle`. */
