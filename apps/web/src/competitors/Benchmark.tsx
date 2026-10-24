@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { Line } from "react-chartjs-2";
 import { useState } from "react";
 import {
@@ -53,20 +53,29 @@ export function Benchmark({
   channel,
   tracked,
   S,
+  days: controlledDays,
+  onDaysChange,
+  benchmarkQuery,
 }: {
   channel: string;
   tracked: number;
   S: Strings;
+  days?: number;
+  onDaysChange?: (days: number) => void;
+  benchmarkQuery?: UseQueryResult<CompetitorBenchmark, Error>;
 }) {
-  const [days, setDays] = useState(30),
+  const [internalDays, setInternalDays] = useState(30),
     [metric, setMetric] = useState<"subscriber_count" | "view_count">(
       "subscriber_count",
     );
-  const query = useQuery({
+  const days = controlledDays ?? internalDays;
+  const setDays = onDaysChange ?? setInternalDays;
+  const internalQuery = useQuery({
     queryKey: [...competitorKeys.channel(channel), "benchmark", days],
     queryFn: ({ signal }) => loadCompetitorBenchmark(channel, days, signal),
-    enabled: tracked > 0,
+    enabled: !benchmarkQuery && tracked > 0,
   });
+  const query = benchmarkQuery ?? internalQuery;
   if (!tracked)
     return (
       <section className="competitor-benchmark">

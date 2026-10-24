@@ -100,6 +100,14 @@ vi.mock("../strings", () => ({
     compLimitLead: (n: number) => `Your plan tracks up to ${n} competitors.`,
     compSeePlans: "See plans",
     compAdd: "Channel link or handle",
+    compTierLabel: "Tier",
+    compReasons: "Reasons",
+    compExport: "Export",
+    compExportSuggestionsCsv: "Suggestions (CSV)",
+    compExportBenchmarkCsv: "Benchmark (CSV)",
+    compExportPdf: "Report (PDF)",
+    compProvenanceNote:
+      "Counts are from YouTube; match scores and changes are our estimate and our calculation.",
     addDirectAvailableDesc: "Search hint",
     addChannelSearch: "Search",
     addChannelCancel: "Cancel",
@@ -116,6 +124,7 @@ vi.mock("../api/competitors", () => ({
   loadChannels: async () => mocks.channels,
   loadMyRole: async () => mocks.role.value,
   loadCompetitors: () => mocks.loadCompetitors(),
+  loadCompetitorBenchmark: async () => ({ days: 30, series: [] }),
   decideCompetitor: (
     ...args: [string, string, "tracked" | "dismissed" | "clear"]
   ) => mocks.decide(...args),
@@ -170,7 +179,7 @@ beforeEach(() => {
 describe("CompetitorsPage", () => {
   it("renders null channel counts as unknown without crashing", async () => {
     renderPage();
-    await screen.findByText("Candidate");
+    await screen.findByRole("link", { name: "Candidate" });
     expect(screen.getByText(/from YouTube: Subscribers —/)).toBeInTheDocument();
   });
   it("renders a null score, unlimited plan and unknown reason safely", async () => {
@@ -178,8 +187,8 @@ describe("CompetitorsPage", () => {
     mocks.candidates[0]!.reasons = [{ kind: "future_reason" }];
     renderPage();
     expect(await screen.findByText(/Not enough data yet/)).toBeInTheDocument();
-    expect(screen.getByText(/unlimited/)).toBeInTheDocument();
-    expect(screen.getByText("Candidate")).toBeInTheDocument();
+    expect(screen.getAllByText(/unlimited/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Candidate" })).toBeInTheDocument();
   });
   it("shows the plan limit with a pricing link and leaves a candidate untracked", async () => {
     mocks.tracked = 3;
@@ -204,13 +213,28 @@ describe("CompetitorsPage", () => {
   it("hides actions from viewers", async () => {
     mocks.role.value = "viewer";
     renderPage();
-    await screen.findByText("Candidate");
+    await screen.findByRole("link", { name: "Candidate" });
     expect(
       screen.queryByRole("button", { name: "Track" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Dismiss" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export" })).toBeInTheDocument();
+  });
+  it("opens the Export menu and calls window.print for PDF export", async () => {
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+    renderPage();
+    await screen.findByRole("link", { name: "Candidate" });
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+    expect(
+      await screen.findByRole("menuitem", { name: "Suggestions (CSV)" }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("menuitem", { name: "Report (PDF)" }),
+    );
+    expect(printSpy).toHaveBeenCalledTimes(1);
+    printSpy.mockRestore();
   });
   it("shows the no active plan state", async () => {
     mocks.loadCompetitors.mockRejectedValueOnce(new Error("no_active_plan"));

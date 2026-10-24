@@ -7,9 +7,23 @@ import { EmptyState, Loading, LoadError } from "../pageStates/PageStates";
 import { Labelled } from "../ui/Labelled";
 import { SelectItem } from "../ui/Select";
 import { Button } from "../ui/Button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/DropdownMenu";
 import { BudgetMeter } from "../ui/BudgetMeter";
+import { downloadText } from "../csv";
 import { CandidateCard } from "./CandidateCard";
 import { Benchmark } from "./Benchmark";
+import { PrintReport } from "./PrintReport";
+import {
+  benchmarkCsv,
+  benchmarkFilename,
+  suggestionsCsv,
+  suggestionsFilename,
+} from "./exports";
 import { n } from "../dashboard/format";
 import { displayDate } from "../i18n";
 import { useLocale } from "../locale";
@@ -17,6 +31,7 @@ import { AddCompetitor } from "./AddCompetitor";
 import {
   useAddCompetitorCandidate,
   useChannelLookup,
+  useCompetitorBenchmark,
   useCompetitorChannels,
   useCompetitors,
   useMyCompetitorRole,
@@ -48,6 +63,14 @@ export function CompetitorsPage() {
   const [addError, setAddError] = useState<string | null>(null);
   // Inline, not in the toast: ToastHost renders outside the router.
   const [limitHit, setLimitHit] = useState(false);
+  const [benchmarkDays, setBenchmarkDays] = useState(30);
+  const trackedCount =
+    query.data?.candidates.filter((c) => c.status === "tracked").length ?? 0;
+  const benchmarkQuery = useCompetitorBenchmark(
+    channel,
+    benchmarkDays,
+    trackedCount > 0,
+  );
   useEffect(() => {
     if (lookup.data) setResolved(lookup.data);
   }, [lookup.data]);
@@ -123,6 +146,42 @@ export function CompetitorsPage() {
             </SelectItem>
           ))}
         </Labelled>
+        {data && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" type="button">
+                {S.compExport}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() =>
+                  downloadText(
+                    suggestionsFilename(data.channel),
+                    suggestionsCsv(data.candidates),
+                  )
+                }
+              >
+                {S.compExportSuggestionsCsv}
+              </DropdownMenuItem>
+              {benchmarkQuery.data && (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    downloadText(
+                      benchmarkFilename(data.channel, benchmarkQuery.data.days),
+                      benchmarkCsv(benchmarkQuery.data),
+                    )
+                  }
+                >
+                  {S.compExportBenchmarkCsv}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onSelect={() => window.print()}>
+                {S.compExportPdf}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </header>
       {query.isPending ? (
         <Loading S={S} />
@@ -226,12 +285,17 @@ export function CompetitorsPage() {
             </section>
             <Benchmark
               channel={channel!}
-              tracked={
-                data.candidates.filter(
-                  (candidate) => candidate.status === "tracked",
-                ).length
-              }
+              tracked={trackedCount}
+              days={benchmarkDays}
+              onDaysChange={setBenchmarkDays}
+              benchmarkQuery={benchmarkQuery}
               S={S}
+            />
+            <PrintReport
+              data={data}
+              benchmark={benchmarkQuery.data}
+              S={S}
+              lang={lang}
             />
           </>
         )

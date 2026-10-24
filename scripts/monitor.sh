@@ -59,7 +59,9 @@ stamp() { date -u '+%Y-%m-%dT%H:%M:%S%z'; }
 iso_ago() {
   case "$(date -u -d '1 minute' +%s 2>/dev/null)" in
     ""|*[!0-9]*) date -u -v-"$1" '+%Y-%m-%dT%H:%M:%SZ' ;;       # BSD: -v-10M / -v-24H
-    *) date -u -d "-$1" '+%Y-%m-%dT%H:%M:%SZ' ;;                # GNU: -10 minutes / -24 hours
+    *)
+      gnu_offset=$(printf '%s' "$1" | sed 's/M$/ minutes/; s/H$/ hours/; s/d$/ days/; s/S$/ seconds/')
+      date -u -d "-$gnu_offset" '+%Y-%m-%dT%H:%M:%SZ' ;;        # GNU: -10 minutes / -24 hours
   esac
 }
 

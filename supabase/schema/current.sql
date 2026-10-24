@@ -7710,6 +7710,7 @@ CREATE OR REPLACE FUNCTION private.worker_video_counts(token_hash text, j uuid, 
  RETURNS jsonb
  LANGUAGE plpgsql
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
 declare w uuid; c uuid; iv int; updated int; unchanged int; begin
   w := private.worker_job(token_hash, j, t);
@@ -7758,6 +7759,7 @@ declare w uuid; c uuid; iv int; updated int; unchanged int; begin
      where cm.workspace_id = w
        and cm.video_id = d.video_id
        and cm.content_purged_at is null
+       and cm.last_seen_at < now() - interval '7 days'
   )
   select count(*)::int into unchanged from deferred;
 
@@ -10732,6 +10734,7 @@ CREATE OR REPLACE FUNCTION public.svc_worker_claim(credential_hash text)
  RETURNS SETOF jobs
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '25s'
 AS $function$
   select * from private.worker_claim(credential_hash)
 $function$
@@ -10740,6 +10743,7 @@ CREATE OR REPLACE FUNCTION public.svc_worker_claim(credential_hash text, job_typ
  RETURNS SETOF jobs
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '25s'
 AS $function$
   select * from private.claim_job(private.worker_workspace(credential_hash), job_types)
 $function$
@@ -10748,6 +10752,7 @@ CREATE OR REPLACE FUNCTION public.svc_worker_commit_batch(credential_hash text, 
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
   select private.worker_commit_batch(credential_hash, j, t, b, hash, payload)
 $function$
@@ -10762,8 +10767,10 @@ CREATE OR REPLACE FUNCTION public.svc_worker_commit_catalogue(credential_hash te
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
-  select private.worker_commit_catalogue(credential_hash, j, t, payload) $function$
+  select private.worker_commit_catalogue(credential_hash, j, t, payload)
+$function$
 
 CREATE OR REPLACE FUNCTION public.svc_worker_commit_channel(credential_hash text, j uuid, t uuid, profile jsonb)
  RETURNS jsonb
@@ -10783,6 +10790,7 @@ CREATE OR REPLACE FUNCTION public.svc_worker_commit_genres(credential_hash text,
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
   select private.worker_commit_genres(credential_hash, j, t, b, records)
 $function$
@@ -10791,15 +10799,19 @@ CREATE OR REPLACE FUNCTION public.svc_worker_commit_topics(credential_hash text,
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
-  select private.worker_commit_topics(credential_hash, j, t, b, records) $function$
+  select private.worker_commit_topics(credential_hash, j, t, b, records)
+$function$
 
 CREATE OR REPLACE FUNCTION public.svc_worker_due_videos(credential_hash text, j uuid, t uuid)
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
-  select private.worker_due_videos(credential_hash, j, t) $function$
+  select private.worker_due_videos(credential_hash, j, t)
+$function$
 
 CREATE OR REPLACE FUNCTION public.svc_worker_featured_due(credential_hash text, j uuid, t uuid)
  RETURNS jsonb
@@ -10819,6 +10831,7 @@ CREATE OR REPLACE FUNCTION public.svc_worker_genres_due(credential_hash text, j 
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '25s'
 AS $function$
   select private.worker_genres_due(credential_hash, j, t, model_id, prompt_version, max_rows)
 $function$
@@ -10835,8 +10848,10 @@ CREATE OR REPLACE FUNCTION public.svc_worker_known_videos(credential_hash text, 
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
-  SELECT private.worker_known_videos(credential_hash, j, t) $function$
+  select private.worker_known_videos(credential_hash, j, t)
+$function$
 
 CREATE OR REPLACE FUNCTION public.svc_worker_mark_revoked(credential_hash text, j uuid)
  RETURNS void
@@ -10903,8 +10918,10 @@ CREATE OR REPLACE FUNCTION public.svc_worker_video_counts(credential_hash text, 
  RETURNS jsonb
  LANGUAGE sql
  SET search_path TO ''
+ SET statement_timeout TO '30s'
 AS $function$
-  select private.worker_video_counts(credential_hash, j, t, payload) $function$
+  select private.worker_video_counts(credential_hash, j, t, payload)
+$function$
 
 CREATE OR REPLACE FUNCTION public.svc_worker_video_finished(credential_hash text, j uuid, t uuid, v uuid, outcome text, error_code text)
  RETURNS void
