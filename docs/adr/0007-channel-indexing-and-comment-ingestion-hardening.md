@@ -28,7 +28,7 @@ A comprehensive code and live-database audit (`SKY-197` / `SKY-199`) of `workers
 5. **Strict Timestamp Invariant Across All Collectors & Flex Tier Auto-Fallback (`apify.py`, `brightdata.py`, `telegram_collector.py`, `x_collector.py`, `tiktok_collector.py`, `topics/gemini.py`, `genres/gemini.py`):**
    - Never substitute `datetime.now()` for a missing date; keep `published_at = None` and set `timestamp_precision = "second" if published_at else "unknown"`.
    - `GeminiTopicClassifier` and `GeminiGenreClassifier` support `service_tier="flex"` (50% cost discount) with automatic fallback to standard tier on `400/429/503`.
-6. **SQL Hardening (`supabase/migrations/20261122000000_channel_indexing_and_comment_ingestion_hardening.sql`) & `channel-lookup` Pre-Check:**
+6. **SQL Hardening (`supabase/migrations/20261126000000_channel_indexing_and_comment_ingestion_hardening.sql`) & `channel-lookup` Pre-Check:**
    - `private.worker_video_counts` refreshes `last_seen_at = now()` on non-purged comments of videos verified as `unchanged`.
    - `private.worker_known_videos` prioritizes the newest 200 items of each `kind` (`video`, `short`, `stream`) within its `LIMIT 5000` window.
    - `private.adopt_channel_content` replaces row-by-row per-video loops with a single set-based bulk `INSERT INTO public.comments ... SELECT ...` and bulk `UPDATE public.video_selections`, while widening the public-collection source allowlist to include Facebook and Instagram collectors.
