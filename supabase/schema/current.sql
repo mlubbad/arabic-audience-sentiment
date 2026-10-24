@@ -2870,8 +2870,21 @@ BEGIN
                  - make_interval(mins => private.catalogue_interval_or_default(q.workspace_id))
                  - interval '6 hours'
             THEN 1
-          WHEN q.type <> 'discover' THEN 2
-          ELSE 3
+          WHEN q.type = 'collect'
+               AND EXISTS (
+                 SELECT 1 FROM public.video_selections vs
+                  WHERE vs.workspace_id = q.workspace_id
+                    AND vs.channel_id = q.channel_id
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM public.video_selections vs
+                  WHERE vs.workspace_id = q.workspace_id
+                    AND vs.channel_id = q.channel_id
+                    AND vs.last_collected_at IS NOT NULL
+               )
+            THEN 2
+          WHEN q.type <> 'discover' THEN 3
+          ELSE 4
         END,
         CASE WHEN w IS NULL THEN coalesce(r_ws.running_count, 0) ELSE 0 END,
         q.not_before,

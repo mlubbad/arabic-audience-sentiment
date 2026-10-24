@@ -33,6 +33,11 @@ A comprehensive code and live-database audit (`SKY-197` / `SKY-199`) of `workers
    - `private.worker_known_videos` prioritizes the newest 200 items of each `kind` (`video`, `short`, `stream`) within its `LIMIT 5000` window.
    - `private.adopt_channel_content` replaces row-by-row per-video loops with a single set-based bulk `INSERT INTO public.comments ... SELECT ...` and bulk `UPDATE public.video_selections`, while widening the public-collection source allowlist to include Facebook and Instagram collectors.
    - `supabase/functions/channel-lookup/index.ts` tries `channels.list(forHandle=@...)` (1 unit) before `search.list` (100 units) whenever a `search` query is a valid handle token (`^[A-Za-z0-9._-]{3,30}$`).
+7. **Facebook Public Scraper Hardening & Initial-Collect Queue Priority (`apify.py`, `brightdata.py`, `facebook_collector.py`, `20261128000000_prioritize_initial_collect_in_claim_job.sql`):**
+   - `ApifyClient._run_actor` checks error JSON for quota/usage exhaustion (`platform-feature-disabled` / `Monthly usage hard limit exceeded`) before raising `invalid_credentials` on HTTP 403, so `FacebookCollector` cleanly cascades to Bright Data when Apify's monthly quota is exhausted.
+   - `BrightDataClient._scrape_dataset` preserves dataset input parameters (`num_of_posts` for Facebook pages), parses NDJSON (newline-delimited JSON) responses, and automatically polls `/datasets/v3/progress/{snapshot_id}` and downloads `/datasets/v3/snapshot/{snapshot_id}?format=json` when `/datasets/v3/scrape` returns `HTTP 202 Accepted` (`snapshot_id`).
+   - `FacebookCollector`, `ApifyClient`, and `BrightDataClient` distinguish Facebook Reels (`reel_<id>`, `kind="short"`, `/reel/<id>/`) from `pfbid...` posts (`/posts/pfbid...`) so comment scraping hits the exact URL shape Facebook serves.
+   - `private.claim_job` prioritizes initial `collect` jobs for channels that have selected videos and zero collected videos so far (`last_collected_at IS NULL`) ahead of routine periodic `collect` and `analyse` jobs.
 
 ## Consequences
 

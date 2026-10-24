@@ -4,6 +4,8 @@ Supports Bright Data Datasets/Scraping API and Web Unlocker Proxy.
 """
 
 from datetime import datetime, timezone
+import json
+import time
 import httpx
 from ..identity import stable_author_id
 from ..meta_graph import parse_graph_time
@@ -46,6 +48,8 @@ class BrightDataClient:
         self.dataset_facebook_comments = dataset_facebook_comments or "gd_lkay758p1eanlolqw8"  # Facebook Comments
         self.dataset_instagram_posts = dataset_instagram_posts or "gd_lk5ns7kz21pck8jpis"  # Instagram Posts
         self.dataset_instagram_comments = dataset_instagram_comments or "gd_ltppn085pokosxh13"  # Instagram Comments
+        self.poll_interval = 3.0
+        self.max_wait = 180.0
 
     def get_proxy_client(self) -> httpx.Client | None:
         """Return an httpx.Client configured with Bright Data Web Unlocker proxy, if configured."""
@@ -66,8 +70,84 @@ class BrightDataClient:
         except (httpx.HTTPError, ValueError, KeyError) as exc:
             return {"ready": False, "error": str(exc)}
 
+    @staticmethod
+    def _parse_response_items(resp: httpx.Response) -> list[dict]:
+        """Parse JSON array, single JSON object, or NDJSON (JSONL) response."""
+        try:
+            data = resp.json()
+            if isinstance(data, list):
+                return [x for x in data if isinstance(x, dict)]
+            if isinstance(data, dict):
+                if "data" in data and isinstance(data["data"], list):
+                    return [x for x in data["data"] if isinstance(x, dict)]
+                return [data]
+            return []
+        except (ValueError, KeyError, TypeError):
+            text = (resp.text or "").strip()
+            if not text:
+                return []
+            items: list[dict] = []
+            for line in text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    parsed = json.loads(line)
+                except ValueError:
+                    raise CollectionError("invalid_response_format", "failed") from None
+                if isinstance(parsed, dict):
+                    items.append(parsed)
+                elif isinstance(parsed, list):
+                    items.extend(x for x in parsed if isinstance(x, dict))
+            if not items:
+                raise CollectionError("invalid_response_format", "failed")
+            return items
+
+    def _poll_snapshot(self, snapshot_id: str, poll_interval: float | None = None, max_wait: float | None = None) -> list[dict]:
+        """Poll Bright Data async snapshot until ready and download its JSON records."""
+        interval = self.poll_interval if poll_interval is None else poll_interval
+        wait_budget = self.max_wait if max_wait is None else max_wait
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        progress_url = f"https://api.brightdata.com/datasets/v3/progress/{snapshot_id}"
+        snapshot_url = f"https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}?format=json"
+        deadline = time.monotonic() + wait_budget
+        while time.monotonic() < deadline:
+            try:
+                prog_resp = self.client.get(progress_url, headers=headers, timeout=30.0)
+            except httpx.HTTPError:
+                time.sleep(interval)
+                continue
+            if prog_resp.status_code in (401, 403):
+                raise CollectionError("invalid_credentials", "blocked")
+            if prog_resp.status_code == 200:
+                try:
+                    prog_data = prog_resp.json()
+                except ValueError:
+                    prog_data = {}
+                status = str(prog_data.get("status") or "").lower()
+                if status == "ready":
+                    break
+                if status in ("failed", "canceled", "cancelled"):
+                    raise CollectionError("brightdata_snapshot_failed", "failed", retryable=True)
+            time.sleep(interval)
+        else:
+            raise CollectionError("scraper_timeout", "failed", retryable=True)
+
+        for _ in range(5):
+            try:
+                snap_resp = self.client.get(snapshot_url, headers=headers, timeout=self.timeout + 15)
+            except httpx.HTTPError:
+                raise CollectionError("network_failure", retryable=True) from None
+            if snap_resp.status_code == 202:
+                time.sleep(interval)
+                continue
+            if snap_resp.is_error:
+                raise CollectionError(f"brightdata_error_{snap_resp.status_code}", "failed", retryable=True)
+            return self._parse_response_items(snap_resp)
+        raise CollectionError("scraper_timeout", "failed", retryable=True)
+
     def _scrape_dataset(self, dataset_id: str, urls: list[dict | str]) -> list[dict]:
-        """Call Bright Data Datasets Scrape API."""
+        """Call Bright Data Datasets Scrape API (with automatic 202 snapshot polling and NDJSON support)."""
         if not self.api_key:
             raise CollectionError("missing_brightdata_api_key", "failed")
 
@@ -76,11 +156,13 @@ class BrightDataClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-        # Format payload: list of objects containing 'url'
-        payload = [{"url": u if isinstance(u, str) else u.get("url")} for u in urls]
+        payload = [
+            {"url": u} if isinstance(u, str) else {k: v for k, v in u.items() if v is not None}
+            for u in urls
+        ]
 
         try:
-            resp = self.client.post(url, headers=headers, json=payload, timeout=self.timeout + 10)
+            resp = self.client.post(url, headers=headers, json=payload, timeout=self.timeout + 15)
         except httpx.HTTPError:
             raise CollectionError("network_failure", retryable=True) from None
 
@@ -93,17 +175,15 @@ class BrightDataClient:
         if resp.is_error:
             raise CollectionError(f"brightdata_error_{resp.status_code}", "failed", retryable=True)
 
-        try:
-            data = resp.json()
-            if isinstance(data, list):
-                return data
-            if isinstance(data, dict):
-                if "data" in data and isinstance(data["data"], list):
-                    return data["data"]
-                return [data]
-            return []
-        except (ValueError, KeyError, TypeError):
-            raise CollectionError("invalid_response_format", "failed") from None
+        items = self._parse_response_items(resp)
+        if (
+            len(items) == 1
+            and isinstance(items[0].get("snapshot_id"), str)
+            and items[0]["snapshot_id"]
+            and not any(k in items[0] for k in ("post_id", "id", "comment_id", "shortcode", "video_id", "tweet_id", "posts", "videos"))
+        ):
+            return self._poll_snapshot(items[0]["snapshot_id"])
+        return items
 
     def scrape_x_profile(self, handle: str, max_items: int = 25) -> list[dict]:
         """Scrape tweets from an X (Twitter) profile using Bright Data."""
@@ -287,26 +367,42 @@ class BrightDataClient:
     def scrape_facebook_posts(self, handle: str, max_items: int = 25) -> list[dict]:
         clean_handle = handle.strip().strip("/")
         raw_items = self._scrape_dataset(
-            self.dataset_facebook_posts, [{"url": f"https://www.facebook.com/{clean_handle}/"}]
+            self.dataset_facebook_posts,
+            [{"url": f"https://www.facebook.com/{clean_handle}/", "num_of_posts": max_items}],
         )
         videos = []
         for item in raw_items[:max_items]:
-            url = item.get("url") if isinstance(item.get("url"), str) else ""
-            post_id = str(item.get("post_id") or item.get("id") or "") or _bd_last_segment(url)
+            raw_url = item.get("url")
+            url: str = raw_url if isinstance(raw_url, str) else ""
+            url_seg = _bd_last_segment(url)
+            post_type = str(item.get("post_type") or "").lower()
+            is_reel = "/reel/" in url or post_type == "reel"
+            if is_reel and url_seg.isdigit():
+                post_id = f"reel_{url_seg}"
+            elif url_seg.startswith("pfbid"):
+                post_id = url_seg
+            else:
+                post_id = str(item.get("post_id") or item.get("id") or "") or url_seg
             if not post_id:
                 continue
             text = _bd_text(item, ("content", "description", "text"))
-            attachments = item.get("attachments") if isinstance(item.get("attachments"), list) else []
+            raw_attachments = item.get("attachments")
+            attachments: list = raw_attachments if isinstance(raw_attachments, list) else []
             is_video = any(isinstance(a, dict) and str(a.get("type", "")).lower() == "video" for a in attachments)
             published_at, _ = parse_graph_time(item.get("date_posted") or item.get("created_at"))
+            thumb = (
+                _bd_attachment_image(attachments)
+                or _bd_text(item, ("thumbnail", "post_external_image", "avatar_image_url", "page_logo"))
+                or None
+            )
             videos.append(
                 {
                     "external_video_id": post_id,
                     "title": text[:100] or f"Post {post_id}",
-                    "kind": "video" if is_video else "channel_post",
+                    "kind": "short" if is_reel else ("video" if is_video else "channel_post"),
                     "published_at": published_at,
                     "reported_comment_count": _bd_int(item.get("num_comments", item.get("comments"))),
-                    "thumbnail_url": _bd_attachment_image(attachments) or _bd_text(item, ("thumbnail",)) or None,
+                    "thumbnail_url": thumb,
                     "field_provenance": {
                         "source": "brightdata",
                         "dataset": self.dataset_facebook_posts,
@@ -320,7 +416,10 @@ class BrightDataClient:
     def scrape_facebook_comments(
         self, post_id: str, handle: str | None = None, max_items: int = 50
     ) -> list[dict]:
-        post_url = f"https://www.facebook.com/{(handle or 'facebook').strip('/')}/posts/{post_id}"
+        if post_id.startswith("reel_"):
+            post_url = f"https://www.facebook.com/reel/{post_id.removeprefix('reel_')}/"
+        else:
+            post_url = f"https://www.facebook.com/{(handle or 'facebook').strip('/')}/posts/{post_id}"
         raw_items = self._scrape_dataset(self.dataset_facebook_comments, [{"url": post_url}])
         return _bd_comments(raw_items[:max_items], post_id)
 
