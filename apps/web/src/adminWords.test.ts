@@ -126,7 +126,7 @@ describe("audit actions in words", () => {
     ])
       written.add(a);
     // Targets and arguments that share the lists' shape but are not actions.
-    for (const notAction of ["usage_grant", "plan_paddle_"])
+    for (const notAction of ["usage_grant", "plan_paddle_", "audience_pepper"])
       written.delete(notAction);
     expect(written.size).toBeGreaterThan(20);
     const missing = [...written].filter(

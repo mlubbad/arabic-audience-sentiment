@@ -1,5 +1,5 @@
 # 0003. Hashed audience identities, kept 30 days, shown only above thresholds
-Status: proposed
+Status: accepted (owner, 2026-10-20). Overlap stays behind the `audience_overlap` switch until YouTube accepts the use case.
 Date: 2026-10-19
 
 ## Context

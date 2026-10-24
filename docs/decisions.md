@@ -1649,3 +1649,23 @@ Rows nobody read for 7 days are dropped.
 Not solved by this: the drain's count is still proportional to the workspace. If it ever exceeds 10
 minutes the next step is incremental rollups, not a longer budget. The worker tick's own `55P03` /
 `57014` (progress.md, 2026-10-17) is a separate cause.
+
+## 2026-10-20: ADR-0003 accepted; phase 3 starts behind a switch
+
+The owner accepted ADR-0003 (hashed audience identities, 30-day retention, thresholds) and asked
+for phase 3 to start now, behind `private.platform_switches('audience_overlap')`, which **stays off
+until YouTube accepts the overlap use case**. The 2026-10-19 Derived Metrics submission did not
+declare overlap; the follow-up request is drafted in `docs/youtube-api-application-2026-10.md` §5
+(#192) for the owner to send.
+
+What "off" means, so shipping is safe before acceptance:
+- the drain builds no identity while the switch is off (WO-29), so nothing derived from commenters
+  across channels exists until it is turned on;
+- the overlap RPCs answer `feature_unavailable` (WO-30/31);
+- the page and its nav entry render for nobody (WO-32).
+
+Work orders: WO-29 #193 (identities), WO-30 #194 (cells, plan gate, RPC), WO-31 #195 (bridge
+videos), WO-32 #196 (page). Overlap is offered on plans with `plans.audience_overlap`: agency,
+media, enterprise and owner (decision 3 of 2026-10-17). A-4 moves from Gemini to Codex like the
+rest of phases 2 and 3. A-5 (the bot rule) waits for acceptance, because it has to be measured on
+real data. Coverage (the share of videos collected) is left for phase 4.
