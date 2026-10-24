@@ -200,6 +200,28 @@ describe("worker_known_videos", () => {
       [YT],
     );
   });
+
+  it("retains the head of every tab kind (e.g. older livestreams) even when 5,100 newer shorts exist", async () => {
+    await db.query(
+      `insert into videos(workspace_id,channel_id,platform,external_video_id,title,kind,published_at)
+       values ($1,$1,'youtube','stream00001','بث مباشر قديم','stream','2019-06-01T00:00:00Z')`,
+      [YT],
+    );
+    await db.query(
+      `insert into videos(workspace_id,channel_id,platform,external_video_id,title,kind,published_at)
+       select $1,$1,'youtube','s' || lpad(g::text,10,'0'),'short','short',
+              timestamptz '2021-01-01' + make_interval(hours => g)
+         from generate_series(1,5100) g`,
+      [YT],
+    );
+    const list = (await known(await lease(YT, "k-kind-head")))!;
+    expect(list).toHaveLength(5000);
+    expect(list).toContain("stream00001");
+    await db.query(
+      "delete from videos where workspace_id=$1 and (external_video_id like 's%' or external_video_id = 'stream00001')",
+      [YT],
+    );
+  });
 });
 
 describe("a refresh commit that lists only what is new", () => {

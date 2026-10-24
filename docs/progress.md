@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-10-24 — Contextual Gemini Batch Reclassification (100% across 9 channels) & Channel Indexing / Comment Ingestion Hardening (ADR-0007)
+
+- **SKY-158 completed (100% across all 9 target channels):**
+  - Executed 163 consecutive waves (`326` hybrid `Gemini Batch API` jobs: `gemini-3.8-flash` + `gemini-4-argon` at 50% Batch discount) with `Keyset Video-Batch Pagination` (`workers/python/src/sentiment/gemini_batch.py`, `scripts/run_gemini_batch_reclassify.py`).
+  - Analysed **`453,651` comments** (`100%` of non-purged comments across `@dralsuwaidan` 176,655; `@aljazeera360` 137,472; `@abdelkafytube` 98,663; `@shfa-1` 31,191; `@mmoshaya` 6,045; `@asharqnews` 2,450; `@sky_echo-q6p` 983; `@afala_yatadabaron` 15; `@mohammedalubbad` 2) and persisted **`114,477` Arabic-explained contextual corrections** (`25.2%` correction rate over `CAMeLBERT-DA`) in `public.comment_reviews`.
+- **SKY-197 & SKY-199 (`ADR-0007`, migration `20261122000000_channel_indexing_and_comment_ingestion_hardening.sql`):**
+  1. **Reply-Aware Delta Sync (`workers/python/src/collectors/youtube_api.py`):** When `commentThreads.list` encounters a top-level comment older than `since`, it sets `cutoff_reached = True` (stopping further page pagination) while harvesting any inline or overflow replies on the current page that were published after `since`, and filters `/comments` replies by `since`.
+  2. **Sub-Batching Guard (`_MAX_BATCH_COMMENTS = 500` in `youtube_api.py`):** Splits any `commentThreads` page exceeding 500 total comments (top-level + inline replies) into `<= 500`-comment sub-batches so `private.commit_batch` never rejects dense pages with `batch_too_large`.
+  3. **Zero-Quota YouTube Atom/RSS Feed & Chunked Catalogue Commits (`youtube_api.py`, `server/runner.py`, `supabase/functions/channel-lookup/index.ts`):** Added `YouTubeAPI.rss_recent_videos()` / `rss_video_ids()` + `use_rss_precheck` (0 quota units); chunked `run_discover()` catalogue commits into 500-video batches with heartbeats; added 1-unit `channels.list(forHandle=@...)` pre-check in `channel-lookup` before 100-unit `search.list`.
+  4. **Strict Timestamp Precision Across All Collectors (`apify.py`, `brightdata.py`, `telegram_collector.py`, `x_collector.py`, `tiktok_collector.py`):** Removed all `datetime.now()` fallbacks for missing dates; missing timestamps stay `None` with `timestamp_precision="unknown"`, eliminating Telegram `invalid_batch` refusals and enforcing Invariant #3.
+  5. **Unchanged-Video Retention & Tab-Head Preservation (`20261122000000`):** `private.worker_video_counts` refreshes `public.comments.last_seen_at = now()` on non-purged comments when a monitored video's comment count is verified unchanged on the source (preventing false 30-day text purges on active channels), and `private.worker_known_videos` retains the newest 200 items of each `kind` (`video`, `short`, `stream`) within its 5,000-video window.
+
 ## 2026-10-19 — WO-22 and WO-24 merged
 
 - **WO-22 (#176) merged** (`cb42a65`) after 3 rounds. The owner updated the cloud worker to `cb42a65`. Genre classification stays behind its switch.
@@ -184,12 +196,13 @@ plus four per channel). About half of that was the stale worker's AJ360 misreads
 and blocked discovers spent more on partial reads before they were cut off.
 
 **Cause, three parts:**
-1. *Retried hourly whatever the block said.* `worker_finish` set a quota block's `not_before` to
+
+1. _Retried hourly whatever the block said._ `worker_finish` set a quota block's `not_before` to
    the billing period end (2026-11-05 here), and nothing honoured it. 60 minutes after the block,
    `enqueue_scheduled`'s backoff queued a fresh job, and `unblock_due_jobs` cancelled the blocked
    one as superseded.
-2. *The wrong reset.* That period end is the plan's units, not the source's daily quota.
-3. *Discovers first.* `claim_job` hands every discover out before any collect. At the reset,
+2. _The wrong reset._ That period end is the plan's units, not the source's daily quota.
+3. _Discovers first._ `claim_job` hands every discover out before any collect. At the reset,
    about 100 channels re-read their whole catalogue (`catalogue_interval` 1440 on these plans)
    and spent the day's quota before any comments were read.
 
@@ -216,6 +229,7 @@ are committed as `partial`); the video is marked blocked and the run goes on. Te
 `test_backfill.py` cases red on the old runner with the production code `invalid_batch`.
 
 **Not done here:**
+
 - A discover still re-reads the whole catalogue: about 7.6k units a day for 179k videos even
   without the misreads. Collects now go first, but the refresh cost is the next fix: incremental
   tabs, or a longer `catalogue_interval` for public channels (the owner's call).
@@ -463,7 +477,7 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
 
 ## 2026-10-04 — WO-13 merged; local Codex dispatch rebuilt after its first three runs
 
-- **Owner directive:** *"راجع جميع الاخفاقات وجد حلا جذريا لكل منها ومن ثم نفذه"* — review every
+- **Owner directive:** _"راجع جميع الاخفاقات وجد حلا جذريا لكل منها ومن ثم نفذه"_ — review every
   failure of the day, fix each at the root, then carry on.
 - **WO-13 (#72)** shipped as PR #74 (`021d21b`, merged as `239979d`): the admin Channels page
   shows the last successful collection per channel and flags stale ones (48 h). Codex reported
@@ -533,7 +547,7 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
 ## 2026-09-24 — Permanent Resolution of Dashboard Timeouts (134k+ Comments), Decoupled UI Failure, and Quota Lifecycle
 
 - **User Directives**:
-  - *"مرارا وتكرارا نواجه نفس المشاكل ،، اريد معرفة جذور المشكلة وحلها لمرة واحدة وبلا رجعة"* ("Over and over again we face the same problems... I want to know the root causes of the problem and solve it once and for all, with no return.")
+  - _"مرارا وتكرارا نواجه نفس المشاكل ،، اريد معرفة جذور المشكلة وحلها لمرة واحدة وبلا رجعة"_ ("Over and over again we face the same problems... I want to know the root causes of the problem and solve it once and for all, with no return.")
 - **Root Causes Identified & Eliminated**:
   1. **Quadratic Database Date Operations in `private.dashboard_aggregates_impl`**:
      - Previously, 31 separate scans (`generate_series(0, 23)` and `(0, 6)`) ran nested loops against 125,000+ comments (~3.87M operations), pushing query latency past 2.5s and triggering statement timeouts or PostgREST 504 gateway drops.
@@ -559,7 +573,7 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
 ## 2026-09-24 — Deep Audit, Root-Cause Elimination for Scheduler/Worker Quota Lifecycle & Platform Admin Services Dashboard
 
 - **User Directives**:
-  - *"افحص سجل التدقيق والمزامنات والمهام الفاشلة والأخطاء وابحث عن مصادر وجذور المشكلة وقم بالتخطيط لحلها من الجذور وبشكل نهائي"* ("Examine the audit log, synchronizations, failed jobs, and errors, find the sources and root causes of the problem, and plan to resolve it from the root and definitively.")
+  - _"افحص سجل التدقيق والمزامنات والمهام الفاشلة والأخطاء وابحث عن مصادر وجذور المشكلة وقم بالتخطيط لحلها من الجذور وبشكل نهائي"_ ("Examine the audit log, synchronizations, failed jobs, and errors, find the sources and root causes of the problem, and plan to resolve it from the root and definitively.")
 - **Root Causes Identified & Eliminated**:
   1. **Statement Timeout `57014` in `private.schedule_due_work`**:
      - `has_due_videos` previously gathered `jsonb_agg` across all uncollected videos before evaluating length, timing out on channels with large video backlogs. Replaced with an indexed existence subquery `select 1 from videos ... limit 1`.
@@ -592,8 +606,8 @@ This entry closes the gap since 2026-10-04. Each item below has its own evidence
 ## 2026-09-24 — Dynamic Plan Limits Management & Admin Dashboard Enhancement
 
 - **User Directives**:
-  - *"نفذ وارفع واختبر"* ("Execute, deploy, and test")
-  - *"وقم بتنفيذ تطوير على لوحة الادارة حتى يتمكنوا من تعديل القيود كلما ارادو بحيث تكون القيود ديناميكية."* ("Implement an enhancement on the admin dashboard so that they can adjust restrictions whenever they want, so that restrictions are dynamic.")
+  - _"نفذ وارفع واختبر"_ ("Execute, deploy, and test")
+  - _"وقم بتنفيذ تطوير على لوحة الادارة حتى يتمكنوا من تعديل القيود كلما ارادو بحيث تكون القيود ديناميكية."_ ("Implement an enhancement on the admin dashboard so that they can adjust restrictions whenever they want, so that restrictions are dynamic.")
 - **Database Architecture & Migration**:
   - Created migration `20260924140000_dynamic_plan_limits_enhancement.sql`:
     - Updated `public.update_plan_limits(p_plan_key text, p_limits jsonb)` to dynamically update all plan limits: `channels_limit` (with `channels` alias), `analysis_units`, `backfill_units`, `historical_days_limit`, `topic_units`, `members_limit` (with `members` alias), `workspaces_limit` (with `workspaces` alias), `insight_reports`, `live_interval_minutes`, and `allow_public_channels`.

@@ -104,9 +104,7 @@ class ApifyClient:
                 continue
             text = item.get("full_text") or item.get("text") or ""
             author_info = item.get("author") or item.get("user") or {}
-            created_at = item.get("createdAt") or item.get("created_at")
-            if not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+            created_at = item.get("createdAt") or item.get("created_at") or None
             comment_count = item.get("replyCount") or item.get("reply_count") or item.get("replies")
 
             media = item.get("media") or item.get("extendedEntities", {}).get("media") or []
@@ -157,9 +155,7 @@ class ApifyClient:
                 continue
             text = item.get("full_text") or item.get("text") or ""
             author_info = item.get("author") or item.get("user") or {}
-            created_at = item.get("createdAt") or item.get("created_at")
-            if not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+            created_at = item.get("createdAt") or item.get("created_at") or None
             likes = item.get("likeCount") or item.get("like_count") or item.get("likes") or 0
             comments.append(
                 {
@@ -194,7 +190,7 @@ class ApifyClient:
             if isinstance(created_at, (int, float)):
                 created_at = datetime.fromtimestamp(created_at, tz=timezone.utc).isoformat()
             elif not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+                created_at = None
 
             stats = item.get("stats") or {}
             comment_count = item.get("commentCount") or stats.get("commentCount")
@@ -237,7 +233,7 @@ class ApifyClient:
             if isinstance(created_at, (int, float)):
                 created_at = datetime.fromtimestamp(created_at, tz=timezone.utc).isoformat()
             elif not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+                created_at = None
 
             author = item.get("user") or item.get("author") or {}
             likes = item.get("diggCount") or item.get("likes") or 0

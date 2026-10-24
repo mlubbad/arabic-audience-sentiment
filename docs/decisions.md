@@ -1,5 +1,7 @@
 # Implementation decisions
 
+2026-10-24 — Channel indexing and comment ingestion hardening (`ADR-0007`, `20261122000000_channel_indexing_and_comment_ingestion_hardening.sql`). Six concrete fixes across Python collectors, Edge Function lookup, and Postgres RPCs: (1) `YouTubeAPI.batches()` harvests inline and overflow replies newer than `since` on older top-level threads in the current page before stopping pagination; (2) pages exceeding 500 comments (top-level + inline replies) are split into `<= 500`-comment sub-batches so `private.commit_batch` never raises `batch_too_large`; (3) `YouTubeAPI.rss_recent_videos()` / `rss_video_ids()` reads `/feeds/videos.xml` at 0 quota units, `run_discover()` commits catalogues `> 500` videos in 500-video chunks with heartbeats, and `channel-lookup` tries `channels.list(forHandle=@...)` (1 unit) before `search.list` (100 units) for handle-shaped queries; (4) `apify.py`, `brightdata.py`, `telegram_collector.py`, `x_collector.py`, and `tiktok_collector.py` never substitute `datetime.now()` for a missing date (`published_at = None`, `timestamp_precision = "unknown"`), fixing Telegram `invalid_batch` refusals; (5) `private.worker_video_counts` refreshes `comments.last_seen_at = now()` on non-purged comments when a selected video's comment count is verified unchanged on the source, preventing false 30-day `purge_comment_text` wipes on active channels; (6) `private.worker_known_videos` retains the newest 200 items per `kind` (`video`, `short`, `stream`) within its `LIMIT 5000` window.
+
 2026-10-19 — The dispatcher, not Codex, merges `main` into a work-order branch. `CODEX_MERGE_MAIN=1`
 does it before a follow-up round runs, with hooks off, and a conflict stops the run. That keeps git
 writes outside the sandbox. It came up when #178 merged with the migration version #176 used, so
@@ -130,6 +132,7 @@ change (`worker-image.yml`).
 Context: GitHub refused every hosted job on 2026-10-10 over a billing block on the then-private
 repository; hosted minutes are free on a public one. The owner made the repository public and
 kept it so.
+
 1. **Consequences accepted.** Code, issues, PRs and workflow logs are readable by anyone. The
    security rules in `AGENTS.md` already forbade secrets in tracked files; they now also forbid
    printing a secret or customer data in a workflow log, and the self-hosted runner of ADR 0002
@@ -151,6 +154,7 @@ second repository under `/tmp` pointed at the worktree; the third run only succe
 standalone clone proved the cause is Codex's sandbox itself: `.git/` is read-only by design under
 `workspace-write` (so the agent cannot plant hooks that run unsandboxed), and neither `--add-dir`
 nor a writable root on the repository defeats it.
+
 1. **Rejected: make `.git` writable** (`sandbox_workspace_write.writable_roots=["<repo>/.git"]`,
    an undocumented carve-out in Codex's permissions policy). It removes a real control and can
    silently stop working on any Codex upgrade.
@@ -170,6 +174,7 @@ nor a writable root on the repository defeats it.
 
 2026-09-24 — Scheduler Statement Timeout Elimination, Resilient Quota Lifecycle, and Centralized Services Health Observability.
 To definitively eliminate recurring failures and statement timeouts identified during comprehensive audit of sync logs, scheduler execution, and background worker queues:
+
 1. **Early-Stopping Existence Subqueries in Scheduler (`private.schedule_due_work`)**:
    - `schedule_due_work` was intermittently failing with PostgreSQL error 57014 (statement timeout).
    - Analysis revealed two expensive linear scans: `jsonb_agg` of all pending video IDs inside `has_due_videos`, and unbounded aggregation of unclassified comments inside `topics_pending`.
@@ -187,6 +192,7 @@ To definitively eliminate recurring failures and statement timeouts identified d
 
 2026-09-24 — Dynamic Plan Limits Administration and Unlimited Invariant Preservation.
 To allow platform administrators to adjust limits and quotas for any subscription plan at any time without code deployments or database migrations, while preserving strict PostgreSQL check constraints:
+
 1. **Dynamic Update RPC (`public.update_plan_limits`)**:
    - Accepts any combination of plan parameters (`channels`, `channels_limit`, `analysis_units`, `backfill_units`, `historical_days_limit`, `topic_units`, `members`, `members_limit`, `workspaces`, `workspaces_limit`, `insight_reports`, `live_interval_minutes`, `allow_public_channels`).
    - Strictly secured behind `public.is_platform_admin()` with `security definer set search_path=''`.
@@ -200,6 +206,7 @@ To allow platform administrators to adjust limits and quotas for any subscriptio
 
 2026-09-24 — YouTube Public Ingestion via OAuth Platform Reader Grant vs Direct API Keys.
 To resolve authentication for unverified public YouTube channels without relying on web scrapers or requiring external Google Cloud API keys:
+
 1. **OAuth Platform Reader Preferred Over Raw API Keys**:
    - Modern Google Cloud accounts and AI Studio issue API keys beginning with `AQ.` (associated with Google Gemini / Generative Language APIs). Passing an `AQ.` key to YouTube Data API v3 endpoints returns `HTTP 401 Unauthorized: "API keys are not supported by this API. Expected OAuth2 access token or other authentication credentials that assert a principal."`
    - Rather than requiring operators to obtain legacy `AIzaSy...` API keys, the system relies on the operator-connected OAuth Platform Reader grant stored securely in `private.platform_reader` (established in migration `20260919200000_a_platform_reader_reads_public_channels.sql`).
@@ -212,6 +219,7 @@ To resolve authentication for unverified public YouTube channels without relying
 
 2026-09-24 — Audience Interaction Metrics Extraction at Zero Additional Quota & Storytelling with Data Integration.
 To empower creators and brand managers with richer contextual insights and actionable engagement intelligence without exceeding YouTube Data API daily quotas:
+
 1. **Zero-Quota-Cost Interaction Metric Extraction**:
    - Rather than making separate calls to video statistics or comment details endpoints, metrics were extracted from existing API responses:
      - `videos.list` was adjusted from `part="snippet"` to `part="snippet,statistics,contentDetails"` (1 quota unit, unchanged). This yields `view_count`, `like_count`, `description`, `tags`, and `category_id` without spending extra quota units.
@@ -225,6 +233,7 @@ To empower creators and brand managers with richer contextual insights and actio
 
 2026-09-23 — Omnichannel Historical Data Backfill & Import and Dynamic Plan Limits.
 To enable users to import historical posts/videos and comments according to their subscription plan while allowing administrators to dynamically customize plan constraints without deploying database migrations:
+
 1. **Quota Separation (`historical_backfill` vs `comment_analysis`)**:
    - Historical backfills (both direct platform syncing and external file uploads) deduct exclusively from `historical_backfill` usage units (`backfill_units` on the plan).
    - This strictly isolates historical backfill operations from the workspace's recurring monthly `comment_analysis` allowance, avoiding surprise quota depletion for ongoing active monitoring.
@@ -239,6 +248,7 @@ To enable users to import historical posts/videos and comments according to thei
 
 2026-09-23 — YouTube Data API Quota Optimization & Incremental Watermark Early Stopping.
 To maximize the efficiency of YouTube's daily API quota limit (10,000 units/day) when monitoring active YouTube channels and videos:
+
 1. **Inline Replies Optimization**:
    - `commentThreads.list` previously requested `part="snippet"` and scheduled every parent with `totalReplyCount > 0` for a separate call to `comments.list` (1 quota unit per parent).
    - Changed request to `part="snippet,replies"`. YouTube returns up to 5 inline replies in `snippet,replies` for zero additional quota cost.
@@ -252,6 +262,7 @@ To maximize the efficiency of YouTube's daily API quota limit (10,000 units/day)
 2026-09-22 — Dashboard Covering Composite Indexes and Frontend Code-Splitting.
 
 Following a comprehensive architecture and performance audit, two high-impact optimizations were prioritized and implemented:
+
 1. **Database Covering Indexes**:
    - `private.dashboard_aggregates_impl` and `private.dashboard_comments_impl` join `sentiment_predictions` and `topic_predictions` using `workspace_id` and active `analysis_key`/`classification_key`.
    - Previous unique indexes had `(comment_id, ...)` or lacked payload columns, preventing index-only scans.
@@ -267,6 +278,7 @@ Following a comprehensive architecture and performance audit, two high-impact op
 When logged in as a platform administrator/owner, the workspace switcher rail and account views previously returned all tenant workspaces across the platform (due to RLS allowing platform admins full visibility). This cluttered the owner's personal view with dozens of customer workspaces. Furthermore, when supporting users or debugging tenant-specific issues, administrators needed a reliable way to view the platform through a specific user's eyes ("لأرى المستخدم بعدسته وعينه") without stealing credentials, bypassing authentication, or compromising auditability.
 
 To resolve this safely and sustainably:
+
 1. **Workspace Isolation (`my_workspaces`)**:
    - Created `public.my_workspaces(target_user_id uuid default null)`:
      - By default (`target_user_id is null`), it strictly returns workspaces where the caller is an explicit member or creator (`m.user_id = auth.uid() or w.created_by = auth.uid()`). This isolates the admin's personal workspaces from customer workspaces in daily operation.
@@ -286,6 +298,7 @@ To resolve this safely and sustainably:
 Users previously experienced ambiguity when setting up a workspace because connecting a channel (via Google OAuth) and selecting/searching for a public channel (via public external ID) were presented concurrently without clarifying their mutual exclusivity. Furthermore, allowing all user tiers to add arbitrary public channels without restriction introduced resource and quota risks.
 
 To address these concerns:
+
 1. **Mutual Exclusivity UX Pattern**:
    - The UI presents a single decision point: "أملك القناة" (Official Owner) vs "لا أملك القناة" (Public Channel Monitoring).
    - Once a channel is attached (either via OAuth grant or via public candidate adoption), only relevant actions (`اختر الفيديوهات`, `فصل القناة`) remain visible, permanently hiding contradictory setup prompts.
@@ -297,10 +310,12 @@ To address these concerns:
 
 2026-09-22 — Cross-Workspace Deduplication & Unified Database Architecture (قاعدة البيانات الواحدة).
 When multiple workspaces monitor the same public channel (e.g. YouTube `@channel_id`), or when a user unselects videos to preserve their daily YouTube API quota (10,000 units), two critical operational issues arose:
+
 1. Workspaces re-fetching and re-analysing identical videos and comments wasted limited YouTube quota and compute power.
 2. In the sync catalogue UI, unselecting videos collapsed their visible metrics to "غير محدد" (Unselected) without communicating how many comments had already been gathered and classified in the database for those videos.
 
 To resolve this on the principle of "قاعدة البيانات الواحدة بمعرف واحد فريد لكل من القناة والفيديو والتعليق" (Single Database source of truth with unique external identifiers):
+
 1. **Cross-Workspace Asset Adoption (`20260922010000_cross_workspace_deduplication.sql`)**:
    - `private.adopt_channel_catalogue(w uuid, c uuid)`: When a channel is registered or updated, any videos catalogued under identical `(platform, external_channel_id)` in other workspaces are adopted into target workspace `w` without needing YouTube API calls.
    - `private.adopt_video_comments_and_predictions(w uuid, v uuid)`: When videos are selected in workspace `w`, comments, analysis runs, sentiment predictions, and topic predictions existing for `(platform, external_video_id)` in any donor workspace are adopted into workspace `w`.
@@ -314,6 +329,7 @@ To resolve this on the principle of "قاعدة البيانات الواحدة 
      - Badges on unselected videos with stored comments display `غير محدد · جُمع X (صُنّف Y)` so creators always know their data is preserved and accessible.
 
 To provide seamless support for X and TikTok channels without requiring operators or end-users to navigate developer portals or restrictive API registration (which are blocked by automated CAPTCHAs and mobile OTPs):
+
 1. Both `XCollector` and `TikTokCollector` implement a resilient dual-mode strategy:
    - When API credentials (`X_BEARER_TOKEN`, `TIKTOK_ACCESS_TOKEN`) are configured in the environment, the collectors use the official API v2 endpoints.
    - When credentials are absent or in zero-configuration mode, the collectors fall back to public web endpoints:
@@ -326,6 +342,7 @@ To provide seamless support for X and TikTok channels without requiring operator
 2026-09-20 — Omnichannel Multi-Platform Architecture (Telegram, X, TikTok, Facebook, Instagram).
 The system was originally built strictly around YouTube (using YouTube Data API v3 channels, videos, comments, and IDs).
 To support expanding audience sentiment analysis to other major social platforms in the Arab world, we designed a unified, platform-agnostic architecture while implementing Telegram as the first live non-YouTube platform:
+
 1. Universal Content Abstraction:
    - Channels and comments now store `platform` (`'youtube' | 'telegram' | 'x' | 'tiktok' | 'facebook' | 'instagram'`).
    - Content items use generalized `video_kind` / `content_kind` (`video`, `short`, `stream`, `channel_post`, `tweet`, `status`).
@@ -343,6 +360,7 @@ to the browser client and computed metrics, timelines, sentiment distributions, 
 When channels scale beyond 10,000 comments (e.g. AJ360 with 71,310+ comments), this approach caused browser memory exhaustion,
 sluggish UI responsiveness, and PostgREST serialization bottlenecks.
 We redesigned this into an enterprise-grade decoupled server-side architecture inspired by jQuery DataTables / server-side streaming:
+
 1. `public.dashboard_aggregates(w uuid, f jsonb)`: Pre-computes metrics, sentiment distribution, timeline buckets, topic counts,
    video aggregates, 24-hour activity distribution, 7-day weekday activity, weekly volume, top commenters, and top negative comments
    directly in PostgreSQL via set-based GROUP BY aggregations. Payload is reduced to ~300KB (or <8KB for smaller filters) with sub-second execution (~1.3s on 71,310 rows).
@@ -352,8 +370,7 @@ We redesigned this into an enterprise-grade decoupled server-side architecture i
    so ILIKE text search across tens of thousands of comments completes in ~28ms.
 4. Backwards Compatibility: The existing `dashboard_snapshot` RPC remains supported, and offline/demo/fixture modes continue
    using client-side `snapshot()` seamlessly. All contracts are formally typed with Zod in `@sentiment/contracts`.
-Migration lives in `supabase/migrations/20260920150000_decoupled_dashboard_architecture.sql`.
-
+   Migration lives in `supabase/migrations/20260920150000_decoupled_dashboard_architecture.sql`.
 
 2026-09-20 — Fair multi-tenant job claim scheduling and real-time operational polling.
 When multiple tenants queue jobs, platform workers claiming across workspaces (`w is null`) must not
@@ -493,7 +510,6 @@ References checked: [Supabase RLS](https://supabase.com/docs/guides/database/pos
 - The fixture carries a plan block so the panel is exercisable without a server. It is synthetic
   like the rest of the fixture and does not describe any real workspace's consumption.
 
-
 2026-09-13 — Parallel development uses three sibling Git worktrees: Codex/Python,
 Claude/platform, and a single integration lane. The original checkout is preserved during
 Claude's transition. Shared TypeScript contracts, Node dependency changes and central
@@ -575,7 +591,7 @@ service authorization follow from this setup.
   a prediction hashed over different text is stored and then never becomes the effective label
   — a comment that is analysed but shows no verdict, with nothing failing anywhere.
 - **Settings are part of what identifies an analysis.** Section 9 makes the fingerprint model,
-  revision, preprocessing *and* settings. They are stored on the run and folded into
+  revision, preprocessing _and_ settings. They are stored on the run and folded into
   `analysis_key`, because a prediction is unique on that key: without them, re-analysing a
   comment under different settings collides with the earlier verdict and the new one is
   dropped. An adapter with no settings declares `{}`, which is a statement rather than an
@@ -730,7 +746,7 @@ for. Nothing was classified under 2.5 anywhere, so nothing is orphaned.
 
 - **A sentiment retry may overwrite only a `failed` verdict — the same rule as topics.**
   `commit_batch`'s prediction insert now conflicts with `do update ... where
-  public.sentiment_predictions.status = 'failed'` rather than `do nothing`. A `succeeded`,
+public.sentiment_predictions.status = 'failed'` rather than `do nothing`. A `succeeded`,
   `skipped` or `unsupported` row is final and a later attempt never touches it, matching
   how `comment_analysis` is metered once ever per comment. This closes the follow-up the
   topic-classification entry above left open. The update also takes the retry's
@@ -738,7 +754,7 @@ for. Nothing was classified under 2.5 anywhere, so nothing is orphaned.
   actually produced the verdict it now carries.
 - **Adoption on update is a second trigger, not a rewrite of the first.**
   `adopt_first_analysis_on_update` (`after update ... referencing new table ... for each
-  statement`) calls the existing `private.adopt_first_analysis()` unchanged; the function
+statement`) calls the existing `private.adopt_first_analysis()` unchanged; the function
   already filters on `status = 'succeeded'` and `active_analysis_key is null`, so a
   failed-to-failed update adopts nothing and an already-adopted channel is never swapped.
   Mirrors `adopt_first_topic_classification_on_update` in `20260916011000`.
@@ -937,7 +953,7 @@ it.
 
 **`retire_workspace` now refuses the platform owner's own workspace**
 (`owner_cannot_retire`). Retiring was already how a workspace stopped existing; the platform
-admin's own workspace is where `workspace_deleted` audit rows land for every *other*
+admin's own workspace is where `workspace_deleted` audit rows land for every _other_
 deletion (see below), and it is the one home a signed-in admin always has. Retiring it would
 leave the platform without an admin identity to act from. This is a narrower rule than "the
 owner can't retire anything" — it blocks exactly the one workspace whose absence would be
@@ -990,7 +1006,7 @@ it as an inference from the grants.
 ## 2026-09-17 — correcting the reason recorded above for `owner_cannot_retire`
 
 The entry above gives the wrong reason. `retire_workspace` does not protect "the one
-workspace where audit rows land"; it refuses the platform owner on *every* workspace they
+workspace where audit rows land"; it refuses the platform owner on _every_ workspace they
 hold (the check is `me = platform_owner()`), because retiring hands a workspace to the
 platform owner — and when the caller is the platform owner, that is a transfer to
 themself: the membership is deleted and re-inserted for the same person, nothing moves, and
@@ -1003,7 +1019,7 @@ the migration's own header comment and the spec (`2026-09-17-workspace-delete-de
 A second correction, same entry: the "recorded on the admin's own home" guarantee, given
 above as "the owner-cannot-retire rule having no delete equivalent needed", is garbled and
 names the wrong mechanism. The real guarantee is evaluation order: `delete_workspace`
-computes `my_home := private.owner_plan_workspace(me)` *after* every `delete` in the
+computes `my_home := private.owner_plan_workspace(me)` _after_ every `delete` in the
 function has already run, so `my_home` can never resolve to the workspace just removed —
 that row is gone from `public.workspaces` by the time the lookup happens, and
 `owner_plan_workspace` only ever returns a workspace that still exists.
@@ -1576,6 +1592,7 @@ no-handler-no-door pattern.
 ## 2026-09-20 — dashboard_snapshot windowing at scale and fair claim scheduling
 
 As live comment collection on active workspaces scaled past 60,000 comments, the unbounded `dashboard_snapshot` RPC generated over 120MB of JSON per request. PostgREST and Cloudflare terminated connections with HTTP 520 / 504 errors, causing the web UI to present `read:live_unavailable`.
+
 - **Windowing recent comments**: `private.dashboard_snapshot_impl` was updated in `20260920140000_dashboard_snapshot_window_and_fair_index.sql` to scope materialized comment rows to the most recent window (1,500 comments, ordered by `published_at DESC NULLS LAST, id DESC`).
 - **CTE scoping**: Sentiment and topic predictions, human reviews, and annotations now join directly against the 1,500 scoped comments rather than materializing across tens of thousands of rows before aggregation.
 - **Index tuning**: Added `comments_workspace_published_desc_idx` on `(workspace_id, published_at DESC NULLS LAST, id DESC)` and `jobs_running_fair_idx` on `(workspace_id, status, lease_expires_at) WHERE status = 'running'` to accelerate both dashboard queries and fair claim scheduling.

@@ -2224,6 +2224,10 @@ export const ar = {
     "لا تصل قياسات حية من هذه الخدمات بعد",
   adminPlanLimitsInvalid:
     "كل حقل يجب أن يكون عدداً صحيحاً من ‎-1 فأكثر (‎-1 تعني بلا حد). لم يُحفظ شيء.",
+  timingSpikesTitle: "السياق الإخباري لطفرات التفاعل",
+  timingSpikesLead:
+    "الأحداث والأخبار الموثقة التي تزامنت مع موجات صعود التعليقات في الفترات المرصودة.",
+  timingSpikesSourceLink: "المصدر الموثق",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,

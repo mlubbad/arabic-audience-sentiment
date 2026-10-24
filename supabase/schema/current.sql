@@ -235,6 +235,7 @@ alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_agg
 alter table "private"."dashboard_aggregates_cache" add constraint "dashboard_aggregates_cache_workspace_id_not_null" NOT NULL workspace_id;
 
 CREATE INDEX dashboard_aggregates_cache_due_idx ON private.dashboard_aggregates_cache USING btree (requested_at);
+CREATE INDEX dashboard_aggregates_cache_pending_idx ON private.dashboard_aggregates_cache USING btree (requested_at) WHERE ((computed_at IS NULL) OR (requested_at > computed_at));
 CREATE UNIQUE INDEX dashboard_aggregates_cache_pkey ON private.dashboard_aggregates_cache USING btree (workspace_id, filter_key);
 
 create table "private"."job_batches" (
@@ -1115,6 +1116,7 @@ CREATE UNIQUE INDEX jobs_one_outstanding_discover ON public.jobs USING btree (wo
 CREATE UNIQUE INDEX jobs_one_outstanding_genre_classify ON public.jobs USING btree (workspace_id, channel_id) WHERE ((type = 'genre_classify'::text) AND (status = ANY (ARRAY['queued'::text, 'running'::text])));
 CREATE UNIQUE INDEX jobs_pkey ON public.jobs USING btree (id);
 CREATE INDEX jobs_running_fair_idx ON public.jobs USING btree (workspace_id, status, lease_expires_at) WHERE (status = 'running'::text);
+CREATE INDEX jobs_running_workspace_lease_idx ON public.jobs USING btree (workspace_id, lease_expires_at) WHERE (status = 'running'::text);
 CREATE UNIQUE INDEX jobs_workspace_id_dedupe_key_key ON public.jobs USING btree (workspace_id, dedupe_key);
 CREATE UNIQUE INDEX jobs_workspace_id_id_key ON public.jobs USING btree (workspace_id, id);
 
@@ -1234,6 +1236,51 @@ alter table "public"."sentiment_predictions" add constraint "sentiment_predictio
 CREATE UNIQUE INDEX sentiment_predictions_pkey ON public.sentiment_predictions USING btree (id);
 CREATE UNIQUE INDEX sentiment_predictions_workspace_id_comment_id_content_hash__key ON public.sentiment_predictions USING btree (workspace_id, comment_id, content_hash, analysis_key);
 CREATE INDEX sentiment_preds_active_covering_idx ON public.sentiment_predictions USING btree (workspace_id, analysis_key, comment_id, content_hash, label) WHERE (status = 'succeeded'::text);
+
+create table "public"."sentiment_spike_attributions" (
+  "id" uuid default gen_random_uuid() not null,
+  "workspace_id" uuid not null,
+  "channel_id" uuid not null,
+  "from_date" date not null,
+  "to_date" date not null,
+  "dominant_sentiment" text not null,
+  "query" text not null,
+  "scope" text default 'news'::text not null,
+  "status" text not null,
+  "headline_ar" text,
+  "summary_ar" text,
+  "citations" jsonb default '[]'::jsonb not null,
+  "error_code" text,
+  "computed_at" timestamp with time zone default now() not null
+);
+alter table "public"."sentiment_spike_attributions" enable row level security;
+
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_channel_fkey" FOREIGN KEY (workspace_id, channel_id) REFERENCES channels(workspace_id, id) ON DELETE CASCADE;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_channel_id_not_null" NOT NULL channel_id;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_citations_check" CHECK (jsonb_typeof(citations) = 'array'::text);
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_citations_not_null" NOT NULL citations;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_computed_at_not_null" NOT NULL computed_at;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_dominant_sentiment_check" CHECK (dominant_sentiment = ANY (ARRAY['positive'::text, 'negative'::text, 'neutral'::text, 'mixed'::text]));
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_dominant_sentiment_not_null" NOT NULL dominant_sentiment;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_failed_error_check" CHECK ((status = 'failed'::text) = (error_code IS NOT NULL AND length(TRIM(BOTH FROM error_code)) > 0));
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_from_date_not_null" NOT NULL from_date;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_id_not_null" NOT NULL id;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_pkey" PRIMARY KEY (id);
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_query_check" CHECK (length(TRIM(BOTH FROM query)) >= 1 AND length(TRIM(BOTH FROM query)) <= 300);
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_query_not_null" NOT NULL query;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_scope_check" CHECK (scope = ANY (ARRAY['news'::text, 'web'::text]));
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_scope_not_null" NOT NULL scope;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_status_check" CHECK (status = ANY (ARRAY['succeeded'::text, 'empty'::text, 'failed'::text]));
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_status_not_null" NOT NULL status;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_succeeded_fields_check" CHECK ((status = 'succeeded'::text) = (headline_ar IS NOT NULL AND length(TRIM(BOTH FROM headline_ar)) > 0 AND summary_ar IS NOT NULL AND length(TRIM(BOTH FROM summary_ar)) > 0));
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_to_date_not_null" NOT NULL to_date;
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_window_check" CHECK (to_date >= from_date);
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_window_key" UNIQUE (workspace_id, channel_id, from_date, to_date, dominant_sentiment);
+alter table "public"."sentiment_spike_attributions" add constraint "sentiment_spike_attributions_workspace_id_not_null" NOT NULL workspace_id;
+
+CREATE INDEX sentiment_spike_attributions_channel_dates_idx ON public.sentiment_spike_attributions USING btree (workspace_id, channel_id, from_date DESC);
+CREATE UNIQUE INDEX sentiment_spike_attributions_pkey ON public.sentiment_spike_attributions USING btree (id);
+CREATE UNIQUE INDEX sentiment_spike_attributions_window_key ON public.sentiment_spike_attributions USING btree (workspace_id, channel_id, from_date, to_date, dominant_sentiment);
 
 create table "public"."subscriptions" (
   "workspace_id" uuid not null,
@@ -1762,10 +1809,9 @@ CREATE OR REPLACE FUNCTION private.adopt_channel_content(w uuid, c uuid)
 AS $function$
 declare
   ch public.channels;
-  target_video record;
-  adopted jsonb;
   vids_adopted int := 0;
   comments_adopted int := 0;
+  iv int;
 begin
   select * into ch from public.channels
    where workspace_id = w and id = c;
@@ -1774,14 +1820,85 @@ begin
   end if;
 
   vids_adopted := private.adopt_channel_catalogue(w, c);
-  for target_video in
-    select v.id from public.videos v
-     where v.workspace_id = w and v.channel_id = c
-     order by v.id
-  loop
-    adopted := private.adopt_video_comments_and_predictions(w, target_video.id);
-    comments_adopted := comments_adopted + coalesce((adopted->>'comments')::int, 0);
-  end loop;
+  iv := coalesce(private.plan_limit(w, 'live_interval'), 1440);
+
+  with donor_map as (
+    select distinct on (target_v.id)
+      target_v.id as target_vid,
+      donor_v.id as donor_vid,
+      donor_v.workspace_id as donor_ws,
+      coalesce(donor_s.last_outcome in ('exhausted', 'unchanged'), false) as donor_complete
+    from public.videos target_v
+    join public.channels donor_ch
+      on donor_ch.platform = ch.platform
+     and donor_ch.external_channel_id = ch.external_channel_id
+     and donor_ch.workspace_id <> w
+     and donor_ch.status <> 'disconnected'
+    join public.videos donor_v
+      on donor_v.workspace_id = donor_ch.workspace_id
+     and donor_v.channel_id = donor_ch.id
+     and donor_v.platform = target_v.platform
+     and donor_v.external_video_id = target_v.external_video_id
+    left join public.video_selections donor_s
+      on donor_s.workspace_id = donor_v.workspace_id
+     and donor_s.video_id = donor_v.id
+    where target_v.workspace_id = w
+      and target_v.channel_id = c
+      and exists (
+        select 1 from public.comments dc
+         where dc.workspace_id = donor_v.workspace_id
+           and dc.video_id = donor_v.id
+      )
+    order by target_v.id, donor_ch.id, donor_v.id
+  ), inserted_comments as (
+    insert into public.comments (
+      workspace_id, video_id, platform, external_comment_id, external_parent_id,
+      is_reply, parent_source, author_channel_id, author_name, text_raw, text_plain,
+      content_hash, published_time_raw, published_at, timestamp_precision,
+      likes_raw, likes_value, source, field_provenance,
+      author_profile_image_url, author_channel_url, reply_count, updated_at
+    )
+    select
+      w, dm.target_vid, cm.platform, cm.external_comment_id, cm.external_parent_id,
+      cm.is_reply, cm.parent_source, cm.author_channel_id, cm.author_name, cm.text_raw, cm.text_plain,
+      cm.content_hash, cm.published_time_raw, cm.published_at, cm.timestamp_precision,
+      cm.likes_raw, cm.likes_value, cm.source, cm.field_provenance,
+      cm.author_profile_image_url, cm.author_channel_url, coalesce(cm.reply_count, 0), cm.updated_at
+    from donor_map dm
+    join public.comments cm
+      on cm.workspace_id = dm.donor_ws
+     and cm.video_id = dm.donor_vid
+    where cm.source in (
+      'youtube_data_api_public', 'youtube_oauth', 'telegram_mtproto',
+      'x_api', 'tiktok_display_api', 'apify', 'brightdata',
+      'facebook_graph_api', 'facebook_apify', 'facebook_brightdata',
+      'instagram_graph_api', 'instagram_apify', 'instagram_brightdata'
+    )
+      and coalesce(cm.field_provenance->>'source', '') <> 'file_upload'
+    on conflict (workspace_id, platform, external_comment_id) do nothing
+    returning video_id
+  ), completed_targets as (
+    select distinct ic.video_id
+      from inserted_comments ic
+      join donor_map dm on dm.target_vid = ic.video_id
+     where dm.donor_complete
+  ), updated_selections as (
+    update public.video_selections s
+       set last_seen_comment_count = (
+             select count(*)::int from public.comments c_cnt
+              where c_cnt.workspace_id = w and c_cnt.video_id = s.video_id
+           ),
+           last_collected_at = (
+             select max(c_max.last_seen_at) from public.comments c_max
+              where c_max.workspace_id = w and c_max.video_id = s.video_id
+           ),
+           last_outcome = 'exhausted',
+           next_check_at = now() + make_interval(mins => iv)
+      from completed_targets ct
+     where s.workspace_id = w
+       and s.video_id = ct.video_id
+  )
+  select count(*)::int into comments_adopted from inserted_comments;
 
   return jsonb_build_object(
     'videos', vids_adopted, 'comments', comments_adopted,
@@ -1887,9 +2004,6 @@ begin
     return jsonb_build_object('comments', 0, 'sentiment', 0, 'topics', 0);
   end if;
 
-  -- Platform collection is the explicit allowlist below. external_import and
-  -- sanitized_fixture are excluded, and file_upload provenance is refused even
-  -- if a malformed row carries an allowed source. New collectors must opt in.
   insert into public.comments (
     workspace_id, video_id, platform, external_comment_id, external_parent_id,
     is_reply, parent_source, author_channel_id, author_name, text_raw, text_plain,
@@ -1908,7 +2022,9 @@ begin
     and c.video_id = donor_vid
     and c.source in (
       'youtube_data_api_public', 'youtube_oauth', 'telegram_mtproto',
-      'x_api', 'tiktok_display_api', 'apify', 'brightdata'
+      'x_api', 'tiktok_display_api', 'apify', 'brightdata',
+      'facebook_graph_api', 'facebook_apify', 'facebook_brightdata',
+      'instagram_graph_api', 'instagram_apify', 'instagram_brightdata'
     )
     and coalesce(c.field_provenance->>'source', '') <> 'file_upload'
   on conflict (workspace_id, platform, external_comment_id) do nothing;
@@ -2486,93 +2602,110 @@ CREATE OR REPLACE FUNCTION private.claim_job(w uuid, job_types text[])
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare claimed public.jobs;
-begin
-  if w is null then
-    insert into public.worker_seen(workspace_id, last_seen_at)
-    select ws.id, now() from public.workspaces ws
-    on conflict (workspace_id) do update set last_seen_at = now();
-  else
-    insert into public.worker_seen(workspace_id, last_seen_at)
-    values (w, now())
-    on conflict (workspace_id) do update set last_seen_at = now();
-  end if;
+DECLARE
+  claimed public.jobs;
+BEGIN
+  IF w IS NULL THEN
+    INSERT INTO public.worker_seen(workspace_id, last_seen_at)
+    SELECT ws.id, now() FROM public.workspaces ws
+    ON CONFLICT (workspace_id) DO NOTHING;
 
-  update public.jobs set
+    UPDATE public.worker_seen s
+       SET last_seen_at = now()
+     WHERE s.workspace_id IN (
+       SELECT ws.workspace_id
+         FROM public.worker_seen ws
+        WHERE ws.last_seen_at < now() - interval '30 seconds'
+          FOR UPDATE SKIP LOCKED
+     );
+  ELSE
+    INSERT INTO public.worker_seen(workspace_id, last_seen_at)
+    VALUES (w, now())
+    ON CONFLICT (workspace_id) DO UPDATE SET last_seen_at = now();
+  END IF;
+
+  UPDATE public.jobs SET
       status = 'failed',
-      error_code = case
-        when reclaims >= 20
-          then 'lease_thrashing:' || reclaims::text
-        else 'retry_exhausted:' || coalesce(last_error, 'no_error_recorded')
-      end,
-      lease_token = null,
-      lease_expires_at = null
-   where (w is null or workspace_id = w)
-     and status in ('queued', 'running')
-     and (attempt >= 3 or reclaims >= 20)
-     and (lease_expires_at is null or lease_expires_at <= now());
+      error_code = CASE
+        WHEN reclaims >= 20
+          THEN 'lease_thrashing:' || reclaims::text
+        ELSE 'retry_exhausted:' || coalesce(last_error, 'no_error_recorded')
+      END,
+      lease_token = NULL,
+      lease_expires_at = NULL
+   WHERE (w IS NULL OR workspace_id = w)
+     AND status IN ('queued', 'running')
+     AND (attempt >= 3 OR reclaims >= 20)
+     AND (lease_expires_at IS NULL OR lease_expires_at <= now());
 
-  update public.jobs j set
+  UPDATE public.jobs j SET
       status = 'running',
-      attempt = j.attempt + case when j.status = 'queued' then 1 else 0 end,
-      reclaims = j.reclaims + case
-        when j.status = 'running' and j.heartbeats > 0 then 1 else 0 end,
-      not_before = case
-        when j.status = 'running' and j.heartbeats > 0 and j.reclaims >= 1
-          then now() + least(interval '30 seconds' * (2 ^ least(j.reclaims, 5)),
+      attempt = j.attempt + CASE WHEN j.status = 'queued' THEN 1 ELSE 0 END,
+      reclaims = j.reclaims + CASE
+        WHEN j.status = 'running' AND j.heartbeats > 0 THEN 1 ELSE 0 END,
+      not_before = CASE
+        WHEN j.status = 'running' AND j.heartbeats > 0 AND j.reclaims >= 1
+          THEN now() + least(interval '30 seconds' * (2 ^ least(j.reclaims, 5)),
                              interval '10 minutes')
-        else j.not_before end,
+        ELSE j.not_before END,
       heartbeats = 0,
       lease_token = gen_random_uuid(),
       lease_expires_at = now() + interval '5 minutes'
-   where j.id = (
-     select q.id from public.jobs q
-      where (w is null or q.workspace_id = w)
-        and (job_types is null or cardinality(job_types) = 0
-             or q.type = any(job_types))
-        and q.attempt < 3
-        and q.reclaims < 20
-        and q.not_before <= now()
-        and (q.status = 'queued'
-             or (q.status = 'running' and q.lease_expires_at <= now()))
-      order by
-        case
-          when q.type = 'discover' and not exists (
-                 select 1 from public.channels ch
-                  where ch.id = q.channel_id and ch.catalogued_at is not null)
-            then 0
-          when q.type = 'discover' and (
-                 select ch.catalogued_at from public.channels ch where ch.id = q.channel_id)
-               <= now() - make_interval(mins => private.catalogue_interval_or_default(q.workspace_id))
-                        - interval '6 hours'
-            then 1
-          when q.type <> 'discover' then 2
-          else 3
-        end,
-        case when w is null then (
-          select count(*) from public.jobs r
-           where r.workspace_id = q.workspace_id
-             and r.status = 'running'
-             and r.lease_expires_at > now()
-        ) else 0 end,
+   WHERE j.id = (
+     WITH running_by_ws AS (
+       SELECT r.workspace_id, count(*) AS running_count
+         FROM public.jobs r
+        WHERE w IS NULL
+          AND r.status = 'running'
+          AND r.lease_expires_at > now()
+        GROUP BY r.workspace_id
+     )
+     SELECT q.id
+       FROM public.jobs q
+       LEFT JOIN public.channels ch
+         ON ch.id = q.channel_id AND ch.workspace_id = q.workspace_id
+       LEFT JOIN running_by_ws r_ws
+         ON r_ws.workspace_id = q.workspace_id
+      WHERE (w IS NULL OR q.workspace_id = w)
+        AND (job_types IS NULL OR cardinality(job_types) = 0
+             OR q.type = ANY(job_types))
+        AND q.attempt < 3
+        AND q.reclaims < 20
+        AND q.not_before <= now()
+        AND (q.status = 'queued'
+             OR (q.status = 'running' AND q.lease_expires_at <= now()))
+      ORDER BY
+        CASE
+          WHEN q.type = 'discover' AND ch.catalogued_at IS NULL
+            THEN 0
+          WHEN q.type = 'discover'
+               AND ch.catalogued_at <= now()
+                 - make_interval(mins => private.catalogue_interval_or_default(q.workspace_id))
+                 - interval '6 hours'
+            THEN 1
+          WHEN q.type <> 'discover' THEN 2
+          ELSE 3
+        END,
+        CASE WHEN w IS NULL THEN coalesce(r_ws.running_count, 0) ELSE 0 END,
         q.not_before,
         q.id
-      for update skip locked limit 1)
-  returning j.* into claimed;
+      FOR UPDATE OF q SKIP LOCKED
+      LIMIT 1
+   )
+  RETURNING j.* INTO claimed;
 
-  if claimed.id is null then return; end if;
+  IF claimed.id IS NULL THEN RETURN; END IF;
 
-  insert into public.sync_runs(workspace_id, channel_id, job_id, mode, source,
-                               status)
-  values (claimed.workspace_id, claimed.channel_id, claimed.id,
-          case when claimed.type in ('discover','collect','analyse','import')
-               then claimed.type else 'collect' end,
+  INSERT INTO public.sync_runs(workspace_id, channel_id, job_id, mode, source, status)
+  VALUES (claimed.workspace_id, claimed.channel_id, claimed.id,
+          CASE WHEN claimed.type IN ('discover','collect','analyse','import')
+               THEN claimed.type ELSE 'collect' END,
           'unknown', 'running')
-  on conflict (workspace_id, job_id) do update
-    set status = 'running', ended_at = null, error_code = null;
+  ON CONFLICT (workspace_id, job_id) DO UPDATE
+    SET status = 'running', ended_at = NULL, error_code = NULL;
 
-  return next claimed;
-end $function$
+  RETURN NEXT claimed;
+END $function$
 
 CREATE OR REPLACE FUNCTION private.commit_batch(j uuid, t uuid, b text, hash text, payload jsonb)
  RETURNS jsonb
@@ -3869,47 +4002,46 @@ begin
 end;
 $function$
 
-CREATE OR REPLACE FUNCTION private.drain_dashboard_aggregates(max_rows integer DEFAULT 2)
+CREATE OR REPLACE FUNCTION private.drain_dashboard_aggregates(max_rows integer DEFAULT 10)
  RETURNS integer
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare
+DECLARE
   r record;
   done int := 0;
-begin
-  delete from private.dashboard_aggregates_cache
-   where requested_at < now() - interval '7 days';
+BEGIN
+  DELETE FROM private.dashboard_aggregates_cache
+   WHERE requested_at < now() - interval '7 days';
 
-  for r in
-    select workspace_id, filter_key, filters
-      from private.dashboard_aggregates_cache
-     where (computed_at is null or requested_at > computed_at)
-       and coalesce(next_attempt_at, '-infinity') <= now()
-     order by requested_at
-     limit max_rows
-       for update skip locked
-  loop
-    -- compute authorises as the service role; the row was authorised when asked.
-    perform set_config('request.jwt.claim.role', 'service_role', true);
-    begin
-      update private.dashboard_aggregates_cache
-         set payload = private.dashboard_aggregates_compute(r.workspace_id, r.filters),
-             computed_at = now(), attempts = 0, next_attempt_at = null, last_error = null
-       where workspace_id = r.workspace_id and filter_key = r.filter_key;
+  FOR r IN
+    SELECT workspace_id, filter_key, filters
+      FROM private.dashboard_aggregates_cache
+     WHERE (computed_at IS NULL OR requested_at > computed_at)
+       AND coalesce(next_attempt_at, '-infinity') <= now()
+     ORDER BY requested_at
+     LIMIT max_rows
+       FOR UPDATE SKIP LOCKED
+  LOOP
+    PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+    BEGIN
+      UPDATE private.dashboard_aggregates_cache
+         SET payload = private.dashboard_aggregates_compute(r.workspace_id, r.filters),
+             computed_at = now(), attempts = 0, next_attempt_at = NULL, last_error = NULL
+       WHERE workspace_id = r.workspace_id AND filter_key = r.filter_key;
       done := done + 1;
-    exception when others then
-      update private.dashboard_aggregates_cache
-         set attempts = attempts + 1,
+    EXCEPTION WHEN OTHERS THEN
+      UPDATE private.dashboard_aggregates_cache
+         SET attempts = attempts + 1,
              last_error = sqlstate,
              next_attempt_at = now() + make_interval(secs => least(60 * power(2, attempts), 3600))
-       where workspace_id = r.workspace_id and filter_key = r.filter_key;
-    end;
-  end loop;
-  perform set_config('request.jwt.claim.role', '', true);
-  return done;
-end
+       WHERE workspace_id = r.workspace_id AND filter_key = r.filter_key;
+    END;
+  END LOOP;
+  PERFORM set_config('request.jwt.claim.role', '', true);
+  RETURN done;
+END
 $function$
 
 CREATE OR REPLACE FUNCTION private.drain_video_comment_stats(max_videos integer DEFAULT 1000, budget interval DEFAULT '00:00:30'::interval)
@@ -5918,18 +6050,39 @@ CREATE OR REPLACE FUNCTION private.touch_worker_seen(token_hash text)
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-declare w uuid; begin
+DECLARE
+  w uuid;
+BEGIN
   w := private.worker_workspace(token_hash);
-  if w is null then
-    insert into public.worker_seen(workspace_id, last_seen_at)
-    select ws.id, now() from public.workspaces ws
-    on conflict (workspace_id) do update set last_seen_at = now();
-  else
-    insert into public.worker_seen(workspace_id, last_seen_at)
-    values (w, now())
-    on conflict (workspace_id) do update set last_seen_at = now();
-  end if;
-end $function$
+  IF w IS NULL THEN
+    INSERT INTO public.worker_seen(workspace_id, last_seen_at)
+    SELECT ws.id, now() FROM public.workspaces ws
+    ON CONFLICT (workspace_id) DO NOTHING;
+
+    UPDATE public.worker_seen s
+       SET last_seen_at = now()
+     WHERE s.workspace_id IN (
+       SELECT ws.workspace_id
+         FROM public.worker_seen ws
+        WHERE ws.last_seen_at < now() - interval '30 seconds'
+          FOR UPDATE SKIP LOCKED
+     );
+  ELSE
+    INSERT INTO public.worker_seen(workspace_id, last_seen_at)
+    VALUES (w, now())
+    ON CONFLICT (workspace_id) DO NOTHING;
+
+    UPDATE public.worker_seen s
+       SET last_seen_at = now()
+     WHERE s.workspace_id IN (
+       SELECT ws.workspace_id
+         FROM public.worker_seen ws
+        WHERE ws.workspace_id = w
+          AND ws.last_seen_at < now() - interval '30 seconds'
+          FOR UPDATE SKIP LOCKED
+     );
+  END IF;
+END $function$
 
 CREATE OR REPLACE FUNCTION private.unblock_due_jobs()
  RETURNS integer
@@ -6933,9 +7086,16 @@ DECLARE w uuid; c uuid; job_type text; c_platform text; c_catalogued timestamptz
   RETURN coalesce((
     SELECT jsonb_agg(k.external_video_id ORDER BY k.published_at DESC NULLS LAST, k.external_video_id)
       FROM (SELECT v.external_video_id, v.published_at
-              FROM public.videos v
-             WHERE v.workspace_id = w AND v.channel_id = c AND v.platform = 'youtube'
-             ORDER BY v.published_at DESC NULLS LAST, v.external_video_id
+              FROM (
+                SELECT v.external_video_id, v.published_at,
+                       row_number() OVER (
+                         PARTITION BY v.kind
+                         ORDER BY v.published_at DESC NULLS LAST, v.external_video_id
+                       ) AS kind_rn
+                  FROM public.videos v
+                 WHERE v.workspace_id = w AND v.channel_id = c AND v.platform = 'youtube'
+              ) v
+             ORDER BY (v.kind_rn <= 200) DESC, v.published_at DESC NULLS LAST, v.external_video_id
              LIMIT 5000) k), '[]'::jsonb);
 END $function$
 
@@ -7149,15 +7309,10 @@ declare w uuid; c uuid; iv int; updated int; unchanged int; begin
         or coalesce(i->>'external_video_id','') !~ '^[A-Za-z0-9_-]{11}$'
         or not (i ? 'comment_count')
         or jsonb_typeof(i->'comment_count') not in ('number','null')
-        -- A count is a whole, non-negative number. A fraction or a negative
-        -- would otherwise fail the column check as a bare 23514.
         or (jsonb_typeof(i->'comment_count') = 'number'
             and (i->>'comment_count') !~ '^[0-9]+$')) then
     raise exception 'invalid_counts' using errcode='22023'; end if;
 
-  -- The stored count follows the source; a null answer leaves the old value
-  -- in place but still records that the source was asked. The last item wins
-  -- when an id is repeated, as it would if the payload were applied in order.
   update public.videos v
      set reported_comment_count = coalesce(p.cnt, v.reported_comment_count),
          reported_comment_count_at = now()
@@ -7168,26 +7323,30 @@ declare w uuid; c uuid; iv int; updated int; unchanged int; begin
    where v.workspace_id = w and v.channel_id = c and v.external_video_id = p.ext;
   get diagnostics updated = row_count;
 
-  -- Deferred: selected, the source reported a count, and it is exactly the
-  -- count the last exhausted read ended at. 'unchanged' is a deferral that
-  -- followed such a read with no read since, so its last_seen still stands;
-  -- comparing only after 'exhausted' would read every second check and
-  -- halve the saving. A partial read never set last_seen, so it is never
-  -- deferred; a null last_seen (never read) is never equal to anything.
   iv := coalesce(private.plan_limit(w, 'live_interval'), 1440);
-  update public.video_selections s
-     set next_check_at = now() + make_interval(mins => iv),
-         last_outcome = 'unchanged'
-    from public.videos v
-    join (select distinct on (i->>'external_video_id')
-                 i->>'external_video_id' as ext, (i->>'comment_count')::int as cnt
-            from jsonb_array_elements(payload) with ordinality as x(i, ord)
-           order by i->>'external_video_id', ord desc) p on p.ext = v.external_video_id
-   where s.workspace_id = w and s.channel_id = c and s.video_id = v.id
-     and v.workspace_id = w and v.channel_id = c
-     and p.cnt is not null and s.last_seen_comment_count = p.cnt
-     and s.last_outcome in ('exhausted', 'unchanged');
-  get diagnostics unchanged = row_count;
+  with deferred as (
+    update public.video_selections s
+       set next_check_at = now() + make_interval(mins => iv),
+           last_outcome = 'unchanged'
+      from public.videos v
+      join (select distinct on (i->>'external_video_id')
+                   i->>'external_video_id' as ext, (i->>'comment_count')::int as cnt
+              from jsonb_array_elements(payload) with ordinality as x(i, ord)
+             order by i->>'external_video_id', ord desc) p on p.ext = v.external_video_id
+     where s.workspace_id = w and s.channel_id = c and s.video_id = v.id
+       and v.workspace_id = w and v.channel_id = c
+       and p.cnt is not null and s.last_seen_comment_count = p.cnt
+       and s.last_outcome in ('exhausted', 'unchanged')
+     returning s.video_id
+  ), touched_comments as (
+    update public.comments cm
+       set last_seen_at = now()
+      from deferred d
+     where cm.workspace_id = w
+       and cm.video_id = d.video_id
+       and cm.content_purged_at is null
+  )
+  select count(*)::int into unchanged from deferred;
 
   return jsonb_build_object(
     'read', coalesce((select jsonb_agg(d->'external_video_id')
@@ -9297,6 +9456,58 @@ AS $function$
   select exists (select 1 from private.platform_admins where user_id = auth.uid());
 $function$
 
+CREATE OR REPLACE FUNCTION public.list_spike_attributions(p_channel uuid, p_limit integer DEFAULT 20)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  ch public.channels;
+  result jsonb;
+BEGIN
+  IF p_limit IS NULL OR p_limit < 1 OR p_limit > 100 THEN
+    RAISE EXCEPTION 'invalid_input' USING errcode = '22023';
+  END IF;
+  SELECT * INTO ch FROM public.channels WHERE id = p_channel;
+  IF ch.id IS NULL OR NOT private.has_role(ch.workspace_id) THEN
+    RAISE EXCEPTION 'forbidden' USING errcode = '42501';
+  END IF;
+
+  SELECT coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'id', a.id,
+        'channel_id', a.channel_id,
+        'from_date', a.from_date,
+        'to_date', a.to_date,
+        'dominant_sentiment', a.dominant_sentiment,
+        'query', a.query,
+        'scope', a.scope,
+        'status', a.status,
+        'headline_ar', a.headline_ar,
+        'summary_ar', a.summary_ar,
+        'citations', a.citations,
+        'error_code', a.error_code,
+        'computed_at', a.computed_at
+      )
+      ORDER BY a.from_date DESC, a.computed_at DESC
+    ),
+    '[]'::jsonb
+  )
+  INTO result
+  FROM (
+    SELECT *
+      FROM public.sentiment_spike_attributions s
+     WHERE s.workspace_id = ch.workspace_id
+       AND s.channel_id = ch.id
+     ORDER BY s.from_date DESC, s.computed_at DESC
+     LIMIT p_limit
+  ) a;
+
+  RETURN result;
+END $function$
+
 CREATE OR REPLACE FUNCTION public.list_workspace_accounts(w uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -10366,6 +10577,7 @@ create policy "tenant_read" on "public"."imports" to authenticated for select us
 create policy "tenant_read" on "public"."jobs" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."memberships" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."sentiment_predictions" to authenticated for select using (private.has_role(workspace_id));
+create policy "sentiment_spike_attributions_member_read" on "public"."sentiment_spike_attributions" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."subscriptions" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."sync_runs" to authenticated for select using (private.has_role(workspace_id));
 create policy "tenant_read" on "public"."topic_predictions" to authenticated for select using (private.has_role(workspace_id));
@@ -10881,6 +11093,18 @@ grant SELECT on table "public"."sentiment_predictions" to "service_role";
 grant TRIGGER on table "public"."sentiment_predictions" to "service_role";
 grant TRUNCATE on table "public"."sentiment_predictions" to "service_role";
 grant UPDATE on table "public"."sentiment_predictions" to "service_role";
+grant SELECT on table "public"."sentiment_spike_attributions" to "authenticated";
+grant DELETE on table "public"."sentiment_spike_attributions" to "postgres";
+grant INSERT on table "public"."sentiment_spike_attributions" to "postgres";
+grant REFERENCES on table "public"."sentiment_spike_attributions" to "postgres";
+grant SELECT on table "public"."sentiment_spike_attributions" to "postgres";
+grant TRIGGER on table "public"."sentiment_spike_attributions" to "postgres";
+grant TRUNCATE on table "public"."sentiment_spike_attributions" to "postgres";
+grant UPDATE on table "public"."sentiment_spike_attributions" to "postgres";
+grant DELETE on table "public"."sentiment_spike_attributions" to "service_role";
+grant INSERT on table "public"."sentiment_spike_attributions" to "service_role";
+grant SELECT on table "public"."sentiment_spike_attributions" to "service_role";
+grant UPDATE on table "public"."sentiment_spike_attributions" to "service_role";
 grant SELECT on table "public"."subscriptions" to "authenticated";
 grant DELETE on table "public"."subscriptions" to "postgres";
 grant INSERT on table "public"."subscriptions" to "postgres";
@@ -11466,6 +11690,9 @@ grant EXECUTE on function import_historical_records(uuid,uuid,jsonb,uuid,jsonb) 
 grant EXECUTE on function import_historical_records(uuid,uuid,jsonb,uuid,jsonb) to "postgres";
 grant EXECUTE on function is_platform_admin() to "authenticated";
 grant EXECUTE on function is_platform_admin() to "postgres";
+grant EXECUTE on function list_spike_attributions(uuid,integer) to "authenticated";
+grant EXECUTE on function list_spike_attributions(uuid,integer) to "postgres";
+grant EXECUTE on function list_spike_attributions(uuid,integer) to "service_role";
 grant EXECUTE on function list_workspace_accounts(uuid) to "authenticated";
 grant EXECUTE on function list_workspace_accounts(uuid) to "postgres";
 grant EXECUTE on function my_role(uuid) to "authenticated";

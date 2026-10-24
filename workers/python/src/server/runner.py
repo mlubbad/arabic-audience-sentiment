@@ -165,6 +165,16 @@ def run_once(
             predictions: list = []
             if analyzer is not None:
                 try:
+                    predictions = analyse(
+                        analyzer,
+                        batch.comments,
+                        video={"external_video_id": video_id, "title": video_title or ""},
+                        channel={
+                            "external_channel_id": lease.get("external_channel_id") or "",
+                            "platform": lease.get("platform") or "youtube",
+                        },
+                    )
+                except TypeError:
                     predictions = analyse(analyzer, batch.comments)
                 except AnalysisError:
                     analysis_failed = True
@@ -262,6 +272,9 @@ def _known_videos(lease: dict) -> frozenset[str] | None:
     return frozenset(known)
 
 
+_MAX_CATALOGUE_COMMIT_CHUNK = 500
+
+
 def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
     """List the channel's videos and commit the list. The lease is already claimed.
 
@@ -283,7 +296,15 @@ def _discover(control: ControlPlane, lease: dict, build_collector) -> bool:
         else:
             result = collector.catalogue(channel_id, known=known)
         control.heartbeat(lease)
-        control.commit_catalogue(lease, result.videos)
+        if len(result.videos) <= _MAX_CATALOGUE_COMMIT_CHUNK:
+            control.commit_catalogue(lease, result.videos)
+        else:
+            for start in range(0, len(result.videos), _MAX_CATALOGUE_COMMIT_CHUNK):
+                if start > 0:
+                    control.heartbeat(lease)
+                control.commit_catalogue(
+                    lease, result.videos[start:start + _MAX_CATALOGUE_COMMIT_CHUNK]
+                )
         if (lease.get("platform") or "youtube") == "youtube" and result.channel is not None:
             try:
                 control.commit_channel(lease, result.channel)
@@ -418,6 +439,16 @@ def _backfill(control: ControlPlane, lease: dict, build_collector, analyzer=None
                         predictions: list = []
                         if analyzer is not None:
                             try:
+                                predictions = analyse(
+                                    analyzer,
+                                    batch.comments,
+                                    video=video,
+                                    channel={
+                                        "external_channel_id": lease.get("external_channel_id") or "",
+                                        "platform": lease.get("platform") or "youtube",
+                                    },
+                                )
+                            except TypeError:
                                 predictions = analyse(analyzer, batch.comments)
                             except AnalysisError:
                                 analysis_failed = True

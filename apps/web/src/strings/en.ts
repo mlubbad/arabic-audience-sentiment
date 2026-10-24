@@ -2220,4 +2220,8 @@ export const en: Strings = {
     "No live telemetry reaches these services yet",
   adminPlanLimitsInvalid:
     "Every field must be a whole number of -1 or more (-1 means unlimited). Nothing was saved.",
+  timingSpikesTitle: "News context for engagement spikes",
+  timingSpikesLead:
+    "Verified public events and news reports that coincided with comment surges in the observed windows.",
+  timingSpikesSourceLink: "Verified source",
 };

@@ -1,4 +1,5 @@
-Read `AGENTS.md`, `docs/agents/CONTEXT.md` and `docs/engineering/PLAYBOOK.md` before implementation.
+Read `AGENTS.md`, `docs/agents/CONTEXT.md` (including **§10 Latest architecture & scalability updates**), `docs/adr/README.md` (`0001`–`0006`), and `docs/engineering/PLAYBOOK.md` before implementation.
+Consult the knowledge graph in `graphify-out/` (`graphify query "<question>"`, `graphify explain "<symbol>"`) before broad file searches, and run `graphify update .` (plus `node scripts/snapshot-schema.mjs` when SQL migrations change) after code changes.
 The "Security and CI rules" section of `AGENTS.md` is binding: the five CI gates
 (CodeQL, Semgrep, gitleaks, dependency audits, verify) must stay green, every
 action/container is pinned by SHA/digest, and secrets never enter tracked files.
