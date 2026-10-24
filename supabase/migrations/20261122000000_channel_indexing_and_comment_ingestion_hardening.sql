@@ -220,7 +220,11 @@ begin
   end if;
 
   vids_adopted := private.adopt_channel_catalogue(w, c);
-  iv := coalesce(private.plan_limit(w, 'live_interval'), 1440);
+  begin
+    iv := coalesce(private.plan_limit(w, 'live_interval'), 1440);
+  exception when others then
+    iv := 1440;
+  end;
 
   with donor_map as (
     select distinct on (target_v.id)

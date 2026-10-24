@@ -18,12 +18,20 @@ A comprehensive code and live-database audit (`SKY-197` / `SKY-199`) of `workers
 
 1. **Reply-Aware Delta Sync (`YouTubeAPI.batches`):** When `effective_since` is reached on a `commentThreads` page, set `cutoff_reached = True` (preventing further page fetches) while continuing to inspect the already-fetched page's older threads for inline replies newer than `effective_since` (and scheduling overflow reply fetches filtered by `effective_since`).
 2. **Sub-Batching Guard (`_MAX_BATCH_COMMENTS = 500` in `YouTubeAPI.batches`):** Automatically split any page exceeding 500 total comments (top-level + inline replies) into `<= 500`-comment sub-batches with distinct checkpoint sub-batch indices before yielding to `commit_batch`.
-3. **Zero-Quota YouTube Atom/RSS Feed (`YouTubeAPI.rss_recent_videos` / `rss_video_ids`):** Parse `https://www.youtube.com/feeds/videos.xml?channel_id=UC...` with regex + `html.unescape` (0 API quota units, no XML entity expansion surface) and support `use_rss_precheck=True` in `catalogue()`.
-4. **Chunked Catalogue Commits (`_MAX_CATALOGUE_COMMIT_CHUNK = 500` in `server/runner.py`):** Commit catalogues exceeding 500 videos in 500-video chunks with worker heartbeats between chunks.
-5. **Strict Timestamp Invariant Across All Collectors (`apify.py`, `brightdata.py`, `telegram_collector.py`, `x_collector.py`, `tiktok_collector.py`):** Never substitute `datetime.now()` for a missing date; keep `published_at = None` and set `timestamp_precision = "second" if published_at else "unknown"`.
+3. **Zero-Quota YouTube Atom/RSS Feed, WebSub Push, HTML Handle Resolution & Timedtext Captions (`YouTubeAPI`):**
+   - `rss_recent_videos` / `rss_video_ids` parses `https://www.youtube.com/feeds/videos.xml?channel_id=UC...` with regex + `html.unescape` (0 API quota units, no XML entity expansion surface) and supports `use_rss_precheck=True` in `catalogue()`.
+   - `subscribe_websub` registers or unregisters webhook push subscriptions on `https://pubsubhubbub.appspot.com/subscribe` (0 quota units).
+   - `resolve_channel_id_zero_quota` extracts `UC...` channel IDs directly from public YouTube channel HTML (`<meta itemprop="channelId">` / `"externalId"`), and `fetch_video_transcript` pulls public timedtext captions at 0 Data API quota cost.
+4. **Chunked Catalogue Commits (`_MAX_CATALOGUE_COMMIT_CHUNK = 500` in `server/runner.py`) & Checkpointed Scraper Pagination (`x_collector.py`, `tiktok_collector.py`):**
+   - Commit catalogues exceeding 500 videos in 500-video chunks with worker heartbeats between chunks.
+   - Support `checkpoint = '{"offset": N}'` pagination across scraper comment batches in `XCollector` and `TikTokCollector`.
+5. **Strict Timestamp Invariant Across All Collectors & Flex Tier Auto-Fallback (`apify.py`, `brightdata.py`, `telegram_collector.py`, `x_collector.py`, `tiktok_collector.py`, `topics/gemini.py`, `genres/gemini.py`):**
+   - Never substitute `datetime.now()` for a missing date; keep `published_at = None` and set `timestamp_precision = "second" if published_at else "unknown"`.
+   - `GeminiTopicClassifier` and `GeminiGenreClassifier` support `service_tier="flex"` (50% cost discount) with automatic fallback to standard tier on `400/429/503`.
 6. **SQL Hardening (`supabase/migrations/20261122000000_channel_indexing_and_comment_ingestion_hardening.sql`) & `channel-lookup` Pre-Check:**
    - `private.worker_video_counts` refreshes `last_seen_at = now()` on non-purged comments of videos verified as `unchanged`.
    - `private.worker_known_videos` prioritizes the newest 200 items of each `kind` (`video`, `short`, `stream`) within its `LIMIT 5000` window.
+   - `private.adopt_channel_content` replaces row-by-row per-video loops with a single set-based bulk `INSERT INTO public.comments ... SELECT ...` and bulk `UPDATE public.video_selections`, while widening the public-collection source allowlist to include Facebook and Instagram collectors.
    - `supabase/functions/channel-lookup/index.ts` tries `channels.list(forHandle=@...)` (1 unit) before `search.list` (100 units) whenever a `search` query is a valid handle token (`^[A-Za-z0-9._-]{3,30}$`).
 
 ## Consequences
