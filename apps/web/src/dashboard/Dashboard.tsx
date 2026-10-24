@@ -38,6 +38,7 @@ import {
   DashboardPendingError,
   PENDING_RETRY_MS,
   loadDashboardComments,
+  loadSpikeAttributions,
   filtersToRpc,
   toLabelledComment,
   reviewsArePersisted,
@@ -344,6 +345,21 @@ function DashboardBody({
     retry: (failureCount, error) =>
       shouldRetryDashboardQuery(failureCount, error, 2),
     retryDelay: (attempt) => attempt * 1000,
+  });
+
+  const activeChannelId = aggregatesQuery.data?.channel?.id ?? "";
+  const spikeAttributionsQuery = useQuery({
+    queryKey: [
+      "spike-attributions",
+      userId,
+      mode,
+      workspaceId,
+      activeChannelId,
+    ],
+    queryFn: ({ signal }) =>
+      loadSpikeAttributions(mode, activeChannelId, 10, signal),
+    enabled: mode === "live" && !read.data && Boolean(activeChannelId),
+    retry: false,
   });
 
   // For the empty state's setup path only; live only, and cheap.
@@ -1114,6 +1130,7 @@ function DashboardBody({
                 hours={hours}
                 weekdays={weekdays}
                 weeks={weeks}
+                spikeAttributions={spikeAttributionsQuery.data ?? []}
               />
               <Comments
                 s={s}

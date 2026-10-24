@@ -9,7 +9,6 @@ import os
 import re
 import uuid
 from collections.abc import Iterator
-from datetime import datetime, timezone
 import httpx
 from .identity import stable_author_id
 from .protocol import Batch, Catalogue, CollectionError, RawComment
@@ -92,7 +91,7 @@ class TelegramCollector:
                     "external_video_id": str(p["id"]),
                     "title": p.get("text", "")[:100] or f"Post {p['id']}",
                     "kind": "channel_post",
-                    "published_at": p.get("date", datetime.now(timezone.utc).isoformat()),
+                    "published_at": p.get("date"),
                     "thumbnail_url": p.get("thumbnail_url") or p.get("photo"),
                     "reported_comment_count": p.get("comments_count"),
                     "comments_state": p.get("comments_state", "open"),
@@ -134,7 +133,7 @@ class TelegramCollector:
                             "external_video_id": str(m.id),
                             "title": first_line[:120],
                             "kind": "channel_post",
-                            "published_at": m.date.isoformat() if getattr(m, "date", None) else datetime.now(timezone.utc).isoformat(),
+                            "published_at": m.date.isoformat() if getattr(m, "date", None) else None,
                             "thumbnail_url": None,
                             "reported_comment_count": comment_count,
                             "comments_state": comments_state,
@@ -213,7 +212,7 @@ class TelegramCollector:
                     title = clean_text[:120].strip() if clean_text else f"منشور {msg_id}"
 
                     time_m = re.search(r'<time datetime="([^"]+)"', block)
-                    pub_time = time_m.group(1) if time_m else datetime.now(timezone.utc).isoformat()
+                    pub_time = time_m.group(1) if time_m else None
 
                     replies_m = re.search(
                         r'class="tgme_widget_message_subtext"[^>]*>(\d+)\s*(?:comment|repl|تعليق|رد|مناقشة)',
@@ -249,7 +248,7 @@ class TelegramCollector:
                             "external_video_id": msg_id,
                             "title": f"منشور {msg_id}",
                             "kind": "channel_post",
-                            "published_at": datetime.now(timezone.utc).isoformat(),
+                            "published_at": None,
                             "reported_comment_count": None,
                             "comments_state": "open",
                             "field_provenance": {"source": self.source, "channel": clean_handle},
@@ -294,6 +293,7 @@ class TelegramCollector:
 
             raw_comments = []
             for c in page:
+                pub_at = c.get("published_at") or c.get("date")
                 raw_comments.append(RawComment(
                     id=str(c["id"]),
                     video_id=str(video_id),
@@ -301,8 +301,8 @@ class TelegramCollector:
                     parent_id=str(c["parent_id"]) if c.get("parent_id") else None,
                     is_reply=bool(c.get("parent_id") or c.get("is_reply")),
                     parent_source="api",
-                    published_at=c.get("published_at", datetime.now(timezone.utc).isoformat()),
-                    timestamp_precision="second",
+                    published_at=pub_at,
+                    timestamp_precision="second" if pub_at else "unknown",
                     author_channel_id=stable_author_id(c.get("author_id")),
                     author_name=c.get("author_name", "مستخدم تليجرام"),
                     likes_value=c.get("reactions_count", 0),
@@ -348,6 +348,7 @@ class TelegramCollector:
                     is_reply = bool(reply_to_msg_id and reply_to_msg_id != post_id)
                     parent_id = str(reply_to_msg_id) if is_reply else None
 
+                    msg_pub = msg.date.isoformat() if getattr(msg, "date", None) else None
                     items.append(RawComment(
                         id=str(msg.id),
                         video_id=str(video_id),
@@ -355,8 +356,8 @@ class TelegramCollector:
                         parent_id=parent_id,
                         is_reply=is_reply,
                         parent_source="api",
-                        published_at=msg.date.isoformat() if getattr(msg, "date", None) else datetime.now(timezone.utc).isoformat(),
-                        timestamp_precision="second",
+                        published_at=msg_pub,
+                        timestamp_precision="second" if msg_pub else "unknown",
                         author_channel_id=author_id,
                         author_name=author_name,
                         likes_value=reactions_count,
@@ -444,6 +445,7 @@ class TelegramCollector:
                     items = data.get("items", [])
                     raw_comments = []
                     for item in items:
+                        item_pub = item.get("date") or item.get("published_at")
                         raw_comments.append(RawComment(
                             id=str(item["id"]),
                             video_id=str(video_id),
@@ -451,8 +453,8 @@ class TelegramCollector:
                             parent_id=str(item["parent_id"]) if item.get("parent_id") else None,
                             is_reply=bool(item.get("parent_id")),
                             parent_source="api",
-                            published_at=item.get("date"),
-                            timestamp_precision="second",
+                            published_at=item_pub,
+                            timestamp_precision="second" if item_pub else "unknown",
                             author_channel_id=str(item.get("author_id", "tg_user")),
                             author_name=item.get("author_name", ""),
                             likes_value=item.get("reactions_count"),
@@ -509,7 +511,7 @@ class TelegramCollector:
                     clean_text = html.unescape(re.sub(r'<br\s*/?>', '\n', text_m.group(1)))
                     clean_text = re.sub(r'<[^>]+>', '', clean_text).strip()
                     cmt_id = id_m.group(1) if id_m else str(uuid.uuid4())
-                    pub_at = time_m.group(1) if time_m else datetime.now(timezone.utc).isoformat()
+                    pub_at = time_m.group(1) if time_m else None
                     raw_comments.append(RawComment(
                         id=cmt_id,
                         video_id=str(video_id),
@@ -518,7 +520,7 @@ class TelegramCollector:
                         is_reply=False,
                         parent_source="api",
                         published_at=pub_at,
-                        timestamp_precision="second",
+                        timestamp_precision="second" if pub_at else "unknown",
                         author_channel_id="tg_user",
                         author_name=author,
                         likes_value=0,

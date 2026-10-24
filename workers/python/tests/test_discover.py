@@ -218,3 +218,36 @@ def test_candidate_profiles_follow_featured_discovery_and_finish_after_commit():
     assert lister.profile_ids == [candidate]
     assert sent["candidate_profiles"] == [{"external_channel_id": candidate, "country": "TR"}]
     assert sent["finish"] == "succeeded"
+
+
+def test_large_catalogue_commits_in_500_video_chunks():
+    chunks = []
+
+    def handler(request):
+        path = request.url.path.rsplit("/", 1)[-1]
+        if path == "claim":
+            return httpx.Response(
+                200,
+                json={
+                    "job_id": "j",
+                    "lease_token": "t",
+                    "type": "discover",
+                    "checkpoint": None,
+                    "videos": [],
+                    "access_token": "tok",
+                },
+            )
+        if path == "commit-catalogue":
+            payload = json.loads(request.content)["payload"]
+            chunks.append(len(payload))
+            return httpx.Response(200, json={"videos": len(payload)})
+        return httpx.Response(200, json={})
+
+    videos = [
+        {"external_video_id": f"v{idx:010d}", "title": "x", "kind": "video"}
+        for idx in range(1200)
+    ]
+    cp = ControlPlane("https://c.invalid", "cred", httpx.Client(transport=httpx.MockTransport(handler)))
+    assert run_discover(cp, lambda *a, **kw: Lister(Catalogue(videos, True))) is True
+    assert chunks == [500, 500, 200]
+

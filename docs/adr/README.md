@@ -24,9 +24,12 @@ What we will do.
 What gets easier, what gets harder, what we'll watch.
 ```
 
-| # | Title | Status |
-| --- | --- | --- |
-| 0001 | Agent team operating model | proposed |
-| 0002 | Switchable CI runner (hosted by default, self-hosted on demand) | proposed |
-| 0003 | Hashed audience identities, kept 30 days, shown only above thresholds | proposed |
-| 0004 | Edge functions deploy from main, in the gated deploy job | accepted |
+| #    | Title                                                                                             | Status   |
+| ---- | ------------------------------------------------------------------------------------------------- | -------- |
+| 0001 | Agent team operating model                                                                        | proposed |
+| 0002 | Switchable CI runner (hosted by default, self-hosted on demand)                                   | proposed |
+| 0003 | Hashed audience identities, kept 30 days, shown only above thresholds                             | proposed |
+| 0004 | Edge functions deploy from main, in the gated deploy job                                          | accepted |
+| 0005 | Seltz AI multi-key pool for sentiment spike context attribution                                   | accepted |
+| 0006 | Two-tier contextual Gemini sentiment engine, dual-write corrections, and DB scalability hardening | accepted |
+| 0007 | Channel indexing and comment ingestion hardening                                                  | accepted |

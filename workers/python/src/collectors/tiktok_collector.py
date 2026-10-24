@@ -187,7 +187,7 @@ class TikTokCollector:
                                     int(item["createTime"]), tz=timezone.utc
                                 ).isoformat()
                                 if "createTime" in item
-                                else datetime.now(timezone.utc).isoformat()
+                                else None
                             ),
                             "reported_comment_count": stats.get("commentCount"),
                             "thumbnail_url": item.get("video", {}).get("cover"),
@@ -219,7 +219,7 @@ class TikTokCollector:
                                         int(item["createTime"]), tz=timezone.utc
                                     ).isoformat()
                                     if "createTime" in item
-                                    else datetime.now(timezone.utc).isoformat()
+                                    else None
                                 ),
                                 "reported_comment_count": stats.get("commentCount"),
                                 "thumbnail_url": item.get("video", {}).get("cover"),
@@ -255,7 +255,7 @@ class TikTokCollector:
                         "external_video_id": str(v["id"]),
                         "title": v.get("desc", "")[:100] or v.get("title", f"Video {v['id']}"),
                         "kind": v.get("kind", "video"),
-                        "published_at": v.get("create_time", datetime.now(timezone.utc).isoformat()),
+                        "published_at": v.get("create_time"),
                         "reported_comment_count": v.get("comment_count"),
                         "thumbnail_url": v.get("cover_image_url"),
                         "field_provenance": {"source": self.source, "handle": clean_handle},
@@ -323,6 +323,7 @@ class TikTokCollector:
                     or stable_author_id(user.get("id"))
                     or stable_author_id(user.get("uid"))
                 )
+                pub_at = c.get("create_time") or c.get("published_at")
                 comments.append(
                     RawComment(
                         id=str(c["id"]),
@@ -331,7 +332,8 @@ class TikTokCollector:
                         parent_id=str(c["parent_id"]) if c.get("parent_id") else None,
                         is_reply=bool(c.get("parent_id")),
                         parent_source="tiktok_reply" if c.get("parent_id") else "root",
-                        published_at=c.get("create_time", datetime.now(timezone.utc).isoformat()),
+                        published_at=pub_at,
+                        timestamp_precision="second" if pub_at else "unknown",
                         author_name=user.get("nickname") or c.get("author_name", ""),
                         author_channel_id=author_id,
                         likes_value=c.get("digg_count", c.get("likes_count", 0)),
@@ -356,11 +358,23 @@ class TikTokCollector:
 
         last_error = None
         has_empty_scraper_result = False
+        offset = 0
+        if checkpoint:
+            try:
+                cp_obj = json.loads(checkpoint)
+                if isinstance(cp_obj, dict) and isinstance(cp_obj.get("offset"), int):
+                    offset = max(0, cp_obj["offset"])
+            except (ValueError, TypeError):
+                offset = 0
+        page_limit = max_items if isinstance(max_items, int) and max_items > 0 else 50
         for source_name, fn in cascade_comments:
             try:
                 raw_comments = fn()
                 if isinstance(raw_comments, list):
                     if raw_comments:
+                        sliced = raw_comments[offset:offset + page_limit]
+                        has_more = (offset + page_limit) < len(raw_comments)
+                        next_cp = json.dumps({"offset": offset + len(sliced)}) if has_more else None
                         comments = [
                             RawComment(
                                 id=c["id"],
@@ -370,15 +384,20 @@ class TikTokCollector:
                                 is_reply=c.get("is_reply", False),
                                 parent_source=f"{source_name}_comment",
                                 published_at=c.get("published_at"),
+                                timestamp_precision="second" if c.get("published_at") else "unknown",
                                 author_name=c.get("author_name", ""),
                                 author_channel_id=c.get("author_channel_id"),
                                 likes_value=c.get("likes_value", 0),
                                 source=source_name,
                                 platform="tiktok",
                             )
-                            for c in raw_comments
+                            for c in sliced
                         ]
-                        yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
+                        yield Batch(
+                            comments=comments,
+                            checkpoint=next_cp,
+                            outcome="partial" if has_more else "exhausted",
+                        )
                         return
                     else:
                         has_empty_scraper_result = True
@@ -423,6 +442,11 @@ class TikTokCollector:
 
             comments = []
             for c in raw_comments:
+                pub_at = (
+                    datetime.fromtimestamp(c["create_time"], tz=timezone.utc).isoformat()
+                    if isinstance(c.get("create_time"), (int, float))
+                    else c.get("create_time")
+                )
                 comments.append(
                     RawComment(
                         id=str(c["id"]),
@@ -431,11 +455,8 @@ class TikTokCollector:
                         parent_id=str(c["parent_comment_id"]) if c.get("parent_comment_id") else None,
                         is_reply=bool(c.get("parent_comment_id")),
                         parent_source="tiktok_reply" if c.get("parent_comment_id") else "root",
-                        published_at=(
-                            datetime.fromtimestamp(c["create_time"], tz=timezone.utc).isoformat()
-                            if isinstance(c.get("create_time"), (int, float))
-                            else c.get("create_time")
-                        ),
+                        published_at=pub_at,
+                        timestamp_precision="second" if pub_at else "unknown",
                         author_name=c.get("author_name", ""),
                         likes_value=c.get("likes_count", 0),
                         source=self.source,

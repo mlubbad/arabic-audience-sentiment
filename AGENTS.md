@@ -1,9 +1,11 @@
 # Project instructions (every agent: Codex, Gemini, Claude)
 
 > **Read first, in this order, and nothing else until your work order tells you to:**
-> 1. `docs/agents/CONTEXT.md`: the project in under 200 lines (layout, commands, invariants).
-> 2. `docs/engineering/PLAYBOOK.md`: team rules, Definition of Done, code standards, review checklist.
-> 3. Your work-order issue on GitHub (linked from the tracker issue #7).
+> 1. `docs/agents/CONTEXT.md` (especially **§10 Latest architecture & scalability updates**): the project in under 200 lines (layout, commands, invariants, and recent architectural changes).
+> 2. `docs/adr/README.md` (`0001`–`0006`): accepted architecture decision records.
+> 3. `docs/engineering/PLAYBOOK.md`: team rules, Definition of Done, code standards, review checklist.
+> 4. `graphify-out/GRAPH_REPORT.md` (or run `graphify query "<question>"` / `graphify explain "<symbol>"`): the live knowledge graph of the codebase. Run `graphify update .` after code changes.
+> 5. Your work-order issue on GitHub (linked from the tracker issue #7).
 >
 > Do **not** read `docs/progress.md`, `docs/verification.md`, `docs/superpowers/**`,
 > `docs/coordination/**` or `docs/agent-reports/**` unless your work order names a section.

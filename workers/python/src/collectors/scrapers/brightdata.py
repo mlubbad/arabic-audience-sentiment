@@ -124,9 +124,7 @@ class BrightDataClient:
                 if not tweet_id:
                     continue
                 text = p.get("description") or p.get("text") or p.get("content") or ""
-                created_at = p.get("date_posted") or p.get("created_at")
-                if not created_at:
-                    created_at = datetime.now(timezone.utc).isoformat()
+                created_at = p.get("date_posted") or p.get("created_at") or None
                 comment_count = p.get("replies") or p.get("comments") or p.get("reply_count") or 0
 
                 # Extract thumbnail: post media if available, fallback to profile avatar
@@ -181,7 +179,7 @@ class BrightDataClient:
                 if cid == tweet_id or not cid:
                     continue
                 text = r.get("text") or r.get("description") or r.get("comment") or ""
-                created_at = r.get("date_posted") or r.get("created_at") or datetime.now(timezone.utc).isoformat()
+                created_at = r.get("date_posted") or r.get("created_at") or None
                 author_name = r.get("user_name") or r.get("name") or r.get("author") or ""
                 likes = r.get("likes") or r.get("like_count") or 0
                 comments.append(
@@ -221,7 +219,7 @@ class BrightDataClient:
                 if isinstance(created_at, (int, float)):
                     created_at = datetime.fromtimestamp(created_at, tz=timezone.utc).isoformat()
                 elif not created_at:
-                    created_at = datetime.now(timezone.utc).isoformat()
+                    created_at = None
 
                 comment_count = p.get("comments") or p.get("comment_count")
                 cover = p.get("cover") or p.get("thumbnail") or p.get("dynamic_cover") or profile_image
@@ -262,7 +260,7 @@ class BrightDataClient:
             if isinstance(created_at, (int, float)):
                 created_at = datetime.fromtimestamp(created_at, tz=timezone.utc).isoformat()
             elif not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+                created_at = None
 
             author = item.get("user") or item.get("author") or {}
             author_name = author.get("nickname") or author.get("uniqueId") or item.get("user_name") or ""
