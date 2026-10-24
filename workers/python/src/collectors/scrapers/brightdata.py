@@ -499,12 +499,14 @@ def _bd_attachment_image(attachments: list) -> str | None:
 
 def _bd_comments(raw_items: list, video_id: str) -> list[dict]:
     comments = []
+    seen_cids: set[str] = set()
     for item in raw_items:
         if not isinstance(item, dict):
             continue
         cid = str(item.get("comment_id") or item.get("id") or "")
-        if not cid:
+        if not cid or cid in seen_cids:
             continue
+        seen_cids.add(cid)
         parent_id = str(item.get("parent_comment_id") or item.get("reply_to_comment_id") or "") or None
         published_at, _ = parse_graph_time(
             item.get("date_created") or item.get("comment_date") or item.get("created_at")

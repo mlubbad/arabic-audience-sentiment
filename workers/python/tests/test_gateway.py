@@ -200,3 +200,37 @@ def test_renew_token_loses_the_lease_loudly_and_falls_back_on_an_older_gateway()
     with pytest.raises(ControlPlaneError) as raised:
         plane(lambda r: httpx.Response(404, json={"code": "not_found"})).renew_token(lease)
     assert raised.value.code == "not_found"
+
+
+def test_build_batch_normalizes_omnichannel_parent_source_to_db_constraint():
+    from server.gateway import build_batch
+
+    c_root = RawComment(
+        id="c1",
+        video_id="v1",
+        text="تعليق جذري",
+        parent_id=None,
+        is_reply=False,
+        parent_source="root",
+        platform="facebook",
+    )
+    c_scraper_reply = RawComment(
+        id="c2",
+        video_id="v1",
+        text="رد عبر كاشط",
+        parent_id="c1",
+        is_reply=True,
+        parent_source="brightdata_comment",
+        platform="facebook",
+    )
+    c_graph_reply = RawComment(
+        id="c3",
+        video_id="v1",
+        text="رد عبر Graph API",
+        parent_id="c1",
+        is_reply=True,
+        parent_source="facebook_reply",
+        platform="facebook",
+    )
+    payload, _ = build_batch("v1", "Title", {}, "exhausted", [c_root, c_scraper_reply, c_graph_reply])
+    assert [c["parent_source"] for c in payload["comments"]] == ["unknown", "extractor", "api"]
