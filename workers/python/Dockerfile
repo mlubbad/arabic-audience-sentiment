@@ -16,7 +16,7 @@
 # `.github/workflows/worker-image.yml` builds it on an arm64 runner and runs the
 # model inside it on every change to the worker.
 # ------------------------------------------------------------------------------
-FROM python:3.12.10-slim@sha256:fd95fa221297a88e1cf49c55ec1828edd7c5a428187e67b5d1805692d11588db
+FROM python:3.15.0-slim@sha256:f5b92f2a669a4c347044f29367f31983280b648250ca94dea66f98c53bc87e58
 
 WORKDIR /app
 
