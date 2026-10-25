@@ -1008,10 +1008,10 @@ function DashboardBody({
     return res as Record<Label, string>;
   }, [labels, s?.measurable]);
 
-  // In live server mode, when data is still arriving or delayed (workspace_total === 0),
+  // In live server mode, when data is still arriving or delayed (!s or workspace_total === 0),
   // keep the shimmer skeleton active instead of showing the video-selection onboarding card.
   const isLiveAwaitingData =
-    isLiveServer && Boolean(s && s.workspace_total === 0);
+    isLiveServer && !result.isError && (!s || s.workspace_total === 0);
 
   return (
     <div className="db-page">
