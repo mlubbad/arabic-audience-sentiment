@@ -33,3 +33,4 @@ What gets easier, what gets harder, what we'll watch.
 | 0005 | Seltz AI multi-key pool for sentiment spike context attribution                                   | accepted |
 | 0006 | Two-tier contextual Gemini sentiment engine, dual-write corrections, and DB scalability hardening | accepted |
 | 0007 | Channel indexing and comment ingestion hardening                                                  | accepted |
+| 0008 | Eleven-point competitor intelligence matrix and SWOT battlecard engine                            | accepted |

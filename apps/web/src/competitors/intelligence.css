@@ -1,0 +1,191 @@
+.competitor-intel {
+  padding: 1.25rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.75rem;
+  margin-block: 1rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.competitor-intel > header h2 {
+  margin-block: 0 0.35rem;
+}
+
+.competitor-intel > header p {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.intel-pacing-card {
+  padding: 1rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--accent, #6558d3) 5%, transparent);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.intel-pacing-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.intel-pacing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.intel-pacing-stat {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.5rem;
+}
+
+.intel-pacing-stat span {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+
+.intel-pacing-stat strong {
+  font-size: 1.1rem;
+}
+
+.intel-schedule-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-block-start: 0.35rem;
+}
+
+.intel-schedule-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border, #ddd);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.intel-matrix-wrap {
+  overflow-x: auto;
+}
+
+.intel-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.intel-matrix-table th,
+.intel-matrix-table td {
+  padding: 0.65rem;
+  text-align: start;
+  border-bottom: 1px solid var(--border, #ddd);
+  vertical-align: top;
+}
+
+.intel-matrix-own {
+  background: color-mix(in srgb, var(--accent, #6558d3) 9%, transparent);
+}
+
+.intel-battlecards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem;
+}
+
+.intel-battlecard {
+  padding: 1rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.65rem;
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.intel-battlecard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.intel-battlecard-head h4 {
+  margin: 0;
+}
+
+.intel-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.intel-swot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.intel-swot-box {
+  padding: 0.65rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.5rem;
+}
+
+.intel-swot-box h5 {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+}
+
+.intel-swot-box ul,
+.intel-outflank-list {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.88rem;
+}
+
+.intel-gap-callout {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border, #ddd);
+  background: color-mix(in srgb, var(--accent, #6558d3) 7%, transparent);
+}
+
+.intel-gap-callout strong {
+  display: block;
+  margin-block-end: 0.25rem;
+}
+
+.intel-edit-form {
+  display: grid;
+  gap: 0.65rem;
+  padding-block-start: 0.5rem;
+  border-top: 1px solid var(--border, #ddd);
+}
+
+.intel-edit-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.intel-edit-form select,
+.intel-edit-form input {
+  padding: 0.45rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 0.35rem;
+}
+
+.intel-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

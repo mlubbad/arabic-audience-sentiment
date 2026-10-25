@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as competitorsApi from "../api/competitors";
 import {
   competitorKeys,
   addCompetitorCandidate,
@@ -9,6 +10,43 @@ import {
   loadMyRole,
   lookupChannel,
 } from "../api/competitors";
+export function useCompetitorIntelligence(
+  channel: string | null,
+  days: number,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [...competitorKeys.channel(channel ?? ""), "intelligence", days],
+    queryFn: ({ signal }) =>
+      typeof competitorsApi.loadCompetitorIntelligence === "function"
+        ? competitorsApi.loadCompetitorIntelligence(channel!, days, signal)
+        : Promise.resolve(null),
+    enabled: !!channel && enabled,
+  });
+}
+export function useUpsertCompetitorIntelligence(channel: string | null) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      candidateExternalId,
+      profile,
+    }: {
+      candidateExternalId: string;
+      profile: Parameters<
+        typeof competitorsApi.upsertCompetitorIntelligence
+      >[2];
+    }) =>
+      competitorsApi.upsertCompetitorIntelligence(
+        channel!,
+        candidateExternalId,
+        profile,
+      ),
+    onSettled: () =>
+      client.invalidateQueries({
+        queryKey: competitorKeys.channel(channel ?? ""),
+      }),
+  });
+}
 export function useCompetitorBenchmark(
   channel: string | null,
   days: number,

@@ -423,4 +423,78 @@ describe("competitor scoring and tracking", () => {
     );
     await db.query("update jobs set status='cancelled' where id=$1", [job.id]);
   });
+
+  it("computes the 11-point competitor intelligence matrix and merges analyst SWOT battlecard overrides", async () => {
+    await as(UA);
+    await decide(A, CAND(1), "tracked");
+    const initial = (
+      await db.query<{ m: Record<string, unknown> }>(
+        "select competitor_intelligence_matrix($1, 30) m",
+        [A],
+      )
+    ).rows[0]!.m as {
+      days: number;
+      tracked_count: number;
+      own: { external_id: string; funnel_stage: string };
+      competitors: {
+        external_id: string;
+        funnel_stage: string;
+        next_funnel_stage: string;
+        tone_of_voice: string;
+        strengths: string[];
+        weaknesses: string[];
+        opportunity_gap: string;
+        threat_level: string;
+        analysis_source: string;
+      }[];
+      pacing_plan: { week_1_schedule: number[]; week_2_schedule: number[] };
+    };
+    expect(initial.days).toBe(30);
+    expect(initial.tracked_count).toBeGreaterThanOrEqual(1);
+    expect(initial.pacing_plan.week_1_schedule).toHaveLength(4);
+    const c1 = initial.competitors.find((c) => c.external_id === CAND(1))!;
+    expect(c1).toBeDefined();
+    expect(c1.analysis_source).toBe("automated");
+    expect(c1.next_funnel_stage).toBeTruthy();
+
+    await db.query(
+      "select upsert_competitor_intelligence_profile($1, $2, $3)",
+      [
+        A,
+        CAND(1),
+        JSON.stringify({
+          connection_between_platforms: "tailored_multi",
+          primary_platform: "instagram",
+          dominant_format: "short",
+          funnel_stage: "consideration",
+          tone_of_voice: "casual",
+          cta_pattern: "اكتب كورس محتوى في التعليقات",
+          conversion_channel: "https://linktr.ee/competitor",
+          visual_style: "تصوير واقعي مع رسوم توضيحية",
+          strengths: ["تفاعل عالٍ على الفيديوهات القصيرة"],
+          weaknesses: ["عدم الرد على تعليقات الجمهور"],
+          opportunity_gap: "دمج النصائح العملية بعرض الحل المباشر والرد الفوري",
+          threat_level: "high",
+        }),
+      ],
+    );
+
+    const updated = (
+      await db.query<{ m: Record<string, unknown> }>(
+        "select competitor_intelligence_matrix($1, 30) m",
+        [A],
+      )
+    ).rows[0]!.m as typeof initial;
+    const c1After = updated.competitors.find((c) => c.external_id === CAND(1))!;
+    expect(c1After.analysis_source).toBe("analyst");
+    expect(c1After.funnel_stage).toBe("consideration");
+    expect(c1After.next_funnel_stage).toBe("decision");
+    expect(c1After.tone_of_voice).toBe("casual");
+    expect(c1After.strengths).toEqual(["تفاعل عالٍ على الفيديوهات القصيرة"]);
+    expect(c1After.weaknesses).toEqual(["عدم الرد على تعليقات الجمهور"]);
+    expect(c1After.opportunity_gap).toBe(
+      "دمج النصائح العملية بعرض الحل المباشر والرد الفوري",
+    );
+    expect(c1After.threat_level).toBe("high");
+  });
 });

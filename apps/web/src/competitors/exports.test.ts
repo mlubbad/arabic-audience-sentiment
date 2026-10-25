@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   BENCHMARK_CSV_COLUMNS,
+  INTELLIGENCE_CSV_COLUMNS,
   SUGGESTION_CSV_COLUMNS,
   benchmarkCsv,
   benchmarkFilename,
   channelSlug,
+  intelligenceCsv,
+  intelligenceFilename,
   suggestionsCsv,
   suggestionsFilename,
 } from "./exports";
@@ -124,6 +127,67 @@ describe("competitor CSV exports (WO-33)", () => {
     ).toBe("competitors-sky_dev-2026-10-24.csv");
     expect(benchmarkFilename({ id: "UC123", handle: null }, 90, clock)).toBe(
       "benchmark-UC123-90d-2026-10-24.csv",
+    );
+    expect(
+      intelligenceFilename({ id: "UC123", handle: "@sky_dev" }, 30, clock),
+    ).toBe("competitor-intelligence-11pt-sky_dev-30d-2026-10-24.csv");
+  });
+
+  it("exports the 11-point competitor intelligence matrix with own channel first and semicolon-joined SWOT arrays", () => {
+    const csv = intelligenceCsv({
+      days: 30,
+      tracked_count: 1,
+      own: {
+        id: "ch1",
+        external_id: "UC_OWN",
+        title: "قناتي",
+        platform: "youtube",
+        connection_strategy: "tailored_multi",
+        subscribers: 10000,
+        subscribers_change: 200,
+        videos_per_week: 2.0,
+        views_per_video: 5000,
+        dominant_format: "mixed",
+        funnel_stage: "consideration",
+        topics_covered: ["Tech", "AI"],
+        tone_of_voice: "semi_formal",
+      },
+      competitors: [
+        {
+          external_id: "UC_COMP",
+          title: "منافس",
+          status: "tracked",
+          tier: "direct",
+          connection_between_platforms: "single_focus",
+          primary_platform: "youtube",
+          subscribers: 20000,
+          subscribers_change: 50,
+          videos_per_week: 1.0,
+          capacity_state: "balanced_growth",
+          views_per_video: 4000,
+          dominant_format: "video",
+          funnel_stage: "awareness",
+          next_funnel_stage: "consideration",
+          topics_covered: ["Tech"],
+          topic_gaps: ["AI"],
+          tone_of_voice: "formal",
+          cta_pattern: "اشترك الآن",
+          conversion_channel: "https://example.com",
+          strengths: ["strong_subscriber_base"],
+          weaknesses: ["uncovered_audience_topics"],
+          opportunity_gap: "own_uncovered_topic_clusters",
+          threat_level: "medium",
+        },
+      ],
+    });
+    const rows = csv.slice(1, -2).split("\r\n");
+    expect(rows[0]).toBe(INTELLIGENCE_CSV_COLUMNS.join(","));
+    expect(rows[1]).toContain("own,UC_OWN,قناتي,own,tailored_multi,youtube");
+    expect(rows[2]).toContain(
+      "competitor,UC_COMP,منافس,direct,single_focus,youtube",
+    );
+    expect(rows[2]).toContain(
+      "strong_subscriber_base,uncovered_audience_topics,own_uncovered_topic_clusters,medium",
     );
   });
 });

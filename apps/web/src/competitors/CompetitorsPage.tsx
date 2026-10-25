@@ -17,10 +17,13 @@ import { BudgetMeter } from "../ui/BudgetMeter";
 import { downloadText } from "../csv";
 import { CandidateCard } from "./CandidateCard";
 import { Benchmark } from "./Benchmark";
+import { CompetitorIntelligence } from "./CompetitorIntelligence";
 import { PrintReport } from "./PrintReport";
 import {
   benchmarkCsv,
   benchmarkFilename,
+  intelligenceCsv,
+  intelligenceFilename,
   suggestionsCsv,
   suggestionsFilename,
 } from "./exports";
@@ -33,6 +36,7 @@ import {
   useChannelLookup,
   useCompetitorBenchmark,
   useCompetitorChannels,
+  useCompetitorIntelligence,
   useCompetitors,
   useMyCompetitorRole,
 } from "./useCompetitors";
@@ -70,6 +74,11 @@ export function CompetitorsPage() {
     channel,
     benchmarkDays,
     trackedCount > 0,
+  );
+  const intelligenceQuery = useCompetitorIntelligence(
+    channel,
+    benchmarkDays,
+    (query.data?.candidates.length ?? 0) > 0,
   );
   useEffect(() => {
     if (lookup.data) setResolved(lookup.data);
@@ -174,6 +183,21 @@ export function CompetitorsPage() {
                   }
                 >
                   {S.compExportBenchmarkCsv}
+                </DropdownMenuItem>
+              )}
+              {intelligenceQuery.data && (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    downloadText(
+                      intelligenceFilename(
+                        data.channel,
+                        intelligenceQuery.data!.days,
+                      ),
+                      intelligenceCsv(intelligenceQuery.data!),
+                    )
+                  }
+                >
+                  {S.compExportIntelligenceCsv}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onSelect={() => window.print()}>
@@ -291,9 +315,16 @@ export function CompetitorsPage() {
               benchmarkQuery={benchmarkQuery}
               S={S}
             />
+            <CompetitorIntelligence
+              channel={channel!}
+              canEdit={canEdit}
+              intelligenceQuery={intelligenceQuery}
+              S={S}
+            />
             <PrintReport
               data={data}
               benchmark={benchmarkQuery.data}
+              intelligence={intelligenceQuery.data}
               S={S}
               lang={lang}
             />
