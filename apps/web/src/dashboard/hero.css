@@ -16,3 +16,8 @@
 .db-split > span {
   color: var(--text-2);
 }
+.db-sk-pill {
+  width: 6.5rem;
+  height: 1.75rem;
+  border-radius: var(--radius-pill, 999px);
+}
