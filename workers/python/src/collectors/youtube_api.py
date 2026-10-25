@@ -5,6 +5,7 @@ token, for a channel its owner has connected. The token path is the product
 path: it needs no API key at all, and it reaches a connected channel's comments
 directly.
 """
+import html
 import json
 import re
 from collections.abc import Iterator, Set as AbstractSet
@@ -17,6 +18,19 @@ from .protocol import Batch, Catalogue, CollectionError, RawComment
 # this margin is renewed before the next request is sent rather than after
 # the source refuses it.
 _RENEW_MARGIN_SECONDS = 120
+_MAX_BATCH_COMMENTS = 500
+_RSS_ENTRY_RE = re.compile(r"<entry>(.*?)</entry>", re.DOTALL)
+_RSS_VID_RE = re.compile(r"<yt:videoId>([A-Za-z0-9_-]{11})</yt:videoId>")
+_RSS_CH_RE = re.compile(r"<yt:channelId>(UC[A-Za-z0-9_-]{22})</yt:channelId>")
+_RSS_TITLE_RE = re.compile(r"<title>(.*?)</title>", re.DOTALL)
+_RSS_PUB_RE = re.compile(r"<published>(.*?)</published>")
+_RSS_DESC_RE = re.compile(r"<media:description>(.*?)</media:description>", re.DOTALL)
+_RSS_VIEWS_RE = re.compile(r'<media:statistics\s+views="(\d+)"')
+_RSS_THUMB_RE = re.compile(r'<media:thumbnail\s+url="([^"]+)"')
+_HTML_CHANNEL_ID_RE = re.compile(
+    r'(?:<meta\s+itemprop="channelId"\s+content="(UC[A-Za-z0-9_-]{22})"|"externalId"\s*:\s*"(UC[A-Za-z0-9_-]{22})")'
+)
+_CAPTION_TEXT_RE = re.compile(r"<text[^>]*>(.*?)</text>", re.DOTALL)
 _KEYWORD_PARTS = re.compile(r'"([^"]*)"?|(\S+)')
 
 
@@ -228,8 +242,17 @@ class YouTubeAPI:
                 params = {"part": "snippet", "parentId": parent, "maxResults": 100, "textFormat": "plainText"}
                 if state["reply_page"]:
                     params["pageToken"] = state["reply_page"]
-                data = self._get("comments", params)
-                comments = [self._comment(c, video_id, parent) for c in data["items"]]
+                data = self._get("comments", params) or {}
+                raw_items = data.get("items", [])
+                if effective_since:
+                    raw_items = [
+                        c for c in raw_items
+                        if not (
+                            c.get("snippet", {}).get("publishedAt")
+                            and self._is_before_or_at(c["snippet"]["publishedAt"], effective_since)
+                        )
+                    ]
+                comments = [self._comment(c, video_id, parent) for c in raw_items]
                 next_page = data.get("nextPageToken")
                 if next_page and next_page == state["reply_page"]:
                     raise CollectionError("repeated_page_token", "partial")
@@ -249,14 +272,30 @@ class YouTubeAPI:
                     for i in data.get("items", []):
                         top = i["snippet"]["topLevelComment"]
                         top_pub = top.get("snippet", {}).get("publishedAt")
+                        total_replies = i["snippet"].get("totalReplyCount", 0)
+                        inline = i.get("replies", {}).get("comments", [])
                         if effective_since and top_pub and self._is_before_or_at(top_pub, effective_since):
                             cutoff_reached = True
-                            break
-                        total_replies = i["snippet"].get("totalReplyCount", 0)
+                            # Reply-aware delta sync: harvest any inline replies on
+                            # this already-fetched page that are newer than `since`.
+                            fresh_inline = [
+                                r for r in inline
+                                if r.get("snippet", {}).get("publishedAt")
+                                and not self._is_before_or_at(r["snippet"]["publishedAt"], effective_since)
+                            ]
+                            if fresh_inline:
+                                if total_replies <= len(inline):
+                                    for r in fresh_inline:
+                                        comments.append(self._comment(r, video_id, parent=top["id"]))
+                                else:
+                                    parents.append(top["id"])
+                            continue
                         comments.append(self._comment(top, video_id, reply_count=total_replies))
-                        inline = i.get("replies", {}).get("comments", [])
                         if total_replies <= len(inline):
                             for r in inline:
+                                r_pub = r.get("snippet", {}).get("publishedAt")
+                                if effective_since and r_pub and self._is_before_or_at(r_pub, effective_since):
+                                    continue
                                 comments.append(self._comment(r, video_id, parent=top["id"]))
                         else:
                             parents.append(top["id"])
@@ -276,6 +315,15 @@ class YouTubeAPI:
                 yield Batch([], None, "exhausted")
                 return
             done = state["threads_done"] and not state["parents"]
+            if len(comments) > _MAX_BATCH_COMMENTS:
+                chunks = [
+                    comments[idx:idx + _MAX_BATCH_COMMENTS]
+                    for idx in range(0, len(comments), _MAX_BATCH_COMMENTS)
+                ]
+                for sub_idx, chunk in enumerate(chunks[:-1], start=1):
+                    sub_state = {**state, "sub_batch": sub_idx}
+                    yield Batch(chunk, json.dumps(sub_state), "partial")
+                comments = chunks[-1]
             yield Batch(comments, None if done else json.dumps(state), "exhausted" if done else "partial")
             if done:
                 return
@@ -466,8 +514,146 @@ class YouTubeAPI:
             if not page:
                 return ids
 
+    def rss_recent_videos(self, channel_id: str) -> list[dict]:
+        """Fetch the 15 most recent uploads from YouTube's public Atom/RSS feed (0 API quota units)."""
+        if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id or ""):
+            raise ValueError("invalid_channel_id")
+        try:
+            response = self.client.get(
+                "https://www.youtube.com/feeds/videos.xml",
+                params={"channel_id": channel_id},
+                timeout=15,
+                follow_redirects=False,
+            )
+        except httpx.HTTPError:
+            return []
+        if response.status_code != 200 or not response.text:
+            return []
+        entries: list[dict] = []
+        for match in _RSS_ENTRY_RE.finditer(response.text):
+            block = match.group(1)
+            vid_m = _RSS_VID_RE.search(block)
+            if not vid_m:
+                continue
+            ch_m = _RSS_CH_RE.search(block)
+            uploader = ch_m.group(1) if ch_m else channel_id
+            if uploader != channel_id:
+                continue
+            title_m = _RSS_TITLE_RE.search(block)
+            pub_m = _RSS_PUB_RE.search(block)
+            desc_m = _RSS_DESC_RE.search(block)
+            views_m = _RSS_VIEWS_RE.search(block)
+            thumb_m = _RSS_THUMB_RE.search(block)
+            entries.append({
+                "external_video_id": vid_m.group(1),
+                "channel_external_id": uploader,
+                "title": html.unescape(title_m.group(1).strip()) if title_m else "",
+                "published_at": pub_m.group(1).strip() if pub_m else None,
+                "description": html.unescape(desc_m.group(1).strip()) if desc_m else "",
+                "view_count": int(views_m.group(1)) if views_m else None,
+                "thumbnail_url": html.unescape(thumb_m.group(1)) if thumb_m else None,
+            })
+        return entries
+
+    def rss_video_ids(self, channel_id: str) -> list[str]:
+        """Return only the 11-char video IDs from the zero-quota YouTube Atom feed."""
+        return [v["external_video_id"] for v in self.rss_recent_videos(channel_id)]
+
+    def subscribe_websub(
+        self,
+        channel_id: str,
+        callback_url: str,
+        *,
+        mode: str = "subscribe",
+        lease_seconds: int = 432000,
+        secret: str | None = None,
+    ) -> bool:
+        """Subscribe or unsubscribe a webhook to YouTube's zero-quota WebSub (PubSubHubbub) hub."""
+        if not re.fullmatch(r"UC[A-Za-z0-9_-]{22}", channel_id or ""):
+            raise ValueError("invalid_channel_id")
+        if mode not in ("subscribe", "unsubscribe"):
+            raise ValueError("invalid_websub_mode")
+        if not callback_url or not callback_url.startswith("https://"):
+            raise ValueError("invalid_callback_url")
+        topic = f"https://www.youtube.com/xml/feeds/videos.xml?channel_id={channel_id}"
+        form = {
+            "hub.mode": mode,
+            "hub.topic": topic,
+            "hub.callback": callback_url,
+            "hub.verify": "async",
+            "hub.lease_seconds": str(lease_seconds),
+        }
+        if secret:
+            form["hub.secret"] = secret
+        try:
+            response = self.client.post(
+                "https://pubsubhubbub.appspot.com/subscribe",
+                data=form,
+                timeout=15,
+                follow_redirects=False,
+            )
+        except httpx.HTTPError:
+            return False
+        return response.status_code in (200, 202, 204)
+
+    def resolve_channel_id_zero_quota(self, handle_or_path: str) -> str | None:
+        """Resolve a YouTube @handle or /c/VanityName to a UC... channel ID via public HTML (0 quota units)."""
+        cleaned = (handle_or_path or "").strip().strip("/")
+        if not cleaned:
+            return None
+        if re.fullmatch(r"UC[A-Za-z0-9_-]{22}", cleaned):
+            return cleaned
+        if cleaned.startswith("@"):
+            path = f"/{cleaned}"
+        elif cleaned.startswith(("c/", "user/")):
+            path = f"/{cleaned}"
+        elif re.fullmatch(r"[A-Za-z0-9._-]{3,40}", cleaned):
+            path = f"/@{cleaned}"
+        else:
+            return None
+        try:
+            response = self.client.get(
+                f"https://www.youtube.com{path}",
+                headers={"accept-language": "ar,en;q=0.8"},
+                timeout=10,
+                follow_redirects=True,
+            )
+        except httpx.HTTPError:
+            return None
+        if response.status_code != 200 or not response.text:
+            return None
+        m = _HTML_CHANNEL_ID_RE.search(response.text)
+        if not m:
+            return None
+        return m.group(1) or m.group(2)
+
+    def fetch_video_transcript(self, video_id: str, lang: str = "ar") -> str | None:
+        """Fetch public timedtext captions for a YouTube video at 0 Data API quota cost."""
+        if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id or ""):
+            raise ValueError("invalid_video_id")
+        for candidate_lang in (lang, "en"):
+            try:
+                response = self.client.get(
+                    "https://www.youtube.com/api/timedtext",
+                    params={"v": video_id, "lang": candidate_lang},
+                    timeout=10,
+                    follow_redirects=False,
+                )
+            except httpx.HTTPError:
+                continue
+            if response.status_code == 200 and "<text" in response.text:
+                segments = [
+                    html.unescape(re.sub(r"<[^>]+>", "", m.group(1))).strip()
+                    for m in _CAPTION_TEXT_RE.finditer(response.text)
+                ]
+                joined = " ".join(s for s in segments if s)
+                if joined:
+                    return joined
+        return None
+
     def catalogue(self, channel_id: str | None = None,
-                  known: AbstractSet[str] | None = None) -> Catalogue:
+                  known: AbstractSet[str] | None = None,
+                  use_rss_precheck: bool = False) -> Catalogue:
         """The channel's videos across its three tabs, with the source's counts.
 
         Cost: about two quota units per fifty videos. The tab playlists are the
@@ -527,6 +713,11 @@ class YouTubeAPI:
         # the job's channel; a mismatch here stops the run before anything of
         # it travels.
         expected = channel_id or channel_item.get("id")
+
+        if use_rss_precheck and known and expected:
+            rss_ids = self.rss_video_ids(expected)
+            if rss_ids and all(vid in known for vid in rss_ids):
+                return Catalogue(videos=[], complete=True, channel=profile)
 
         found: dict[str, dict] = {}
         any_tab = False

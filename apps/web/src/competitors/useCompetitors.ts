@@ -4,10 +4,22 @@ import {
   addCompetitorCandidate,
   decideCompetitor,
   loadChannels,
+  loadCompetitorBenchmark,
   loadCompetitors,
   loadMyRole,
   lookupChannel,
 } from "../api/competitors";
+export function useCompetitorBenchmark(
+  channel: string | null,
+  days: number,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [...competitorKeys.channel(channel ?? ""), "benchmark", days],
+    queryFn: ({ signal }) => loadCompetitorBenchmark(channel!, days, signal),
+    enabled: !!channel && enabled,
+  });
+}
 export function useCompetitorChannels(workspaceId: string | null) {
   return useQuery({
     queryKey: competitorKeys.channels(workspaceId ?? ""),

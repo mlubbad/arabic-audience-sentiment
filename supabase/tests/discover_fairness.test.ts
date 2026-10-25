@@ -139,4 +139,30 @@ describe("claim order between refresh discovers and collects", () => {
     expect(await claim()).toBe("collect");
     expect(await claim()).toBeNull();
   });
+
+  it("claims an initial collect for a newly selected channel before routine periodic collects", async () => {
+    const vid = "00000000-0000-4000-8000-0000000000b1";
+    await db.query(
+      `insert into videos(id, workspace_id, channel_id, platform, external_video_id, title)
+       values ($1, $2, $3, 'youtube', 'vid_init_01', 'Initial video')
+       on conflict do nothing`,
+      [vid, W, FRESH],
+    );
+    await db.query(
+      `insert into video_selections(workspace_id, channel_id, video_id, selected_by, last_collected_at)
+       values ($1, $2, $3, $4, null)
+       on conflict (workspace_id, video_id) do update set last_collected_at = null`,
+      [W, FRESH, vid, OWNER],
+    );
+
+    await job("routine-collect", OTHER, "collect", "10 hours", {
+      notBefore: "-10 hours",
+    });
+    await job("initial-collect", FRESH, "collect", "1 minute", {
+      notBefore: "-1 minute",
+    });
+    expect(await claim()).toBe("initial-collect");
+    expect(await claim()).toBe("routine-collect");
+    await db.exec("delete from video_selections; delete from videos");
+  });
 });

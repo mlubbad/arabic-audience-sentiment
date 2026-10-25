@@ -70,7 +70,7 @@ const AccountDemoSchema = z
     clients: z.array(ClientRowSchema),
     channels: z.array(ChannelRowSchema),
     jobs: z.array(JobRowSchema),
-    usage: z.record(UsageSummarySchema),
+    usage: z.record(z.string(), UsageSummarySchema),
   })
   .strict();
 

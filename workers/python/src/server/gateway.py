@@ -74,12 +74,26 @@ def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+_DB_PARENT_SOURCES = {"api", "extractor", "inferred_id", "unknown"}
+
+
+def _normalize_parent_source(c: RawComment) -> str:
+    ps = (c.parent_source or "").strip()
+    if ps in _DB_PARENT_SOURCES:
+        return ps
+    if not c.parent_id:
+        return "unknown"
+    if any(k in ps for k in ("apify", "brightdata", "scraper", "extractor")):
+        return "extractor"
+    return "api"
+
+
 def _comment(c: RawComment) -> dict[str, Any]:
     d = {
         "external_comment_id": c.id,
         "external_parent_id": c.parent_id,
         "is_reply": c.is_reply,
-        "parent_source": c.parent_source,
+        "parent_source": _normalize_parent_source(c),
         "author_channel_id": c.author_channel_id,
         "author_name": c.author_name,
         "text_raw": c.text,
@@ -91,7 +105,7 @@ def _comment(c: RawComment) -> dict[str, Any]:
         "published_at": c.published_at,
         "timestamp_precision": c.timestamp_precision,
         "likes_raw": c.likes_raw,
-        "likes_value": c.likes_value,
+        "likes_value": max(0, c.likes_value) if isinstance(c.likes_value, int) and not isinstance(c.likes_value, bool) else None,
         "source": c.source,
         "field_provenance": c.field_provenance,
     }

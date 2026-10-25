@@ -1,0 +1,9 @@
+# Stale historical logs and write-once plans (see docs/agents/CONTEXT.md §8)
+docs/superpowers/plans/
+docs/coordination/
+docs/agent-reports/
+docs/implementation-plan.md
+.codex-logs/
+.codex-workspace/
+.worker-logs/
+test-results/

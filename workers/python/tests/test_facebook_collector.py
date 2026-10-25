@@ -23,6 +23,8 @@ def test_facebook_collector_validates_handle_and_post_id():
     post = FacebookCollector._clean_post_id
     assert post("1122334455") == "1122334455"
     assert post("10001_1122334455") == "10001_1122334455"
+    assert post("reel_29021154867568303") == "reel_29021154867568303"
+    assert post("https://www.facebook.com/reel/29021154867568303/") == "reel_29021154867568303"
     assert post("https://www.facebook.com/aljazeera/posts/pfbid0AbCdEfGhIjKlMnOpQrStUvWxYz") == (
         "pfbid0AbCdEfGhIjKlMnOpQrStUvWxYz"
     )
