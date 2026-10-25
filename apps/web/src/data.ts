@@ -7,9 +7,11 @@ import {
   OpsSnapshotSchema,
   DashboardAggregatesSchema,
   DashboardCommentsResponseSchema,
+  SpikeAttributionListSchema,
   type OpsSnapshot,
   type DashboardAggregates,
   type DashboardCommentsResponse,
+  type SpikeAttribution,
   applyReview,
   applyTopicReview,
   exportRows,
@@ -1127,4 +1129,24 @@ export async function loadDashboardComments(
     next_cursor:
       hasMore && slice.length > 0 ? slice[slice.length - 1].id : null,
   };
+}
+
+export async function loadSpikeAttributions(
+  mode: DataMode,
+  channelId: string,
+  limit = 10,
+  signal?: AbortSignal,
+): Promise<SpikeAttribution[]> {
+  if (mode !== "live" || !channelId) {
+    return [];
+  }
+  const data = await callRpcWithAuthRetry<unknown>(
+    "list_spike_attributions",
+    {
+      p_channel: channelId,
+      p_limit: limit,
+    },
+    signal,
+  );
+  return SpikeAttributionListSchema.parse(data);
 }

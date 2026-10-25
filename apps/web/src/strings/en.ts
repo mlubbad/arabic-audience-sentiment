@@ -111,6 +111,14 @@ export const en: Strings = {
   compTier_indirect: "Indirect: some similar topics",
   compTier_aspirational: "Aspirational: larger channel with similar topics",
   compTier_related: "Related: broad topic connection",
+  compTierLabel: "Tier",
+  compReasons: "Reasons",
+  compExport: "Export",
+  compExportSuggestionsCsv: "Suggestions (CSV)",
+  compExportBenchmarkCsv: "Benchmark (CSV)",
+  compExportPdf: "Report (PDF)",
+  compProvenanceNote:
+    "Counts are from YouTube; match scores and changes are our estimate and our calculation.",
   navOperations: "Operations",
   navAccount: "Sources & account",
   navAdmin: "Admin",
@@ -2248,4 +2256,8 @@ export const en: Strings = {
     "No live telemetry reaches these services yet",
   adminPlanLimitsInvalid:
     "Every field must be a whole number of -1 or more (-1 means unlimited). Nothing was saved.",
+  timingSpikesTitle: "News context for engagement spikes",
+  timingSpikesLead:
+    "Verified public events and news reports that coincided with comment surges in the observed windows.",
+  timingSpikesSourceLink: "Verified source",
 };

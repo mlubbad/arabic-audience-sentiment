@@ -12,6 +12,7 @@
 import { useEffect, useRef } from "react";
 import type { Chart as ChartJS } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
+import type { SpikeAttribution } from "@sentiment/contracts";
 import { plottable, type Bucketed } from "../analytics";
 import { Card } from "../ui/Card";
 import type { Strings } from "../strings";
@@ -29,13 +30,18 @@ export function Timing({
   hours,
   weekdays,
   weeks,
+  spikeAttributions = [],
 }: {
   s: Snapshot;
   S: Strings;
   hours: Bucketed;
   weekdays: Bucketed;
   weeks: Bucketed;
+  spikeAttributions?: SpikeAttribution[];
 }) {
+  const succeededSpikes = spikeAttributions.filter(
+    (sp) => sp.status === "succeeded" && sp.headline_ar && sp.summary_ar,
+  );
   const peakHourBucket = [...hours.buckets].sort(
     (a, b) => b.count - a.count,
   )[0];
@@ -227,6 +233,45 @@ export function Timing({
           </p>
         </Card>
       </div>
+      {succeededSpikes.length > 0 && (
+        <Card>
+          <h3 className="db-card-title">{S.timingSpikesTitle}</h3>
+          <p className="db-note">{S.timingSpikesLead}</p>
+          <div
+            className="db-timing-spikes"
+            data-testid="timing-spike-attributions"
+          >
+            {succeededSpikes.map((sp) => (
+              <div key={sp.id} className="db-timing-spike-item">
+                <div className="db-timing-pill">
+                  <span className="db-timing-pill-badge">
+                    {sp.from_date} → {sp.to_date}
+                  </span>
+                  <strong className="db-timing-pill-text">
+                    {sp.headline_ar}
+                  </strong>
+                </div>
+                <p className="db-note">{sp.summary_ar}</p>
+                {sp.citations.length > 0 && (
+                  <div className="db-timing-meta-pills">
+                    {sp.citations.slice(0, 3).map((c, idx) => (
+                      <a
+                        key={`${sp.id}-cit-${idx}`}
+                        href={c.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="db-timing-subpill"
+                      >
+                        {S.timingSpikesSourceLink} ({idx + 1})
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </section>
   );
 }

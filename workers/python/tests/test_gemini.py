@@ -182,3 +182,16 @@ def test_a_single_item_that_is_blocked_is_not_split_further():
     [v] = fake.classifier().classify(TAXONOMY, items(1))
     assert v.error_code == "gemini_bad_response"
     assert len(fake.requests) == 1
+
+
+def test_flex_service_tier_auto_falls_back_to_standard_on_503():
+    fake = Fake([
+        (503, {"error": {"message": "Flex capacity busy"}}),
+        (200, answer([(0, "praise")])),
+    ])
+    [v] = fake.classifier(service_tier="flex").classify(TAXONOMY, items(1))
+    assert v.status == "succeeded" and v.topic_key == "praise"
+    assert len(fake.requests) == 2
+    assert json.loads(fake.requests[0].content).get("serviceTier") == "flex"
+    assert "serviceTier" not in json.loads(fake.requests[1].content)
+

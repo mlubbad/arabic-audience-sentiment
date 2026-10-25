@@ -30,7 +30,13 @@ def analysis_key(model_id: str, revision: str, parameters: dict) -> str:
     return f"{model_id}@{revision}+{PREPROCESSING_VERSION}+{parameters_digest(parameters)}"
 
 
-def analyse(analyzer, comments: Sequence[RawComment]) -> list[dict[str, Any]]:
+def analyse(
+    analyzer,
+    comments: Sequence[RawComment],
+    *,
+    video: dict[str, Any] | None = None,
+    channel: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """One prediction record per comment, in the order they were given.
 
     Every record names a comment in the same sequence, which is what the batch
@@ -42,7 +48,12 @@ def analyse(analyzer, comments: Sequence[RawComment]) -> list[dict[str, Any]]:
     # stores and is a statement, not a missing value.
     parameters = dict(getattr(analyzer, "parameters", None) or {})
     try:
-        predictions = analyzer.predict([c.text for c in comments])
+        if hasattr(analyzer, "predict_contextual"):
+            predictions = analyzer.predict_contextual(
+                comments, video=video, channel=channel
+            )
+        else:
+            predictions = analyzer.predict([c.text for c in comments])
     except Exception as exc:  # noqa: BLE001 — the adapter's type is not ours to know
         raise AnalysisError() from exc
     if len(predictions) != len(comments):

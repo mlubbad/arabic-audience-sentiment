@@ -316,10 +316,12 @@ def main() -> None:
         help="one or more scoped worker credentials, comma-separated",
     )
     default_model = os.environ.get("SENTIMENT_MODEL", "none")
-    if default_model not in ["none", "deterministic-test", *CANDIDATES.keys()]:
+    if default_model not in ["none", "deterministic-test", "gemini", *CANDIDATES.keys()]:
         default_model = "none"
     p.add_argument(
-        "--model", default=default_model, choices=["none", "deterministic-test", *sorted(CANDIDATES.keys())]
+        "--model",
+        default=default_model,
+        choices=["none", "deterministic-test", "gemini", *sorted(CANDIDATES.keys())],
     )
     p.add_argument(
         "--topics",
@@ -352,6 +354,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _request_stop)
     signal.signal(signal.SIGINT, _request_stop)
 
+    client = httpx.Client()
     analyzer = None
     if args.model in CANDIDATES:
         from sentiment.transformer import load_pinned
@@ -359,12 +362,18 @@ def main() -> None:
         _log(f"loading the classifier ({args.model})")
         analyzer = load_pinned(args.model)
         _log(f"loaded {analyzer.model_id}@{analyzer.revision[:12]}")
+    elif args.model == "gemini":
+        from sentiment.gemini_batch import GeminiContextualSentimentAdapter
+
+        key = os.environ.get("GEMINI_API_KEY", "")
+        if not key:
+            raise SystemExit("--model gemini needs GEMINI_API_KEY")
+        analyzer = GeminiContextualSentimentAdapter(key, client)
+        _log(f"sentiment classifier: {analyzer.model_id}@{analyzer.revision}")
     elif args.model == "deterministic-test":
         from sentiment.deterministic import DeterministicTestAnalyzer
 
         analyzer = DeterministicTestAnalyzer()
-
-    client = httpx.Client()
     classifier = None
     if args.topics == "gemini":
         from topics.gemini import GeminiTopicClassifier

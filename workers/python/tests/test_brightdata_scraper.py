@@ -314,7 +314,7 @@ def test_brightdata_scrape_facebook_posts_and_comments():
 
     bd = BrightDataClient(api_key="k", client=httpx.Client(transport=httpx.MockTransport(handler)))
     posts = bd.scrape_facebook_posts("aljazeera")
-    assert seen[0] == ("gd_lkaxegm826bjpoo9m5", [{"url": "https://www.facebook.com/aljazeera/"}])
+    assert seen[0] == ("gd_lkaxegm826bjpoo9m5", [{"url": "https://www.facebook.com/aljazeera/", "num_of_posts": 25}])
     assert posts[0]["external_video_id"] == "5566778899"
     assert posts[0]["kind"] == "channel_post"
     assert posts[0]["reported_comment_count"] == 12
@@ -326,6 +326,69 @@ def test_brightdata_scrape_facebook_posts_and_comments():
     assert comments[0]["id"] == "fbc_1" and comments[0]["text"] == "نقاش جيد"
     assert comments[0]["author_name"] == "ريم" and comments[0]["author_channel_id"] == "9001"
     assert comments[0]["likes_value"] == 4 and comments[0]["published_at"] == "2026-09-21T09:30:00+00:00"
+
+
+def test_brightdata_async_snapshot_polling_ndjson_and_reel_pfbid():
+    progress_calls = 0
+    seen_comment_urls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal progress_calls
+        url = str(request.url)
+        if "/datasets/v3/progress/sd_fb_1" in url:
+            progress_calls += 1
+            return httpx.Response(200, json={"status": "ready" if progress_calls >= 2 else "running"})
+        if "/datasets/v3/snapshot/sd_fb_1" in url:
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "post_id": "1737611258366686",
+                        "post_type": "Reel",
+                        "url": "https://www.facebook.com/reel/29021154867568303/",
+                        "content": "مقطع ريل تقني",
+                        "date_posted": "2026-10-24T10:25:02.000Z",
+                        "num_comments": 8,
+                        "avatar_image_url": "https://cdn.example.com/avatar.jpg",
+                    },
+                    {
+                        "post_id": "1736869988440813",
+                        "post_type": "Post",
+                        "url": "https://www.facebook.com/NagdyWP/posts/pfbid02GexV6kxYEcAxpd3xwkmyGxuXamfR5wHtXJK3ZyPAm5NCHLPnRdZcQSdbvkCXkf4il",
+                        "content": "منشور طويل بمعرف pfbid",
+                        "date_posted": "2026-10-23T09:00:00.000Z",
+                        "num_comments": 58,
+                    },
+                ],
+            )
+        if request.url.params.get("dataset_id") == "gd_lkaxegm826bjpoo9m5":
+            return httpx.Response(202, json={"snapshot_id": "sd_fb_1", "message": "in progress"})
+        if request.url.params.get("dataset_id") == "gd_lkay758p1eanlolqw8":
+            req = json.loads(request.content.decode("utf-8"))
+            seen_comment_urls.append(req[0]["url"])
+            ndjson_body = (
+                json.dumps({"comment_id": "c1", "comment_text": "تعليق أول", "user_name": "أحمد", "num_likes": 3})
+                + "\n"
+                + json.dumps({"comment_id": "c2", "comment_text": "تعليق ثانٍ", "user_name": "سارة", "num_likes": 1})
+            )
+            return httpx.Response(200, text=ndjson_body)
+        return httpx.Response(404)
+
+    bd = BrightDataClient(api_key="k", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    bd.poll_interval = 0.01
+    bd.max_wait = 1.0
+    posts = bd.scrape_facebook_posts("NagdyWP", max_items=10)
+    assert len(posts) == 2
+    assert posts[0]["external_video_id"] == "reel_29021154867568303"
+    assert posts[0]["kind"] == "short"
+    assert posts[0]["thumbnail_url"] == "https://cdn.example.com/avatar.jpg"
+    assert posts[1]["external_video_id"] == "pfbid02GexV6kxYEcAxpd3xwkmyGxuXamfR5wHtXJK3ZyPAm5NCHLPnRdZcQSdbvkCXkf4il"
+    assert posts[1]["kind"] == "channel_post"
+
+    reel_comments = bd.scrape_facebook_comments("reel_29021154867568303", handle="NagdyWP")
+    assert seen_comment_urls[0] == "https://www.facebook.com/reel/29021154867568303/"
+    assert len(reel_comments) == 2
+    assert reel_comments[0]["id"] == "c1" and reel_comments[1]["id"] == "c2"
 
 
 def test_brightdata_scrape_instagram_posts_and_comments():

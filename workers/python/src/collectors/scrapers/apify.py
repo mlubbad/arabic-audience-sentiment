@@ -54,8 +54,6 @@ class ApifyClient:
         except httpx.HTTPError:
             raise CollectionError("network_failure", retryable=True) from None
 
-        if resp.status_code in (401, 403):
-            raise CollectionError("invalid_credentials", "blocked")
         if resp.status_code == 402:
             raise CollectionError("apify_quota_depleted", "failed", retryable=False)
         if resp.status_code == 404:
@@ -67,14 +65,20 @@ class ApifyClient:
         if resp.is_error:
             try:
                 err_json = resp.json()
-                err_type = str(err_json.get("error", {}).get("type", "")).lower() if isinstance(err_json, dict) else ""
-                err_msg = str(err_json.get("error", {}).get("message", "")).lower() if isinstance(err_json, dict) else ""
-                if any(x in err_type or x in err_msg for x in ("usage", "credit", "payment", "quota", "plan-limit")):
+                err_obj = err_json.get("error") if isinstance(err_json, dict) else None
+                err_type = str(err_obj.get("type", "")).lower() if isinstance(err_obj, dict) else ""
+                err_msg = (str(err_obj.get("message", "")) if isinstance(err_obj, dict) else str(err_obj or "")).lower()
+                if any(
+                    x in err_type or x in err_msg
+                    for x in ("usage", "credit", "payment", "quota", "plan-limit", "platform-feature-disabled", "hard limit")
+                ):
                     raise CollectionError("apify_quota_depleted", "failed", retryable=False)
             except CollectionError:
                 raise
-            except (ValueError, KeyError, TypeError):
+            except (ValueError, KeyError, TypeError, AttributeError):
                 pass
+            if resp.status_code in (401, 403):
+                raise CollectionError("invalid_credentials", "blocked")
             raise CollectionError(f"apify_error_{resp.status_code}", "failed", retryable=True)
 
         try:
@@ -104,9 +108,7 @@ class ApifyClient:
                 continue
             text = item.get("full_text") or item.get("text") or ""
             author_info = item.get("author") or item.get("user") or {}
-            created_at = item.get("createdAt") or item.get("created_at")
-            if not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+            created_at = item.get("createdAt") or item.get("created_at") or None
             comment_count = item.get("replyCount") or item.get("reply_count") or item.get("replies")
 
             media = item.get("media") or item.get("extendedEntities", {}).get("media") or []
@@ -157,9 +159,7 @@ class ApifyClient:
                 continue
             text = item.get("full_text") or item.get("text") or ""
             author_info = item.get("author") or item.get("user") or {}
-            created_at = item.get("createdAt") or item.get("created_at")
-            if not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+            created_at = item.get("createdAt") or item.get("created_at") or None
             likes = item.get("likeCount") or item.get("like_count") or item.get("likes") or 0
             comments.append(
                 {
@@ -194,7 +194,7 @@ class ApifyClient:
             if isinstance(created_at, (int, float)):
                 created_at = datetime.fromtimestamp(created_at, tz=timezone.utc).isoformat()
             elif not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+                created_at = None
 
             stats = item.get("stats") or {}
             comment_count = item.get("commentCount") or stats.get("commentCount")
@@ -237,7 +237,7 @@ class ApifyClient:
             if isinstance(created_at, (int, float)):
                 created_at = datetime.fromtimestamp(created_at, tz=timezone.utc).isoformat()
             elif not created_at:
-                created_at = datetime.now(timezone.utc).isoformat()
+                created_at = None
 
             author = item.get("user") or item.get("author") or {}
             likes = item.get("diggCount") or item.get("likes") or 0
@@ -270,19 +270,29 @@ class ApifyClient:
         }
         videos = []
         for item in self._run_actor(self.facebook_posts_actor, run_input):
-            url = item.get("url") if isinstance(item.get("url"), str) else ""
-            post_id = str(item.get("postId") or "") or _last_path_segment(url)
+            raw_url = item.get("url")
+            url: str = raw_url if isinstance(raw_url, str) else ""
+            url_seg = _last_path_segment(url)
+            is_reel = "/reel/" in url
+            if is_reel and url_seg.isdigit():
+                post_id = f"reel_{url_seg}"
+            elif url_seg.startswith("pfbid"):
+                post_id = url_seg
+            else:
+                post_id = str(item.get("postId") or "") or url_seg
             if not post_id:
                 continue
-            text = item.get("text") if isinstance(item.get("text"), str) else ""
-            media = item.get("media") if isinstance(item.get("media"), list) else []
+            raw_text = item.get("text")
+            text: str = raw_text if isinstance(raw_text, str) else ""
+            raw_media = item.get("media")
+            media: list = raw_media if isinstance(raw_media, list) else []
             is_video = any(isinstance(m, dict) and m.get("__typename") == "Video" for m in media)
             published_at, _ = parse_graph_time(item.get("time") or item.get("timestamp"))
             videos.append(
                 {
                     "external_video_id": post_id,
                     "title": text[:100] or f"Post {post_id}",
-                    "kind": "video" if is_video else "channel_post",
+                    "kind": "short" if is_reel else ("video" if is_video else "channel_post"),
                     "published_at": published_at,
                     "reported_comment_count": _int_or_none(item.get("comments")),
                     "thumbnail_url": _first_media_image(media),
@@ -300,7 +310,10 @@ class ApifyClient:
         self, post_id: str, handle: str | None = None, max_items: int = 50
     ) -> list[dict]:
         """Comments and replies of one Facebook post."""
-        post_url = f"https://www.facebook.com/{(handle or 'facebook').strip('/')}/posts/{post_id}"
+        if post_id.startswith("reel_"):
+            post_url = f"https://www.facebook.com/reel/{post_id.removeprefix('reel_')}/"
+        else:
+            post_url = f"https://www.facebook.com/{(handle or 'facebook').strip('/')}/posts/{post_id}"
         run_input = {
             "startUrls": [{"url": post_url}],
             "resultsLimit": max_items,
