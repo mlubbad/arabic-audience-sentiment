@@ -41,10 +41,12 @@ class GeminiGenreClassifier:
     prompt_version = PROMPT_VERSION
 
     def __init__(self, api_key: str, client: httpx.Client,
-                 model_id: str = "gemini-3.6-flash", sleep=time.sleep):
+                 model_id: str = "gemini-3.6-flash", sleep=time.sleep,
+                 service_tier: str | None = None):
         if not api_key:
             raise ValueError("missing_gemini_api_key")
         self.model_id = model_id
+        self.service_tier = service_tier
         self._key, self._client, self._sleep = api_key, client, sleep
 
     def classify(self, taxonomy: list[dict], items: list[GenreItem]) -> list[GenreVerdict]:
@@ -110,18 +112,35 @@ class GeminiGenreClassifier:
         return verdicts
 
     def _ask(self, body: dict) -> list:
+        active_tier = self.service_tier
         for attempt in range(_RETRIES + 1):
+            req_body = {**body, "serviceTier": active_tier} if active_tier else body
             try:
                 response = self._client.post(
                     f"{_BASE}/{self.model_id}:generateContent",
                     headers={"x-goog-api-key": self._key, "content-type": "application/json"},
-                    json=body, timeout=60,
+                    json=req_body, timeout=60,
                 )
             except httpx.HTTPError:
+                if active_tier == "flex":
+                    active_tier = None
                 if attempt < _RETRIES:
                     self._sleep(2 ** attempt)
                     continue
                 raise GenreError("gemini_unavailable") from None
+            if active_tier == "flex" and response.status_code in (400, 429, 503):
+                active_tier = None
+                try:
+                    response = self._client.post(
+                        f"{_BASE}/{self.model_id}:generateContent",
+                        headers={"x-goog-api-key": self._key, "content-type": "application/json"},
+                        json=body, timeout=60,
+                    )
+                except httpx.HTTPError:
+                    if attempt < _RETRIES:
+                        self._sleep(2 ** attempt)
+                        continue
+                    raise GenreError("gemini_unavailable") from None
             if response.status_code == 429 or response.status_code >= 500:
                 if attempt < _RETRIES:
                     self._sleep(2 ** attempt)

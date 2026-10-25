@@ -538,3 +538,183 @@ def test_youtube_interaction_fields_extracted():
         assert r.author_profile_image_url == "https://yt3.ggpht.com/reply_avatar.jpg"
         assert r.is_reply is True
 
+
+def test_reply_aware_delta_sync_harvests_new_replies_on_older_threads():
+    # When topLevelComment is older than `since`, but has an inline reply newer
+    # than `since`, the reply is harvested from the current page without paging further.
+    calls = []
+
+    def handler(request):
+        calls.append((request.url.path, request.url.params.get("pageToken")))
+        if request.url.path.endswith("/commentThreads"):
+            return httpx.Response(
+                200,
+                json={
+                    "nextPageToken": "page2_never_called",
+                    "items": [
+                        {
+                            "snippet": {
+                                "topLevelComment": {
+                                    "id": "old_thread",
+                                    "snippet": {
+                                        "textOriginal": "تعليق قديم",
+                                        "publishedAt": "2026-09-15T08:00:00Z",
+                                    },
+                                },
+                                "totalReplyCount": 2,
+                            },
+                            "replies": {
+                                "comments": [
+                                    {
+                                        "id": "old_reply",
+                                        "snippet": {
+                                            "textOriginal": "رد قديم",
+                                            "parentId": "old_thread",
+                                            "publishedAt": "2026-09-16T08:00:00Z",
+                                        },
+                                    },
+                                    {
+                                        "id": "fresh_reply",
+                                        "snippet": {
+                                            "textOriginal": "رد جديد اليوم على تعليق قديم",
+                                            "parentId": "old_thread",
+                                            "publishedAt": "2026-09-25T10:00:00Z",
+                                        },
+                                    },
+                                ]
+                            },
+                        }
+                    ],
+                },
+            )
+        return httpx.Response(404)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        adapter = YouTubeAPI("fixture-key", client)
+        batches = list(
+            adapter.batches("abcdefghijk", None, since="2026-09-22T00:00:00Z")
+        )
+        assert len(batches) == 1
+        assert batches[0].outcome == "exhausted"
+        assert [c.id for c in batches[0].comments] == ["fresh_reply"]
+        assert batches[0].comments[0].parent_id == "old_thread"
+        assert calls == [("/youtube/v3/commentThreads", None)]
+
+
+def test_sub_batching_guard_splits_pages_exceeding_500_comments():
+    # A single commentThreads page of 100 threads x 5 inline replies = 600 comments.
+    # Commit-batch rejects > 500 comments, so batches() must split into <= 500 chunks.
+    items = []
+    for t_idx in range(100):
+        tid = f"t_{t_idx:03d}"
+        items.append({
+            "snippet": {
+                "topLevelComment": {
+                    "id": tid,
+                    "snippet": {"textOriginal": f"تعليق {t_idx}"},
+                },
+                "totalReplyCount": 5,
+            },
+            "replies": {
+                "comments": [
+                    {
+                        "id": f"{tid}_r{r_idx}",
+                        "snippet": {
+                            "textOriginal": f"رد {r_idx}",
+                            "parentId": tid,
+                        },
+                    }
+                    for r_idx in range(5)
+                ]
+            },
+        })
+
+    client = _responding(200, {"items": items})
+    adapter = YouTubeAPI("fixture-key", client)
+    batches = list(adapter.batches("abcdefghijk", None))
+    assert len(batches) == 2
+    assert len(batches[0].comments) == 500
+    assert batches[0].outcome == "partial"
+    assert len(batches[1].comments) == 100
+    assert batches[1].outcome == "exhausted"
+
+
+def test_rss_recent_videos_and_precheck_zero_quota():
+    ch_id = "UC" + "x" * 22
+    rss_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"
+          xmlns:media="http://search.yahoo.com/mrss/"
+          xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <yt:videoId>vid00000001</yt:videoId>
+        <yt:channelId>{ch_id}</yt:channelId>
+        <title>حلقة &amp; نقاش</title>
+        <published>2026-10-20T12:00:00+00:00</published>
+        <media:group>
+          <media:description>وصف الحلقة</media:description>
+          <media:thumbnail url="https://i.ytimg.com/vi/vid00000001/hqdefault.jpg"/>
+          <media:community>
+            <media:statistics views="9500"/>
+          </media:community>
+        </media:group>
+      </entry>
+    </feed>"""
+
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        if request.url.path.endswith("/feeds/videos.xml"):
+            return httpx.Response(200, text=rss_xml)
+        if request.url.path.endswith("/channels"):
+            return httpx.Response(200, json={
+                "items": [{
+                    "id": ch_id,
+                    "contentDetails": {"relatedPlaylists": {"uploads": "UU" + "x" * 22}},
+                    "snippet": {"title": "قناة"},
+                }]
+            })
+        return httpx.Response(500)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        api = YouTubeAPI("fixture-key", client)
+        recent = api.rss_recent_videos(ch_id)
+        assert len(recent) == 1
+        assert recent[0]["external_video_id"] == "vid00000001"
+        assert recent[0]["title"] == "حلقة & نقاش"
+        assert recent[0]["view_count"] == 9500
+
+        # When known already includes vid00000001 and use_rss_precheck=True,
+        # playlistItems is skipped completely.
+        cat = api.catalogue(ch_id, known={"vid00000001"}, use_rss_precheck=True)
+        assert cat.complete is True
+        assert cat.videos == []
+        assert not any(p.endswith("/playlistItems") for p in calls)
+
+
+def test_websub_subscription_and_zero_quota_html_resolution_and_transcript():
+    ch_id = "UC" + "z" * 22
+
+    def handler(request):
+        if str(request.url).startswith("https://pubsubhubbub.appspot.com/subscribe"):
+            return httpx.Response(202, text="")
+        if str(request.url) == "https://www.youtube.com/@aljazeera360":
+            return httpx.Response(
+                200,
+                text=f'<html><head><meta itemprop="channelId" content="{ch_id}"></head></html>',
+            )
+        if request.url.path.endswith("/api/timedtext"):
+            return httpx.Response(
+                200,
+                text='<transcript><text start="0" dur="2">بسم الله &amp; أهلاً بكم</text></transcript>',
+            )
+        return httpx.Response(404)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        api = YouTubeAPI("fixture-key", client)
+        assert api.subscribe_websub(ch_id, "https://app.sky-develop.net/api/websub") is True
+        assert api.resolve_channel_id_zero_quota("@aljazeera360") == ch_id
+        assert api.fetch_video_transcript("vid00000001") == "بسم الله & أهلاً بكم"
+
+
+

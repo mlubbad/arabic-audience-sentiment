@@ -120,6 +120,14 @@ export const ar = {
   compTier_indirect: "غير مباشر: بعض الموضوعات متقاربة",
   compTier_aspirational: "طموح: قناة أكبر وموضوعات متقاربة",
   compTier_related: "مرتبط: صلة عامة بالموضوعات",
+  compTierLabel: "الفئة",
+  compReasons: "أسباب الاقتراح",
+  compExport: "تصدير",
+  compExportSuggestionsCsv: "الاقتراحات (CSV)",
+  compExportBenchmarkCsv: "المقارنة المرجعية (CSV)",
+  compExportPdf: "التقرير (PDF)",
+  compProvenanceNote:
+    "الأعداد من يوتيوب، ودرجات التطابق ومعدلات التغير من تقديرنا وحسابنا.",
   navOperations: "التشغيل",
   navAccount: "المصادر والحساب",
   /** Shown only to a platform admin; the page's own title is `adminTitle`. */
@@ -2251,6 +2259,10 @@ export const ar = {
     "لا تصل قياسات حية من هذه الخدمات بعد",
   adminPlanLimitsInvalid:
     "كل حقل يجب أن يكون عدداً صحيحاً من ‎-1 فأكثر (‎-1 تعني بلا حد). لم يُحفظ شيء.",
+  timingSpikesTitle: "السياق الإخباري لطفرات التفاعل",
+  timingSpikesLead:
+    "الأحداث والأخبار الموثقة التي تزامنت مع موجات صعود التعليقات في الفترات المرصودة.",
+  timingSpikesSourceLink: "المصدر الموثق",
 } as const;
 
 /** What a translation must fill in for one entry: a sentence for a sentence,

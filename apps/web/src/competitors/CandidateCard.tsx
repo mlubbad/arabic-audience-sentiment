@@ -1,7 +1,28 @@
-import { useStrings } from "../strings";
+import { useStrings, type Strings } from "../strings";
 import { n } from "../dashboard/format";
 import type { Suggestions } from "../api/competitors";
 import { Button } from "../ui/Button";
+
+export function reasonLabel(
+  r: { kind: string; value?: unknown },
+  S: Strings,
+): string | null {
+  return r.kind === "shared_topics"
+    ? S.compSharedTopics(n(Number(r.value)))
+    : r.kind === "same_language"
+      ? S.compSameLanguage
+      : r.kind === "same_country"
+        ? S.compSameCountry
+        : r.kind === "size_ratio"
+          ? S.compSizeRatio(n(Number(r.value)))
+          : null;
+}
+
+export function tierLabel(tier: string | null, S: Strings): string | null {
+  if (!tier) return null;
+  return (S[`compTier_${tier}` as keyof Strings] as string | undefined) ?? tier;
+}
+
 export function CandidateCard({
   item,
   canEdit,
@@ -55,7 +76,7 @@ export function CandidateCard({
         <p>
           <span
             className="competitor-tier"
-            title={S[`compTier_${item.tier}` as keyof typeof S] as string}
+            title={tierLabel(item.tier, S) ?? undefined}
           >
             {item.tier}
           </span>
@@ -63,17 +84,7 @@ export function CandidateCard({
       )}
       <ul>
         {item.reasons.map((r, i) => (
-          <li key={i}>
-            {r.kind === "shared_topics"
-              ? S.compSharedTopics(n(Number(r.value)))
-              : r.kind === "same_language"
-                ? S.compSameLanguage
-                : r.kind === "same_country"
-                  ? S.compSameCountry
-                  : r.kind === "size_ratio"
-                    ? S.compSizeRatio(n(Number(r.value)))
-                    : null}
-          </li>
+          <li key={i}>{reasonLabel(r, S)}</li>
         ))}
       </ul>
       {canEdit && (

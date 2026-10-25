@@ -358,6 +358,39 @@ describe("the live check by comment count", () => {
     expect(await stored(V2)).toMatchObject({ reported_comment_count: 21 });
   });
 
+  it("refreshes last_seen_at on non-purged comments when a video is verified unchanged", async () => {
+    await db.exec("reset role");
+    const vid1 = await videoId(V1);
+    await db.query(
+      `insert into comments(workspace_id, video_id, platform, external_comment_id, is_reply,
+         parent_source, author_name, text_raw, text_plain, content_hash,
+         timestamp_precision, source, first_seen_at, last_seen_at)
+       values ($1, $2, 'youtube', 'cmt_unchanged_1', false, 'api', 'معلق',
+               'تعليق حي على فيديو مستقر', 'تعليق حي على فيديو مستقر', 'hash_u1',
+               'unknown', 'youtube_data_api_public',
+               now() - interval '35 days', now() - interval '35 days')`,
+      [A, vid1],
+    );
+    await db.query(
+      "update video_selections set next_check_at = now() - interval '1 minute' where workspace_id = $1 and video_id = $2",
+      [A, vid1],
+    );
+    const lease = await one<Lease>(
+      "select id, lease_token from jobs where workspace_id=$1 and status='running'",
+      [A],
+    );
+    const answer = await counts(lease, [
+      { external_video_id: V1, comment_count: 10 },
+    ]);
+    expect(answer.unchanged).toBe(1);
+    await db.exec("reset role");
+    const cmt = await one<{ fresh: boolean }>(
+      "select last_seen_at > now() - interval '1 minute' as fresh from comments where workspace_id=$1 and external_comment_id='cmt_unchanged_1'",
+      [A],
+    );
+    expect(cmt.fresh).toBe(true);
+  });
+
   it("another credential cannot report counts into this job", async () => {
     const lease = await one<Lease>(
       "select id, lease_token from jobs where workspace_id=$1 and status='running'",

@@ -138,6 +138,19 @@ async function lookup(
   if (!query) throw new LookupError("invalid_query", 400);
 
   if (query.kind === "search") {
+    // When the query is a single handle-shaped token (e.g. from `/c/ChannelName`
+    // or a bare handle typed without `@`), try `channels.list(forHandle=...)`
+    // first (1 quota unit) before spending 100 quota units on `search.list`.
+    if (/^[A-Za-z0-9._-]{3,30}$/.test(query.value)) {
+      const byHandle = await ytGet(credential, "channels", {
+        part: "snippet",
+        forHandle: `@${query.value}`,
+      });
+      const matched = byHandle.items
+        .map(candidate)
+        .filter((c: Candidate | null): c is Candidate => c !== null);
+      if (matched.length > 0) return matched;
+    }
     // search.list names ids only; the details call fills in handle and face,
     // one unit for up to fifty — small beside the search's hundred.
     const found = await ytGet(credential, "search", {

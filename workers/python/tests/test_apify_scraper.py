@@ -178,6 +178,20 @@ def test_apify_error_handling():
     assert exc_usage.value.code == "apify_quota_depleted"
     assert exc_usage.value.retryable is False
 
+    # 403 with platform-feature-disabled / Monthly usage hard limit exceeded
+    def hard_limit_403_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            403,
+            json={"error": {"type": "platform-feature-disabled", "message": "Monthly usage hard limit exceeded"}},
+        )
+
+    c_limit403 = ApifyClient(token="test", client=httpx.Client(transport=httpx.MockTransport(hard_limit_403_handler)))
+    with pytest.raises(CollectionError) as exc_limit403:
+        c_limit403.scrape_facebook_posts("NagdyWP")
+    assert exc_limit403.value.code == "apify_quota_depleted"
+    assert exc_limit403.value.outcome == "failed"
+    assert exc_limit403.value.retryable is False
+
 
 def test_apify_scrape_facebook_posts_and_comments():
     seen = []

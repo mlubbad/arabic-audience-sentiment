@@ -27,3 +27,4 @@ export * from "./workspaceSharing";
 export * from "./historical";
 export * from "./servicesHealth";
 export * from "./competitors";
+export * from "./spikeAttributions";

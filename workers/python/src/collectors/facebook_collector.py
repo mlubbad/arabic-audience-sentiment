@@ -20,7 +20,7 @@ from .scrapers.brightdata import BrightDataClient
 
 _VANITY = re.compile(r"^[A-Za-z0-9.]{1,80}$")
 _NUMERIC = re.compile(r"^[0-9]{1,64}$")
-_POST_ID = re.compile(r"^([0-9]{1,30}(_[0-9]{1,30})?|pfbid[A-Za-z0-9]{10,120})$")
+_POST_ID = re.compile(r"^([0-9]{1,30}(_[0-9]{1,30})?|reel_[0-9]{1,30}|pfbid[A-Za-z0-9]{10,120})$")
 _RESERVED = {"groups", "events", "marketplace", "watch", "gaming", "pages", "profile.php", "posts"}
 _CATALOGUE_CAP = 200
 _POST_FIELDS = (
@@ -76,7 +76,15 @@ class FacebookCollector:
 
     @staticmethod
     def _clean_post_id(video_id: str) -> str:
-        s = (video_id or "").strip().split("?")[0].rstrip("/").rsplit("/", 1)[-1]
+        raw = (video_id or "").strip().split("?")[0].rstrip("/")
+        if "/reel/" in raw:
+            seg = raw.rsplit("/", 1)[-1]
+            if seg.isdigit():
+                s = f"reel_{seg}"
+            else:
+                s = seg
+        else:
+            s = raw.rsplit("/", 1)[-1]
         if not _POST_ID.match(s):
             raise ValueError("invalid_video_id")
         return s

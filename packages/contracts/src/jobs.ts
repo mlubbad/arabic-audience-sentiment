@@ -30,8 +30,8 @@ export const JobSchema = z.object({
   attempt: z.number().int().nonnegative(),
   not_before: timestamp,
   lease_expires_at: timestamp.nullable(),
-  checkpoint: z.record(z.unknown()),
-  counters: z.record(z.number().int().nonnegative()),
+  checkpoint: z.record(z.string(), z.unknown()),
+  counters: z.record(z.string(), z.number().int().nonnegative()),
   error_code: z.string().nullable(),
 }); // Public job DTO deliberately excludes lease tokens and credentials.
 export const ErrorSchema = z.object({
@@ -89,7 +89,7 @@ export const BatchCommentSchema = z
     likes_raw: z.string().nullable(),
     likes_value: z.number().int().nonnegative().nullable(),
     source: z.string().min(1),
-    field_provenance: z.record(z.unknown()),
+    field_provenance: z.record(z.string(), z.unknown()),
     author_profile_image_url: z.string().nullable().optional(),
     author_channel_url: z.string().nullable().optional(),
     reply_count: z.number().int().nonnegative().optional(),
@@ -110,7 +110,7 @@ export const BatchPredictionSchema = z
     analysis_key: z.string().min(1),
     status: z.enum(["succeeded", "skipped", "failed", "unsupported"]),
     label: LabelSchema.nullable(),
-    class_scores: z.record(LabelSchema, z.number().min(0).max(1)),
+    class_scores: z.record(z.string(), z.number().min(0).max(1)),
     model_id: z.string().min(1),
     revision: z.string().min(1),
     preprocessing_version: z.string().min(1),
@@ -118,7 +118,7 @@ export const BatchPredictionSchema = z
     // the fingerprint model, revision, preprocessing *and* settings; the
     // column and its unique index already named this, and nothing wrote it. An
     // adapter with no settings sends {}, which is a statement, not an absence.
-    parameters: z.record(z.unknown()),
+    parameters: z.record(z.string(), z.unknown()),
   })
   .strict()
   .refine(
@@ -148,7 +148,7 @@ export const BatchPayloadSchema = z
     // Null when the source did not give one; the server falls back to the id
     // rather than inventing a title.
     video_title: z.string().nullable(),
-    checkpoint: z.record(z.unknown()),
+    checkpoint: z.record(z.string(), z.unknown()),
     outcome: OutcomeSchema,
     comments: z.array(BatchCommentSchema).max(500),
     predictions: z.array(BatchPredictionSchema).max(500),

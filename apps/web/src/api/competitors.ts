@@ -28,10 +28,23 @@ const candidateSchema = z
     subscriber_count: nullableNumber,
     view_count: nullableNumber,
     video_count: nullableNumber,
+    country: z.string().nullable().optional(),
+    default_language: z.string().nullable().optional(),
     profile_observed_at: z.string().nullable(),
+    components: z
+      .object({
+        content: nullableNumber.optional(),
+        locale: nullableNumber.optional(),
+        size: nullableNumber.optional(),
+      })
+      .optional(),
     score: nullableNumber,
     tier: z.string().nullable(),
-    reasons: z.array(z.object({ kind: z.string() }).passthrough()),
+    reasons: z.array(
+      z
+        .object({ kind: z.string(), value: z.number().optional() })
+        .passthrough(),
+    ),
   })
   .passthrough();
 export const suggestionsSchema = z.object({

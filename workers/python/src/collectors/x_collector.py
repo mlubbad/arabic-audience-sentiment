@@ -9,7 +9,6 @@ import html
 import json
 import re
 from collections.abc import Iterator
-from datetime import datetime, timezone
 import httpx
 from .protocol import Batch, Catalogue, CollectionError, RawComment
 from .scrapers.apify import ApifyClient
@@ -216,7 +215,7 @@ class XCollector:
                         "external_video_id": tid,
                         "title": clean_text[:100] or f"Tweet {tid}",
                         "kind": "tweet",
-                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        "published_at": None,
                         "reported_comment_count": None,
                         "field_provenance": {"source": self.source, "handle": clean_handle},
                     }
@@ -241,7 +240,7 @@ class XCollector:
                         "external_video_id": str(t["id"]),
                         "title": t.get("text", "")[:100] or f"Tweet {t['id']}",
                         "kind": "tweet",
-                        "published_at": t.get("created_at", datetime.now(timezone.utc).isoformat()),
+                        "published_at": t.get("created_at"),
                         "reported_comment_count": t.get("reply_count", t.get("comments_count")),
                         "field_provenance": {"source": self.source, "handle": clean_handle},
                     }
@@ -302,6 +301,7 @@ class XCollector:
             raw_replies = self.fixture_data["comments"].get(clean_id, [])
             comments = []
             for r in raw_replies:
+                pub_at = r.get("created_at") or r.get("published_at")
                 comments.append(
                     RawComment(
                         id=str(r["id"]),
@@ -310,7 +310,8 @@ class XCollector:
                         parent_id=str(r["parent_id"]) if r.get("parent_id") else None,
                         is_reply=bool(r.get("parent_id")),
                         parent_source="x_reply",
-                        published_at=r.get("created_at", datetime.now(timezone.utc).isoformat()),
+                        published_at=pub_at,
+                        timestamp_precision="second" if pub_at else "unknown",
                         author_name=r.get("author_name", ""),
                         author_channel_id=r.get("author_id"),
                         likes_value=r.get("likes_count", 0),
@@ -335,11 +336,23 @@ class XCollector:
 
         last_error = None
         has_empty_scraper_result = False
+        offset = 0
+        if checkpoint:
+            try:
+                cp_obj = json.loads(checkpoint)
+                if isinstance(cp_obj, dict) and isinstance(cp_obj.get("offset"), int):
+                    offset = max(0, cp_obj["offset"])
+            except (ValueError, TypeError):
+                offset = 0
+        page_limit = max_items if isinstance(max_items, int) and max_items > 0 else 50
         for source_name, fn in cascade_replies:
             try:
                 raw_replies = fn()
                 if isinstance(raw_replies, list):
                     if raw_replies:
+                        sliced = raw_replies[offset:offset + page_limit]
+                        has_more = (offset + page_limit) < len(raw_replies)
+                        next_cp = json.dumps({"offset": offset + len(sliced)}) if has_more else None
                         comments = [
                             RawComment(
                                 id=r["id"],
@@ -349,15 +362,20 @@ class XCollector:
                                 is_reply=r.get("is_reply", True),
                                 parent_source=f"{source_name}_reply",
                                 published_at=r.get("published_at"),
+                                timestamp_precision="second" if r.get("published_at") else "unknown",
                                 author_name=r.get("author_name", ""),
                                 author_channel_id=r.get("author_channel_id"),
                                 likes_value=r.get("likes_value", 0),
                                 source=source_name,
                                 platform="x",
                             )
-                            for r in raw_replies
+                            for r in sliced
                         ]
-                        yield Batch(comments=comments, checkpoint=None, outcome="exhausted")
+                        yield Batch(
+                            comments=comments,
+                            checkpoint=next_cp,
+                            outcome="partial" if has_more else "exhausted",
+                        )
                         return
                     else:
                         has_empty_scraper_result = True
@@ -410,6 +428,7 @@ class XCollector:
                         is_reply=True,
                         parent_source="x_reply",
                         published_at=r.get("created_at"),
+                        timestamp_precision="second" if r.get("created_at") else "unknown",
                         author_name=f"user_{r.get('author_id', '')}",
                         author_channel_id=r.get("author_id"),
                         likes_value=metrics.get("like_count", 0),
