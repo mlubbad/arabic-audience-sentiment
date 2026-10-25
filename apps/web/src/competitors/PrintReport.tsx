@@ -1,21 +1,35 @@
-import type { CompetitorBenchmark, Suggestions } from "../api/competitors";
+import type {
+  CompetitorBenchmark,
+  CompetitorIntelligence,
+  Suggestions,
+} from "../api/competitors";
 import { n } from "../dashboard/format";
 import { displayDate } from "../i18n";
 import type { Locale } from "../locale";
 import type { Strings } from "../strings";
 import { formatKpi } from "./Benchmark";
 import { reasonLabel, tierLabel } from "./CandidateCard";
+import {
+  capLabel,
+  formatLabel,
+  funnelLabel,
+  gapLabel,
+  threatLabel,
+  toneLabel,
+} from "./CompetitorIntelligence";
 import "./print.css";
 
 export function PrintReport({
   data,
   benchmark,
+  intelligence,
   S,
   lang,
   exportedAt = new Date().toISOString(),
 }: {
   data: Suggestions;
   benchmark?: CompetitorBenchmark | null;
+  intelligence?: CompetitorIntelligence | null;
   S: Strings;
   lang: Locale;
   exportedAt?: string;
@@ -119,6 +133,39 @@ export function PrintReport({
                   {benchmarkCols.map((col) => (
                     <td key={col.key}>{formatKpi(col.key, s.kpis[col.key])}</td>
                   ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {intelligence && intelligence.competitors.length > 0 && (
+        <section>
+          <h2>{S.compIntelTitle}</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>{S.compIntelColChannel}</th>
+                <th>{S.compIntelColCapacity}</th>
+                <th>{S.compIntelColFormat}</th>
+                <th>{S.compIntelColFunnel}</th>
+                <th>{S.compIntelColTone}</th>
+                <th>{S.compIntelColThreat}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {intelligence.competitors.map((c) => (
+                <tr key={c.external_id}>
+                  <th>{c.title}</th>
+                  <td>{capLabel(c.capacity_state, S)}</td>
+                  <td>{formatLabel(c.dominant_format, S)}</td>
+                  <td>{funnelLabel(c.funnel_stage, S)}</td>
+                  <td>{toneLabel(c.tone_of_voice, S)}</td>
+                  <td>
+                    {threatLabel(c.threat_level, S)} ·{" "}
+                    {gapLabel(c.opportunity_gap, S)}
+                  </td>
                 </tr>
               ))}
             </tbody>

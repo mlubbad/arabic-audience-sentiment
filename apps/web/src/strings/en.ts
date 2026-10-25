@@ -116,9 +116,103 @@ export const en: Strings = {
   compExport: "Export",
   compExportSuggestionsCsv: "Suggestions (CSV)",
   compExportBenchmarkCsv: "Benchmark (CSV)",
+  compExportIntelligenceCsv: "11-Point Competitor Intelligence (CSV)",
   compExportPdf: "Report (PDF)",
   compProvenanceNote:
     "Counts are from YouTube; match scores and changes are our estimate and our calculation.",
+  compIntelTitle:
+    "Competitor Intelligence Matrix (11-Point Content & SWOT Battlecards)",
+  compIntelSubtitle:
+    "Unified 11-point digital content teardown combined with SWOT battlecards, customer journey funnel stages, and gradual publishing cadence planning.",
+  compIntelPacingTitle:
+    "Point 03 · Audience Capacity & Gradual Two-Week Pacing Plan",
+  compIntelPacingNote:
+    "To protect algorithmic reach, avoid abrupt publishing frequency shifts; follow the two-week gradual step schedule.",
+  compIntelCurrentCadence: "Your current weekly posts",
+  compIntelTargetCadence: "Recommended weekly target",
+  compIntelWeek1: "Week 1 (transition step)",
+  compIntelWeek2: "Week 2 (steady target)",
+  compIntelMatrixTitle:
+    "11-Point Comparison Matrix (Your Channel vs Competitors)",
+  compIntelBattlecardsTitle:
+    "Competitive Battlecards (SWOT, Actionable Gap & Funnel Outflank Play)",
+  compIntelColChannel: "Channel / Competitor",
+  compIntelColPlatforms: "01 · Cross-platform link",
+  compIntelColScale: "02 · Audience scale & tier",
+  compIntelColCapacity: "03 · Capacity & cadence",
+  compIntelColEngagement: "04 · Views / video efficiency",
+  compIntelColFormat: "05 · Dominant format",
+  compIntelColFunnel: "06 · Funnel objective",
+  compIntelColTopics: "07 · Topics & gaps",
+  compIntelColTone: "08 · Tone of voice",
+  compIntelColCta: "09–10 · CTA & conversion path",
+  compIntelColThreat: "11 · Threat & opportunity",
+  compIntelOwnBadge: "Your channel",
+  compIntelEditBtn: "Customize qualitative profile",
+  compIntelSaveBtn: "Save profile",
+  compIntelStrengths: "Observed strengths",
+  compIntelWeaknesses: "Weaknesses & vulnerabilities",
+  compIntelOpportunityGap: "Actionable opportunity gap",
+  compIntelOutflankTitle: "3-Step Funnel Outflanking Play",
+  compIntelTopicGapsLabel:
+    "Topics your channel covers that this competitor misses",
+  compIntelConn_tailored_multi: "Tailored content per platform",
+  compIntelConn_mirrored_multi: "Mirrored posts across platforms",
+  compIntelConn_single_focus: "Single primary platform focus",
+  compIntelCap_high_trust_high_frequency:
+    "High cadence with strong per-video engagement",
+  compIntelCap_volume_diluted:
+    "Over-posting beyond audience capacity (diluted reach)",
+  compIntelCap_dormant_brand_opportunity:
+    "Large brand, dormant cadence — prime capture opportunity",
+  compIntelCap_balanced_growth: "Balanced cadence matching audience capacity",
+  compIntelFormat_video: "Long-form videos",
+  compIntelFormat_short: "Shorts / Reels",
+  compIntelFormat_stream: "Live streams",
+  compIntelFormat_carousel: "Carousels & multi-image",
+  compIntelFormat_post: "Static posts",
+  compIntelFormat_mixed: "Balanced mix (Long + Short)",
+  compIntelFunnel_awareness: "Awareness & reach",
+  compIntelFunnel_consideration: "Consideration & educational tips",
+  compIntelFunnel_engagement: "Engagement & community",
+  compIntelFunnel_decision: "Decision & conversion",
+  compIntelTone_formal: "Formal & institutional",
+  compIntelTone_semi_formal: "Semi-formal (authoritative & approachable)",
+  compIntelTone_casual: "Casual & youth-friendly",
+  compIntelTone_irreverent: "Bold & mass-appeal",
+  compIntelTone_bilingual_friendly: "Bilingual (Arabic-first approachable)",
+  compIntelTone_bilingual_premium: "Bilingual (Executive / premium)",
+  compIntelThreat_high: "High",
+  compIntelThreat_medium: "Medium",
+  compIntelThreat_low: "Low",
+  compIntelGap_dormant_giant_capture:
+    "Capture market share through consistent weekly publishing and deeper audience Q&A",
+  compIntelGap_quality_over_quantity_outflank:
+    "Outflank diluted high-volume posting with higher-retention videos",
+  compIntelGap_own_uncovered_topic_clusters:
+    "Own the high-demand topic clusters this competitor leaves uncovered",
+  compIntelGap_advance_funnel_to_consideration_and_decision:
+    "Competitor stays in Awareness; outflank by pairing actionable tips (Consideration) with a clear solution CTA (Decision)",
+  compIntelGap_differentiate_with_short_video_and_direct_cta:
+    "Differentiate via high-retention Shorts/Reels paired with a specific closing CTA",
+  compIntelStr_strong_subscriber_base:
+    "Larger subscriber base than your channel",
+  compIntelStr_high_views_per_video: "Higher average views per video",
+  compIntelStr_consistent_publishing_cadence:
+    "Consistent weekly publishing cadence",
+  compIntelStr_positive_subscriber_momentum:
+    "Positive subscriber growth momentum",
+  compIntelStr_broad_topic_coverage: "Broad topic category coverage",
+  compIntelWeak_low_publishing_frequency:
+    "Low weekly publishing frequency (< 1/week)",
+  compIntelWeak_lower_views_per_video_than_own:
+    "Lower average views per video than your channel",
+  compIntelWeak_volume_diluted_reach:
+    "Over-posting dilutes per-video view performance",
+  compIntelWeak_uncovered_audience_topics:
+    "Leaves key audience topics uncovered",
+  compIntelWeak_stagnant_subscriber_growth:
+    "Stagnant or negative subscriber growth",
   navOperations: "Operations",
   navAccount: "Sources & account",
   navAdmin: "Admin",

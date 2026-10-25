@@ -8,7 +8,11 @@
  * - unknown values are empty cells (`""`), never `0`;
  * - header keys carry provenance (`_youtube`, `_our_estimate`, `_our_calculation`).
  */
-import type { CompetitorBenchmark, Suggestions } from "../api/competitors";
+import type {
+  CompetitorBenchmark,
+  CompetitorIntelligence,
+  Suggestions,
+} from "../api/competitors";
 import { csvCell } from "../csv";
 
 export const SUGGESTION_CSV_COLUMNS = [
@@ -135,6 +139,105 @@ export function benchmarkCsv(benchmark: CompetitorBenchmark): string {
         s.kpis.views_change,
         s.kpis.videos_per_week,
         s.kpis.views_per_video,
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+  }
+  return "\ufeff" + lines.join("\r\n") + "\r\n";
+}
+
+export const INTELLIGENCE_CSV_COLUMNS = [
+  "kind",
+  "external_id",
+  "title",
+  "tier",
+  "connection_between_platforms",
+  "primary_platform",
+  "subscribers_youtube",
+  "subscribers_change_our_calculation",
+  "videos_per_week_our_calculation",
+  "capacity_state_our_estimate",
+  "views_per_video_our_calculation",
+  "dominant_format_our_estimate",
+  "funnel_stage_our_estimate",
+  "next_funnel_stage_our_estimate",
+  "topics_covered",
+  "topic_gaps_our_calculation",
+  "tone_of_voice_our_estimate",
+  "cta_pattern",
+  "conversion_channel",
+  "strengths",
+  "weaknesses",
+  "opportunity_gap",
+  "threat_level_our_estimate",
+] as const;
+
+export function intelligenceFilename(
+  channel: { id: string; handle?: string | null },
+  days: number,
+  now: Date = new Date(),
+): string {
+  return `competitor-intelligence-11pt-${channelSlug(channel)}-${days}d-${utcDay(now)}.csv`;
+}
+
+export function intelligenceCsv(intel: CompetitorIntelligence): string {
+  const lines = [INTELLIGENCE_CSV_COLUMNS.join(",")];
+  lines.push(
+    [
+      "own",
+      intel.own.external_id,
+      intel.own.title,
+      "own",
+      intel.own.connection_strategy ?? null,
+      intel.own.platform ?? "youtube",
+      intel.own.subscribers ?? null,
+      intel.own.subscribers_change ?? null,
+      intel.own.videos_per_week ?? null,
+      null,
+      intel.own.views_per_video ?? null,
+      intel.own.dominant_format ?? null,
+      intel.own.funnel_stage ?? null,
+      null,
+      (intel.own.topics_covered ?? []).join(";") || null,
+      null,
+      intel.own.tone_of_voice ?? null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]
+      .map(csvCell)
+      .join(","),
+  );
+  for (const c of intel.competitors) {
+    lines.push(
+      [
+        "competitor",
+        c.external_id,
+        c.title,
+        c.tier ?? null,
+        c.connection_between_platforms ?? null,
+        c.primary_platform ?? null,
+        c.subscribers ?? null,
+        c.subscribers_change ?? null,
+        c.videos_per_week ?? null,
+        c.capacity_state ?? null,
+        c.views_per_video ?? null,
+        c.dominant_format ?? null,
+        c.funnel_stage ?? null,
+        c.next_funnel_stage ?? null,
+        (c.topics_covered ?? []).join(";") || null,
+        (c.topic_gaps ?? []).join(";") || null,
+        c.tone_of_voice ?? null,
+        c.cta_pattern ?? null,
+        c.conversion_channel ?? null,
+        (c.strengths ?? []).join(";") || null,
+        (c.weaknesses ?? []).join(";") || null,
+        c.opportunity_gap ?? null,
+        c.threat_level ?? null,
       ]
         .map(csvCell)
         .join(","),
