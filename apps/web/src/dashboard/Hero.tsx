@@ -8,6 +8,7 @@
  */
 import type { Label } from "@sentiment/contracts";
 import { Badge, type BadgeProps } from "../ui/Badge";
+import { Skeleton } from "../ui/Skeleton";
 import type { Strings } from "../strings";
 import type { Snapshot } from "./Dashboard";
 import { n } from "./format";
@@ -84,7 +85,14 @@ export function Hero({
           )}
         </>
       ) : (
-        <p>{S.readingStored}</p>
+        <>
+          <p>{S.readingStored}</p>
+          <div className="db-pills" aria-hidden="true">
+            <Skeleton className="db-sk-pill" />
+            <Skeleton className="db-sk-pill" />
+            <Skeleton className="db-sk-pill" />
+          </div>
+        </>
       )}
     </header>
   );

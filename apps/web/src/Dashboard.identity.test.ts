@@ -250,4 +250,57 @@ describe("dashboard identity boundary", () => {
     expect(html).toContain('data-testid="source-scope">مساحة ب');
     expect(html).not.toContain(`data-testid="source-scope">مساحة العمل ${B}`);
   });
+
+  it("shows the shimmer loading skeleton and hides the video-selection setup screen in live server mode while overview data is delayed", () => {
+    shared.forcedPlace = {
+      kind: "ready",
+      id: B,
+      name: "مساحة ب",
+      options: [{ id: B, name: "مساحة ب" }],
+    };
+    shared.user = "user-b";
+    // No dashboard-source in cache -> isLiveServer = true
+    shared.cache.delete(key("user-b", B));
+    shared.cache.set(
+      JSON.stringify(["dashboard-aggregates", "user-b", "live", B, {}]),
+      {
+        channel: null,
+        videos: [],
+        video_options: [],
+        workspace_total: 0,
+        total: 0,
+        analysed: 0,
+        not_analysed: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        stale_count: 0,
+        unique_authors: 0,
+        unknown_authors: 0,
+        replies: 0,
+        reviewed_count: 0,
+        conflict_count: 0,
+        sentiments: { positive: 0, negative: 0, neutral: 0, mixed: 0 },
+        by_day: [],
+        unknown_time: 0,
+        authors: [],
+        words: [],
+        topics: [],
+        active_topic_key: null,
+        sync: { last_sync: null, queued_jobs: 1, worker: null },
+      },
+    );
+    shared.cache.set(
+      JSON.stringify(["dashboard-comments", "user-b", "live", B, {}, 10, null]),
+      {
+        rows: [],
+        has_more: false,
+        next_cursor: null,
+        cursor_reset: false,
+      },
+    );
+    const html = render();
+    expect(html).toContain('data-testid="loading"');
+    expect(html).toContain("ui-skeleton");
+    expect(html).not.toContain('data-testid="empty-setup"');
+  });
 });

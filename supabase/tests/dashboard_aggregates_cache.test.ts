@@ -147,4 +147,44 @@ describe("dashboard_aggregates answers from a cache the drain fills", () => {
     );
     expect(Number(n.rows[0].n)).toBe(0);
   });
+
+  it("invalidates a cached zero-comment payload as soon as comments arrive", async () => {
+    // 1. Prime cache while workspace has 0 comments
+    expect((await read()).cache?.state).toBe("pending");
+    await drain();
+    const zeroPayload = await read();
+    expect(zeroPayload.cache?.state).toBe("fresh");
+    expect(zeroPayload.workspace_total).toBe(0);
+
+    // 2. Insert a video and a comment for this workspace
+    await db.exec("reset role");
+    const chId = "00000000-0000-4000-8000-0000000000c1";
+    const vidId = "00000000-0000-4000-8000-0000000000d1";
+    await db.query(
+      "insert into clients(id, workspace_id, name) values ($1, $1, 'Cache Client') on conflict do nothing",
+      [W],
+    );
+    await db.query(
+      "insert into channels(id, workspace_id, client_id, external_channel_id, platform) values ($1, $2, $2, 'UC_cache_test', 'youtube') on conflict do nothing",
+      [chId, W],
+    );
+    await db.query(
+      "insert into videos(id, workspace_id, channel_id, platform, external_video_id, title) values ($1, $2, $3, 'youtube', 'vid_cache01', 'Test Video')",
+      [vidId, W, chId],
+    );
+    await db.query(
+      `insert into comments(workspace_id, video_id, platform, external_comment_id, is_reply, parent_source, text_raw, text_plain, content_hash, timestamp_precision, source)
+       values ($1, $2, 'youtube', 'cm_cache_1', false, 'unknown', 'تعليق جديد', 'تعليق جديد', repeat('a', 64), 'unknown', 'youtube_data_api')`,
+      [W, vidId],
+    );
+
+    // 3. Next read returns pending (shimmer) instead of the stale 0-comment payload, and drain computes workspace_total = 1
+    const afterInsert = await read();
+    expect(afterInsert.cache?.state).toBe("pending");
+    await drain();
+    const refreshed = await read();
+    expect(refreshed.cache?.state).toBe("fresh");
+    expect(refreshed.workspace_total).toBe(1);
+    expect(refreshed.total).toBe(1);
+  });
 });
