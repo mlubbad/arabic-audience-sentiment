@@ -900,21 +900,12 @@ export async function loadDashboardAggregates(
       signal,
     );
     // The server answers from a cache the database fills in the background
-    // (20261111010000). Until a first payload exists (or while a stale zero-row
-    // pre-collection cache entry is waiting on the drain after comments arrived)
-    // it says so; a compute that failed names its SQLSTATE, which the page shows
-    // as the error code.
+    // (20261111010000). Until a first payload exists it says so; a compute that
+    // failed names its SQLSTATE, which the page shows as the error code.
     const cache = (
       data as { cache?: { state?: string; error?: string } } | null
     )?.cache;
-    const wsTotal = (data as { workspace_total?: number } | null)
-      ?.workspace_total;
-    if (
-      cache?.state === "pending" ||
-      (cache?.state === "stale" && wsTotal === 0)
-    ) {
-      throw new DashboardPendingError();
-    }
+    if (cache?.state === "pending") throw new DashboardPendingError();
     if (cache?.state === "failed") {
       throw new DashboardRpcError("live_unavailable", { code: cache.error });
     }
