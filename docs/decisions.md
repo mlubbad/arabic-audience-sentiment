@@ -1,5 +1,10 @@
 # Implementation decisions
 
+2026-10-25 — Dependabot no longer offers Python minor or major versions for the worker image.
+#155 (3.14) was declined on 2026-10-18 with an "ignore" comment that Dependabot never received, so
+#204 (3.15) arrived and failed the worker tests and image build. The ignore now lives in
+`.github/dependabot.yml`. Patch and digest updates on 3.12 still come. #204 is closed.
+
 2026-10-24 — Channel indexing and comment ingestion hardening (`ADR-0007`, `20261126000000_channel_indexing_and_comment_ingestion_hardening.sql`). Six concrete fixes across Python collectors, Edge Function lookup, and Postgres RPCs: (1) `YouTubeAPI.batches()` harvests inline and overflow replies newer than `since` on older top-level threads in the current page before stopping pagination; (2) pages exceeding 500 comments (top-level + inline replies) are split into `<= 500`-comment sub-batches so `private.commit_batch` never raises `batch_too_large`; (3) `YouTubeAPI.rss_recent_videos()` / `rss_video_ids()` reads `/feeds/videos.xml` at 0 quota units, `run_discover()` commits catalogues `> 500` videos in 500-video chunks with heartbeats, and `channel-lookup` tries `channels.list(forHandle=@...)` (1 unit) before `search.list` (100 units) for handle-shaped queries; (4) `apify.py`, `brightdata.py`, `telegram_collector.py`, `x_collector.py`, and `tiktok_collector.py` never substitute `datetime.now()` for a missing date (`published_at = None`, `timestamp_precision = "unknown"`), fixing Telegram `invalid_batch` refusals; (5) `private.worker_video_counts` refreshes `comments.last_seen_at = now()` on non-purged comments when a selected video's comment count is verified unchanged on the source, preventing false 30-day `purge_comment_text` wipes on active channels; (6) `private.worker_known_videos` retains the newest 200 items per `kind` (`video`, `short`, `stream`) within its `LIMIT 5000` window.
 
 2026-10-19 — The dispatcher, not Codex, merges `main` into a work-order branch. `CODEX_MERGE_MAIN=1`

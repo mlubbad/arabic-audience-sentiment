@@ -41,3 +41,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # The runtime is pinned to 3.12 in the Dockerfile, CI and a test; moving it is
+    # its own planned change (#155, #204). Patch and digest updates still come.
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
