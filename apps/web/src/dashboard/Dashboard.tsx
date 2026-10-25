@@ -274,7 +274,10 @@ function DashboardBody({
     retryDelay: (_attempt, error) =>
       error instanceof DashboardPendingError ? PENDING_RETRY_MS : 1000,
     refetchInterval: (query) =>
-      query.state.data?.cache?.state === "stale" ? 15_000 : false,
+      query.state.data?.cache?.state === "stale" ||
+      query.state.data?.workspace_total === 0
+        ? 5_000
+        : false,
   });
 
   const pageOffset = cursors.length * limit;
@@ -1005,10 +1008,15 @@ function DashboardBody({
     return res as Record<Label, string>;
   }, [labels, s?.measurable]);
 
+  // In live server mode, when data is still arriving or delayed (workspace_total === 0),
+  // keep the shimmer skeleton active instead of showing the video-selection onboarding card.
+  const isLiveAwaitingData =
+    isLiveServer && Boolean(s && s.workspace_total === 0);
+
   return (
     <div className="db-page">
       <Hero
-        s={s}
+        s={isLiveAwaitingData ? undefined : s}
         S={S}
         workspaceName={workspaceName}
         range={range}
@@ -1054,8 +1062,10 @@ function DashboardBody({
       </div>
       <p className="db-note db-filterbar-note">{S.periodNote}</p>
       <Provenance source={source} />
-      {result.isPending && <Loading S={S} />}
-      {!result.isPending && result.isFetching && <Updating S={S} />}
+      {(result.isPending || isLiveAwaitingData) && <Loading S={S} />}
+      {!result.isPending && !isLiveAwaitingData && result.isFetching && (
+        <Updating S={S} />
+      )}
       {result.isError && (
         <LoadError
           S={S}
@@ -1063,7 +1073,7 @@ function DashboardBody({
           onRetry={() => void result.refetch()}
         />
       )}
-      {s && (
+      {s && !isLiveAwaitingData && (
         <>
           {s.workspace_total > 0 && (
             <Summary s={s} S={S} topicName={topicName} />

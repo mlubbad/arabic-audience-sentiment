@@ -779,5 +779,28 @@ describe("loadDashboardAggregates null channel handling", () => {
       expect(snapshot.kpis?.total_likes).toBe(100);
       expect(snapshot.kpis?.total_comments).toBe(2);
     });
+
+    it("treats a stale zero-comment aggregates cache response as pending so shimmer stays active", async () => {
+      const { loadDashboardAggregates, DashboardPendingError } =
+        await loadModule();
+      rpc.mockImplementation(async (name) => {
+        if (name === "dashboard_aggregates") {
+          return {
+            data: {
+              ...liveAggregates(0),
+              workspace_total: 0,
+              total: 0,
+              cache: { state: "stale", computed_at: "2026-10-25T00:00:00Z" },
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: null };
+      });
+
+      await expect(
+        loadDashboardAggregates("live", "00000000-0000-4000-8000-000000000001"),
+      ).rejects.toBeInstanceOf(DashboardPendingError);
+    });
   });
 });

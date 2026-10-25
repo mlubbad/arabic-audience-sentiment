@@ -3570,8 +3570,10 @@ declare
   k       text;
   c       private.dashboard_aggregates_cache;
   stale   boolean;
+  fresh_payload jsonb;
 begin
   if not (coalesce(current_setting('request.jwt.claim.role', true), '') = 'service_role'
+          or current_user = 'service_role'
           or private.has_role(w)) then
     raise exception 'forbidden' using errcode = '42501';
   end if;
@@ -3594,7 +3596,49 @@ begin
     return jsonb_build_object('cache', jsonb_build_object('state', 'pending'));
   end if;
 
+  -- If the cached payload was computed when the workspace had 0 comments or 0 analysed
+  -- predictions, and data has since arrived, never serve the stale zero state.
+  if c.payload is not null
+     and (
+       (coalesce((c.payload->>'workspace_total')::int, 0) = 0
+        and exists (select 1 from public.comments cm where cm.workspace_id = w limit 1))
+       or
+       (coalesce((c.payload->>'analysed')::int, 0) = 0
+        and exists (select 1 from public.sentiment_predictions sp where sp.workspace_id = w and sp.status = 'succeeded' limit 1))
+     ) then
+    if exists (select 1 from public.sentiment_predictions sp where sp.workspace_id = w and sp.status = 'succeeded' limit 1)
+       and not exists (select 1 from (select 1 from public.comments cm where cm.workspace_id = w limit 5001) x offset 5000) then
+      fresh_payload := private.dashboard_aggregates_compute(w, filters);
+      update private.dashboard_aggregates_cache
+         set payload = fresh_payload,
+             computed_at = now(),
+             requested_at = now(),
+             last_error = null
+       where workspace_id = w and filter_key = k;
+      return fresh_payload || jsonb_build_object('cache', jsonb_build_object('state', 'fresh', 'computed_at', now()));
+    end if;
+
+    update private.dashboard_aggregates_cache
+       set payload = null,
+           computed_at = null,
+           requested_at = now()
+     where workspace_id = w and filter_key = k;
+    return jsonb_build_object('cache', jsonb_build_object('state', 'pending'));
+  end if;
+
   if c.payload is null then
+    if exists (select 1 from public.sentiment_predictions sp where sp.workspace_id = w and sp.status = 'succeeded' limit 1)
+       and not exists (select 1 from (select 1 from public.comments cm where cm.workspace_id = w limit 5001) x offset 5000) then
+      fresh_payload := private.dashboard_aggregates_compute(w, filters);
+      update private.dashboard_aggregates_cache
+         set payload = fresh_payload,
+             computed_at = now(),
+             requested_at = now(),
+             last_error = null
+       where workspace_id = w and filter_key = k;
+      return fresh_payload || jsonb_build_object('cache', jsonb_build_object('state', 'fresh', 'computed_at', now()));
+    end if;
+
     update private.dashboard_aggregates_cache
        set requested_at = now()
      where workspace_id = w and filter_key = k;
@@ -4689,6 +4733,43 @@ begin
    where id = j and lease_token = t and status = 'running' and lease_expires_at > now();
   if not found then raise exception 'lease_lost' using errcode='P0001'; end if;
 end $function$
+
+CREATE OR REPLACE FUNCTION private.invalidate_dashboard_cache_on_channel_analysis_key()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF NEW.active_analysis_key IS DISTINCT FROM OLD.active_analysis_key THEN
+    UPDATE private.dashboard_aggregates_cache
+       SET payload = NULL,
+           computed_at = NULL,
+           requested_at = now()
+     WHERE workspace_id = NEW.workspace_id;
+  END IF;
+  RETURN NEW;
+END
+$function$
+
+CREATE OR REPLACE FUNCTION private.invalidate_zero_dashboard_cache_on_comment_insert()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  UPDATE private.dashboard_aggregates_cache c
+     SET payload = NULL,
+         computed_at = NULL,
+         requested_at = now()
+    FROM (SELECT DISTINCT workspace_id FROM inserted) ins
+   WHERE c.workspace_id = ins.workspace_id
+     AND c.payload IS NOT NULL
+     AND coalesce((c.payload->>'workspace_total')::int, 0) = 0;
+  RETURN NULL;
+END
+$function$
 
 CREATE OR REPLACE FUNCTION private.mark_all_channel_compare()
  RETURNS void
@@ -12115,6 +12196,8 @@ grant EXECUTE on function private.has_role(uuid,text[]) to "authenticated";
 grant EXECUTE on function private.has_role(uuid,text[]) to "postgres";
 grant EXECUTE on function private.heartbeat(uuid,uuid) to "postgres";
 grant EXECUTE on function private.heartbeat(uuid,uuid) to "service_role";
+grant EXECUTE on function private.invalidate_dashboard_cache_on_channel_analysis_key() to "postgres";
+grant EXECUTE on function private.invalidate_zero_dashboard_cache_on_comment_insert() to "postgres";
 grant EXECUTE on function private.mark_all_channel_compare() to "postgres";
 grant EXECUTE on function private.mark_channel_compare_dirty() to "postgres";
 grant EXECUTE on function private.oauth_attach_channel(text,text,bytea,text,text[]) to "postgres";
