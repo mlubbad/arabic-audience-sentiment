@@ -1,10 +1,11 @@
 # Implementation decisions
 
-2026-10-30 — The worker's Python moves to 3.12.15 in one change: the Dockerfile base (from
-Dependabot #219, digest checked against Docker Hub), both `python-version` lines in `ci.yml` and
-`workers/python/.python-version`. #219 bumped only the Dockerfile and failed
-`scripts/worker-image.test.ts`, which holds the image to CI's version. Patch bumps of the base image
-will keep needing this pairing, so a Dependabot Python PR is never merged on its own.
+2026-10-30 — The worker's Python moves to 3.12.13 in one change: the Dockerfile base (digest from
+Docker Hub), both `python-version` lines in `ci.yml` and `workers/python/.python-version`.
+Dependabot #219 proposed 3.12.15 in the Dockerfile alone and failed `scripts/worker-image.test.ts`,
+which holds the image to CI's version. 3.12.15 itself cannot run in CI yet: uv 0.11.11 (pinned in
+CI and the image) only downloads up to 3.12.13. A later patch therefore waits for a uv bump, and a
+Dependabot Python PR is never merged on its own.
 
 2026-10-25 — Dependabot no longer offers Python minor or major versions for the worker image.
 #155 (3.14) was declined on 2026-10-18 with an "ignore" comment that Dependabot never received, so

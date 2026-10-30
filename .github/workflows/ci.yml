@@ -40,7 +40,7 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: 0.11.11
-          python-version: 3.12.15
+          python-version: 3.12.13
       - run: npm ci
       - run: uv --directory workers/python sync --frozen
       - run: npm run lint
@@ -82,7 +82,7 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: 0.11.11
-          python-version: 3.12.15
+          python-version: 3.12.13
       - run: npm ci
       - run: uv --directory workers/python sync --frozen
       # Includes the dependency-free ownership guard regression tests.
