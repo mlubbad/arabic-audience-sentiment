@@ -7,7 +7,7 @@
 # - It ran SENTIMENT_MODEL=none and synced without the `inference` group, so a
 #   deployed container collected but never classified a comment.
 # - It used python:3.14 while the project requires ==3.12.*, leaving uv to fetch
-#   an interpreter at build time. The base is now the same 3.12.10 CI runs.
+#   an interpreter at build time. The base is now the same 3.12.15 CI runs.
 # - uv 0.5.21 predates the lock file's format; it is now CI's 0.11.11.
 #
 # Built for linux/arm64 (Oracle Cloud Ampere A1) and linux/amd64. On arm64 the
@@ -16,7 +16,7 @@
 # `.github/workflows/worker-image.yml` builds it on an arm64 runner and runs the
 # model inside it on every change to the worker.
 # ------------------------------------------------------------------------------
-FROM python:3.12.10-slim@sha256:fd95fa221297a88e1cf49c55ec1828edd7c5a428187e67b5d1805692d11588db
+FROM python:3.12.15-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 
 WORKDIR /app
 
