@@ -1,5 +1,16 @@
 # Implementation decisions
 
+2026-10-30 — The worker's Python moves to 3.12.13 in one change: the Dockerfile base (digest from
+Docker Hub), both `python-version` lines in `ci.yml` and `workers/python/.python-version`.
+Dependabot #219 proposed 3.12.15 in the Dockerfile alone and failed `scripts/worker-image.test.ts`,
+which holds the image to CI's version. 3.12.15 itself cannot run in CI yet: uv 0.11.11 (pinned in
+CI and the image) only downloads up to 3.12.13. A later patch therefore waits for a uv bump, and a
+Dependabot Python PR is never merged on its own.
+
+2026-10-31 — `pyasn1` moves from 0.6.4 to 0.6.5 in `workers/python/uv.lock` for CVE-2026-119194 to
+-119197, which turned pip-audit red on every PR and would on `main`. Only the `pyasn1` entry changed:
+`uv lock --upgrade-package` also rewrote torch/nvidia markers, which were left as they were.
+
 2026-10-25 — Dependabot no longer offers Python minor or major versions for the worker image.
 #155 (3.14) was declined on 2026-10-18 with an "ignore" comment that Dependabot never received, so
 #204 (3.15) arrived and failed the worker tests and image build. The ignore now lives in
